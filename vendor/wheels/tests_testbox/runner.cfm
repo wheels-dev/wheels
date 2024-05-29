@@ -2,6 +2,11 @@
 <cfscript>
     testBox = new testbox.system.TestBox(directory="wheels.tests_testbox.specs")
 
+    //Sorting the bundles Alphabetically
+    local.sortedArray = testBox.getBundles();
+    arraySort(local.sortedArray, "textNoCase");
+    testBox.setBundles(local.sortedArray)
+
     setTestboxEnvironment()
 
     if(structKeyExists(url, "format")){
