@@ -38,7 +38,7 @@ Sure, that works. But you're already starting to repeat yourself in the code. Wh
 component extends="Controller" {
 
     function secretStuff() {
-        if ( cgi.remote_addr Does !Contain "212.55" ) {
+        if ( !find("212.55", cgi.remote_addr) ) {
             flashInsert(alert="Sorry, we're !open in that area.");
             redirectTo(action="sorry");
         } else if ( !StructKeyExists(session, "userId") ) {
@@ -48,7 +48,7 @@ component extends="Controller" {
     }
 
     function evenMoreSecretStuff() {
-        if ( cgi.remote_addr Does !Contain "212.55" ) {
+        if ( !find("212.55", cgi.remote_addr) ) {
             flashInsert(msg="Sorry, we're !open in that area.");
             redirectTo(action="sorry");
         } else if ( !StructKeyExists(session, "userId") ) {
@@ -76,7 +76,7 @@ component extends="Controller" {
     }
 
     function restrictAccess() {
-        if ( cgi.remote_addr Does !Contain "212.55" ) {
+        if ( !find("212.55", cgi.remote_addr) ) {
             flashInsert(msg="Sorry, we're !open in that area.");
             redirectTo(action="sorry");
         } else if ( !StructKeyExists(session, "userId") ) {
@@ -98,7 +98,7 @@ component extends="Controller" {
     }
 
     private function restrictAccess() {
-        if ( cgi.remote_addr Does !Contain "212.55" ) {
+        if ( !find("212.55", cgi.remote_addr) ) {
             flashInsert(msg="Sorry, we're !open in that area.");
             redirectTo(action="sorry");
         } else if ( !StructKeyExists(session, "userId") ) {
@@ -177,7 +177,7 @@ Now the `byIP` argument will be available in the `authorize` function.
 To help you avoid any clashing of argument names, CFWheels also supports passing in the arguments in a struct as well:
 
 ```javascript
-// The `through` argument would clash here if it wasn't stored within a struct 
+// The `through` argument would clash here if it wasn't stored within a struct
 args.byIP = true;
 args.through = true;
 filters(through="authorize", authorizeArguments=args);
@@ -190,14 +190,14 @@ Because your controller's `config()` function only runs once per application sta
 For example, this code would only evaluate the value for `request.region` on the very first request, and CFWheels will store that particular value in memory for all subsequent requests:
 
 ```javascript
-// This is probably not what you intended  
+// This is probably not what you intended
 filters(through="authorize", byIP=true, region=request.region);
 ```
 
 To avoid this hard-coding of values from request to request, you can instead pass an expression. (The double pound signs are necessary to escape dynamic values within the string. We only want to store a string representation of the expression to be evaluated.)
 
 ```javascript
-// This is probably more along the lines of what you intended 
+// This is probably more along the lines of what you intended
 filters(through="authorize", byIP=true, region="##request.region##");
 ```
 

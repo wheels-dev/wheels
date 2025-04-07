@@ -189,6 +189,7 @@ component output="false" {
     try{
       cfdbinfo(attributeCollection="#arguments#");
     }catch(any e){
+      cfdbinfo(attributeCollection="#arguments#");
       local.type = arguments.type;
 			arguments.type = "dbnames";
       cfdbinfo(attributeCollection="#arguments#");
