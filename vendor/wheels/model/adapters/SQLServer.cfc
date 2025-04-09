@@ -236,7 +236,6 @@ component extends="Base" output=false {
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
-				// query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
 				query = $query(sql = "SELECT TOP 1 #arguments.primaryKey# as lastId FROM #local.tbl#", argumentCollection = arguments.queryAttributes);
 				local.rv[$generatedKey()] = query.lastId;
 				return local.rv;

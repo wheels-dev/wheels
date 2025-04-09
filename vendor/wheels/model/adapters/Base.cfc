@@ -119,7 +119,6 @@ component output=false extends="wheels.Global"{
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
-				// query = $query(sql = "SELECT LAST_INSERT_ID() AS lastId", argumentCollection = arguments.queryAttributes);
 				query = $query(sql = "SELECT #arguments.primaryKey# AS lastId FROM #local.tbl# ORDER BY #arguments.primaryKey# DESC LIMIT 1", argumentCollection = arguments.queryAttributes);
 				local.rv[$generatedKey()] = query.lastId;
 				return local.rv;
