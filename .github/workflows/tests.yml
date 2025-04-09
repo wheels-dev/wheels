@@ -41,8 +41,8 @@ jobs:
           #   dbengine: mysql
           # - cfengine: adobe@2018
           #   dbengine: postgres
-          - cfengine: adobe@2018
-            dbengine: sqlserver_cicd
+          # - cfengine: adobe@2018
+          #   dbengine: sqlserver_cicd
           - cfengine: adobe@2018
             dbengine: h2
           # - cfengine: adobe@2021
