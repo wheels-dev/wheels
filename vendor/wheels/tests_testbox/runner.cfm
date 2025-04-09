@@ -167,8 +167,12 @@
             application.wheels.csrfCookieEncryptionAlgorithm,
             application.wheels.csrfCookieEncryptionEncoding
         )
-        if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2", url.db)){
-            application.wheels.dataSourceName = "wheelstestdb_" & url.db;
+        if (structKeyExists(url, "db") && listFind("mysql,sqlserver,sqlserver_cicd,postgres,h2", url.db)) {
+            if (listFind("sqlserver,sqlserver_cicd", url.db)) {
+                application.wheels.dataSourceName = "wheelstestdb_sqlserver";
+            } else {
+                application.wheels.dataSourceName = "wheelstestdb_" & url.db;
+            }
         } else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
             application.wheels.dataSourceName = "wheelstestdb"; 
         } else {
