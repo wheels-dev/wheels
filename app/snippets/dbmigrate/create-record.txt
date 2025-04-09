@@ -1,64 +1,48 @@
-<!---
-    |-------------------------------------------------------------------------------------------|
+/*
+  |-------------------------------------------------------------------------------------------|
 	| Parameter     | Required | Type    | Default | Description                                |
-    |-------------------------------------------------------------------------------------------|
+  |-------------------------------------------------------------------------------------------|
 	| table         | Yes      | string  |         | Name of table to add record to             |
 	| columnNames   | Yes      | string  |         | Use column name as argument name and value |
-    |-------------------------------------------------------------------------------------------|
+  |-------------------------------------------------------------------------------------------|
 
     EXAMPLE:
       addRecord(table='members',id=1,username='admin',password='#Hash("admin")#');
---->
-<cfcomponent extends="|DBMigrateExtends|" hint="|DBMigrateDescription|">
-  <cffunction name="up">
-  	<cfset hasError = false />
-  	<cftransaction>
-	    <cfscript>
-	    	try{
-	    		addRecord(table='|tableName|',field='');
-	    	}
-	    	catch (any ex){
-	    		hasError = true;
-		      	catchObject = ex;
-	    	}
-		    
-	    </cfscript>
-	    <cfif hasError>
-	    	<cftransaction action="rollback" />
-	    	<cfthrow 
-			    detail = "#catchObject.detail#"
-			    errorCode = "1"
-			    message = "#catchObject.message#"
-			    type = "Any">
-	    <cfelse>
-	    	<cftransaction action="commit" />
-	    </cfif>
-	 </cftransaction>
-  </cffunction>
-  
-  <cffunction name="down">
-  	<cfset hasError = false />
-  	<cftransaction>
-	    <cfscript>
-	    	try{
-	    		removeRecord(table='|tableName|',where='');
-	    	}
-	    	catch (any ex){
-	    		hasError = true;
-		      	catchObject = ex;
-	    	}
-			
-	    </cfscript>
-	     <cfif hasError>
-	    	<cftransaction action="rollback" />
-	    	<cfthrow 
-			    detail = "#catchObject.detail#"
-			    errorCode = "1"
-			    message = "#catchObject.message#"
-			    type = "Any">
-	    <cfelse>
-	    	<cftransaction action="commit" />
-	    </cfif>
-	 </cftransaction>
-  </cffunction>
-</cfcomponent>
+*/
+component extends="|DBMigrateExtends|" hint="|DBMigrateDescription|" {
+
+	function up() {
+		transaction {
+			try {
+				addRecord(table = '|tableName|', field = '');
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+	function down() {
+		transaction {
+			try {
+				removeRecord(table = '|tableName|', where = '');
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+}

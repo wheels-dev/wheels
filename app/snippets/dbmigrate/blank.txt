@@ -1,51 +1,37 @@
-<cfcomponent extends="|DBMigrateExtends|" hint="|DBMigrateDescription|">
-  <cffunction name="up">
-  	<cfset hasError = false />
-  	<cftransaction>
-	    <cfscript>
-	    	try{
-	    		//your code goes here
-	    	}
-	    	catch (any ex){
-	    		hasError = true;
-		      	catchObject = ex;
-	    	}
-	      
-	    </cfscript>
-	    <cfif hasError>
-	    	<cftransaction action="rollback" />
-	    	<cfthrow 
-			    detail = "#catchObject.detail#"
-			    errorCode = "1"
-			    message = "#catchObject.message#"
-			    type = "Any">
-	    <cfelse>
-	    	<cftransaction action="commit" />
-	    </cfif>
- 	 </cftransaction>
-  </cffunction>
-  <cffunction name="down">
-  	<cfset hasError = false />
-  	<cftransaction>
-	    <cfscript>
-	      try{
-	    		//your code goes here
-	    	}
-	    	catch (any ex){
-	    		hasError = true;
-		      	catchObject = ex;
-	    	}
-	    </cfscript>
-		<cfif hasError>
-	    	<cftransaction action="rollback" />
-	    	<cfthrow 
-			    detail = "#catchObject.detail#"
-			    errorCode = "1"
-			    message = "#catchObject.message#"
-			    type = "Any">
-	    <cfelse>
-	    	<cftransaction action="commit" />
-	    </cfif>
- 	 </cftransaction>
-  </cffunction>
-</cfcomponent>
+component extends="|DBMigrateExtends|" hint="|DBMigrateDescription|" {
+
+	function up() {
+		transaction {
+			try {
+				// your code goes here
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+	function down() {
+		transaction {
+			try {
+				// your code goes here
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+}

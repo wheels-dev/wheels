@@ -1,7 +1,7 @@
-<!---
-    |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+/*
+  |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 	| Parameter     | Required | Type    | Default | Description                                                                                                                                           |
-    |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 	| table         | Yes      | string  |         | existing table name                                                                                                                                   |
 	| columnName    | Yes      | string  |         | name for column to change                                                                                                                             |
 	| columnType    | Yes      | string  |         | new type for column                                                                                                                                   |
@@ -12,60 +12,45 @@
 	| precision     | No       | number  |         | precision value for decimal columns, i.e. number of digits the column can hold                                                                        |
 	| scale         | No       | number  |         | scale value for decimal columns, i.e. number of digits that can be placed to the right of the decimal point (must be less than or equal to precision) |
 	| addColumns    | No       | number  | false   | if true, attempts to add columns and database will likely throw an error if column already exists                                                     |
-    |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+  |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
     EXAMPLE:
-      changeColumn(table='members',columnType='string',columnName='status',limit=50);
---->
-<cfcomponent extends="|DBMigrateExtends|" hint="|DBMigrateDescription|">
-  <cffunction name="up">
-  	<cfset hasError = false />
-  	<cftransaction>
-	    <cfscript>
-	    	try{
-	    		changeColumn(table='|tableName|', columnType='', columnName='columnName', default='', null=true);
-	    	}
-	    	catch (any ex){
-	    		hasError = true;
-		      	catchObject = ex;
-	    	}
-		    
-	    </cfscript>
-	   <cfif hasError>
-	    	<cftransaction action="rollback" />
-	    	<cfthrow 
-			    detail = "#catchObject.detail#"
-			    errorCode = "1"
-			    message = "#catchObject.message#"
-			    type = "Any">
-	    <cfelse>
-	    	<cftransaction action="commit" />
-	    </cfif>
- 	 </cftransaction>
-  </cffunction>
-  <cffunction name="down">
-  	<cfset hasError = false />
-  	<cftransaction>
-	    <cfscript>
-	    	try{
-	    		changeColumn(table='|tableName|',columnName='columnName');
-	    	}
-	    	catch (any ex){
-	    		hasError = true;
-		      	catchObject = ex;
-	    	}
-			
-	    </cfscript>
-	 	<cfif hasError>
-	    	<cftransaction action="rollback" />
-	    	<cfthrow 
-			    detail = "#catchObject.detail#"
-			    errorCode = "1"
-			    message = "#catchObject.message#"
-			    type = "Any">
-	    <cfelse>
-	    	<cftransaction action="commit" />
-	    </cfif>
-	 </cftransaction>
-  </cffunction>
-</cfcomponent>
+      changeColumn(table='members', columnType='string', columnName='status', limit=50);
+*/
+component extends="|DBMigrateExtends|" hint="|DBMigrateDescription|" {
+
+	function up() {
+		transaction {
+			try {
+				changeColumn(table = '|tableName|', columnType = '', columnName = 'columnName', default = '', null = true);
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+	function down() {
+		transaction {
+			try {
+				changeColumn(table = '|tableName|', columnName = 'columnName');
+			} catch (any e) {
+				local.exception = e;
+			}
+
+			if (StructKeyExists(local, "exception")) {
+				transaction action="rollback";
+				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+			} else {
+				transaction action="commit";
+			}
+		}
+	}
+
+}
