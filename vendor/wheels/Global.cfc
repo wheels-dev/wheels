@@ -2652,5 +2652,20 @@ component output="false" {
 		return local.rv;
 	}
 
+	/**
+	 * Normalizes a nested key path by converting bracket notation (e.g., `form[user][email]`) to dot notation (e.g., `form.user.email`).
+	 *
+	 * [section: Global Helpers]
+	 * [category: String Functions]
+	 *
+	 * @path The key path to normalize.
+	 */
+	public string function normalizePath(required string path) {
+		local.norm = arguments.path;
+		local.norm = reReplace(local.norm, "\[(.*?)\]", ".\1", "all");
+		local.norm = reReplace(local.norm, "^\.", "", "one");
+		return local.norm;
+	}
+
 	include "/app/global/functions.cfm";
 }

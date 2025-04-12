@@ -111,13 +111,39 @@
 						<p>
 							<strong>#local.scopeName#</strong>
 							<cfset local.hide = "wheels">
+							<cfset local.sanitizedScope = duplicate(local.scope)>
+
 							<cfloop list="#local.skip#" index="local.j">
-								<cfif local.j Contains "." AND ListFirst(local.j, ".") IS local.scopeName>
-									<cfset local.hide = ListAppend(local.hide, ListRest(local.j, "."))>
+								<!--- Normalize the key path --->
+								<cfset local.normalizedPath = normalizePath(local.j)>
+								<cfif local.normalizedPath CONTAINS "." AND ListFirst(local.normalizedPath, ".") EQ local.scopeName>
+									<!--- Get nested path relative to the scope --->
+									<cfset local.relativePath = ListRest(local.normalizedPath, ".")>
+									<cfset local.keyList = ListToArray(local.relativePath, ".")>
+
+									<!--- Walk into the sanitized struct and mask the nested key --->
+									<cfset local.ref = local.sanitizedScope>
+									<cfset local.depth = ArrayLen(local.keyList)>
+									<cfloop from="1" to="#local.depth#" index="local.k">
+										<cfset local.key = local.keyList[local.k]>
+										<cfif local.k EQ local.depth>
+											<cfif StructKeyExists(local.ref, local.key)>
+												<cfset local.ref[local.key] = "[hidden]">
+											</cfif>
+										<cfelse>
+											<cfif StructKeyExists(local.ref, local.key) AND isStruct(local.ref[local.key])>
+												<cfset local.ref = local.ref[local.key]>
+											<cfelse>
+												<cfbreak>
+											</cfif>
+										</cfif>
+									</cfloop>
+								<cfelseif ListFindNoCase(local.skip, local.scopeName)>
+									<cfset local.hide = ListAppend(local.hide, local.j)>
 								</cfif>
 							</cfloop>
 							<pre>
-								<cfdump var="#local.scope#" format="text" showUDFs="false" hide="#local.hide#">
+								<cfdump var="#local.sanitizedScope#" format="text" showUDFs="false" hide="#local.hide#">
 							</pre>
 						</p>
 					</cfif>
