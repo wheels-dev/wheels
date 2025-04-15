@@ -6,7 +6,7 @@ component output="false" extends="wheels.Global"{
 	public struct function init(
 		string migratePath = "/app/migrator/migrations/",
 		string sqlPath = "/app/migrator/sql/",
-		string templatePath = "/wheels/migrator/templates/"
+		string templatePath = "/app/snippets/dbmigrate/"
 	) {
 		this.paths.migrate = ExpandPath(arguments.migratePath);
 		this.paths.sql = ExpandPath(arguments.sqlPath);
@@ -289,7 +289,7 @@ component output="false" extends="wheels.Global"{
 		required string templateName,
 		string migrationPrefix = ""
 	) {
-		local.templateFile = this.paths.templates & "/" & arguments.templateName & ".cfc";
+		local.templateFile = this.paths.templates & "/" & arguments.templateName & ".txt";
 		local.lastDirectory = ListLast(this.paths.migrate, "/");
 		local.customTemplateFile = ReplaceNoCase(this.paths.migrate, "/#local.lastDirectory#/", "/templates/") & arguments.templateName & ".cfc";
 		if (FileExists(local.customTemplateFile)) {
@@ -308,10 +308,10 @@ component output="false" extends="wheels.Global"{
 			if (Len(Trim(application[local.appKey].rootcomponentpath))) {
 				local.extendsPath = application[local.appKey].rootcomponentpath & ".wheels.migrator.Migration";
 			}
-			local.templateContent = Replace(local.templateContent, "[extends]", local.extendsPath);
+			local.templateContent = Replace(local.templateContent, "|DBMigrateExtends|", local.extendsPath);
 			local.templateContent = Replace(
 				local.templateContent,
-				"[description]",
+				"|DBMigrateDescription|",
 				Replace(arguments.migrationName, """", "&quot;", "all")
 			);
 			local.migrationFile = ReReplace(arguments.migrationName, "[^A-z0-9]+", " ", "all");
