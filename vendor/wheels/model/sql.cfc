@@ -630,7 +630,8 @@ component {
 						type = local.params[local.i].type,
 						dataType = local.params[local.i].dataType,
 						scale = local.params[local.i].scale,
-						list = local.params[local.i].list
+						list = local.params[local.i].list,
+						property = local.column
 					};
 					ArrayAppend(local.rv, local.param);
 				}
@@ -695,6 +696,9 @@ component {
 			local.iEnd = ArrayLen(arguments.sql);
 			for (local.i = local.iEnd; local.i > 0; local.i--) {
 				if (IsStruct(arguments.sql[local.i]) && local.pos > 0) {
+					if (structKeyExists(arguments.sql[local.i], 'property') && local.originalValues[local.pos] != 'null'){
+						structDelete(arguments.sql[local.i], 'property');
+					}
 					arguments.sql[local.i].value = local.originalValues[local.pos];
 					if (local.originalValues[local.pos] == "") {
 						arguments.sql[local.i].null = true;

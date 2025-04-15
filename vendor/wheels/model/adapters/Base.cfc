@@ -349,7 +349,7 @@ component output=false extends="wheels.Global"{
 		if (!StructKeyExists(arguments.settings, "value")) {
 			Throw(
 				type = "Wheels.QueryParamValue",
-				message = "The value for `cfqueryparam` cannot be determined",
+				message = "The value for `cfqueryparam` cannot be determined for property `#arguments.settings.property#`.<br>This usually happens due to a syntax error in the WHERE clause (e.g., using unquoted strings or invalid values).",
 				extendedInfo = "This is usually caused by a syntax error in the `WHERE` statement, such as forgetting to quote strings for example."
 			);
 		}
