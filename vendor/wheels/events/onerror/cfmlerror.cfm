@@ -128,7 +128,7 @@
 										<cfset local.key = local.keyList[local.k]>
 										<cfif local.k EQ local.depth>
 											<cfif StructKeyExists(local.ref, local.key)>
-												<cfset local.ref[local.key] = "[hidden]">
+												<cfset StructDelete(local.ref, local.key)>
 											</cfif>
 										<cfelse>
 											<cfif StructKeyExists(local.ref, local.key) AND isStruct(local.ref[local.key])>
