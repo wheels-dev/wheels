@@ -564,6 +564,13 @@ component {
 			try {
 				local.property = ListGetAt(local.properties, local.i);
 				this[local.property] = local.query[local.property][1];
+				if (isNumeric(this[local.property]) && !reFind("^0\d*$", this[local.property])) {
+					if (this[local.property] <= 2147483647) {
+						this[local.property] =  JavaCast("int", this[local.property]);
+					} else if (this[local.property] <= 9223372036854775807) {
+						this[local.property] = JavaCast("long", this[local.property]);
+					}
+				}
 			} catch (any e) {
 				this[local.property] = "";
 			}
