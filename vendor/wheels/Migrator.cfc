@@ -290,14 +290,9 @@ component output="false" extends="wheels.Global"{
 		string migrationPrefix = ""
 	) {
 		local.templateFile = this.paths.templates & "/" & arguments.templateName & ".txt";
-		local.lastDirectory = ListLast(this.paths.migrate, "/");
-		local.customTemplateFile = ReplaceNoCase(this.paths.migrate, "/#local.lastDirectory#/", "/templates/") & arguments.templateName & ".cfc";
-		if (FileExists(local.customTemplateFile)) {
-			local.templateFile = local.customTemplateFile;
-		}
 		local.extendsPath = "wheels.migrator.Migration";
 		if (!FileExists(local.templateFile)) {
-			return "Template #arguments.templateName# could not be found";
+			return "Template #arguments.templateName# could not be found. <br/> To resolve this, generate the necessary template files by running `wheels g snippets` from the root of your application";
 		}
 		if (!DirectoryExists(this.paths.migrate)) {
 			DirectoryCreate(this.paths.migrate);
