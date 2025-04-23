@@ -85,7 +85,7 @@ component output="false" {
 		application.wo = wirebox.getInstance("global");
 		initArgs.path="wheels";
 		initArgs.filename="onapplicationstart";
-		application.wirebox.getInstance(name = "wheels.events.onapplicationstart", initArguments = initArgs).$init();
+		application.wirebox.getInstance(name = "wheels.events.onapplicationstart", initArguments = initArgs).$init(this);
 	}
 
 	public void function onApplicationEnd( struct ApplicationScope ) {

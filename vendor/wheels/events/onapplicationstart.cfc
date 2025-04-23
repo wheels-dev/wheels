@@ -2,20 +2,13 @@ component {
 
 	property name="Mixins" inject="id:Plugins";
 
-	public void function $init() {
+	public void function $init(struct keys = {}) {
 
-		application.appDir     = expandPath("../app/");
-		application.vendorDir  = expandPath("../vendor/");
-		application.wheelsDir  = application.vendorDir & "wheels/";
-		application.wireboxDir = application.vendorDir & "wirebox/";
-		application.testboxDir = application.vendorDir & "testbox/";
+		// Embedding values from `Application.cfc`'s `this` scope into the current component's `this` scope.
+		for (key in keys) {
+			this[key] = keys[key];
+		}
 
-		// Set up the mappings for the application.
-		application.mappings["/app"]     = application.appDir;
-		application.mappings["/vendor"]  = application.vendorDir;
-		application.mappings["/wheels"]  = application.wheelsDir;
-		application.mappings["/wirebox"] = application.wireboxDir;
-		application.mappings["/testbox"] = application.testboxDir;
 		// Abort if called from incorrect file.
 		application.wo.$abortInvalidRequest();
 
