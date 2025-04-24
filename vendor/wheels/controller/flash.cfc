@@ -128,6 +128,22 @@ component {
 	}
 
 	/**
+	 * Dynamically sets flashStorage during request lifecycle.
+	 *
+	 * [section: Controller]
+	 * [category: Flash Functions]
+	 *
+	 * @storage   Accepts "session" or "cookie"
+	 * @setGlobally       If true, updates both app-level and controller-level flashStorage
+	 */
+	public void function setFlashStorage(string storage = "session", boolean setGlobally = false) {
+		if (setGlobally) {
+			application.wheels.flashStorage = arguments.storage;
+		}
+		$setFlashStorage(arguments.storage);
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public struct function $readFlash() {
