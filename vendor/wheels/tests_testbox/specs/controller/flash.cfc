@@ -52,7 +52,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("key does not exist in session", () => {
 				_controller.flashInsert(success = "Congrats!")
-				result = _controller.flash("invalidkey")
+				result = _controller.flash("invalidKey")
 
 				expect(result).toBe("")
 			})
@@ -60,7 +60,7 @@ component extends="testbox.system.BaseSpec" {
 			it("key does not exist in cookie", () => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashInsert(success = "Congrats!")
-				result = _controller.flash("invalidkey")
+				result = _controller.flash("invalidKey")
 
 				expect(result).toBe("")
 			})
@@ -83,7 +83,7 @@ component extends="testbox.system.BaseSpec" {
 			it("with provided key is empty in session", () => {
 				_controller.flashInsert(success = "Congrats!")
 				_controller.flashClear()
-				result = _controller.flash("invalidkey")
+				result = _controller.flash("invalidKey")
 
 				expect(result).toBe("")
 			})
@@ -92,7 +92,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashInsert(success = "Congrats!")
 				_controller.flashClear()
-				result = _controller.flash("invalidkey")
+				result = _controller.flash("invalidKey")
 
 				expect(result).toBe("")
 			})
@@ -134,8 +134,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashclear", () => {
-			
+		describe("Tests that flashClear", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -165,8 +165,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashcount", () => {
-			
+		describe("Tests that flashCount", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -196,8 +196,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashdelete", () => {
-			
+		describe("Tests that flashDelete", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -225,8 +225,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashinsert", () => {
-			
+		describe("Tests that flashInsert", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -267,8 +267,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashisempty", () => {
-			
+		describe("Tests that flashIsEmpty", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -309,8 +309,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashkeep", () => {
-			
+		describe("Tests that flashKeep", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -350,8 +350,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashkeyexists", () => {
-			
+		describe("Tests that flashKeyExists", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -379,8 +379,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashmessages", () => {
-			
+		describe("Tests that flashMessages", () => {
+
 			beforeEach(() => {
 				_controller.$setFlashStorage("cookie")
 				_controller.flashClear()
@@ -478,7 +478,7 @@ component extends="testbox.system.BaseSpec" {
 				actual = _controller.flashMessages()
 
 				expect(actual).toBe('<div class="flash-messages"><p class="success-message">Congrats!</p><p class="success-message">Congrats Again!</p></div>')
-				
+
 				_controller.$setFlashAppend(false)
 			})
 
@@ -613,7 +613,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 		})
 
-		describe("Tests that flashstorage none", () => {
+		describe("Tests that flashStorage none", () => {
 
 			it("is not setting key in flash", () => {
 				_controller.$setFlashStorage("none")
@@ -624,5 +624,69 @@ component extends="testbox.system.BaseSpec" {
 				_controller.flashClear()
 			})
 		})
+
+		describe("Tests the setFlashStorage", () => {
+
+			beforeEach(() => {
+				originalAppStorage = application.wheels.flashStorage;
+			})
+
+			afterEach(() => {
+				application.wheels.flashStorage = originalAppStorage;
+			})
+
+			it("sets flash storage to 'session'", () => {
+				_controller.setFlashStorage("session");
+				expect(_controller.$getFlashStorage()).toBe("session");
+			})
+
+			it("sets flash storage to 'cookie'", () => {
+				_controller.setFlashStorage("cookie");
+				expect(_controller.$getFlashStorage()).toBe("cookie");
+			})
+
+			it("defaults to 'session' when no storage argument is passed", () => {
+				_controller.setFlashStorage();
+				expect(_controller.$getFlashStorage()).toBe("session");
+			})
+
+			it("accepts mixed-case values and normalizes them (e.g. 'COOKIE' to 'cookie')", () => {
+				_controller.setFlashStorage("SESSION");
+				expect(_controller.$getFlashStorage()).toBe("session");
+
+				_controller.setFlashStorage("CoOkIe");
+				expect(_controller.$getFlashStorage()).toBe("cookie");
+			})
+
+			it("does not change flash storage if an invalid type is passed", () => {
+				_controller.setFlashStorage("cookie");
+				_controller.setFlashStorage("invalidType");
+				expect(_controller.$getFlashStorage()).toBe("cookie");
+			});
+
+			it("updates application-level flashStorage when setGlobally is true", () => {
+				_controller.setFlashStorage("cookie", true);
+				expect(application.wheels.flashStorage).toBe("cookie");
+			})
+
+			it("does not update application-level flashStorage when setGlobally is false", () => {
+				application.wheels.flashStorage = "session";
+				_controller.setFlashStorage("cookie", false);
+				expect(application.wheels.flashStorage).toBe("session");
+			})
+
+			it("does not update application-level flashStorage when setGlobally is omitted (defaults to false)", () => {
+				application.wheels.flashStorage = "session";
+				_controller.setFlashStorage("cookie");
+				expect(application.wheels.flashStorage).toBe("session");
+			})
+
+			it("sets both controller-level and app-level flashStorage when setGlobally is true", () => {
+				_controller.setFlashStorage("cookie", true);
+				expect(_controller.$getFlashStorage()).toBe("cookie");
+				expect(application.wheels.flashStorage).toBe("cookie");
+			})
+		})
+
 	}
 }

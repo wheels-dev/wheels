@@ -137,10 +137,12 @@ component {
 	 * @setGlobally       If true, updates both app-level and controller-level flashStorage
 	 */
 	public void function setFlashStorage(string storage = "session", boolean setGlobally = false) {
-		if (setGlobally) {
-			application.wheels.flashStorage = arguments.storage;
+		if (listFindNoCase("session,cookie", arguments.storage)) {
+			if (setGlobally) {
+				application.wheels.flashStorage = arguments.storage;
+			}
+			$setFlashStorage(arguments.storage);
 		}
-		$setFlashStorage(arguments.storage);
 	}
 
 	/**
