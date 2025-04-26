@@ -2,20 +2,13 @@ component {
 
 	property name="Mixins" inject="id:Plugins";
 
-	public void function $init() {
+	public void function $init(struct keys = {}) {
 
-		application.appDir     = expandPath("../app/");
-		application.vendorDir  = expandPath("../vendor/");
-		application.wheelsDir  = application.vendorDir & "wheels/";
-		application.wireboxDir = application.vendorDir & "wirebox/";
-		application.testboxDir = application.vendorDir & "testbox/";
+		// Embedding values from `Application.cfc`'s `this` scope into the current component's `this` scope.
+		for (key in keys) {
+			application[key] = keys[key];
+		}
 
-		// Set up the mappings for the application.
-		application.mappings["/app"]     = application.appDir;
-		application.mappings["/vendor"]  = application.vendorDir;
-		application.mappings["/wheels"]  = application.wheelsDir;
-		application.mappings["/wirebox"] = application.wireboxDir;
-		application.mappings["/testbox"] = application.testboxDir;
 		// Abort if called from incorrect file.
 		application.wo.$abortInvalidRequest();
 
@@ -56,7 +49,7 @@ component {
 		);
 		if (
 			Len(local.upgradeTo)
-			&& !StructKeyExists(this, "disableEngineCheck")
+			&& !StructKeyExists(application, "disableEngineCheck")
 			&& !StructKeyExists(url, "disableEngineCheck")
 		) {
 			local.type = "Wheels.EngineNotSupported";
@@ -154,8 +147,8 @@ component {
 		}
 
 		// Set datasource name to same as the folder the app resides in unless the developer has set it with the global setting already.
-		if (StructKeyExists(this, "dataSource")) {
-			application.$wheels.dataSourceName = this.dataSource;
+		if (StructKeyExists(application, "dataSource")) {
+			application.$wheels.dataSourceName = application.dataSource;
 		} else {
 			application.$wheels.dataSourceName = LCase(
 				ListLast(GetDirectoryFromPath(GetBaseTemplatePath()), Right(GetDirectoryFromPath(GetBaseTemplatePath()), 1))
@@ -332,7 +325,7 @@ component {
 		application.$wheels.resetPropertiesStructKeyCase = true;
 
 		// If session management is enabled in the application we default to storing Flash data in the session scope, if not we use a cookie.
-		if (StructKeyExists(this, "sessionManagement") && this.sessionManagement) {
+		if (StructKeyExists(application, "sessionManagement") && application.sessionManagement) {
 			application.$wheels.sessionManagement = true;
 			application.$wheels.flashStorage = "session";
 		} else {
