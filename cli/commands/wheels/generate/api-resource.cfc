@@ -70,7 +70,7 @@ component extends="../base" {
                 local.authContent = "
     // Authentication check before actions
     function init() {
-        filters(through="authenticateAPI", except="index,show");
+        filters(through='authenticateAPI', except='index,show');
     }
     
     private function authenticateAPI() {
@@ -106,97 +106,114 @@ component extends="../base" {
             }
             
             local.docsPath = "#local.docsDir#/#local.objectNamePlural#.md";
-            local.docsContent = "# #local.objectNamePluralC# API
+            local.docTitle = "#local.objectNamePluralC# API";
+            // Create documentation using arrays and join to avoid markdown/CFML syntax conflicts
+            local.lines = [];
             
-## Endpoints
-
-### GET /#local.objectNamePlural#
-Returns a list of all #local.objectNamePlural#.
-
-#### Response
-```json
-{
-    "#local.objectNamePlural#": [
-        {
-            "id": 1,
-            "createdAt": "2023-01-01T12:00:00Z",
-            "updatedAt": "2023-01-01T12:00:00Z"
-        }
-    ]
-}
-```
-
-### GET /#local.objectNamePlural#/:id
-Returns a specific #local.objectNameSingular# by ID.
-
-#### Response
-```json
-{
-    "#local.objectNameSingular#": {
-        "id": 1,
-        "createdAt": "2023-01-01T12:00:00Z",
-        "updatedAt": "2023-01-01T12:00:00Z"
-    }
-}
-```
-
-### POST /#local.objectNamePlural#
-Creates a new #local.objectNameSingular#.
-
-#### Request
-```json
-{
-    "#local.objectNameSingular#": {
-        "property1": "value1",
-        "property2": "value2"
-    }
-}
-```
-
-#### Response
-```json
-{
-    "#local.objectNameSingular#": {
-        "id": 1,
-        "property1": "value1",
-        "property2": "value2",
-        "createdAt": "2023-01-01T12:00:00Z",
-        "updatedAt": "2023-01-01T12:00:00Z"
-    }
-}
-```
-
-### PUT /#local.objectNamePlural#/:id
-Updates an existing #local.objectNameSingular#.
-
-#### Request
-```json
-{
-    "#local.objectNameSingular#": {
-        "property1": "updatedValue"
-    }
-}
-```
-
-#### Response
-```json
-{
-    "#local.objectNameSingular#": {
-        "id": 1,
-        "property1": "updatedValue",
-        "property2": "value2",
-        "createdAt": "2023-01-01T12:00:00Z",
-        "updatedAt": "2023-01-01T12:00:00Z"
-    }
-}
-```
-
-### DELETE /#local.objectNamePlural#/:id
-Deletes a #local.objectNameSingular#.
-
-#### Response
-Status 204 No Content
-";
+            // Title
+            arrayAppend(local.lines, chr(35) & " " & local.docTitle);
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & " Endpoints");
+            arrayAppend(local.lines, "");
+            
+            // GET all endpoint
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & " GET /" & local.objectNamePlural);
+            arrayAppend(local.lines, "Returns a list of all " & local.objectNamePlural & ".");
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & chr(35) & " Response");
+            arrayAppend(local.lines, "```json");
+            arrayAppend(local.lines, "{");
+            arrayAppend(local.lines, '    "' & local.objectNamePlural & '": [');
+            arrayAppend(local.lines, '        {');
+            arrayAppend(local.lines, '            "id": 1,');
+            arrayAppend(local.lines, '            "createdAt": "2023-01-01T12:00:00Z",');
+            arrayAppend(local.lines, '            "updatedAt": "2023-01-01T12:00:00Z"');
+            arrayAppend(local.lines, '        }');
+            arrayAppend(local.lines, '    ]');
+            arrayAppend(local.lines, '}');
+            arrayAppend(local.lines, "```");
+            arrayAppend(local.lines, "");
+            
+            // GET by ID endpoint
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & " GET /" & local.objectNamePlural & "/:id");
+            arrayAppend(local.lines, "Returns a specific " & local.objectNameSingular & " by ID.");
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & chr(35) & " Response");
+            arrayAppend(local.lines, "```json");
+            arrayAppend(local.lines, "{");
+            arrayAppend(local.lines, '    "' & local.objectNameSingular & '": {');
+            arrayAppend(local.lines, '        "id": 1,');
+            arrayAppend(local.lines, '        "createdAt": "2023-01-01T12:00:00Z",');
+            arrayAppend(local.lines, '        "updatedAt": "2023-01-01T12:00:00Z"');
+            arrayAppend(local.lines, '    }');
+            arrayAppend(local.lines, '}');
+            arrayAppend(local.lines, "```");
+            arrayAppend(local.lines, "");
+            
+            // POST endpoint
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & " POST /" & local.objectNamePlural);
+            arrayAppend(local.lines, "Creates a new " & local.objectNameSingular & ".");
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & chr(35) & " Request");
+            arrayAppend(local.lines, "```json");
+            arrayAppend(local.lines, "{");
+            arrayAppend(local.lines, '    "' & local.objectNameSingular & '": {');
+            arrayAppend(local.lines, '        "property1": "value1",');
+            arrayAppend(local.lines, '        "property2": "value2"');
+            arrayAppend(local.lines, '    }');
+            arrayAppend(local.lines, '}');
+            arrayAppend(local.lines, "```");
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & chr(35) & " Response");
+            arrayAppend(local.lines, "```json");
+            arrayAppend(local.lines, "{");
+            arrayAppend(local.lines, '    "' & local.objectNameSingular & '": {');
+            arrayAppend(local.lines, '        "id": 1,');
+            arrayAppend(local.lines, '        "property1": "value1",');
+            arrayAppend(local.lines, '        "property2": "value2",');
+            arrayAppend(local.lines, '        "createdAt": "2023-01-01T12:00:00Z",');
+            arrayAppend(local.lines, '        "updatedAt": "2023-01-01T12:00:00Z"');
+            arrayAppend(local.lines, '    }');
+            arrayAppend(local.lines, '}');
+            arrayAppend(local.lines, "```");
+            arrayAppend(local.lines, "");
+            
+            // PUT endpoint
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & " PUT /" & local.objectNamePlural & "/:id");
+            arrayAppend(local.lines, "Updates an existing " & local.objectNameSingular & ".");
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & chr(35) & " Request");
+            arrayAppend(local.lines, "```json");
+            arrayAppend(local.lines, "{");
+            arrayAppend(local.lines, '    "' & local.objectNameSingular & '": {');
+            arrayAppend(local.lines, '        "property1": "updatedValue"');
+            arrayAppend(local.lines, '    }');
+            arrayAppend(local.lines, '}');
+            arrayAppend(local.lines, "```");
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & chr(35) & " Response");
+            arrayAppend(local.lines, "```json");
+            arrayAppend(local.lines, "{");
+            arrayAppend(local.lines, '    "' & local.objectNameSingular & '": {');
+            arrayAppend(local.lines, '        "id": 1,');
+            arrayAppend(local.lines, '        "property1": "updatedValue",');
+            arrayAppend(local.lines, '        "property2": "value2",');
+            arrayAppend(local.lines, '        "createdAt": "2023-01-01T12:00:00Z",');
+            arrayAppend(local.lines, '        "updatedAt": "2023-01-01T12:00:00Z"');
+            arrayAppend(local.lines, '    }');
+            arrayAppend(local.lines, '}');
+            arrayAppend(local.lines, "```");
+            arrayAppend(local.lines, "");
+            
+            // DELETE endpoint
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & " DELETE /" & local.objectNamePlural & "/:id");
+            arrayAppend(local.lines, "Deletes a " & local.objectNameSingular & ".");
+            arrayAppend(local.lines, "");
+            arrayAppend(local.lines, chr(35) & chr(35) & chr(35) & chr(35) & " Response");
+            arrayAppend(local.lines, "Status 204 No Content");
+            
+            // Combine all lines with line breaks
+            local.docsContent = arrayToList(local.lines, chr(10));
             
             file action='write' file='#local.docsPath#' mode='777' output='#trim(local.docsContent)#';
             print.greenLine("Created API documentation at #local.docsPath#");

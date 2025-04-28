@@ -74,8 +74,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    ";
+    runs-on: ubuntu-latest";
         
         if (arguments.dockerEnabled) {
             local.ciWorkflowContent &= "
@@ -89,7 +88,7 @@ jobs:
           MYSQL_PASSWORD: cfwheels
         ports:
           - 3306:3306
-        options: --health-cmd=\"mysqladmin ping\" --health-interval=10s --health-timeout=5s --health-retries=3";
+        options: --health-cmd='mysqladmin ping' --health-interval=10s --health-timeout=5s --health-retries=3";
         }
         
         local.ciWorkflowContent &= "
@@ -106,11 +105,11 @@ jobs:
       - name: Set up Wheels
         run: |
           box server start
-          box wheels reload
-      ";
+          box wheels reload";
         
         if (arguments.dockerEnabled) {
             local.ciWorkflowContent &= "
+      
       - name: Run database migrations
         run: box wheels dbmigrate up";
         }
@@ -118,8 +117,7 @@ jobs:
         local.ciWorkflowContent &= "
       
       - name: Run tests
-        run: box wheels test
-";
+        run: box wheels test";
         
         file action='write' file='#local.ciWorkflowPath#' mode='777' output='#local.ciWorkflowContent#';
         print.greenLine("Created GitHub Actions CI workflow");
@@ -157,15 +155,15 @@ jobs:
           file: ./Dockerfile.production
           push: true
           tags: |
-            \${{ secrets.DOCKER_REGISTRY }}/cfwheels:latest
-            \${{ secrets.DOCKER_REGISTRY }}/cfwheels:\${{ github.sha }}
+            ${{ secrets.DOCKER_REGISTRY }}/cfwheels:latest
+            ${{ secrets.DOCKER_REGISTRY }}/cfwheels:${{ github.sha }}
             
       - name: Deploy to production
         uses: appleboy/ssh-action@master
         with:
-          host: \${{ secrets.SSH_HOST }}
-          username: \${{ secrets.SSH_USERNAME }}
-          key: \${{ secrets.SSH_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
           script: |
             cd /path/to/deployment
             docker-compose pull
@@ -176,9 +174,9 @@ jobs:
       - name: Deploy to production
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          server: \${{ secrets.FTP_SERVER }}
-          username: \${{ secrets.FTP_USERNAME }}
-          password: \${{ secrets.FTP_PASSWORD }}
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./
           server-dir: /path/to/deployment/";
             }
@@ -278,11 +276,11 @@ deploy:
   before_script:
     - apk add --no-cache openssh-client
     - eval $(ssh-agent -s)
-    - echo \"$SSH_PRIVATE_KEY\" | tr -d '\\r' | ssh-add -
+    - echo '$SSH_PRIVATE_KEY' | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
   script:
-    - ssh -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST \"cd /path/to/deployment && docker-compose pull && docker-compose up -d\"
+    - ssh -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST 'cd /path/to/deployment && docker-compose pull && docker-compose up -d'
   environment:
     name: production
     url: https://example.com
@@ -373,13 +371,13 @@ deploy:
                 sh 'docker push ${DOCKER_REGISTRY}/cfwheels-app:latest'
                 
                 sshagent(['production-server']) {
-                    sh 'ssh user@production-server \"cd /path/to/deployment && docker-compose pull && docker-compose up -d\"'
+                    sh 'ssh user@production-server ''cd /path/to/deployment && docker-compose pull && docker-compose up -d'''
                 }";
             } else {
                 local.jenkinsfileContent &= "
                 sshagent(['production-server']) {
                     sh 'rsync -avz --delete ./ user@production-server:/path/to/deployment/'
-                    sh 'ssh user@production-server \"cd /path/to/deployment && box server restart\"'
+                    sh 'ssh user@production-server ''cd /path/to/deployment && box server restart'''
                 }";
             }
             

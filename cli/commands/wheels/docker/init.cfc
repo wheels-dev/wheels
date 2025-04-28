@@ -29,12 +29,12 @@ component extends="../base" {
         // Validate inputs
         local.validDatabases = ["h2", "mysql", "postgres", "mssql"];
         if (!arrayContains(local.validDatabases, lCase(arguments.db))) {
-            error("Invalid database: #arguments.db#. Please choose from: #arrayToList(local.validDatabases)#");
+            error("Invalid database: ##arguments.db##. Please choose from: ##arrayToList(local.validDatabases)##");
         }
         
         local.validEngines = ["lucee", "adobe"];
         if (!arrayContains(local.validEngines, lCase(arguments.cfengine))) {
-            error("Invalid ColdFusion engine: #arguments.cfengine#. Please choose from: #arrayToList(local.validEngines)#");
+            error("Invalid ColdFusion engine: ##arguments.cfengine##. Please choose from: ##arrayToList(local.validEngines)##");
         }
         
         // Set default DB versions if not specified
@@ -104,14 +104,14 @@ services:
       - #arguments.db#
     environment:
       - WHEELS_ENVIRONMENT=development
-      # Database connection settings
-      - WHEELS_DATASOURCE_NAME=#arguments.db#
-      - WHEELS_DATASOURCE_HOST=#arguments.db#
+      ## Database connection settings
+      - WHEELS_DATASOURCE_NAME=##arguments.db##
+      - WHEELS_DATASOURCE_HOST=##arguments.db##
 #local.dbService.cfEnvironment#
 
 #local.dbService.service#
       
-  # Add additional services as needed (redis, etc.)
+  ## Add additional services as needed (redis, etc.)
 
 volumes:
   #arguments.db#_data:
@@ -136,14 +136,14 @@ volumes:
         if (lCase(arguments.cfengine) == "lucee") {
             local.dockerfileContent = "FROM lucee/lucee:#arguments.cfVersion#
 
-# Install CommandBox
+## Install CommandBox
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     curl \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install CommandBox
+## Install CommandBox
 RUN curl -fsSl https://downloads.ortussolutions.com/debs/gpg | gpg --dearmor > /etc/apt/trusted.gpg.d/ortussolutions.gpg && \
     echo 'deb [trusted=yes] https://downloads.ortussolutions.com/debs/noarch /' > /etc/apt/sources.list.d/commandbox.list && \
     apt-get update && \
@@ -153,40 +153,40 @@ RUN curl -fsSl https://downloads.ortussolutions.com/debs/gpg | gpg --dearmor > /
 
 WORKDIR /app
 
-# Copy the application
+## Copy the application
 COPY . .
 
-# Make sure directory permissions are set correctly
+## Make sure directory permissions are set correctly
 RUN chmod -R 755 /app
 
-# Expose port
+## Expose port
 EXPOSE 8080
 
-# Health check
+## Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:8080/ || exit 1
 
-# Start Lucee
-CMD ["catalina.sh", "run"]";
+## Start Lucee
+CMD ['catalina.sh', 'run']";
         } else {
             // Adobe ColdFusion Dockerfile
             local.dockerfileContent = "FROM adobecoldfusion/#arguments.cfVersion#:latest
 
 WORKDIR /app
 
-# Copy the application
+## Copy the application
 COPY . .
 
-# Make sure directory permissions are set correctly
+## Make sure directory permissions are set correctly
 RUN chmod -R 755 /app
 
-# Expose port
+## Expose port
 EXPOSE 8080
 
-# Health check
+## Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:8080/ || exit 1
 
-# Start Adobe ColdFusion
-CMD ["/opt/coldfusion/bin/coldfusion", "start"]";
+## Start Adobe ColdFusion
+CMD ['/opt/coldfusion/bin/coldfusion', 'start']";
         }
         
         file action='write' file='#local.dockerfilePath#' mode='777' output='#local.dockerfileContent#';
@@ -311,39 +311,39 @@ GO
     private void function createDockerIgnore() {
         local.dockerIgnorePath = fileSystemUtil.resolvePath(".dockerignore");
         
-        local.dockerIgnoreContent = "# .dockerignore for Wheels application
+        local.dockerIgnoreContent = "## .dockerignore for Wheels application
 
-# Version control
+## Version control
 .git
 .gitignore
 .svn
 
-# Docker related
+## Docker related
 Dockerfile
 docker-compose.yml
 docker/
 
-# Temporary files
+## Temporary files
 tmp/
 temp/
 
-# Logs
+## Logs
 logs/
 *.log
 
-# Dependencies
+## Dependencies
 node_modules/
 
-# Build artifacts
+## Build artifacts
 build/
 dist/
 
-# Editor specific files
+## Editor specific files
 .vscode/
 .idea/
 *.sublime-*
 
-# OS specific files
+## OS specific files
 .DS_Store
 Thumbs.db
 ";

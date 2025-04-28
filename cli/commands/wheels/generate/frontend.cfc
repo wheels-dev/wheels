@@ -184,7 +184,7 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: ##1a1a1a;
   color: white;
   cursor: pointer;
   transition: border-color 0.25s;
@@ -222,7 +222,7 @@ export default defineConfig({
 import App from "./App.vue";
 import "./style.css";
 
-createApp(App).mount("#app");';
+createApp(App).mount("##app");';
         file action='write' file='#arguments.path#/src/main.js' mode='777' output='#local.mainContent#';
         
         // Create App.vue
@@ -278,7 +278,7 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: ##1a1a1a;
   color: white;
   cursor: pointer;
   transition: border-color 0.25s;
@@ -370,7 +370,7 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: ##1a1a1a;
   color: white;
   cursor: pointer;
   transition: border-color 0.25s;
@@ -396,9 +396,10 @@ export default defineConfig({
      * Setup asset pipeline integration
      */
     private void function setupAssetPipeline(required string framework, required string path) {
-        // Create integration helper for the view
+        // Create helper for frontend assets
         local.assetsHelperPath = fileSystemUtil.resolvePath("app/helpers/frontend_assets.cfm");
         
+        // Using CFML string literals to simplify quotes management
         local.assetsHelperContent = '<cfscript>
 /**
  * Includes frontend assets in the view
@@ -413,44 +414,31 @@ function frontendAssets() {
         local.manifest = deserializeJSON(fileRead(local.manifestPath));
         
         // Get the main entry point
-        if (structKeyExists(local.manifest, "src/main.';
+        local.mainKey = "src/main.";
         
         // Add framework-specific file extension
-        switch (lCase(arguments.framework)) {
+        switch (lCase("' & framework & '")) {
             case "react":
-                local.assetsHelperContent &= 'jsx';
+                local.mainKey = local.mainKey & "jsx";
                 break;
             case "vue":
             case "alpine":
-                local.assetsHelperContent &= 'js';
+                local.mainKey = local.mainKey & "js";
                 break;
         }
         
-        local.assetsHelperContent &= '")) {
-            local.entry = local.manifest["src/main.';
-        
-        // Add framework-specific file extension again
-        switch (lCase(arguments.framework)) {
-            case "react":
-                local.assetsHelperContent &= 'jsx';
-                break;
-            case "vue":
-            case "alpine":
-                local.assetsHelperContent &= 'js';
-                break;
-        }
-        
-        local.assetsHelperContent &= '"];
+        if (structKeyExists(local.manifest, local.mainKey)) {
+            local.entry = local.manifest[local.mainKey];
             
             // Script tag for the main JS file
             if (structKeyExists(local.entry, "file")) {
-                local.scriptTag = \'<script type="module" src="/assets/frontend/\' & local.entry.file & \'"></script>\';
+                local.scriptTag = "<script type=""module"" src=""/assets/frontend/" & local.entry.file & """></script>";
             }
             
             // CSS files
             if (structKeyExists(local.entry, "css") && isArray(local.entry.css)) {
                 for (local.cssFile in local.entry.css) {
-                    local.styleTag &= \'<link rel="stylesheet" href="/assets/frontend/\' & local.cssFile & \'">\';
+                    local.styleTag = local.styleTag & "<link rel=""stylesheet"" href=""/assets/frontend/" & local.cssFile & """>";
                 }
             }
         }
