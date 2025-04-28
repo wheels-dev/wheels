@@ -176,13 +176,46 @@ You can override this setting in the same way that you override other Wheels\
 settings by running the [set()](https://api.cfwheels.org/controller.set.html) function like this:
 
 ```javascript
-//In `app/config/settings.cfm` or another `settings.cfm` file within the `app/config` subfolders
+// In `app/config/settings.cfm` or another `settings.cfm` file within the `app/config` subfolders
 set(flashStorage="session");
 ```
 
 Note: Before you set Wheels to use the `session` scope, you need to make sure\
 that session management is enabled. To enable it, all you need to do is add\
 `this.SessionManagement = true` to the `app/config/app.cfm` file.
+
+#### Changing Flash Storage Dynamically During a Request
+
+From Wheels 3.0, you now have the ability to dynamically change the flash storage\
+during the lifecycle of a controller or request or the complete application using\
+the `setFlashStorage()` function.
+
+This can be helpful if you need to switch between using session-based or\
+cookie-based flash storage at runtime depending on the context of the request.
+
+```javascript
+// Inside your controller action
+setFlashStorage("cookie");
+```
+
+By default, it changes the storage for the current controller only. However,\
+if you want to change it globally for all subsequent requests (until changed\
+again), you can pass a second argument `setGlobally=true`:
+
+```javascript
+// Change globally for the entire application
+setFlashStorage("session", true);
+```
+
+The storage argument accepts only `session` or `cookie`. If any other value is\
+passed, Wheels will simply ignore the change (no error will be thrown).
+Always make sure to pass a valid storage type to avoid unexpected behavior.
+
+Note: Be careful when changing flash storage dynamically during requests,\
+as it will change the entire application's flash scope depending on the settings\
+and this may result in logical errors depending on your flash settings,\
+especially if your application relies heavily on a consistent flash\
+storage mechanism across multiple requests or clusters.
 
 ### Choosing a Storage Method
 
