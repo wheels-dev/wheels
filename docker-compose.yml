@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  cfwheels:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./:/app
+    depends_on:
+      - mysql
+    environment:
+      - WHEELS_ENVIRONMENT=development
+      # Database connection settings
+      - WHEELS_DATASOURCE_NAME=#arguments.db#
+      - WHEELS_DATASOURCE_HOST=#arguments.db#
+      - WHEELS_DATASOURCE_USERNAME=wheels
+      - WHEELS_DATASOURCE_PASSWORD=wheels
+      - WHEELS_DATASOURCE_DATABASE=wheels
+      - WHEELS_DATASOURCE_PORT=3306
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=wheels
+      - MYSQL_USER=wheels
+      - MYSQL_PASSWORD=wheels
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/db:/docker-entrypoint-initdb.d
+    ports:
+      - '3306:3306'
+
+  # Add additional services as needed (redis, etc.)
+
+volumes:
+  mysql_data:
+    driver: local

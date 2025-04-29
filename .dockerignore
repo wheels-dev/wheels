@@ -1,0 +1,36 @@
+# .dockerignore for Wheels application
+
+# Version control
+.git
+.gitignore
+.svn
+
+# Docker related
+Dockerfile
+docker-compose.yml
+docker/
+
+# Temporary files
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+
+# Dependencies
+node_modules/
+
+# Build artifacts
+build/
+dist/
+
+# Editor specific files
+.vscode/
+.idea/
+*.sublime-*
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
