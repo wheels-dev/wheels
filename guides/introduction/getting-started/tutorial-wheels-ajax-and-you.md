@@ -1,13 +1,13 @@
 ---
 description: >-
-  Using CFWheels to develop web applications with AJAX features is a breeze. You
+  Using Wheels to develop web applications with AJAX features is a breeze. You
   have several options and tools at your disposal, which we'll cover in this
   chapter.
 ---
 
-# Tutorial: CFWheels, AJAX, and You
+# Tutorial: Wheels, AJAX, and You
 
-CFWheels was designed to be as lightweight as possible, so this keeps your options fairly open for developing AJAX features into your application.
+Wheels was designed to be as lightweight as possible, so this keeps your options fairly open for developing AJAX features into your application.
 
 While there are several flavors of JavaScript libraries out there with AJAX support, we will be using the [jQuery framework](http://jquery.com) in this tutorial. Let's assume that you are fairly familiar with the basics of jQuery and know how to set it up.
 
@@ -15,7 +15,7 @@ For this tutorial, let's create the simplest example of all: a link that will re
 
 ### A Simple Example
 
-In this example, we'll wire up some simple JavaScript code that calls a CFWheels action asynchronously. All of this will be done with basic jQuery code and built-in CFWheels functionality.
+In this example, we'll wire up some simple JavaScript code that calls a Wheels action asynchronously. All of this will be done with basic jQuery code and built-in Wheels functionality.
 
 First, let's make sure we've got an appropriate route setup. It might be you're still using the default `wildcard()` route which will create some default `GET` routes for the `controller/action` pattern, but we'll add a new route here just for practice. We are going to create a route named `sayHello` and direct it to the `hello` action of the `say` controller. There are two ways you could write this code a long hand method specifying the controller and action separately as well as a short hand method that combines the two into a single parameter.
 
@@ -57,7 +57,7 @@ Then, let's create a link to a controller's action in a view file, like so:
 
 That piece of code by itself will work just like you expect it to. When you click the link, you will load the `hello` action inside the `say` controller.
 
-But let's make it into an asynchronous request. Add this JavaScript (either on the page inside `script` tags or in a separate `.js` file included via [javaScriptIncludeTag()](https://api.cfwheels.org/controller.javaScriptIncludeTag.html) ):
+But let's make it into an asynchronous request. Add this JavaScript (either on the page inside `script` tags or in a separate `.js` file included via [javaScriptIncludeTag()](https://api.wheels.dev/controller.javaScriptIncludeTag.html) ):
 
 {% code title="JavaScript" %}
 ```javascript
@@ -85,7 +85,7 @@ With that code, we are listening to the `click` event of the hyperlink, which wi
 
 Note that the `success` block inserts keys from the response into the empty `h1` and `p` blocks in the calling view. (You may have been wondering about those when you saw the first example. Mystery solved.)
 
-The last thing that we need to do is implement the `say/hello` action. Note that the request expects a `dataType` of `JSON`. By default, CFWheels controllers only generate HTML responses, but there is an easy way to generate JSON instead using CFWheels's [provides()](https://api.cfwheels.org/controller.provides.html) and [renderWith()](https://api.cfwheels.org/controller.renderWith.html) functions:
+The last thing that we need to do is implement the `say/hello` action. Note that the request expects a `dataType` of `JSON`. By default, Wheels controllers only generate HTML responses, but there is an easy way to generate JSON instead using Wheels's [provides()](https://api.wheels.dev/controller.provides.html) and [renderWith()](https://api.wheels.dev/controller.renderWith.html) functions:
 
 {% code title="app/controllers/Say.cfc" %}
 ```javascript
@@ -107,14 +107,14 @@ component extends="Controller" {
 ```
 {% endcode %}
 
-In this controller's `config()` method, we use the [provides()](https://api.cfwheels.org/controller.provides.html) function to indicate that we want all actions in the controller to be able to respond with the data in HTML or JSON formats. Note that the client calling the action can request the type by passing a URL parameter named format or by sending the `format` in the request header.
+In this controller's `config()` method, we use the [provides()](https://api.wheels.dev/controller.provides.html) function to indicate that we want all actions in the controller to be able to respond with the data in HTML or JSON formats. Note that the client calling the action can request the type by passing a URL parameter named format or by sending the `format` in the request header.
 
-The call to [renderWith()](https://api.cfwheels.org/controller.renderWith.html) in the `hello` action takes care of the translation to the requested format. Our JavaScript is requesting JSON, so Wheels will format the `greeting` struct as JSON automatically and send it back to the client. If the client requested HTML or the default of none, Wheels will process and serve the view template at `app/views/say/hello.cfm`. For more information about  [provides()](https://api.cfwheels.org/controller.provides.html) and  [renderWith()](https://api.cfwheels.org/controller.renderWith.html), reference the chapter on [Responding with Multiple Formats](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/responding-with-multiple-formats).
+The call to [renderWith()](https://api.wheels.dev/controller.renderWith.html) in the `hello` action takes care of the translation to the requested format. Our JavaScript is requesting JSON, so Wheels will format the `greeting` struct as JSON automatically and send it back to the client. If the client requested HTML or the default of none, Wheels will process and serve the view template at `app/views/say/hello.cfm`. For more information about  [provides()](https://api.wheels.dev/controller.provides.html) and  [renderWith()](https://api.wheels.dev/controller.renderWith.html), reference the chapter on [Responding with Multiple Formats](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/responding-with-multiple-formats).
 
 Lastly, notice the lines where we're setting `greeting["message"]` and `greeting["time"]`. Due to the case-insensitive nature of ColdFusion, we recommend setting variables to be consumed by JavaScript using bracket notation like that. If you do not use that notation (i.e., `greetings.message` and `greetings.time` instead), your JavaScript will need to reference those keys from the JSON as `MESSAGE` and `TIME` (all caps). Unless you like turning caps lock on and off, you can see how that would get annoying after some time.
 
 Assuming you already included jQuery in your application and you followed the code examples above, you now have a simple AJAX-powered web application built on Wheels. After clicking that `Alert me!` link, your say controller will respond back to you the serialized message via AJAX. jQuery will parse the JSON object and populate the `h1` and `p`with the appropriate data.
 
-### AJAX in CFWheels Explained
+### AJAX in Wheels Explained
 
 That is it! Hopefully now you have a clearer picture on how to create AJAX-based features for your web applications.

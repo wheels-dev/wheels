@@ -52,7 +52,7 @@ set(transactionMode=false);
 ```
 {% endcode %}
 
-See the chapter about [Configuration and Defaults](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/working-with-cfwheels/configuration-and-defaults) for more details.
+See the chapter about [Configuration and Defaults](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults) for more details.
 
 ### Using Rollbacks
 
@@ -72,7 +72,7 @@ set(transactionMode="rollback");
 
 ### Nesting Transactions with invokeWithTransaction
 
-One issue with ColdFusion is that you cannot nest `<cftransaction>` tags. In this case, Wheels provides a workaround. If you wish to run a method within a transaction, use [invokeWithTransaction()](https://api.cfwheels.org/model.invokeWithTransaction.html), as below.
+One issue with ColdFusion is that you cannot nest `<cftransaction>` tags. In this case, Wheels provides a workaround. If you wish to run a method within a transaction, use [invokeWithTransaction()](https://api.wheels.dev/model.invokeWithTransaction.html), as below.
 
 ```javascript
 invokeWithTransaction(

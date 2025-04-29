@@ -24,7 +24,7 @@ Any functions in that file will now only be included for the view pages of that 
 
 ### When _not_ to Use Helper Functions
 
-Helper functions, together with the use of [Partials](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/partials), gives you a way to keep your code nice and DRY, but there are a few things to keep in mind as you work with them.
+Helper functions, together with the use of [Partials](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/partials), gives you a way to keep your code nice and DRY, but there are a few things to keep in mind as you work with them.
 
 The `helpers.cfm` files are only meant to be used for views, hence the placement in the _**app/views**_ folder.
 

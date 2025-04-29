@@ -1,6 +1,6 @@
 ---
 description: >-
-  With CFWheels, writing automated tests for your application is part of the
+  With Wheels, writing automated tests for your application is part of the
   development lifecycle itself, and running the tests is as simple as clicking a
   link.
 ---
@@ -13,7 +13,7 @@ At some point, your code is going to break. Upgrades, feature enhancements, and 
 
 The problem is that today's fix could be tomorrow's bug. What if there were an automated way of checking if that change you're making is going to break something? That's where writing tests for your application can be invaluable.
 
-For testing your application in CFWheels, we have added a third party tool [TestBox](https://github.com/Ortus-Solutions/TestBox) in the framework which doesn't come preinstalled but you can install it by running `box install` in the Commandbox from inside your application.
+For testing your application in Wheels, we have added a third party tool [TestBox](https://github.com/Ortus-Solutions/TestBox) in the framework which doesn't come preinstalled but you can install it by running `box install` in the Commandbox from inside your application.
 
 ### The Test Framework
 
@@ -21,7 +21,7 @@ Testbox is a simple yet powerful tool for testing your application. It contains 
 
 ### Conventions
 
-In order to run tests against your application, all tests must reside in the `tests/Testbox` directory off the root of your CFWheels application, or within a subdirectory thereof.
+In order to run tests against your application, all tests must reside in the `tests/Testbox` directory off the root of your Wheels application, or within a subdirectory thereof.
 
 When you run the tests for your application, Testbox recursively scans your application's `tests/Testbox/specs` directory for valid tests. Whilst you have freedom to organize your subdirectories, tests and supporting files any way you see fit, we would recommend using the directory structure below as a guide:
 
@@ -336,9 +336,9 @@ component extends="Controller" {
 }
 ```
 
-Notice the `return` in the `create` action in the `redirectTo()` method? The reason for this is quite simple, under the covers, when you call `redirectTo()`, CFWheels is using `cflocation`. As we all know, there is no way to intercept or stop a `cflocation` from happening. This can cause quite a number of problems when testing out a controller because you would never be able to get back any information about the redirection.&#x20;
+Notice the `return` in the `create` action in the `redirectTo()` method? The reason for this is quite simple, under the covers, when you call `redirectTo()`, Wheels is using `cflocation`. As we all know, there is no way to intercept or stop a `cflocation` from happening. This can cause quite a number of problems when testing out a controller because you would never be able to get back any information about the redirection.&#x20;
 
-To work around this, the CFWheels test framework will "delay" the execution of a redirect until after the controller has finished processing. This allows CFWheels to gather and present some information to you about what redirection will occur.&#x20;
+To work around this, the Wheels test framework will "delay" the execution of a redirect until after the controller has finished processing. This allows Wheels to gather and present some information to you about what redirection will occur.&#x20;
 
 The drawback to this technique is that the controller will continue processing and as such we need to explicitly exit out of the controller action on our own, thus the reason why we use `return`.
 
@@ -592,7 +592,7 @@ it("heading with class returns expected markup", () => {
 
 Testing plugins requires slightly different approaches depending on the `mixin` attribute defined in the plugin's main component.
 
-Below is a simple plugin called `timeAgo` that extends CFWheels' `timeAgoInWords` view helper by appending "ago" to the function's return value. Take note of the `mixin="controller"` argument as this will play a part in how we test the plugin.
+Below is a simple plugin called `timeAgo` that extends Wheels' `timeAgoInWords` view helper by appending "ago" to the function's return value. Take note of the `mixin="controller"` argument as this will play a part in how we test the plugin.
 
 ```java
 component mixin="controller" {
@@ -640,7 +640,7 @@ component extends="wheels.Controller" {
 }
 ```
 
-Firstly, in our `/app/plugins/timeago/tests/TestTimeAgo.cfc` we'll need to copy the application scope so that we can change some of CFWheels' internal paths. Fear not, we'll reinstate any changes after the tests have finished executing using the `AfterEach()` function. so that if you're running your tests on your local development machine, your application will continue to function as expected after you're done testing.
+Firstly, in our `/app/plugins/timeago/tests/TestTimeAgo.cfc` we'll need to copy the application scope so that we can change some of Wheels' internal paths. Fear not, we'll reinstate any changes after the tests have finished executing using the `AfterEach()` function. so that if you're running your tests on your local development machine, your application will continue to function as expected after you're done testing.
 
 Once the setup is done, we simply execute the plugin functions and check using `expect()` function that the return values are what we expect.&#x20;
 
@@ -694,7 +694,7 @@ If your plugin is uses `mixin="model"`, you will need to create and instantiate 
 
 Testing plugins requires slightly different approaches depending on the `mixin` attribute defined in the plugin's main component.
 
-Below is a simple plugin called `timeAgo` that extends CFWheels' `timeAgoInWords` view helper by appending "ago" to the function's return value. Take note of the `mixin="controller"` argument as this will play a part in how we test the plugin.
+Below is a simple plugin called `timeAgo` that extends Wheels' `timeAgoInWords` view helper by appending "ago" to the function's return value. Take note of the `mixin="controller"` argument as this will play a part in how we test the plugin.
 
 ```java
 component mixin="controller" {
@@ -741,7 +741,7 @@ component extends="wheels.Controller" {
 }
 ```
 
-Firstly, in our `/plugins/timeago/tests/TestTimeAgo.cfc` we'll need to copy the application scope so that we can change some of CFWheels' internal paths. Fear not, we'll reinstate any changes after the tests have finished executing using the `teardown` function. so that if you're running your tests on your local development machine, your application will continue to function as expected after you're done testing.
+Firstly, in our `/plugins/timeago/tests/TestTimeAgo.cfc` we'll need to copy the application scope so that we can change some of Wheels' internal paths. Fear not, we'll reinstate any changes after the tests have finished executing using the `teardown` function. so that if you're running your tests on your local development machine, your application will continue to function as expected after you're done testing.
 
 Once the setup is done, we simply execute the plugin functions and assert that the return values are what we expect.&#x20;
 
@@ -802,7 +802,7 @@ These URLs are useful should you want an external system to run your tests.
 
 **Test Results Format**
 
-CFWheels can return your test results in either HTML, JSON, TXT or JUnit formats, simply by using the `format` url parameter. Eg: `format=junit`
+Wheels can return your test results in either HTML, JSON, TXT or JUnit formats, simply by using the `format` url parameter. Eg: `format=junit`
 
 ### Additional Techniques
 
@@ -838,10 +838,10 @@ component extends="tests.Testbox.Test" {
 }
 ```
 
-* Overloading application vars.. CFWheels will revert the application scope after all tests have completed.
+* Overloading application vars.. Wheels will revert the application scope after all tests have completed.
 
 Caveat: The test suite request must complete without uncaught exceptions. If an uncaught exception occurs, the application scope may stay 'dirty', so it's recommended to reload the application by adding `reload=true` param to your url whilst developing your test packages.
 
-### Learn By Example: CFWheels Core
+### Learn By Example: Wheels Core
 
-The CFWheels core uses this test framework for its unit test suite and contains a wealth of useful examples. They can all be found in the [`tests_testbox` folder](https://github.com/cfwheels/cfwheels/tree/develop/vendor/wheels/tests_testbox) of the CFWheels git repo.
+The Wheels core uses this test framework for its unit test suite and contains a wealth of useful examples. They can all be found in the [`tests_testbox` folder](https://github.com/cfwheels/cfwheels/tree/develop/vendor/wheels/tests_testbox) of the Wheels git repo.

@@ -115,7 +115,7 @@ This file is used by Apache, and you specifically need it for URL rewriting to w
 
 #### public/urlrewrite.xml
 
-If you use Tomcat and Tuckey, or CommandBox [URL Rewriting](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting), you'll need this file. Otherwise, you can safely delete it.
+If you use Tomcat and Tuckey, or CommandBox [URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting), you'll need this file. Otherwise, you can safely delete it.
 
 #### web.config
 

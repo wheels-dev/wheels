@@ -4,11 +4,11 @@ description: Environments that match your development stages.
 
 # Switching Environments
 
-CFWheels allows you to set up different _environments_ that match stages in your development cycle. That way you can configure different values that match what services to call and how your app behaves based on where you are in your development.
+Wheels allows you to set up different _environments_ that match stages in your development cycle. That way you can configure different values that match what services to call and how your app behaves based on where you are in your development.
 
-The **Development** environment is the most convenient one to use as you start building your application because it does not cache any data. Therefore, if you make any changes to your controllers and actions, for example, it will immediately be picked up by CFWheels.
+The **Development** environment is the most convenient one to use as you start building your application because it does not cache any data. Therefore, if you make any changes to your controllers and actions, for example, it will immediately be picked up by Wheels.
 
-Other environment modes cache this information in order to speed up your application as much as possible. Making changes to the database in these most modes will cause CFWheels to throw an error. (Although that can be avoided with a `reload` call. More on that later.)
+Other environment modes cache this information in order to speed up your application as much as possible. Making changes to the database in these most modes will cause Wheels to throw an error. (Although that can be avoided with a `reload` call. More on that later.)
 
 The fastest environment mode in terms of page load time is the **Production** mode. This is what you should set your application to run in before you launch your website.
 
@@ -20,7 +20,7 @@ Besides the 2 environments mentioned above, there are 2 more. Let's go through t
 
 **Development**
 
-* Shows friendly CFWheels specific errors as well as regular ColdFusion errors on screen.
+* Shows friendly Wheels specific errors as well as regular ColdFusion errors on screen.
 * Does not email you when an error is encountered.
 * Caches controller and model initialization (the `config()` methods).
 * Caches the database schema.
@@ -59,7 +59,7 @@ http://www.mysite.com/?reload=true
 ```
 {% endcode %}
 
-This tells CFWheels to reload the entire framework (it will also run your code in the `app/events/onapplicationstart.cfm`file), thus picking up any changes made in the `app/config/environment.cfm` file.
+This tells Wheels to reload the entire framework (it will also run your code in the `app/events/onapplicationstart.cfm`file), thus picking up any changes made in the `app/config/environment.cfm` file.
 
 **Lazy Reloading**&#x20;
 
@@ -71,7 +71,7 @@ http://www.mysite.com/?reload=testing
 ```
 {% endcode %}
 
-This will make CFWheels skip your `app/config/environment.cfm` file and just use the URL value instead (`testing`, in this case).
+This will make Wheels skip your `app/config/environment.cfm` file and just use the URL value instead (`testing`, in this case).
 
 **Password-Protected Reloads**&#x20;
 

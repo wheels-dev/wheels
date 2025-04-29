@@ -2,9 +2,9 @@
 
 One of a developer’s biggest time sinks is coming up with and writing accurate and engaging documentation. Even if it’s an internal project with.. well, just you… it’s still incredibly valuable to have: coming back to projects a few months or even years later can often lead to a bit of head scratching and screams of “why?”, especially with your own code.
 
-Whilst we’re not promising that CFWheels will write all your documentation for you, we have put some tools in place to hopefully make the process a little less painful. With a small amount of adjustment in how you document your core functions, documentation doesn’t necessarily have to be such a time consuming process.
+Whilst we’re not promising that Wheels will write all your documentation for you, we have put some tools in place to hopefully make the process a little less painful. With a small amount of adjustment in how you document your core functions, documentation doesn’t necessarily have to be such a time consuming process.
 
-In the CFWheels core, we've adopted javadoc-style syntax (with a few twists of our own) to automatically create our main documentation, and there's nothing stopping you adding to this core set of documentation for your own app. It just needs a bit of markup.
+In the Wheels core, we've adopted javadoc-style syntax (with a few twists of our own) to automatically create our main documentation, and there's nothing stopping you adding to this core set of documentation for your own app. It just needs a bit of markup.
 
 ### Browse the Core API
 
@@ -13,7 +13,7 @@ Following that link leads you to the main internal documentation.&#x20;
 
 ![](../.gitbook/assets/29a95a8-docs1.jpg)
 
-The three-column layout is designed to allow for quick filtering by section or function name. On the right are the main CFWheels core categories, such as Controller and Model functions. These categories are further divided into subcategories, such as Flash and Pagination functions. Clicking on a link in the right column will filter the list in the left and middle columns to show all matching functions, including child functions of that category.
+The three-column layout is designed to allow for quick filtering by section or function name. On the right are the main Wheels core categories, such as Controller and Model functions. These categories are further divided into subcategories, such as Flash and Pagination functions. Clicking on a link in the right column will filter the list in the left and middle columns to show all matching functions, including child functions of that category.
 
 Filtering by function name is made simple by a “filter-as-you-type” search field in the left column, making it very quick to find the right function.
 
@@ -78,4 +78,4 @@ Whilst the core has additional code samples which can be loaded from text files,
 
 Whilst this API/function explorer is a great first step, you’ll notice your controller and model specific functions aren’t included (only those shared amongst controllers, or in the `/app/global/functions.cfm` file. This is because we’re only looking at the main `Model.cfc` and `Controller.cfc` and what it can access.
 
-In CFWheels 2.1, we’ll look at adding a full Controller and Model metadata explorer using the same techniques, and map functions like `show()` to their respective routes too.
+In Wheels 2.1, we’ll look at adding a full Controller and Model metadata explorer using the same techniques, and map functions like `show()` to their respective routes too.

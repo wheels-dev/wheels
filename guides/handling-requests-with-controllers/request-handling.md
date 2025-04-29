@@ -62,21 +62,21 @@ same name in the controller file.
 
 Mapping an incoming URL to code is only one side of the equation. You will also\
 need a way to create these URLs. This is done through a variety of different\
-functions like [linkTo()](https://api.cfwheels.org/controller.linkto.html) (for creating links), [startFormTag()](https://api.cfwheels.org/controller.startformtag.html) (for\
-creating forms), and [redirectTo()](https://api.cfwheels.org/controller.redirectto.html) (for redirecting users), to name a few.
+functions like [linkTo()](https://api.wheels.dev/controller.linkto.html) (for creating links), [startFormTag()](https://api.wheels.dev/controller.startformtag.html) (for\
+creating forms), and [redirectTo()](https://api.wheels.dev/controller.redirectto.html) (for redirecting users), to name a few.
 
 Internally, all of these functions use the same code to create the URL, namely\
-the [URLFor()](https://api.cfwheels.org/controller.urlfor.html) function. The [URLFor()](https://api.cfwheels.org/controller.urlfor.html) function accepts a controller and\
+the [URLFor()](https://api.wheels.dev/controller.urlfor.html) function. The [URLFor()](https://api.wheels.dev/controller.urlfor.html) function accepts a controller and\
 an action argument, which are what you will use most of the time. It has a lot\
 of other arguments and does some neat stuff (like defaulting to the current\
 controller when you don't specifically pass one in). So check out the\
-documentation for the [URLFor()](https://api.cfwheels.org/controller.urlfor.html) function for all the details.
+documentation for the [URLFor()](https://api.wheels.dev/controller.urlfor.html) function for all the details.
 
 By the way, by using URL rewriting in Apache or IIS, you can completely get rid\
 of the `index.cfm` part of the URL so that\
 `http://localhost/index.cfm/shop/products` becomes\
 `http://localhost/shop/products`. You can read more about this in the\
-[URL Rewriting](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) chapter.
+[URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) chapter.
 
 For the remainder of this chapter, we'll type out the URLs in this shorter and\
 prettier way.
@@ -105,15 +105,15 @@ component extends="Controller" {
 {% endcode %}
 
 The only thing this does is specify the view page to render using the\
-[renderView()](https://api.cfwheels.org/controller.renderview.html) function.
+[renderView()](https://api.wheels.dev/controller.renderview.html) function.
 
-The [renderView()](https://api.cfwheels.org/controller.renderview.html) function is available to you because the `shop` controller extends the main Wheels `Controller`component. Don't forget to include that `extends` attribute in your `cfcomponent` call as you build your controllers!
+The [renderView()](https://api.wheels.dev/controller.renderview.html) function is available to you because the `shop` controller extends the main Wheels `Controller`component. Don't forget to include that `extends` attribute in your `cfcomponent` call as you build your controllers!
 
-So, how does [renderView()](https://api.cfwheels.org/controller.renderview.html) work? Well, it accepts the arguments `controller` and `action` (among others, such as `route`), and, based on these, it will try to include a view file. In our case, the view file is stored at `app/views/shop/products.cfm`.
+So, how does [renderView()](https://api.wheels.dev/controller.renderview.html) work? Well, it accepts the arguments `controller` and `action` (among others, such as `route`), and, based on these, it will try to include a view file. In our case, the view file is stored at `app/views/shop/products.cfm`.
 
-You can read the chapter about [Rendering Content](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) for more information about the [renderView()](https://api.cfwheels.org/controller.renderview.html) function.
+You can read the chapter about [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) for more information about the [renderView()](https://api.wheels.dev/controller.renderview.html) function.
 
-It's important to note that the [renderView()](https://api.cfwheels.org/controller.renderview.html) function does not cause any controller actions or functions to be executed. It just specifies what view\
+It's important to note that the [renderView()](https://api.wheels.dev/controller.renderview.html) function does not cause any controller actions or functions to be executed. It just specifies what view\
 files to get content from. Keep this in mind going forward because it's a common assumption that it does. (Especially when you want to include the view page for another action, it's easy to jump to the incorrect conclusion that the code for that action would also get executed.)
 
 ### Wheels Conventions
@@ -123,7 +123,7 @@ code in the example above, and it will still work because Wheels will just guess
 what your intention is. Let's have a quick look at exactly what code can be\
 removed and why.
 
-The first thing Wheels assumes is that if you call [renderView()](https://api.cfwheels.org/controller.renderview.html) without\
+The first thing Wheels assumes is that if you call [renderView()](https://api.wheels.dev/controller.renderview.html) without\
 arguments, you want to include the view page for the **current** controller and\
 action.
 
@@ -144,7 +144,7 @@ component extends="Controller" {
 … and it will still work just fine.
 
 Does Wheels assume anything else? Sure it does. You can actually remove the\
-entire [renderView()](https://api.cfwheels.org/controller.renderview.html) call because Wheels will assume that you always want to call a view page when the processing in the controller is done. Wheels will call\
+entire [renderView()](https://api.wheels.dev/controller.renderview.html) call because Wheels will assume that you always want to call a view page when the processing in the controller is done. Wheels will call\
 it for you behind the scenes.
 
 That leaves you with this code:
@@ -223,21 +223,21 @@ you can just use the `params` struct for all of them instead.
 
 This concept becomes even more useful once we start getting into creating forms\
 specifically meant for accessing object properties. But let's save the details\
-of all that for the [Form Helpers and Showing Errors](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) chapter.
+of all that for the [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) chapter.
 
 ### JSON as part of the request body
 
-If you're constructing a JSON API, you're inevitably going to come across how to deal with "incoming" json packets to your routing endpoints. Instead of having to test each request with whether it's valid json etc, CFWheels will automatically map the JSON body in a request to the params struct, as long as it has `application/json` as it's mime type.
+If you're constructing a JSON API, you're inevitably going to come across how to deal with "incoming" json packets to your routing endpoints. Instead of having to test each request with whether it's valid json etc, Wheels will automatically map the JSON body in a request to the params struct, as long as it has `application/json` as it's mime type.
 
 So in the same way that the `url` and `form` scopes are merged, so a valid `json` body would be. The exception to the rule is when a javascript array is the root element, where it's then added to `params._json` to follow Rails conventions. (For obvious reasons, we can't merge an array into a struct!)
 
 {% hint style="info" %}
 #### NOTE
 
-The mapping of a json array to params.\_json was introduced in CFWheels 2.1
+The mapping of a json array to params.\_json was introduced in Wheels 2.1
 {% endhint %}
 
 ### Routing
 
 For more advanced URL-to-code mappings, you are encourage to use a concept called _routing_.\
-It allows for you to fully customize every URL in your application, including which HTTP verb can be used. You can read more about this in the chapter called [Routing](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing).
+It allows for you to fully customize every URL in your application, including which HTTP verb can be used. You can read more about this in the chapter called [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing).

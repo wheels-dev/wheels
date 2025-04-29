@@ -20,11 +20,11 @@ Reloading Wheels is required when installing/uninstalling. (Issue a `reload=true
 
 ### Installing via Commandbox
 
-With the CFWheels CLI installed, you can just do:
+With the Wheels CLI installed, you can just do:
 
 {% code title="CommandBox" %}
 ```shell
-# List all CFWheels plugins on forgebox
+# List all Wheels plugins on forgebox
 $ wheels plugins list
 ```
 {% endcode %}
@@ -41,7 +41,7 @@ $ install select-string
 ```
 {% endcode %}
 
-When run in the root of a CFWheels application, it should automatically add the plugin to `/app/plugins` and generate a `.zip` file with the corresponding name and version number.
+When run in the root of a Wheels application, it should automatically add the plugin to `/app/plugins` and generate a `.zip` file with the corresponding name and version number.
 
 ### File Permissions on plugins Folder
 
@@ -59,8 +59,8 @@ The debug area will also show the version number of the plugin if the plugin Aut
 
 ### Due Diligence
 
-Plugins are very powerful, remember, they can completely override other functions, including CFWheels core functions and functions of other installed plugins. For this reason we recommend that you take a look at the code itself for the plugins that you intend to use. This is especially important if you have multiple plugins that override the same function. In those cases you'll have to determine if the plugins play well with each other (which they typically do if they run their code and then defer back to the CFWheels core function afterwards) or if they clash and cause problems (in which case you can perhaps contribute to the plugin repository in an effort to make the plugins behave better in situations like this).
+Plugins are very powerful, remember, they can completely override other functions, including Wheels core functions and functions of other installed plugins. For this reason we recommend that you take a look at the code itself for the plugins that you intend to use. This is especially important if you have multiple plugins that override the same function. In those cases you'll have to determine if the plugins play well with each other (which they typically do if they run their code and then defer back to the Wheels core function afterwards) or if they clash and cause problems (in which case you can perhaps contribute to the plugin repository in an effort to make the plugins behave better in situations like this).
 
 ### Available Plugins
 
-To view all official plugins that are available for CFWheels you can go to the [Plugins](https://www.forgebox.io/type/cfwheels-plugins) listing on forgebox. Often the community will have a better idea of what plugins work best for your situation, so get on the mailing list and ask if you're in any doubt.
+To view all official plugins that are available for Wheels you can go to the [Plugins](https://www.forgebox.io/type/wheels-plugins) listing on forgebox. Often the community will have a better idea of what plugins work best for your situation, so get on the mailing list and ask if you're in any doubt.

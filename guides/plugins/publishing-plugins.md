@@ -4,17 +4,17 @@ description: How to publish your plugin to forgebox.io via CommandBox
 
 # Publishing Plugins
 
-So, you've created your new magic, world solving plugin, and naturally, you want to share it with the world. CFWheels uses [forgebox.io](https://www.forgebox.io/type/cfwheels-plugins) as a plugins repository. This enables us to manage our CFWheels application's dependencies, install updates easily via CommandBox and more.
+So, you've created your new magic, world solving plugin, and naturally, you want to share it with the world. Wheels uses [forgebox.io](https://www.forgebox.io/type/wheels-plugins) as a plugins repository. This enables us to manage our Wheels application's dependencies, install updates easily via CommandBox and more.
 
 As a plugin author, it's well worth spending a little time setting yourself up to work with forgebox with the minimum amount of effort. Once done, you'll be able to either publish directly from the commandline, or upload to forgebox manually.
 
-This tutorial makes extensive use of CommandBox, GIT and the CFWheels CLI.
+This tutorial makes extensive use of CommandBox, GIT and the Wheels CLI.
 
 ### Requirements
 
 We strongly recommend always having the latest version of [CommandBox](https://www.ortussolutions.com/products/commandbox).
 
-You'll also want the CFWheels CLI. You can install that in CommandBox via `install wheels-cli`. This will also update it if you've got an older version installed.
+You'll also want the Wheels CLI. You can install that in CommandBox via `install wheels-cli`. This will also update it if you've got an older version installed.
 
 Some scripted commands also require the git CLI, although these are technically optional.
 
@@ -53,7 +53,7 @@ Forgebox uses your local `box.json` - you'll need one! Critical package informat
 $ init
 
 # Or pass in parameters at the same time
-$ init name="My Funky Plugin" slug=my-funky-plugin version=1.0.0 type="cfwheels-plugins"
+$ init name="My Funky Plugin" slug=my-funky-plugin version=1.0.0 type="wheels-plugins"
 
 # Or use the wizard
 $ init --wizard
@@ -62,7 +62,7 @@ $ init --wizard
 
 ### Ensure you've set some critical box.json attributes
 
-In order for other CFWheels users to quickly identify and install your plugin via the CFWheels CLI, make sure you set the following `box.json` attributes - whilst a standard `box.json` might only have `name, version,author`, we need a little more information. Here's a template to get you started: (replace the values in CAPS)
+In order for other Wheels users to quickly identify and install your plugin via the Wheels CLI, make sure you set the following `box.json` attributes - whilst a standard `box.json` might only have `name, version,author`, we need a little more information. Here's a template to get you started: (replace the values in CAPS)
 
 {% code title="box.json" %}
 ```json
@@ -81,8 +81,8 @@ In order for other CFWheels users to quickly identify and install your plugin vi
  "packageDirectory":"PLUGIN-NAME",
   // Required: The Forgebox slug, must be unique
  "slug":"FORGEBOX-SLUG",
-  // Required: Must be cfwheels-plugins
- "type":"cfwheels-plugins",
+  // Required: Must be wheels-plugins
+ "type":"wheels-plugins",
   // Required: From here is optional but recommended
  "homepage":"https://github.com/GITHUBUSERNAME/GITHUB-REPONAME",
  "shortDescription":"PLUGIN DESCRIPTION",
@@ -109,7 +109,7 @@ Your completed `box.json` might look something like this:
  "version":"0.0.4",
  "author":"Tom King",
   // Required: GitHub Repository stub, including version hash
- "location":"neokoenig/cfwheels-shortcodes#v0.0.4",
+ "location":"neokoenig/wheels-shortcodes#v0.0.4",
   // Required: Should always be /app/plugins/
  "directory":"/app/plugins/",
   // Required: Should always be true
@@ -118,15 +118,15 @@ Your completed `box.json` might look something like this:
  "packageDirectory":"Shortcodes",
   // Required: The Forgebox slug, must be unique
  "slug":"shortcodes",
-  // Required: Must be cfwheels-plugins
- "type":"cfwheels-plugins",
+  // Required: Must be wheels-plugins
+ "type":"wheels-plugins",
   // Required: From here is optional but recommended
- "homepage":"https://github.com/neokoenig/cfwheels-shortcodes",
- "shortDescription":"Shortcodes Plugin for CFWheels",
+ "homepage":"https://github.com/neokoenig/wheels-shortcodes",
+ "shortDescription":"Shortcodes Plugin for Wheels",
  "keywords":"shortcodes",
  "private":false,
  "scripts":{
-   "postVersion":"package set location='neokoenig/cfwheels-shortcodes#v`package version`'",
+   "postVersion":"package set location='neokoenig/wheels-shortcodes#v`package version`'",
  "patch-release":"bump --patch",
  "minor-release":"bump --minor",
  "major-release":"bump --major",
@@ -154,7 +154,7 @@ Remember this configuration will "stick", so make sure you change it back afterw
 
 ### Publishing a plugin to forgebox
 
-Both CFWheels CLI and Forgebox are expecting a tagged release with the plugin contents (e.g. zip). So the best way to publish is to...
+Both Wheels CLI and Forgebox are expecting a tagged release with the plugin contents (e.g. zip). So the best way to publish is to...
 
 1. Navigate into the plugin directory
 2. Ensure that directory is authorized to publish the repo (e.g. `git remote -v` should list your fetch/push endpoints)
@@ -234,8 +234,8 @@ Running package script [patch-release].
 Set version = 0.1.7
 
 Running package script [postVersion].
-> package set location='neokoenig/cfwheels-cli#v`package version`'
-Set location = neokoenig/cfwheels-cli#v0.1.7
+> package set location='neokoenig/wheels-cli#v`package version`'
+Set location = neokoenig/wheels-cli#v0.1.7
 Package is a Git repo.  Tagging...
 Tag [v0.1.7] created.
 Sending package information to ForgeBox, please wait...
@@ -249,7 +249,7 @@ Compressing objects: 100% (8/8), done.
 Writing objects: 100% (10/10), 908 bytes | 0 bytes/s, done.
 Total 10 (delta 5), reused 0 (delta 0)
 remote: Resolving deltas: 100% (5/5), completed with 4 local objects.
-To https://github.com/neokoenig/cfwheels-cli.git
+To https://github.com/neokoenig/wheels-cli.git
    477648f..400604b  master -> master
  * [new tag]         v0.1.7 -> v0.1.7
 
