@@ -46,7 +46,7 @@ request since we performed a redirect after setting the Flash.
 </cfoutput>
 ```
 
-As you can see above, you use the [flashInsert()](https://api.cfwheels.org/controller.flashinsert.html) function with a named argument when you want to store data in the Flash and the [flash()](https://api.cfwheels.org/controller.flash.html) function when you want to display the data in a view.
+As you can see above, you use the [flashInsert()](https://api.wheels.dev/controller.flashinsert.html) function with a named argument when you want to store data in the Flash and the [flash()](https://api.wheels.dev/controller.flash.html) function when you want to display the data in a view.
 
 The key chosen above is `success`, but it could have been anything that we wanted. Just like with a normal struct, the naming of the keys is your job.
 
@@ -55,8 +55,8 @@ As an example, you may choose to use one key for storing messages after the user
 ### Shortcut for Setting the Flash and Redirecting
 
 The more you work with Wheels and the Flash, the more that you're going to find\
-that you keep repeating that [flashInsert()](https://api.cfwheels.org/controller.flashinsert.html)/ [redirectTo()](https://api.cfwheels.org/controller.redirectto.html) combo all\
-the time. Wheels has a solution for that within the [redirectTo()](https://api.cfwheels.org/controller.redirectto.html) function\
+that you keep repeating that [flashInsert()](https://api.wheels.dev/controller.flashinsert.html)/ [redirectTo()](https://api.wheels.dev/controller.redirectto.html) combo all\
+the time. Wheels has a solution for that within the [redirectTo()](https://api.wheels.dev/controller.redirectto.html) function\
 itself:&#x20;
 
 ```javascript
@@ -64,7 +64,7 @@ redirectTo(action="edit", success="The user was updated successfully.");
 ```
 
 That piece of code does exactly the same thing as the example shown previously\
-in this chapter. The Wheels [redirectTo()](https://api.cfwheels.org/controller.redirectto.html) function sees the `success`\
+in this chapter. The Wheels [redirectTo()](https://api.wheels.dev/controller.redirectto.html) function sees the `success`\
 argument coming in and knows that it's not part of its own declared arguments.
 
 Therefore, you (the developer) must intend for it to be stored in the Flash,\
@@ -89,27 +89,27 @@ takes custom arguments, so remember this workaround.
 
 ### More Flashy Functions
 
-Besides [flash()](https://api.cfwheels.org/controller.flash.html) and [flashInsert()](https://api.cfwheels.org/controller.flashinsert.html) that are used to read\
+Besides [flash()](https://api.wheels.dev/controller.flash.html) and [flashInsert()](https://api.wheels.dev/controller.flashinsert.html) that are used to read\
 from/insert to the Flash, there are a few other functions worth mentioning.
 
-[flashCount()](https://api.cfwheels.org/controller.flashcount.html) is used to count how many key/value pairs there are in the\
+[flashCount()](https://api.wheels.dev/controller.flashcount.html) is used to count how many key/value pairs there are in the\
 Flash.
 
-[flashClear()](https://api.cfwheels.org/controller.flashclear.html) and [flashDelete()](https://api.cfwheels.org/controller.flashdelete.html) do exactly the same as their\
+[flashClear()](https://api.wheels.dev/controller.flashclear.html) and [flashDelete()](https://api.wheels.dev/controller.flashdelete.html) do exactly the same as their\
 counterparts in the struct world, `StructClear` and `StructDelete`—they clear\
 the entire Flash and delete a specific key/value from it, respectively.
 
-[flashKeyExists()](https://api.cfwheels.org/controller.flashkeyexists.html) is used to check if a specific key exists. So it would\
+[flashKeyExists()](https://api.wheels.dev/controller.flashkeyexists.html) is used to check if a specific key exists. So it would\
 make sense to make use of that function in the code listed above to avoid\
 outputting an empty `<p>` tag on requests where the Flash is empty.\
-( [flash()](https://api.cfwheels.org/controller.flash.html) will return an empty string when the specified key does not\
+( [flash()](https://api.wheels.dev/controller.flash.html) will return an empty string when the specified key does not\
 exist.)
 
-Check out the [Controller > Flash Functions](https://api.cfwheels.org/) section in the API listing of all the functions that deal with the Flash.
+Check out the [Controller > Flash Functions](https://api.wheels.dev/) section in the API listing of all the functions that deal with the Flash.
 
-#### Wholesale Flash Handling with [flashMessages()](https://api.cfwheels.org/controller.flashmessages.html)
+#### Wholesale Flash Handling with [flashMessages()](https://api.wheels.dev/controller.flashmessages.html)
 
-Throw the [flashIsEmpty()](https://api.cfwheels.org/controller.set.html) function into the mix, and you might find\
+Throw the [flashIsEmpty()](https://api.wheels.dev/controller.set.html) function into the mix, and you might find\
 yourself writing code across your Wheels projects that looks something like\
 this:&#x20;
 
@@ -134,7 +134,7 @@ this:&#x20;
 </cfoutput>
 ```
 
-All of that above code can be replaced with a single call to the [flashMessages()](https://api.cfwheels.org/controller.flashmessages.html) function:
+All of that above code can be replaced with a single call to the [flashMessages()](https://api.wheels.dev/controller.flashmessages.html) function:
 
 ```html
 <cfoutput>
@@ -142,12 +142,12 @@ All of that above code can be replaced with a single call to the [flashMessages(
 </cfoutput>
 ```
 
-Whenever any value is inserted into the Flash, [flashMessages()](https://api.cfwheels.org/controller.flashmessages.html) will\
+Whenever any value is inserted into the Flash, [flashMessages()](https://api.wheels.dev/controller.flashmessages.html) will\
 display it similarly to the complex example above, with `class` attributes set\
 similarly (`errorMessage` for the `error` key and `successMessage` for the\
 `success` key).
 
-You can also use [flashMessages()](https://api.cfwheels.org/controller.flashmessages.html)'s `key/keys` argument to limit its reach\
+You can also use [flashMessages()](https://api.wheels.dev/controller.flashmessages.html)'s `key/keys` argument to limit its reach\
 to a list of given keys. Let's say that we only want our layout to show messages\
 for the `alert` key but not for the `error` or `success` keys (or any other for\
 that matter). We would write our call like so:
@@ -159,9 +159,9 @@ that matter). We would write our call like so:
 ```
 
 Just keep in mind that this approach isn't as flexible, so if you need to\
-customize the markup of the messages beyond [flashMessages()](https://api.cfwheels.org/controller.flashmessages.html)'s\
-capabilities, you should revert back to using [flashIsEmpty()](https://api.cfwheels.org/controller.flashisempty.html),\
-[flash()](https://api.cfwheels.org/controller.flash.html), and other related functions manually.
+customize the markup of the messages beyond [flashMessages()](https://api.wheels.dev/controller.flashmessages.html)'s\
+capabilities, you should revert back to using [flashIsEmpty()](https://api.wheels.dev/controller.flashisempty.html),\
+[flash()](https://api.wheels.dev/controller.flash.html), and other related functions manually.
 
 ### Flash Storage Options
 
@@ -173,7 +173,7 @@ the Flash in the `session` scope. Otherwise, it will store it in a cookie on the
 user's computer.
 
 You can override this setting in the same way that you override other Wheels\
-settings by running the [set()](https://api.cfwheels.org/controller.set.html) function like this:
+settings by running the [set()](https://api.wheels.dev/controller.set.html) function like this:
 
 ```javascript
 // In `app/config/settings.cfm` or another `settings.cfm` file within the `app/config` subfolders
@@ -236,7 +236,7 @@ considerations.
 
 ### Appending to, rather than replacing the flash
 
-From CFWheels 2.1, you can now change the default flash behavior to append to an existing key, rather than directly replacing it. To turn on this behavior, add `set(flashAppend=true)` to you `/app/config/settings.cfm` file.
+From Wheels 2.1, you can now change the default flash behavior to append to an existing key, rather than directly replacing it. To turn on this behavior, add `set(flashAppend=true)` to you `/app/config/settings.cfm` file.
 
 An example of where this might be useful:
 

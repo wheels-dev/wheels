@@ -5,7 +5,7 @@ description: >-
   easy to maintain over the long haul.
 ---
 
-# Contributing to CFWheels
+# Contributing to Wheels
 
 ## Repository
 
@@ -40,17 +40,17 @@ Here's the process that we'd like for you to follow. This process is in place ma
 
 ## Developing with Docker
 
-To easily develop and test CFWheels locally on multiple CFML engines using Docker, check out the [Docker Instructions](https://github.com/cfwheels/cfwheels/blob/main/docker/README.md)
+To easily develop and test Wheels locally on multiple CFML engines using Docker, check out the [Docker Instructions](https://github.com/cfwheels/cfwheels/blob/main/docker/README.md)
 
 ## Code Style
 
 All framework code should use the guidelines at [https://github.com/cfwheels/cfwheels/wiki/Code-Style-Guide](https://github.com/cfwheels/cfwheels/wiki/Code-Style-Guide). This will make things more readable and will keep everyone on the same page. If you're working on code and notice any violations of the official style, feel free to correct it!
 
-Additionally, we recommend that any applications written using the CFWheels framework follow the same style. This is optional, of course, but still strongly recommended.
+Additionally, we recommend that any applications written using the Wheels framework follow the same style. This is optional, of course, but still strongly recommended.
 
 ## Supported CFML Engines
 
-All code for CFWheels should be written for use with both Adobe ColdFusion 2018 upwards, and Lucee 5 upwards.
+All code for Wheels should be written for use with both Adobe ColdFusion 2018 upwards, and Lucee 5 upwards.
 
 ## Naming Conventions
 
@@ -70,7 +70,7 @@ To stay true to our ColdFusion and Java roots, all names must be camelCase. In s
 
 #### Local Variables
 
-Since moving to CFWheels 2.x, the old `loc` scope has now been deprecated and you should use the function `local` scope.
+Since moving to Wheels 2.x, the old `loc` scope has now been deprecated and you should use the function `local` scope.
 
 Code Example
 

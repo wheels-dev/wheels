@@ -54,7 +54,7 @@ Pretty URLs Rule markup
 {% code title="pretty urls rule" %}
 ```xml
 <rule enabled="true">
-    <name>CFWheels pretty URLs</name>
+    <name>Wheels pretty URLs</name>
     <condition type="request-uri" operator="notequal">^/(flex2gateway|jrunscripts|cfide|cf_scripts|cfformgateway|cffileservlet|lucee|files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots.txt|favicon.ico|sitemap.xml|rewrite.cfm)</condition>
     <from>^/(.*)$</from>
     <to type="passthrough">/rewrite.cfm/$1</to>
@@ -73,7 +73,7 @@ A complete barebones `WEB-INF/urlrewrite.xml` configuration example with pretty 
 
 <urlrewrite>
   <rule enabled="true">
-    <name>CFWheels pretty URLs</name>
+    <name>Wheels pretty URLs</name>
     <condition type="request-uri" operator="notequal">^/(flex2gateway|jrunscripts|cfide|cf_scripts|cfformgateway|cffileservlet|lucee|files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots.txt|favicon.ico|sitemap.xml|rewrite.cfm)</condition>
     <from>^/(.*)$</from>
     <to type="passthrough">/rewrite.cfm/$1</to>

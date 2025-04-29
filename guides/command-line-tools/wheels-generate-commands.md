@@ -9,7 +9,7 @@ The `wheels generate` command is what CommandBox calls a namespace and contains 
 
 ## `wheels generate app-wizard`
 
-Creates a new CFWheels application using our wizard to gather all the necessary information. This is the recommended route to start a new application.
+Creates a new Wheels application using our wizard to gather all the necessary information. This is the recommended route to start a new application.
 
 This command will ask for:
 
@@ -41,7 +41,7 @@ You can select a template to use for your app.
 
 ![wheels new - step 3](<../.gitbook/assets/Screen Shot 2022-06-18 at 12.32.14 PM.png>)
 
-You can set what you want to use as your reload password or accept the default. Please make sure to change this before you go into production. Ideally this should be kept out of your source repository by using something like the (CFWheels DotEnvSettings Plugin)\[[https://www.forgebox.io/view/cfwheels-dotenvsettings](https://www.forgebox.io/view/cfwheels-dotenvsettings)].
+You can set what you want to use as your reload password or accept the default. Please make sure to change this before you go into production. Ideally this should be kept out of your source repository by using something like the (Wheels DotEnvSettings Plugin)\[[https://www.forgebox.io/view/wheels-dotenvsettings](https://www.forgebox.io/view/wheels-dotenvsettings)].
 
 ![wheels new - step 4](<../.gitbook/assets/Screen Shot 2022-06-18 at 12.32.43 PM.png>)
 
@@ -69,9 +69,9 @@ If you opted to continue, you'll see a bunch of things scroll across your screen
 
 ## `wheels generate app`
 
-Create a blank CFWheels app from one of our app templates or a template using a valid Endpoint ID which can come from ForgeBox, HTTP/S, git, github, etc.
+Create a blank Wheels app from one of our app templates or a template using a valid Endpoint ID which can come from ForgeBox, HTTP/S, git, github, etc.
 
-By default an app named MyCFWheelsApp will be created in a sub directory called MyCFWheelsApp.
+By default an app named MyWheelsApp will be created in a sub directory called MyWheelsApp.
 
 The most basic call...
 ```
@@ -84,13 +84,13 @@ wheels g app
 ```
 
 Here are the basic templates that are available for you that come from ForgeBox
-- CFWheels Base Template - Stable (default)
-- CFWheels Base Template - Bleeding Edge
-- CFWheels Template - HelloWorld
-- CFWheels Template - HelloDynamic
-- CFWheels Template - HelloPages
-- CFWheels Example App
-- CFWheels - TodoMVC - HTMX - Demo App
+- Wheels Base Template - Stable (default)
+- Wheels Base Template - Bleeding Edge
+- Wheels Template - HelloWorld
+- Wheels Template - HelloDynamic
+- Wheels Template - HelloPages
+- Wheels Example App
+- Wheels - TodoMVC - HTMX - Demo App
 
 ```
 wheels create app template=base
@@ -103,11 +103,11 @@ wheels create app template=http://site.com/myCustomAppTemplate.zip
 
 | Parameter      | Required | Default        | Description                                           |
 | -------------- | -------- | -------------- | ----------------------------------------------------- |
-| name           | false    | MyCFWheelsApp  | The name of the app you want to create                |
+| name           | false    | MyWheelsApp  | The name of the app you want to create                |
 | template       | false    | base template  | The name of the app template to use                   |
-| directory      | false    | mycfwheelsapp/ | The directory to create the app in                    |
+| directory      | false    | mywheelsapp/ | The directory to create the app in                    |
 | reloadPassword | false    | ChangeMe       | The reload password to set for the app                |
-| datasourceName | false    | MyCFWheelsApp  | The datasource name to set for the app                |
+| datasourceName | false    | MyWheelsApp  | The datasource name to set for the app                |
 | cfmlEngine     | false    | Lucee          | The CFML engine to use for the app                    |
 | setupH2        | false    | false          | Setup the H2 database for development                 |
 | init           | false    | false          | "init" the directory as a package if it isn't already |

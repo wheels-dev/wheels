@@ -1,5 +1,5 @@
 ---
-description: Let CFWheels handle time stamping of records.
+description: Let Wheels handle time stamping of records.
 ---
 
 # Automatic Time Stamps
@@ -10,15 +10,15 @@ As with anything that is a common task performed by many developers, it makes a 
 
 ### Columns Used for Timestamps
 
-If you have either of the following columns in your database table, CFWheels will see them and treat them a little differently than others.
+If you have either of the following columns in your database table, Wheels will see them and treat them a little differently than others.
 
 **createdat**
 
-CFWheels will use a `createdat` column automatically to store the current date and time when an `INSERT`operation is made (which could happen through a [save()](https://api.cfwheels.org/model.save.html) or [create()](https://api.cfwheels.org/model.create.html) operation, for example).
+Wheels will use a `createdat` column automatically to store the current date and time when an `INSERT`operation is made (which could happen through a [save()](https://api.wheels.dev/model.save.html) or [create()](https://api.wheels.dev/model.create.html) operation, for example).
 
 **updatedat**
 
-If CFWheels sees an `updatedat` column, it will use it to store the current date and time automatically when an `UPDATE` operation is made (which could happen through a [save()](https://api.cfwheels.org/model.save.html) or [update()](https://api.cfwheels.org/model.update.html) operation, for example).
+If Wheels sees an `updatedat` column, it will use it to store the current date and time automatically when an `UPDATE` operation is made (which could happen through a [save()](https://api.wheels.dev/model.save.html) or [update()](https://api.wheels.dev/model.update.html) operation, for example).
 
 ### Data Type of Columns
 

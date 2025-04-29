@@ -1,18 +1,18 @@
 ---
-description: Instructions for installing CFWheels on your system.
+description: Instructions for installing Wheels on your system.
 ---
 
 # Manual Installation
 
-Installing CFWheels is so simple that there is barely a need for a chapter devoted to it. But we figured we'd better make one anyway in case anyone is specifically looking for a chapter about installation.
+Installing Wheels is so simple that there is barely a need for a chapter devoted to it. But we figured we'd better make one anyway in case anyone is specifically looking for a chapter about installation.
 
-So, here are the simple steps you need to follow to get rolling on CFWheels...
+So, here are the simple steps you need to follow to get rolling on Wheels...
 
 ### Manual Installation
 
-### 1. Download CFWheels
+### 1. Download Wheels
 
-You have 2 choices when downloading CFWheels. You can either use the latest official release of CFWheels, or you can take a walk on the wild side and go with the latest committed source code in our Git repository.
+You have 2 choices when downloading Wheels. You can either use the latest official release of Wheels, or you can take a walk on the wild side and go with the latest committed source code in our Git repository.
 
 The latest official releases can always be found in the [Releases](https://github.com/cfwheels/cfwheels/releases) section of GitHub, and the Git repository is available at our [GitHub repo](https://github.com/cfwheels/cfwheels).
 
@@ -22,20 +22,20 @@ Let's assume you have downloaded the latest official release. (Really, you shoul
 
 ### 2. Setup the Website
 
-Getting an empty website running with CFWheels installed is an easy process if you already know your way around IIS or Apache. Basically, you need to create a new website in your web server of choice and unzip the contents of the file into the root of it.
+Getting an empty website running with Wheels installed is an easy process if you already know your way around IIS or Apache. Basically, you need to create a new website in your web server of choice and unzip the contents of the file into the root of it.
 
-In case you're not sure, here are the instructions for setting up an empty CFWheels site that can be accessed when typing `localhost` in your browser. The instructions refer to a system running Windows Server 2003 and IIS, but you should be able to follow along and apply the instructions with minor modifications to your system. (See [Requirements](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/introduction/requirements) for a list of tested systems).
+In case you're not sure, here are the instructions for setting up an empty Wheels site that can be accessed when typing `localhost` in your browser. The instructions refer to a system running Windows Server 2003 and IIS, but you should be able to follow along and apply the instructions with minor modifications to your system. (See [Requirements](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/introduction/requirements) for a list of tested systems).
 
-* Create a new folder under your web root (usually `C:\Inetpub\wwwroot`) named `wheels_site` and unzip the CFWheels `.zip` file into the root of it.
-* Create a new website using IIS called `CFWheels Site` with `localhost` as the host header name and `C:\Inetpub\wwwroot\mysite` as the path to your home directory.
+* Create a new folder under your web root (usually `C:\Inetpub\wwwroot`) named `wheels_site` and unzip the Wheels `.zip` file into the root of it.
+* Create a new website using IIS called `Wheels Site` with `localhost` as the host header name and `C:\Inetpub\wwwroot\mysite` as the path to your home directory.
 
-If you want to run a CFWheels-powered application from a subfolder in an existing website, this is entirely possible, but you may need to get a little creative with your URL rewrite rules if you want to get pretty URLs--it will only work out of the box on recent versions of Apache. (Read more about this in the [URL Rewriting](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) chapter.)
+If you want to run a Wheels-powered application from a subfolder in an existing website, this is entirely possible, but you may need to get a little creative with your URL rewrite rules if you want to get pretty URLs--it will only work out of the box on recent versions of Apache. (Read more about this in the [URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) chapter.)
 
 ### 3. Setup the Database (Optional)
 
 Create a new database in MySQL, PostgreSQL, Microsoft SQL Server, or H2 and add a new data source for it in the ColdFusion/Lucee Administrator, just as you'd normally do. Now open up `app/config/settings.cfm` and call `set(dataSourceName="")` with the name you chose for the data source.
 
-If you don't want to be bothered by opening up a CFWheels configuration file at all, there is a nice convention you can follow for the naming. Just name your data source with the same name as the folder you are running your website from (`mysite` in the example above), and CFWheels will use that when you haven't set the `dataSourceName` setting using the [Set()](https://api.cfwheels.org/v3.0.0-SNAPSHOT/set.html) function.
+If you don't want to be bothered by opening up a Wheels configuration file at all, there is a nice convention you can follow for the naming. Just name your data source with the same name as the folder you are running your website from (`mysite` in the example above), and Wheels will use that when you haven't set the `dataSourceName` setting using the [Set()](https://api.wheels.dev/v3.0.0-SNAPSHOT/set.html) function.
 
 ### 4. Test It
 

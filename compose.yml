@@ -1,10 +1,10 @@
-# Description: Docker Compose file for running the CFWheels Test Suite
+# Description: Docker Compose file for running the Wheels Test Suite
 
 services:
   testui:
     build:
       context: ./docker/testui
-    image: cfwheels-testui:v1.0.2
+    image: wheels-testui:v1.0.2
     ports:
       - "3000:8080"
 
@@ -12,17 +12,17 @@ services:
     build:
       context: ./
       dockerfile: ./docker/lucee@5/Dockerfile
-    image: cfwheels-test-lucee5:v1.0.2
+    image: wheels-test-lucee5:v1.0.2
     restart: always
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./:/wheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/lucee@5/server.json
-        target: /cfwheels-test-suite/server.json
+        target: /wheels-test-suite/server.json
       - type: bind
         source: ./docker/lucee@5/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /wheels-test-suite/app/config/settings.cfm
     ports:
       - "60005:60005"
 
@@ -30,17 +30,17 @@ services:
     build:
       context: ./
       dockerfile: ./docker/lucee@6/Dockerfile
-    image: cfwheels-test-lucee6:v1.0.2
+    image: wheels-test-lucee6:v1.0.2
     restart: always
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./:/wheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/lucee@6/server.json
-        target: /cfwheels-test-suite/server.json
+        target: /wheels-test-suite/server.json
       - type: bind
         source: ./docker/lucee@6/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /wheels-test-suite/app/config/settings.cfm
     ports:
       - "60006:60006"
 
@@ -48,17 +48,17 @@ services:
     build:
       context: ./
       dockerfile: ./docker/adobe@2018/Dockerfile
-    image: cfwheels-test-adobe2018:v1.0.2
+    image: wheels-test-adobe2018:v1.0.2
     restart: always
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./:/wheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/adobe@2018/server.json
-        target: /cfwheels-test-suite/server.json
+        target: /wheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2018/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /wheels-test-suite/app/config/settings.cfm
     ports:
       - "62018:62018"
 
@@ -66,17 +66,17 @@ services:
     build:
       context: ./
       dockerfile: ./docker/adobe@2021/Dockerfile
-    image: cfwheels-test-adobe2021:v1.0.2
+    image: wheels-test-adobe2021:v1.0.2
     restart: always
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./:/wheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/adobe@2021/server.json
-        target: /cfwheels-test-suite/server.json
+        target: /wheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2021/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /wheels-test-suite/app/config/settings.cfm
     ports:
       - "62021:62021"
 
@@ -84,17 +84,17 @@ services:
     build:
       context: ./
       dockerfile: ./docker/adobe@2023/Dockerfile
-    image: cfwheels-test-adobe2023:v1.0.1
+    image: wheels-test-adobe2023:v1.0.1
     restart: always
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./:/wheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/adobe@2023/server.json
-        target: /cfwheels-test-suite/server.json
+        target: /wheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2023/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /wheels-test-suite/app/config/settings.cfm
     ports:
       - "62023:62023"
 
@@ -124,7 +124,7 @@ services:
     build:
       context: ./
       dockerfile: ./docker/sqlserver/Dockerfile
-    image: cfwheels-sqlserver:v1.0.1
+    image: wheels-sqlserver:v1.0.1
     environment:
       MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
       ACCEPT_EULA: Y
@@ -136,7 +136,7 @@ services:
     build:
       context: ./
       dockerfile: ./docker/sqlserver/Dockerfile_CICD
-    image: cfwheels-sqlserver:v1.0.1
+    image: wheels-sqlserver:v1.0.1
     environment:
       MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
       ACCEPT_EULA: Y

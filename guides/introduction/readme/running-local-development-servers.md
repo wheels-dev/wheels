@@ -29,7 +29,7 @@ The server will then start on a random port on `127.0.0.1` based the configurati
 }
 ```
 
-In this `server.json` file, the server name is set to `wheels`, meaning I can now start the server from any directory by simply calling `start myApp`. We don't have any port specified, but you can specify any port you want. Lastly, we have URL rewriting enabled and pointed the URL rewrite configuration file to `public/urlrewrite.xml`, which is included starting from CFWheels 2.x.
+In this `server.json` file, the server name is set to `wheels`, meaning I can now start the server from any directory by simply calling `start myApp`. We don't have any port specified, but you can specify any port you want. Lastly, we have URL rewriting enabled and pointed the URL rewrite configuration file to `public/urlrewrite.xml`, which is included starting from Wheels 2.x.
 
 #### Using custom host names
 
@@ -64,21 +64,21 @@ server list
 ```shell-session
 myapp (stopped)
  http://127.0.0.1:60000
- Webroot: /Users/cfwheels/Documents/myapp
+ Webroot: /Users/wheels/Documents/myapp
 
 myAPI (stopped)
  http://127.0.0.1:60010
- Webroot: /Users/cfwheels/Documents/myAPI
+ Webroot: /Users/wheels/Documents/myAPI
 
 megasite (stopped)
  http://127.0.0.1:61280
  CF Engine: lucee 4.5.4+017
- Webroot: /Users/cfwheels/Documents/megasite
+ Webroot: /Users/wheels/Documents/megasite
 
 awesomesite (stopped)
  http://127.0.0.1:60015
  CF Engine: lucee 4.5.4+017
- Webroot: /Users/cfwheels/Documents/awesomeo
+ Webroot: /Users/wheels/Documents/awesomeo
 ```
 
 To remove a server configuration from the list, you can use `server forget myapp`. Note the status of the servers on the list are somewhat unreliable, as it only remembers the last known state of the server: so if you start a server and then turn off your local machine, it may still remember it as `running` when you turn your local machine back on, which is why we recommend the use of `force: true` in the `server.json` file.
@@ -155,7 +155,7 @@ You can of course run multiple servers, so if you need to test your app on Lucee
 CommandBox 5.1 required to install dependencies easily
 {% endhint %}
 
-By default, the Lucee server that CommandBox starts includes all the essential Lucee extensions you need, but if need to minimize the size of the Lucee instance you launch, then you can use Lucee-Light by specifying `cfengine=lucee-light` in your `server.json` file. CFWheels can run just fine on lucee-light (which is after all, Lucee, minus all the extensions) but at a minimum, requires the following extensions to be installed as dependencies in your `box.json`. Please note you may have to add any drivers you need for your database to this list as well.
+By default, the Lucee server that CommandBox starts includes all the essential Lucee extensions you need, but if need to minimize the size of the Lucee instance you launch, then you can use Lucee-Light by specifying `cfengine=lucee-light` in your `server.json` file. Wheels can run just fine on lucee-light (which is after all, Lucee, minus all the extensions) but at a minimum, requires the following extensions to be installed as dependencies in your `box.json`. Please note you may have to add any drivers you need for your database to this list as well.
 
 ```json
 "dependencies":{

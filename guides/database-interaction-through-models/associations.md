@@ -16,7 +16,7 @@ The association methods should always be called in the `config()` method of a mo
 
 ### The belongsTo Association
 
-If your database table contains a field that is a foreign key to another table, then this is where to use the [belongsTo()](https://api.cfwheels.org/model.belongsto.html)function.
+If your database table contains a field that is a foreign key to another table, then this is where to use the [belongsTo()](https://api.wheels.dev/model.belongsto.html)function.
 
 If we had a comments table that contains a foreign key to the posts table called `postid`, then we would have this `config()` method within our comment model:
 
@@ -60,7 +60,7 @@ And don't worry about those pesky words in the English language that aren't plur
 
 ### An Example of hasOne
 
-The [hasOne()](https://api.cfwheels.org/model.hasone.html) association is not used as often as the [hasMany()](https://api.cfwheels.org/model.hasmany.html) association, but it has its use cases. The most common use case is when you have a large table that you have broken down into two or more smaller tables (a.k.a. denormalization) for performance reasons or otherwise.
+The [hasOne()](https://api.wheels.dev/model.hasone.html) association is not used as often as the [hasMany()](https://api.wheels.dev/model.hasmany.html) association, but it has its use cases. The most common use case is when you have a large table that you have broken down into two or more smaller tables (a.k.a. denormalization) for performance reasons or otherwise.
 
 Let's consider an association between `user` and `profile`. A lot of websites allow you to enter required info such as name and email but also allow you to add optional information such as age, salary, and so on. These can of course be stored in the same table. But given the fact that so much information is optional, it would make sense to have the required info in a `users` table and the optional info in a `profiles` table. This gives us a `hasOne()` relationship between these two models: "A user _has one_ profile."
 
@@ -96,13 +96,13 @@ As you can see, you do not pluralize "profile" in this case because there is onl
 
 By the way, as you can see above, the association goes both ways, i.e. a `user hasOne() profile`, and a `profile belongsTo()` a `user`. Generally speaking, all associations should be set up this way. This will give you the fullest API to work with in terms of the methods and arguments that Wheels makes available for you.
 
-However, this is not a definite requirement. Wheels associations are completely independent of one another, so it's perfectly OK to setup a [hasMany()](https://api.cfwheels.org/model.hasmany.html) association without specifying the related [belongsTo()](https://api.cfwheels.org/model.belongsto.html) association.
+However, this is not a definite requirement. Wheels associations are completely independent of one another, so it's perfectly OK to setup a [hasMany()](https://api.wheels.dev/model.hasmany.html) association without specifying the related [belongsTo()](https://api.wheels.dev/model.belongsto.html) association.
 
 ### Dependencies
 
 A dependency is when an associated model relies on the existence of its parent. In the example above, a `profile` is dependent on a `user`. When you delete the `user`, you would usually want to delete the `profile` as well.
 
-CFWheels makes this easy for you. When setting up your association, simply add the argument `dependent` with one of the following values, and CFWheels will automatically deal with the dependency.
+Wheels makes this easy for you. When setting up your association, simply add the argument `dependent` with one of the following values, and Wheels will automatically deal with the dependency.
 
 In your `model.cfc` file's `config()` function::
 
@@ -140,9 +140,9 @@ component extends="Model" {
 
 Both the manager and employee are stored in the same `employees` table and share the same `Employee` model.
 
-When you use this association in your code, the `employees` table will be joined to itself using the `managerid` column. CFWheels will handle the aliasing of the (otherwise duplicated) table names. It does this by using the pluralized version of the name you gave the association (in other words "managers" in this case).
+When you use this association in your code, the `employees` table will be joined to itself using the `managerid` column. Wheels will handle the aliasing of the (otherwise duplicated) table names. It does this by using the pluralized version of the name you gave the association (in other words "managers" in this case).
 
-This is important to remember because if you, for example, want to select the manager's name, you will have to do so manually (CFWheels won't do this for you, like it does with normal associations) using the `select` argument.
+This is important to remember because if you, for example, want to select the manager's name, you will have to do so manually (Wheels won't do this for you, like it does with normal associations) using the `select` argument.
 
 Here's an example of how to select both the name of the employee and their manager:
 
@@ -200,7 +200,7 @@ There are a couple ways to join data via associations, which we'll go over now.
 
 ### Using the include Argument in findAll()
 
-To join data from related tables in our [findAll()](https://api.cfwheels.org/model.findall.html) calls, we simply need to use the include argument. Let's say that we wanted to include data about the author in our  [findAll()](https://api.cfwheels.org/model.findall.html) call for `posts`.
+To join data from related tables in our [findAll()](https://api.wheels.dev/model.findall.html) calls, we simply need to use the include argument. Let's say that we wanted to include data about the author in our  [findAll()](https://api.wheels.dev/model.findall.html) call for `posts`.
 
 Here's what that call would look like:
 
@@ -303,9 +303,9 @@ As usual, this will make more sense when put into the context of an example. So 
 
 ### Example: Dynamic Shortcut Methods for Posts and Comments
 
-Let's say that you tell Wheels through a [hasMany()](https://api.cfwheels.org/model.hasmany.html) call that a `post` _has many_ `comments`. What happens then is that Wheels will enrich the post model by adding a bunch of useful methods related to this association.
+Let's say that you tell Wheels through a [hasMany()](https://api.wheels.dev/model.hasmany.html) call that a `post` _has many_ `comments`. What happens then is that Wheels will enrich the post model by adding a bunch of useful methods related to this association.
 
-If you wanted to get all `comments` that have been submitted for a `post`, you can now call `post.comments()`. In the background, Wheels will delegate this to a [findAll()](https://api.cfwheels.org/model.findall.html) call with the `where` argument set to `postid=#post.id#`.
+If you wanted to get all `comments` that have been submitted for a `post`, you can now call `post.comments()`. In the background, Wheels will delegate this to a [findAll()](https://api.wheels.dev/model.findall.html) call with the `where` argument set to `postid=#post.id#`.
 
 ### Listing of Dynamic Shortcut Methods
 
@@ -313,7 +313,7 @@ Here are all the methods that are added for the three possible association types
 
 **Methods Added by hasMany**
 
-Given that you have told Wheels that a `post` _has many_ `comments` through a [hasMany()](https://api.cfwheels.org/model.hasmany.html) call, here are the methods that will be made available to you on the `post` model.
+Given that you have told Wheels that a `post` _has many_ `comments` through a [hasMany()](https://api.wheels.dev/model.hasmany.html) call, here are the methods that will be made available to you on the `post` model.
 
 Replace `XXX` below with the name of the associated model (i.e. `comments` in the case of the example that we're using here).
 
@@ -333,9 +333,9 @@ Replace `XXX` below with the name of the associated model (i.e. `comments` in th
 
 **Methods Added by hasOne**
 
-The [hasOne()](https://api.cfwheels.org/model.hasone.html) association adds a few methods as well. Most of them are very similar to the ones added by [hasMany()](https://api.cfwheels.org/model.hasmany.html).
+The [hasOne()](https://api.wheels.dev/model.hasone.html) association adds a few methods as well. Most of them are very similar to the ones added by [hasMany()](https://api.wheels.dev/model.hasmany.html).
 
-Given that you have told Wheels that an `author` _has one_ `profile` through a [hasOne()](https://api.cfwheels.org/model.hasone.html) call, here are the methods that will be made available to you on the `author` model.
+Given that you have told Wheels that an `author` _has one_ `profile` through a [hasOne()](https://api.wheels.dev/model.hasone.html) call, here are the methods that will be made available to you on the `author` model.
 
 | Method      | Example                    | Description                                                                                                                                                                                                                                                                                               |
 | ----------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -349,9 +349,9 @@ Given that you have told Wheels that an `author` _has one_ `profile` through a [
 
 **Methods Added by belongsTo**
 
-The [belongsTo()](https://api.cfwheels.org/model.belongsto.html) association adds a couple of methods to your model as well.
+The [belongsTo()](https://api.wheels.dev/model.belongsto.html) association adds a couple of methods to your model as well.
 
-Given that you have told Wheels that a `comment` belongs to a `post` through a [belongsTo()](https://api.cfwheels.org/model.belongsto.html) call, here are the methods that will be made available to you on the `comment` model.
+Given that you have told Wheels that a `comment` belongs to a `post` through a [belongsTo()](https://api.wheels.dev/model.belongsto.html) call, here are the methods that will be made available to you on the `comment` model.
 
 | Method   | Example           | Description                                                                                                                                 |
 | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -446,9 +446,9 @@ component extends="Controller" {
 
 ### Creating a Shortcut for a Many-to-Many Relationship
 
-With the `shortcut` argument to [hasMany()](https://api.cfwheels.org/model.hasmany.html), you can have Wheels create a dynamic method that lets you bypass the join model and instead reference the model on the other end of the many-to-many relationship directly.
+With the `shortcut` argument to [hasMany()](https://api.wheels.dev/model.hasmany.html), you can have Wheels create a dynamic method that lets you bypass the join model and instead reference the model on the other end of the many-to-many relationship directly.
 
-For our example above, you can alter the [hasMany()](https://api.cfwheels.org/model.hasmany.html) call on the `customer` model to look like this instead:
+For our example above, you can alter the [hasMany()](https://api.wheels.dev/model.hasmany.html) call on the `customer` model to look like this instead:
 
 {% code title="app/models/customer.cfc" %}
 ```javascript
@@ -476,11 +476,11 @@ component extends="Controller" {
 ```
 {% endcode %}
 
-This functionality relies on having set up all the appropriate [hasMany()](https://api.cfwheels.org/model.hasmany.html) and [belongsTo()](https://api.cfwheels.org/model.belongsto.html) associations in all 3 models (like we have in our example in this chapter).
+This functionality relies on having set up all the appropriate [hasMany()](https://api.wheels.dev/model.hasmany.html) and [belongsTo()](https://api.wheels.dev/model.belongsto.html) associations in all 3 models (like we have in our example in this chapter).
 
 It also relies on the association names being consistent, but if you have customized your association names, you can specify exactly which associations the shortcut method should use with the `through` argument.
 
-The `through` argument accepts a list of 2 association names. The first argument is the name of the [belongsTo()](https://api.cfwheels.org/model.belongsto.html)association (set in the `subscription` model in this case), and the second argument is the [hasMany()](https://api.cfwheels.org/model.hasmany.html) association going back the other way (set in the `publication` model).
+The `through` argument accepts a list of 2 association names. The first argument is the name of the [belongsTo()](https://api.wheels.dev/model.belongsto.html)association (set in the `subscription` model in this case), and the second argument is the [hasMany()](https://api.wheels.dev/model.hasmany.html) association going back the other way (set in the `publication` model).
 
 Sound complicated? That's another reason to stick to the conventions whenever possible: it keeps things simple.
 

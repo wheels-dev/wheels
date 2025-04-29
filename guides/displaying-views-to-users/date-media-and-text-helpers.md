@@ -12,7 +12,7 @@ Wheels's included view helper functions can help you out in those tricky little 
 * Media Helpers
 * Text Helpers
 
-We also have separate chapters about Wheels form helpers in [Form Helpers and Showing Errors](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) and creating your own helpers in [Creating Custom View Helpers](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/creating-custom-view-helpers).
+We also have separate chapters about Wheels form helpers in [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) and creating your own helpers in [Creating Custom View Helpers](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/creating-custom-view-helpers).
 
 ### Date Helpers
 
@@ -35,7 +35,7 @@ Let's say that you have a comment section in your application, which shows the t
 
 That works, but it's pretty tedious. And if you think about it, the date will be formatted in a way that is not that meaningful to the end user.
 
-Instead of "April 27, 2009 10:10 pm," it may be more helpful to display "a few minutes ago" or "2 hours ago." This can be accomplished with a Wheels date helper called [timeAgoInWords()](https://api.cfwheels.org/controller.timeagoinwords.html).
+Instead of "April 27, 2009 10:10 pm," it may be more helpful to display "a few minutes ago" or "2 hours ago." This can be accomplished with a Wheels date helper called [timeAgoInWords()](https://api.wheels.dev/controller.timeagoinwords.html).
 
 ```javascript
 <cfoutput query="comments">
@@ -56,7 +56,7 @@ Working with media is also a walk in the park with Wheels. Let's jump into a few
 
 **Style Sheets**
 
-First, to include CSS files in your layout, you can use the [styleSheetLinkTag()](https://api.cfwheels.org/controller.styleSheetLinkTag.html) function:
+First, to include CSS files in your layout, you can use the [styleSheetLinkTag()](https://api.wheels.dev/controller.styleSheetLinkTag.html) function:
 
 ```javascript
 <!--- layout.cfm --->
@@ -83,7 +83,7 @@ Lastly, you can also link to stylesheets at a different domain or subdomain by s
 
 **JavaScript Files**
 
-Including JavaScript files is just as simple with the [javaScriptIncludeTag()](https://api.cfwheels.org/controller.javascriptincludetag.html) helper. This time, files are referenced from the _**public/javascripts**_ folder.
+Including JavaScript files is just as simple with the [javaScriptIncludeTag()](https://api.wheels.dev/controller.javascriptincludetag.html) helper. This time, files are referenced from the _**public/javascripts**_ folder.
 
 ```javascript
 #javaScriptIncludeTag("jquery")#
@@ -97,7 +97,7 @@ Like with style sheets, you can also specify lists of JavaScript includes as wel
 
 **Displaying Images**
 
-Wheels's [imageTag()](https://api.cfwheels.org/controller.imagetag.html) helper also provides some simple, yet powerful functionality:
+Wheels's [imageTag()](https://api.wheels.dev/controller.imagetag.html) helper also provides some simple, yet powerful functionality:
 
 ```javascript
 <cfoutput>

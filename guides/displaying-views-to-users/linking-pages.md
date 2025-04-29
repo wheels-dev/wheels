@@ -1,18 +1,18 @@
 ---
 description: >-
-  CFWheels does some magic to help you link to other pages within your app. Read
+  Wheels does some magic to help you link to other pages within your app. Read
   on to learn why you'll rarely use an <a> tag ever again.
 ---
 
 # Linking Pages
 
-CFWheels's built-in [linkTo()](https://api.cfwheels.org/controller.linkto.html) function does all of the heavy lifting involved with linking the different pages of your application together. You'll generally be using [linkTo()](https://api.cfwheels.org/controller.linkto.html) within your view code.
+Wheels's built-in [linkTo()](https://api.wheels.dev/controller.linkto.html) function does all of the heavy lifting involved with linking the different pages of your application together. You'll generally be using [linkTo()](https://api.wheels.dev/controller.linkto.html) within your view code.
 
-As you'll soon realize, the [linkTo()](https://api.cfwheels.org/controller.linkto.html) function accepts a whole bunch of arguments. We won't go over all of them here, so don't forget to have a look at the [documentation](https://api.cfwheels.org/controller.linkto.html) for the complete details.
+As you'll soon realize, the [linkTo()](https://api.wheels.dev/controller.linkto.html) function accepts a whole bunch of arguments. We won't go over all of them here, so don't forget to have a look at the [documentation](https://api.wheels.dev/controller.linkto.html) for the complete details.
 
 ### Default Wildcard Linking
 
-When installing CFWheels, if you open the file at `app/config/routes.cfm`, you'll see something like this:
+When installing Wheels, if you open the file at `app/config/routes.cfm`, you'll see something like this:
 
 {% code title="app/config/routes.cfm" %}
 ```javascript
@@ -23,7 +23,7 @@ mapper()
 ```
 {% endcode %}
 
-The call to [wildcard()](https://api.cfwheels.org/mapper.wildcard.html) allows a simple linking structure where we can use the [linkTo()](https://api.cfwheels.org/controller.linkto.html) helper to link to a combination of controller and action.
+The call to [wildcard()](https://api.wheels.dev/mapper.wildcard.html) allows a simple linking structure where we can use the [linkTo()](https://api.wheels.dev/controller.linkto.html) helper to link to a combination of controller and action.
 
 For example, if we had a `widgets` controller with a `new` action, we could link to it like this:
 
@@ -39,9 +39,9 @@ That would generally produce this HTML markup:
 
 ### Linking to Routes
 
-If you're developing a non-trivial CFWheels application, you'll quickly grow out of the wildcard-based routing. You'll likely need to link to URLs containing primary keys, URL-friendly slugged titles, and nested subfolders. Now would be a good time to take a deep dive into the [Routing](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter and learn the concepts.
+If you're developing a non-trivial Wheels application, you'll quickly grow out of the wildcard-based routing. You'll likely need to link to URLs containing primary keys, URL-friendly slugged titles, and nested subfolders. Now would be a good time to take a deep dive into the [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter and learn the concepts.
 
-When you're using [linkTo()](https://api.cfwheels.org/controller.linkto.html) to create links to routes, you need to pay attention to 2 pieces of information: the route _name_ and any _parameters_ that the route requires.
+When you're using [linkTo()](https://api.wheels.dev/controller.linkto.html) to create links to routes, you need to pay attention to 2 pieces of information: the route _name_ and any _parameters_ that the route requires.
 
 Let's work with a set of sample routes to practice creating links:
 
@@ -125,7 +125,7 @@ mapper()
 
 ### Linking to Resources
 
-Resources are the encouraged routing pattern in CFWheels, and you will likely find yourself using this type of route most often.
+Resources are the encouraged routing pattern in Wheels, and you will likely find yourself using this type of route most often.
 
 Once you setup a resource in `app/config/routes.cfm`, the key is to inspect the routes generated and get a feel for the names and parameters that are expected.
 
@@ -139,7 +139,7 @@ mapper()
 ```
 {% endcode %}
 
-We would see these linkable routes generated related to the posts. (See the chapter on [Form Helpers and Showing Errors](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) for information about posting forms to the rest of the routes.)
+We would see these linkable routes generated related to the posts. (See the chapter on [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) for information about posting forms to the rest of the routes.)
 
 | Name     | Method | Pattern            | Controller | Action |
 | -------- | ------ | ------------------ | ---------- | ------ |
@@ -194,7 +194,7 @@ The above code would generate markup like this:
 
 ### A Deep Dive into Linking and Routing
 
-The [Routing](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter lists your options for generating URLs that are available in your application. Following is an explanation of how to link to the various types of routes available.
+The [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter lists your options for generating URLs that are available in your application. Following is an explanation of how to link to the various types of routes available.
 
 ### Namespaces
 
@@ -266,7 +266,7 @@ To link to the `pages` resource, you add the parent resource's singular name fir
 
 ### Linking to a Delete Action
 
-CFWheels 2.0 introduced security improvements for actions that change data in your applications (i.e., creating, updating, and deleting database records). CFWheels protects these actions by requiring that they happen along with a form `POST` in the browser.
+Wheels 2.0 introduced security improvements for actions that change data in your applications (i.e., creating, updating, and deleting database records). Wheels protects these actions by requiring that they happen along with a form `POST` in the browser.
 
 A common UI pattern is to have a link to delete a record, usually in an admin area. Unfortunately, links can only trigger `GET` requests, so we need to work around this.
 
@@ -282,24 +282,24 @@ To link to a delete request's required `DELETE` method, we need to code the link
 )#
 ```
 
-The [buttonTo()](https://api.cfwheels.org/controller.buttonto.html) helper generates a form with submit button. As you can see from the example, you can style the submit button itself by prepending any arguments with `input` (e.g., `inputClass`).
+The [buttonTo()](https://api.wheels.dev/controller.buttonto.html) helper generates a form with submit button. As you can see from the example, you can style the submit button itself by prepending any arguments with `input` (e.g., `inputClass`).
 
 Then it is up to you to style the form and submit button to look like a link or button using CSS (using whatever `class`es that you prefer in your markup, of course).
 
-If you need even more control, you can code up your own [startFormTag()](https://api.cfwheels.org/controller.startformtag.html) with whatever markup that you like. Just be sure to pass `method="delete"` to the call to `startFormTag`.
+If you need even more control, you can code up your own [startFormTag()](https://api.wheels.dev/controller.startformtag.html) with whatever markup that you like. Just be sure to pass `method="delete"` to the call to `startFormTag`.
 
 By the way, this will work with any request method that you please: `post`, `patch`, and `put` as well as `delete`.
 
 ### Extreme Example
 
-If we were to use all of the parameters for [linkTo()](https://api.cfwheels.org/controller.linkto.html), our code may look something like this:
+If we were to use all of the parameters for [linkTo()](https://api.wheels.dev/controller.linkto.html), our code may look something like this:
 
 ```html
 #linkTo(
-    text='<i class="rock-fist"></i> CFWheels Rocks!',
-    route="cfwheelsRocks",
+    text='<i class="rock-fist"></i> Wheels Rocks!',
+    route="wheelsRocks",
     key=55,
-    params="rocks=yes&referral=cfwheels.org",
+    params="rocks=yes&referral=wheels.dev",
     anchor="rockin",
     host="www.example.co.uk",
     protocol="https",
@@ -311,12 +311,12 @@ If we were to use all of the parameters for [linkTo()](https://api.cfwheels.org/
 Which would generate this HTML (or something like it):
 
 ```html
-<a href="https://www.example.co.uk/cfwheels/rocks/55?rocks=yes&amp;amp;referral=cfwheels.org#rockin"><i class="rock-fist"></i> CFWheels Rocks!</a>
+<a href="https://www.example.co.uk/wheels/rocks/55?rocks=yes&amp;amp;referral=wheels.dev#rockin"><i class="rock-fist"></i> Wheels Rocks!</a>
 ```
 
 ### Images and Other Embedded HTML in Link Texts
 
-If you'd like to use an image as a link to another page, pass the output of [imageTag()](https://api.cfwheels.org/controller.imagetag.html) to the `text` argument of [linkTo()](https://api.cfwheels.org/controller.linkto.html)and use the `encode` argument to instruct `linkTo` to only encode `attributes`:
+If you'd like to use an image as a link to another page, pass the output of [imageTag()](https://api.wheels.dev/controller.imagetag.html) to the `text` argument of [linkTo()](https://api.wheels.dev/controller.linkto.html)and use the `encode` argument to instruct `linkTo` to only encode `attributes`:
 
 ```html
 #linkTo(
@@ -345,9 +345,9 @@ If you decide to opt out of encoding, be careful. Any dynamic data passed in to 
 
 ### Adding Additional Attributes Like class, rel, and id
 
-Like many of the other CFWheels view helpers, any additional arguments that you pass to [linkTo()](https://api.cfwheels.org/controller.linkto.html) will be added to the generated `<a>` tag as attributes.
+Like many of the other Wheels view helpers, any additional arguments that you pass to [linkTo()](https://api.wheels.dev/controller.linkto.html) will be added to the generated `<a>` tag as attributes.
 
-For example, if you'd like to add a `class` attribute value of button to your link, here's what the call to [linkTo()](https://api.cfwheels.org/controller.linkto.html) would look like:
+For example, if you'd like to add a `class` attribute value of button to your link, here's what the call to [linkTo()](https://api.wheels.dev/controller.linkto.html) would look like:
 
 ```
 #linkTo(text="Check Out", route="checkout", class="button")#
@@ -357,7 +357,7 @@ The same goes for any other argument that you pass, including but not limited to
 
 ### What If I Don't Have URL Rewriting Enabled?
 
-CFWheels will handle linking to pages without URL rewriting for you automatically. Let's pretend that you still have CFWheels installed in your site root, but you do not have URL rewriting on. How you write your [linkTo()](https://api.cfwheels.org/controller.linkto.html) call will not change:
+Wheels will handle linking to pages without URL rewriting for you automatically. Let's pretend that you still have Wheels installed in your site root, but you do not have URL rewriting on. How you write your [linkTo()](https://api.wheels.dev/controller.linkto.html) call will not change:
 
 ```
 #linkTo(
@@ -367,15 +367,15 @@ CFWheels will handle linking to pages without URL rewriting for you automaticall
 )#
 ```
 
-CFWheels will still correctly build the link markup:
+Wheels will still correctly build the link markup:
 
 ```html
 <a href="/index.cfm/products/3">This link isn't as pretty, but it still works</a>
 ```
 
-### Linking in a Subfolder Deployment of CFWheels
+### Linking in a Subfolder Deployment of Wheels
 
-The same would be true if you had CFWheels installed in a subfolder, thus perhaps eliminating your ability to use [URL Rewriting](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) (depending on what web server you have). The same [linkTo()](https://api.cfwheels.org/controller.linkto.html) code above may generate this HTML if you had CFWheels installed in a subfolder called `foo`:
+The same would be true if you had Wheels installed in a subfolder, thus perhaps eliminating your ability to use [URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) (depending on what web server you have). The same [linkTo()](https://api.wheels.dev/controller.linkto.html) code above may generate this HTML if you had Wheels installed in a subfolder called `foo`:
 
 ```html
 <a
@@ -388,12 +388,12 @@ The same would be true if you had CFWheels installed in a subfolder, thus perhap
 
 An `<a>` tag is easy enough, isn't it? Why would we need to use a function to do this mundane task? It turns out that there are some advantages. Here's the deal.
 
-CFWheels gives you a good amount of structure for your applications. With this, instead of thinking of URLs in the "old way," we think in terms of what route we're sending the user to.
+Wheels gives you a good amount of structure for your applications. With this, instead of thinking of URLs in the "old way," we think in terms of what route we're sending the user to.
 
-What's more, CFWheels is smart enough to build URLs for you. And it'll do this for you based on your situation with URL rewriting. Are you using URL rewriting in your app? Great. CFWheels will build your URLs accordingly. Not fortunate enough to have URL rewriting capabilities in your development or production environments? That's fine too because CFWheels will handle that automatically. Are you using CFWheels in a subfolder on your site, thus eliminating your ability to use URL rewriting? CFWheels handles that for you too.
+What's more, Wheels is smart enough to build URLs for you. And it'll do this for you based on your situation with URL rewriting. Are you using URL rewriting in your app? Great. Wheels will build your URLs accordingly. Not fortunate enough to have URL rewriting capabilities in your development or production environments? That's fine too because Wheels will handle that automatically. Are you using Wheels in a subfolder on your site, thus eliminating your ability to use URL rewriting? Wheels handles that for you too.
 
-If you see the pattern, this gives your application a good deal of portability. For example, you could later enable URL rewriting or move your application to a different subfolder. As long as you're using [linkTo()](https://api.cfwheels.org/controller.linkto.html) to build your links, you won't need to change anything extra to your code in order to accommodate this change.
+If you see the pattern, this gives your application a good deal of portability. For example, you could later enable URL rewriting or move your application to a different subfolder. As long as you're using [linkTo()](https://api.wheels.dev/controller.linkto.html) to build your links, you won't need to change anything extra to your code in order to accommodate this change.
 
-Lastly, if you later install a [plugin](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/plugins/installing-and-using-plugins) that needs to modify link markup, that plugin's hook is the [linkTo()](https://api.cfwheels.org/controller.linkto.html) helper.
+Lastly, if you later install a [plugin](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/plugins/installing-and-using-plugins) that needs to modify link markup, that plugin's hook is the [linkTo()](https://api.wheels.dev/controller.linkto.html) helper.
 
 Oh, and another reason is that it's just plain cool too. ;)

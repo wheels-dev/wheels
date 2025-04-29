@@ -1,15 +1,15 @@
 {
     "name":"Wheels.dev",
     "version":"3.0.0-SNAPSHOT",
-    "author":"CFWheels Core Team and Community",
-    "shortDescription":"CFWheels MVC Framework Core Directory",
+    "author":"Wheels Core Team and Community",
+    "shortDescription":"Wheels MVC Framework Core Directory",
     "location":"ForgeboxStorage",
     "slug":"wheels.fw",
     "directory":"vendor/wheels",
     "createPackageDirectory":true,
     "packageDirectory":"vendor/wheels",
-    "homepage":"https://cfwheels.org/",
-    "documentation":"https://docs.cfwheels.org/",
+    "homepage":"https://wheels.dev/",
+    "documentation":"https://docs.wheels.dev/",
     "changelog":"https://github.com/cfwheels/cfwheels/blob/master/CHANGELOG.md",
     "bugs":"https://github.com/cfwheels/cfwheels/issues",
     "repository":{
@@ -20,7 +20,6 @@
         "mvc",
         "rails",
         "wheels",
-        "cfwheels",
         "core"
     ],
     "ignore":[
@@ -29,10 +28,10 @@
     ],
     "installPathConvention":{
         "modules":"vendor/",
-        "cfwheels-plugins":"vendor/"
+        "wheels-plugins":"vendor/"
     },
     "installPaths":{
-        "cfwheels":"vendor/wheels/",
+        "wheels":"vendor/wheels/",
         "wirebox":"vendor/wirebox/",
         "testbox":"vendor/testbox/"
     },

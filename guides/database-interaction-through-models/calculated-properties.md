@@ -18,9 +18,9 @@ Consider the example of `fullName`. If your database table has fields for `first
 
 In most object-oriented languages, you would add a method to your class called `getFullName()`, which would return the concatenation of `this.firstName & " " & this.lastName`. The `getFullName()` method could potentially provide arguments to list the last name first and other types of calculations or transformations as well.
 
-Wheels still allows for you to do this sort of dynamic calculation with the `returnAs="objects"` argument in methods like [findAll()](https://api.cfwheels.org/model.findall.html), but we advise against it when fetching large data sets because of the slowness of `CreateObject()` across CFML engines.
+Wheels still allows for you to do this sort of dynamic calculation with the `returnAs="objects"` argument in methods like [findAll()](https://api.wheels.dev/model.findall.html), but we advise against it when fetching large data sets because of the slowness of `CreateObject()` across CFML engines.
 
-See the chapter on [Reading Records](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/reading-records) for more information.
+See the chapter on [Reading Records](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/reading-records) for more information.
 
 #### Using Calculated Properties to Generate fullName in the Database at Runtime
 
@@ -36,7 +36,7 @@ property(
 
 As you can probably deduce, we're creating a SQL statement that will be run in the `SELECT` clause to generate the \`fullName.
 
-With this line in place, `fullName` will become available in both full model objects and query objects returned by the various finder methods like [findAll()](https://api.cfwheels.org/model.findall.html) and [findOne()](https://api.cfwheels.org/model.findone.html).
+With this line in place, `fullName` will become available in both full model objects and query objects returned by the various finder methods like [findAll()](https://api.wheels.dev/model.findall.html) and [findOne()](https://api.wheels.dev/model.findone.html).
 
 ### Example #2: Age
 

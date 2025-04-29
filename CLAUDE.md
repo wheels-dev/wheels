@@ -21,6 +21,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Pascal case for built-in CF functions (e.g., IsNumeric(), Trim())
 - Use `local` scope for function variables (not var-scoped)
 - Prefix "private" methods with `$` (e.g., `$query()`) for internal use
-- Follow CFWheels validation/callback patterns in models
+- Follow Wheels validation/callback patterns in models
 - Use transactions for database tests
 - Use TestBox for writing tests with describe/it syntax

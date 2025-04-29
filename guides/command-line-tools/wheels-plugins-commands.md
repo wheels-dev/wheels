@@ -4,7 +4,7 @@ These are the commands in the `wheels plugins` namespace. Currently this section
 
 ## `wheels plugins list`
 
-This command will make a call to ForgeBox.io and bring back a list of available CFWheels Plugins listed on ForgeBox.
+This command will make a call to ForgeBox.io and bring back a list of available Wheels Plugins listed on ForgeBox.
 
 ```
 wheels plugins list
@@ -12,109 +12,109 @@ wheels plugins list
 
 ```
 ❯ wheels plugins list
-================ CFWheels Plugins From ForgeBox ======================
+================ Wheels Plugins From ForgeBox ======================
 Contacting ForgeBox, please wait...
 
- CFWheels Example Plugin    ( Tom King )
-Type: CFWheels Plugins
-Slug: "cfwheels-plugin-example"
-CFWheels Example Plugin
+ Wheels Example Plugin    ( Tom King )
+Type: Wheels Plugins
+Slug: "wheels-plugin-example"
+Wheels Example Plugin
 
 
  Shortcodes    ( Tom King )
-Type: CFWheels Plugins
+Type: Wheels Plugins
 Slug: "shortcodes"
-Shortcodes Plugin for CFWheels
+Shortcodes Plugin for Wheels
 
 
- CFWheels iCal4j    ( Tom King )
-Type: CFWheels Plugins
-Slug: "cfwheels-ical4j"
-CFWheels 2.x Plugin Date Repeats Methods via iCal4J Java Lib
+ Wheels iCal4j    ( Tom King )
+Type: Wheels Plugins
+Slug: "wheels-ical4j"
+Wheels 2.x Plugin Date Repeats Methods via iCal4J Java Lib
 
 
- CFWheels JS Disable    ( Tom King )
-Type: CFWheels Plugins
-Slug: "cfwheels-js-disable"
-JS Disable - CFWheels Plugin
+ Wheels JS Disable    ( Tom King )
+Type: Wheels Plugins
+Slug: "wheels-js-disable"
+JS Disable - Wheels Plugin
 
 
- CFWheels bCrypt    ( Tom King )
-Type: CFWheels Plugins
-Slug: "cfwheels-bcrypt"
-CFWheels 2.x plugin helper methods for the bCrypt Java Lib
+ Wheels bCrypt    ( Tom King )
+Type: Wheels Plugins
+Slug: "wheels-bcrypt"
+Wheels 2.x plugin helper methods for the bCrypt Java Lib
 
 
- CFWheels JS Confirm    ( Tom King )
-Type: CFWheels Plugins
-Slug: "cfwheels-js-confirm"
-JS Confirm - CFWheels Plugin
+ Wheels JS Confirm    ( Tom King )
+Type: Wheels Plugins
+Slug: "wheels-js-confirm"
+JS Confirm - Wheels Plugin
 
 
- CFWheels JWT    ( Tom King )
-Type: CFWheels Plugins
-Slug: "cfwheels-jwt"
-CFWheels plugin for encoding and decoding JSON Web Tokens (JWT)
+ Wheels JWT    ( Tom King )
+Type: Wheels Plugins
+Slug: "wheels-jwt"
+Wheels plugin for encoding and decoding JSON Web Tokens (JWT)
 
 
- CFWheels SAML    ( Tom Sucaet )
-Type: CFWheels Plugins
-Slug: "cfwheels-saml"
-CFWheels plugin for SAML Single Sign-On
+ Wheels SAML    ( Tom Sucaet )
+Type: Wheels Plugins
+Slug: "wheels-saml"
+Wheels plugin for SAML Single Sign-On
 
 
- CFWheels Models Default Scope    ( Landon Fabbricino )
-Type: CFWheels Plugins
+ Wheels Models Default Scope    ( Landon Fabbricino )
+Type: Wheels Plugins
 Slug: "defaultScope"
-CFWheels 2.1+ Add default scope to models for FindAll method
+Wheels 2.1+ Add default scope to models for FindAll method
 
 
  Bens Json Serializer For Wheels    ( Brandon Shea )
-Type: CFWheels Plugins
-Slug: "cfwheels-bens-json-serializer"
+Type: Wheels Plugins
+Slug: "wheels-bens-json-serializer"
 Swaps renderWith()'s use of serializeJson() with Ben Nadel's JsonSerializer
 
 
- CFWheels DotEnvSettings Plugin    ( Peter Amiri )
-Type: CFWheels Plugins
-Slug: "cfwheels-dotenvsettings"
-DotEnvSettings Plugin for CFWheels
+ Wheels DotEnvSettings Plugin    ( Peter Amiri )
+Type: Wheels Plugins
+Slug: "wheels-dotenvsettings"
+DotEnvSettings Plugin for Wheels
 
 
  TitleTag Plugin    ( Chris Geirman )
-Type: CFWheels Plugins
-Slug: "cfwheels-titletag-plugin"
+Type: Wheels Plugins
+Slug: "wheels-titletag-plugin"
 DRY up your title tags. Allows you to define each page's title within it's view.
 
 
- CFWheels HTMX Plugin    ( Peter Amiri )
-Type: CFWheels Plugins
-Slug: "cfwheels-htmx-plugin"
-HTMX Plugin for CFWheels
+ Wheels HTMX Plugin    ( Peter Amiri )
+Type: Wheels Plugins
+Slug: "wheels-htmx-plugin"
+HTMX Plugin for Wheels
 
 
- CFWheels File Bin    ( Brandon Shea )
-Type: CFWheels Plugins
-Slug: "cfwheels-filebin"
-CFWheels File Bin
+ Wheels File Bin    ( Brandon Shea )
+Type: Wheels Plugins
+Slug: "wheels-filebin"
+Wheels File Bin
 
 
- cfwheels ckEditor plugin    ( Reuben Brown )
-Type: CFWheels Plugins
-Slug: "cfwheels-ckeditor-plugin"
+ wheels ckEditor plugin    ( Reuben Brown )
+Type: Wheels Plugins
+Slug: "wheels-ckeditor-plugin"
 Over-ride the textArea() function
 
 
- cfwheels Bootstrap Multiselect plugin    ( Reuben Brown )
-Type: CFWheels Plugins
-Slug: "cfwheels-bootstrapmultiselect-plugin"
+ wheels Bootstrap Multiselect plugin    ( Reuben Brown )
+Type: Wheels Plugins
+Slug: "wheels-bootstrapmultiselect-plugin"
 Creates a new function to allow for a multiselect box
 
 
  Datepicker    ( Adam Chapman )
-Type: CFWheels Plugins
+Type: Wheels Plugins
 Slug: "datepicker"
-Datepicker Plugin for CFWheels
+Datepicker Plugin for Wheels
 
 
 

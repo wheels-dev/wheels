@@ -4,13 +4,13 @@ description: Where to place your view files and what to put in them.
 
 # Pages
 
-We've talked previously about how the controller is responsible for deciding which view files to render to the user. Read the [Rendering Content](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) chapter if you need to refresh your memory about that topic.
+We've talked previously about how the controller is responsible for deciding which view files to render to the user. Read the [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) chapter if you need to refresh your memory about that topic.
 
 In this chapter, we'll explain exactly _where_ to place these files and _what_ to put in them.
 
 ### Where to Place the Files
 
-In the simplest case, your controller action (typically a function inside your controller CFC file) will have a view file associated with it. As explained in the [Rendering Content](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) chapter, this file will be included automatically at the end of the controller action code. So if you're running the `show` action in the `blog` controller, for example, Wheels will include the `app/views/blog/show.cfm` file.
+In the simplest case, your controller action (typically a function inside your controller CFC file) will have a view file associated with it. As explained in the [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) chapter, this file will be included automatically at the end of the controller action code. So if you're running the `show` action in the `blog` controller, for example, Wheels will include the `app/views/blog/show.cfm` file.
 
 Some rules can be spotted here:
 
@@ -27,17 +27,17 @@ There can be some exceptions to this process though, so let's go through some po
 
 ### Controller Actions Without Associated View Files
 
-Not all controller actions need a corresponding view file. Consider the case where you process a form submission. To make sure it's not possible for the user to refresh the page and cause multiple submissions, you may choose to perform the form processing and then send the user directly to another page using the [redirectTo()](https://api.cfwheels.org/controller.redirectto.html) function.
+Not all controller actions need a corresponding view file. Consider the case where you process a form submission. To make sure it's not possible for the user to refresh the page and cause multiple submissions, you may choose to perform the form processing and then send the user directly to another page using the [redirectTo()](https://api.wheels.dev/controller.redirectto.html) function.
 
 ### Rendering the View File for Another Action
 
 Sometimes you want the controller action to render the view file for a different action than the one currently executing. This is especially common when your application processes a form and the user makes an input error. In this case, you'll probably choose to have your application display the same form again for correction.
 
-In this case, you can use the [renderView()](https://api.cfwheels.org/controller.renderview.html) function and specify a different action in the `action` argument (which will include the view page for that action but not **run** the controller code for it).
+In this case, you can use the [renderView()](https://api.wheels.dev/controller.renderview.html) function and specify a different action in the `action` argument (which will include the view page for that action but not **run** the controller code for it).
 
 ### Sharing a View File Between Actions
 
-Sometimes it's useful to have a view file that can be called from several controller actions. For these cases, you'll typically call [renderView()](https://api.cfwheels.org/controller.renderview.html) with the `template` argument.
+Sometimes it's useful to have a view file that can be called from several controller actions. For these cases, you'll typically call [renderView()](https://api.wheels.dev/controller.renderview.html) with the `template` argument.
 
 When using the `template` argument, there are specific rules that Wheels will follow in order to locate the file you want to include:
 
@@ -51,7 +51,7 @@ Also note that both `renderView(template="thepage")` and `renderView(template="t
 
 This is the output of your application: what the users will see in their browsers. Most often this will consist of HTML, but it can also be JavaScript, CSS, XML, etc. You are of course free to use any CFML tags and functions that you want to in the file as well. (This is a CFML application, right?)
 
-In addition to this normal code that you'll see in most ColdFusion applications—whether they are made for a framework or not—Wheels also gives you some nice constructs to help keep your code clean. The most important ones of these are [Layouts](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/layouts) , Partials, and Helpers.
+In addition to this normal code that you'll see in most ColdFusion applications—whether they are made for a framework or not—Wheels also gives you some nice constructs to help keep your code clean. The most important ones of these are [Layouts](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/layouts) , Partials, and Helpers.
 
 When writing your view code, you will have access to the variables you have set up in the controller file. The idea is that the variables you want to access in the view should be set unscoped (or in the `variables` scope if you prefer to set it explicitly) in the controller so that they are available to the view template.
 
@@ -73,14 +73,14 @@ For example, if the view is to display the `title` column from a query object ca
 </ul>
 ```
 
-Please note that you do **not** need to do this when passing in data to CFWheels view helpers. The view helpers themselves will handle calling `EncodeForUrl`, `EncodeForHtml` and `EncodeForHtmlAttribute` internally as needed.
+Please note that you do **not** need to do this when passing in data to Wheels view helpers. The view helpers themselves will handle calling `EncodeForUrl`, `EncodeForHtml` and `EncodeForHtmlAttribute` internally as needed.
 
-By "view helpers" we mean everything listed as such in the [API reference](https://api.cfwheels.org/), so be aware that global helpers, such as [capitalize](https://api.cfwheels.org/controller.capitalize.html), [humanize](https://api.cfwheels.org/controller.humanize.html) etc, do not encode the content you pass in. When in doubt, simply test by passing in a string and check the HTML source of the output to see whether CFWheels encoded it or not.
+By "view helpers" we mean everything listed as such in the [API reference](https://api.wheels.dev/), so be aware that global helpers, such as [capitalize](https://api.wheels.dev/controller.capitalize.html), [humanize](https://api.wheels.dev/controller.humanize.html) etc, do not encode the content you pass in. When in doubt, simply test by passing in a string and check the HTML source of the output to see whether Wheels encoded it or not.
 
 To control encoding in general you have three global settings at your disposal (they all default to `true`):
 
-* `encodeURLs`: When `true`, calls `EncodeForUrl` to encode parameter name and values in [URLFor](https://api.cfwheels.org/controller.urlfor.html).
-* `encodeHtmlTags`: When `true`, calls `EncodeForHtml` to encode tag content in [linkTo](https://api.cfwheels.org/controller.linkto.html), [textAreaTag](https://api.cfwheels.org/controller.textareatag.html) etc.
-* `encodeHtmlAttributes`: When `true`, calls `EncodeForHtmlAttribute` to encode attribute values in [linkTo](https://api.cfwheels.org/controller.linkto.html), [textAreaTag](https://api.cfwheels.org/controller.textareatag.html) etc.
+* `encodeURLs`: When `true`, calls `EncodeForUrl` to encode parameter name and values in [URLFor](https://api.wheels.dev/controller.urlfor.html).
+* `encodeHtmlTags`: When `true`, calls `EncodeForHtml` to encode tag content in [linkTo](https://api.wheels.dev/controller.linkto.html), [textAreaTag](https://api.wheels.dev/controller.textareatag.html) etc.
+* `encodeHtmlAttributes`: When `true`, calls `EncodeForHtmlAttribute` to encode attribute values in [linkTo](https://api.wheels.dev/controller.linkto.html), [textAreaTag](https://api.wheels.dev/controller.textareatag.html) etc.
 
-All individual functions also have their own `encode` argument (can be set to `true` / `false` or `attributes`) that overrides the global setting. Setting it to `attributes` will only encode HTML attribute values but leave tag content as is. Note that the `attributes` option is not available on functions that don't produce any tag content (such as [imageTag](https://api.cfwheels.org/controller.imagetag.html) for example), in those cases it's enough to pass in either `true` or `false`.
+All individual functions also have their own `encode` argument (can be set to `true` / `false` or `attributes`) that overrides the global setting. Setting it to `attributes` will only encode HTML attribute values but leave tag content as is. Note that the `attributes` option is not available on functions that don't produce any tag content (such as [imageTag](https://api.wheels.dev/controller.imagetag.html) for example), in those cases it's enough to pass in either `true` or `false`.

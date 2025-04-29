@@ -56,7 +56,7 @@ If you're actively trying to avoid the use of `cfprocessingdirective`, you can r
 
 ![](https://files.readme.io/7ee1953-umlaut\_3.png)![](https://files.readme.io/7ee1953-umlaut\_3.png)
 
-### Localizing CFWheels Helpers
+### Localizing Wheels Helpers
 
 // Example using monthNames args in dateSelect()\
 Coming soon

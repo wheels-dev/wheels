@@ -1,26 +1,26 @@
 ---
-description: Instructions for upgrading CFWheels applications
+description: Instructions for upgrading Wheels applications
 ---
 
 # Upgrading
 
 
 
-CFWheels follows Semantic Versioning ([http://semver.org/](http://semver.org)) so large version changes (e.g, `1.x.x -> 2.x.x`) will most likely contain breaking changes which will require evaluation of your codebase. Minor version changes (e.g, `1.3.x->1.4.x`) will often contain new functionality, but in a backwards-compatible manner, and maintenance releases (e.g `1.4.4 -> 1.4.5`) will just be trying to fix bugs.
+Wheels follows Semantic Versioning ([http://semver.org/](http://semver.org)) so large version changes (e.g, `1.x.x -> 2.x.x`) will most likely contain breaking changes which will require evaluation of your codebase. Minor version changes (e.g, `1.3.x->1.4.x`) will often contain new functionality, but in a backwards-compatible manner, and maintenance releases (e.g `1.4.4 -> 1.4.5`) will just be trying to fix bugs.
 
-Generally speaking, upgrading CFWheels is as easy as replacing the `wheels` folder, especially for those small maintenance releases: however, there are usually exceptions in minor point releases (i.e, `1.1` to `1.3` required replacing other files outside the `wheels` folder). The notes below detail those changes.
+Generally speaking, upgrading Wheels is as easy as replacing the `wheels` folder, especially for those small maintenance releases: however, there are usually exceptions in minor point releases (i.e, `1.1` to `1.3` required replacing other files outside the `wheels` folder). The notes below detail those changes.
 
 ### Upgrading to 3.0.0
 
 #### Compatibility Changes
 
-Adobe Coldfusion 2016 and below are no longer compatible with CFWheels going forward. Consequently, these versions have been removed from the Wheels Internal Test Suites.
+Adobe Coldfusion 2016 and below are no longer compatible with Wheels going forward. Consequently, these versions have been removed from the Wheels Internal Test Suites.
 
 #### Code changes
 
-* Migrate your tests from the `tests` directory which are written with rocketUnit and rewrite them into [Testbox](https://www.ortussolutions.com/products/testbox) in the `tests/Testbox` directory. Starting with CFWheels 3.x, [Testbox](https://www.ortussolutions.com/products/testbox) will replace RocketUnit as the default testing framework.
-* Starting with CFWheels 3.x, [Wirebox](https://www.ortussolutions.com/products/wireboxhttps://www.ortussolutions.com/products/wirebox) will be used as the default dependency injector.
-* After installing CFWheels 3.x, you'll have to run `box install` to intall testbox and wirebox in your application as they are not shipped with CFWheels but are rather listed in `box.json` file as dependencies to be installed.
+* Migrate your tests from the `tests` directory which are written with rocketUnit and rewrite them into [Testbox](https://www.ortussolutions.com/products/testbox) in the `tests/Testbox` directory. Starting with Wheels 3.x, [Testbox](https://www.ortussolutions.com/products/testbox) will replace RocketUnit as the default testing framework.
+* Starting with Wheels 3.x, [Wirebox](https://www.ortussolutions.com/products/wireboxhttps://www.ortussolutions.com/products/wirebox) will be used as the default dependency injector.
+* After installing Wheels 3.x, you'll have to run `box install` to intall testbox and wirebox in your application as they are not shipped with Wheels but are rather listed in `box.json` file as dependencies to be installed.
 * Added Mappings for the `app`, `vendor`, `wheels`, `wirebox`, `testbox` and `tests` directories.
 * `root.cfm` and `rewrite.cfm` have been removed. All the requests are now being redirected only through `public/index.cfm`.
 * A `.env` file has been added in the root of the application which adds the H2 database extension for lucee and sets the cfadmin password to `commandbox` for both [Lucee](http://lucee.org) and [Adobe ColdFusion](http://www.adobe.com/products/coldfusion/).
@@ -63,7 +63,7 @@ Other major changes required to upgrade your application are listed in the follo
 
 #### Supported CFML Engines
 
-CFWheels 2.0 requires one of these CFML engines:
+Wheels 2.0 requires one of these CFML engines:
 
 * Lucee 4.5.5.006 + / 5.2.1.9+
 * Adobe ColdFusion 10.0.23 / 11.0.12+ / 2016.0.4+
@@ -81,15 +81,15 @@ We've updated our minimum requirements to match officially supported versions fr
 * The global setting `cacheModelInitialization` has been renamed to `cacheModelConfig`.
 * The global setting `clearServerCache` has been renamed to `clearTemplateCache`.
 * The `updateProperties()` method has been removed, use `update()` instead.
-* JavaScript arguments like `confirm` and `disable` have been removed from the link and form helper functions (use the [JS Confirm](https://github.com/perdjurner/cfwheels-js-confirm) and [JS Disable](https://github.com/perdjurner/cfwheels-js-disable) plugins to reinstate the old behavior).
+* JavaScript arguments like `confirm` and `disable` have been removed from the link and form helper functions (use the [JS Confirm](https://github.com/perdjurner/wheels-js-confirm) and [JS Disable](https://github.com/perdjurner/wheels-js-disable) plugins to reinstate the old behavior).
 * The `renderPage` function has been renamed to `renderView`
 * `includePartial()` now requires the `partial` and `query` arguments to be set (if using a query)
 
 #### Routing
 
-The [addRoute()](https://api.cfwheels.org/v1.4.5/addroute.html) function has been removed in CFWheels 2.0 in favor of a new routing API. See the [Routing](https://guides.cfwheels.org/docs/routing) chapter for information about the new RESTful routing system.
+The [addRoute()](https://api.wheels.dev/v1.4.5/addroute.html) function has been removed in Wheels 2.0 in favor of a new routing API. See the [Routing](https://guides.wheels.dev/docs/routing) chapter for information about the new RESTful routing system.
 
-A limited version of the "wildcard" route (`[controller]/[action]/[key]`) is available as `[controller]/[action]`) if you use the new [wildcard()](https://api.cfwheels.org/mapper.wildcard.html) mapper method:
+A limited version of the "wildcard" route (`[controller]/[action]/[key]`) is available as `[controller]/[action]`) if you use the new [wildcard()](https://api.wheels.dev/mapper.wildcard.html) mapper method:
 
 {% code title="app/config/routes.cfm" %}
 ```javascript
@@ -103,23 +103,23 @@ By default, this is limited to `GET` requests for security reasons.
 
 #### Cross-Site Request Forgery (CSRF) Protection
 
-It is strongly recommended that you enable CFWheels 2.0's built-in CSRF protection.
+It is strongly recommended that you enable Wheels 2.0's built-in CSRF protection.
 
 For many applications, you need to follow these steps:
 
-1. In `controllers/Controller.cfc`, add a call to [protectsFromForgery()](https://guides.cfwheels.org/docs/protectsfromforgery) to the `config` method.
-2. Add a call to the [csrfMetaTags()](https://api.cfwheels.org/controller.csrfMetaTags.html) helper in your layouts' `<head>` sections.
-3. Configure any AJAX calls that `POST` data to your application to pass the `authenticityToken` from the `<meta>`tags generated by [csrfMetaTags()](https://api.cfwheels.org/controller.csrfMetaTags.html) as an `X-CSRF-TOKEN` HTTP header.
+1. In `controllers/Controller.cfc`, add a call to [protectsFromForgery()](https://guides.wheels.dev/docs/protectsfromforgery) to the `config` method.
+2. Add a call to the [csrfMetaTags()](https://api.wheels.dev/controller.csrfMetaTags.html) helper in your layouts' `<head>` sections.
+3. Configure any AJAX calls that `POST` data to your application to pass the `authenticityToken` from the `<meta>`tags generated by [csrfMetaTags()](https://api.wheels.dev/controller.csrfMetaTags.html) as an `X-CSRF-TOKEN` HTTP header.
 4. Update your route definitions to enforce HTTP verbs on actions that manipulate data (`get`, `post`, `patch`, `delete`, etc.)
 5. Make sure that forms within the application are `POST`ing data to the actions that require `post`, `patch`, and `delete` verbs.
 
-See documentation for the [CSRF Protection Plugin](https://github.com/liquifusion/cfwheels-csrf-protection) for more information.
+See documentation for the [CSRF Protection Plugin](https://github.com/liquifusion/wheels-csrf-protection) for more information.
 
-Note: If you had previously installed the [CSRF Protection plugin](https://github.com/liquifusion/cfwheels-csrf-protection), you may remove it and rely on the functionality included in the CFWheels 2 core.
+Note: If you had previously installed the [CSRF Protection plugin](https://github.com/liquifusion/wheels-csrf-protection), you may remove it and rely on the functionality included in the Wheels 2 core.
 
 #### Database Migrations
 
-If you have previously been using the dbmigrate plugin, you can now use the inbuilt version within the CFWheels 2 core.&#x20;
+If you have previously been using the dbmigrate plugin, you can now use the inbuilt version within the Wheels 2 core.&#x20;
 
 Database Migration files in `/db/migrate/` should now be moved to `/migrator/migrations` and extend `wheels.migrator.Migration`, not `plugins.dbmigrate.Migration` which can be changed with a simple find and replace. Note: Oracle is not currently supported for Migrator.
 
@@ -128,11 +128,11 @@ Database Migration files in `/db/migrate/` should now be moved to `/migrator/mig
 1. Replace the `wheels` folder with the new one from the 1.4 download.
 2. Replace URL rewriting rule files – i.e, `.htaccess`, `web.config`, `IsapiRewrite.ini`
 
-In addition, if you're upgrading from an earlier version of CFWheels, we recommend reviewing the instructions from earlier reference guides below.
+In addition, if you're upgrading from an earlier version of Wheels, we recommend reviewing the instructions from earlier reference guides below.
 
 ### Upgrading to 1.3.x
 
-If you are upgrading from CFWheels 1.1.0 or newer, follow these steps:
+If you are upgrading from Wheels 1.1.0 or newer, follow these steps:
 
 1. Replace the `wheels` folder with the new one from the 1.3 download.
 2. Replace the root `root.cfm` file with the new one from the 1.3 download.
@@ -141,7 +141,7 @@ If you are upgrading from CFWheels 1.1.0 or newer, follow these steps:
    * `events/onmaintenance.cfm`
    * `events/onmissingtemplate.cfm`
 
-In addition, if you're upgrading from an earlier version of CFWheels, we recommend reviewing the instructions from earlier reference guides below.
+In addition, if you're upgrading from an earlier version of Wheels, we recommend reviewing the instructions from earlier reference guides below.
 
 Note: To accompany the newest 1.1.x releases, we've highlighted the changes that are affected by each release in this cycle.&#x20;
 

@@ -6,7 +6,7 @@ description: >-
 
 # Database Migrations
 
-With CFWheels 2.x, you can now create, alter and populate your database via cfscript in an organized manner. Using custom CFC files, you can create an organized database schema, and move between versions easily, either programmatically, via the provided GUI, or via the CLI.&#x20;
+With Wheels 2.x, you can now create, alter and populate your database via cfscript in an organized manner. Using custom CFC files, you can create an organized database schema, and move between versions easily, either programmatically, via the provided GUI, or via the CLI.&#x20;
 
 ### Getting Started
 
@@ -79,7 +79,7 @@ t.create();
 ```
 {% endcode %}
 
-`t.timestamps();` creates CFWheels [automatic timestamp](https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/automatic-time-stamps) columns of `createdAt`,`updatedAt` and `deletedAt`.
+`t.timestamps();` creates Wheels [automatic timestamp](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/automatic-time-stamps) columns of `createdAt`,`updatedAt` and `deletedAt`.
 
 The `t.create();` is the final statement which executes the actual action.
 

@@ -6,8 +6,8 @@
   * [Running Local Development Servers](introduction/readme/running-local-development-servers.md)
   * [Beginner Tutorial: Hello World](introduction/readme/beginner-tutorial-hello-world.md)
   * [Beginner Tutorial: Hello Database](introduction/readme/beginner-tutorial-hello-database.md)
-  * [Tutorial: CFWheels, AJAX, and You](introduction/readme/tutorial-cfwheels-ajax-and-you.md)
-* [Frameworks and CFWheels](introduction/frameworks-and-cfwheels.md)
+  * [Tutorial: Wheels, AJAX, and You](introduction/readme/tutorial-wheels-ajax-and-you.md)
+* [Frameworks and Wheels](introduction/frameworks-and-wheels.md)
 * [Requirements](introduction/requirements.md)
 * [Manual Installation](introduction/manual-installation.md)
 * [Upgrading](introduction/upgrading.md)
@@ -21,15 +21,15 @@
 * [wheels dbmigrate - commands](command-line-tools/wheels-dbmigrate-commands.md)
 * [wheels plugins - commands](command-line-tools/wheels-plugins-commands.md)
 
-## Working with CFWheels
+## Working with Wheels
 
-* [Conventions](working-with-cfwheels/conventions.md)
-* [Configuration and Defaults](working-with-cfwheels/configuration-and-defaults.md)
-* [Directory Structure](working-with-cfwheels/directory-structure.md)
-* [Switching Environments](working-with-cfwheels/switching-environments.md)
-* [Testing Your Application](working-with-cfwheels/testing-your-application.md)
-* [Contributing to CFWheels](working-with-cfwheels/contributing-to-cfwheels.md)
-* [Documenting your Code](working-with-cfwheels/documenting-your-code.md)
+* [Conventions](working-with-wheels/conventions.md)
+* [Configuration and Defaults](working-with-wheels/configuration-and-defaults.md)
+* [Directory Structure](working-with-wheels/directory-structure.md)
+* [Switching Environments](working-with-wheels/switching-environments.md)
+* [Testing Your Application](working-with-wheels/testing-your-application.md)
+* [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
+* [Documenting your Code](working-with-wheels/documenting-your-code.md)
 
 ## Handling Requests with Controllers
 
