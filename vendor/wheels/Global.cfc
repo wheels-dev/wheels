@@ -2667,5 +2667,18 @@ component output="false" {
 		return local.norm;
 	}
 
+	/**
+	 * Generates a 36-character UUID compatible with SQL Server's uniqueidentifier.
+	 *
+	 * [section: Global Helpers]
+	 * [category: UUID Functions]
+	 *
+	 * @return A valid 36-character UUID string (e.g., 123e4567-e89b-12d3-a456-426614174000)
+	 */
+	public string function generateUUID() {
+		// Use Java UUID generator for a 36-character format
+		return createObject("java", "java.util.UUID").randomUUID().toString();
+	}
+
 	include "/app/global/functions.cfm";
 }

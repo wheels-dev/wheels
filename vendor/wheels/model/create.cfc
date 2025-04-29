@@ -239,6 +239,39 @@ component {
 			$timestampProperty(property = variables.wheels.class.timeStampOnUpdateProperty);
 		}
 
+		local.pks = listToArray(primaryKeys());
+		local.uuidBasedKeys = [];
+		local.columnMeta = {};
+		local.key = "";
+
+		for (local.key in local.pks) {
+			local.key = trim(local.key);
+			local.columnMeta = this.columnDataForProperty(local.key);
+
+			if ($isUUIDColumn(local.columnMeta)) {
+				arrayAppend(local.uuidBasedKeys, local.key);
+			}
+		}
+
+		for (local.key in local.uuidBasedKeys) {
+			if (!structKeyExists(this, local.key) || isNull(this[local.key])) {
+				local.newUUID = generateUUID();
+
+				while (true) {
+					local.exists = this.findOne(
+						where = "#local.primaryKey# = '#local.newUUID#'"
+					);
+
+					if (!local.exists) {
+						this[local.key] = local.newUUID;
+						break;
+					} else {
+						local.newUUID = generateUUID();
+					}
+				}
+			}
+		}
+
 		// Start by adding column names and values for the properties that exist on the object to two arrays.
 		local.sql = [];
 		local.sql2 = [];
@@ -275,7 +308,6 @@ component {
 			}
 
 			// Map the primary keys down to the SQL columns.
-			local.pks = ListToArray(primaryKeys());
 			local.iEnd = ArrayLen(local.pks);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.pks[local.i] = variables.wheels.class.properties[local.pks[local.i]].column;
@@ -307,4 +339,15 @@ component {
 		}
 		return true;
 	}
+
+	/**
+	 * Determines if a column is likely intended to store UUID value
+	 */
+	public boolean function $isUUIDColumn(required struct columnMeta) {
+		return (
+			listFindNoCase("uniqueidentifier,char,varchar,uuid,raw,text", arguments.columnMeta.dataType)
+			&& (arguments.columnMeta.size == 36 || isNull(arguments.columnMeta.size))
+		);
+	}
+
 }
