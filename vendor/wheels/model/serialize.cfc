@@ -184,6 +184,12 @@ component {
 				local.rv[local.item] = "";
 			}
 		}
+
+		for (local.column in arguments.properties.columnList) {
+			if (!StructKeyExists(local.rv, local.column)) {
+				local.rv[local.column] = arguments.properties[local.column][arguments.row];
+			}
+		}
 		return local.rv;
 	}
 
