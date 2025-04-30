@@ -60,6 +60,7 @@ component {
 	 * @objectName Name of the variable containing the parent object to represent with this form field.
 	 * @association Name of the association set in the parent object to represent with this form field.
 	 * @keys Primary keys associated with this form field. Note that these keys should be listed in the order that they appear in the database table.
+	 * @id Optional. Explicit ID for the generated checkbox input. If not provided, an ID will be generated automatically.
 	 * @label The label text to use in the form control.
 	 * @labelPlacement Whether to place the label before, after, or wrapped around the form control. Label text placement can be controlled using `aroundLeft` or `aroundRight`.
 	 * @prepend String to prepend to the form control. Useful to wrap the form control with HTML tags.
@@ -82,7 +83,8 @@ component {
 		string appendToLabel,
 		string errorElement,
 		string errorClass,
-		any encode
+		any encode,
+		string id
 	) {
 		$args(name = "hasManyCheckBox", args = arguments);
 		arguments.keys = Replace(arguments.keys, ", ", ",", "all");
@@ -94,7 +96,7 @@ component {
 			local.checked = false;
 		}
 		arguments.objectName = ListLast(arguments.objectName, ".");
-		local.tagId = "#arguments.objectName#-#arguments.association#-#Replace(arguments.keys, ",", "-", "all")#-_delete";
+		local.tagId = (len(trim(arguments.id))) ? arguments.id : "#arguments.objectName#-#arguments.association#-#Replace(arguments.keys, ",", "-", "all")#-_delete";
 		local.tagName = "#arguments.objectName#[#arguments.association#][#arguments.keys#][_delete]";
 		StructDelete(arguments, "keys");
 		StructDelete(arguments, "objectName");
