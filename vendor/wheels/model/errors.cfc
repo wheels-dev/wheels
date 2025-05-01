@@ -95,6 +95,8 @@ component {
 				local.error = variables.wheels.errors[local.i];
 				if (local.error.property == arguments.property && local.error.name == arguments.name) {
 					ArrayDeleteAt(variables.wheels.errors, local.i);
+				} else if (local.error.property == arguments.property && !Len(arguments.name)) {
+					ArrayDeleteAt(variables.wheels.errors, local.i);
 				}
 			}
 		}
@@ -133,6 +135,8 @@ component {
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.error = variables.wheels.errors[local.i];
 			if (local.error.property == arguments.property && local.error.name == arguments.name) {
+				ArrayAppend(local.rv, variables.wheels.errors[local.i]);
+			} else if (local.error.property == arguments.property && !Len(arguments.name)) {
 				ArrayAppend(local.rv, variables.wheels.errors[local.i]);
 			}
 		}

@@ -498,7 +498,8 @@ component {
 						) {
 							addError(
 								message = $validationErrorMessage(local.propertyName, local.thisValidation.args.message),
-								property = local.propertyName
+								property = local.propertyName,
+								name = replace(local.thisValidation.method, "$validates", "", "one")
 							);
 						}
 					} else {
@@ -514,7 +515,8 @@ component {
 						) {
 							addError(
 								message = $validationErrorMessage(local.thisValidation.args.property, local.thisValidation.args.message),
-								property = local.thisValidation.args.property
+								property = local.thisValidation.args.property,
+								name = replace(local.thisValidation.method, "$validates", "", "one")
 							);
 						} else if (
 							!StructKeyExists(local.thisValidation.args, "property")

@@ -68,7 +68,11 @@ component extends="testbox.system.BaseSpec" {
 
 				r = user.errorCount(property = "lastname")
 
-				expect(r).toBe(3)
+				expect(r).toBe(5)
+
+				r = user.errorCount(property = "lastname", name = 'lastname_errors')
+
+				expect(r).toBe(2)
 
 				user.clearErrors(property = "lastname")
 				r = user.errorCount(property = "lastname")
@@ -85,7 +89,7 @@ component extends="testbox.system.BaseSpec" {
 
 				r = user.hasErrors(property = "lastname", name = "lastname_errors")
 
-				expect(r).toBeTrue()
+				expect(r).toBeFalse()
 			})
 
 			it("give error information for lastname property name provided", () => {
@@ -122,7 +126,7 @@ component extends="testbox.system.BaseSpec" {
 
 				r = user.errorCount(property = "firstname")
 
-				expect(r).toBe(2)
+				expect(r).toBe(5)
 
 				user.clearErrors(property = "firstname")
 				r = user.errorCount(property = "firstname")
@@ -139,7 +143,7 @@ component extends="testbox.system.BaseSpec" {
 
 				r = user.hasErrors(property = "firstname", name = "firstname_errors")
 
-				expect(r).toBeTrue()
+				expect(r).toBeFalse()
 			})
 
 			it("give error information for firstname property name provided", () => {
@@ -290,32 +294,32 @@ component extends="testbox.system.BaseSpec" {
 				r = user.hasErrors(name = "base_errorsx")
 
 				expect(r).toBeFalse()
-				
+
 				r = user.errorCount(name = "base_errorsx")
 
 				expect(r).toBe(0)
-				
+
 				user.clearErrors(name = "base_errorsx")
 				r = user.hasErrors(name = "base_errors")
 
 				expect(r).toBeTrue()
-				
+
 				r = user.hasErrors(property = "lastname")
 
 				expect(r).toBeTrue()
-				
+
 				r = user.hasErrors(property = "lastname", name = "lastname_errors")
 
 				expect(r).toBeTrue()
-				
+
 				r = user.hasErrors(property = "firstname")
 
 				expect(r).toBeTrue()
-				
+
 				r = user.hasErrors(property = "firstname", name = "firstname_errors")
 
 				expect(r).toBeTrue()
-				
+
 			})
 		})
 	}
