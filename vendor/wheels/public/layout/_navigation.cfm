@@ -29,23 +29,30 @@
 					#navArgs.Text#
 					<div class="menu">
 						<div class="item">
-							<span class="text">App Tests</span>
+							<span class="text">Testbox</span>
 							<div class="menu">
-								<a href="/testbox" class="#navArgs['class']#" target="_blank">HTML</a>
-								<a href="/testbox?format=json" class="#navArgs['class']#" target="_blank">JSON</a>
-								<a href="/testbox?format=txt" class="#navArgs['class']#" target="_blank">TXT</a>
-								<a href="/testbox?format=junit" class="#navArgs['class']#" target="_blank">JUnit</a>
+								<div class="item">
+									<span class="text">App Tests</span>
+									<div class="menu">
+										<a href="/testbox" class="#navArgs['class']#" target="_blank">HTML</a>
+										<a href="/testbox?format=json" class="#navArgs['class']#" target="_blank">JSON</a>
+										<a href="/testbox?format=txt" class="#navArgs['class']#" target="_blank">TXT</a>
+										<a href="/testbox?format=junit" class="#navArgs['class']#" target="_blank">JUnit</a>
+									</div>
+								</div>
+								<div class="item">
+									<span class="text">Core Tests</span>
+									<div class="menu">
+										<a href="#urlFor(argumentCollection = navArgs)#" class="#navArgs['class']#" target="_blank">HTML</a>
+										<a href="#urlFor(argumentCollection = navArgs)#?format=json" class="#navArgs['class']#" target="_blank">JSON</a>
+										<a href="#urlFor(argumentCollection = navArgs)#?format=txt" class="#navArgs['class']#" target="_blank">TXT</a>
+										<a href="#urlFor(argumentCollection = navArgs)#?format=junit" class="#navArgs['class']#" target="_blank">JUnit</a>
+									</div>
+								</div> 
 							</div>
 						</div>
-						<div class="item">
-							<span class="text">Core Tests</span>
-							<div class="menu">
-								<a href="#urlFor(argumentCollection = navArgs)#" class="#navArgs['class']#" target="_blank">HTML</a>
-								<a href="#urlFor(argumentCollection = navArgs)#?format=json" class="#navArgs['class']#" target="_blank">JSON</a>
-								<a href="#urlFor(argumentCollection = navArgs)#?format=txt" class="#navArgs['class']#" target="_blank">TXT</a>
-								<a href="#urlFor(argumentCollection = navArgs)#?format=junit" class="#navArgs['class']#" target="_blank">JUnit</a>
-							</div>
-						</div>
+			
+						<a href="/wheels/packages/app" class="#navArgs['class']#">RocketUnit</a>
 					</div>
 				</div>
 			<cfelse>
