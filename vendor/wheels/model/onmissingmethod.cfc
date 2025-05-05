@@ -323,7 +323,11 @@ component {
 						$setForeignKeyValues(missingMethodArguments = arguments.missingMethodArguments, keys = local.info.foreignKey);
 					}
 				} else if (local.info.type == "hasMany") {
-					local.where = $keyWhereString(properties = local.info.foreignKey, keys = primaryKeys());
+					if (structKeyExists(local.info, "joinKey") AND Len(local.info.joinKey) AND local.info.joinKey NEQ primaryKeys()) {
+						local.where = $keyWhereString(properties = local.info.foreignKey, keys = local.info.joinKey);
+					} else {
+						local.where = $keyWhereString(properties = local.info.foreignKey, keys = primaryKeys());
+					}
 					if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
 						local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
 					}
