@@ -242,6 +242,9 @@ component {
 		}
 
 		$args(name = "paginationLinks", args = arguments);
+		if (StructKeyExists(arguments, "params") && isStruct(arguments.params)) {
+			arguments.params = $paramsToQueryString(arguments.params);
+		}
 		local.skipArgs = "windowSize,alwaysShowAnchors,anchorDivider,linkToCurrentPage,prepend,append,prependToPage,addActiveClassToPrependedParent,prependOnFirst,prependOnAnchor,appendToPage,appendOnLast,appendOnAnchor,classForCurrent,handle,name,showSinglePage,pageNumberAsParam";
 		local.linkToArguments = Duplicate(arguments);
 		local.iEnd = ListLen(local.skipArgs);
@@ -486,4 +489,19 @@ component {
 		}
 		return arguments.text;
 	}
+
+	public string function $paramsToQueryString(required any params) {
+		if (!isStruct(arguments.params)) {
+			return arguments.params;
+		}
+		local.queryString = "";
+		for (key in arguments.params) {
+			local.value = arguments.params[key];
+			if (!isNull(local.value) && local.value != "") {
+				local.queryString &= (Len(local.queryString) ? "&" : "") & key & "=" & encodeForUrl(local.value);
+			}
+		}
+		return local.queryString;
+	}
+
 }
