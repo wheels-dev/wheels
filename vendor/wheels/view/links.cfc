@@ -494,14 +494,14 @@ component {
 		if (!isStruct(arguments.params)) {
 			return arguments.params;
 		}
-		var queryString = "";
+		local.queryString = "";
 		for (key in arguments.params) {
-			var value = arguments.params[key];
-			if (!isNull(value) && value != "") {
-				queryString &= (Len(queryString) ? "&" : "") & key & "=" & encodeForUrl(value);
+			local.value = arguments.params[key];
+			if (!isNull(local.value) && local.value != "") {
+				local.queryString &= (Len(local.queryString) ? "&" : "") & key & "=" & encodeForUrl(local.value);
 			}
 		}
-		return queryString;
+		return local.queryString;
 	}
 
 }
