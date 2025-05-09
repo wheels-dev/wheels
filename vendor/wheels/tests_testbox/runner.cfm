@@ -112,13 +112,16 @@
     }
     else{
         result = testBox.run(
-            reporter = "testbox.system.reports.SimpleReporter"
+            reporter = "testbox.system.reports.JSONReporter"
         )
-        writeOutput(result)
     }
     // reset the original environment
     application.wheels = application.$$$wheels
     structDelete(application, "$$$wheels")
+    if(!structKeyExists(url, "format")){
+        // Use our html template
+        include "html.cfm";
+    }
 
     private function setTestboxEnvironment() {
         // creating backup for original environment
