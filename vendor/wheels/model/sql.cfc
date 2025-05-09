@@ -276,7 +276,7 @@ component {
 		/* To fix the issue below:
 			https://github.com/cfwheels/cfwheels/issues/1048
 
-			The original issue was due to the alias not being passed in to identify the same columns in multiple tables. When we pass in the alias/dot notation in the select clause, it does not add the calculated properties due to the below condition which causes the orignal name of calculated property to be passed in the final query instead of the definition of calculated property, and that gives an invalid column when executed. Commented the below if and else condition and made fixes in case "." and " AS " is passed in.
+			The original issue was due to the alias not being passed in to identify the same columns in multiple tables. When we pass in the alias/dot notation in the select clause, it does not add the calculated properties due to the below condition which causes the original name of calculated property to be passed in the final query instead of the definition of calculated property, and that gives an invalid column when executed. Commented the below if and else condition and made fixes in case "." and " AS " is passed in.
 		*/
 		// if (!Find(".", arguments.list) && !Find(" AS ", arguments.list)) {
 			local.rv = "";
@@ -307,9 +307,14 @@ component {
 					local.toAppend = "";
 					local.classData = local.classes[local.j];
 
-					// create a struct for this model unless it already exists
-					if (!StructKeyExists(local.addedPropertiesByModel, local.classData.modelName)) {
-						local.addedPropertiesByModel[local.classData.modelName] = "";
+					local.associationKey = local.classData.modelName;
+					if (structKeyExists(local.classData, "pluralizedName") && local.classData.pluralizedName != "") {
+						local.associationKey &= "_" & local.classData.pluralizedName;
+					}
+
+					// Init the tracking list for this association
+					if (!structKeyExists(local.addedPropertiesByModel, local.associationKey)) {
+						local.addedPropertiesByModel[local.associationKey] = "";
 					}
 
 					// if we find the property in this model and it's not already added we go ahead and add it to the select clause
@@ -319,7 +324,7 @@ component {
 							|| StructKeyExists(local.classData.calculatedProperties, local.iItem)
 							|| ListFindNoCase(local.classData.aliasedPropertyList, local.iItem)
 						)
-						&& !ListFindNoCase(local.addedPropertiesByModel[local.classData.modelName], local.iItem)
+						&& !ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem)
 					) {
 						// if expanded column aliases is enabled then mark all columns from included classes as duplicates in order to prepend them with their class name
 						local.flagAsDuplicate = false;
@@ -331,9 +336,9 @@ component {
 							Get the column passed in the select argument with the included table's name prepended to it and replace table name to get the original name.
 
 							For example,
-							If the developer includes "comment" table and passes commentcreatedat column name in select, then get the createdat column in comment table and return that.
+							If the developer includes "comment" table and passes commentCreatedAt column name in select, then get the createdAt column in comment table and return that.
 
-							This is only valid for id,createdat,updatedat,deletedat columns.
+							This is only valid for id,createdAt,updatedAt,deletedAt columns.
 						*/
 						if(Len(arguments.include) && ListFindNoCase(local.classData.aliasedPropertyList, local.iItem)){
 							local.iItem = replaceNoCase(local.iItem, local.classData.modelName, '');
@@ -376,8 +381,8 @@ component {
 								}
 							}
 						}
-						local.addedPropertiesByModel[local.classData.modelName] = ListAppend(
-							local.addedPropertiesByModel[local.classData.modelName],
+						local.addedPropertiesByModel[local.associationKey] = ListAppend(
+							local.addedPropertiesByModel[local.associationKey],
 							local.iItem
 						);
 						break;
@@ -391,7 +396,7 @@ component {
 					Added an exception in case the column specified in the select or group argument does not exist in the database.
 					This will only be in case when not using "table.column" or "column AS something" since in those cases Wheels passes through the select clause unchanged.
 				*/
-				if (application.wheels.showErrorInformation && !Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.classData.modelName], local.iItem) EQ 0) {
+				if (application.wheels.showErrorInformation && !Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem) EQ 0) {
 					Throw(
 						type = "Wheels.ColumnNotFound",
 						message = "Wheels looked for the column mapped to the `#local.iItem#` property but couldn't find it in the database table.",
@@ -412,7 +417,7 @@ component {
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
 					local.iItem = ListGetAt(local.rv, local.i);
 
-					// get the property part, done by taking everytyhing from the end of the string to a . or a space (which would be found when using " AS ")
+					// get the property part, done by taking everything from the end of the string to a . or a space (which would be found when using " AS ")
 					local.property = Reverse(SpanExcluding(Reverse(local.iItem), ". "));
 
 					// check if this one has been flagged as a duplicate, we get the number of classes to skip and also remove the flagged info from the item
@@ -431,13 +436,31 @@ component {
 						// this is a duplicate so we prepend the class name and then insert it unless a property with the resulting name already exist
 						local.classData = local.classes[local.duplicateCount];
 
-						// prepend class name to the property
-						local.newProperty = local.classData.modelName & local.property;
+						// Initialize aliasFound
+						local.aliasFound = false;
+						local.alias = "";
 
+						// Check for join and extract alias
+						if (StructKeyExists(local.classData, "join")) {
+							local.match = ReFindNoCase("\sAS\s+(\w+)", local.classData.join, 1, true);
+							if (ArrayLen(local.match.len) >= 2 && local.match.len[2] > 0) {
+								local.alias = Mid(local.classData.join, local.match.pos[2], local.match.len[2]);
+								local.aliasFound = CompareNoCase(local.alias, local.classData.pluralizedName) EQ 0;
+							}
+						}
+
+						// Construct newProperty using alias or modelName
+						local.newProperty = (local.aliasFound ? local.alias : local.classData.modelName) & local.property;
+
+						// Determine newItem based on presence of " AS " in iItem
 						if (Find(" AS ", local.iItem)) {
 							local.newItem = ReplaceNoCase(local.iItem, " AS " & local.property, " AS " & local.newProperty);
 						} else {
-							local.newItem = local.iItem & " AS " & local.newProperty;
+							if (local.aliasFound) {
+								local.newItem = local.alias & "." & local.property & " AS " & local.newProperty;
+							} else {
+								local.newItem = local.iItem & " AS " & local.newProperty;
+							}
 						}
 					}
 					if (!ListFindNoCase(local.addedProperties, local.newProperty)) {

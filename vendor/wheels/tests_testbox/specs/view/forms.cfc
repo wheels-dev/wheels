@@ -935,7 +935,7 @@ component extends="testbox.system.BaseSpec" {
 			it("is valid", () => {
 				_controller = g.controller(name = "ControllerWithModel")
 				e = _controller.textArea(objectName = "user", property = "firstname")
-				r = '<label for="user-firstname">Firstname<textarea id="user-firstname" name="user&##x5b;firstname&##x5d;">Tony</textarea></label>'
+				r = '<label for="user-firstname">Firstname<textarea id="user-firstname" maxlength="50" name="user&##x5b;firstname&##x5d;">Tony</textarea></label>'
 
 				expect(e).toBe(r)
 			})
