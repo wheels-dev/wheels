@@ -453,7 +453,7 @@ component {
 						local.newProperty = (local.aliasFound ? local.alias : local.classData.modelName) & local.property;
 
 						// Determine newItem based on presence of " AS " in iItem
-						if (FindNoCase(" AS ", local.iItem)) {
+						if (Find(" AS ", local.iItem)) {
 							local.newItem = ReplaceNoCase(local.iItem, " AS " & local.property, " AS " & local.newProperty);
 						} else {
 							if (local.aliasFound) {
