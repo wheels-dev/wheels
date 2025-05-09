@@ -15,11 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        commandbox_version: [ "6.0.0" ]
-        jdkVersion: [ "21" ]
-        experimental: [false]
         cfengine: [ "lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023" ]
         dbengine: ["mysql", "postgres", "sqlserver_cicd", "h2"]
+        commandbox_version: [ "6.2.1" ]
+        jdkVersion: [ "21" ]
+        experimental: [false]
         exclude:
           # - cfengine: lucee@5
           #   dbengine: mysql
