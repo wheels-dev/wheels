@@ -108,9 +108,9 @@ component {
 		local.after = $formAfterElement(argumentCollection = arguments);
 		arguments.type = "password";
 		arguments.name = $tagName(arguments.objectName, arguments.property);
-		local.maxlength = $maxLength(argumentCollection = arguments);
-		if (StructKeyExists(local, "maxlength")) {
-			arguments.maxlength = local.maxlength;
+		local.maxLength = $maxLength(argumentCollection = arguments);
+		if (StructKeyExists(local, "maxLength")) {
+			arguments.maxLength = local.maxLength;
 		}
 		if (!StructKeyExists(arguments, "value") || !Len(arguments.value)) {
 			arguments.value = $formValue(argumentCollection = arguments);
@@ -263,6 +263,10 @@ component {
 	) {
 		$args(name = "textArea", reserved = "name", args = arguments);
 		arguments.objectName = $objectName(argumentCollection = arguments);
+		local.maxLength = $maxLength(argumentCollection = arguments);
+		if (StructKeyExists(local, "maxLength")) {
+			arguments.maxLength = local.maxLength;
+		}
 		if (!StructKeyExists(arguments, "id")) {
 			arguments.id = $tagId(arguments.objectName, arguments.property);
 		}
@@ -439,7 +443,7 @@ component {
 	 * @property [see:textField].
 	 * @association [see:textField].
 	 * @position [see:textField].
-	 * @options A collection to populate the select form control with. Can be a query recordset or an array of objects.
+	 * @options A collection to populate the select form control with. Can be a query recordSet or an array of objects.
 	 * @includeBlank Whether to include a blank option in the select form control. Pass true to include a blank line or a string that should represent what display text should appear for the empty value (for example, "- Select One -").
 	 * @valueField The column or property to use for the value of each list element. Used only when a query or array of objects has been supplied in the options argument.  Required when specifying `textField`
 	 * @textField The column or property to use for the value of each list element that the end user will see. Used only when a query or array of objects has been supplied in the options argument. Required when specifying `valueField`
