@@ -107,8 +107,8 @@ Chris Peters from Liquifusion demonstrates the ColdRoute plugin for Wheels
 [Wirebox Plugin for Wheels](https://vimeo.com/channels/wheels/)\
 Doug Boude demonstrates using his new Wirebox plugin for Wheels
 
-[DBMigrate Create Operations](https://vimeo.com/channels/wheels/40902756)\
-Chris Peters from Liquifusion demonstrates creating tables and records in the DBMigrate plugin for ColdFusion on Wheels
+[Database Migrations](https://vimeo.com/channels/wheels/40902756)\
+Chris Peters from Liquifusion demonstrates creating tables and records using database migrations in ColdFusion on Wheels
 
 [CF Meetup, March 10 2011](https://vimeo.com/channels/wheels/21863242)\
 Online ColdFusion Meetup (coldfusionmeetup.com) session for March 10 2011, "What's New in Wheels 1.1", with Chris Peters:
