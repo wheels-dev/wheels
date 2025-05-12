@@ -70,7 +70,7 @@ component extends="testbox.system.BaseSpec" {
 			it("is rendering without layout", () => {
 				_controller.renderView(layout = false)
 
-				expect(_controller.response()).toBe("view template content")
+				expect(trim(_controller.response())).toBe("view template content")
 			})
 
 			it("is rendering with default layout in controller folder", () => {

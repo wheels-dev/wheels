@@ -295,7 +295,7 @@ component {
 	 */
 	public string function response() {
 		if ($performedRender()) {
-			return Trim(variables.$instance.response);
+			return variables.$instance.response;
 		} else {
 			return "";
 		}
