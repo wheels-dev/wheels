@@ -303,7 +303,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 </cfquery>
 
 <!--- populate with data --->
-<cfset local.user = application.wo.model("user").create(
+<cfset local.user = model("user").create(
 	username = 'tonyp',
 	password = 'tonyp123',
 	firstname = 'Tony',
@@ -320,7 +320,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	isactive = 1
 )>
 
-<cfset local.user = application.wo.model("user").create(
+<cfset local.user = model("user").create(
 	username = 'chrisp',
 	password = 'chrisp123',
 	firstname = 'Chris',
@@ -337,7 +337,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	isactive = 1
 )>
 
-<cfset local.user = application.wo.model("user").create(
+<cfset local.user = model("user").create(
 	username = 'perd',
 	password = 'perd123',
 	firstname = 'Per',
@@ -354,7 +354,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	isactive = 1
 )>
 
-<cfset local.user = application.wo.model("user").create(
+<cfset local.user = model("user").create(
 	username = 'raulr',
 	password = 'raulr23',
 	firstname = 'Raul',
@@ -371,7 +371,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	isactive = 1
 )>
 
-<cfset local.user = application.wo.model("user").create(
+<cfset local.user = model("user").create(
 	username = 'joeb',
 	password = 'joeb',
 	firstname = 'Joe',
@@ -388,7 +388,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	isactive = 1
 )>
 
-<cfset local.per = application.wo.model("author").create(firstName = "Per", lastName = "Djurner")>
+<cfset local.per = model("author").create(firstName = "Per", lastName = "Djurner")>
 <cfset local.per.createProfile(dateOfBirth = "20/02/1975", bio = "ColdFusion Developer")>
 <cfset local.per.createPost(title = "Title for first test post", body = "Text for first test post", views = 5)>
 <cfset local.per.createPost(
@@ -402,7 +402,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	body = "Text for third test post",
 	averageRating = "3.2"
 )>
-<cfset local.tony = application.wo.model("author").create(firstName = "Tony", lastName = "Petruzzi")>
+<cfset local.tony = model("author").create(firstName = "Tony", lastName = "Petruzzi")>
 <cfset local.tony.createPost(
 	title = "Title for fourth test post",
 	body = "Text for fourth test post",
@@ -415,27 +415,27 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	views = 2,
 	averageRating = "3.6"
 )>
-<cfset local.chris = application.wo.model("author").create(firstName = "Chris", lastName = "Peters")>
-<cfset local.peter = application.wo.model("author").create(firstName = "Peter", lastName = "Amiri")>
-<cfset local.james = application.wo.model("author").create(firstName = "James", lastName = "Gibson")>
-<cfset local.raul = application.wo.model("author").create(firstName = "Raul", lastName = "Riera")>
-<cfset local.andy = application.wo.model("author").create(firstName = "Andy", lastName = "Bellenie")>
-<cfset local.adam = application.wo.model("author").create(firstName = "Adam", lastName = "Chapman, Duke of Surrey")>
-<cfset local.tom = application.wo.model("author").create(firstName = "Tom", lastName = "King")>
-<cfset local.david = application.wo.model("author").create(firstName = "David", lastName = "Belanger")>
+<cfset local.chris = model("author").create(firstName = "Chris", lastName = "Peters")>
+<cfset local.peter = model("author").create(firstName = "Peter", lastName = "Amiri")>
+<cfset local.james = model("author").create(firstName = "James", lastName = "Gibson")>
+<cfset local.raul = model("author").create(firstName = "Raul", lastName = "Riera")>
+<cfset local.andy = model("author").create(firstName = "Andy", lastName = "Bellenie")>
+<cfset local.adam = model("author").create(firstName = "Adam", lastName = "Chapman, Duke of Surrey")>
+<cfset local.tom = model("author").create(firstName = "Tom", lastName = "King")>
+<cfset local.david = model("author").create(firstName = "David", lastName = "Belanger")>
 
-<cfset local.users = application.wo.model("user").findAll(order = "id")>
+<cfset local.users = model("user").findAll(order = "id")>
 
 <cfloop query="local.users">
 	<cfloop from="1" to="5" index="local.i">
-		<cfset local.gallery = application.wo.model("gallery").create(
+		<cfset local.gallery = model("gallery").create(
 			userid = "#local.users.id#",
 			title = "#local.users.firstname# Test Galllery #local.i#",
 			description = "test gallery #local.i# for #local.users.firstname#"
 		)>
 
 		<cfloop from="1" to="10" index="local.i2">
-			<cfset local.photo = application.wo.model("photo").create(
+			<cfset local.photo = model("photo").create(
 				galleryid = "#local.gallery.id#",
 				filename = "Gallery #local.gallery.id# Photo Test #local.i2#",
 				description1 = "test photo #local.i2# for gallery #local.gallery.id#"
@@ -444,19 +444,19 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 	</cfloop>
 </cfloop>
 
-<cfset application.wo.model("user2").create(
+<cfset model("user2").create(
 	username = "Chris",
 	password = "x",
 	firstName = "x",
 	lastName = "x"
 )>
-<cfset application.wo.model("user2").create(
+<cfset model("user2").create(
 	username = "Tim",
 	password = "x",
 	firstName = "x",
 	lastName = "x"
 )>
-<cfset application.wo.model("user2").create(
+<cfset model("user2").create(
 	username = "Tom",
 	password = "x",
 	firstName = "x",
@@ -464,13 +464,13 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 )>
 
 <!--- create a profile with an author --->
-<cfset application.wo.model("profile").create(dateOfBirth = "1/1/1970", bio = "Unknown Author")>
+<cfset model("profile").create(dateOfBirth = "1/1/1970", bio = "Unknown Author")>
 
-<cfset local.posts = application.wo.model("post").findAll(order = "id")>
+<cfset local.posts = model("post").findAll(order = "id")>
 
 <cfloop query="local.posts">
 	<cfloop from="1" to="3" index="local.i">
-		<cfset local.comment = application.wo.model("comment").create(
+		<cfset local.comment = model("comment").create(
 			postid = local.posts.id,
 			body = "This is comment #local.i#",
 			name = "some commenter #local.i#",
@@ -482,47 +482,47 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 
 <!--- cities and shops --->
 <cfloop from="1" to="5" index="local.i">
-	<cfset application.wo.model("city").create(id = "3", citycode = "#local.i#", name = "county #local.i#")>
+	<cfset model("city").create(id = "3", citycode = "#local.i#", name = "county #local.i#")>
 
-	<cfset application.wo.model("shop").create(shopid = "shop#local.i#", citycode = "#local.i#", name = "shop #local.i#")>
+	<cfset model("shop").create(shopid = "shop#local.i#", citycode = "#local.i#", name = "shop #local.i#")>
 </cfloop>
 <!--- shop 1 has 5 trucks --->
 <cfloop from="1" to="5" index="local.i">
-	<cfset application.wo.model("truck").create(shopid = "shop1", registration = "TRUCK-#local.i#")>
+	<cfset model("truck").create(shopid = "shop1", registration = "TRUCK-#local.i#")>
 </cfloop>
 
-<cfset application.wo.model("shop").create(shopid = " shop6", citycode = 0, name = "x")>
+<cfset model("shop").create(shopid = " shop6", citycode = 0, name = "x")>
 
 <!--- tags --->
-<cfset local.releases = application.wo.model("tag").create(name = "releases", description = "testdesc")>
-<cfset application.wo.model("tag").create(name = "minor", description = "a minor release", parentid = 3)>
-<cfset application.wo.model("tag").create(name = "major", description = "a major release")>
-<cfset application.wo.model("tag").create(name = "point", description = "a point release", parentid = 2)>
+<cfset local.releases = model("tag").create(name = "releases", description = "testdesc")>
+<cfset model("tag").create(name = "minor", description = "a minor release", parentid = 3)>
+<cfset model("tag").create(name = "major", description = "a major release")>
+<cfset model("tag").create(name = "point", description = "a point release", parentid = 2)>
 
-<cfset local.fruit = application.wo.model("tag").create(name = "fruit", description = "something to eat")>
-<cfset application.wo.model("tag").create(name = "apple", description = "ummmmmm good", parentid = local.fruit.id)>
-<cfset application.wo.model("tag").create(name = "pear", description = "rhymes with Per", parentid = local.fruit.id)>
-<cfset application.wo.model("tag").create(name = "banana", description = "peal it", parentid = local.fruit.id)>
+<cfset local.fruit = model("tag").create(name = "fruit", description = "something to eat")>
+<cfset model("tag").create(name = "apple", description = "ummmmmm good", parentid = local.fruit.id)>
+<cfset model("tag").create(name = "pear", description = "rhymes with Per", parentid = local.fruit.id)>
+<cfset model("tag").create(name = "banana", description = "peal it", parentid = local.fruit.id)>
 
 <!--- classifications --->
-<cfset application.wo.model("classification").create(postid = 1, tagid = 7)>
+<cfset model("classification").create(postid = 1, tagid = 7)>
 
 <!--- collisiontests --->
-<cfset application.wo.model("collisiontest").create(method = "test")>
+<cfset model("collisiontest").create(method = "test")>
 
 <!--- collisiontests --->
 <cfloop from="1" to="5" index="i">
 	<cfloop from="1" to="5" index="a">
-		<cfset application.wo.model("CombiKey").create(id1 = "#i#", id2 = "#a#", userId = "#a#")>
+		<cfset model("CombiKey").create(id1 = "#i#", id2 = "#a#", userId = "#a#")>
 	</cfloop>
 </cfloop>
 
 <!--- sqltype --->
-<cfset application.wo.model("sqltype").create(stringVariableType = "tony", textType = "blah blah blah blah")>
+<cfset model("sqltype").create(stringVariableType = "tony", textType = "blah blah blah blah")>
 
 <!--- assign posts for multiple join test --->
 <cfset local.andy.update(favouritePostId = 1, leastFavouritePostId = 2)>
 
 <!--- uppercase table --->
-<cfset application.wo.model("category").create(category_name = "Quick Brown Foxes")>
-<cfset application.wo.model("category").create(category_name = "Lazy Dogs")>
+<cfset model("category").create(category_name = "Quick Brown Foxes")>
+<cfset model("category").create(category_name = "Lazy Dogs")>

@@ -117,6 +117,7 @@
     structDelete(application, "$$$wheels")
     if(!structKeyExists(url, "format") || url.format eq "html"){
         // Use our html template
+        type = "Core";
         include "html.cfm";
     }
 

@@ -1,12 +1,22 @@
 <cfcontent type="text/html">
 <cfparam name="result" default="">
 <cfparam name="_baseParams" default="">
-
+<cfparam name="type" type="string">
+<cfif NOT listFindNoCase("Core,App", type)>
+    <cfthrow message="Invalid 'type' value. Allowed values are 'Core' or 'App'." type="InvalidType">
+</cfif>
 <cfscript>
-    DeJsonResult = DeserializeJSON(result)
+    DeJsonResult = DeserializeJSON(result);
+    if(type eq "Core") {
+        package = "wheels.tests_testbox.specs";
+        route = "wheelstestbox";
+    } else if(type eq "App") {
+        package = "tests.Testbox.specs";
+        route = "testbox";
+    }
     // Convert TestBox results to a format similar to RocketUnit
     testResults = {
-        path = StructKeyExists(url, "directory") ? url.directory : "wheels.tests_testbox.specs",
+        path = StructKeyExists(url, "directory") ? url.directory : package,
         begin = DeJsonResult.startTime,
         end = DeJsonResult.endTime,
         ok = true,
@@ -33,7 +43,7 @@
                     time = spec.totalDuration,
                     status = "",
                     message = "",
-                    cleanTestCase = replaceNoCase(bundle.name, "wheels.tests_testbox.specs.", "", "all"),
+                    cleanTestCase = replaceNoCase(bundle.name, "#package#.", "", "all"),
                     cleanTestName = spec.name
                 };
                 
@@ -77,8 +87,8 @@
 <cfinclude template="/wheels/public/layout/_header.cfm">
 <div class="ui container">
 
-    #pageHeader(title="TestBox Test Results")#
-    <cfinclude template="_navigation.cfm">
+    #pageHeader(title="TestBox #type# Test Results")#
+    <cfinclude template="/wheels/tests_testbox/_navigation.cfm">
 
     <cfif NOT isStruct(testResults)>
         <p style="margin-bottom: 50px;">Sorry, no tests were found.</p>
@@ -114,8 +124,8 @@
             <tbody>
                 <cfloop array="#failures#" index="result">
                     <tr class="error">
-                        <td><a href="?directory=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?directory=#result.packageName#&testSpecs=#result.testName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                        <td><a href="?method=runRemote&testSpecs=#ReplaceNoCase(result.testName," ","%20","all")#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td class="failed">#result.status#</td>
                     </tr>
@@ -152,8 +162,8 @@
             <tbody>
                 <cfloop array="#passes#" index="result">
                     <tr class="positive">
-                        <td><a href="?directory=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?directory=#result.packageName#&testSpecs=#result.testName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                        <td><a href="?method=runRemote&testSpecs=#ReplaceNoCase(result.testName," ","%20","all")#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td class="success">#result.status#</td>
                     </tr>
