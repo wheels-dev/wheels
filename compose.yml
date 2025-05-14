@@ -115,18 +115,6 @@ services:
     ports:
       - "5433:5432"
 
-  sqlserver:
-    build:
-      context: ./
-      dockerfile: ./docker/sqlserver/Dockerfile
-    image: cfwheels-sqlserver:v1.0.1
-    environment:
-      MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
-      ACCEPT_EULA: Y
-      MSSQL_PID: Developer
-    ports:
-      - "1434:1433"
-
   sqlserver_cicd:
     build:
       context: ./
