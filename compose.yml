@@ -1,13 +1,48 @@
 # Description: Docker Compose file for running the CFWheels Test Suite
 
 services:
+  # Original TestUI - keeping for backward compatibility
   testui:
-    profiles: ["ui", "all"]
+    profiles: ["ui-legacy", "all"]
     build:
       context: ./docker/testui
     image: cfwheels-testui:v1.0.2
     ports:
       - "3000:8080"
+
+  # New Modern TestUI
+  testui-new:
+    profiles: ["ui", "all"]
+    build:
+      context: ./docker/testui-new
+    image: cfwheels-testui-new:v1.0.0
+    ports:
+      - "3001:80"
+    # Optional dependencies - these are not required for the TestUI to start
+    # but it will work better if these services are available
+    depends_on:
+      - lucee5
+      - lucee6
+      - adobe2023
+    # Add extra_hosts to allow container to access host services
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Mount Docker socket for container management (readonly)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Add healthcheck to verify container is working properly
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    # Add restart policy to ensure container stays up
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE=/api
+      - VITE_MOCK_API=true
 
   lucee5:
     profiles: ["lucee", "quick-test", "all"]
