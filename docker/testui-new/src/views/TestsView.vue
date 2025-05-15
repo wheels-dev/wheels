@@ -148,22 +148,28 @@
           <div class="card-body">
             <!-- Overall Summary Stats -->
             <div class="row text-center g-2 mb-4">
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <div class="p-3 border rounded">
                   <div class="fs-5 fw-bold">{{ summary.total }}</div>
                   <div class="small text-muted">Total Tests</div>
                 </div>
               </div>
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <div class="p-3 border rounded border-success bg-success bg-opacity-10">
                   <div class="fs-5 fw-bold text-success">{{ summary.passed }}</div>
                   <div class="small text-muted">Passed</div>
                 </div>
               </div>
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <div class="p-3 border rounded border-danger bg-danger bg-opacity-10">
                   <div class="fs-5 fw-bold text-danger">{{ summary.failed + summary.errors }}</div>
                   <div class="small text-muted">Failed</div>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="p-3 border rounded border-warning bg-warning bg-opacity-10">
+                  <div class="fs-5 fw-bold text-warning">{{ summary.skipped }}</div>
+                  <div class="small text-muted">Skipped</div>
                 </div>
               </div>
             </div>
@@ -188,13 +194,16 @@
                           {{ groupedRun.engine }} + {{ groupedRun.database }}
                         </h6>
                         <div>
-                          <span class="badge me-2" :class="{
-                            'bg-success': groupedRun.failedCount === 0,
-                            'bg-danger': groupedRun.failedCount > 0
-                          }">
-                            {{ groupedRun.passedCount }}/{{ groupedRun.totalCount }}
+                          <span class="badge bg-success me-1">
+                            {{ groupedRun.passedCount }}
                           </span>
-                          <span class="badge bg-secondary">
+                          <span class="badge bg-danger me-1" v-if="groupedRun.failedCount > 0">
+                            {{ groupedRun.failedCount }}
+                          </span>
+                          <span class="badge bg-warning me-1" v-if="groupedRun.skippedCount > 0">
+                            {{ groupedRun.skippedCount }}
+                          </span>
+                          <span class="badge bg-secondary me-1">
                             {{ (groupedRun.totalCount > 0 ? (groupedRun.passedCount / groupedRun.totalCount * 100) : 0).toFixed(1) }}%
                           </span>
                         </div>
