@@ -26,9 +26,6 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "60005:60005"
-    depends_on:
-      mysql:
-        condition: service_healthy
 
   lucee6:
     profiles: ["lucee", "compatibility", "all"]
@@ -47,9 +44,6 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "60006:60006"
-    depends_on:
-      mysql:
-        condition: service_healthy
 
   adobe2018:
     profiles: ["adobe", "legacy", "compatibility", "all"]
@@ -68,9 +62,6 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62018:62018"
-    depends_on:
-      mysql:
-        condition: service_healthy
 
   adobe2021:
     profiles: ["adobe", "compatibility", "all"]
@@ -89,9 +80,6 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62021:62021"
-    depends_on:
-      mysql:
-        condition: service_healthy
 
   adobe2023:
     profiles: ["adobe", "current", "compatibility", "all"]
@@ -110,9 +98,6 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62023:62023"
-    depends_on:
-      mysql:
-        condition: service_healthy
 
   mysql:
     profiles: ["db", "mysql", "quick-test", "compatibility", "all"]
@@ -182,6 +167,11 @@ services:
           memory: 4G
         reservations:
           memory: 2G
+    # Add network aliases so CFWheels can connect with correct hostnames
+    networks:
+      default:
+        aliases:
+          - sqlserver
 
 volumes:
   mysql_data:

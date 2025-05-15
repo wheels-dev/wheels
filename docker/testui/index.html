@@ -179,7 +179,10 @@
 
             //Get Execution Order
             const execOrder = getExecutionOrder();
-
+            
+            // Clear the requestList array before adding new items
+            requestList = [];
+            
             for(let i = 0; i < requestStatus.length; i++){
                 requestStatus[i].textContent = 'pending';
                 requestStatus[i].classList.add('bg-info','text-white');
@@ -207,7 +210,8 @@
                 requestStatus[i].classList.remove('text-dark','text-white','bg-warning','bg-info','bg-danger','bg-success');
                 requestStatus[i].parentNode.nextSibling.innerHTML = '';
             }
-            requestList.length = 0;
+            // Use a more explicit reset to ensure the array is completely emptied
+            requestList = [];
             document.getElementById('start-queue').classList.remove('btn-warning');
             document.getElementById('start-queue').classList.add('btn-success');
             document.getElementById('start-queue').innerHTML = `<svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="play fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-play-fill b-icon bi"><g><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"></path></g></svg> Start Queue`;
@@ -288,7 +292,8 @@
         document.getElementById('clear-queue').classList.add('d-none');
         document.getElementById('console-clear').classList.add('d-none');
         document.getElementById('results-clear').classList.add('d-none');
-
+        // Reset the request list array when clearing everything
+        requestList = [];
     })
 
     //Clear Queue
@@ -296,7 +301,8 @@
         document.getElementById('queue-section').innerHTML = `No Tests added yet.<br><em>Click on a test on the left to add it to the queue.</em>`;
         document.getElementById('start-queue').classList.add('d-none');
         document.getElementById('clear-queue').classList.add('d-none');
-
+        // Reset the request list array when clearing the queue
+        requestList = [];
     })
 
     //Clear Console
