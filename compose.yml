@@ -18,12 +18,6 @@ services:
     image: cfwheels-testui-new:v1.0.0
     ports:
       - "3001:80"
-    # Optional dependencies - these are not required for the TestUI to start
-    # but it will work better if these services are available
-    depends_on:
-      - lucee5
-      - lucee6
-      - adobe2023
     # Add extra_hosts to allow container to access host services
     extra_hosts:
       - "host.docker.internal:host-gateway"
