@@ -249,21 +249,33 @@ class TestService {
           throw new Error('Received HTML or text response instead of JSON. Check test runner URL and format parameter.');
         }
       } else if (typeof testData === 'object' && testData !== null) {
-        // Handle direct object responses
-        if (!testData.totalExecuted && !testData.totalFailed && !testData.totalError) {
-          console.error('Response object does not match expected TestBox format:', testData);
+        // Handle direct object responses - check for TestBox format
+        // TestBox may have different field names based on version
+        console.log('TestBox response fields:', Object.keys(testData).join(', '));
+        
+        // Check for any of the expected TestBox formats
+        const hasTestBoxFields = testData.totalSpecs !== undefined || 
+                               testData.totalPass !== undefined ||
+                               testData.totalExecuted !== undefined;
+        
+        if (!hasTestBoxFields) {
+          console.error('Response object does not seem to be TestBox format:', testData);
           throw new Error('Invalid test response format. Expected TestBox JSON output.');
         }
         
         // Update summary data from the actual response
-        testRun.summary.total = testData.totalExecuted || 0;
-        testRun.summary.passed = (testData.totalExecuted || 0) - 
-                                (testData.totalFailed || 0) - 
-                                (testData.totalError || 0) - 
-                                (testData.totalSkipped || 0);
-        testRun.summary.failed = testData.totalFailed || 0;
+        // Handle different field names in different TestBox versions
+        testRun.summary.total = testData.totalSpecs || testData.totalExecuted || testData.totalTests || 0;
+        testRun.summary.passed = testData.totalPass || 
+                               ((testData.totalExecuted || 0) - 
+                               (testData.totalFail || testData.totalFailed || 0) - 
+                               (testData.totalError || 0) - 
+                               (testData.totalSkipped || 0));
+        testRun.summary.failed = testData.totalFail || testData.totalFailed || 0;
         testRun.summary.errors = testData.totalError || 0;
         testRun.summary.skipped = testData.totalSkipped || 0;
+        
+        console.log('Parsed summary:', testRun.summary);
       } else {
         console.error('Unexpected response type:', typeof testData);
         throw new Error('Unexpected response type from test runner');
@@ -471,8 +483,86 @@ class TestService {
   
   // Process test results data and update the testRun object
   private processTestResults(testRun: TestRun, testData: any): TestRun {
-    // Map the results from TestBox format to our TestResult format
-    if (testData.results && Array.isArray(testData.results)) {
+    console.log('Processing test results from TestBox data. Looking for detailed results...');
+    
+    // First check for modern TestBox format with bundleStats
+    if (testData.bundleStats && Array.isArray(testData.bundleStats)) {
+      console.log(`Found ${testData.bundleStats.length} bundles with test results`);
+      
+      // Process each bundle's test specs
+      let allResults: TestResult[] = [];
+      
+      testData.bundleStats.forEach((bundle: any, bundleIndex: number) => {
+        const bundleName = bundle.path || `Bundle ${bundleIndex}`;
+        
+        // Process specs if available
+        if (bundle.suiteStats && Array.isArray(bundle.suiteStats)) {
+          bundle.suiteStats.forEach((suite: any) => {
+            if (suite.specStats && Array.isArray(suite.specStats)) {
+              // Add each spec as a test result
+              suite.specStats.forEach((spec: any, specIndex: number) => {
+                // Determine test status
+                const status = spec.status === 'Passed' ? TestStatus.Passed :
+                              spec.status === 'Failed' ? TestStatus.Failed :
+                              spec.status === 'Error' ? TestStatus.Error :
+                              spec.status === 'Skipped' ? TestStatus.Skipped :
+                              TestStatus.Unknown;
+                
+                // Create test result
+                const testResult: TestResult = {
+                  id: `${bundleIndex}_${specIndex}`,
+                  name: spec.name || `${bundleName}: ${suite.name || 'Unknown'} - Test ${specIndex}`,
+                  status,
+                  duration: spec.totalDuration || 0,
+                  timestamp: new Date().toISOString()
+                };
+                
+                // Add error details if available
+                if (status === TestStatus.Failed || status === TestStatus.Error) {
+                  testResult.error = {
+                    message: spec.failMessage || spec.error || 'Test failed',
+                    detail: spec.failDetail || spec.stacktrace || 'No detailed error information available'
+                  };
+                }
+                
+                allResults.push(testResult);
+              });
+            }
+          });
+        }
+      });
+      
+      console.log(`Processed ${allResults.length} individual test results from bundles`);
+      
+      // Update results if we found any
+      if (allResults.length > 0) {
+        testRun.results = allResults;
+      } else {
+        console.log('No individual test results found in bundle stats. Creating summary results.');
+        
+        // Create summary results for each bundle
+        testData.bundleStats.forEach((bundle: any, index: number) => {
+          const bundleName = bundle.path || `Bundle ${index}`;
+          const hasFailed = (bundle.totalFail || 0) > 0 || (bundle.totalError || 0) > 0;
+          
+          testRun.results.push({
+            id: `bundle_${index}`,
+            name: bundleName,
+            status: hasFailed ? TestStatus.Failed : TestStatus.Passed,
+            duration: bundle.totalDuration || 0,
+            timestamp: new Date().toISOString(),
+            error: hasFailed ? {
+              message: `${bundle.totalFail || 0} tests failed in this bundle`,
+              detail: `Bundle Path: ${bundleName}`
+            } : undefined
+          });
+        });
+      }
+    }
+    // Legacy format with results array
+    else if (testData.results && Array.isArray(testData.results)) {
+      console.log(`Found legacy format with ${testData.results.length} results`);
+      
       testRun.results = testData.results.map((result: any, index: number) => {
         // Convert TestBox status to our TestStatus enum
         const status = result.status === 'Passed' ? TestStatus.Passed :
@@ -501,6 +591,8 @@ class TestService {
         return testResult;
       });
     } else {
+      console.log('No detailed test results found. Creating summary result.');
+      
       // Fallback for unsupported response format - create a single result
       testRun.results.push({
         id: 'summary',
