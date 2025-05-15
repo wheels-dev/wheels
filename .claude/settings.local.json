@@ -19,7 +19,8 @@
       "Bash(docker-compose:*)",
       "Bash(docker compose down:*)",
       "Bash(docker compose build:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(docker logs:*)"
     ],
     "deny": []
   }
