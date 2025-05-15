@@ -2,6 +2,7 @@
 
 services:
   testui:
+    profiles: ["ui", "all"]
     build:
       context: ./docker/testui
     image: cfwheels-testui:v1.0.2
@@ -9,6 +10,7 @@ services:
       - "3000:8080"
 
   lucee5:
+    profiles: ["lucee", "quick-test", "all"]
     build:
       context: ./
       dockerfile: ./docker/lucee@5/Dockerfile
@@ -24,8 +26,12 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "60005:60005"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   lucee6:
+    profiles: ["lucee", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/lucee@6/Dockerfile
@@ -41,8 +47,12 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "60006:60006"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   adobe2018:
+    profiles: ["adobe", "legacy", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2018/Dockerfile
@@ -58,8 +68,12 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62018:62018"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   adobe2021:
+    profiles: ["adobe", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2021/Dockerfile
@@ -75,8 +89,12 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62021:62021"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   adobe2023:
+    profiles: ["adobe", "current", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2023/Dockerfile
@@ -92,10 +110,13 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62023:62023"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   mysql:
-    image: mysql:latest
-    # command: --default-authentication-plugin=mysql_native_password
+    profiles: ["db", "mysql", "quick-test", "compatibility", "all"]
+    image: mysql:8.0
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: wheelstestdb
@@ -104,9 +125,18 @@ services:
       MYSQL_PASSWORD: wheelstestdb
     ports:
       - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - mysql_data:/var/lib/mysql
 
   postgres:
-    image: postgres:latest
+    profiles: ["db", "postgres", "all"]
+    image: postgres:14
     restart: always
     environment:
       POSTGRES_USER: wheelstestdb
@@ -114,15 +144,46 @@ services:
       POSTGRES_INITDB_ARGS: --auth-host=md5
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wheelstestdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   sqlserver_cicd:
+    profiles: ["db", "sqlserver", "advanced", "all"]
     build:
       context: ./
       dockerfile: ./docker/sqlserver/Dockerfile_CICD
-    image: cfwheels-sqlserver:v1.0.1
+    image: cfwheels-sqlserver:v1.0.2
+    restart: always
     environment:
       MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
       ACCEPT_EULA: Y
       MSSQL_PID: Developer
+      # Increase memory to ensure stability
+      MSSQL_MEMORY_LIMIT_MB: 4096
     ports:
       - "1434:1433"
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" -C || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+volumes:
+  mysql_data:
+  postgres_data:
+  sqlserver_data:
