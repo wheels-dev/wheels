@@ -1,5 +1,6 @@
 import type { TestBundle, TestSpec, TestRun, TestResult, CfmlEngine, Database } from '@/types';
 import { TestStatus } from '@/types';
+import { api } from '@/utils/api';
 
 class TestService {
   private apiBase: string = '/api/tests';
@@ -174,60 +175,84 @@ class TestService {
     };
     
     try {
-      // In a real implementation, we would make the actual HTTP request here
-      // For now, let's simulate a response with a large number of tests
+      // Make the actual HTTP request to the test runner
+      console.log(`Making real HTTP request to test runner at: ${testRunnerUrl}${params.toString()}`);
       
-      // Create simulated tests - using 1613 as specified
-      console.log(`Generating 1613 simulated test results...`);
-      const totalTests = 1613;
-      testRun.summary.total = totalTests;
+      // Determine the engine API name
+      const engineApiName = this.getEngineApiName(engine);
+      if (!engineApiName) {
+        throw new Error(`Unknown engine: ${engine.name} ${engine.version}`);
+      }
       
-      // Show a loading message in console
-      console.log(`Starting test execution simulation (this may take a while for 1613 tests)...`);
+      // Use the api.cfml method to make a request through the NGINX proxy
+      const requestPath = `wheels/testbox?${params.toString()}`;
+      console.log(`Making request to CFML engine: ${engineApiName}, path: ${requestPath}`);
       
-      // Use a longer delay to better simulate the full test suite
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // Generate test results - with most tests passing
-      for (let i = 0; i < totalTests; i++) {
-        // Simulate realistic pass/fail rates - 95% pass rate
-        const random = Math.random();
-        let status;
-        
-        // Add more failed tests if this is SQL Server (simulating common issues)
-        const isSQLServer = database.name === 'SQL Server';
-        const failureThreshold = isSQLServer ? 0.85 : 0.95;
-        
-        if (random > failureThreshold) {
-          status = TestStatus.Failed;
-          testRun.summary.failed++;
-        } else if (random > failureThreshold - 0.02) {
-          status = TestStatus.Error;
-          testRun.summary.errors++;
-        } else if (random > failureThreshold - 0.05) {
-          status = TestStatus.Skipped;
-          testRun.summary.skipped++;
-        } else {
-          status = TestStatus.Passed;
-          testRun.summary.passed++;
+      const response = await api.cfml<any>(engineApiName, requestPath, {
+        headers: {
+          'Accept': 'application/json'
         }
-        
-        const result: TestResult = {
-          id: `test_${i}`,
-          name: this.generateRealisticTestName(bundle.id, i),
-          status,
-          duration: 0.05 + Math.random() * 0.8, // Most tests are fast, some are slower
-          timestamp: new Date().toISOString()
-        };
-        
-        if (status === TestStatus.Failed || status === TestStatus.Error) {
-          result.error = {
-            message: this.generateRealisticErrorMessage(database.name, status),
-            detail: this.generateRealisticErrorDetail(bundle.id)
+      });
+      
+      if (response.error || !response.data) {
+        throw new Error(`Test request failed: ${response.error || 'No data returned'}`);
+      }
+      
+      const testData = response.data;
+      console.log('Test response received:', testData);
+      
+      // Parse the response and extract test results
+      if (!testData.totalExecuted && !testData.totalFailed && !testData.totalError) {
+        console.error('Invalid test response format:', testData);
+        throw new Error('Invalid test response format. Expected TestBox JSON output.');
+      }
+      
+      // Update summary data from the actual response
+      testRun.summary.total = testData.totalExecuted || 0;
+      testRun.summary.passed = (testData.totalExecuted || 0) - 
+                              (testData.totalFailed || 0) - 
+                              (testData.totalError || 0) - 
+                              (testData.totalSkipped || 0);
+      testRun.summary.failed = testData.totalFailed || 0;
+      testRun.summary.errors = testData.totalError || 0;
+      testRun.summary.skipped = testData.totalSkipped || 0;
+      
+      // Process test results
+      if (testData.results && Array.isArray(testData.results)) {
+        testRun.results = testData.results.map((result: any, index: number) => {
+          const status = result.status === 'Passed' ? TestStatus.Passed :
+                        result.status === 'Failed' ? TestStatus.Failed :
+                        result.status === 'Error' ? TestStatus.Error :
+                        result.status === 'Skipped' ? TestStatus.Skipped :
+                        TestStatus.Unknown;
+                        
+          const testResult: TestResult = {
+            id: result.id || `test_${index}`,
+            name: result.name || `Unknown Test ${index}`,
+            status,
+            duration: result.duration || 0,
+            timestamp: result.timestamp || new Date().toISOString()
           };
-        }
-        
-        testRun.results.push(result);
+          
+          if (status === TestStatus.Failed || status === TestStatus.Error) {
+            testResult.error = {
+              message: result.message || result.failMessage || 'Test failed or errored',
+              detail: result.failDetail || result.detail || 'No detailed error information available'
+            };
+          }
+          
+          return testResult;
+        });
+      } else {
+        // Fallback for unsupported response format - create a single result
+        testRun.results.push({
+          id: 'summary',
+          name: 'Test Suite Summary',
+          status: testRun.summary.failed > 0 || testRun.summary.errors > 0 ? 
+                 TestStatus.Failed : TestStatus.Passed,
+          duration: 0,
+          timestamp: new Date().toISOString()
+        });
       }
       
       // Update the test run status based on results
@@ -502,6 +527,21 @@ class TestService {
     
     // Default port if not found
     return 8080;
+  }
+  
+  // Helper method to get the engine API name for NGINX proxy
+  private getEngineApiName(engine: CfmlEngine): string | null {
+    if (engine.name === 'Lucee') {
+      if (engine.version === '5') return 'lucee5';
+      if (engine.version === '6') return 'lucee6';
+    } else if (engine.name === 'Adobe') {
+      if (engine.version === '2018') return 'adobe2018';
+      if (engine.version === '2021') return 'adobe2021';
+      if (engine.version === '2023') return 'adobe2023';
+    }
+    
+    // Unknown engine
+    return null;
   }
   
   // Helper method to get database configuration

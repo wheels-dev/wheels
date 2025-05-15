@@ -36,7 +36,7 @@ services:
     environment:
       - NODE_ENV=production
       - VITE_API_BASE=/api
-      - VITE_MOCK_API=true
+      - VITE_MOCK_API=false
 
   lucee5:
     profiles: ["lucee", "quick-test", "all"]
