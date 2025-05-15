@@ -46,16 +46,8 @@
                   </select>
                 </div>
                 
-                <!-- Test Bundle Selection -->
-                <div class="mb-3">
-                  <label class="form-label fw-bold">Test Bundle</label>
-                  <select class="form-select" v-model="selectedBundle">
-                    <option value="" selected>Select a test bundle</option>
-                    <option v-for="bundle in testBundles" :key="bundle.id" :value="bundle.id">
-                      {{ bundle.name }}
-                    </option>
-                  </select>
-                </div>
+                <!-- Test Bundle is now hardcoded to "all" -->
+                <input type="hidden" v-model="selectedBundle" value="all">
               </div>
               
               <div class="col-md-6">
@@ -84,23 +76,8 @@
                   </label>
                 </div>
                 
-                <div>
-                  <label class="form-label fw-bold">Execution Order</label>
-                  <div class="form-check mb-2">
-                    <input class="form-check-input" type="radio" name="executionOrder" id="orderAsc" 
-                          value="directory asc" v-model="executionOrder">
-                    <label class="form-check-label" for="orderAsc">
-                      directory asc
-                    </label>
-                  </div>
-                  <div class="form-check">
-                    <input class="form-check-input" type="radio" name="executionOrder" id="orderDesc" 
-                          value="directory desc" v-model="executionOrder">
-                    <label class="form-check-label" for="orderDesc">
-                      directory desc
-                    </label>
-                  </div>
-                </div>
+                <!-- Execution Order is now hardcoded to "directory asc" -->
+                <input type="hidden" v-model="executionOrder" value="directory asc">
               </div>
             </div>
           </div>
@@ -393,6 +370,9 @@ onMounted(async () => {
     fetchTestBundles(),
     fetchEnginesAndDatabases()
   ])
+  
+  // Automatically set the bundle to "all"
+  selectedBundle.value = 'all'
 })
 
 // Fetch test bundles
@@ -503,8 +483,11 @@ const fetchEnginesAndDatabases = async () => {
 
 // Queue a test configuration
 const addToQueue = () => {
-  if (!selectedEngine.value || !selectedDatabase.value || !selectedBundle.value) {
-    alert('Please select an engine, database, and test bundle')
+  // Always use "all" for the bundle
+  selectedBundle.value = 'all'
+  
+  if (!selectedEngine.value || !selectedDatabase.value) {
+    alert('Please select an engine and database')
     return
   }
   
