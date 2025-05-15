@@ -388,10 +388,14 @@ const getDatabaseNameFromTest = (test: TestResult): string => {
   return test.database ? test.database.name : 'Unknown Database'
 }
 
-// Format duration in seconds to a human-readable string
-const formatDuration = (seconds: number): string => {
+// Format duration in seconds or milliseconds to a human-readable string
+const formatDuration = (duration: number): string => {
   // Handle invalid or zero duration
-  if (!seconds || seconds <= 0) return '0s'
+  if (!duration || duration <= 0) return '0s'
+  
+  // Check if duration is likely in milliseconds (large number)
+  // This helps handle cases where the API might return ms or seconds
+  const seconds = duration > 1000 ? duration / 1000 : duration
   
   // For very short durations (less than 1 second)
   if (seconds < 1) {
@@ -401,6 +405,7 @@ const formatDuration = (seconds: number): string => {
   
   // For durations less than a minute
   if (seconds < 60) {
+    // Use 1 decimal place for seconds
     return `${seconds.toFixed(1)}s`
   }
   

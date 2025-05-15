@@ -513,7 +513,9 @@ class TestService {
                   id: `${bundleIndex}_${specIndex}`,
                   name: spec.name || `${bundleName}: ${suite.name || 'Unknown'} - Test ${specIndex}`,
                   status,
-                  duration: spec.totalDuration || 0,
+                  // Convert duration from milliseconds to seconds if the value is very large
+                  duration: spec.totalDuration ? 
+                    (spec.totalDuration > 1000 ? spec.totalDuration / 1000 : spec.totalDuration) : 0,
                   timestamp: new Date().toISOString()
                 };
                 
@@ -549,7 +551,9 @@ class TestService {
             id: `bundle_${index}`,
             name: bundleName,
             status: hasFailed ? TestStatus.Failed : TestStatus.Passed,
-            duration: bundle.totalDuration || 0,
+            // Convert duration from milliseconds to seconds if needed
+            duration: bundle.totalDuration ? 
+              (bundle.totalDuration > 1000 ? bundle.totalDuration / 1000 : bundle.totalDuration) : 0,
             timestamp: new Date().toISOString(),
             error: hasFailed ? {
               message: `${bundle.totalFail || 0} tests failed in this bundle`,
@@ -615,7 +619,17 @@ class TestService {
     testRun.endTime = new Date().toISOString();
     const endTime = new Date();
     const startTime = new Date(testRun.startTime);
+    
+    // Calculate duration in seconds (converting from milliseconds)
     testRun.duration = (endTime.getTime() - startTime.getTime()) / 1000;
+    
+    // If the test data has its own duration value, use whichever is larger
+    if (testData.totalDuration) {
+      // Check if it's already in seconds or might be in milliseconds
+      const dataDuration = testData.totalDuration > 1000 ? 
+        testData.totalDuration / 1000 : testData.totalDuration;
+      testRun.duration = Math.max(testRun.duration, dataDuration);
+    }
     
     return testRun;
   }
