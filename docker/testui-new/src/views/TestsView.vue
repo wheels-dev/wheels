@@ -272,7 +272,7 @@
                                     </div>
                                     <p class="mb-1">{{ result.error?.message }}</p>
                                   </div>
-                                  <div class="bg-light p-3 rounded border mx-2 mb-2">
+                                  <div class="bg-dark bg-opacity-10 p-3 rounded border mx-2 mb-2 error-detail-container">
                                     <pre class="mb-0"><code>{{ result.error?.detail || 'No detailed error information available.' }}</code></pre>
                                   </div>
                                 </td>
@@ -701,3 +701,24 @@ const copyResults = () => {
     .catch(() => alert('Failed to copy results'))
 }
 </script>
+
+<style scoped>
+/* Custom styles for error detail container to ensure proper text color in both themes */
+.error-detail-container {
+  color: var(--bs-body-color);
+}
+
+/* When in dark mode, ensure text is visible */
+@media (prefers-color-scheme: dark) {
+  .error-detail-container {
+    color: #f8f9fa !important; /* Light color for dark mode */
+  }
+}
+
+/* When in light mode, ensure text is visible */
+@media (prefers-color-scheme: light) {
+  .error-detail-container {
+    color: #212529 !important; /* Dark color for light mode */
+  }
+}
+</style>
