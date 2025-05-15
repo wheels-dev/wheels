@@ -20,7 +20,19 @@
       "Bash(docker compose down:*)",
       "Bash(docker compose build:*)",
       "Bash(docker compose:*)",
-      "Bash(docker logs:*)"
+      "Bash(docker logs:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss init:*)",
+      "Bash(cp:*)",
+      "Bash(chmod:*)",
+      "Bash(rm:*)",
+      "Bash(curl:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker cp:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker rmi:*)"
     ],
     "deny": []
   }

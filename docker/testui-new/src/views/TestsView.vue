@@ -240,20 +240,44 @@
                             </tr>
                           </thead>
                           <tbody>
-                            <tr v-for="result in groupedRun.failedTests" :key="result.id" 
-                                @click="showTestDetails(result)" style="cursor: pointer"
-                                class="border-danger">
-                              <td>{{ result.name }}</td>
-                              <td class="text-center">
-                                <span class="badge" :class="{
-                                  'bg-danger': result.status === TestStatus.Failed || result.status === TestStatus.Error,
-                                  'bg-warning': result.status === TestStatus.Running
-                                }">
-                                  {{ result.status.toUpperCase() }}
-                                </span>
-                              </td>
-                              <td class="text-end">{{ result.duration.toFixed(2) }}s</td>
-                            </tr>
+                            <template v-for="result in groupedRun.failedTests" :key="result.id">
+                              <tr 
+                                @click="toggleTestDetails(result)" 
+                                style="cursor: pointer"
+                                :class="{'border-danger': true, 'table-warning': result.id === activeTestId}">
+                                <td>
+                                  <i class="bi" :class="result.id === activeTestId ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
+                                  {{ result.name }}
+                                </td>
+                                <td class="text-center">
+                                  <span class="badge" :class="{
+                                    'bg-danger': result.status === TestStatus.Failed || result.status === TestStatus.Error,
+                                    'bg-warning': result.status === TestStatus.Running
+                                  }">
+                                    {{ result.status.toUpperCase() }}
+                                  </span>
+                                </td>
+                                <td class="text-end">{{ result.duration.toFixed(2) }}s</td>
+                              </tr>
+                              <!-- Expandable test details row -->
+                              <tr v-if="result.id === activeTestId">
+                                <td colspan="3" class="border-0 p-0">
+                                  <div class="alert alert-danger mx-2 mb-2 mt-1">
+                                    <h6 class="alert-heading">
+                                      <i class="bi bi-exclamation-triangle-fill me-2"></i>Error Details
+                                    </h6>
+                                    <div class="small mb-2">
+                                      <strong>Engine:</strong> {{ getEngineNameFromTest(result) }},
+                                      <strong>Database:</strong> {{ getDatabaseNameFromTest(result) }}
+                                    </div>
+                                    <p class="mb-1">{{ result.error?.message }}</p>
+                                  </div>
+                                  <div class="bg-light p-3 rounded border mx-2 mb-2">
+                                    <pre class="mb-0"><code>{{ result.error?.detail || 'No detailed error information available.' }}</code></pre>
+                                  </div>
+                                </td>
+                              </tr>
+                            </template>
                           </tbody>
                         </table>
                       </div>
@@ -319,6 +343,7 @@ const databases = ref<any[]>([])
 const queue = ref<TestQueueItem[]>([])
 const results = ref<TestResult[]>([])
 const activeTest = ref<TestResult | null>(null)
+const activeTestId = ref<string | null>(null)
 const summary = ref({
   total: 0,
   passed: 0,
@@ -676,9 +701,17 @@ const clearResults = () => {
   activeTest.value = null
 }
 
-// Show details for a specific test
-const showTestDetails = (test: TestResult) => {
-  activeTest.value = test
+// Toggle test details expansion for the clicked test
+const toggleTestDetails = (test: TestResult) => {
+  // If clicking the same test that's already active, collapse it
+  if (activeTestId.value === test.id) {
+    activeTestId.value = null
+    activeTest.value = null
+  } else {
+    // Otherwise, expand the clicked test and collapse any others
+    activeTestId.value = test.id
+    activeTest.value = test
+  }
 }
 
 // Copy results to clipboard
