@@ -297,34 +297,7 @@
       </div>
     </div>
     
-    <!-- Test Details (shown only for failed tests) -->
-    <div class="row" v-if="activeTest && (activeTest.status === TestStatus.Failed || activeTest.status === TestStatus.Error)">
-      <div class="col-12">
-        <div class="card shadow-sm">
-          <div class="card-header bg-danger bg-opacity-10">
-            <h5 class="card-title mb-0">
-              <i class="bi bi-file-earmark-code me-2"></i> Failed Test Details
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="alert alert-danger">
-              <h5 class="alert-heading">
-                <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ activeTest.name }}
-              </h5>
-              <div class="small mb-2">
-                <strong>Engine:</strong> {{ getEngineNameFromTest(activeTest) }},
-                <strong>Database:</strong> {{ getDatabaseNameFromTest(activeTest) }}
-              </div>
-              <p class="mb-0">{{ activeTest.error?.message }}</p>
-            </div>
-            
-            <div class="bg-light p-3 rounded border">
-              <pre class="mb-0"><code>{{ activeTest.error?.detail || 'No detailed error information available.' }}</code></pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Test details are now shown inline with each failed test -->
   </div>
 </template>
 
@@ -633,6 +606,8 @@ const startTests = async () => {
   
   isRunning.value = true
   results.value = []
+  activeTest.value = null
+  activeTestId.value = null
   summary.value = {
     total: 0,
     passed: 0,
@@ -699,6 +674,7 @@ const clearResults = () => {
     skipped: 0
   }
   activeTest.value = null
+  activeTestId.value = null
 }
 
 // Toggle test details expansion for the clicked test
