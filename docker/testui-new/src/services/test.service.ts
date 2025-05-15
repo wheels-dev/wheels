@@ -98,7 +98,7 @@ class TestService {
     oldFormatParams.append('db', database.name.toLowerCase());
     
     // Add timeout parameter to prevent test runner from timing out
-    oldFormatParams.append('timeout', '600');  // 10 minutes in seconds
+    oldFormatParams.append('timeout', '1800');  // 30 minutes in seconds
     
     if (bundle.id !== 'all') {
       oldFormatParams.append('testBundles', bundle.id);
