@@ -148,28 +148,36 @@
           <div class="card-body">
             <!-- Overall Summary Stats -->
             <div class="row text-center g-2 mb-4">
-              <div class="col-md-3">
+              <div class="col-lg mb-2">
                 <div class="p-3 border rounded">
                   <div class="fs-5 fw-bold">{{ summary.total }}</div>
                   <div class="small text-muted">Total Tests</div>
                 </div>
               </div>
-              <div class="col-md-3">
+              <div class="col-lg mb-2">
                 <div class="p-3 border rounded border-success bg-success bg-opacity-10">
                   <div class="fs-5 fw-bold text-success">{{ summary.passed }}</div>
                   <div class="small text-muted">Passed</div>
                 </div>
               </div>
-              <div class="col-md-3">
+              <div class="col-lg mb-2">
                 <div class="p-3 border rounded border-danger bg-danger bg-opacity-10">
                   <div class="fs-5 fw-bold text-danger">{{ summary.failed + summary.errors }}</div>
                   <div class="small text-muted">Failed</div>
                 </div>
               </div>
-              <div class="col-md-3">
+              <div class="col-lg mb-2">
                 <div class="p-3 border rounded border-warning bg-warning bg-opacity-10">
                   <div class="fs-5 fw-bold text-warning">{{ summary.skipped }}</div>
                   <div class="small text-muted">Skipped</div>
+                </div>
+              </div>
+              <div class="col-lg mb-2">
+                <div class="p-3 border rounded border-info bg-info bg-opacity-10">
+                  <div class="fs-5 fw-bold text-info">
+                    <i class="bi bi-hourglass-split me-1"></i>{{ formatDuration(getTotalDuration) }}
+                  </div>
+                  <div class="small text-muted">Duration</div>
                 </div>
               </div>
             </div>
@@ -208,8 +216,11 @@
                           </span>
                         </div>
                       </div>
-                      <div class="small mt-1">
+                      <div class="small mt-1 d-flex justify-content-between">
                         <strong>{{ groupedRun.bundle }}</strong>
+                        <span class="text-muted">
+                          <i class="bi bi-clock me-1"></i>{{ formatDuration(groupedRun.duration) }}
+                        </span>
                       </div>
                     </div>
                     
@@ -243,7 +254,7 @@
                                     {{ result.status.toUpperCase() }}
                                   </span>
                                 </td>
-                                <td class="text-end">{{ result.duration.toFixed(2) }}s</td>
+                                <td class="text-end">{{ formatDuration(result.duration) }}</td>
                               </tr>
                               <!-- Expandable test details row -->
                               <tr v-if="result.id === activeTestId">
@@ -311,6 +322,15 @@ const summary = ref({
   skipped: 0
 })
 
+// Computed property for total test duration
+const getTotalDuration = computed(() => {
+  if (results.value.length === 0) return 0;
+  
+  // Either use the sum of all test durations or the overall run duration if available
+  const totalDuration = results.value.reduce((total, result) => total + (result.duration || 0), 0);
+  return Math.max(totalDuration, summary.value.duration || 0);
+});
+
 // Grouped results for summary cards
 const groupedResults = computed(() => {
   const groups = new Map()
@@ -332,12 +352,16 @@ const groupedResults = computed(() => {
         passedCount: 0,
         failedCount: 0,
         skippedCount: 0,
-        failedTests: []
+        failedTests: [],
+        duration: 0
       })
     }
     
     const group = groups.get(groupKey)
     group.totalCount++
+    
+    // Add test duration to the group duration
+    group.duration += result.duration || 0
     
     // Categorize test result
     if (result.status === TestStatus.Passed) {
@@ -362,6 +386,33 @@ const getEngineNameFromTest = (test: TestResult): string => {
 
 const getDatabaseNameFromTest = (test: TestResult): string => {
   return test.database ? test.database.name : 'Unknown Database'
+}
+
+// Format duration in seconds to a human-readable string
+const formatDuration = (seconds: number): string => {
+  // Handle invalid or zero duration
+  if (!seconds || seconds <= 0) return '0s'
+  
+  // For very short durations (less than 1 second)
+  if (seconds < 1) {
+    const ms = Math.round(seconds * 1000)
+    return `${ms}ms`
+  }
+  
+  // For durations less than a minute
+  if (seconds < 60) {
+    return `${seconds.toFixed(1)}s`
+  }
+  
+  // For longer durations
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = Math.round(seconds % 60)
+  
+  if (remainingSeconds === 0) {
+    return `${minutes}m`
+  }
+  
+  return `${minutes}m ${remainingSeconds}s`
 }
 
 // Form values
