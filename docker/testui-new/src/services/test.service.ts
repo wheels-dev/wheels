@@ -185,9 +185,14 @@ class TestService {
       }
       
       // Use the api.cfml method to make a request through the NGINX proxy
+      // The path must NOT include the leading slash as the NGINX configuration will add it
       const requestPath = `wheels/testbox?${params.toString()}`;
       console.log(`Making request to CFML engine: ${engineApiName}, path: ${requestPath}`);
       
+      // Log the full URL that will be constructed
+      console.log(`Full API URL will be: /api/${engineApiName}/${requestPath}`);
+      
+      // Make the API request through the NGINX proxy
       const response = await api.cfml<any>(engineApiName, requestPath, {
         headers: {
           'Accept': 'application/json'
@@ -199,77 +204,77 @@ class TestService {
       }
       
       const testData = response.data;
-      console.log('Test response received:', testData);
+      console.log('Test response received type:', typeof testData);
       
-      // Parse the response and extract test results
-      if (!testData.totalExecuted && !testData.totalFailed && !testData.totalError) {
-        console.error('Invalid test response format:', testData);
-        throw new Error('Invalid test response format. Expected TestBox JSON output.');
-      }
+      // Log a truncated version of the response for debugging
+      const truncatedResponse = typeof testData === 'string' 
+        ? testData.substring(0, 500) + '...[truncated]' 
+        : JSON.stringify(testData).substring(0, 500) + '...[truncated]';
+      console.log('Test response sample:', truncatedResponse);
       
-      // Update summary data from the actual response
-      testRun.summary.total = testData.totalExecuted || 0;
-      testRun.summary.passed = (testData.totalExecuted || 0) - 
-                              (testData.totalFailed || 0) - 
-                              (testData.totalError || 0) - 
-                              (testData.totalSkipped || 0);
-      testRun.summary.failed = testData.totalFailed || 0;
-      testRun.summary.errors = testData.totalError || 0;
-      testRun.summary.skipped = testData.totalSkipped || 0;
-      
-      // Process test results
-      if (testData.results && Array.isArray(testData.results)) {
-        testRun.results = testData.results.map((result: any, index: number) => {
-          const status = result.status === 'Passed' ? TestStatus.Passed :
-                        result.status === 'Failed' ? TestStatus.Failed :
-                        result.status === 'Error' ? TestStatus.Error :
-                        result.status === 'Skipped' ? TestStatus.Skipped :
-                        TestStatus.Unknown;
-                        
-          const testResult: TestResult = {
-            id: result.id || `test_${index}`,
-            name: result.name || `Unknown Test ${index}`,
-            status,
-            duration: result.duration || 0,
-            timestamp: result.timestamp || new Date().toISOString()
-          };
-          
-          if (status === TestStatus.Failed || status === TestStatus.Error) {
-            testResult.error = {
-              message: result.message || result.failMessage || 'Test failed or errored',
-              detail: result.failDetail || result.detail || 'No detailed error information available'
-            };
+      // Handle string responses (in case the API returns plain text or HTML)
+      if (typeof testData === 'string') {
+        // If it looks like JSON, try to parse it
+        if (testData.trim().startsWith('{') || testData.trim().startsWith('[')) {
+          try {
+            const parsedData = JSON.parse(testData);
+            console.log('Successfully parsed string response as JSON');
+            
+            // Continue with the parsed data
+            if (!parsedData.totalExecuted && !parsedData.totalFailed && !parsedData.totalError) {
+              console.error('Parsed response does not match expected TestBox format');
+              throw new Error('Invalid test response format. Expected TestBox JSON output.');
+            }
+            
+            // Update summary with parsed data
+            testRun.summary.total = parsedData.totalExecuted || 0;
+            testRun.summary.passed = (parsedData.totalExecuted || 0) - 
+                                  (parsedData.totalFailed || 0) - 
+                                  (parsedData.totalError || 0) - 
+                                  (parsedData.totalSkipped || 0);
+            testRun.summary.failed = parsedData.totalFailed || 0;
+            testRun.summary.errors = parsedData.totalError || 0;
+            testRun.summary.skipped = parsedData.totalSkipped || 0;
+            
+            // Use the parsed data for results processing
+            if (parsedData.results && Array.isArray(parsedData.results)) {
+              return this.processTestResults(testRun, parsedData);
+            }
+          } catch (e) {
+            console.error('Failed to parse string response as JSON:', e);
+            throw new Error('Failed to parse test response as JSON');
           }
-          
-          return testResult;
-        });
+        } else {
+          console.error('Response is a string but not JSON. HTML response?');
+          throw new Error('Received HTML or text response instead of JSON. Check test runner URL and format parameter.');
+        }
+      } else if (typeof testData === 'object' && testData !== null) {
+        // Handle direct object responses
+        if (!testData.totalExecuted && !testData.totalFailed && !testData.totalError) {
+          console.error('Response object does not match expected TestBox format:', testData);
+          throw new Error('Invalid test response format. Expected TestBox JSON output.');
+        }
+        
+        // Update summary data from the actual response
+        testRun.summary.total = testData.totalExecuted || 0;
+        testRun.summary.passed = (testData.totalExecuted || 0) - 
+                                (testData.totalFailed || 0) - 
+                                (testData.totalError || 0) - 
+                                (testData.totalSkipped || 0);
+        testRun.summary.failed = testData.totalFailed || 0;
+        testRun.summary.errors = testData.totalError || 0;
+        testRun.summary.skipped = testData.totalSkipped || 0;
       } else {
-        // Fallback for unsupported response format - create a single result
-        testRun.results.push({
-          id: 'summary',
-          name: 'Test Suite Summary',
-          status: testRun.summary.failed > 0 || testRun.summary.errors > 0 ? 
-                 TestStatus.Failed : TestStatus.Passed,
-          duration: 0,
-          timestamp: new Date().toISOString()
-        });
+        console.error('Unexpected response type:', typeof testData);
+        throw new Error('Unexpected response type from test runner');
       }
       
-      // Update the test run status based on results
-      if (testRun.summary.failed > 0 || testRun.summary.errors > 0) {
-        testRun.status = TestStatus.Failed;
-      } else {
-        testRun.status = TestStatus.Passed;
-      }
+      // Process test results from the response and return the updated testRun
+      const processedTestRun = this.processTestResults(testRun, testData);
       
-      testRun.endTime = new Date().toISOString();
+      console.log(`Test run complete with ${processedTestRun.summary.total} tests (${processedTestRun.summary.passed} passed, ${processedTestRun.summary.failed + processedTestRun.summary.errors} failed)`);
       
-      // Realistic duration for 1613 tests - between 30-60 seconds
-      const endTime = new Date();
-      const startTime = new Date(testRun.startTime);
-      testRun.duration = (endTime.getTime() - startTime.getTime()) / 1000;
-      
-      console.log(`Test run complete with ${testRun.summary.total} tests (${testRun.summary.passed} passed, ${testRun.summary.failed + testRun.summary.errors} failed)`);
+      return processedTestRun;
     } catch (error) {
       console.error('Error running tests:', error);
       
@@ -462,6 +467,65 @@ class TestService {
       ];
       return failures[Math.floor(Math.random() * failures.length)];
     }
+  }
+  
+  // Process test results data and update the testRun object
+  private processTestResults(testRun: TestRun, testData: any): TestRun {
+    // Map the results from TestBox format to our TestResult format
+    if (testData.results && Array.isArray(testData.results)) {
+      testRun.results = testData.results.map((result: any, index: number) => {
+        // Convert TestBox status to our TestStatus enum
+        const status = result.status === 'Passed' ? TestStatus.Passed :
+                      result.status === 'Failed' ? TestStatus.Failed :
+                      result.status === 'Error' ? TestStatus.Error :
+                      result.status === 'Skipped' ? TestStatus.Skipped :
+                      TestStatus.Unknown;
+                      
+        // Create the test result object
+        const testResult: TestResult = {
+          id: result.id || `test_${index}`,
+          name: result.name || `Unknown Test ${index}`,
+          status,
+          duration: result.duration || 0,
+          timestamp: result.timestamp || new Date().toISOString()
+        };
+        
+        // Add error details for failed or errored tests
+        if (status === TestStatus.Failed || status === TestStatus.Error) {
+          testResult.error = {
+            message: result.message || result.failMessage || 'Test failed or errored',
+            detail: result.failDetail || result.detail || 'No detailed error information available'
+          };
+        }
+        
+        return testResult;
+      });
+    } else {
+      // Fallback for unsupported response format - create a single result
+      testRun.results.push({
+        id: 'summary',
+        name: 'Test Suite Summary',
+        status: testRun.summary.failed > 0 || testRun.summary.errors > 0 ? 
+               TestStatus.Failed : TestStatus.Passed,
+        duration: 0,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Update the test run status based on results
+    if (testRun.summary.failed > 0 || testRun.summary.errors > 0) {
+      testRun.status = TestStatus.Failed;
+    } else {
+      testRun.status = TestStatus.Passed;
+    }
+    
+    // Set end time and calculate duration
+    testRun.endTime = new Date().toISOString();
+    const endTime = new Date();
+    const startTime = new Date(testRun.startTime);
+    testRun.duration = (endTime.getTime() - startTime.getTime()) / 1000;
+    
+    return testRun;
   }
   
   // Generate detailed error information
