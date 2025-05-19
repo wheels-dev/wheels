@@ -29,7 +29,7 @@
 					#navArgs.Text#
 					<div class="menu">
 						<div class="item">
-							<span class="text">Testbox</span>
+							<span class="text">TestbBox</span>
 							<div class="menu">
 								<div class="item">
 									<span class="text">App Tests</span>
