@@ -1,6 +1,7 @@
 component extends="Model" {
 
 	function config() {
+		table("_c_o_r_e_users");
 		hasMany(name = "galleries");
 		hasOne(name = "combikey");
 		hasOne(name = "author", foreignKey = "firstName", joinKey = "firstName");

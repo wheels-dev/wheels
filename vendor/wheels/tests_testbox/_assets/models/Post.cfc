@@ -1,6 +1,7 @@
 component extends="Model" {
 
 	function config() {
+		table("_c_o_r_e_posts");
 		belongsTo("author");
 		hasMany("comments");
 		hasMany("classifications");

@@ -1,7 +1,7 @@
 component extends="Model" {
 
 	function config() {
-		settablenameprefix("tbl");
+		settablenameprefix("_c_o_r_e_tbl");
 		table("users");
 		local.db_info = $dbinfo(datasource = application.wheels.dataSourceName, type = "version");
 		local.db = LCase(

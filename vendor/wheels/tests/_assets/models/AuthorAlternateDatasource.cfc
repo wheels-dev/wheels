@@ -1,7 +1,7 @@
 component extends="Model" {
 
 	function config() {
-		table("authors");
+		table("_c_o_r_e_authors");
 		dataSource("wheelstestdb_h2");
 	}
 
