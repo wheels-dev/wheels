@@ -4,7 +4,7 @@ component {
 	 */
 	public array function $addDeleteClause(required array sql, required boolean softDelete, struct useIndex = {}) {
 		if (variables.wheels.class.softDeletion && arguments.softDelete) {
-			if (Len(arguments.useIndex)) {
+			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
 				local.indexHint = this.$indexHint(
 					useIndex = arguments.useIndex,
 					modelName = variables.wheels.class.modelName,
@@ -21,7 +21,7 @@ component {
 			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = "cf_sql_timestamp"};
 			ArrayAppend(arguments.sql, local.param);
 		} else {
-			if (Len(arguments.useIndex)) {
+			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
 				ArrayAppend(arguments.sql, "DELETE tbl FROM #tableName()# tbl");
 			} else {
 				ArrayAppend(arguments.sql, "DELETE FROM #tableName()#");
@@ -622,7 +622,7 @@ component {
 						local.column = ListLast(local.param.property, ".");
 						if (!Find(".", local.param.property) || local.table == local.classData.tableName) {
 							if (StructKeyExists(local.classData.propertyStruct, local.column)) {
-								if (Len(arguments.useIndex) && !($softDeletion() && arguments.softDelete)) {
+								if ((structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) && !($softDeletion() && arguments.softDelete)) {
 									local.param.column = "tbl." & local.classData.properties[local.column].column;
 								} else {
 									local.param.column = local.classData.tableName & "." & local.classData.properties[local.column].column;
@@ -692,7 +692,7 @@ component {
 			if ($softDeletion() && arguments.softDelete) {
 				local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
 			} else if ($softDeletion()) {
-				if (Len(arguments.useIndex)) {
+				if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
 					local.addToWhere = ListAppend(local.addToWhere, "tbl." & $softDeleteColumn() & " IS NULL");
 				} else {
 					local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
