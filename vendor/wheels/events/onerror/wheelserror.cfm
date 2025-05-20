@@ -34,7 +34,7 @@
 				<cftry>
 					<cfsavecontent variable="local.fileContents">
 						<cfset local.pos = 0>
-						<pre style="overflow-x: scroll; padding-bottom:10px;">
+						<p style="overflow-x: scroll; padding-bottom:10px;">
 							<code>
 								<cfloop file="#arguments.wheelsError.tagContext[local.errorPos].template#" index="local.i">
 									<cfset local.pos = local.pos + 1>
@@ -45,11 +45,11 @@
 										<cfelse>
 											#local.pos#: #HtmlEditFormat(local.i)#
 										</cfif>
-										#Chr(13)##Chr(10)#
+										#Chr(13)##Chr(10)#<br>
 									</cfif>
 								</cfloop>
 							</code>
-						</pre>
+						</p>
 					</cfsavecontent>
 					<cfcatch>
 						<cfset local.lookupWorked = false>
