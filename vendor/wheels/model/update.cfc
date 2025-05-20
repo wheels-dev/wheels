@@ -15,6 +15,7 @@ component {
 	 * @reload [see:findAll].
 	 * @parameterize [see:findAll].
 	 * @instantiate Whether or not to instantiate the object(s) first. When objects are not instantiated, any callbacks and validations set on them will be skipped.
+	 * @useIndex [see:findAll].
 	 * @validate [see:save].
 	 * @transaction [see:save].
 	 * @callbacks [see:findAll].
@@ -27,6 +28,7 @@ component {
 		boolean reload,
 		any parameterize,
 		boolean instantiate,
+		struct useIndex = {},
 		boolean validate = "true",
 		string transaction = "#application.wheels.transactionMode#",
 		boolean callbacks = "true",
@@ -37,7 +39,7 @@ component {
 		arguments.where = $cleanInList(arguments.where);
 		arguments.properties = $setProperties(
 			argumentCollection = arguments,
-			filterList = "where,include,properties,reload,parameterize,instantiate,validate,transaction,callbacks,includeSoftDeletes",
+			filterList = "where,include,properties,reload,parameterize,instantiate,useIndex,validate,transaction,callbacks,includeSoftDeletes",
 			setOnModel = false
 		);
 
@@ -52,7 +54,8 @@ component {
 				callbacks = arguments.callbacks,
 				includeSoftDeletes = arguments.includeSoftDeletes,
 				returnIncluded = false,
-				returnAs = "objects"
+				returnAs = "objects",
+				useIndex = arguments.useIndex
 			);
 			local.iEnd = ArrayLen(local.objects);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
@@ -71,6 +74,12 @@ component {
 			arguments.sql = [];
 			// Issue#1273: Added this section to allow included tables to be referenced in the query
 			local.migration = CreateObject("component", "wheels.migrator.Migration").init();
+			local.indexHint = this.$indexHint(
+				useIndex = arguments.useIndex,
+				modelName = variables.wheels.class.modelName,
+				adapterName = get("adapterName")
+			);
+			
 			if (ListFind('MySQL', local.migration.adapter.adapterName())){
 				local.list = "";
 				local.associations = [];
@@ -82,9 +91,21 @@ component {
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
 					local.list &= local.associations[local.i].join;
 				}
-				ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.list# SET");
+				if (Len(local.indexHint)) {
+					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.indexHint# #local.list# SET");
+				} else {
+					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.list# SET");
+				}
+				
 			}
-			else if (ListFind('PostgreSQL,H2,MicrosoftSQLServer', local.migration.adapter.adapterName())){
+			else if (ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
+				if (Len(local.indexHint)) {
+					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.indexHint# SET");
+				} else {
+					ArrayAppend(arguments.sql, "UPDATE #tableName()# SET");
+				}
+			}
+			else if (ListFind('PostgreSQL,H2', local.migration.adapter.adapterName())){
 				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET");
 			}
 			local.pos = 0;
@@ -163,6 +184,7 @@ component {
 	 * @properties The properties you want to set on the object (can also be passed in as named arguments).
 	 * @reload [see:findAll].
 	 * @validate [see:save].
+	 * @useIndex [see:findAll].
 	 * @transaction [see:save].
 	 * @callbacks [see:findAll].
 	 * @includeSoftDeletesYou can set this argument to true to include soft-deleted records in the results.
@@ -173,6 +195,7 @@ component {
 		struct properties = {},
 		boolean reload,
 		boolean validate = "true",
+		struct useIndex = {},
 		string transaction = "#application.wheels.transactionMode#",
 		boolean callbacks = "true",
 		boolean includeSoftDeletes = "false"
@@ -182,6 +205,7 @@ component {
 			includeSoftDeletes = arguments.includeSoftDeletes,
 			order = arguments.order,
 			reload = arguments.reload,
+			useIndex = arguments.useIndex,
 			where = arguments.where
 		);
 		StructDelete(arguments, "where");
@@ -286,7 +310,7 @@ component {
 				&& StructKeyExists(this, $get("timeStampOnUpdateProperty"))
 				&& Len(this[$get("timeStampOnUpdateProperty")])
 			) {
-				// leave updatedat unmolested
+				// leave updatedAt unmolested
 			} else if ($get("setUpdatedAtOnCreate") && variables.wheels.class.timeStampingOnUpdate) {
 				$timestampProperty(property = variables.wheels.class.timeStampOnUpdateProperty);
 			}

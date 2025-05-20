@@ -13,6 +13,7 @@ component {
 	 * @reload [see:findAll].
 	 * @parameterize [see:findAll].
 	 * @instantiate [see:updateAll].
+	 * @useIndex [see:findAll].
 	 * @transaction [see:save].
 	 * @callbacks [see:findAll].
 	 * @includeSoftDeletes [see:findAll].
@@ -24,6 +25,7 @@ component {
 		boolean reload,
 		any parameterize,
 		boolean instantiate,
+		struct useIndex = {},
 		string transaction = application.wheels.transactionMode,
 		boolean callbacks = true,
 		boolean includeSoftDeletes = false,
@@ -40,6 +42,7 @@ component {
 				parameterize = arguments.parameterize,
 				reload = arguments.reload,
 				returnAs = "objects",
+				useIndex = arguments.useIndex,
 				returnIncluded = false,
 				where = arguments.where
 			);
@@ -57,12 +60,22 @@ component {
 			}
 		} else {
 			arguments.sql = [];
-			arguments.sql = $addDeleteClause(sql = arguments.sql, softDelete = arguments.softDelete);
+			arguments.sql = $addDeleteClause(sql = arguments.sql, softDelete = arguments.softDelete, useIndex = arguments.useIndex);
+			local.indexHint = this.$indexHint(
+				useIndex = arguments.useIndex,
+				modelName = variables.wheels.class.modelName,
+				adapterName = get("adapterName")
+			);
+			if (Len(local.indexHint) && !(variables.wheels.class.softDeletion && arguments.softDelete)) {
+				ArrayAppend(arguments.sql, local.indexHint);
+			}
 			arguments.sql = $addWhereClause(
 				sql = arguments.sql,
 				where = arguments.where,
 				include = arguments.include,
-				includeSoftDeletes = arguments.includeSoftDeletes
+				includeSoftDeletes = arguments.includeSoftDeletes,
+				softDelete = arguments.softDelete,
+				useIndex = arguments.useIndex
 			);
 			arguments.sql = $addWhereClauseParameters(sql = arguments.sql, where = arguments.where);
 			local.rv = invokeWithTransaction(method = "$deleteAll", argumentCollection = arguments);
@@ -117,6 +130,7 @@ component {
 	 * @transaction [see:save].
 	 * @callbacks [see:findAll].
 	 * @includeSoftDeletes [see:findAll].
+	 * @useIndex [see:findAll].
 	 * @softDelete [see:deleteAll].
 	 */
 	public boolean function deleteOne(
@@ -126,6 +140,7 @@ component {
 		string transaction = application.wheels.transactionMode,
 		boolean callbacks = true,
 		boolean includeSoftDeletes = false,
+		struct useIndex = {},
 		boolean softDelete = true
 	) {
 		$args(name = "deleteOne", args = arguments);
@@ -133,6 +148,7 @@ component {
 			includeSoftDeletes = arguments.includeSoftDeletes,
 			order = arguments.order,
 			reload = arguments.reload,
+			useIndex = arguments.useIndex,
 			where = arguments.where
 		);
 		if (IsObject(local.object)) {

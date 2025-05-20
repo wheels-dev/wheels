@@ -2,13 +2,30 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public array function $addDeleteClause(required array sql, required boolean softDelete) {
+	public array function $addDeleteClause(required array sql, required boolean softDelete, struct useIndex = {}) {
 		if (variables.wheels.class.softDeletion && arguments.softDelete) {
-			ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
+			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
+				local.indexHint = this.$indexHint(
+					useIndex = arguments.useIndex,
+					modelName = variables.wheels.class.modelName,
+					adapterName = get("adapterName")
+				);
+				if (Len(local.indexHint)) {
+					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.indexHint# SET #variables.wheels.class.softDeleteColumn# = ");
+				} else {
+					ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
+				}
+			} else {
+				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
+			}
 			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = "cf_sql_timestamp"};
 			ArrayAppend(arguments.sql, local.param);
 		} else {
-			ArrayAppend(arguments.sql, "DELETE FROM #tableName()#");
+			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
+				ArrayAppend(arguments.sql, "DELETE tbl FROM #tableName()# tbl");
+			} else {
+				ArrayAppend(arguments.sql, "DELETE FROM #tableName()#");
+			}
 		}
 		return arguments.sql;
 	}
@@ -490,7 +507,9 @@ component {
 		required array sql,
 		required string where,
 		required string include,
-		required boolean includeSoftDeletes
+		required boolean includeSoftDeletes,
+		boolean softDelete = true,
+		struct useIndex = {}
 	) {
 		// Issue#1273: Added this section to allow included tables to be referenced in the query
 		local.migration = CreateObject("component", "wheels.migrator.Migration").init();
@@ -502,6 +521,8 @@ component {
 			where = arguments.where,
 			include = arguments.include,
 			includeSoftDeletes = arguments.includeSoftDeletes,
+			softDelete = arguments.softDelete,
+			useIndex = arguments.useIndex,
 			sql = local.tempSql
 		);
 		if(arguments.include != "" && ListFind('PostgreSQL', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
@@ -529,7 +550,7 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "") {
+	public array function $whereClause(required string where, string include = "", boolean includeSoftDeletes = "false", sql = "", boolean softDelete = "true", useIndex = {}) {
 		local.rv = [];
 		if (Len(arguments.where)) {
 			// setup an array containing class info for current class and all the ones that should be included
@@ -601,7 +622,11 @@ component {
 						local.column = ListLast(local.param.property, ".");
 						if (!Find(".", local.param.property) || local.table == local.classData.tableName) {
 							if (StructKeyExists(local.classData.propertyStruct, local.column)) {
-								local.param.column = local.classData.tableName & "." & local.classData.properties[local.column].column;
+								if ((structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) && !($softDeletion() && arguments.softDelete)) {
+									local.param.column = "tbl." & local.classData.properties[local.column].column;
+								} else {
+									local.param.column = local.classData.tableName & "." & local.classData.properties[local.column].column;
+								}								
 								local.param.dataType = local.classData.properties[local.column].dataType;
 								local.param.type = local.classData.properties[local.column].type;
 								local.param.scale = local.classData.properties[local.column].scale;
@@ -664,8 +689,14 @@ component {
 		// add soft delete sql
 		if (!arguments.includeSoftDeletes) {
 			local.addToWhere = "";
-			if ($softDeletion()) {
+			if ($softDeletion() && arguments.softDelete) {
 				local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
+			} else if ($softDeletion()) {
+				if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
+					local.addToWhere = ListAppend(local.addToWhere, "tbl." & $softDeleteColumn() & " IS NULL");
+				} else {
+					local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
+				}
 			}
 			local.addToWhere = Replace(local.addToWhere, ",", " AND ", "all");
 			if (Len(local.addToWhere)) {
