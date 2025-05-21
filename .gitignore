@@ -20,3 +20,4 @@ WEB-INF
 settings.json
 settings.xml
 *.db
+.claude/settings.local.json

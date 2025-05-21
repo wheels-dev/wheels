@@ -1,106 +1,136 @@
-# Description: Docker Compose file for running the Wheels Test Suite
+# Description: Docker Compose file for running the CFWheels Test Suite
 
 services:
+  # Original TestUI - keeping for backward compatibility
   testui:
+    profiles: ["ui-legacy", "all"]
     build:
       context: ./docker/testui
-    image: wheels-testui:v1.0.2
+    image: cfwheels-testui:v1.0.2
     ports:
       - "3000:8080"
 
+  # New Modern TestUI
+  testui-new:
+    profiles: ["ui", "all"]
+    build:
+      context: ./docker/testui-new
+    image: cfwheels-testui-new:v1.0.0
+    ports:
+      - "3001:80"
+    # Add extra_hosts to allow container to access host services
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Mount Docker socket for container management (readonly)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Add healthcheck to verify container is working properly
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    # Add restart policy to ensure container stays up
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE=/api
+      - VITE_MOCK_API=false
+
   lucee5:
+    profiles: ["lucee", "quick-test", "all"]
     build:
       context: ./
       dockerfile: ./docker/lucee@5/Dockerfile
-    image: wheels-test-lucee5:v1.0.2
-    restart: always
+    image: cfwheels-test-lucee5:v1.0.2
     volumes:
-      - ./:/wheels-test-suite
+      - ./:/cfwheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/lucee@5/server.json
-        target: /wheels-test-suite/server.json
+        target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/lucee@5/settings.cfm
-        target: /wheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "60005:60005"
 
   lucee6:
+    profiles: ["lucee", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/lucee@6/Dockerfile
-    image: wheels-test-lucee6:v1.0.2
-    restart: always
+    image: cfwheels-test-lucee6:v1.0.2
     volumes:
-      - ./:/wheels-test-suite
+      - ./:/cfwheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/lucee@6/server.json
-        target: /wheels-test-suite/server.json
+        target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/lucee@6/settings.cfm
-        target: /wheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "60006:60006"
 
   adobe2018:
+    profiles: ["adobe", "legacy", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2018/Dockerfile
-    image: wheels-test-adobe2018:v1.0.2
-    restart: always
+    image: cfwheels-test-adobe2018:v1.0.2
     volumes:
-      - ./:/wheels-test-suite
+      - ./:/cfwheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/adobe@2018/server.json
-        target: /wheels-test-suite/server.json
+        target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2018/settings.cfm
-        target: /wheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62018:62018"
 
   adobe2021:
+    profiles: ["adobe", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2021/Dockerfile
-    image: wheels-test-adobe2021:v1.0.2
-    restart: always
+    image: cfwheels-test-adobe2021:v1.0.2
     volumes:
-      - ./:/wheels-test-suite
+      - ./:/cfwheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/adobe@2021/server.json
-        target: /wheels-test-suite/server.json
+        target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2021/settings.cfm
-        target: /wheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62021:62021"
 
   adobe2023:
+    profiles: ["adobe", "current", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2023/Dockerfile
-    image: wheels-test-adobe2023:v1.0.1
-    restart: always
+    image: cfwheels-test-adobe2023:v1.0.1
     volumes:
-      - ./:/wheels-test-suite
+      - ./:/cfwheels-test-suite
       - ~/.CommandBox/artifacts:/root/.CommandBox/artifacts
       - type: bind
         source: ./docker/adobe@2023/server.json
-        target: /wheels-test-suite/server.json
+        target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2023/settings.cfm
-        target: /wheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62023:62023"
 
   mysql:
-    image: mysql:latest
-    # command: --default-authentication-plugin=mysql_native_password
+    profiles: ["db", "mysql", "quick-test", "compatibility", "all"]
+    image: mysql:8.0
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: wheelstestdb
@@ -109,9 +139,18 @@ services:
       MYSQL_PASSWORD: wheelstestdb
     ports:
       - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - mysql_data:/var/lib/mysql
 
   postgres:
-    image: postgres:latest
+    profiles: ["db", "postgres", "all"]
+    image: postgres:14
     restart: always
     environment:
       POSTGRES_USER: wheelstestdb
@@ -119,27 +158,51 @@ services:
       POSTGRES_INITDB_ARGS: --auth-host=md5
     ports:
       - "5433:5432"
-
-  sqlserver:
-    build:
-      context: ./
-      dockerfile: ./docker/sqlserver/Dockerfile
-    image: wheels-sqlserver:v1.0.1
-    environment:
-      MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
-      ACCEPT_EULA: Y
-      MSSQL_PID: Developer
-    ports:
-      - "1434:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wheelstestdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   sqlserver_cicd:
+    profiles: ["db", "sqlserver", "advanced", "all"]
     build:
       context: ./
       dockerfile: ./docker/sqlserver/Dockerfile_CICD
-    image: wheels-sqlserver:v1.0.1
+    image: cfwheels-sqlserver:v1.0.2
+    restart: always
     environment:
       MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
       ACCEPT_EULA: Y
       MSSQL_PID: Developer
+      # Increase memory to ensure stability
+      MSSQL_MEMORY_LIMIT_MB: 4096
     ports:
       - "1434:1433"
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" -C || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    # Add network aliases so CFWheels can connect with correct hostnames
+    networks:
+      default:
+        aliases:
+          - sqlserver
+
+volumes:
+  mysql_data:
+  postgres_data:
+  sqlserver_data:

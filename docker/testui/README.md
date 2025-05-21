@@ -1,7 +1,33 @@
 # cfwheels-test-suite-ui
 
-This vueJS app just provides a way of queuing tests for each of the docker containers. It should start on localhost:3000 when using `docker-compose up`.
-If you want to make changes to the interface, it's easiest to run it in development mode which provides hot reloading.
+This web application provides a way of queuing tests for each of the docker containers. It starts on localhost:3000 when using `docker compose up` with the appropriate profile.
+
+## Features
+
+- Simple web interface to run tests
+- Support for multiple CFML engines (Lucee 5/6, Adobe 2018/2021/2023)
+- Support for multiple databases (MySQL, PostgreSQL, SQL Server, H2)
+- Real-time test results display
+- Test queue management
+
+## Usage
+
+1. Start the TestUI container along with the desired CFML engines and databases:
+   ```bash
+   docker compose --profile ui --profile lucee --profile db up -d
+   ```
+
+2. Access the TestUI at http://localhost:3000
+
+3. Click on a CFML engine + database combination to add it to the test queue
+
+4. Click "Start Queue" to run the tests
+
+5. View results in the Results panel
+
+## Recent Changes
+
+- **2025-05-15**: Fixed issue with test queue not clearing between runs, which was causing subsequent test runs to rerun previous tests
 
 ## Project setup for local development
 ```
@@ -29,6 +55,9 @@ When you've made your changes, build it and commit the changes
 npm run lint
 ```
 
-### Customize configuration
+### Key Files
 
-See [Configuration Reference](https://cli.vuejs.org/config/).
+- `index.html` - Main UI and application logic
+- `services/servers.js` - Configuration for CFML engine endpoints
+- `services/databases.js` - Configuration for database options
+- `services/testsuites.js` - Combines servers and databases into runnable test suites

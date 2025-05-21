@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(box wheels docker init --help)",
+      "Bash(box wheels generate:*)",
+      "Bash(box wheels:*)",
+      "Bash(box)",
+      "Bash(find:*)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git mv:*)",
+      "Bash(git push:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(docker exec:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker compose down:*)",
+      "Bash(docker compose build:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker logs:*)",
+      "Bash(mkdir:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss init:*)",
+      "Bash(cp:*)",
+      "Bash(chmod:*)",
+      "Bash(rm:*)",
+      "Bash(curl:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker cp:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker rmi:*)"
+    ],
+    "deny": []
+  }
+}
