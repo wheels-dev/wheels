@@ -2,7 +2,7 @@
   <div class="container-fluid py-4">
     <h1 class="mb-4 fs-2">CFWheels Test Runner</h1>
     
-    <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+    <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
       <!-- Test Runner Card -->
       <div class="col">
         <div class="card h-100 shadow-sm">
@@ -19,27 +19,6 @@
           <div class="card-footer bg-transparent border-top-0 text-end">
             <router-link to="/tests" class="btn btn-primary">
               <i class="bi bi-play-fill me-1"></i> Test Runner
-            </router-link>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Container Management Card -->
-      <div class="col">
-        <div class="card h-100 shadow-sm">
-          <div class="card-body">
-            <div class="d-flex align-items-center mb-3">
-              <div class="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center me-3"
-                   style="width: 48px; height: 48px; font-size: 24px;">
-                <i class="bi bi-hdd-stack text-success"></i>
-              </div>
-              <h5 class="card-title mb-0">Container Management</h5>
-            </div>
-            <p class="card-text">Manage Docker containers for your test environment.</p>
-          </div>
-          <div class="card-footer bg-transparent border-top-0 text-end">
-            <router-link to="/containers" class="btn btn-success">
-              <i class="bi bi-hdd-stack-fill me-1"></i> Containers
             </router-link>
           </div>
         </div>
