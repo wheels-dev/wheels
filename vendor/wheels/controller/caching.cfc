@@ -33,6 +33,30 @@ component {
 	}
 
 	/**
+	 * Clears cached action metadata for current controller.
+	 * 
+	 * [section: Controller]
+	 * [category: Configuration Functions]
+	 *
+	 * @action Optional. A single action or list of actions to clear. If not provided, clears all cached actions of current controller.
+	 */
+	public void function clearCachableActions(string action = "") {
+		if (!Len(arguments.action)) {
+			return $clearCachableActions();
+		}
+
+		// Only remove specific actions from the cache list
+		var filtered = [];
+		for (var i = 1; i <= ArrayLen(variables.$class.cachableActions); i++) {
+			var a = variables.$class.cachableActions[i];
+			if (!ListFindNoCase(arguments.action, a.action)) {
+				ArrayAppend(filtered, a);
+			}
+		}
+		variables.$class.cachableActions = filtered;
+	}
+
+	/**
 	 * Called from the caches function.
 	 */
 	public void function $addCachableAction(required struct action) {
