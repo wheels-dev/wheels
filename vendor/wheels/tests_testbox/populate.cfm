@@ -50,7 +50,7 @@
 <cfset local.tableList = ValueList(local.dbinfo.table_name, Chr(7))>
 
 <!--- list of views to delete --->
-<cfset local.views = "userphotos">
+<cfset local.views = "_c_o_r_e_userphotos">
 <cfloop list="#local.views#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
@@ -63,7 +63,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "_c_o_r_e_authors,_c_o_r_e_cities,_c_o_r_e_classifications,_c_o_r_e_comments,_c_o_r_e_galleries,_c_o_r_e_photos,_c_o_r_e_posts,_c_o_r_e_profiles,_c_o_r_e_shops,_c_o_r_e_trucks,_c_o_r_e_tags,_c_o_r_e_users,_c_o_r_e_collisiontests,_c_o_r_e_combikeys,_c_o_r_e_tblusers,_c_o_r_e_sqltypes,_c_o_r_e_CATEGORIES,migratorversions">
+<cfset local.tables = "_c_o_r_e_authors,_c_o_r_e_cities,_c_o_r_e_classifications,_c_o_r_e_comments,_c_o_r_e_galleries,_c_o_r_e_photos,_c_o_r_e_posts,_c_o_r_e_profiles,_c_o_r_e_shops,_c_o_r_e_trucks,_c_o_r_e_tags,_c_o_r_e_users,_c_o_r_e_collisiontests,_c_o_r_e_combikeys,_c_o_r_e_tblusers,_c_o_r_e_sqltypes,_c_o_r_e_CATEGORIES,migratorversions,_c_o_r_e_levels">
 <cfloop list="#local.tables#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
@@ -297,9 +297,9 @@ CREATE TABLE _c_o_r_e_CATEGORIES
 
 <!--- create views --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE VIEW userphotos AS
+CREATE VIEW _c_o_r_e_userphotos AS
 SELECT u.id AS userid, u.username AS username, u.firstname AS firstname, u.lastname AS lastname, g.title AS title, g.id AS galleryid
-FROM users u INNER JOIN galleries g ON u.id = g.userid
+FROM _c_o_r_e_users u INNER JOIN _c_o_r_e_galleries g ON u.id = g.userid
 </cfquery>
 
 <!--- populate with data --->

@@ -7,8 +7,8 @@ component extends="Model" {
 		hasMany("classifications");
 		validatesUniquenessOf("title");
 		property(name = "titleAlias", sql = "title", select = false);
-		property(name = "firstId", sql = "MAX(posts.id)", select = false);
-		property(name = "createdAtAlias", sql = "posts.createdat", dataType = "datetime", select = false);
+		property(name = "firstId", sql = "MAX(_c_o_r_e_posts.id)", select = false);
+		property(name = "createdAtAlias", sql = "_c_o_r_e_posts.createdat", dataType = "datetime", select = false);
 	}
 
 	function afterFindCallback() {
