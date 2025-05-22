@@ -45,7 +45,7 @@ jobs:
           fi
 
       - name: Build CFWheels Variants for ${{ env.BRANCH }} v${{ env.CFWHEELS_VERSION }}
-        id: Build-CFWheels-Variants-${{ env.BRANCH }}-v${{ env.CFWHEELS_VERSION }}
+        id: Build-CFWheels-Variants
         run: |
           ant -DisPreRelease=${{ env.CFWHEELS_PRERELEASE }} -Dcfwheels.version=${{ env.CFWHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
 
