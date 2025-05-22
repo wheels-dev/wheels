@@ -46,14 +46,14 @@ component {
 		}
 
 		// Only remove specific actions from the cache list
-		var filtered = [];
-		for (var i = 1; i <= ArrayLen(variables.$class.cachableActions); i++) {
-			var a = variables.$class.cachableActions[i];
-			if (!ListFindNoCase(arguments.action, a.action)) {
-				ArrayAppend(filtered, a);
+		local.filtered = [];
+		for (local.i = 1; local.i <= ArrayLen(variables.$class.cachableActions); local.i++) {
+			local.cachableAction = variables.$class.cachableActions[i];
+			if (!ListFindNoCase(arguments.action, local.cachableAction.action)) {
+				ArrayAppend(local.filtered, local.cachableAction);
 			}
 		}
-		variables.$class.cachableActions = filtered;
+		variables.$class.cachableActions = local.filtered;
 	}
 
 	/**
