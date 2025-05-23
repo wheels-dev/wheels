@@ -6,7 +6,9 @@
       "Bash(box version:*)",
       "Bash(rm:*)",
       "Bash(git add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(box help:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
