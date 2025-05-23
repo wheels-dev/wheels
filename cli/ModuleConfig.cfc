@@ -57,6 +57,10 @@ component {
             .to("#moduleMapping#.models.SecurityService");
         binder.map("OptimizationService@wheels-cli")
             .to("#moduleMapping#.models.OptimizationService");
+        binder.map("CodeGenerationService@wheels-cli")
+            .to("#moduleMapping#.models.CodeGenerationService");
+        binder.map("ScaffoldService@wheels-cli")
+            .to("#moduleMapping#.models.ScaffoldService");
         
         log.info('Wheels CLI Module loaded successfully.');
     }
