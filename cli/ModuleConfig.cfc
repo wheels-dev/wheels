@@ -53,6 +53,10 @@ component {
             .to("#moduleMapping#.models.PluginService");
         binder.map("EnvironmentService@wheels-cli")
             .to("#moduleMapping#.models.EnvironmentService");
+        binder.map("SecurityService@wheels-cli")
+            .to("#moduleMapping#.models.SecurityService");
+        binder.map("OptimizationService@wheels-cli")
+            .to("#moduleMapping#.models.OptimizationService");
         
         log.info('Wheels CLI Module loaded successfully.');
     }

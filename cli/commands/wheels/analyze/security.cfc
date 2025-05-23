@@ -5,7 +5,7 @@
  * wheels analyze security --fix --report=json
  * wheels analyze security --severity=high --path=app/
  */
-component extends="wheels-cli.models.BaseCommand" {
+component extends="../base" {
     
     /**
      * @path.hint Path to scan (default: current directory)
