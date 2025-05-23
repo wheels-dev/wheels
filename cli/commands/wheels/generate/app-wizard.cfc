@@ -75,8 +75,8 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
 
     var template = multiselect( 'Which Wheels Template shall we use? ' )
       .options( [
-        {value: 'cfwheels-base-template', display: '2.5.x - Wheels Base Template - Stable Release', selected: true},
-        {value: 'wheels-base-template@BE', display: '3.0.x - Wheels Base Template - Bleeding Edge'},
+        {value: 'wheels-base-template@BE', display: '3.0.x - Wheels Base Template - Bleeding Edge', selected: true},
+        {value: 'cfwheels-base-template', display: '2.5.x - Wheels Base Template - Stable Release'},
         {value: 'cfwheels-template-htmx-alpine-simple', display: 'Wheels Template - HTMX - Alpine.js - Simple.css'},
         {value: 'cfwheels-template-example-app', display: 'Wheels Example App'},
         {value: 'cfwheels-todomvc-htmx', display: 'Wheels - TodoMVC - HTMX - Demo App'},

@@ -11,11 +11,6 @@ component {
         settings = {
             "modulePath": modulePath
         }
-        
-        // Register StyleHelper as a singleton
-        binder.map("StyleHelper@wheels")
-            .to("#moduleMapping#.models.StyleHelper")
-            .asSingleton();
     }
 
     // Runs when module is loaded

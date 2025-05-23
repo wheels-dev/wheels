@@ -19,28 +19,19 @@ component extends="base" {
         string excludeFiles="", 
         numeric interval=1
     ) {
-        // Display command header
-        Style.commandHeader("WHEELS WATCH MODE");
-        Style.info("Monitoring files for changes. Press Ctrl+C to stop watching.");
+        // Welcome message
+        print.line();
+        print.boldMagentaLine( "Wheels Watch Mode" );
+        print.line( "Monitoring files for changes..." );
+        print.line( "Press Ctrl+C to stop watching" );
         print.line();
         
         // Convert directories to array
         local.dirsToWatch = listToArray(arguments.includeDirs);
         local.filesToExclude = listToArray(arguments.excludeFiles);
         
-        // Display watch configuration
-        local.configTable = [
-            ["Directories", arguments.includeDirs],
-            ["Excluded Files", len(arguments.excludeFiles) ? arguments.excludeFiles : "None"],
-            ["Check Interval", arguments.interval & " second" & (arguments.interval > 1 ? "s" : "")]
-        ];
-        Style.table(local.configTable);
-        
         // Initialize tracking for last modified times
         local.fileTimestamps = {};
-        
-        // Show progress during initial scan
-        local.scanProgressId = Style.startProgress("Scanning files");
         
         // Initial scan of files to establish baseline
         for (local.dir in local.dirsToWatch) {
@@ -56,14 +47,7 @@ component extends="base" {
             }
         }
         
-        Style.endProgress(local.scanProgressId, true);
-        Style.success("Watching #structCount(local.fileTimestamps)# files across #arrayLen(local.dirsToWatch)# directories");
-        print.line();
-        
-        // Display interactive tips
-        Style.tip("You can view your application at: http://localhost:8080");
-        Style.tip("Changes to #local.dirsToWatch[1]# will be detected automatically");
-        print.line();
+        print.greenLine("Watching #structCount(local.fileTimestamps)# files across #arrayLen(local.dirsToWatch)# directories");
         
         // Start the watch loop
         while (true) {
@@ -99,36 +83,24 @@ component extends="base" {
             // If there are changes, reload the application
             if (arrayLen(local.changes) > 0) {
                 // Log changes
-                Style.sectionHeader("Changes Detected");
-                
                 for (local.change in local.changes) {
                     local.relativePath = replace(local.change.file, getCWD(), "");
                     if (local.change.type == "new") {
-                        print.cyanLine("📄 New file: #local.relativePath#");
+                        print.boldCyanLine("New file detected: #local.relativePath#");
                     } else {
-                        print.cyanLine("🔄 Modified: #local.relativePath#");
+                        print.boldCyanLine("Modified file detected: #local.relativePath#");
                     }
                 }
                 
                 // Reload the application
                 print.line();
-                local.reloadId = Style.startProgress("Reloading application");
+                print.boldGreenLine("Reloading application...");
                 
                 try {
                     command("wheels reload").run();
-                    Style.endProgress(local.reloadId, true);
-                    Style.success("Application reloaded successfully at #timeFormat(now(), "HH:mm:ss")#");
+                    print.boldGreenLine("Application reloaded successfully at #timeFormat(now(), "HH:mm:ss")#");
                 } catch (any e) {
-                    Style.endProgress(local.reloadId, false);
-                    Style.errorWithSolutions(
-                        "Error reloading application: #e.message#",
-                        [
-                            "Check server logs for more information",
-                            "Ensure the application server is running",
-                            "Check for syntax errors in modified files"
-                        ],
-                        "https://wheels.dev/docs/troubleshooting"
-                    );
+                    print.boldRedLine("Error reloading application: #e.message#");
                 }
                 
                 print.line();

@@ -8,7 +8,6 @@ component excludeFromHelp=true {
 	property name='packageService' inject='packageService';
 	property name="ConfigService" inject="ConfigService";
 	property name="JSONService" inject="JSONService";
-	property name="Style" inject="StyleHelper@wheels";
 
 //=====================================================================
 //= 	Scaffolding
@@ -313,7 +312,7 @@ component excludeFromHelp=true {
 			if ( directoryExists( current.webRoot & "app/snippets" ) ) {
 					var templateDirectory=current.webRoot & "app/snippets";
 			} else if ( directoryExists( current.moduleRoot & "templates" ) ) {
-					var templateDirectory=current.webRoot & "app/snippets";
+					var templateDirectory=current.moduleRoot & "templates";
 			} else {
 					error( "#templateDirectory# Template Directory can't be found." );
 			}
@@ -329,6 +328,11 @@ component excludeFromHelp=true {
 			moduleRoot  = expandPath("/wheels-cli/templates/"),
 			targetDir   = getCWD() & "app/snippets/"
 		};
+
+		// Only proceed if the app folder exists
+		if (!directoryExists(current.webRoot & "app/")) {
+			return;
+		}
 	
 		// Create target directory if it doesn't exist
 		if (!directoryExists(current.targetDir)) {
@@ -336,10 +340,8 @@ component excludeFromHelp=true {
 		}
 	
 		// List of root-level files and folders to exclude
-		var excludedRootFiles = [
-			"BoxJSON.txt", "ConfigAppContent.txt", "ConfigDataSourceH2Content.txt", "ConfigReloadPasswordContent.txt", "ConfigRoutes.txt", "WheelsBoxJSON.txt"
-		];
-		var excludedFolders = ["bootstrap"];
+		var excludedRootFiles = [];
+		var excludedFolders = [];
 	
 		// Get all entries in the templates directory
 		var entries = directoryList(current.moduleRoot, false, "query");

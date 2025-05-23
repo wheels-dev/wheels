@@ -82,7 +82,7 @@ component extends="base" {
 			}
 	  		// Optional Adapter Override
 	  		if(len(loc.adapter)){
-	  			loc.testurl&="&adapter=#loc.adapter#";
+	  			loc.testurl&="&adapter=#loc.adapter#"
 	  		}
 	  		return loc;
 	  }

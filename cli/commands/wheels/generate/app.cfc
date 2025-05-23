@@ -19,13 +19,13 @@
  *  {code}
  *
  *  Here are the basic templates that are available for you that come from ForgeBox
- *  - Wheels Base Template - Stable (default)
- *  - Wheels Base Template - Bleeding Edge
+ *  - Wheels Base Template - Bleeding Edge (default)
+ *  - Wheels Base Template - Stable
  *  - Wheels Template - HelloWorld
  *  - Wheels Template - HelloDynamic
  *  - Wheels Template - HelloPages
  *  - Wheels Example App
- *  - Wheels - TodoMVC - HTMX - Demp App
+ *  - Wheels - TodoMVC - HTMX - Demo App
  *
  * {code:bash}
  * wheels create app template=base
@@ -47,6 +47,7 @@ component aliases="wheels g app" extends="../base" {
     // Map these shortcut names to the actual ForgeBox slugs
     variables.templateMap = {
       'Base'        : 'cfwheels-base-template',
+      'Base@BE'     : 'wheels-base-template@BE',
       'HelloWorld'  : 'cfwheels-template-helloworld',
       'HelloDynamic': 'cfwheels-template-hellodynamic',
       'HelloPages'  : 'cfwheels-template-hellopages'
@@ -57,7 +58,7 @@ component aliases="wheels g app" extends="../base" {
 
   /**
    * @name           The name of the app you want to create
-   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug)
+   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug). Default is Base@BE (Bleeding Edge)
    * @directory      The directory to create the app in
    * @reloadPassword The reload passwrod to set for the app
    * @datasourceName The datasource name to set for the app
@@ -69,7 +70,7 @@ component aliases="wheels g app" extends="../base" {
    **/
   function run(
     name     = 'MyWheelsApp',
-    template = 'Base',
+    template = 'wheels-base-template@BE',
     directory,
     reloadPassword = 'changeMe',
     datasourceName,
