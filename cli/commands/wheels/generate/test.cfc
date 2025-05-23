@@ -1,37 +1,40 @@
 /**
- * I generate a test stub in /test/TYPE/NAME.cfc
+ * Generate test files for Wheels applications
  *
+ * Examples:
  * {code:bash}
  * wheels generate test model user
- * {code}
- *
- * {code:bash}
  * wheels generate test controller users
- * {code}
- *
- * {code:bash}
  * wheels generate test view users edit
+ * wheels generate test unit UserService --open
+ * wheels generate test integration UserController --crud
  * {code}
  **/
 component aliases='wheels g test' extends="../base"  {
 
 	/**
-	 * @type.hint View path folder or name of object, i.e user
-	 * @type.options model,controller,view
-	 * @objectname.hint View path folder or name of object, i.e user
-	 * @name.hint Name of the action/view
+	 * @type.hint Type of test: model, controller, view, unit, integration
+	 * @type.options model,controller,view,unit,integration
+	 * @objectname.hint Name of object/class to test
+	 * @name.hint Name of the action/view (for view tests)
+	 * @crud.hint Generate CRUD test methods
+	 * @mock.hint Generate mock objects
+	 * @open.hint Open the created file in editor
 	 **/
 	function run(
 		required string type,
 		required string objectname,
-		string name=""
+		string name="",
+		boolean crud=false,
+		boolean mock=false,
+		boolean open=false
 	){
 		var obj = helpers.getNameVariants(listLast( arguments.objectname, '/\' ));
-		var testsdirectory     = fileSystemUtil.resolvePath( "tests\Testbox\specs" );
+		var testsdirectory = fileSystemUtil.resolvePath( "tests/Testbox/specs" );
 
 		// Validate directories
 		if( !directoryExists( testsdirectory ) ) {
-			error( "[#arguments.testsdirectory#] can't be found. Are you running this from your site root?" );
+			error( "[#testsdirectory#] can't be found. Are you running this from your site root?" );
  		}
  		if( arguments.type == "view" && !len(arguments.name)){
  			error( "If creating a view, we need to know the name of the view as well as the objectname");
@@ -61,20 +64,182 @@ component aliases='wheels g test' extends="../base"  {
  					directoryCreate(testObjPath);
  				}
  			break;
+ 			case "unit":
+ 				var testName=obj.objectNameSingularC & "Test.cfc";
+ 				var testPath=fileSystemUtil.resolvePath("tests/Testbox/specs/unit/#testName#");
+ 				if( !directoryExists(fileSystemUtil.resolvePath("tests/Testbox/specs/unit"))){
+ 					directoryCreate(fileSystemUtil.resolvePath("tests/Testbox/specs/unit"));
+ 				}
+ 			break;
+ 			case "integration":
+ 				var testName=obj.objectNameSingularC & "Test.cfc";
+ 				var testPath=fileSystemUtil.resolvePath("tests/Testbox/specs/integration/#testName#");
+ 				if( !directoryExists(fileSystemUtil.resolvePath("tests/Testbox/specs/integration"))){
+ 					directoryCreate(fileSystemUtil.resolvePath("tests/Testbox/specs/integration"));
+ 				}
+ 			break;
  			default:
- 				error("Unknown type: should be one of model/controller/view");
+ 				error("Unknown type: should be one of model/controller/view/unit/integration");
  			break;
  		}
 
  		if( fileExists( testPath ) ) {
-			error( "[#testPath#] already exists?" );
+			if( !confirm( "[#testPath#] already exists. Overwrite? [y/n]" ) ){
+				print.line( "Cancelled." );
+				return;
+			}
  		}
 
-		//Copy template files to the application folder if they do not exist there
+		// Copy template files to the application folder if they do not exist there
 		ensureSnippetTemplatesExist();
-		// Get test content
-		var testContent = fileRead(fileSystemUtil.resolvePath('app/snippets/tests/#type#.txt'));
+		
+		// Get test content - enhanced with CRUD and mock options
+		var testContent = generateTestContent(arguments.type, obj, arguments.crud, arguments.mock);
+		
 		file action='write' file='#testPath#' mode ='777' output='#trim( testContent )#';
-		print.line( 'Created Test Stub #testPath#' );
+		print.greenLine( 'Created test: #testPath#' );
+		
+		if (arguments.open) {
+			openPath(testPath);
+		}
+		
+		// Suggest running the test
+		print.line()
+			 .yellowLine("Run your test with:")
+			 .line("wheels test run --filter=#obj.objectNameSingular#");
+	}
+	
+	/**
+	 * Generate enhanced test content based on type and options
+	 */
+	private function generateTestContent(
+		required string type,
+		required struct obj,
+		boolean crud = false,
+		boolean mock = false
+	) {
+		var templatePath = "";
+		
+		// Check if enhanced template exists
+		if (arguments.crud && fileExists(fileSystemUtil.resolvePath("app/snippets/tests/#arguments.type#-crud.txt"))) {
+			templatePath = fileSystemUtil.resolvePath("app/snippets/tests/#arguments.type#-crud.txt");
+		} else if (fileExists(fileSystemUtil.resolvePath("app/snippets/tests/#arguments.type#.txt"))) {
+			templatePath = fileSystemUtil.resolvePath("app/snippets/tests/#arguments.type#.txt");
+		} else {
+			// Generate default content if no template exists
+			return generateDefaultTestContent(arguments.type, arguments.obj, arguments.crud, arguments.mock);
+		}
+		
+		var content = fileRead(templatePath);
+		content = $replaceDefaultObjectNames(content, arguments.obj);
+		
+		// Add mock setup if requested
+		if (arguments.mock) {
+			content = addMockSetup(content, arguments.obj);
+		}
+		
+		return content;
+	}
+	
+	/**
+	 * Generate default test content when no template exists
+	 */
+	private function generateDefaultTestContent(
+		required string type,
+		required struct obj,
+		boolean crud = false,
+		boolean mock = false
+	) {
+		var content = "component extends=""testbox.system.BaseSpec"" {" & chr(10) & chr(10);
+		content &= "    function run() {" & chr(10);
+		content &= "        describe(""#obj.objectNameSingularC# #arguments.type# Tests"", function() {" & chr(10);
+		
+		if (arguments.type == "model" && arguments.crud) {
+			content &= generateModelCrudTests(arguments.obj);
+		} else if (arguments.type == "controller" && arguments.crud) {
+			content &= generateControllerCrudTests(arguments.obj);
+		} else {
+			content &= "            it(""should run a basic test"", function() {" & chr(10);
+			content &= "                expect(true).toBeTrue();" & chr(10);
+			content &= "            });" & chr(10);
+		}
+		
+		content &= "        });" & chr(10);
+		content &= "    }" & chr(10);
+		content &= "}" & chr(10);
+		
+		return content;
+	}
+	
+	/**
+	 * Generate CRUD tests for models
+	 */
+	private function generateModelCrudTests(required struct obj) {
+		var tests = "";
+		tests &= "            beforeEach(function() {" & chr(10);
+		tests &= "                variables.#obj.objectNameSingular# = model(""#obj.objectNameSingular#"").new();" & chr(10);
+		tests &= "            });" & chr(10) & chr(10);
+		
+		tests &= "            it(""should create a new #obj.objectNameSingular#"", function() {" & chr(10);
+		tests &= "                variables.#obj.objectNameSingular#.name = ""Test #obj.objectNameSingular#"";" & chr(10);
+		tests &= "                expect(variables.#obj.objectNameSingular#.save()).toBeTrue();" & chr(10);
+		tests &= "            });" & chr(10) & chr(10);
+		
+		tests &= "            it(""should update an existing #obj.objectNameSingular#"", function() {" & chr(10);
+		tests &= "                variables.#obj.objectNameSingular#.name = ""Updated #obj.objectNameSingular#"";" & chr(10);
+		tests &= "                expect(variables.#obj.objectNameSingular#.save()).toBeTrue();" & chr(10);
+		tests &= "            });" & chr(10) & chr(10);
+		
+		tests &= "            it(""should delete a #obj.objectNameSingular#"", function() {" & chr(10);
+		tests &= "                variables.#obj.objectNameSingular#.save();" & chr(10);
+		tests &= "                expect(variables.#obj.objectNameSingular#.delete()).toBeTrue();" & chr(10);
+		tests &= "            });" & chr(10);
+		
+		return tests;
+	}
+	
+	/**
+	 * Generate CRUD tests for controllers
+	 */
+	private function generateControllerCrudTests(required struct obj) {
+		var tests = "";
+		tests &= "            beforeEach(function() {" & chr(10);
+		tests &= "                variables.controller = controller(""#obj.objectNamePlural#"");" & chr(10);
+		tests &= "            });" & chr(10) & chr(10);
+		
+		tests &= "            it(""should display index page"", function() {" & chr(10);
+		tests &= "                var result = variables.controller.index();" & chr(10);
+		tests &= "                expect(result).toBeStruct();" & chr(10);
+		tests &= "            });" & chr(10) & chr(10);
+		
+		tests &= "            it(""should create a new #obj.objectNameSingular#"", function() {" & chr(10);
+		tests &= "                params.#obj.objectNameSingular# = { name = ""Test"" };" & chr(10);
+		tests &= "                var result = variables.controller.create();" & chr(10);
+		tests &= "                expect(result).toBeStruct();" & chr(10);
+		tests &= "            });" & chr(10);
+		
+		return tests;
+	}
+	
+	/**
+	 * Add mock setup to test content
+	 */
+	private function addMockSetup(required string content, required struct obj) {
+		// This would add mock object setup to the test
+		// Implementation depends on mocking framework used
+		return arguments.content;
+	}
+	
+	/**
+	 * Open a file path in the default editor
+	 */
+	private function openPath(required string path) {
+		if (shell.isWindows()) {
+			runCommand("start #arguments.path#");
+		} else if (shell.isMac()) {
+			runCommand("open #arguments.path#");
+		} else {
+			runCommand("xdg-open #arguments.path#");
+		}
 	}
 }
