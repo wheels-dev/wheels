@@ -164,27 +164,27 @@ component extends="wheels-cli.models.BaseCommand" {
 <head>
     <title>Wheels Code Analysis Report</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: ##f5f5f5; }
         .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; margin-bottom: 30px; }
+        h1 { color: ##333; margin-bottom: 30px; }
         .summary { display: flex; gap: 20px; margin-bottom: 30px; }
         .summary-card { flex: 1; padding: 20px; border-radius: 8px; text-align: center; }
-        .summary-card.error { background: #ffebee; color: #c62828; }
-        .summary-card.warning { background: #fff3e0; color: #ef6c00; }
-        .summary-card.info { background: #e3f2fd; color: #1565c0; }
-        .summary-card.success { background: #e8f5e9; color: #2e7d32; }
+        .summary-card.error { background: ##ffebee; color: ##c62828; }
+        .summary-card.warning { background: ##fff3e0; color: ##ef6c00; }
+        .summary-card.info { background: ##e3f2fd; color: ##1565c0; }
+        .summary-card.success { background: ##e8f5e9; color: ##2e7d32; }
         .summary-card h2 { margin: 0 0 10px 0; font-size: 36px; }
         .summary-card p { margin: 0; font-size: 14px; }
         .file-section { margin-bottom: 30px; }
-        .file-header { background: #f5f5f5; padding: 15px; border-radius: 5px; font-weight: bold; }
-        .issue { padding: 15px; border-left: 4px solid #ddd; margin: 10px 0; }
-        .issue.error { border-color: #f44336; background: #ffebee; }
-        .issue.warning { border-color: #ff9800; background: #fff3e0; }
-        .issue.info { border-color: #2196f3; background: #e3f2fd; }
+        .file-header { background: ##f5f5f5; padding: 15px; border-radius: 5px; font-weight: bold; }
+        .issue { padding: 15px; border-left: 4px solid ##ddd; margin: 10px 0; }
+        .issue.error { border-color: ##f44336; background: ##ffebee; }
+        .issue.warning { border-color: ##ff9800; background: ##fff3e0; }
+        .issue.info { border-color: ##2196f3; background: ##e3f2fd; }
         .issue-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
-        .issue-location { font-family: monospace; color: #666; }
-        .issue-rule { font-size: 12px; color: #999; }
-        .fixable { color: #4caf50; font-size: 12px; }
+        .issue-location { font-family: monospace; color: ##666; }
+        .issue-rule { font-size: 12px; color: ##999; }
+        .fixable { color: ##4caf50; font-size: 12px; }
     </style>
 </head>
 <body>

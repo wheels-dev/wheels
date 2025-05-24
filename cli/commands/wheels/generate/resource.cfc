@@ -453,9 +453,7 @@ component aliases='wheels g resource' extends="../base" {
         }
         
         var content = fileRead(routesPath);
-        var resourceRoute = options.api ? 
-            '.apiResource("' & obj.objectNamePlural & '")' :
-            '.resources("' & obj.objectNamePlural & '")';
+        var resourceRoute = options.api ? '.apiResource("' & obj.objectNamePlural & '")' : '.resources("' & obj.objectNamePlural & '")';
         
         // Check if route already exists
         if (!find(resourceRoute, content)) {

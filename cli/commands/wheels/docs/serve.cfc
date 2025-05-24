@@ -100,11 +100,11 @@ component extends="wheels-cli.models.BaseCommand" {
     <title>Wheels Documentation</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; }
-        h1 { color: #2c3e50; }
+        h1 { color: ##2c3e50; }
         .file-list { list-style: none; padding: 0; }
         .file-list li { margin: 10px 0; }
-        .file-list a { text-decoration: none; color: #3498db; padding: 5px 10px; display: inline-block; }
-        .file-list a:hover { background: #ecf0f1; border-radius: 4px; }
+        .file-list a { text-decoration: none; color: ##3498db; padding: 5px 10px; display: inline-block; }
+        .file-list a:hover { background: ##ecf0f1; border-radius: 4px; }
         .file { margin-left: 20px; }
         .folder { font-weight: bold; }
         .icon { margin-right: 5px; }

@@ -338,16 +338,16 @@ component extends="wheels-cli.commands.wheels.base" {
     <title>Wheels Performance Report</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: ##f5f5f5; }
         .container { max-width: 1200px; margin: 0 auto; }
         .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .metric { display: inline-block; margin: 10px 20px; }
-        .metric-value { font-size: 36px; font-weight: bold; color: #333; }
-        .metric-label { font-size: 14px; color: #666; }
+        .metric-value { font-size: 36px; font-weight: bold; color: ##333; }
+        .metric-label { font-size: 14px; color: ##666; }
         .chart-container { position: relative; height: 300px; margin: 20px 0; }
-        h1, h2 { color: #333; }
-        .warning { color: #ff6b6b; }
-        .success { color: #51cf66; }
+        h1, h2 { color: ##333; }
+        .warning { color: ##ff6b6b; }
+        .success { color: ##51cf66; }
     </style>
 </head>
 <body>

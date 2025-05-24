@@ -187,7 +187,7 @@ component extends="wheels-cli.models.BaseCommand" {
             // Parse functions
             if (structKeyExists(metadata, "functions")) {
                 for (var func in metadata.functions) {
-                    if (!func.name startsWith "$" && func.access != "private") {
+                    if (!(func.name.startsWith("$")) && func.access != "private") {
                         arrayAppend(info.functions, parseFunction(func));
                     }
                 }
@@ -255,17 +255,17 @@ component extends="wheels-cli.models.BaseCommand" {
     <title>' & componentInfo.name & ' - Wheels API Documentation</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; }
-        h1, h2, h3 { color: #2c3e50; }
-        .component-header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
-        .component-type { display: inline-block; background: #007bff; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
-        .extends { color: #6c757d; font-style: italic; }
-        .property, .method { border-left: 3px solid #007bff; padding: 15px; margin: 20px 0; background: #f8f9fa; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: ##333; max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1, h2, h3 { color: ##2c3e50; }
+        .component-header { background: ##f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+        .component-type { display: inline-block; background: ##007bff; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .extends { color: ##6c757d; font-style: italic; }
+        .property, .method { border-left: 3px solid ##007bff; padding: 15px; margin: 20px 0; background: ##f8f9fa; }
         .property-name, .method-name { font-weight: bold; font-size: 18px; }
-        .type { color: #007bff; font-family: monospace; }
+        .type { color: ##007bff; font-family: monospace; }
         .parameter { margin: 10px 0; padding: 10px; background: white; border-radius: 4px; }
-        .required { color: #dc3545; }
-        pre { background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        .required { color: ##dc3545; }
+        pre { background: ##f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; }
         code { font-family: "Courier New", monospace; }
     </style>
 </head>
@@ -345,7 +345,7 @@ component extends="wheels-cli.models.BaseCommand" {
     }
     
     private function generateMarkdownDoc(componentInfo) {
-        var md = '# ' & componentInfo.name & chr(10) & chr(10);
+        var md = chr(35) & ' ' & componentInfo.name & chr(10) & chr(10);
         
         if (len(componentInfo.description)) {
             md &= componentInfo.description & chr(10) & chr(10);
@@ -357,9 +357,9 @@ component extends="wheels-cli.models.BaseCommand" {
         
         // Properties
         if (arrayLen(componentInfo.properties)) {
-            md &= '## Properties' & chr(10) & chr(10);
+            md &= chr(35) & chr(35) & ' Properties' & chr(10) & chr(10);
             for (var prop in componentInfo.properties) {
-                md &= '### ' & prop.name & chr(10);
+                md &= chr(35) & chr(35) & chr(35) & ' ' & prop.name & chr(10);
                 md &= '- Type: `' & prop.type & '`' & chr(10);
                 if (prop.required) md &= '- Required: Yes' & chr(10);
                 if (len(prop.hint)) md &= '- Description: ' & prop.hint & chr(10);
@@ -369,9 +369,9 @@ component extends="wheels-cli.models.BaseCommand" {
         
         // Methods
         if (arrayLen(componentInfo.functions)) {
-            md &= '## Methods' & chr(10) & chr(10);
+            md &= chr(35) & chr(35) & ' Methods' & chr(10) & chr(10);
             for (var func in componentInfo.functions) {
-                md &= '### ' & func.name & '()' & chr(10);
+                md &= chr(35) & chr(35) & chr(35) & ' ' & func.name & '()' & chr(10);
                 md &= '- Returns: `' & func.returnType & '`' & chr(10);
                 if (len(func.hint)) md &= '- Description: ' & func.hint & chr(10);
                 
@@ -419,15 +419,15 @@ component extends="wheels-cli.models.BaseCommand" {
     <title>Wheels API Documentation</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; }
-        .sidebar { width: 300px; background: #f8f9fa; padding: 20px; height: 100vh; overflow-y: auto; }
+        .sidebar { width: 300px; background: ##f8f9fa; padding: 20px; height: 100vh; overflow-y: auto; }
         .content { flex: 1; padding: 20px; }
-        h1 { color: #2c3e50; margin-bottom: 30px; }
-        h2 { color: #34495e; margin-top: 30px; }
+        h1 { color: ##2c3e50; margin-bottom: 30px; }
+        h2 { color: ##34495e; margin-top: 30px; }
         .component-list { list-style: none; padding: 0; }
         .component-list li { margin: 5px 0; }
-        .component-list a { text-decoration: none; color: #3498db; }
+        .component-list a { text-decoration: none; color: ##3498db; }
         .component-list a:hover { text-decoration: underline; }
-        .stats { background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 30px; }
+        .stats { background: ##ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 30px; }
     </style>
 </head>
 <body>
@@ -472,14 +472,14 @@ component extends="wheels-cli.models.BaseCommand" {
     }
     
     private function generateMarkdownIndex(outputPath, components) {
-        var indexMD = '# Wheels API Documentation' & chr(10) & chr(10);
+        var indexMD = chr(35) & ' Wheels API Documentation' & chr(10) & chr(10);
         indexMD &= 'Generated on ' & dateFormat(now(), "long") & chr(10) & chr(10);
         
-        indexMD &= '## Table of Contents' & chr(10) & chr(10);
+        indexMD &= chr(35) & chr(35) & ' Table of Contents' & chr(10) & chr(10);
         
         for (var type in ["models", "controllers", "services", "views"]) {
             if (structKeyExists(arguments.components, type) && arrayLen(arguments.components[type])) {
-                indexMD &= '### ' & helpers.capitalize(type) & chr(10) & chr(10);
+                indexMD &= chr(35) & chr(35) & chr(35) & ' ' & helpers.capitalize(type) & chr(10) & chr(10);
                 
                 for (var comp in arguments.components[type]) {
                     var link = type & '/' & comp.name & '.md';

@@ -432,10 +432,10 @@ component {
                 
                 // Look for loops with queries
                 if (reFindNoCase("<cfloop.*query=", content) || 
-                    reFindNoCase("for\s*\(.*in.*\.findAll\(\)", content)) {
+                    reFindNoCase("for\\s*\\(.*in.*\\.findAll\\(\\)", content)) {
                     
                     // Check if there's another query inside the loop
-                    if (reFindNoCase("(findByKey|findOne|findAll|model\(\)\.)", content)) {
+                    if (reFindNoCase("(findByKey|findOne|findAll|model\\(\\)\\.)", content)) {
                         arrayAppend(arguments.results.recommendations, {
                             type: "N_PLUS_ONE",
                             file: file,
