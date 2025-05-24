@@ -182,7 +182,7 @@ component {
         }
         
         // Check for unused CSS (simple heuristic)
-        if (reFindNoCase("(\.unused|\.deprecated|\.old-)", content)) {
+        if (reFindNoCase("(unused|deprecated|old-)", content)) {
             arrayAppend(arguments.results.recommendations, {
                 type: "UNUSED_CSS",
                 file: arguments.filePath,
@@ -288,8 +288,8 @@ component {
                 var content = fileRead(file);
                 
                 // Check for local jQuery, Bootstrap, etc.
-                if (reFindNoCase("(jquery|bootstrap|font-awesome).*\.(js|css)", content) &&
-                    !reFindNoCase("(cdn\.|cdnjs\.|googleapis\.com|unpkg\.com)", content)) {
+                if (reFindNoCase("(jquery|bootstrap|font-awesome)[^""']*(js|css)", content) &&
+                    !reFindNoCase("(cdn|cdnjs|googleapis|unpkg)", content)) {
                     
                     arrayAppend(arguments.results.recommendations, {
                         type: "CDN_USAGE",
@@ -431,11 +431,11 @@ component {
                 var content = fileRead(file);
                 
                 // Look for loops with queries
-                if (reFindNoCase("<cfloop.*query=", content) || 
-                    reFindNoCase("for\\s*\\(.*in.*\\.findAll\\(\\)", content)) {
+                if (findNoCase("cfloop", content) && findNoCase("query", content) || 
+                    findNoCase("findAll", content)) {
                     
                     // Check if there's another query inside the loop
-                    if (reFindNoCase("(findByKey|findOne|findAll|model\\(\\)\\.)", content)) {
+                    if (findNoCase("findByKey", content) || findNoCase("findOne", content) || findNoCase("findAll", content)) {
                         arrayAppend(arguments.results.recommendations, {
                             type: "N_PLUS_ONE",
                             file: file,

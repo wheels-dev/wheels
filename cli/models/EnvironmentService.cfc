@@ -268,17 +268,17 @@ component {
         var envContent = [];
         
         // Basic settings
-        arrayAppend(envContent, "# Wheels Environment: #arguments.environment#");
-        arrayAppend(envContent, "# Generated on: #dateTimeFormat(now(), 'yyyy-mm-dd HH:nn:ss')#");
+        arrayAppend(envContent, "## Wheels Environment: #arguments.environment#");
+        arrayAppend(envContent, "## Generated on: #dateTimeFormat(now(), 'yyyy-mm-dd HH:nn:ss')#");
         arrayAppend(envContent, "");
-        arrayAppend(envContent, "# Application Settings");
+        arrayAppend(envContent, "## Application Settings");
         arrayAppend(envContent, "WHEELS_ENV=#arguments.environment#");
         arrayAppend(envContent, "WHEELS_RELOAD_PASSWORD=wheels#arguments.environment#");
         arrayAppend(envContent, "");
         
         // Database settings
         if (arguments.config.keyExists("datasource")) {
-            arrayAppend(envContent, "# Database Settings");
+            arrayAppend(envContent, "## Database Settings");
             arrayAppend(envContent, "DB_DRIVER=#arguments.config.datasource.driver#");
             arrayAppend(envContent, "DB_HOST=#arguments.config.datasource.host#");
             arrayAppend(envContent, "DB_PORT=#arguments.config.datasource.port#");
@@ -289,7 +289,7 @@ component {
         }
         
         // Server settings
-        arrayAppend(envContent, "# Server Settings");
+        arrayAppend(envContent, "## Server Settings");
         arrayAppend(envContent, "SERVER_PORT=#arguments.config.port#");
         if (arguments.config.keyExists("cfengine")) {
             arrayAppend(envContent, "SERVER_CFENGINE=#arguments.config.cfengine#");
@@ -360,11 +360,11 @@ services:
   db:
     image: #getDatabaseImage(arguments.database)#
     ports:
-      - ""#getDatabasePort(arguments.database)#:#getDatabasePort(arguments.database)#""
+      - ""##getDatabasePort(arguments.database)##:##getDatabasePort(arguments.database)##""
     environment:
-      #getDatabaseEnvironment(arguments.database)#
+      ##getDatabaseEnvironment(arguments.database)##
     volumes:
-      - db_data:/var/lib/#getDatabaseVolumeDir(arguments.database)#
+      - db_data:/var/lib/##getDatabaseVolumeDir(arguments.database)##
 
 volumes:
   db_data:";
@@ -378,17 +378,17 @@ volumes:
     private function generateDockerfile() {
         return "FROM ortussolutions/commandbox:lucee5
 
-# Copy application files
+## Copy application files
 COPY . /app
 WORKDIR /app
 
-# Install dependencies
+## Install dependencies
 RUN box install
 
-# Expose port
+## Expose port
 EXPOSE 8080
 
-# Start server
+## Start server
 CMD [""box"", ""server"", ""start"", ""--console""]";
     }
     
@@ -396,8 +396,8 @@ CMD [""box"", ""server"", ""start"", ""--console""]";
      * Generate Vagrantfile
      */
     private function generateVagrantfile(argumentCollection) {
-        return "# -*- mode: ruby -*-
-# vi: set ft=ruby :
+        return "## -*- mode: ruby -*-
+## vi: set ft=ruby :
 
 Vagrant.configure(""2"") do |config|
   config.vm.box = ""ubuntu/focal64""
@@ -418,24 +418,24 @@ end";
      * Generate provisioning script
      */
     private function generateProvisionScript(argumentCollection) {
-        return "#!/bin/bash
+        return "##!/bin/bash
 
-# Update system
+## Update system
 apt-get update
 apt-get upgrade -y
 
-# Install Java
+## Install Java
 apt-get install -y openjdk-11-jdk
 
-# Install CommandBox
+## Install CommandBox
 curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add -
 echo ""deb https://downloads.ortussolutions.com/debs/noarch /"" | tee -a /etc/apt/sources.list.d/commandbox.list
 apt-get update && apt-get install -y commandbox
 
-# Install database
-#getProvisionDatabase(arguments.database)#
+## Install database
+##getProvisionDatabase(arguments.database)##
 
-# Setup application
+## Setup application
 cd /vagrant
 box install
 box server start port=8080 host=0.0.0.0";
@@ -452,7 +452,7 @@ box server start port=8080 host=0.0.0.0";
             var lines = fileRead(envFile).listToArray(chr(10));
             for (var line in lines) {
                 line = trim(line);
-                if (len(line) && !line.startsWith("##")) {
+                if (len(line) && !line.startsWith("####")) {
                     var parts = line.listToArray("=");
                     if (arrayLen(parts) >= 2) {
                         var key = trim(parts[1]);
@@ -564,7 +564,7 @@ sudo -u postgres createdb wheels
 sudo -u postgres psql -c ""CREATE USER wheels WITH PASSWORD 'wheels_password';""
 sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE wheels TO wheels;""";
             default:
-                return "# H2 database will be created automatically";
+                return "## H2 database will be created automatically";
         }
     }
     

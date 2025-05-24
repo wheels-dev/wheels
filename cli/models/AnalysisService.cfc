@@ -247,7 +247,7 @@ component {
         }
         
         // Check for missing query caching
-        if (reFindNoCase("<cfquery(?!.*cachedwithin)", content)) {
+        if (findNoCase("cfquery", content) && !findNoCase("cachedwithin", content)) {
             arrayAppend(issues, {
                 line = 1,
                 column = 1,

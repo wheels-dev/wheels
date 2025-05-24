@@ -446,19 +446,19 @@ component aliases='wheels g resource' extends="../base" {
         
         if (!fileExists(routesPath)) {
             // Create basic routes file if it doesn't exist
-            var routesContent = '<cfscript>' & chr(10);
-            routesContent &= '// Routes' & chr(10);
-            routesContent &= '</cfscript>' & chr(10);
+            var routesContent = chr(60) & "cfscript" & chr(62) & chr(10);
+            routesContent &= "// Routes" & chr(10);
+            routesContent &= chr(60) & "/cfscript" & chr(62) & chr(10);
             fileWrite(routesPath, routesContent);
         }
         
         var content = fileRead(routesPath);
-        var resourceRoute = options.api ? '.apiResource("' & obj.objectNamePlural & '")' : '.resources("' & obj.objectNamePlural & '")';
+        var resourceRoute = arguments.options.api ? '.apiResource("' & arguments.obj.objectNamePlural & '")' : '.resources("' & arguments.obj.objectNamePlural & '")';
         
         // Check if route already exists
         if (!find(resourceRoute, content)) {
             // Insert before closing tag
-            content = reReplace(content, "</cfscript>", resourceRoute & '.end();' & chr(10) & '</cfscript>');
+            content = reReplace(content, chr(60) & "/cfscript" & chr(62), resourceRoute & '.end();' & chr(10) & chr(60) & '/cfscript' & chr(62));
             fileWrite(routesPath, content);
             return true;
         }
