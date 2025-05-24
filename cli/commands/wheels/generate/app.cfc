@@ -1,7 +1,7 @@
 /**
  *  Create a blank Wheels app from one of our app templates or a template using a valid Endpoint ID which can come from .
  *  ForgeBox, HTTP/S, git, github, etc.
- *  By default an app named MyWheelsApp will be created in a sub directoryt call MyWheelsApp.
+ *  By default an app named MyWheelsApp will be created in a sub directory call MyWheelsApp.
  *
  *  The most basic call...
  *  {code:bash}
@@ -11,11 +11,6 @@
  *  This can be shortened to...
  *  {code:bash}
  *  wheels g app
- *  {code}
- *
- *  or simply
- *  {code:bash}
- *  wheels new
  *  {code}
  *
  *  Here are the basic templates that are available for you that come from ForgeBox
@@ -69,14 +64,14 @@ component aliases="wheels g app" extends="../base" {
    * @force          Force installation into an none empty directory
    **/
   function run(
-    name     = 'MyWheelsApp',
+    name     = 'MyApp',
     template = 'wheels-base-template@BE',
     directory,
-    reloadPassword = 'changeMe',
+    reloadPassword = '',
     datasourceName,
     cfmlEngine      = 'lucee',
     boolean useBootstrap = false,
-    boolean setupH2 = false,
+    boolean setupH2 = true,
     boolean init    = false,
     boolean force   = false
   ) {
@@ -219,12 +214,12 @@ component aliases="wheels g app" extends="../base" {
     // Definitely refactor this into some sort of templating system?
     if(useBootstrap){
       print.greenline( "========= Installing Bootstrap Settings").toConsole();
-      
+
       // Replace Default Template with something more sensible
       var bsLayout=fileRead( getTemplate('/bootstrap/layout.cfm' ) );
       bsLayout = replaceNoCase( bsLayout, "|appName|", arguments.name, 'all' );
       file action='write' file='#fileSystemUtil.resolvePath("app/views/layout.cfm")#' mode ='777' output='#trim(bsLayout)#';
-      
+
       // Add Bootstrap default form settings
       var bsSettings=fileRead( getTemplate('/bootstrap/settings.cfm' ) );
       bsSettings = bsSettings & cr & '// CLI-Appends-Here';
@@ -240,7 +235,7 @@ component aliases="wheels g app" extends="../base" {
       }
 
     }
-     
+
       print.line()
     print.greenBoldLine( '========= All Done! =============================' )
       .greenBoldLine( '| Your app has been successfully created. Type   |' )
