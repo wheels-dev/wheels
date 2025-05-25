@@ -1,6 +1,5 @@
 component {
     
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
     property name="serverService" inject="ServerService@commandbox-core";
     property name="templateService" inject="TemplateService@wheels-cli";
     
@@ -569,9 +568,32 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE wheels TO wheels;"""
     }
     
     /**
-     * Resolve a file path
+     * Resolve a file path  
      */
-    private function resolvePath(path) {
-        return fileSystemUtil.resolvePath(arguments.path);
+    private function resolvePath(path, baseDirectory = "") {
+        // Prepend app/ to common paths if not already present
+        var appPath = arguments.path;
+        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
+            // Common app directories
+            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
+                appPath = "app/" & appPath;
+            }
+        }
+        
+        // If path is already absolute, return it
+        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
+            return appPath;
+        }
+        
+        // Build absolute path from current working directory
+        // Use provided base directory or fall back to expandPath
+        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
+        
+        // Ensure we have a trailing slash
+        if (right(baseDir, 1) != "/") {
+            baseDir &= "/";
+        }
+        
+        return baseDir & appPath;
     }
 }

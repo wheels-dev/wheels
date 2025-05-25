@@ -1,6 +1,5 @@
 component {
     
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
     property name="print" inject="print";
     
     /**
@@ -84,7 +83,7 @@ component {
         }
         
         var testPath = determineTestPath(arguments.type, testName);
-        var testDir = getDirectoryFromPath(fileSystemUtil.resolvePath(testPath));
+        var testDir = getDirectoryFromPath(resolvePath(testPath));
         
         // Create directory if it doesn't exist
         if (!directoryExists(testDir)) {
@@ -101,7 +100,7 @@ component {
         );
         
         // Write test file
-        fileWrite(fileSystemUtil.resolvePath(testPath), testContent);
+        fileWrite(resolvePath(testPath), testContent);
         
         return testPath;
     }
@@ -346,5 +345,35 @@ component {
             return left(arguments.word, len(arguments.word) - 1);
         }
         return arguments.word;
+    }
+    
+    /**
+     * Resolve a file path  
+     */
+    private function resolvePath(path, baseDirectory = "") {
+        // Prepend app/ to common paths if not already present
+        var appPath = arguments.path;
+        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
+            // Common app directories
+            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
+                appPath = "app/" & appPath;
+            }
+        }
+        
+        // If path is already absolute, return it
+        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
+            return appPath;
+        }
+        
+        // Build absolute path from current working directory
+        // Use provided base directory or fall back to expandPath
+        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
+        
+        // Ensure we have a trailing slash
+        if (right(baseDir, 1) != "/") {
+            baseDir &= "/";
+        }
+        
+        return baseDir & appPath;
     }
 }

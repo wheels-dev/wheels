@@ -2,7 +2,7 @@ component {
     
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
     property name="migrationService" inject="MigrationService@wheels-cli";
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
+    property name="helpers" inject="helpers@wheels";
     
     /**
      * Generate a complete scaffold (model, controller, views, migration)
@@ -14,7 +14,8 @@ component {
         string hasMany = "",
         boolean api = false,
         boolean tests = true,
-        boolean force = false
+        boolean force = false,
+        string baseDirectory = ""
     ) {
         var results = {
             success: true,
@@ -25,15 +26,13 @@ component {
         
         try {
             // Start transaction-like operation
-            print.boldLine("🏗️  Scaffolding #arguments.name#...")
-                 .line();
             
             // 1. Generate Model
-            print.yellowLine("📦 Creating model...");
             var modelResult = codeGenerationService.generateModel(
                 name = arguments.name,
                 properties = parseProperties(arguments.properties),
-                force = arguments.force
+                force = arguments.force,
+                baseDirectory = arguments.baseDirectory
             );
             
             if (modelResult.success) {
@@ -42,37 +41,36 @@ component {
                     path: modelResult.path
                 });
                 arrayAppend(results.rollback, modelResult.path);
-                print.greenLine("   ✅ Model created");
+                // Model created successfully
             } else {
                 throw(type="ScaffoldError", message="Failed to create model: #modelResult.error#");
             }
             
             // 2. Generate Migration
-            print.yellowLine("📄 Creating migration...");
-            var migrationResult = migrationService.createMigration(
-                name = "create_#helpers.toPlural(lCase(arguments.name))#_table",
-                table = helpers.toPlural(lCase(arguments.name)),
-                model = arguments.name,
-                type = "create"
-            );
-            
-            if (migrationResult.success) {
+            try {
+                var migrationPath = migrationService.createMigration(
+                    name = "create_#variables.helpers.pluralize(lCase(arguments.name))#_table",
+                    table = variables.helpers.pluralize(lCase(arguments.name)),
+                    model = arguments.name,
+                    type = "create",
+                    baseDirectory = arguments.baseDirectory
+                );
+                
                 arrayAppend(results.generated, {
                     type: "migration",
-                    path: migrationResult.path
+                    path: migrationPath
                 });
-                arrayAppend(results.rollback, migrationResult.path);
-                print.greenLine("   ✅ Migration created");
-            } else {
-                throw(type="ScaffoldError", message="Failed to create migration: #migrationResult.error#");
+                arrayAppend(results.rollback, migrationPath);
+            } catch (any e) {
+                throw(type="ScaffoldError", message="Failed to create migration: #e.message#");
             }
             
             // 3. Generate Controller
-            print.yellowLine("🎮 Creating controller...");
             var controllerResult = codeGenerationService.generateController(
-                name = helpers.toPlural(arguments.name),
+                name = variables.helpers.pluralize(arguments.name),
                 rest = true,
-                force = arguments.force
+                force = arguments.force,
+                baseDirectory = arguments.baseDirectory
             );
             
             if (controllerResult.success) {
@@ -81,22 +79,23 @@ component {
                     path: controllerResult.path
                 });
                 arrayAppend(results.rollback, controllerResult.path);
-                print.greenLine("   ✅ Controller created");
+                // Controller created successfully
             } else {
                 throw(type="ScaffoldError", message="Failed to create controller: #controllerResult.error#");
             }
             
             // 4. Generate Views (unless API-only)
             if (!arguments.api) {
-                print.yellowLine("📝 Creating views...");
+                // Creating views...
                 var viewActions = ["index", "show", "new", "edit", "_form"];
                 var viewsCreated = 0;
                 
                 for (var action in viewActions) {
                     var viewResult = codeGenerationService.generateView(
-                        name = helpers.toPlural(arguments.name),
+                        name = variables.helpers.pluralize(arguments.name),
                         action = action,
-                        force = arguments.force
+                        force = arguments.force,
+                        baseDirectory = arguments.baseDirectory
                     );
                     
                     if (viewResult.success) {
@@ -108,17 +107,18 @@ component {
                         viewsCreated++;
                     }
                 }
-                print.greenLine("   ✅ #viewsCreated# views created");
+                // Views created successfully
             }
             
             // 5. Generate Tests
             if (arguments.tests) {
-                print.yellowLine("🧪 Creating tests...");
+                // Creating tests...
                 
                 // Model test
                 var modelTestResult = codeGenerationService.generateTest(
                     type = "model",
-                    name = arguments.name
+                    name = arguments.name,
+                    baseDirectory = arguments.baseDirectory
                 );
                 if (modelTestResult.success) {
                     arrayAppend(results.generated, {
@@ -131,7 +131,8 @@ component {
                 // Controller test
                 var controllerTestResult = codeGenerationService.generateTest(
                     type = "controller",
-                    name = helpers.toPlural(arguments.name)
+                    name = variables.helpers.pluralize(arguments.name),
+                    baseDirectory = arguments.baseDirectory
                 );
                 if (controllerTestResult.success) {
                     arrayAppend(results.generated, {
@@ -141,32 +142,16 @@ component {
                     arrayAppend(results.rollback, controllerTestResult.path);
                 }
                 
-                print.greenLine("   ✅ Tests created");
+                // Tests created successfully
             }
             
             // 6. Update routes
-            var routesUpdated = updateRoutes(arguments.name);
+            var routesUpdated = updateRoutes(arguments.name, arguments.baseDirectory);
             if (routesUpdated) {
-                print.greenLine("📍 Routes updated");
+                // Routes updated successfully
             }
             
-            // Success summary
-            print.line()
-                 .greenBoldLine("✅ Scaffold completed successfully!")
-                 .line()
-                 .yellowLine("📋 Generated files:")
-                 .line();
-            
-            for (var item in results.generated) {
-                print.line("   • #item.type#: #item.path#");
-            }
-            
-            // Next steps
-            print.line()
-                 .yellowLine("📋 Next steps:")
-                 .line("1. Run migrations: wheels dbmigrate up")
-                 .line("2. Start server: box server start")
-                 .line("3. Visit: http://localhost:8080/#lCase(helpers.toPlural(arguments.name))#");
+            // Success - scaffold completed
             
         } catch (any e) {
             // Rollback on error
@@ -174,7 +159,7 @@ component {
             arrayAppend(results.errors, e.message);
             
             if (e.type == "ScaffoldError") {
-                print.redBoldLine("❌ Scaffold failed: #e.message#");
+                // Scaffold failed
                 rollbackScaffold(results.rollback);
             } else {
                 rethrow;
@@ -234,16 +219,16 @@ component {
     /**
      * Update routes file to include resource
      */
-    private function updateRoutes(required string name) {
+    private function updateRoutes(required string name, string baseDirectory = "") {
         try {
-            var routesPath = fileSystemUtil.resolvePath("config/routes.cfm");
+            var routesPath = resolvePath("config/routes.cfm", arguments.baseDirectory);
             if (!fileExists(routesPath)) {
-                routesPath = fileSystemUtil.resolvePath("app/config/routes.cfm");
+                routesPath = resolvePath("app/config/routes.cfm", arguments.baseDirectory);
             }
             
             if (fileExists(routesPath)) {
                 var content = fileRead(routesPath);
-                var resourceName = lCase(helpers.toPlural(arguments.name));
+                var resourceName = lCase(variables.helpers.pluralize(arguments.name));
                 var resourceLine = 'resources(name="#resourceName#");';
                 
                 // Check if resource already exists
@@ -272,14 +257,11 @@ component {
      */
     private function rollbackScaffold(required array files) {
         if (arrayLen(arguments.files)) {
-            print.line()
-                 .yellowLine("🔄 Rolling back created files...");
-            
             for (var file in arguments.files) {
                 if (fileExists(file)) {
                     try {
                         fileDelete(file);
-                        print.line("   • Removed: #file#");
+                        // File removed
                     } catch (any e) {
                         // Silent fail
                     }
@@ -291,7 +273,7 @@ component {
     /**
      * Validate scaffold requirements
      */
-    function validateScaffold(required string name) {
+    function validateScaffold(required string name, string baseDirectory = "") {
         var errors = [];
         
         // Check name
@@ -305,12 +287,12 @@ component {
         }
         
         // Check if already exists
-        var modelPath = fileSystemUtil.resolvePath("models/#helpers.capitalize(arguments.name)#.cfc");
+        var modelPath = resolvePath("models/#variables.helpers.capitalize(arguments.name)#.cfc", arguments.baseDirectory);
         if (fileExists(modelPath)) {
             arrayAppend(errors, "Model already exists: #modelPath#");
         }
         
-        var controllerPath = fileSystemUtil.resolvePath("controllers/#helpers.toPlural(helpers.capitalize(arguments.name))#.cfc");
+        var controllerPath = resolvePath("controllers/#variables.helpers.pluralize(variables.helpers.capitalize(arguments.name))#.cfc", arguments.baseDirectory);
         if (fileExists(controllerPath)) {
             arrayAppend(errors, "Controller already exists: #controllerPath#");
         }
@@ -319,5 +301,35 @@ component {
             valid: arrayLen(errors) == 0,
             errors: errors
         };
+    }
+    
+    /**
+     * Resolve a file path  
+     */
+    private function resolvePath(path, baseDirectory = "") {
+        // Prepend app/ to common paths if not already present
+        var appPath = arguments.path;
+        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
+            // Common app directories
+            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
+                appPath = "app/" & appPath;
+            }
+        }
+        
+        // If path is already absolute, return it
+        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
+            return appPath;
+        }
+        
+        // Build absolute path from current working directory
+        // Use provided base directory or fall back to expandPath
+        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
+        
+        // Ensure we have a trailing slash
+        if (right(baseDir, 1) != "/") {
+            baseDir &= "/";
+        }
+        
+        return baseDir & appPath;
     }
 }

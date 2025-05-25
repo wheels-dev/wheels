@@ -1,7 +1,6 @@
 component {
     
     property name="templateService" inject="TemplateService@wheels-cli";
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
     property name="helpers" inject="helpers@wheels";
     
     /**
@@ -12,11 +11,12 @@ component {
         string extends = "",
         string description = "",
         boolean force = false,
-        array properties = []
+        array properties = [],
+        string baseDirectory = ""
     ) {
         var modelName = helpers.capitalize(arguments.name);
-        var fileName = helpers.toPlural(modelName) & ".cfc";
-        var filePath = resolvePath("models/#fileName#");
+        var fileName = helpers.pluralize(modelName) & ".cfc";
+        var filePath = resolvePath("models/#fileName#", arguments.baseDirectory);
         
         // Check if file exists
         if (fileExists(filePath) && !arguments.force) {
@@ -30,7 +30,7 @@ component {
         // Prepare template context
         var context = {
             modelName: modelName,
-            tableName: helpers.toPlural(lCase(modelName)),
+            tableName: helpers.pluralize(lCase(modelName)),
             extends: len(arguments.extends) ? arguments.extends : "Model",
             description: arguments.description,
             properties: arguments.properties,
@@ -43,9 +43,10 @@ component {
         // Generate from template
         try {
             var generatedPath = templateService.generateFromTemplate(
-                template = "model.cfc",
+                template = "ModelContent.txt",
                 destination = "models/#fileName#",
-                context = context
+                context = context,
+                baseDirectory = arguments.baseDirectory
             );
             
             return {
@@ -70,11 +71,12 @@ component {
         string description = "",
         boolean rest = false,
         boolean force = false,
-        array actions = []
+        array actions = [],
+        string baseDirectory = ""
     ) {
         var controllerName = helpers.capitalize(arguments.name);
         var fileName = controllerName & ".cfc";
-        var filePath = resolvePath("controllers/#fileName#");
+        var filePath = resolvePath("controllers/#fileName#", arguments.baseDirectory);
         
         // Check if file exists
         if (fileExists(filePath) && !arguments.force) {
@@ -107,11 +109,12 @@ component {
         
         // Generate from template
         try {
-            var template = arguments.rest ? "controller-rest.cfc" : "controller.cfc";
+            var template = arguments.rest ? "CRUDContent.txt" : "ControllerContent.txt";
             var generatedPath = templateService.generateFromTemplate(
                 template = template,
                 destination = "controllers/#fileName#",
-                context = context
+                context = context,
+                baseDirectory = arguments.baseDirectory
             );
             
             return {
@@ -134,10 +137,11 @@ component {
         required string name,
         required string action,
         string template = "",
-        boolean force = false
+        boolean force = false,
+        string baseDirectory = ""
     ) {
         var controllerName = helpers.capitalize(arguments.name);
-        var viewDir = resolvePath("views/#lCase(controllerName)#");
+        var viewDir = resolvePath("views/#lCase(controllerName)#", arguments.baseDirectory);
         var fileName = arguments.action & ".cfm";
         var filePath = viewDir & "/" & fileName;
         
@@ -160,17 +164,19 @@ component {
             // Auto-detect template based on action name
             switch (arguments.action) {
                 case "index":
-                    arguments.template = "view-index.cfm";
+                    arguments.template = "crud/index.txt";
                     break;
                 case "show":
-                    arguments.template = "view-show.cfm";
+                    arguments.template = "crud/show.txt";
                     break;
                 case "new":
+                    arguments.template = "crud/new.txt";
+                    break;
                 case "edit":
-                    arguments.template = "view-form.cfm";
+                    arguments.template = "crud/edit.txt";
                     break;
                 default:
-                    arguments.template = "view-default.cfm";
+                    arguments.template = "ViewContent.txt";
             }
         }
         
@@ -187,7 +193,8 @@ component {
             var generatedPath = templateService.generateFromTemplate(
                 template = arguments.template,
                 destination = "views/#lCase(controllerName)#/#fileName#",
-                context = context
+                context = context,
+                baseDirectory = arguments.baseDirectory
             );
             
             return {
@@ -237,7 +244,7 @@ component {
         
         // Generate controller
         var controllerResult = generateController(
-            name = helpers.toPlural(arguments.name),
+            name = helpers.pluralize(arguments.name),
             rest = true,
             force = arguments.force
         );
@@ -257,7 +264,7 @@ component {
             var viewActions = ["index", "show", "new", "edit"];
             for (var action in viewActions) {
                 var viewResult = generateView(
-                    name = helpers.toPlural(arguments.name),
+                    name = helpers.pluralize(arguments.name),
                     action = action,
                     force = arguments.force
                 );
@@ -284,7 +291,8 @@ component {
         required string name,
         boolean unit = false,
         boolean integration = false,
-        array methods = []
+        array methods = [],
+        string baseDirectory = ""
     ) {
         var testName = arguments.name;
         if (!reFindNoCase("Test$", testName)) {
@@ -311,10 +319,10 @@ component {
         }
         
         var fileName = testName & ".cfc";
-        var filePath = resolvePath(testDir & fileName);
+        var filePath = resolvePath(testDir & fileName, arguments.baseDirectory);
         
         // Create directory if needed
-        var dir = resolvePath(testDir);
+        var dir = resolvePath(testDir, arguments.baseDirectory);
         if (!directoryExists(dir)) {
             directoryCreate(dir, true);
         }
@@ -330,11 +338,12 @@ component {
         
         // Generate from template
         try {
-            var template = "test-#arguments.type#.cfc";
+            var template = "tests/#arguments.type#.txt";
             var generatedPath = templateService.generateFromTemplate(
                 template = template,
                 destination = testDir & fileName,
-                context = context
+                context = context,
+                baseDirectory = arguments.baseDirectory
             );
             
             return {
@@ -433,7 +442,30 @@ component {
     /**
      * Resolve a file path
      */
-    private function resolvePath(path) {
-        return fileSystemUtil.resolvePath(arguments.path);
+    private function resolvePath(path, baseDirectory = "") {
+        // Prepend app/ to common paths if not already present
+        var appPath = arguments.path;
+        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
+            // Common app directories
+            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
+                appPath = "app/" & appPath;
+            }
+        }
+        
+        // If path is already absolute, return it
+        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
+            return appPath;
+        }
+        
+        // Build absolute path from current working directory
+        // Use provided base directory or fall back to expandPath
+        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
+        
+        // Ensure we have a trailing slash
+        if (right(baseDir, 1) != "/") {
+            baseDir &= "/";
+        }
+        
+        return baseDir & appPath;
     }
 }

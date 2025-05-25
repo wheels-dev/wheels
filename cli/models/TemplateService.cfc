@@ -1,6 +1,5 @@
 component {
     
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
     
     /**
      * Generate file from template
@@ -8,10 +7,20 @@ component {
     function generateFromTemplate(
         required string template,
         required string destination,
-        required struct context
+        required struct context,
+        string baseDirectory = ""
     ) {
-        var templatePath = expandPath("/wheels-cli/templates/#arguments.template#");
-        var destinationPath = resolvePath(arguments.destination);
+        // Try to find the template in the app/snippets directory first
+        var appSnippetsPath = expandPath("app/snippets/#arguments.template#");
+        var templatePath = "";
+        
+        if (fileExists(appSnippetsPath)) {
+            templatePath = appSnippetsPath;
+        } else {
+            // Fall back to module templates
+            templatePath = expandPath("/wheels-cli/templates/#arguments.template#");
+        }
+        var destinationPath = resolvePath(arguments.destination, arguments.baseDirectory);
         
         if (!fileExists(templatePath)) {
             throw("Template not found: #arguments.template#");
@@ -40,7 +49,15 @@ component {
         // Replace {{variable}} with context values
         for (var key in arguments.context) {
             var value = arguments.context[key];
-            processed = reReplace(processed, "\{\{#key#\}\}", value, "all");
+            // Handle arrays and structs differently
+            if (isArray(value) || isStruct(value)) {
+                // Skip arrays and structs in the generic replacement
+                continue;
+            }
+            // Convert to string if it's a simple value
+            if (isSimpleValue(value)) {
+                processed = reReplace(processed, "\{\{#key#\}\}", toString(value), "all");
+            }
         }
         
         // Handle special transformations
@@ -78,6 +95,24 @@ component {
             processed = reReplace(processed, "\{\{validations\}\}", validationCode, "all");
         } else {
             processed = reReplace(processed, "\{\{validations\}\}", "", "all");
+        }
+        
+        // Process actions for controllers
+        if (structKeyExists(arguments.context, "actions") && isArray(arguments.context.actions)) {
+            var actionsCode = generateActionsCode(arguments.context.actions);
+            processed = replace(processed, "|Actions|", actionsCode, "all");
+        } else {
+            processed = replace(processed, "|Actions|", "", "all");
+        }
+        
+        // Process pipe-delimited placeholders (used in CRUD templates)
+        // Generate object name variations from model or controller name
+        if (structKeyExists(arguments.context, "modelName")) {
+            var modelName = arguments.context.modelName;
+            processed = replace(processed, "|ObjectNameSingular|", lCase(modelName), "all");
+            processed = replace(processed, "|ObjectNamePlural|", lCase(pluralize(modelName)), "all");
+            processed = replace(processed, "|ObjectNameSingularC|", modelName, "all");
+            processed = replace(processed, "|ObjectNamePluralC|", pluralize(modelName), "all");
         }
         
         return processed;
@@ -159,6 +194,25 @@ component {
     }
     
     /**
+     * Generate controller actions code
+     */
+    private function generateActionsCode(required array actions) {
+        var code = [];
+        
+        for (var action in arguments.actions) {
+            arrayAppend(code, "");
+            arrayAppend(code, "    /**");
+            arrayAppend(code, "     * #action# action");
+            arrayAppend(code, "     */");
+            arrayAppend(code, "    function #action#() {");
+            arrayAppend(code, "        // TODO: Implement #action# action");
+            arrayAppend(code, "    }");
+        }
+        
+        return arrayToList(code, chr(10));
+    }
+    
+    /**
      * Simple pluralization helper
      */
     private function pluralize(required string word) {
@@ -192,5 +246,35 @@ component {
         } else {
             return singular & "s";
         }
+    }
+    
+    /**
+     * Resolve a file path
+     */
+    private function resolvePath(path, baseDirectory = "") {
+        // Prepend app/ to common paths if not already present
+        var appPath = arguments.path;
+        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
+            // Common app directories
+            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
+                appPath = "app/" & appPath;
+            }
+        }
+        
+        // If path is already absolute, return it
+        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
+            return appPath;
+        }
+        
+        // Build absolute path from current working directory
+        // Use provided base directory or fall back to expandPath
+        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
+        
+        // Ensure we have a trailing slash
+        if (right(baseDir, 1) != "/") {
+            baseDir &= "/";
+        }
+        
+        return baseDir & appPath;
     }
 }

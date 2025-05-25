@@ -62,7 +62,8 @@ component aliases="wheels g controller" extends="../base" {
             description = arguments.description,
             rest = arguments.rest,
             force = arguments.force,
-            actions = actionList
+            actions = actionList,
+            baseDirectory = getCWD()
         );
         
         if (result.success) {
@@ -81,7 +82,8 @@ component aliases="wheels g controller" extends="../base" {
                         var viewResult = codeGenerationService.generateView(
                             name = arguments.name,
                             action = action,
-                            force = arguments.force
+                            force = arguments.force,
+                            baseDirectory = getCWD()
                         );
                         
                         if (viewResult.success) {

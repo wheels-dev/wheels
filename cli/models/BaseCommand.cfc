@@ -1,7 +1,6 @@
 component extends="commandbox.system.BaseCommand" {
     
     property name="configService" inject="ConfigService@commandbox-core";
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
     
     /**
      * Check if current directory is a Wheels project

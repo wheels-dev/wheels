@@ -58,7 +58,8 @@ component aliases='wheels g model' extends="../base" {
             name = arguments.name,
             description = arguments.description,
             force = arguments.force,
-            properties = parsedProperties
+            properties = parsedProperties,
+            baseDirectory = getCWD()
         );
         
         if (result.success) {
@@ -69,17 +70,18 @@ component aliases='wheels g model' extends="../base" {
                 print.line()
                      .yellowLine("📄 Creating migration...");
                 
-                var migrationResult = migrationService.createMigration(
-                    name = "create_#helpers.toPlural(lCase(arguments.name))#_table",
-                    table = helpers.toPlural(lCase(arguments.name)),
-                    model = arguments.name,
-                    type = "create"
-                );
-                
-                if (migrationResult.success) {
-                    print.greenLine("✅ Created migration: #migrationResult.path#");
-                } else {
-                    print.redLine("❌ Failed to create migration: #migrationResult.error#");
+                try {
+                    var migrationPath = migrationService.createMigration(
+                        name = "create_#helpers.pluralize(lCase(arguments.name))#_table",
+                        table = helpers.pluralize(lCase(arguments.name)),
+                        model = arguments.name,
+                        type = "create",
+                        baseDirectory = getCWD()
+                    );
+                    
+                    print.greenLine("✅ Created migration: #migrationPath#");
+                } catch (any e) {
+                    print.redLine("❌ Failed to create migration: #e.message#");
                 }
             }
             

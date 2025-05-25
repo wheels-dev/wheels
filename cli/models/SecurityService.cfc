@@ -1,7 +1,5 @@
 component {
     
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
-    
     /**
      * Scan for security vulnerabilities
      */

@@ -10,7 +10,11 @@
       "Bash(box help:*)",
       "Bash(find:*)",
       "Bash(rg:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(./test_commands.sh:*)",
+      "Bash(./test_app_generation.sh:*)",
+      "Bash(box reload:*)"
     ],
     "deny": []
   }

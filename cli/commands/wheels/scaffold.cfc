@@ -32,7 +32,7 @@ component extends="base" {
         boolean force = false
     ) {
         // Validate scaffold
-        var validation = scaffoldService.validateScaffold(arguments.name);
+        var validation = scaffoldService.validateScaffold(arguments.name, getCWD());
         if (!validation.valid) {
             print.redBoldLine("❌ Cannot scaffold '#arguments.name#':")
                  .line();
@@ -51,7 +51,8 @@ component extends="base" {
             hasMany = arguments.hasMany,
             api = arguments.api,
             tests = arguments.tests,
-            force = arguments.force
+            force = arguments.force,
+            baseDirectory = getCWD()
         );
         
         if (!result.success) {

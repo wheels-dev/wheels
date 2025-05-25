@@ -1,6 +1,5 @@
 component {
     
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
     property name="print" inject="print";
     
     /**
@@ -10,12 +9,13 @@ component {
         required string name,
         string table = "",
         string model = "",
-        string type = "create"
+        string type = "create",
+        string baseDirectory = ""
     ) {
         var timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
         var className = sanitizeMigrationName(arguments.name);
         var fileName = timestamp & "_" & className & ".cfc";
-        var migrationDir = fileSystemUtil.resolvePath("app/migrator/migrations");
+        var migrationDir = resolvePath("app/migrator/migrations", arguments.baseDirectory);
         
         // Create migrations directory if it doesn't exist
         if (!directoryExists(migrationDir)) {
@@ -47,7 +47,7 @@ component {
         numeric count = 10
     ) {
         var seederName = sanitizeSeederName(arguments.name);
-        var seederDir = fileSystemUtil.resolvePath("app/migrator/seeds");
+        var seederDir = resolvePath("app/migrator/seeds");
         
         // Create seeds directory if it doesn't exist
         if (!directoryExists(seederDir)) {
@@ -313,5 +313,35 @@ component {
         }
         
         return plural;
+    }
+    
+    /**
+     * Resolve a file path  
+     */
+    private function resolvePath(path, baseDirectory = "") {
+        // Prepend app/ to common paths if not already present
+        var appPath = arguments.path;
+        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
+            // Common app directories
+            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
+                appPath = "app/" & appPath;
+            }
+        }
+        
+        // If path is already absolute, return it
+        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
+            return appPath;
+        }
+        
+        // Build absolute path from current working directory
+        // Use provided base directory or fall back to expandPath
+        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
+        
+        // Ensure we have a trailing slash
+        if (right(baseDir, 1) != "/") {
+            baseDir &= "/";
+        }
+        
+        return baseDir & appPath;
     }
 }
