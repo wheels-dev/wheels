@@ -21,8 +21,22 @@ component excludeFromHelp=true {
 		if(!directoryExists( fileSystemUtil.resolvePath("vendor/wheels") ) ){
 			error("We're currently looking in #getCWD()#, but can't find a /wheels/ folder?");
 		}
+		// Check vendor/wheels/box.json first for wheels-core version
+		if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/box.json"))){
+			local.wheelsBoxJSON = packageService.readPackageDescriptorRaw( fileSystemUtil.resolvePath("vendor/wheels") );
+			if(structKeyExists(local.wheelsBoxJSON, "version")){
+				return local.wheelsBoxJSON.version;
+			}
+		}
 		if(fileExists(fileSystemUtil.resolvePath("box.json"))){
 			local.boxJSON = packageService.readPackageDescriptorRaw( getCWD() );
+			// Check if wheels-core is in dependencies
+			if(structKeyExists(local.boxJSON, "dependencies") && structKeyExists(local.boxJSON.dependencies, "wheels-core")){
+				// Extract version from dependency string like "^3.0.0-SNAPSHOT+695"
+				local.wheelsDep = local.boxJSON.dependencies["wheels-core"];
+				local.wheelsDep = reReplace(local.wheelsDep, "[\^~>=<]", "", "all");
+				return local.wheelsDep;
+			}
 			return local.boxJSON.version;
 		} else if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/events/onapplicationstart.cfm"))) { 
 			var output = command( 'cd vendor\wheels' ).run( returnOutput=true );

@@ -18,7 +18,14 @@
       "Bash(box wheels:*)",
       "Bash(/usr/local/bin/box:*)",
       "Bash(wheels g view:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(box server:*)",
+      "Bash(wheels dbmigrate:*)",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_click",
+      "Bash(timeout:*)",
+      "Bash(true)"
     ],
     "deny": []
   }
