@@ -16,7 +16,9 @@
       "Bash(./test_app_generation.sh:*)",
       "Bash(box reload:*)",
       "Bash(box wheels:*)",
-      "Bash(/usr/local/bin/box:*)"
+      "Bash(/usr/local/bin/box:*)",
+      "Bash(wheels g view:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

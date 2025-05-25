@@ -508,4 +508,34 @@ component aliases='wheels g resource' extends="../base" {
                 return "string";
         }
     }
+    
+    private function displayGenerationSummary(generatedFiles, options) {
+        print.line()
+             .boldGreenLine("✨ Resource generation complete!")
+             .line()
+             .yellowLine("Generated files:");
+        
+        for (var file in arguments.generatedFiles) {
+            print.line("  - " & file);
+        }
+        
+        print.line()
+             .cyanLine("Next steps:")
+             .line("  1. Run migrations: wheels dbmigrate up")
+             .line("  2. Reload your application");
+        
+        if (arguments.options.tests) {
+            print.line("  3. Run tests: wheels test run");
+        }
+    }
+    
+    private function openPath(required string path) {
+        if (shell.isWindows()) {
+            runCommand("start #arguments.path#");
+        } else if (shell.isMac()) {
+            runCommand("open #arguments.path#");
+        } else {
+            runCommand("xdg-open #arguments.path#");
+        }
+    }
 }
