@@ -14,7 +14,9 @@
       "Bash(chmod:*)",
       "Bash(./test_commands.sh:*)",
       "Bash(./test_app_generation.sh:*)",
-      "Bash(box reload:*)"
+      "Bash(box reload:*)",
+      "Bash(box wheels:*)",
+      "Bash(/usr/local/bin/box:*)"
     ],
     "deny": []
   }
