@@ -79,7 +79,14 @@ component extends="base" {
 							   & "&type=#loc.type#"
 							   & "&format=#loc.format#"
 							   & "&reload=#loc.reload#";
-			}
+			} else {
+			// Default for plugin or other types
+			loc.testurl = "http://" & loc.host & ":" & loc.port
+						   & "/" & "?controller=tests&action=runner&view=runner"
+						   & "&type=#loc.type#"
+						   & "&format=#loc.format#"
+						   & "&reload=#loc.reload#";
+		}
 	  		// Optional Adapter Override
 	  		if(len(loc.adapter)){
 	  			loc.testurl&="&adapter=#loc.adapter#"

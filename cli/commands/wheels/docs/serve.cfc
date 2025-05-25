@@ -5,7 +5,7 @@
  * wheels docs serve --port=8080 --root=docs/api
  * wheels docs serve --open --watch
  */
-component extends="wheels-cli.models.BaseCommand" {
+component extends="../base" {
     
     property name="serverService" inject="ServerService@commandbox-core";
     

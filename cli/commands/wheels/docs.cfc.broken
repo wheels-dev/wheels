@@ -26,13 +26,19 @@ component extends="base" {
             return;
         }
         
+        // Forward all remaining arguments to the subcommand
+        var args = duplicate(arguments);
+        structDelete(args, "subcommand");
+        
         // Delegate to subcommand
         switch(arguments.subcommand) {
             case "generate":
-                command("wheels docs generate").run();
+                // Pass control to the generate subcommand
+                runCommand("wheels docs generate", args);
                 break;
             case "serve":
-                command("wheels docs serve").run();
+                // Pass control to the serve subcommand
+                runCommand("wheels docs serve", args);
                 break;
             default:
                 error("Unknown subcommand: #arguments.subcommand#");

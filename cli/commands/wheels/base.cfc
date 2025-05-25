@@ -250,6 +250,31 @@ component excludeFromHelp=true {
 
 	// Get information about the currently running server so we can send commmands
 	function $getServerInfo(){
+		// First, try to read port from server.json if it exists
+		var serverJSON = fileSystemUtil.resolvePath("server.json");
+		if (fileExists(serverJSON)) {
+			try {
+				var serverConfig = deserializeJSON(fileRead(serverJSON));
+				
+				// Check for port in web.port
+				if (structKeyExists(serverConfig, "web") && structKeyExists(serverConfig.web, "port") && serverConfig.web.port > 0) {
+					local.port = serverConfig.web.port;
+					local.host = structKeyExists(serverConfig.web, "host") ? serverConfig.web.host : "localhost";
+					
+					// If host is "localhost", convert to 127.0.0.1 for consistency
+					if (local.host == "localhost") {
+						local.host = "127.0.0.1";
+					}
+					
+					local.serverURL = "http://" & local.host & ":" & local.port;
+					return local;
+				}
+			} catch (any e) {
+				// Continue to fallback
+			}
+		}
+		
+		// Fall back to original method
 		var serverDetails = serverService.resolveServerDetails( serverProps={ webroot=getCWD() } );
   		local.host              = serverDetails.serverInfo.host;
   		local.port              = serverDetails.serverInfo.port;
@@ -261,7 +286,14 @@ component excludeFromHelp=true {
 	string function $getBridgeURL() {
 		var serverInfo=$getServerInfo();
 		var geturl=serverInfo.serverUrl;
-  			getURL &= "/?controller=wheels&action=wheels&view=cli";
+		
+		// For Wheels apps with public webroot, we need to add /public to the URL
+		// Check if public/index.cfm exists
+		if (fileExists(fileSystemUtil.resolvePath("public/index.cfm"))) {
+			getURL &= "/public";
+		}
+		
+		getURL &= "/?controller=wheels&action=wheels&view=cli";
   		return geturl;
 	}
 

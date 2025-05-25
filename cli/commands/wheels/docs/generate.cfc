@@ -5,7 +5,7 @@
  * wheels docs generate --output=docs/api --format=html
  * wheels docs generate --include=models,controllers --serve
  */
-component extends="wheels-cli.models.BaseCommand" {
+component extends="../base" {
     
     /**
      * @output.hint Output directory for docs
