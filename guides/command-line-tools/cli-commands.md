@@ -1,46 +1,229 @@
 # CLI Commands
 
-The command line tools extends the functionality of [CommandBox](https://www.ortussolutions.com/products/commandbox) with some commands specifically designed for Wheels development.
+The Wheels Command Line Interface (CLI) provides a comprehensive set of tools that streamline development, testing, deployment, and maintenance of Wheels applications. Built as a CommandBox module, the Wheels CLI brings modern development workflows to CFML developers, inspired by tools like Ruby on Rails' command line interface.
 
-[CommandBox](https://www.ortussolutions.com/products/commandbox) brings a whole host of command line capabilities to the CFML developer. It allows you to write scripts that can be executed at the command line written entirely in CFML. It allows you to start a CFML server from any directory on your machine and wire up the code in that directory as the web root of the server. What's more is, those servers can be either Lucee servers or Adobe ColdFusion servers. You can even specify what version of each server to launch. Lastly, CommandBox is a package manager for CFML. That means you can take some CFML code and package it up into a module, host it on ForgeBox.io, and make it available to other CFML developers. In fact we make extensive use of these capabilities to distribute Wheels plugins and templates. More on that later.
+## Overview
 
-One module that we have created is a module that extends CommandBox itself with commands and features specific to the Wheels framework. The Wheels CLI module for CommandBox is modeled after the Ruby on Rails CLI module and gives similar capabilities to the Wheels developer.
+The Wheels CLI transforms how you interact with your Wheels applications by providing powerful commands for:
 
-### Install CommandBox
+- **Rapid Application Development** - Generate new applications, controllers, models, views, and complete scaffolds
+- **Database Management** - Create and run migrations, manage schemas, and seed data
+- **Testing and Quality** - Run tests, generate coverage reports, and analyze code quality
+- **Deployment and DevOps** - Docker integration, CI/CD configuration, and environment management
+- **Performance and Security** - Analyze performance bottlenecks and scan for vulnerabilities
+- **Plugin Management** - Install, update, and manage Wheels plugins from ForgeBox
 
-The first step is to get [CommandBox](https://www.ortussolutions.com/products/commandbox) downloaded and running. CommandBox is available for Windows, Mac & Linux, and can be installed manually or using one of the respective package managers for each OS. You can use [Chocolatey](https://chocolatey.org) on Windows, [Homebrew](https://brew.sh) on MacOS, or Yum/Apt on Linux depending on your flavor of Linux. Please follow the instructions on how to install CommandBox on your particular operating system. At the end of the installation process you want to make sure the `box` command is part of your system path so you can call the command from any directory on your system.
+## Prerequisites
 
-Once installed, you can either double-click on the `box` executable which opens the CommandBox shell window, or run `box` from a CMD window in Windows, Terminal window in MacOS, or shell prompt on a Linux server. Sometimes you only want to call a single CommandBox command and don't need to launch a whole CommandBox shell window to do that, for these instances you can call the CommandBox command directly from your default system terminal window by prefixing the command with the `box` prefix.
+### Installing CommandBox
 
-So to run the CommandBox `version` command you could run box version from the shell or you could launch the CommandBox shell and run version inside it.
+The Wheels CLI requires [CommandBox](https://www.ortussolutions.com/products/commandbox), a powerful CFML development tool that provides:
+
+- CFML script execution at the command line
+- Embedded servers (both Lucee and Adobe ColdFusion)
+- Package management for CFML modules
+- Task runners and automation tools
+
+Install CommandBox using your operating system's package manager:
 
 {% tabs %}
-{% tab title="Shell" %}
+{% tab title="Windows (Chocolatey)" %}
+```powershell
+choco install commandbox
+```
+{% endtab %}
+
+{% tab title="macOS (Homebrew)" %}
+```bash
+brew install commandbox
+```
+{% endtab %}
+
+{% tab title="Linux (apt)" %}
+```bash
+curl -fsSL https://downloads.ortussolutions.com/debs/gpg | sudo apt-key add -
+echo "deb https://downloads.ortussolutions.com/debs/noarch /" | sudo tee -a /etc/apt/sources.list.d/commandbox.list
+sudo apt-get update && sudo apt-get install commandbox
+```
+{% endtab %}
+{% endtabs %}
+
+Verify your installation:
+
+```bash
 box version
-{% endtab %}
+```
 
-{% tab title="CommandBox" %}
-version
-{% endtab %}
-{% endtabs %}
+### Installing the Wheels CLI
 
-This is a good concept to grasp, cause depending on your workflow, you may find it easier to do one versus the other. Most of the commands you will see in these CLI guides will assume that you are entering the command in the actual CommandBox shell so the `box` prefix is left off.
+Once CommandBox is installed, add the Wheels CLI module:
 
-### Install the wheels-cli CommandBox Module
+```bash
+box install wheels-cli
+```
 
-Okay, now that we have CommandBox installed, let's add the Wheels CLI module.
+This adds all Wheels-specific commands to your CommandBox installation, prefixed with the `wheels` namespace.
 
-{% tabs %}
-{% tab title="CommandBox" %}
-install wheels-cli
-{% endtab %}
-{% endtabs %}
+## Command Structure
 
-Installing this module will add a number of commands to your default CommandBox installation. All of these commands are prefixed by the `wheels` name space. There are commands to create a brand new Wheels application or scaffold out sections of your application. We'll see some of these commands in action momentarily.
+Wheels CLI commands follow a consistent structure:
 
-These tools allow you to adopt a more modern workflow and allow you to create and manipulate many Wheels objects from the command line. By making these tools available in the command line, not only will you be able to speed up your development but you can also utilize these commands in Continuous Integration (CI) and Continuous Deployment (CD) work flows.
+```bash
+wheels [command] [subcommand] [arguments] [flags]
+```
 
-* [wheels - commands](wheels-commands.md)
-* [wheels generate - commands](wheels-generate-commands.md)
-* [wheels dbmigrate - commands](wheels-dbmigrate-commands.md)
-* [wheels plugins - commands](wheels-plugins-commands.md)
+### Command Namespaces
+
+Commands are organized into logical namespaces:
+
+- **Core Commands** - `wheels init`, `wheels info`, `wheels reload`, etc.
+- **Generation** - `wheels generate` (aliased as `wheels g`)
+- **Database** - `wheels dbmigrate` and `wheels db`
+- **Testing** - `wheels test`
+- **Analysis** - `wheels analyze`
+- **Security** - `wheels security`
+- **Deployment** - `wheels deploy`, `wheels docker`, `wheels ci`
+- **Configuration** - `wheels config`, `wheels env`
+- **Plugins** - `wheels plugins`
+
+### Common Patterns
+
+Most generation commands support these common flags:
+
+- `--force` - Overwrite existing files
+- `--dry-run` - Preview changes without applying them
+- `--quiet` - Suppress output
+- `--help` - Display command-specific help
+
+### Environment Variables
+
+The CLI respects these environment variables:
+
+- `WHEELS_ENV` - Default environment (development, testing, production)
+- `WHEELS_DATASOURCE` - Default database datasource name
+- `WHEELS_RELOAD_PASSWORD` - Password for reloading applications
+
+## Quick Start Examples
+
+### Create a New Application
+
+```bash
+wheels new myapp
+```
+
+This launches an interactive wizard that guides you through creating a new Wheels application.
+
+### Generate a Complete Resource
+
+```bash
+wheels scaffold Product name:string price:decimal description:text
+```
+
+This single command creates:
+- Model with properties
+- Database migration
+- Controller with CRUD actions
+- Views for all actions
+- Routes configuration
+- Test files
+
+### Run Database Migrations
+
+```bash
+wheels dbmigrate latest
+```
+
+Migrates your database to the latest version.
+
+### Run Tests
+
+```bash
+wheels test app
+```
+
+Runs all application tests and displays results.
+
+## Command Categories
+
+The Wheels CLI provides commands in these categories:
+
+1. **[Core Commands](wheels-core-commands.md)** - Essential commands for application management
+2. **[Generation Commands](wheels-generate-commands.md)** - Code generators for rapid development
+3. **[Database Commands](wheels-dbmigrate-commands.md)** - Database migrations and management
+4. **[Testing Commands](wheels-testing-commands.md)** - Test execution and coverage
+5. **[Configuration Commands](wheels-configuration-commands.md)** - Environment and settings management
+6. **[Analysis Commands](wheels-analysis-commands.md)** - Code quality and performance analysis
+7. **[Deployment Commands](wheels-deployment-commands.md)** - Docker, CI/CD, and deployment tools
+8. **[Plugin Commands](wheels-plugins-commands.md)** - Plugin installation and management
+
+## Interactive vs Direct Execution
+
+You can use Wheels CLI commands in two ways:
+
+### Interactive CommandBox Shell
+
+Launch the CommandBox shell and run commands directly:
+
+```bash
+box
+CommandBox> wheels info
+CommandBox> wheels g controller Products
+CommandBox> exit
+```
+
+### Direct Execution
+
+Run commands directly from your system terminal:
+
+```bash
+box wheels info
+box wheels g controller Products
+```
+
+## Getting Help
+
+Every command includes built-in help:
+
+```bash
+wheels help
+wheels generate help
+wheels g controller --help
+```
+
+## Best Practices
+
+1. **Use Aliases** - Save time with command aliases like `g` for `generate`
+2. **Leverage Tab Completion** - CommandBox provides tab completion for commands
+3. **Create Scripts** - Combine commands in CommandBox task runners
+4. **Check Status First** - Use `wheels info` to verify your environment
+5. **Preview Changes** - Use `--dry-run` to preview destructive operations
+
+## Troubleshooting
+
+### Common Issues
+
+**Port Detection Errors**: Some commands may fail to detect the server port. Ensure your server.json file contains the correct port configuration.
+
+**Permission Errors**: On Unix-based systems, you may need to use `sudo` for certain operations or ensure proper file permissions.
+
+**Module Not Found**: If commands aren't recognized, reinstall the wheels-cli module:
+```bash
+box uninstall wheels-cli
+box install wheels-cli
+```
+
+### Debug Mode
+
+Enable debug output for troubleshooting:
+```bash
+wheels [command] --debug
+```
+
+## Next Steps
+
+Explore the detailed documentation for each command category:
+
+* [Core Commands](wheels-core-commands.md) - Start here for essential commands
+* [Generation Commands](wheels-generate-commands.md) - Learn about code generation
+* [Database Commands](wheels-dbmigrate-commands.md) - Master database migrations
+* [Testing Commands](wheels-testing-commands.md) - Set up your testing workflow
