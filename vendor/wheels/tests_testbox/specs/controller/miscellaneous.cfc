@@ -168,7 +168,10 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is specifying a directory", () => {
-				args.directory = ExpandPath("/wheels/tests_testbox/_assets")
+				// Get the directory where the test assets are located
+				local.currentDir = GetDirectoryFromPath(GetCurrentTemplatePath());
+				// Navigate to the _assets directory
+				args.directory = local.currentDir & "../../../_assets"
 				args.file = "files/cfwheels-logo.png"
 				r = _controller.sendFile(argumentCollection = args)
 
