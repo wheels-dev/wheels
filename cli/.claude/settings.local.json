@@ -26,7 +26,8 @@
       "mcp__puppeteer__puppeteer_click",
       "Bash(timeout:*)",
       "Bash(true)",
-      "mcp__puppeteer__puppeteer_evaluate"
+      "mcp__puppeteer__puppeteer_evaluate",
+      "WebFetch(domain:kamal-deploy.org)"
     ],
     "deny": []
   }
