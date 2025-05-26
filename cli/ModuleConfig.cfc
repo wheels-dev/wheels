@@ -21,15 +21,15 @@ component {
             // Default template repository
             templateRepository: "https://github.com/wheels-dev/wheels-templates",
             // Testing configuration
-            testbox = {
-                runner = "/tests/runner.cfm",
-                coverage = true,
-                watchPaths = ["models/**", "handlers/**", "views/**"]
+            testbox: {
+                runner: "/tests/runner.cfm",
+                coverage: true,
+                watchPaths: ["models/**", "handlers/**", "views/**"]
             },
             // Migration configuration
-            migrations = {
-                defaultDirectory = "db/migrations",
-                seedDirectory = "db/seeds"
+            migrations: {
+                defaultDirectory: "db/migrations",
+                seedDirectory: "db/seeds"
             }
         };
         
