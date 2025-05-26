@@ -1,0 +1,47 @@
+{
+    "name":"Wheels CLI Commands",
+    "version":"@build.version@",
+    "author":"Tom King, Peter Amiri",
+    "location":"cfwheels/wheels-cli#v@build.version@",
+    "directory":"",
+    "createPackageDirectory":true,
+    "packageDirectory":"wheels-cli",
+    "homepage":"https://github.com/cfwheels/wheels-cli",
+    "documentation":"https://guides.cfwheels.org/docs/command-line-tools/cli-commands",
+    "repository":{
+        "type":"GIT",
+        "URL":"https://github.com/cfwheels/wheels-cli"
+    },
+    "bugs":"https://github.com/cfwheels/wheels-cli/issues",
+    "slug":"wheels-cli",
+    "shortDescription":"Wheels.dev CLI Commands",
+    "description":"Command Line Interface for CFWheels framework providing code generation, database migrations, testing, and development tools",
+    "instructions":"Install via CommandBox by typing 'install wheels-cli'",
+    "changelog":"",
+    "type":"commandbox-modules",
+    "keywords":"wheels.dev,wheels,cli,commands",
+    "private":false,
+    "dependencies":{
+        "testbox-cli":"^2.0.0",
+        "commandbox-migrations":"^5.0.0",
+        "commandbox-dotenv":"^3.0.0"
+    },
+    "devDependencies":{
+        "testbox":"^5.0.0"
+    },
+    "installPaths":{
+        "testbox":"testbox/",
+        "testbox-cli":"modules/testbox-cli/",
+        "commandbox-migrations":"modules/commandbox-migrations/",
+        "commandbox-dotenv":"modules/commandbox-dotenv/"
+    },
+    "scripts":{
+        "postVersion":"package set location='cfwheels/wheels-cli#v`package version`'",
+        "postPublish":"!git push --follow-tags",
+        "patch-release":"bump --patch && publish",
+        "minor-release":"bump --minor && publish",
+        "major-release":"bump --major && publish",
+        "test":"testbox run",
+        "test:watch":"testbox run --watch"
+    }
+}

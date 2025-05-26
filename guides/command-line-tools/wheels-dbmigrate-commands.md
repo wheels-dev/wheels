@@ -1,140 +1,810 @@
-# wheels dbmigrate - commands
+# Database Commands
 
-These are the commands in the `wheels dbmigrate` namespace. They allow you to manipulate the
-database structure and script the changes. This makes is easy to share your changes with
-coworkers, check them into source control, or apply them automatically when you deploy your
-code to production.
+The Wheels CLI provides comprehensive database management through migration commands and database utilities. These commands help you version control your database schema and manage data seeding.
 
-## `wheels dbmigrate`
+## Overview
 
-This is another namespace with sub commands within it. It also has an alias of `wheels db` which allows you to shorten the command you need to type.
+Database commands are organized into two main categories:
+- **Migration Commands** (`wheels dbmigrate`) - Schema versioning and migration
+- **Database Utilities** (`wheels db`) - Schema dumps and data seeding
 
-## `wheels dbmigrate info`
+All migration commands support multiple database platforms including MySQL, PostgreSQL, SQL Server, and H2.
 
-This command doesn't take any inputs but simply tries to communicate with the running server and gather information
-about your migrations and displays them in a table.
+## Migration Concepts
 
-```
-wheels dbmigrate info
-```
+Wheels uses a migration system to:
+- Track database schema changes over time
+- Enable team collaboration on database changes
+- Support rollback to previous versions
+- Maintain consistency across environments
 
-```
-❯ wheels db info
-Sending: http://127.0.0.1:59144/?controller=wheels&action=wheels&view=cli&command=info
-Call to bridge was successful.
-+-----------------------------------------+-----------------------------------------+
-| Datasource:                  wheels.dev | Total Migrations:                     3 |
-| Database Type:                       H2 | Available Migrations:                 2 |
-|                                         | Current Version:         20220619110404 |
-|                                         | Latest Version:          20220619110706 |
-+-----------------------------------------+-----------------------------------------+
-+----------+------------------------------------------------------------------------+
-|          | 20220619110706_cli_create_column_user_lastname                         |
-|          | 20220619110540_cli_create_column_user_firstname                        |
-| migrated | 20220619110404_cli_create_table_users                                  |
-+----------+------------------------------------------------------------------------+
-```
+Each migration has:
+- A unique timestamp-based version number
+- An `up()` method for applying changes
+- A `down()` method for reverting changes
 
-From the information presented in the two tables you can see how many migration files are in your
-application and of those how many have already been applied and available to be applied. You are
-also presented with the datasource name and database type information.
+## wheels dbmigrate create
 
-## `wheels dbmigrate latest`
+Create new migration files for database changes.
 
-This command will migrate the database to the latest version. This command will apply each migration
-file from the current state all the way to the latest one at a time. If a SQL error is encountered
-in one of the files, the command will stop at that point and report the error.
+### Subcommands
 
-```
-wheels dbmigrate latest
+### dbmigrate create table
+
+Create a migration for a new database table.
+
+#### Syntax
+
+```bash
+wheels dbmigrate create table [name] [options]
 ```
 
-## `wheels dbmigrate reset`
+#### Parameters
 
-This command will migrate the database to version 0 effectively resetting the database to nothing.
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| name | string | Yes | - | Table name |
+| --id | boolean | No | true | Include id column |
+| --timestamps | boolean | No | true | Include createdAt/updatedAt |
+| --force | boolean | No | false | Overwrite existing |
 
-```
-wheels dbmigrate reset
-```
+#### Examples
 
-## `wheels dbmigrate up`
-
-This command will process the next migration file from the current state. If the database is already at
-the latest version this command will have no effect.
-
-```
-wheels dbmigrate up
-```
-
-## `wheels dbmigrate down`
-
-This command will reverse the current migration file and take the database one step backwards. If the database is
-already at version 0 then this command will have no effect.
-
-```
-wheels dbmigrate down
+Basic table:
+```bash
+wheels dbmigrate create table products
 ```
 
-## `wheels dbmigrate exec`
-
-This command will run a particular migration file and take the database to that version. The four directional
-migration commands above `latest`, `reset`, `up`, and `down` each in turn call this command to process their
-intended action.
-
-```
-wheels dbmigrate exec [version]
+Table without timestamps:
+```bash
+wheels dbmigrate create table products --timestamps=false
 ```
 
-| Parameter  | Required | Default | Description                                         |
-| ---------- | -------- | ------- | --------------------------------------------------- |
-| version    | true     |         | The version to migrate the database to              |
+#### Generated Migration
 
-## `wheels dbmigrate create table`
-
-This command will generate a new migration file for creating a table in the database. Keep in mind you will
-still have to run the migration file but this will add it to the migration history.
-
-```
-wheels dbmigrate create table [name] [force] [id] [primaryKey]
-```
-
-| Parameter  | Required | Default | Description                                         |
-| ---------- | -------- | ------- | --------------------------------------------------- |
-| name       | true     |         | The name of the database table to create            |
-| force      | false    | false   | Force the creation of the table                     |
-| id         | false    | true    | Auto create ID column as autoincrement ID           |
-| primaryKey | false    | ID      | Overrides the default primary key column name       |
-
-## `wheels dbmigrate create column`
-
-This command will generate a new migration file for adding a new column to an existing table.
-
-```
-wheels dbmigrate create column [name] [columnType] [columnName] [default] [null] [limit] [precision] [scale]
+```cfm
+component extends="wheels.dbmigrate.Migration" {
+    
+    function up() {
+        transaction {
+            t = createTable("products");
+            t.primaryKey();
+            t.timestamps();
+            t.create();
+        }
+    }
+    
+    function down() {
+        transaction {
+            dropTable("products");
+        }
+    }
+}
 ```
 
-| Parameter  | Required | Default | Description                                         |
-| ---------- | -------- | ------- | --------------------------------------------------- |
-| name       | true     |         | The name of the database table to modify            |
-| columnType | true     |         | The column type to add                              |
-| columnName | false    |         | The column name to add                              |
-| default    | false    |         | The default value to set for the column             |
-| null       | false    | true    | Should the column allow nulls                       |
-| limit      | false    |         | The character limit of the column                   |
-| precision  | false    |         | The precision of the numeric column                 |
-| scale      | false    |         | The scale of the numeric column                     |
+---
 
-## `wheels dbmigrate create blank`
+### dbmigrate create column
 
-## `wheels dbmigrate remove table`
+Create a migration to add columns to an existing table.
 
-This command generates a migration file to remove a table. The migration file is will still need to be run
-individual but this command gets the migration generated and into the history.
+#### Syntax
 
+```bash
+wheels dbmigrate create column [table] [columnName] [columnType] [options]
 ```
+
+#### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| table | string | Yes | - | Table name |
+| columnName | string | Yes | - | Column name |
+| columnType | string | Yes | - | Column type |
+| --default | string | No | - | Default value |
+| --null | boolean | No | true | Allow nulls |
+| --limit | integer | No | - | Column length |
+| --precision | integer | No | - | Numeric precision |
+| --scale | integer | No | - | Numeric scale |
+
+#### Column Types
+
+- `string` - Variable length string
+- `text` - Long text
+- `integer` - Integer number
+- `biginteger` - Large integer
+- `float` - Floating point
+- `decimal` - Precise decimal
+- `boolean` - True/false
+- `binary` - Binary data
+- `date` - Date only
+- `time` - Time only
+- `datetime` - Date and time
+- `timestamp` - Timestamp
+
+#### Examples
+
+Add string column:
+```bash
+wheels dbmigrate create column products name string
+```
+
+Add decimal with precision:
+```bash
+wheels dbmigrate create column products price decimal --precision=10 --scale=2
+```
+
+Add non-nullable column with default:
+```bash
+wheels dbmigrate create column products active boolean --null=false --default=true
+```
+
+#### Generated Migration
+
+```cfm
+component extends="wheels.dbmigrate.Migration" {
+    
+    function up() {
+        transaction {
+            addColumn(table="products", columnName="price", columnType="decimal", precision=10, scale=2);
+        }
+    }
+    
+    function down() {
+        transaction {
+            removeColumn(table="products", columnName="price");
+        }
+    }
+}
+```
+
+---
+
+### dbmigrate create blank
+
+Create a blank migration file for custom changes.
+
+#### Syntax
+
+```bash
+wheels dbmigrate create blank [migrationName]
+```
+
+#### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| migrationName | string | Yes | - | Migration description |
+
+#### Examples
+
+```bash
+wheels dbmigrate create blank AddIndexToUsersEmail
+wheels dbmigrate create blank UpdateProductPrices
+wheels dbmigrate create blank MigrateOldDataFormat
+```
+
+#### Generated Migration
+
+```cfm
+component extends="wheels.dbmigrate.Migration" {
+    
+    function up() {
+        transaction {
+            // Add your migration code here
+        }
+    }
+    
+    function down() {
+        transaction {
+            // Add your rollback code here
+        }
+    }
+}
+```
+
+#### Use Cases
+
+Blank migrations are useful for:
+- Complex schema changes
+- Data migrations
+- Adding indexes
+- Custom SQL execution
+- Multi-step migrations
+
+---
+
+## wheels dbmigrate remove
+
+Create migrations to remove database objects.
+
+### dbmigrate remove table
+
+Create a migration to drop a table.
+
+#### Syntax
+
+```bash
 wheels dbmigrate remove table [name]
 ```
 
-| Parameter  | Required | Default | Description                                         |
-| ---------- | -------- | ------- | --------------------------------------------------- |
-| name       | true     |         | The name of the database table to remove            |
+#### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| name | string | Yes | - | Table name to drop |
+
+#### Examples
+
+```bash
+wheels dbmigrate remove table legacy_products
+```
+
+#### Generated Migration
+
+```cfm
+component extends="wheels.dbmigrate.Migration" {
+    
+    function up() {
+        transaction {
+            dropTable("legacy_products");
+        }
+    }
+    
+    function down() {
+        transaction {
+            // Optionally recreate the table structure
+            t = createTable("legacy_products");
+            t.primaryKey();
+            t.timestamps();
+            t.create();
+        }
+    }
+}
+```
+
+---
+
+## wheels dbmigrate up
+
+Migrate the database forward by one version.
+
+### Syntax
+
+```bash
+wheels dbmigrate up [options]
+```
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| --version | string | No | Next version | Target version |
+
+### Description
+
+Executes the next pending migration's `up()` method. Useful for:
+- Step-by-step migration during development
+- Debugging migration issues
+- Controlled production deployments
+
+### Examples
+
+Run next migration:
+```bash
+wheels dbmigrate up
+```
+
+Migrate to specific version:
+```bash
+wheels dbmigrate up --version=20231215120000
+```
+
+### Notes
+
+- Updates the migration version in the database
+- Wraps migration in a transaction
+- Shows execution time and status
+- Stops on first error
+
+---
+
+## wheels dbmigrate down
+
+Rollback the database by one version.
+
+### Syntax
+
+```bash
+wheels dbmigrate down [options]
+```
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| --version | string | No | Previous version | Target version |
+
+### Description
+
+Executes the current migration's `down()` method to revert changes. Essential for:
+- Fixing migration mistakes
+- Testing rollback procedures
+- Development iterations
+
+### Examples
+
+Rollback one migration:
+```bash
+wheels dbmigrate down
+```
+
+Rollback to specific version:
+```bash
+wheels dbmigrate down --version=20231215110000
+```
+
+### Notes
+
+- Requires properly implemented down() methods
+- Not all migrations can be safely reversed
+- Always backup before rolling back production
+
+---
+
+## wheels dbmigrate latest
+
+Migrate the database to the latest version.
+
+### Syntax
+
+```bash
+wheels dbmigrate latest
+```
+
+### Parameters
+
+None
+
+### Description
+
+Runs all pending migrations to bring the database to the latest version. This is the most commonly used migration command.
+
+### Examples
+
+```bash
+wheels dbmigrate latest
+```
+
+Output:
+```
+Migrating from version 20231215110000 to 20231215130000
+
+[20231215120000] CreateProductsTable.cfc
+  ↳ Migrated (0.023s)
+
+[20231215130000] AddIndexToProductsSku.cfc
+  ↳ Migrated (0.015s)
+
+Database migrated successfully to version 20231215130000
+```
+
+### Notes
+
+- Runs migrations in chronological order
+- Skips already applied migrations
+- Shows progress for each migration
+- Stops on first error
+
+---
+
+## wheels dbmigrate reset
+
+Reset the database by rolling back all migrations.
+
+### Syntax
+
+```bash
+wheels dbmigrate reset
+```
+
+### Parameters
+
+None
+
+### Description
+
+Rolls back all migrations to version 0, effectively returning the database to its initial state. **Use with extreme caution**.
+
+### Examples
+
+```bash
+wheels dbmigrate reset
+```
+
+You'll be prompted:
+```
+WARNING: This will rollback ALL migrations!
+Are you sure you want to reset the database? (y/N)
+```
+
+### Notes
+
+- Destroys all data in migrated tables
+- Cannot be undone
+- Requires confirmation
+- Useful for development environments only
+
+---
+
+## wheels dbmigrate info
+
+Display current migration status and pending migrations.
+
+### Syntax
+
+```bash
+wheels dbmigrate info
+```
+
+### Parameters
+
+None
+
+### Description
+
+Shows:
+- Current database version
+- List of pending migrations
+- Migration history
+- Database connection info
+
+### Examples
+
+```bash
+wheels dbmigrate info
+```
+
+Output:
+```
+=====================================
+Database Migration Status
+=====================================
+Current Version:    20231215120000
+Latest Version:     20231215130000
+Pending Migrations: 1
+
+Applied Migrations:
+  ✓ 20231215110000 - CreateUsersTable
+  ✓ 20231215120000 - CreateProductsTable
+
+Pending Migrations:
+  ○ 20231215130000 - AddIndexToProductsSku
+
+Database: myapp_development
+=====================================
+```
+
+---
+
+## wheels dbmigrate exec
+
+Execute a specific migration version.
+
+### Syntax
+
+```bash
+wheels dbmigrate exec [version] [options]
+```
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| version | string | Yes | - | Migration version |
+| --direction | string | No | up | Direction (up/down) |
+
+### Description
+
+Manually execute a specific migration, regardless of current version. Useful for:
+- Re-running failed migrations
+- Testing specific migrations
+- Fixing migration issues
+
+### Examples
+
+Run specific migration up:
+```bash
+wheels dbmigrate exec 20231215120000
+```
+
+Run specific migration down:
+```bash
+wheels dbmigrate exec 20231215120000 --direction=down
+```
+
+### Notes
+
+- Bypasses version checking
+- Use carefully to avoid version conflicts
+- Doesn't update version table when direction=down
+
+---
+
+## wheels db schema
+
+Manage database schema dumps and loads.
+
+### Syntax
+
+```bash
+wheels db schema [options]
+```
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| --dump | boolean | No | false | Dump schema to file |
+| --load | boolean | No | false | Load schema from file |
+| --format | string | No | sql | Output format |
+
+### Description
+
+Export or import database schema for:
+- Backup purposes
+- Setting up new environments
+- Schema documentation
+- Database replication
+
+### Examples
+
+Dump schema:
+```bash
+wheels db schema --dump
+```
+
+Dump as JSON:
+```bash
+wheels db schema --dump --format=json
+```
+
+Load schema:
+```bash
+wheels db schema --load
+```
+
+### Notes
+
+- Schema dumps exclude data
+- Useful for CI/CD pipelines
+- Format options: sql, json
+- Creates db/schema.sql or db/schema.json
+
+---
+
+## wheels db seed
+
+Seed the database with initial or test data.
+
+### Syntax
+
+```bash
+wheels db seed [options]
+```
+
+### Parameters
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| --file | string | No | db/seeds.cfm | Seed file |
+| --environment | string | No | Current | Target environment |
+
+### Description
+
+Populates database with:
+- Initial application data
+- Test data for development
+- Demo data for staging
+- Reference data
+
+### Examples
+
+Run default seeds:
+```bash
+wheels db seed
+```
+
+Run specific seed file:
+```bash
+wheels db seed --file=db/seeds/products.cfm
+```
+
+Seed test environment:
+```bash
+wheels db seed --environment=testing
+```
+
+### Seed File Example
+
+```cfm
+// db/seeds.cfm
+<cfscript>
+// Create admin user
+user = model("User").create(
+    email = "admin@example.com",
+    password = "secure123",
+    role = "admin"
+);
+
+// Create sample products
+products = [
+    {name: "Widget", price: 19.99},
+    {name: "Gadget", price: 29.99},
+    {name: "Doohickey", price: 39.99}
+];
+
+for (product in products) {
+    model("Product").create(product);
+}
+
+writeOutput("Database seeded successfully!");
+</cfscript>
+```
+
+---
+
+## Migration Best Practices
+
+### Writing Migrations
+
+1. **Keep migrations focused** - One logical change per migration
+2. **Always include down()** - Even if it just logs that reversal isn't possible
+3. **Use transactions** - Wrap changes in transaction blocks
+4. **Test rollbacks** - Ensure down() methods work correctly
+5. **Name descriptively** - Use clear, descriptive migration names
+
+### Migration Examples
+
+#### Adding an Index
+
+```cfm
+component extends="wheels.dbmigrate.Migration" {
+    
+    function up() {
+        transaction {
+            addIndex(table="products", columnNames="sku", unique=true);
+        }
+    }
+    
+    function down() {
+        transaction {
+            removeIndex(table="products", indexName="idx_products_sku");
+        }
+    }
+}
+```
+
+#### Renaming a Column
+
+```cfm
+component extends="wheels.dbmigrate.Migration" {
+    
+    function up() {
+        transaction {
+            renameColumn(table="users", columnName="lastname", newColumnName="last_name");
+        }
+    }
+    
+    function down() {
+        transaction {
+            renameColumn(table="users", columnName="last_name", newColumnName="lastname");
+        }
+    }
+}
+```
+
+#### Data Migration
+
+```cfm
+component extends="wheels.dbmigrate.Migration" {
+    
+    function up() {
+        transaction {
+            // Add new column
+            addColumn(table="products", columnName="slug", columnType="string");
+            
+            // Populate with data
+            products = model("Product").findAll();
+            for (product in products) {
+                product.update(slug=createSlug(product.name));
+            }
+        }
+    }
+    
+    function down() {
+        transaction {
+            removeColumn(table="products", columnName="slug");
+        }
+    }
+    
+    private function createSlug(required string text) {
+        return lCase(reReplace(arguments.text, "[^a-zA-Z0-9]", "-", "all"));
+    }
+}
+```
+
+### Environment Considerations
+
+#### Development
+
+- Run migrations frequently
+- Test rollbacks regularly
+- Use `wheels dbmigrate reset` for clean slate
+- Seed with test data
+
+#### Testing
+
+- Reset between test runs
+- Use minimal seed data
+- Consider in-memory databases
+
+#### Production
+
+- Always backup first
+- Test migrations in staging
+- Use `wheels dbmigrate info` to verify
+- Plan for rollback scenarios
+- Consider maintenance windows
+
+## Troubleshooting
+
+### Common Issues
+
+**Port Detection Failed**
+```
+Error: Cannot connect to database on port 0
+```
+Solution: Ensure server.json contains correct port configuration
+
+**Migration Already Exists**
+```
+Error: Migration 20231215120000 already exists
+```
+Solution: Migrations are timestamp-based; wait a second before creating another
+
+**Foreign Key Constraints**
+```
+Error: Cannot drop table due to foreign key constraint
+```
+Solution: Drop constraints before dropping tables:
+```cfm
+removeForeignKey(table="orders", keyName="fk_orders_users");
+dropTable("users");
+```
+
+**Transaction Rollback**
+```
+Error: Migration failed and was rolled back
+```
+Solution: Check migration code for syntax errors or constraint violations
+
+### Debugging Migrations
+
+1. **Run migrations individually** with `wheels dbmigrate up`
+2. **Check SQL output** by adding `debug=true` to migration methods
+3. **Verify database state** with `wheels dbmigrate info`
+4. **Test in development** before applying to production
+5. **Keep backups** before major migrations
+
+## Summary
+
+The Wheels database commands provide a robust system for managing database changes:
+
+- **Version control** your schema with migrations
+- **Collaborate** with team members on database changes
+- **Deploy** with confidence using tested migrations
+- **Rollback** when needed with down migrations
+- **Seed** data for development and testing
+
+Remember: Migrations are code. Test them, review them, and version control them just like your application code.

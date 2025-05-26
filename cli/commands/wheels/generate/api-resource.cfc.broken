@@ -6,7 +6,7 @@
  * wheels generate api-resource posts --model=true --docs=true
  * {code}
  */
-component extends="../base" {
+component aliases='wheels g api-resource' extends="../base" {
 
     /**
      * @name Name of the API resource (singular or plural)
@@ -67,26 +67,24 @@ component extends="../base" {
             
             // Add authentication if requested
             if (arguments.auth) {
-                local.authContent = "
-    // Authentication check before actions
-    function init() {
-        filters(through="authenticateAPI", except="index,show")
-    }
-    
-    private function authenticateAPI() {
-        // Add your API authentication logic here
-        // Example: Check for API token in header
-        local.apiToken = request.headers['X-API-Token'] ?: '';
-        if (len(local.apiToken) == 0 || !authenticateToken(local.apiToken)) {
-            renderWith(data={error='Unauthorized'}, status=401);
-        }
-    }
-    
-    private function authenticateToken(required string token) {
-        // Implement your token validation logic
-        // Return true if token is valid, false otherwise
-        return false;
-    }";
+                local.authContent = chr(10) & 
+                    "    // Authentication check before actions" & chr(10) &
+                    "    function init() {" & chr(10) &
+                    "        filters(through=""authenticateAPI"", except=""index,show"");" & chr(10) &
+                    "    }" & chr(10) & chr(10) &
+                    "    private function authenticateAPI() {" & chr(10) &
+                    "        // Add your API authentication logic here" & chr(10) &
+                    "        // Example: Check for API token in header" & chr(10) &
+                    "        local.apiToken = request.headers['X-API-Token'] ?: '';" & chr(10) &
+                    "        if (len(local.apiToken) == 0 || !authenticateToken(local.apiToken)) {" & chr(10) &
+                    "            renderWith(data={error='Unauthorized'}, status=401);" & chr(10) &
+                    "        }" & chr(10) &
+                    "    }" & chr(10) & chr(10) &
+                    "    private function authenticateToken(required string token) {" & chr(10) &
+                    "        // Implement your token validation logic" & chr(10) &
+                    "        // Return true if token is valid, false otherwise" & chr(10) &
+                    "        return false;" & chr(10) &
+                    "    }";
                 local.content = replaceNoCase(local.content, "function init() {", "#local.authContent#", "all");
             }
             
@@ -106,27 +104,23 @@ component extends="../base" {
             }
             
             local.docsPath = "#local.docsDir#/#local.objectNamePlural#.md";
-            local.docsContent = "# #local.objectNamePluralC# API
-            
-## Endpoints
-
-### GET /#local.objectNamePlural#
-Returns a list of all #local.objectNamePlural#.
-
-#### Response
-```json
-{
-    "#local.objectNamePlural#": [
-        {
-            "id": 1,
-            "createdAt": "2023-01-01T12:00:00Z",
-            "updatedAt": "2023-01-01T12:00:00Z"
-        }
-    ]
-}
-```
-
-### GET /#local.objectNamePlural#/:id
+            local.docsContent = chr(35) & " #local.objectNamePluralC# API" & chr(10) & chr(10) &
+            "## Endpoints" & chr(10) & chr(10) &
+            "### GET /#local.objectNamePlural#" & chr(10) &
+            "Returns a list of all #local.objectNamePlural#." & chr(10) & chr(10) &
+            "#### Response" & chr(10) &
+            "```json" & chr(10) &
+            "{" & chr(10) &
+            '    "#local.objectNamePlural#": [' & chr(10) &
+            "        {" & chr(10) &
+            '            "id": 1,' & chr(10) &
+            '            "createdAt": "2023-01-01T12:00:00Z",' & chr(10) &
+            '            "updatedAt": "2023-01-01T12:00:00Z"' & chr(10) &
+            "        }" & chr(10) &
+            "    ]" & chr(10) &
+            "}" & chr(10) &
+            "```" & chr(10) & chr(10) &
+            "### GET /#local.objectNamePlural#/:id"
 Returns a specific #local.objectNameSingular# by ID.
 
 #### Response
