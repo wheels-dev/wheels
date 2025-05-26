@@ -78,6 +78,16 @@ jobs:
         env:
           BOXJSON_DIR: /build-cfwheels-base/cfwheels
 
+      # publish CLI package
+      - uses: pixl8/github-action-box-publish@v4
+        id: Publish-CLI-Package
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
+        env:
+          BOXJSON_DIR: /build-cfwheels-cli/wheels-cli
+
       - name: Post Slack Message
         id: Post-Slack-Message
         uses: act10ns/slack@v2
