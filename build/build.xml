@@ -12,6 +12,7 @@
 	<property name="cfwheels.slug"	 		    value="cfwheels"/>
 	<property name="cfwheels.core.slug"	 		value="cfwheels"/>
 	<property name="cfwheels.base.slug"	 		value="cfwheels-base-template"/>
+	<property name="cfwheels.cli.slug"	 		value="wheels-cli"/>
 
   <!-- Default environment check, if not passed via -Denvironment -->
 	<condition property="environment"       value="local">
@@ -80,7 +81,7 @@
 	<target
 		name="build.all"
 		description="Builds CFWheels"
-		depends="build.cfwheels.core,build.cfwheels.base">
+		depends="build.cfwheels.core,build.cfwheels.base,build.cfwheels.cli">
 	</target>
 
   <!-- ================================ -->
@@ -249,5 +250,87 @@
 			  encoding="UTF-8"/>
 	</target>
   <!-- ================================ -->
+
+	  <!-- ================================ -->
+		<!-- Build CFWheels CLI Distribution -->
+		<target name="build.cfwheels.cli" description="Build a new CFWheels CLI distribution" depends="init">
+			<!-- Cleanup build dir -->
+			<property name="dir.build.cli" value="${basedir}/build-cfwheels-cli"/>
+			<delete dir="${dir.build.cli}" />
+			<mkdir dir="${dir.build.cli}" />
+
+			<!-- Init Platform Dirs -->
+			<property name="dir.cfwheels.exports"	value="${dir.exports}/cfwheels/${cfwheels.version}" />
+			<property name="be.cfwheels.exports" 	value="${be.exports}/cfwheels" />
+
+			<property name="build.cli.label" value="${cfwheels.cli.slug}-${cfwheels.version}-${start.DSTAMP}${start.TSTAMP}"/>
+			<concat destfile="${dir.build.cli}/wheels-cli/${build.cli.label}">Built on ${start.TODAY}</concat>
+
+			<copy todir="${dir.build.cli}/wheels-cli" encoding="UTF-8" overwrite="true">
+				<fileset dir="${basedir}/cli">
+					<exclude name="workspace/**"/>
+					<exclude name="simpletestapp/**"/>
+					<exclude name="*.log"/>
+					<exclude name=".git/**"/>
+					<exclude name=".gitignore"/>
+				</fileset>
+			</copy>
+
+			<!-- Copy box.json to exports -->
+			<copy file="build/cli/box.json" 	toFile="${dir.build.cli}/wheels-cli/box.json" 	encoding="UTF-8" overwrite="true"/>
+			<copy file="build/cli/README.md" toFile="${dir.build.cli}/wheels-cli/README.md" 	encoding="UTF-8" overwrite="true"/>
+
+			<!-- Replace Version + Build Numbers -->
+			<replaceregexp match='@build.version@' replace="${cfwheels.version}" flags="ig" byline="true" encoding="UTF-8">
+			  <fileset dir="${dir.build.cli}/wheels-cli" />
+			</replaceregexp>
+
+			<!-- Determine snapshot vs isPrerelease vs master artifact -->
+			<if>
+				<equals arg1="${isPreRelease}" arg2="true" />
+				<then>
+					<replaceregexp match='@build.number@' replace="${build.number}" flags="ig" byline="true" encoding="UTF-8">
+						<fileset dir="${dir.build.cli}/wheels-cli" />
+					</replaceregexp>
+				</then>
+
+				<elseif>
+					<equals arg1="${build.branch}" arg2="develop" />
+					<then>
+						<replaceregexp match='\+@build.number@' replace="-snapshot" flags="ig" byline="true" encoding="UTF-8">
+						  <fileset dir="${dir.build.cli}/wheels-cli" />
+						</replaceregexp>
+					</then>
+				</elseif>
+
+				<else>
+					<replaceregexp match='@build.number@' replace="${build.number}" flags="ig" byline="true" encoding="UTF-8">
+					  <fileset dir="${dir.build.cli}/wheels-cli" />
+					</replaceregexp>
+				</else>
+			</if>
+
+			<!-- Zip CFWheels CLI Bundle -->
+			<zip destfile="${dir.cfwheels.exports}/${cfwheels.cli.slug}-${cfwheels.version}.zip" basedir="${dir.build.cli}/wheels-cli" />
+
+			<!-- Build Checksum -->
+			<checksum forceoverwrite="true" fileext=".md5">
+				<fileset dir="${dir.cfwheels.exports}">
+					<include name="*.zip" />
+				</fileset>
+			</checksum>
+			<checksum forceoverwrite="true" algorithm="SHA-512" fileext=".sha512">
+				<fileset dir="${dir.cfwheels.exports}">
+					<include name="*.zip" />
+				</fileset>
+			</checksum>
+
+			<!-- Move Bleeding Edge to Root -->
+			<copy file="${dir.cfwheels.exports}/${cfwheels.cli.slug}-${cfwheels.version}.zip"
+				  tofile="${be.cfwheels.exports}/${cfwheels.cli.slug}-be.zip"
+				  overwrite="true"
+				  encoding="UTF-8"/>
+		</target>
+	  <!-- ================================ -->
 
 </project>
