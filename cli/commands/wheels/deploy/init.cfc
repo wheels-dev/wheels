@@ -217,7 +217,7 @@ COPY . /var/www/
 
 # Install CommandBox for dependency management
 RUN curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add -
-RUN echo ""deb https://downloads.ortussolutions.com/debs/noarch /"" | tee -a /etc/apt/sources.list.d/commandbox.list
+RUN echo "deb https://downloads.ortussolutions.com/debs/noarch /" | tee -a /etc/apt/sources.list.d/commandbox.list
 RUN apt-get update && apt-get install -y commandbox
 
 # Install dependencies
@@ -230,7 +230,7 @@ COPY deploy/lucee-config.xml /opt/lucee/web/lucee-web.xml.cfm
 EXPOSE 3000
 
 # Start command
-CMD [""box"", ""server"", ""start"", ""--console"", ""--force"", ""port=3000""]";
+CMD ["box", "server", "start", "--console", "--force", "port=3000"]";
         } else {
             dockerfile = "FROM adobecoldfusion/coldfusion:latest
 
@@ -252,7 +252,7 @@ RUN box install
 EXPOSE 3000
 
 # Start command
-CMD [""box"", ""server"", ""start"", ""--console"", ""--force"", ""cfengine=adobe@2023"", ""port=3000""]";
+CMD ["box", "server", "start", "--console", "--force", "cfengine=adobe@2023", "port=3000"]";
         }
         
         return dockerfile;

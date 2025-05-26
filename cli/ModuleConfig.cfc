@@ -19,7 +19,7 @@ component {
             // Module path
             "modulePath": modulePath,
             // Default template repository
-            templateRepository = "https://github.com/wheels-dev/wheels-templates",
+            templateRepository: "https://github.com/wheels-dev/wheels-templates",
             // Testing configuration
             testbox = {
                 runner = "/tests/runner.cfm",
