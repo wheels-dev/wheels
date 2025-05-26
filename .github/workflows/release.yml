@@ -88,12 +88,12 @@ jobs:
         env:
           BOXJSON_DIR: /build-cfwheels-cli/wheels-cli
 
-      - name: Post Slack Message
-        id: Post-Slack-Message
-        uses: act10ns/slack@v2
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ job.status }}
-          steps: ${{ toJson(steps) }}
-          channel: '#wheels-dev'
-        if: always()
+#      - name: Post Slack Message
+#        id: Post-Slack-Message
+#        uses: act10ns/slack@v2
+#        with:
+#          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+#          status: ${{ job.status }}
+#          steps: ${{ toJson(steps) }}
+#          channel: '#wheels-dev'
+#        if: always()
