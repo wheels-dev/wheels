@@ -202,7 +202,41 @@ services:
         aliases:
           - sqlserver
 
+  oracle:
+    profiles: ["db", "oracle", "advanced", "all"]
+    image: container-registry.oracle.com/database/free:23.3.0.0
+    restart: always
+    environment:
+      ORACLE_PWD: Oracle123!
+      ORACLE_CHARACTERSET: AL32UTF8
+      ORACLE_PDB: FREEPDB1
+      APP_USER: wheelstestdb
+      APP_USER_PASSWORD: wheelstestdb123!
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    healthcheck:
+      test: ["CMD", "/opt/oracle/checkDBStatus.sh"]
+      interval: 30s
+      timeout: 30s
+      start_period: 10m
+      retries: 20
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./docker/oracle/init-scripts:/opt/oracle/scripts/startup
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    networks:
+      default:
+        aliases:
+          - oracle
+
 volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
+  oracle_data:

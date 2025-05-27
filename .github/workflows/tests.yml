@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         cfengine: [ "lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023" ]
-        dbengine: ["mysql", "postgres", "sqlserver_cicd", "h2"]
+        dbengine: ["mysql", "postgres", "sqlserver_cicd", "h2", "oracle"]
         commandbox_version: [ "6.2.1" ]
         jdkVersion: [ "21" ]
         experimental: [false]
@@ -61,6 +61,8 @@ jobs:
           #   dbengine: sqlserver_cicd
           - cfengine: adobe@2023
             dbengine: h2
+          # Oracle testing enabled for all engines after successful Lucee 5 test
+          # Adobe ColdFusion doesn't support H2, so we exclude those combinations above
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

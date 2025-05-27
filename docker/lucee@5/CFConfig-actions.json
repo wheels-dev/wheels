@@ -80,6 +80,21 @@
 			"allow":"511",
 			"clob":true,
 			"blob":true
+		},
+		"wheelstestdb_oracle": {
+			"class": "oracle.jdbc.OracleDriver",
+			"dbdriver": "Oracle",
+			"database": "FREEPDB1",
+			"dsn": "jdbc:oracle:thin:@{host}:{port}/{database}",
+			"host": "localhost",
+			"password": "wheelstestdb123!",
+			"port": "1521",
+			"username": "wheelstestdb",
+			"blob": true,
+			"clob": true,
+			"connectionLimit": "-1",
+			"connectionTimeout": "20",
+			"validate": false
 		}
 	}
 }
