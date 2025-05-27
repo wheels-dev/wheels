@@ -81,7 +81,7 @@
 			"blob":true
 		},
 		"wheelstestdb_oracle": {
-			"class": "oracle.jdbc.OracleDriver",
+			"class": "macromedia.jdbc.MacromediaDriver",
 			"dbdriver": "Oracle",
 			"database": "FREEPDB1",
 			"dsn": "jdbc:oracle:thin:@{host}:{port}/{database}",

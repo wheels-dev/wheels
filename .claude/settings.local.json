@@ -32,7 +32,15 @@
       "Bash(docker stop:*)",
       "Bash(docker cp:*)",
       "Bash(docker rm:*)",
-      "Bash(docker rmi:*)"
+      "Bash(docker rmi:*)",
+      "Bash(diff:*)",
+      "Bash(true)",
+      "Bash(box server start:*)",
+      "Bash(box uninstall:*)",
+      "Bash(mv:*)",
+      "Bash(box server:*)",
+      "Bash(box run-script:*)",
+      "Bash(/Users/peter/projects/wheels/.engine/adobe@2021/WEB-INF/cfusion/bin/cfpm.sh install oracle)"
     ],
     "deny": []
   }

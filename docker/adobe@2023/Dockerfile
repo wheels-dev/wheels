@@ -10,8 +10,5 @@ ENV BOX_SERVER_CFCONFIGFILE "./docker/adobe@2023/CFConfig.json"
 ENV BOX_SERVER_PROFILE      "none"
 ENV BOX_INSTALL             TRUE
 
-# Copy Oracle JDBC driver
-COPY docker/adobe@2023/lib ${APP_DIR}/docker/adobe@2023/lib
-
 # WARM UP THE SERVER
 RUN ${BUILD_DIR}/util/warmup-server.sh
