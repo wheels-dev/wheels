@@ -1,30 +1,27 @@
 {
-	"name": "test-ui",
-	"version": "0.1.0",
-	"private": true,
-	"scripts": {
-		"start": "http-server --port 8080"
-	},
-	"devDependencies": {
-		"babel-eslint": "^10.1.0",
-		"eslint": "^6.7.2"
-	},
-	"eslintConfig": {
-		"root": true,
-		"env": {
-			"node": true
-		},
-		"extends": [
-			"eslint:recommended"
-		],
-		"parserOptions": {
-			"parser": "babel-eslint"
-		},
-		"rules": {}
-	},
-	"browserslist": [
-		"> 1%",
-		"last 2 versions",
-		"not dead"
-	]
+  "name": "testui-new",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "type-check": "vue-tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "CFWheels TestUI - Modern test runner interface",
+  "dependencies": {
+    "@types/node": "^22.15.18",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "pinia": "^3.0.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "vue-tsc": "^2.0.28"
+  }
 }

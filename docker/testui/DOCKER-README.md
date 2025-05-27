@@ -15,7 +15,7 @@ The TestUI application is containerized for easy deployment and consistent behav
 ### TestUI Container
 
 - **Base Image**: `nginx:stable-alpine`
-- **Ports**: 80 (internal), 3001 (mapped to host)
+- **Ports**: 80 (internal), 3000 (mapped to host)
 - **Volumes**: Docker socket mounted (read-only) for container management
 - **Extra Hosts**: `host.docker.internal` for accessing host services
 
@@ -43,7 +43,7 @@ The TestUI communicates with CFML engines via HTTP:
 
 - NGINX proxies requests to host machine ports where engines are running
 - Each engine has a dedicated proxy location in the NGINX configuration
-- Example URL format: `http://localhost:3001/api/lucee6/wheels/testbox?format=json`
+- Example URL format: `http://localhost:3000/api/lucee6/wheels/testbox?format=json`
 
 ### Host Network Access
 

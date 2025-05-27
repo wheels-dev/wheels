@@ -40,7 +40,7 @@ export interface CfmlEngine {
 }
 
 // Database types
-export type DatabaseType = 'h2' | 'mysql' | 'postgres' | 'sqlserver';
+export type DatabaseType = 'h2' | 'mysql' | 'postgres' | 'sqlserver' | 'oracle';
 
 // Database
 export interface Database {
@@ -80,6 +80,7 @@ export interface TestResult {
   database?: Database;
   bundle?: TestBundle;
   spec?: TestSpec;
+  runId?: string; // Unique identifier for each test run
   error?: {
     message: string;
     detail?: string;

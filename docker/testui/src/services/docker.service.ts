@@ -310,6 +310,8 @@ class DockerService {
           this._cachedDatabases['sqlserver'] = container;
         } else if (container.name.includes('h2') || container.image.includes('h2')) {
           this._cachedDatabases['h2'] = container;
+        } else if (container.name.includes('oracle') || container.image.includes('oracle')) {
+          this._cachedDatabases['oracle'] = container;
         }
       }
     });
@@ -741,6 +743,20 @@ class DockerService {
         isCFWheelsContainer: true,
         cfwheelsType: 'database',
         cfwheelsName: 'h2'
+      },
+      {
+        id: 'mock-oracle',
+        name: 'cfwheels-oracle-1',
+        type: 'database',
+        image: 'oracle/database:19.3.0',
+        status: 'stopped',
+        ports: { '1521': '1522' },
+        created: now,
+        labels: { 'com.github.cfwheels.type': 'database', 'com.github.cfwheels.name': 'oracle' },
+        isCFWheelsContainer: true,
+        cfwheelsType: 'database',
+        cfwheelsName: 'oracle',
+        cfwheelsVersion: '19.3.0'
       }
     ];
   }

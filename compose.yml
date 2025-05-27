@@ -1,23 +1,14 @@
 # Description: Docker Compose file for running the CFWheels Test Suite
 
 services:
-  # Original TestUI - keeping for backward compatibility
+  # Modern TestUI
   testui:
-    profiles: ["ui-legacy", "all"]
-    build:
-      context: ./docker/testui
-    image: cfwheels-testui:v1.0.2
-    ports:
-      - "3000:8080"
-
-  # New Modern TestUI
-  testui-new:
     profiles: ["ui", "all"]
     build:
-      context: ./docker/testui-new
-    image: cfwheels-testui-new:v1.0.0
+      context: ./docker/testui
+    image: cfwheels-testui:v2.0.0
     ports:
-      - "3001:80"
+      - "3000:80"
     # Add extra_hosts to allow container to access host services
     extra_hosts:
       - "host.docker.internal:host-gateway"

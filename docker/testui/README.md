@@ -1,63 +1,106 @@
-# cfwheels-test-suite-ui
+# CFWheels TestUI
 
-This web application provides a way of queuing tests for each of the docker containers. It starts on localhost:3000 when using `docker compose up` with the appropriate profile.
+A modern test runner interface for CFWheels framework testing.
 
 ## Features
 
-- Simple web interface to run tests
-- Support for multiple CFML engines (Lucee 5/6, Adobe 2018/2021/2023)
-- Support for multiple databases (MySQL, PostgreSQL, SQL Server, H2)
-- Real-time test results display
-- Test queue management
+- **Modern UI** with dark and light theme support
+- **Test Runner** for executing tests across different CFML engines and databases
+- **Docker Integration** for managing containers directly from the UI
+- **Pre-flight System** to ensure all required services are running before tests
+- **Enhanced Test Results** with detailed error information and test statistics
 
-## Usage
+## Tech Stack
 
-1. Start the TestUI container along with the desired CFML engines and databases:
-   ```bash
-   docker compose --profile ui --profile lucee --profile db up -d
-   ```
+- Vue 3 with Composition API
+- TypeScript for type safety
+- Tailwind CSS and DaisyUI for styling
+- Pinia for state management
+- Vite for fast development and builds
 
-2. Access the TestUI at http://localhost:3000
+## Quick Start
 
-3. Click on a CFML engine + database combination to add it to the test queue
+### Using Docker (Recommended)
 
-4. Click "Start Queue" to run the tests
+The TestUI is integrated with Docker for easy setup and development.
 
-5. View results in the Results panel
+#### Production Mode
 
-## Recent Changes
-
-- **2025-05-15**: Fixed issue with test queue not clearing between runs, which was causing subsequent test runs to rerun previous tests
-
-## Project setup for local development
+```bash
+# From the CFWheels root directory
+docker-compose --profile ui up -d
 ```
+
+Then visit http://localhost:3000 in your browser.
+
+#### Development Mode
+
+```bash
+# From the testui directory
+docker-compose -f docker-compose.dev.yml up
+```
+
+For more detailed Docker instructions, see [DOCKER-INTEGRATION.md](./DOCKER-INTEGRATION.md).
+
+### Manual Development
+
+#### Prerequisites
+
+- Node.js 18+ and npm
+
+#### Setup
+
+```bash
+# Install dependencies
 npm install
+
+# Start development server
+npm run dev
 ```
 
-Installs required dependencies in `node_modules` (which is git ignored)
+### Build for Production
 
-### Compiles and hot-reloads
-```
-npm run serve
-```
-
-Starts the local development server. It will try for localhost:3000 but if it can't open on that port will try 3001 etc
-
-### Compiles and minifies for production
-```
+```bash
+# Build the application
 npm run build
+
+# Preview the production build
+npm run preview
 ```
 
-When you've made your changes, build it and commit the changes
+## Project Structure
 
-### Lints and fixes files
 ```
-npm run lint
+/src
+  /assets           # Static assets like CSS, images
+  /components       # Reusable Vue components
+  /services         # Services for API calls and business logic
+  /stores           # Pinia stores for state management
+  /types            # TypeScript interfaces and types
+  /utils            # Helper functions and utilities
+  /views            # Main view components
+  App.vue           # Root component
+  main.ts           # Application entry point
 ```
 
-### Key Files
+## Docker Integration
 
-- `index.html` - Main UI and application logic
-- `services/servers.js` - Configuration for CFML engine endpoints
-- `services/databases.js` - Configuration for database options
-- `services/testsuites.js` - Combines servers and databases into runnable test suites
+The TestUI provides integration with Docker to manage CFML engine and database containers. It allows you to:
+
+- View container status and health
+- Start, stop, and restart containers
+- Manage container profiles for different testing scenarios
+- Run pre-flight checks before test execution
+
+See [DOCKER-INTEGRATION.md](./DOCKER-INTEGRATION.md) for detailed information on Docker integration.
+
+## Container Profiles
+
+The following pre-defined container profiles are available:
+
+- **Core Tests Profile**: Minimal setup for running core CFWheels tests
+- **Full Test Suite Profile**: Complete setup for running all tests across all engines and databases
+
+## Development
+
+For development guidelines, see [DEVELOPMENT.md](./DEVELOPMENT.md).

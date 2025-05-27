@@ -67,35 +67,55 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
+                  <tr 
+                    @click="openEngine('lucee5', 60005)"
+                    :class="{ 'cursor-pointer': engines.lucee5?.status === 'running' }"
+                    :title="engines.lucee5?.status === 'running' ? 'Click to open Lucee 5' : ''"
+                  >
                     <td>Lucee 5</td>
                     <td class="text-end" v-if="engines.lucee5">
                       <span class="badge" :class="getStatusClass(engines.lucee5)">{{ getStatusText(engines.lucee5) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr 
+                    @click="openEngine('lucee6', 60006)"
+                    :class="{ 'cursor-pointer': engines.lucee6?.status === 'running' }"
+                    :title="engines.lucee6?.status === 'running' ? 'Click to open Lucee 6' : ''"
+                  >
                     <td>Lucee 6</td>
                     <td class="text-end" v-if="engines.lucee6">
                       <span class="badge" :class="getStatusClass(engines.lucee6)">{{ getStatusText(engines.lucee6) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr 
+                    @click="openEngine('adobe2018', 62018)"
+                    :class="{ 'cursor-pointer': engines.adobe2018?.status === 'running' }"
+                    :title="engines.adobe2018?.status === 'running' ? 'Click to open Adobe 2018' : ''"
+                  >
                     <td>Adobe 2018</td>
                     <td class="text-end" v-if="engines.adobe2018">
                       <span class="badge" :class="getStatusClass(engines.adobe2018)">{{ getStatusText(engines.adobe2018) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr 
+                    @click="openEngine('adobe2021', 62021)"
+                    :class="{ 'cursor-pointer': engines.adobe2021?.status === 'running' }"
+                    :title="engines.adobe2021?.status === 'running' ? 'Click to open Adobe 2021' : ''"
+                  >
                     <td>Adobe 2021</td>
                     <td class="text-end" v-if="engines.adobe2021">
                       <span class="badge" :class="getStatusClass(engines.adobe2021)">{{ getStatusText(engines.adobe2021) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr 
+                    @click="openEngine('adobe2023', 62023)"
+                    :class="{ 'cursor-pointer': engines.adobe2023?.status === 'running' }"
+                    :title="engines.adobe2023?.status === 'running' ? 'Click to open Adobe 2023' : ''"
+                  >
                     <td>Adobe 2023</td>
                     <td class="text-end" v-if="engines.adobe2023">
                       <span class="badge" :class="getStatusClass(engines.adobe2023)">{{ getStatusText(engines.adobe2023) }}</span>
@@ -155,6 +175,13 @@
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
+                  <tr>
+                    <td>Oracle</td>
+                    <td class="text-end" v-if="databases.oracle">
+                      <span class="badge" :class="getStatusClass(databases.oracle)">{{ getStatusText(databases.oracle) }}</span>
+                    </td>
+                    <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -182,7 +209,8 @@ const databases = ref({
   h2: null,
   mysql: null,
   sqlserver: null,
-  postgres: null
+  postgres: null,
+  oracle: null
 });
 
 // Helper methods for status badges
@@ -223,6 +251,14 @@ function getStatusText(container) {
   }
 }
 
+// Open engine URL in a new tab
+function openEngine(engineKey: string, port: number) {
+  const engine = engines.value[engineKey];
+  if (engine && engine.status === 'running') {
+    window.open(`http://localhost:${port}`, '_blank');
+  }
+}
+
 // Fetch container data
 async function fetchContainers() {
   try {
@@ -258,6 +294,8 @@ async function fetchContainers() {
         databases.value.sqlserver = container;
       } else if (container.name.includes('postgres') || container.image.includes('postgres')) {
         databases.value.postgres = container;
+      } else if (container.name.includes('oracle') || container.image.includes('oracle')) {
+        databases.value.oracle = container;
       }
     });
     
@@ -294,3 +332,20 @@ onMounted(() => {
   return () => clearInterval(refreshInterval);
 });
 </script>
+
+<style scoped>
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.cursor-pointer:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Add hover effect for dark mode */
+@media (prefers-color-scheme: dark) {
+  .cursor-pointer:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+}
+</style>

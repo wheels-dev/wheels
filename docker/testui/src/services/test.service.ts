@@ -750,6 +750,15 @@ class TestService {
         username: 'sa',
         password: 'x!bsT8t60yo0cTVTPq'
       };
+    } else if (database.name === 'Oracle') {
+      return {
+        dsn: 'wheelstestdb',
+        database_type: 'oracle',
+        host: 'oracle',
+        port: 1521,
+        username: 'system',
+        password: 'oracle'
+      };
     }
     
     // Default config if not found

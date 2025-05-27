@@ -1,361 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="/favicon.ico">
-    <title>Wheels Test UI</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.4.1/dist/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-</head>
-<body>
-	<noscript><strong>We're sorry but test-ui doesn't work properly without JavaScript enabled. Please enable it to continue.</strong></noscript>
-	<div>
-		<nav class="navbar navbar-light bg-light navbar-expand-sm">
-			<button type="button" class="navbar-toggler collapsed" style="overflow-anchor: none;"><span class="navbar-toggler-icon"></span></button>
-			<a class="navbar-brand" href="#">
-				<img src="wheels_logo.png" width="200" alt="">
-			</a>
-			<div class="navbar-collapse collapse" style="display: none;">
-				<ul class="navbar-nav">
-					<li class="navbar-text">Wheels Framework Test Suite</li>
-				</ul>
-			</div>
-		</nav>
-		<div class="home">
-			<div class="container-fluid mt-5">
-				<div class="row">
-					<div class="col-lg-4">
-						<div class="card border-secondary">
-							<!-- Testes Section -->
-							<div class="card-header">Run Tests:</div>
-							<div class="list-group" id="test-section">
-							</div>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CFWheels Test UI</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Custom dark mode styles -->
+    <style>
+      .dark-theme {
+        --bs-body-bg: #212529;
+        --bs-body-color: #f8f9fa;
+      }
+      
+      
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      
+      #app {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      
+      .footer {
+        margin-top: auto;
+      }
 
-                            <!-- Execution Order -->
-                            <fieldset class="form-group m-3">
-                                <legend tabindex="-1" class="bv-no-focus-ring col-form-label pt-0">Execution Order</legend>
-                                <div>
-                                    <div id="executionOrder" role="radiogroup" tabindex="-1" class="bv-no-focus-ring">
-                                        <div class="custom-control custom-radio">
-                                            <input id="executionOrder_option_0" type="radio" name="executionOrder" class="custom-control-input" value="directory asc" checked>
-                                            <label for="executionOrder_option_0" class="custom-control-label"><span>directory asc</span></label>
-                                        </div>
-                                        <div class="custom-control custom-radio">
-                                            <input id="executionOrder_option_1" type="radio" name="executionOrder" class="custom-control-input" value="directory desc">
-                                            <label for="executionOrder_option_1" class="custom-control-label"><span>directory desc</span></label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </fieldset>
-
-						</div>
-						<div class="card mt-3">
-							<!--Server Section-->
-							<div class="card-header">Open Server</div>
-							<div class="list-group" id="server-section"></div>
-						</div>
-					</div>
-					<div class="col-lg-8">
-						<div class="card">
-							<div class="card-header">
-								<div class="d-flex flex-row">
-									<h6><svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="card list" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-card-list b-icon bi"><g><path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h13zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-13z"></path><path d="M5 8a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 5 8zm0-2.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0 5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-1-5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zM4 8a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0zm0 2.5a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0z"></path></g></svg> Queue</h6>
-									<div class="ml-auto btn-group">
-                                        <button type="button" class="btn btn-success btn-sm d-none" id="start-queue">
-                                            <svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="play fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-play-fill b-icon bi">
-                                                <g>
-                                                    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"></path>
-                                                </g>
-                                            </svg> Start Queue</button>
-                                        <button type="button" class="btn btn-danger btn-sm d-none" id="clear-queue">
-                                            <svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="trash fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-trash-fill b-icon bi">
-                                                <g>
-                                                    <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"></path>
-                                                </g>
-                                            </svg> Clear Queue</button>
-										<button type="button" class="btn btn-danger btn-sm" id="clear-all">
-											<svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="trash fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-trash-fill b-icon bi">
-												<g>
-													<path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"></path>
-												</g>
-											</svg> Clear All</button>
-									</div>
-								</div>
-							</div>
-							<p class="text-center mt-3" id="queue-section">No Tests added yet.<br><em>Click on a test on the left to add it to the queue.</em></p>
-						</div>
-						<div class="card mt-3">
-							<div class="card-header">
-								<div class="d-flex flex-row">
-									<h6>Console</h6>
-                                    <button type="button" class="btn ml-auto btn-link btn-sm d-none" id="console-clear">
-                                        <svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="trash fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-trash-fill b-icon bi">
-                                            <g>
-                                                <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"></path>
-                                            </g>
-                                        </svg> Clear
-                                    </button>
-								</div>
-							</div>
-							<p class="text-center mt-3" id="console-section">Nothing here yet</p>
-						</div>
-						<div class="card mt-3">
-							<div class="card-header">
-								<div class="d-flex flex-row">
-									<h6>Results</h6>
-                                    <button type="button" class="btn ml-auto btn-link btn-sm d-none" id="results-clear">
-                                        <svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="trash fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-trash-fill b-icon bi">
-                                            <g>
-                                                <path d="M2.5 1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1H3v9a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h.5a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H10a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1H2.5zm3 4a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5zM8 5a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7A.5.5 0 0 1 8 5zm3 .5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 1 0z"></path>
-                                            </g>
-                                        </svg> Clear
-                                    </button>
-								</div>
-							</div>
-							<p class="text-center mt-3" id="results-section">No results returned yet</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-</body>
-<script type="module" src="services/testsuites.js"></script>
-<script>
-    let serverSection = document.getElementById('server-section');
-    let testSection = document.getElementById('test-section');
-    let requestStatus = document.getElementsByClassName('request-status');
-    let requestList = [];
-
-    window.onload = function(){
-        //Tests Section
-        let arrayTests = [];
-        let tempTests;
-
-        for(let i = 0; i < testsuites.length; i++){
-            tempTests = `<button title="Add Test to Queue" type="button" class="test list-group-item list-group-item-action"><svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="plus circle" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-plus-circle b-icon bi"><g><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"></path><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"></path></g></svg> ${testsuites[i].displayname} </button>`;
-            arrayTests.push(tempTests);
-        }
-
-        arrayTests = arrayTests.join('');
-        testSection.innerHTML = arrayTests;
-
-        //Server Section
-
-        let arrayServers = [];
-        let tempServer;
-
-        for(let i = 0; i < servers.length; i++){
-            tempServer = `<a title="Open Server in New Window" href="${servers[i].server}" target="_blank" class="list-group-item list-group-item-action"> ${servers[i].servername} <svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="box arrow up right" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-box-arrow-up-right b-icon bi"><g><path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"></path><path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"></path></g></svg></a>`;
-            arrayServers.push(tempServer);
-        }
-
-        arrayServers = arrayServers.join('');
-        serverSection.innerHTML = arrayServers;
-
-        //Select Test
-        const tests = document.getElementsByClassName('test');
-        const queueSection = document.getElementById('queue-section');
-
-        for(let i = 0; i < tests.length; i++){
-            tests[i].addEventListener('click',function(){
-                clearSection(queueSection);
-                if(!queueSection.innerHTML.includes(`<div class="row p-1 text-left"><div class="col-md-1"><span class="badge badge-light request-status">waiting</span></div><div class="col-md-1"></div><div class="col-md-10 request-list">${tests[i].textContent}</div></div>`)){
-                    queueSection.insertAdjacentHTML('beforeend', `<div class="row p-1 text-left"><div class="col-md-1"><span class="badge badge-light request-status">waiting</span></div><div class="col-md-1"></div><div class="col-md-10 request-list">${tests[i].textContent}</div></div>`);
-                }
-            })
-        }
-    }
-
-    //Tests start
-    document.getElementById('start-queue').addEventListener('click', async function(){
-        if(document.getElementById('start-queue').textContent.trim() === 'Start Queue'){
-            document.getElementById('start-queue').innerHTML = `<svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="stop fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-stop-fill b-icon bi"><g><path d="M5 3.5h6A1.5 1.5 0 0 1 12.5 5v6a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 11V5A1.5 1.5 0 0 1 5 3.5z"></path></g></svg> Stop Queue`;
-            document.getElementById('start-queue').classList.remove('btn-success');
-            document.getElementById('start-queue').classList.add('btn-warning');
-            document.getElementById('clear-queue').classList.add('disabled');
-            document.getElementById('clear-queue').disabled = 'disabled';
-            requestListTemp = document.getElementsByClassName('request-list');
-
-            //Get Execution Order
-            const execOrder = getExecutionOrder();
-            
-            // Clear the requestList array before adding new items
-            requestList = [];
-            
-            for(let i = 0; i < requestStatus.length; i++){
-                requestStatus[i].textContent = 'pending';
-                requestStatus[i].classList.add('bg-info','text-white');
-                requestList.push(requestListTemp[i].textContent.trim());
-            }
-            for(let i = 0; i < requestList.length; i++){
-                let currentServer = servers.find((server) => server.servername === requestList[i].trim().split(':')[0]);
-                let currentDatabase = databases.find((database) => database.databasename === requestList[i].trim().split(':')[1].trim());
-
-                requestUrl = `${currentServer.server}/wheels/testbox?format=json&sort=${execOrder}&db=${currentDatabase.database}`;
-                clearSection(document.getElementById('console-section'));
-                document.getElementById('console-section').insertAdjacentHTML('beforeend', `<div class="row p-1"><div class="col-md-1"><span class="badge badge-info">${gettime()}</span></div><div class="col-md-11 text-left">Test Started -${requestList[i]}</div></div>`);
-                await API_call(requestUrl, requestList[i], requestStatus[i],requestStatus[i].parentNode.nextSibling,i);
-            }
-            document.getElementById('start-queue').innerHTML = `<svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="play fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-play-fill b-icon bi"><g><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"></path></g></svg> Start Queue`;
-            document.getElementById('start-queue').classList.remove('btn-warning');
-            document.getElementById('start-queue').classList.add('btn-success');
-            document.getElementById('clear-queue').classList.remove('disabled');
-            document.getElementById('clear-queue').disabled = '';
-        }
-        else if(document.getElementById('start-queue').textContent.trim() === 'Stop Queue'){
-            requestStatus = document.getElementsByClassName('request-status');
-            for(let i =0; i < requestStatus.length; i++){
-                requestStatus[i].textContent = 'waiting';
-                requestStatus[i].classList.remove('text-dark','text-white','bg-warning','bg-info','bg-danger','bg-success');
-                requestStatus[i].parentNode.nextSibling.innerHTML = '';
-            }
-            // Use a more explicit reset to ensure the array is completely emptied
-            requestList = [];
-            document.getElementById('start-queue').classList.remove('btn-warning');
-            document.getElementById('start-queue').classList.add('btn-success');
-            document.getElementById('start-queue').innerHTML = `<svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="play fill" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-play-fill b-icon bi"><g><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"></path></g></svg> Start Queue`;
-            document.getElementById('clear-queue').classList.remove('disabled');
-            document.getElementById('clear-queue').disabled = '';
-        }
-    })
-
-    //API call
-    async function API_call(requestUrl, request_server, requestStatus,spinner,index){
-        try{
-            document.getElementById('console-section').insertAdjacentHTML('beforeend', `<div class="row p-1"><div class="col-md-1"><span class="badge badge-info">${gettime()}</span></div><div class="col-md-11 text-left">${requestUrl}</div></div>`);
-            requestStatus.textContent = 'running';
-            requestStatus.classList.remove('bg-info','bg-success','bg-danger');
-            requestStatus.classList.add('bg-warning','text-dark');
-            spinner.innerHTML = '<span aria-hidden="true" class="spinner-border spinner-border-sm"></span>';
-            const response = await fetch(requestUrl);
-
-            const data = await response.json();
-            //Filter Results
-            const filteredResults = data.bundleStats.filter(bundle => {
-                const suiteStats = bundle.suiteStats;
-                const filteredSuiteStats = suiteStats.filter(suite => suite.status === 'Error' || suite.status === 'Failed');
-                const filteredSpecStats = suiteStats.flatMap(suite => suite.specStats.filter(spec => spec.status === 'Error' || spec.status === 'Failed'));
-                return filteredSuiteStats.length > 0 || filteredSpecStats.length > 0;
-            });
-
-            clearSection(document.getElementById('results-section'));
-            const timeStart = new Date(data.startTime).toLocaleString('en-US');
-            const timeEnd = new Date(data.endTime).toLocaleString('en-US');
-            if(data.totalError > 0 || data.totalFail > 0){
-                requestStatus.textContent = 'error';
-                requestStatus.classList.remove('bg-warning','text-dark');
-                requestStatus.classList.add('bg-danger');
-                spinner.innerHTML = '';
-                clearSection(document.getElementById('console-section'));
-                if(response.status == '417'){
-                    document.getElementById('console-section').insertAdjacentHTML('beforeend', `<div class="row p-1"><div class="col-md-1"><span class="badge badge-danger">${gettime()}</span></div><div class="col-md-11 text-left">Request failed with status code 417</div></div>`);
-                    document.getElementById('console-section').insertAdjacentHTML('beforeend', `<div class="row p-1"><div class="col-md-1"><span class="badge badge-danger">${gettime()}</span></div><div class="col-md-11 text-left">Expectation Failed</div></div>`);
-                }
-                else{
-                    document.getElementById('console-section').insertAdjacentHTML('beforeend', `<div class="row p-1"><div class="col-md-1"><span class="badge badge-danger">${gettime()}</span></div><div class="col-md-11 text-left">Tests Failed:${request_server}</div></div>`);
-                }
-                document.getElementById('results-section').insertAdjacentHTML('beforeend',`<div class="card m-3 border-danger" id="errorBody${index}"><div class="card-header bg-danger text-white"><div class="d-flex flex-row"><h6>${request_server}</h6><button type="button" class="btn ml-auto btn-light btn-sm" onclick = "copyToClipboard('errorBody${index}')"><svg viewBox="0 0 16 16" width="1em" height="1em" focusable="false" role="img" aria-label="file earmark code" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi-file-earmark-code b-icon bi"><g><path d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3 0A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h-2z"></path><path d="M8.646 6.646a.5.5 0 0 1 .708 0l2 2a.5.5 0 0 1 0 .708l-2 2a.5.5 0 0 1-.708-.708L10.293 9 8.646 7.354a.5.5 0 0 1 0-.708zm-1.292 0a.5.5 0 0 0-.708 0l-2 2a.5.5 0 0 0 0 .708l2 2a.5.5 0 0 0 .708-.708L5.707 9l1.647-1.646a.5.5 0 0 0 0-.708z"></path></g></svg> Copy to Clipboard</button> </div></div><p class="card-text"><div class="row text-left ml-1"><div class="col-lg-4"> Path: Wheels.Testbox<br> Cases: ${data.totalBundles}<br> Tests: ${data.totalSpecs} </div><div class="col-lg-3"> Passes: <strong class="text-danger">${data.totalPass}</strong><br> Failures: <span>${data.totalFail}</span><br> Errors: <span>${data.totalError}</span></div><div class="col-lg-5"> Started: ${timeStart}<br> Ended: ${timeEnd}<br></div></div></p></div>`);
-
-                if(filteredResults.length > 0){
-                    for(let i = 0 ; i < filteredResults.length; i++){
-                        for(let j = 0 ; j < filteredResults[i].suiteStats.length; j++){
-                            for(let k=0 ; k < filteredResults[i].suiteStats[j].specStats.length ; k++){
-                                if(filteredResults[i].suiteStats[j].specStats[k].status === "Error" || filteredResults[i].suiteStats[j].specStats[k].status === "Failed"){
-                                    document.getElementById(`errorBody${index}`).insertAdjacentHTML('beforeend',`<div role="alert" class="alert m-3 text-left alert-danger"><span class="badge badge-danger">${filteredResults[i].suiteStats[j].specStats[k].status}</span> <strong>${filteredResults[i].suiteStats[j].specStats[k].name}</strong><br><pre></pre><hr><pre><strong>${filteredResults[i].suiteStats[j].specStats[k].failMessage}<strong></br>${filteredResults[i].suiteStats[j].specStats[k].failDetail}</br></br>${filteredResults[i].suiteStats[j].specStats[k].failStacktrace}</pre></div>`)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else{
-                requestStatus.textContent = 'done';
-                requestStatus.classList.remove('bg-warning','text-dark');
-                requestStatus.classList.add('bg-success');
-                spinner.innerHTML = '';
-                document.getElementById('console-section').insertAdjacentHTML('beforeend', `<div class="row p-1"><div class="col-md-1"><span class="badge badge-success">${gettime()}</span></div><div class="col-md-11 text-left">Tests Passed:${request_server}</div></div>`);
-                document.getElementById('results-section').insertAdjacentHTML('afterbegin',`<div class="card m-3 border-success"><div class="card-header bg-success text-white"><div class="d-flex flex-row"><h6>${request_server}</h6> </div></div><p class="card-text"><div class="row text-left ml-1"><div class="col-lg-4"> Path: Wheels.Testbox<br> Cases: ${data.totalBundles}<br> Tests: ${data.totalSpecs} </div><div class="col-lg-3"> Passes: <strong class="text-success">${data.totalPass}</strong><br> Failures: <span>${data.totalFail}</span><br> Errors: <span>${data.totalError}</span></div><div class="col-lg-5"> Started: ${timeStart}<br> Ended: ${timeEnd}<br></div></div></p></div>`);
-            }
-        }
-        catch(error){
-            console.error('Fetch Error:', error);
-        }
-    }
-
-    //Clear All
-    document.getElementById('clear-all').addEventListener('click',function(){
-        document.getElementById('queue-section').innerHTML = `No Tests added yet.<br><em>Click on a test on the left to add it to the queue.</em>`;
-        document.getElementById('console-section').innerHTML = `Nothing here yet`;
-        document.getElementById('results-section').innerHTML = `No results returned yet`;
-        document.getElementById('start-queue').classList.add('d-none');
-        document.getElementById('clear-queue').classList.add('d-none');
-        document.getElementById('console-clear').classList.add('d-none');
-        document.getElementById('results-clear').classList.add('d-none');
-        // Reset the request list array when clearing everything
-        requestList = [];
-    })
-
-    //Clear Queue
-    document.getElementById('clear-queue').addEventListener('click',function(){
-        document.getElementById('queue-section').innerHTML = `No Tests added yet.<br><em>Click on a test on the left to add it to the queue.</em>`;
-        document.getElementById('start-queue').classList.add('d-none');
-        document.getElementById('clear-queue').classList.add('d-none');
-        // Reset the request list array when clearing the queue
-        requestList = [];
-    })
-
-    //Clear Console
-    document.getElementById('console-clear').addEventListener('click', function(){
-        document.getElementById('console-section').innerHTML = 'Nothing here yet';
-        document.getElementById('console-clear').classList.add('d-none');
-    })
-
-    //Clear Results
-    document.getElementById('results-clear').addEventListener('click', function(){
-        document.getElementById('results-section').innerHTML = 'No results returned yet';
-        document.getElementById('results-clear').classList.add('d-none');
-    })
-
-    //Get current time with '0' included
-    function gettime(){
-        const date = new Date();
-        return `${date.getHours()}:${date.getMinutes().toString().padStart(2,'0')}`;
-    }
-
-    //Get Execution Order
-    function getExecutionOrder(){
-        const selectedRadioButtons = document.querySelector('input[name="executionOrder"]:checked');
-        return selectedRadioButtons.value.replace(' ','%20');
-    }
-
-    //Copy Test Results to Clipboard
-    function copyToClipboard(clipboardId){
-        const textElement = document.getElementById(clipboardId);
-        const range = document.createRange();
-        range.selectNode(textElement);
-        window.getSelection().removeAllRanges();
-        window.getSelection().addRange(range);
-        document.execCommand('copy');
-        window.getSelection().removeAllRanges();
-        alert('Text Copied!');
-    }
-
-    //Clear Sections
-    function clearSection(section){
-        if(section.innerHTML.includes(`No Tests added yet.<br><em>Click on a test on the left to add it to the queue.</em>`)){
-            section.innerHTML = '';
-            document.getElementById('start-queue').classList.remove('d-none');
-            document.getElementById('clear-queue').classList.remove('d-none');
-        }
-        else if(section.textContent === 'Nothing here yet'){
-            section.textContent = '';
-            document.getElementById('console-clear').classList.remove('d-none');
-        }
-        else if(section.textContent === 'No results returned yet'){
-            section.textContent = '';
-            document.getElementById('results-clear').classList.remove('d-none');
-        }
-    }
-</script>
+      /* Custom status indicators */
+      .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 5px;
+      }
+      .status-running { background-color: var(--bs-success); box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.2); }
+      .status-stopped { background-color: var(--bs-danger); box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2); }
+      .status-starting { 
+        background-color: var(--bs-warning); 
+        box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+        animation: pulse 1.5s infinite; 
+      }
+      .status-stopping { 
+        background-color: var(--bs-warning); 
+        box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+        animation: pulse 1.5s infinite; 
+      }
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- Bootstrap 5 JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

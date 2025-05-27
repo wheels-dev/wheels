@@ -64,6 +64,20 @@ export const useDatabaseStore = defineStore('database', () => {
         username: 'sa',
         password: ''
       }
+    },
+    {
+      id: 'oracle',
+      name: 'Oracle',
+      version: '19.3.0',
+      port: 1521,
+      status: ContainerStatus.Stopped,
+      connectionInfo: {
+        host: 'oracle',
+        port: 1521,
+        database: 'cfwheels',
+        username: 'system',
+        password: 'oracle'
+      }
     }
   ]);
 

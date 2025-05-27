@@ -4,11 +4,11 @@
       <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="#">
           <div class="logo-container me-2">
-            <img 
-              :src="theme === 'dark' ? '/wheels_logo_transparancy_white.png' : '/wheels_logo_transparancy_black.png'" 
-              alt="CFWheels Logo" 
-              height="30" 
-              class="d-inline-block align-top" 
+            <img
+              :src="theme === 'dark' ? '/wheels_logo_transparancy_white.png' : '/wheels_logo_transparancy_black.png'"
+              alt="CFWheels Logo"
+              height="30"
+              class="d-inline-block align-top"
             />
           </div>
           <span class="fw-bold">Test UI</span>
@@ -26,16 +26,16 @@
             </li>
           </ul>
           <div class="d-flex align-items-center">
-            <span 
-              v-if="usingMockData" 
+            <span
+              v-if="usingMockData"
               class="badge bg-warning me-3 d-flex align-items-center"
               title="Using mock data - Docker API connection issue detected"
             >
               <i class="bi bi-exclamation-triangle-fill me-1"></i> Mock Data
             </span>
-            <button 
-              @click="toggleTheme" 
-              class="btn btn-sm" 
+            <button
+              @click="toggleTheme"
+              class="btn btn-sm"
               :class="theme === 'dark' ? 'btn-outline-light' : 'btn-outline-dark'"
             >
               <span v-if="theme === 'dark'">
@@ -57,7 +57,7 @@
     <footer class="footer py-3 mt-auto" :class="theme === 'dark' ? 'bg-dark text-light border-top border-secondary' : 'bg-light text-dark border-top'">
       <div class="container text-center">
         <span>CFWheels Test Environment</span>
-        <span class="badge bg-primary ms-2">v1.0</span>
+        <span class="badge bg-primary ms-2">v2.0.0</span>
       </div>
     </footer>
   </div>
@@ -107,14 +107,14 @@ onMounted(() => {
       theme.value = 'dark'
     }
   }
-  
+
   // Apply theme immediately
   updateBodyClass()
-  
+
   // Check mock data status initially and set up interval
   checkMockDataStatus()
   const mockStatusInterval = setInterval(checkMockDataStatus, 5000)
-  
+
   // Listen for system preference changes
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
     // Only change if user hasn't manually set a preference
@@ -123,7 +123,7 @@ onMounted(() => {
       updateBodyClass()
     }
   })
-  
+
   // Clean up interval on component unmount
   return () => clearInterval(mockStatusInterval)
 })

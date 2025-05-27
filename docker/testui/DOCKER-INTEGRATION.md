@@ -20,14 +20,14 @@ To run the TestUI in production mode:
 docker-compose --profile ui up -d
 ```
 
-This will build and start the TestUI container, making it accessible at http://localhost:3001
+This will build and start the TestUI container, making it accessible at http://localhost:3000
 
 ### Development Mode
 
 For active development with hot-reloading:
 
 ```bash
-# From the docker/testui-new directory
+# From the docker/testui directory
 docker-compose -f docker-compose.dev.yml up
 ```
 
@@ -46,7 +46,7 @@ The TestUI is part of the following Docker Compose profiles:
 You can also build and run the TestUI directly using Docker:
 
 ```bash
-# From the docker/testui-new directory
+# From the docker/testui directory
 ./docker-build.sh       # For production mode
 ./docker-build.sh dev   # For development mode
 ```
@@ -84,7 +84,7 @@ If the container cannot access services on the host machine:
 
 2. Check if the host services are running and accessible from the container:
    ```bash
-   docker exec -it cfwheels-testui-new curl host.docker.internal:60005
+   docker exec -it cfwheels-testui curl host.docker.internal:60005
    ```
 
 ### API Proxy Issues
@@ -93,12 +93,12 @@ If API requests are not being properly proxied:
 
 1. Check the NGINX configuration in the container:
    ```bash
-   docker exec -it cfwheels-testui-new cat /etc/nginx/conf.d/default.conf
+   docker exec -it cfwheels-testui cat /etc/nginx/conf.d/default.conf
    ```
 
 2. Check the NGINX logs:
    ```bash
-   docker exec -it cfwheels-testui-new tail -f /var/log/nginx/error.log
+   docker exec -it cfwheels-testui tail -f /var/log/nginx/error.log
    ```
 
 ## Docker Socket Integration
@@ -131,18 +131,18 @@ If the TestUI cannot access the Docker socket:
 
 1. Check if the Docker socket is properly mounted:
    ```bash
-   docker exec -it cfwheels-testui-new ls -la /var/run/docker.sock
+   docker exec -it cfwheels-testui ls -la /var/run/docker.sock
    ```
 
 2. Verify the entrypoint script ran correctly:
    ```bash
-   docker logs cfwheels-testui-new
+   docker logs cfwheels-testui
    ```
 
 3. Check NGINX permissions:
    ```bash
-   docker exec -it cfwheels-testui-new id nginx
-   docker exec -it cfwheels-testui-new ls -la /var/run/docker.sock
+   docker exec -it cfwheels-testui id nginx
+   docker exec -it cfwheels-testui ls -la /var/run/docker.sock
    ```
 
 ## Security Considerations

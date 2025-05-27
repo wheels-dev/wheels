@@ -105,12 +105,34 @@
             </div>
             
             <div v-else class="list-group">
-              <div v-for="item in queue" :key="item.id" class="list-group-item d-flex justify-content-between align-items-center mb-2">
-                <div>
-                  <div class="fw-semibold mb-1">{{ item.engine.name }} {{ item.engine.version }} + {{ item.database.name }}</div>
-                  <div class="small text-muted">{{ item.bundle.name }}</div>
+              <div v-for="(item, index) in queue" :key="item.id" 
+                   class="list-group-item d-flex justify-content-between align-items-center"
+                   :class="{
+                     'border-primary': isRunning && currentTestIndex === index
+                   }">
+                <div class="flex-grow-1">
+                  <div class="d-flex align-items-center">
+                    <div v-if="isRunning && currentTestIndex === index" class="me-2">
+                      <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Running...</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div class="fw-semibold mb-1">{{ item.engine.name }} {{ item.engine.version }} + {{ item.database.name }}</div>
+                      <div class="small text-muted">
+                        {{ item.bundle.name }}
+                        <span v-if="isRunning && currentTestIndex === index" class="ms-2">
+                          <i class="bi bi-clock text-primary"></i>
+                          <span class="text-primary">{{ formatElapsedTime(currentTestStartTime) }}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <button class="btn btn-sm btn-outline-danger" title="Remove from queue" @click="removeFromQueue(item.id)">
+                <button class="btn btn-sm btn-outline-danger" 
+                        title="Remove from queue" 
+                        @click="removeFromQueue(item.id)"
+                        :disabled="isRunning">
                   <i class="bi bi-x-lg"></i>
                 </button>
               </div>
@@ -182,7 +204,7 @@
               </div>
             </div>
             
-            <div v-if="results.length === 0" class="text-center text-muted my-4">
+            <div v-if="results.length === 0 && !isRunning" class="text-center text-muted my-4">
               <i class="bi bi-clipboard-check fs-1 d-block mb-2"></i>
               <p>No test results yet</p>
               <p class="small">Run tests to see results here</p>
@@ -217,7 +239,12 @@
                         </div>
                       </div>
                       <div class="small mt-1 d-flex justify-content-between">
-                        <strong>{{ groupedRun.bundle }}</strong>
+                        <div>
+                          <strong>{{ groupedRun.bundle }}</strong>
+                          <span class="text-muted ms-2">
+                            <i class="bi bi-calendar3 me-1"></i>{{ formatTimestamp(groupedRun.timestamp) }}
+                          </span>
+                        </div>
                         <span class="text-muted">
                           <i class="bi bi-clock me-1"></i>{{ formatDuration(groupedRun.duration) }}
                         </span>
@@ -307,6 +334,8 @@ import { TestStatus, TestRun, TestQueueItem, TestResult } from '@/types'
 // State
 const isRunning = ref(false)
 const currentRunId = ref<string | null>(null)
+const currentTestIndex = ref(-1)
+const currentTestStartTime = ref<Date | null>(null)
 const testBundles = ref<any[]>([])
 const engines = ref<any[]>([])
 const databases = ref<any[]>([])
@@ -322,6 +351,7 @@ const summary = ref({
   skipped: 0
 })
 
+
 // Computed property for total test duration
 const getTotalDuration = computed(() => {
   if (results.value.length === 0) return 0;
@@ -336,15 +366,17 @@ const groupedResults = computed(() => {
   const groups = new Map()
   
   results.value.forEach(result => {
-    // Create a unique key for each engine/database combination
-    const engineKey = result.engine ? `${result.engine.name} ${result.engine.version}` : 'Unknown Engine'
-    const dbKey = result.database ? result.database.name : 'Unknown Database'
-    const bundleKey = result.bundle ? result.bundle.name : 'Unknown Bundle'
-    const groupKey = `${engineKey}|${dbKey}|${bundleKey}`
+    // Group by runId to keep each test run separate
+    const runId = result.runId || 'unknown-run'
     
     // Initialize group if it doesn't exist
-    if (!groups.has(groupKey)) {
-      groups.set(groupKey, {
+    if (!groups.has(runId)) {
+      const engineKey = result.engine ? `${result.engine.name} ${result.engine.version}` : 'Unknown Engine'
+      const dbKey = result.database ? result.database.name : 'Unknown Database'
+      const bundleKey = result.bundle ? result.bundle.name : 'Unknown Bundle'
+      
+      groups.set(runId, {
+        runId: runId,
         engine: engineKey,
         database: dbKey,
         bundle: bundleKey,
@@ -353,11 +385,12 @@ const groupedResults = computed(() => {
         failedCount: 0,
         skippedCount: 0,
         failedTests: [],
-        duration: 0
+        duration: 0,
+        timestamp: result.timestamp || new Date().toISOString()
       })
     }
     
-    const group = groups.get(groupKey)
+    const group = groups.get(runId)
     group.totalCount++
     
     // Add test duration to the group duration
@@ -374,9 +407,9 @@ const groupedResults = computed(() => {
     }
   })
   
-  // Convert map to array and sort by failed count (descending)
+  // Convert map to array and sort by timestamp (most recent first)
   return Array.from(groups.values())
-    .sort((a, b) => b.failedCount - a.failedCount)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 })
 
 // Helper methods for test details
@@ -386,6 +419,53 @@ const getEngineNameFromTest = (test: TestResult): string => {
 
 const getDatabaseNameFromTest = (test: TestResult): string => {
   return test.database ? test.database.name : 'Unknown Database'
+}
+
+// Format elapsed time since start
+const formatElapsedTime = (startTime: Date | null): string => {
+  if (!startTime) return '0s'
+  const elapsed = Date.now() - startTime.getTime()
+  const seconds = Math.floor(elapsed / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return `${minutes}m ${remainingSeconds}s`
+}
+
+// Update elapsed time every second
+let elapsedInterval: ReturnType<typeof setInterval> | null = null
+const startElapsedTimer = () => {
+  if (elapsedInterval) clearInterval(elapsedInterval)
+  elapsedInterval = setInterval(() => {
+    // Force Vue to re-render by updating the start time reference
+    if (currentTestStartTime.value) {
+      currentTestStartTime.value = new Date(currentTestStartTime.value)
+    }
+  }, 1000)
+}
+
+const stopElapsedTimer = () => {
+  if (elapsedInterval) {
+    clearInterval(elapsedInterval)
+    elapsedInterval = null
+  }
+}
+
+// Format timestamp to a human-readable string
+const formatTimestamp = (timestamp: string): string => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+  
+  // For older runs, show the actual time
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 // Format duration in seconds or milliseconds to a human-readable string
@@ -504,6 +584,9 @@ const fetchEnginesAndDatabases = async () => {
           version = c.image.split(':')[1] || ''
         } else if (c.name.includes('sqlserver') || c.image.includes('sqlserver')) {
           name = 'SQL Server'
+        } else if (c.name.includes('oracle') || c.image.includes('oracle')) {
+          name = 'Oracle'
+          version = c.image.split(':')[1] || ''
         }
         
         return {
@@ -664,20 +747,36 @@ const startTests = async () => {
     skipped: 0
   }
   
+  // Reset test tracking
+  currentTestIndex.value = -1
+  currentTestStartTime.value = null
+  
+  // Start the elapsed timer
+  startElapsedTimer()
+  
   try {
     // Run tests for each item in the queue
-    for (const item of queue.value) {
+    for (let i = 0; i < queue.value.length; i++) {
+      const item = queue.value[i]
       if (!isRunning.value) break // Stop if tests were cancelled
+      
+      // Update current test tracking
+      currentTestIndex.value = i
+      currentTestStartTime.value = new Date()
       
       const testRun = await testService.runTests(item.engine, item.database, item.bundle)
       currentRunId.value = testRun.id
+      
+      // Generate a unique run ID for this test suite execution
+      const runId = `run-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       
       // Add metadata to each test result to identify which engine/database/bundle it belongs to
       const resultsWithMetadata = testRun.results.map(result => ({
         ...result,
         engine: item.engine,
         database: item.database,
-        bundle: item.bundle
+        bundle: item.bundle,
+        runId: runId
       }))
       
       // Update results and summary
@@ -698,6 +797,9 @@ const startTests = async () => {
   } finally {
     isRunning.value = false
     currentRunId.value = null
+    currentTestIndex.value = -1
+    currentTestStartTime.value = null
+    stopElapsedTimer()
   }
 }
 
