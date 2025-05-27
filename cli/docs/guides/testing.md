@@ -10,6 +10,7 @@ Wheels CLI provides robust testing capabilities through TestBox integration, off
 - Watch mode for continuous testing
 - Code coverage reporting
 - Parallel test execution
+- Docker-based testing across multiple engines and databases
 
 ## Test Structure
 
@@ -664,9 +665,94 @@ it("sends email on user creation", function() {
 });
 ```
 
+## Docker-Based Testing
+
+Wheels provides a comprehensive Docker environment for testing across multiple CFML engines and databases.
+
+### Quick Start with Docker
+
+```bash
+# Start the TestUI and all test containers
+docker compose --profile all up -d
+
+# Access the TestUI
+open http://localhost:3000
+```
+
+### TestUI Features
+
+The modern TestUI provides:
+- **Visual Test Runner**: Run and monitor tests in real-time
+- **Container Management**: Start/stop containers directly from the UI
+- **Multi-Engine Support**: Test on Lucee 5/6 and Adobe ColdFusion 2018/2021/2023
+- **Multi-Database Support**: MySQL, PostgreSQL, SQL Server, H2, and Oracle
+- **Pre-flight Checks**: Ensures all services are running before tests
+- **Test History**: Track test results over time
+
+### Container Management
+
+The TestUI includes an API server that allows you to:
+1. Click on any stopped engine or database to start it
+2. Monitor container health and status
+3. View real-time logs
+4. No terminal required for basic operations
+
+### Docker Profiles
+
+Use profiles to start specific combinations:
+
+```bash
+# Just the UI
+docker compose --profile ui up -d
+
+# Quick test setup (Lucee 5 + MySQL)
+docker compose --profile quick-test up -d
+
+# All Lucee engines
+docker compose --profile lucee up -d
+
+# All Adobe engines
+docker compose --profile adobe up -d
+
+# All databases
+docker compose --profile db up -d
+```
+
+### Running Tests via Docker
+
+```bash
+# Using the CLI inside a container
+docker exec -it cfwheels-lucee5-1 wheels test run
+
+# Direct URL access
+curl http://localhost:60005/wheels/testbox?format=json&db=mysql
+```
+
+### Database Testing
+
+Test against different databases by using the `db` parameter:
+
+```bash
+# MySQL
+wheels test run --db=mysql
+
+# PostgreSQL
+wheels test run --db=postgres
+
+# SQL Server
+wheels test run --db=sqlserver
+
+# H2 (Lucee only)
+wheels test run --db=h2
+
+# Oracle
+wheels test run --db=oracle
+```
+
 ## See Also
 
 - [wheels test run](../commands/testing/test-run.md) - Test execution command
 - [wheels test coverage](../commands/testing/test-coverage.md) - Coverage generation
 - [wheels generate test](../commands/generate/test.md) - Generate test files
 - [TestBox Documentation](https://testbox.ortusbooks.com/) - Complete TestBox guide
+- [Docker Testing Guide](/docker/testui/README.md) - Detailed Docker testing documentation

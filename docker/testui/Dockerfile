@@ -18,16 +18,20 @@ RUN npm run build
 FROM nginx:stable-alpine
 
 # Install packages needed for Docker socket access
-RUN apk add --no-cache shadow coreutils
+RUN apk add --no-cache shadow coreutils curl
 
 # Copy built files from the build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY proxy_buffer_size.conf /etc/nginx/conf.d/
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
+
+# Make entrypoint executable
+RUN chmod +x /docker-entrypoint.sh
 
 # Expose port
 EXPOSE 80

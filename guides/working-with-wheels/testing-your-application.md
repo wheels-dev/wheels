@@ -804,6 +804,79 @@ These URLs are useful should you want an external system to run your tests.
 
 Wheels can return your test results in either HTML, JSON, TXT or JUnit formats, simply by using the `format` url parameter. Eg: `format=junit`
 
+### Running Tests with Docker
+
+CFWheels provides a comprehensive Docker-based testing environment that allows you to run tests across multiple CFML engines and databases simultaneously. This is especially useful for ensuring compatibility across different environments.
+
+#### Using the TestUI
+
+The easiest way to run tests in Docker is through the TestUI, which provides a modern web interface for managing tests:
+
+```bash
+# From the CFWheels root directory
+docker compose --profile ui up -d
+```
+
+Then navigate to http://localhost:3000 to access the TestUI.
+
+**TestUI Features:**
+- **Visual Test Runner**: See test results in real-time with detailed error information
+- **Container Management**: Start stopped containers directly from the UI by clicking on them
+- **Pre-flight Checks**: Automatic verification that required services are running before tests
+- **Multi-Engine Testing**: Run tests across Lucee 5/6 and Adobe ColdFusion 2018/2021/2023
+- **Multi-Database Support**: Test against MySQL, PostgreSQL, SQL Server, H2, and Oracle
+- **Test History**: View previous test runs and results
+
+#### Running Tests Across Different Databases
+
+The Docker setup includes multiple database configurations. You can run tests against different databases by appending the `db` parameter:
+
+- `db=mysql` - MySQL database
+- `db=postgres` - PostgreSQL database  
+- `db=sqlserver` - Microsoft SQL Server
+- `db=h2` - H2 embedded database (Lucee only)
+- `db=oracle` - Oracle database (requires additional setup)
+
+Example URLs:
+```
+http://localhost:60005/wheels/testbox?format=json&db=mysql
+http://localhost:60005/wheels/testbox?format=json&db=postgres
+```
+
+#### Docker Profiles
+
+The Docker Compose setup uses profiles to organize containers:
+
+- `ui`: TestUI and API server
+- `lucee`: All Lucee engines
+- `adobe`: All Adobe ColdFusion engines
+- `db`: All database containers
+- `quick-test`: Minimal setup (Lucee 5 + MySQL)
+- `all`: All containers
+
+Start specific profiles:
+```bash
+# Just the UI
+docker compose --profile ui up -d
+
+# Lucee engines with databases
+docker compose --profile lucee --profile db up -d
+
+# Everything
+docker compose --profile all up -d
+```
+
+#### Container Management from TestUI
+
+The TestUI includes an API server that allows you to start Docker containers directly from the web interface:
+
+1. Click on any stopped engine or database in the dashboard
+2. Confirm that you want to start the service
+3. The container will start automatically
+4. Status updates appear in real-time
+
+This eliminates the need to use the terminal for basic container management tasks.
+
 ### Additional Techniques
 
 Whilst best practice recommends that tests should be kept as simple and readable as possible, sometimes moving commonly used code into test suite helpers can greatly improve the simplicity of your tests.

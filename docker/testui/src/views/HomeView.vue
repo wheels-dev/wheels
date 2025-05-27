@@ -68,9 +68,9 @@
                 </thead>
                 <tbody>
                   <tr 
-                    @click="openEngine('lucee5', 60005)"
-                    :class="{ 'cursor-pointer': engines.lucee5?.status === 'running' }"
-                    :title="engines.lucee5?.status === 'running' ? 'Click to open Lucee 5' : ''"
+                    @click="handleEngineClick('lucee5', 60005)"
+                    :class="{ 'cursor-pointer': true }"
+                    :title="!engines.lucee5 ? 'Click to see how to start Lucee 5' : engines.lucee5.status === 'running' ? 'Click to open Lucee 5' : 'Click to start Lucee 5'"
                   >
                     <td>Lucee 5</td>
                     <td class="text-end" v-if="engines.lucee5">
@@ -79,9 +79,9 @@
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
                   <tr 
-                    @click="openEngine('lucee6', 60006)"
-                    :class="{ 'cursor-pointer': engines.lucee6?.status === 'running' }"
-                    :title="engines.lucee6?.status === 'running' ? 'Click to open Lucee 6' : ''"
+                    @click="handleEngineClick('lucee6', 60006)"
+                    :class="{ 'cursor-pointer': true }"
+                    :title="!engines.lucee6 ? 'Click to see how to start Lucee 6' : engines.lucee6.status === 'running' ? 'Click to open Lucee 6' : 'Click to start Lucee 6'"
                   >
                     <td>Lucee 6</td>
                     <td class="text-end" v-if="engines.lucee6">
@@ -90,9 +90,9 @@
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
                   <tr 
-                    @click="openEngine('adobe2018', 62018)"
-                    :class="{ 'cursor-pointer': engines.adobe2018?.status === 'running' }"
-                    :title="engines.adobe2018?.status === 'running' ? 'Click to open Adobe 2018' : ''"
+                    @click="handleEngineClick('adobe2018', 62018)"
+                    :class="{ 'cursor-pointer': true }"
+                    :title="!engines.adobe2018 ? 'Click to see how to start Adobe 2018' : engines.adobe2018.status === 'running' ? 'Click to open Adobe 2018' : 'Click to start Adobe 2018'"
                   >
                     <td>Adobe 2018</td>
                     <td class="text-end" v-if="engines.adobe2018">
@@ -101,9 +101,9 @@
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
                   <tr 
-                    @click="openEngine('adobe2021', 62021)"
-                    :class="{ 'cursor-pointer': engines.adobe2021?.status === 'running' }"
-                    :title="engines.adobe2021?.status === 'running' ? 'Click to open Adobe 2021' : ''"
+                    @click="handleEngineClick('adobe2021', 62021)"
+                    :class="{ 'cursor-pointer': true }"
+                    :title="!engines.adobe2021 ? 'Click to see how to start Adobe 2021' : engines.adobe2021.status === 'running' ? 'Click to open Adobe 2021' : 'Click to start Adobe 2021'"
                   >
                     <td>Adobe 2021</td>
                     <td class="text-end" v-if="engines.adobe2021">
@@ -112,9 +112,9 @@
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
                   <tr 
-                    @click="openEngine('adobe2023', 62023)"
-                    :class="{ 'cursor-pointer': engines.adobe2023?.status === 'running' }"
-                    :title="engines.adobe2023?.status === 'running' ? 'Click to open Adobe 2023' : ''"
+                    @click="handleEngineClick('adobe2023', 62023)"
+                    :class="{ 'cursor-pointer': true }"
+                    :title="!engines.adobe2023 ? 'Click to see how to start Adobe 2023' : engines.adobe2023.status === 'running' ? 'Click to open Adobe 2023' : 'Click to start Adobe 2023'"
                   >
                     <td>Adobe 2023</td>
                     <td class="text-end" v-if="engines.adobe2023">
@@ -147,35 +147,55 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
+                  <tr
+                    @click="handleDatabaseClick('h2')"
+                    :class="{ 'cursor-pointer': !databases.h2 || databases.h2?.status === 'stopped' }"
+                    :title="!databases.h2 || databases.h2?.status === 'stopped' ? 'H2 is embedded in Lucee' : ''"
+                  >
                     <td>H2</td>
                     <td class="text-end" v-if="databases.h2">
                       <span class="badge" :class="getStatusClass(databases.h2)">{{ getStatusText(databases.h2) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr
+                    @click="handleDatabaseClick('mysql')"
+                    :class="{ 'cursor-pointer': !databases.mysql || databases.mysql?.status !== 'running' }"
+                    :title="!databases.mysql ? 'Click to see how to start MySQL' : databases.mysql.status !== 'running' ? 'Click to start MySQL' : ''"
+                  >
                     <td>MySQL</td>
                     <td class="text-end" v-if="databases.mysql">
                       <span class="badge" :class="getStatusClass(databases.mysql)">{{ getStatusText(databases.mysql) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr
+                    @click="handleDatabaseClick('sqlserver')"
+                    :class="{ 'cursor-pointer': !databases.sqlserver || databases.sqlserver?.status !== 'running' }"
+                    :title="!databases.sqlserver ? 'Click to see how to start SQL Server' : databases.sqlserver.status !== 'running' ? 'Click to start SQL Server' : ''"
+                  >
                     <td>SQL Server</td>
                     <td class="text-end" v-if="databases.sqlserver">
                       <span class="badge" :class="getStatusClass(databases.sqlserver)">{{ getStatusText(databases.sqlserver) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr
+                    @click="handleDatabaseClick('postgres')"
+                    :class="{ 'cursor-pointer': !databases.postgres || databases.postgres?.status !== 'running' }"
+                    :title="!databases.postgres ? 'Click to see how to start PostgreSQL' : databases.postgres.status !== 'running' ? 'Click to start PostgreSQL' : ''"
+                  >
                     <td>PostgreSQL</td>
                     <td class="text-end" v-if="databases.postgres">
                       <span class="badge" :class="getStatusClass(databases.postgres)">{{ getStatusText(databases.postgres) }}</span>
                     </td>
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
-                  <tr>
+                  <tr
+                    @click="handleDatabaseClick('oracle')"
+                    :class="{ 'cursor-pointer': !databases.oracle || databases.oracle?.status !== 'running' }"
+                    :title="!databases.oracle ? 'Click to see how to start Oracle' : databases.oracle.status !== 'running' ? 'Click to start Oracle' : ''"
+                  >
                     <td>Oracle</td>
                     <td class="text-end" v-if="databases.oracle">
                       <span class="badge" :class="getStatusClass(databases.oracle)">{{ getStatusText(databases.oracle) }}</span>
@@ -251,11 +271,91 @@ function getStatusText(container) {
   }
 }
 
-// Open engine URL in a new tab
-function openEngine(engineKey: string, port: number) {
+// Copy text to clipboard
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    console.error('Failed to copy to clipboard:', err);
+    return false;
+  }
+}
+
+// Show Docker command and copy to clipboard
+function showDockerCommand(serviceName: string, command: string) {
+  const message = `${serviceName} is not running.\n\nRun this command to start it:\n\n${command}\n\nThe command has been copied to your clipboard.`;
+  
+  copyToClipboard(command).then(success => {
+    if (success) {
+      alert(message);
+    } else {
+      // Fallback if clipboard API fails
+      prompt(`${serviceName} is not running. Copy this command to start it:`, command);
+    }
+  });
+}
+
+// Handle engine click - open if running, show start instructions if not found
+async function handleEngineClick(engineKey: string, port: number) {
   const engine = engines.value[engineKey];
-  if (engine && engine.status === 'running') {
+  
+  if (!engine) {
+    // Container not found - show command to start it
+    const command = `docker compose up -d ${engineKey}`;
+    showDockerCommand(engineKey.toUpperCase(), command);
+    return;
+  }
+  
+  if (engine.status === 'running') {
+    // Open in browser if running
     window.open(`http://localhost:${port}`, '_blank');
+  } else if (engine.status === 'stopped' || engine.status === 'exited') {
+    // Show command to start the existing container
+    const containerName = engine.names[0].replace(/^\//, '');
+    const command = `docker start ${containerName}`;
+    showDockerCommand(engineKey.toUpperCase(), command);
+  }
+}
+
+// Handle database click - show start instructions if not found
+async function handleDatabaseClick(dbKey: string) {
+  const database = databases.value[dbKey];
+  
+  // H2 is embedded, can't be started separately
+  if (dbKey === 'h2') {
+    if (!database || database.status === 'stopped') {
+      alert('H2 is embedded in Lucee. Start a Lucee engine to use H2.');
+    }
+    return;
+  }
+  
+  if (!database) {
+    // Container not found - show command to start it
+    const dbName = dbKey === 'sqlserver' ? 'SQL Server' : dbKey.charAt(0).toUpperCase() + dbKey.slice(1);
+    
+    if (dbKey === 'oracle') {
+      alert(`Oracle database is not included in the default Docker Compose setup.\n\nTo use Oracle, you'll need to add it to your compose.yml file or run it separately.`);
+    } else {
+      // Map database keys to actual service names
+      const serviceMap = {
+        'sqlserver': 'sqlserver',
+        'mysql': 'mysql',
+        'postgres': 'postgres'
+      };
+      const serviceName = serviceMap[dbKey] || dbKey;
+      const command = `docker compose up -d ${serviceName}`;
+      showDockerCommand(dbName, command);
+    }
+    return;
+  }
+  
+  if (database.status === 'stopped' || database.status === 'exited') {
+    // Show command to start the existing container
+    const containerName = database.names[0].replace(/^\//, '');
+    const command = `docker start ${containerName}`;
+    const dbName = dbKey === 'sqlserver' ? 'SQL Server' : dbKey.charAt(0).toUpperCase() + dbKey.slice(1);
+    showDockerCommand(dbName, command);
   }
 }
 
@@ -340,6 +440,17 @@ onMounted(() => {
 
 .cursor-pointer:hover {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Visual hint for non-running containers */
+.cursor-pointer .badge.bg-danger,
+.cursor-pointer .badge.bg-warning {
+  transition: transform 0.2s ease;
+}
+
+.cursor-pointer:hover .badge.bg-danger,
+.cursor-pointer:hover .badge.bg-warning {
+  transform: scale(1.1);
 }
 
 /* Add hover effect for dark mode */

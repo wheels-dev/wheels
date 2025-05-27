@@ -377,24 +377,18 @@ class DockerService {
   
   /**
    * Start a Docker container
+   * @deprecated Now showing commands to user instead of executing
    */
   async startContainer(id: string): Promise<void> {
-    console.log(`Starting container ${id}...`);
-    
-    try {
-      const response = await api.post(`${this.apiBase}/containers/${id}/start`);
-      
-      if (response.error) {
-        console.error(`Error starting container ${id}:`, response.error);
-        throw new Error(response.error);
-      }
-      
-      // Force refresh of containers after action
-      setTimeout(() => this.getContainers(true), 500);
-    } catch (error) {
-      console.error(`Error in startContainer for ${id}:`, error);
-      throw error;
-    }
+    throw new Error('Container start is now handled by showing commands to user');
+  }
+
+  /**
+   * Start a Docker Compose service
+   * @deprecated Now showing commands to user instead of executing
+   */
+  async startService(profile: string | null, service?: string): Promise<void> {
+    throw new Error('Service start is now handled by showing commands to user');
   }
   
   /**
@@ -718,7 +712,7 @@ class DockerService {
       },
       {
         id: 'mock-sqlserver',
-        name: 'cfwheels-sqlserver_cicd-1',
+        name: 'cfwheels-sqlserver-1',
         type: 'database',
         image: 'cfwheels-sqlserver:v1.0.2',
         status: 'stopped',

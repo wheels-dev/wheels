@@ -4,7 +4,7 @@
 
 - `/src/docker/` - New Docker based standalone test suite (not for CI)
 - `/src/docker/sqlserver` - SQL server specific config
-- `/src/docker/testui` - Test Suite front end
+- `/src/docker/testui` - Modern Test Suite frontend with container management
 
 ## Docker Compose Profiles
 
@@ -13,7 +13,7 @@ The Docker Compose setup now uses profiles to organize the containers:
 - `db`: Database containers (MySQL, PostgreSQL, SQL Server)
 - `lucee`: Lucee CFML engines (5, 6)
 - `adobe`: Adobe ColdFusion engines (2018, 2021, 2023)
-- `ui`: TestUI container for running and viewing tests
+- `ui`: TestUI containers (web interface and API server) for running tests and managing containers
 - `quick-test`: Minimal setup for quick testing (Lucee 5, MySQL)
 - `current`: Latest versions of Lucee and Adobe engines
 - `compatibility`: All CFML engines for compatibility testing
@@ -87,18 +87,24 @@ Docker compose basically creates it's own internal network and exposes the vario
 - ACF2021 on `62021`
 - ACF2023 on `62023`
 - TestUI on `3000`
+- TestUI API Server on `3001`
 
 ### Network Configuration
 
 The containers use the following network configuration:
 
 - Network aliases ensure that containers can communicate with each other
-- SQL Server is accessible via both the service name `sqlserver_cicd` and hostname `sqlserver`
+- SQL Server is accessible via the service name `sqlserver`
 - CFML engine containers connect to databases using the hostnames defined in their CFConfig.json files
 
 ### How to actually run the tests
 
-Use the Provided UI at `localhost:3000` for ease. This is just a glorified task runner which hits the respective endpoint for each server as required.
+Use the Provided UI at `localhost:3000` for ease. The TestUI provides:
+- Visual test runner with real-time results
+- Container management - start stopped containers by clicking on them
+- Pre-flight checks to ensure services are running
+- Test history and statistics
+- Support for all CFML engines and databases including Oracle
 
 You can also access each CF Engine directly on it's respective port, i.e, to access ACF2018, you just go to `localhost:62018`
 
@@ -114,7 +120,7 @@ docker compose --profile lucee up -d
 
 # Using service names
 docker compose up adobe2018
-docker compose up sqlserver_cicd
+docker compose up sqlserver
 ```
 
 Likewise if you need to rebuild any of the images, you can do it on an image by image basis if needed:

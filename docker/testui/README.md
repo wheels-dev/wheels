@@ -7,8 +7,10 @@ A modern test runner interface for CFWheels framework testing.
 - **Modern UI** with dark and light theme support
 - **Test Runner** for executing tests across different CFML engines and databases
 - **Docker Integration** for managing containers directly from the UI
+- **Container Management** - Start Docker containers by clicking on stopped services
 - **Pre-flight System** to ensure all required services are running before tests
 - **Enhanced Test Results** with detailed error information and test statistics
+- **API Server** for Docker command execution from the UI
 
 ## Tech Stack
 
@@ -28,8 +30,12 @@ The TestUI is integrated with Docker for easy setup and development.
 
 ```bash
 # From the CFWheels root directory
-docker-compose --profile ui up -d
+docker compose --profile ui up -d
 ```
+
+This will start:
+- **TestUI** on http://localhost:3000 - The main test runner interface
+- **TestUI API** on http://localhost:3001 - API server for Docker command execution
 
 Then visit http://localhost:3000 in your browser.
 
@@ -85,12 +91,23 @@ npm run preview
 
 ## Docker Integration
 
-The TestUI provides integration with Docker to manage CFML engine and database containers. It allows you to:
+The TestUI provides deep integration with Docker to manage CFML engine and database containers. It allows you to:
 
-- View container status and health
-- Start, stop, and restart containers
+- View container status and health in real-time
+- Start containers directly from the UI by clicking on stopped services
+- Stop and restart running containers
 - Manage container profiles for different testing scenarios
 - Run pre-flight checks before test execution
+- Execute Docker Compose commands through the API server
+
+### Container Management
+
+The TestUI includes an API server that enables container management directly from the web interface:
+
+- **Click on stopped engines/databases** to start them automatically
+- **No need to use terminal** - all container operations available in the UI
+- **Automatic container detection** when services start
+- **Real-time status updates** every 5 seconds
 
 See [DOCKER-INTEGRATION.md](./DOCKER-INTEGRATION.md) for detailed information on Docker integration.
 

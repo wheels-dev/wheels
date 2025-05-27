@@ -39,7 +39,9 @@
       "mcp__puppeteer__puppeteer_screenshot",
       "mcp__puppeteer__puppeteer_click",
       "mcp__puppeteer__puppeteer_select",
-      "mcp__puppeteer__puppeteer_evaluate"
+      "mcp__puppeteer__puppeteer_evaluate",
+      "Bash(docker build:*)",
+      "Bash(docker:*)"
     ],
     "deny": []
   }
