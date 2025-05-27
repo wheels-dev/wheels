@@ -1537,7 +1537,7 @@ component output="false" {
 			local.serverNameReversed = ListToArray(Reverse(SpanExcluding(Reverse(local.originfull), ".")));
 			local.wildcardPassed = true;
 			// Check each part with corresponding part in other array
-			for (i = 1; i LTE ArrayLen(local.domainReversed); i = i + 1) {
+			for (local.i = 1; i LTE ArrayLen(local.domainReversed); i = i + 1) {
 				if (local.domainReversed[i] != local.serverNameReversed[i] && local.domainReversed[i] DOES NOT CONTAIN '*') {
 					local.wildcardPassed = false;
 					break;
@@ -2618,7 +2618,7 @@ component output="false" {
 		local.insideFunction = false;
 		local.bracketCount = 0;
 
-		for (i = 1; i <= len(arguments.list); i++) {
+		for (local.i = 1; i <= len(arguments.list); i++) {
 			local.char = mid(arguments.list, i, 1);
 
 			// Check if we are entering or exiting a function's parentheses
