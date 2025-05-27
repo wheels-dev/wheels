@@ -15,8 +15,11 @@
 	},
 	"app":{
 			"cfengine":"adobe@2018.0.10+320417",
-			"libDirs":"docker/adobe@2018/lib",
+			"libDirs":"/cfwheels-test-suite/docker/adobe@2018/lib",
 			"serverHomeDirectory":".engine/adobe@2018"
 	},
-	"cfconfigFile":"CFConfig.json"
+	"cfconfigFile":"CFConfig.json",
+	"scripts":{
+        "onServerInstall":"cfpm install image,mail,zip,caching,oracle,sqlserver"
+    }
 }

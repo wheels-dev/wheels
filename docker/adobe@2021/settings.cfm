@@ -9,8 +9,8 @@
 	/*
 		If you leave these settings commented out, CFWheels will set the data source name to the same name as the folder the application resides in.
 	*/
-	set(coreTestDataSourceName="wheelstestdb_sqlserver");
-	set(dataSourceName="wheelstestdb_sqlserver");
+	set(coreTestDataSourceName="wheelstestdb_oracle");
+	set(dataSourceName="wheelstestdb_oracle");
 	// set(dataSourceUserName="");
 	// set(dataSourcePassword="");
 

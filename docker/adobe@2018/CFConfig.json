@@ -19,7 +19,7 @@
 			"class": "com.mysql.cj.jdbc.Driver",
 			"database": "wheelstestdb",
 			"dbdriver": "mysql",
-			"dsn": "jdbc:mysql://{host}:{port}/{database}",
+			"dsn": "jdbc:mysql://{host}:{port}/{database}?tinyInt1isBit=false",
 			"host": "mysql",
 			"password": "wheelstestdb",
 			"port": "3306",
@@ -49,7 +49,7 @@
 			"database": "wheelstestdb",
 			"dbdriver": "MSSQL",
 			"dsn": "jdbc:sqlserver://{host}:{port}",
-			"host": "sqlserver",
+			"host": "sqlserver_cicd",
 			"password": "x!bsT8t60yo0cTVTPq",
 			"port": "1433",
 			"username": "sa",
@@ -64,7 +64,7 @@
 			"database": "msdb",
 			"dbdriver": "MSSQL",
 			"dsn": "jdbc:sqlserver://{host}:{port}",
-			"host": "sqlserver",
+			"host": "sqlserver_cicd",
 			"password": "x!bsT8t60yo0cTVTPq",
 			"port": "1433",
 			"username": "sa",
@@ -79,6 +79,21 @@
 			"allow":"511",
 			"clob":true,
 			"blob":true
+		},
+		"wheelstestdb_oracle": {
+			"class": "oracle.jdbc.OracleDriver",
+			"dbdriver": "Oracle",
+			"database": "FREEPDB1",
+			"dsn": "jdbc:oracle:thin:@{host}:{port}/{database}",
+			"host": "oracle",
+			"password": "wheelstestdb123!",
+			"port": "1521",
+			"username": "wheelstestdb",
+			"blob": true,
+			"clob": true,
+			"connectionLimit": "-1",
+			"connectionTimeout": "20",
+			"validate": false
 		}
 	}
 }
