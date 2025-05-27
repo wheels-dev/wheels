@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         cfengine: [ "lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023" ]
-        dbengine: ["mysql", "postgres", "sqlserver_cicd", "h2"]
+        dbengine: ["mysql", "postgres", "sqlserver", "h2"]
         commandbox_version: [ "6.2.1" ]
         jdkVersion: [ "21" ]
         experimental: [false]
@@ -26,7 +26,7 @@ jobs:
           # - cfengine: lucee@5
           #   dbengine: postgres
           # - cfengine: lucee@5
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           # - cfengine: lucee@5
           #   dbengine: h2
           # - cfengine: lucee@6
@@ -34,7 +34,7 @@ jobs:
           # - cfengine: lucee@6
           #   dbengine: postgres
           # - cfengine: lucee@6
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           # - cfengine: lucee@6
           #   dbengine: h2
           # - cfengine: adobe@2018
@@ -42,7 +42,7 @@ jobs:
           # - cfengine: adobe@2018
           #   dbengine: postgres
           # - cfengine: adobe@2018
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           - cfengine: adobe@2018
             dbengine: h2
           # - cfengine: adobe@2021
@@ -50,7 +50,7 @@ jobs:
           # - cfengine: adobe@2021
           #   dbengine: postgres
           # - cfengine: adobe@2021
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           - cfengine: adobe@2021
             dbengine: h2
           # - cfengine: adobe@2023
@@ -58,7 +58,7 @@ jobs:
           # - cfengine: adobe@2023
           #   dbengine: postgres
           # - cfengine: adobe@2023
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           - cfengine: adobe@2023
             dbengine: h2
     steps:
