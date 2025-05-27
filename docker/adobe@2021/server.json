@@ -15,10 +15,14 @@
 	},
 	"app":{
 			"cfengine":"adobe@2021.0.11+330247",
-				"serverHomeDirectory":".engine/adobe@2021"
+			"libDirs":"./docker/adobe@2021/lib",
+			"serverHomeDirectory":".engine/adobe@2021"
 	},
 	"cfconfigFile":"CFConfig.json",
+	"JVM":{
+		"args":"-Djava.class.path=./docker/adobe@2021/lib/ojdbc11.jar"
+	},
 	"scripts":{
-        "onServerInstall":"cfpm install image,mail,zip,caching,sqlserver,oracle"
+        "onServerInstall":"cfpm install image,mail,zip,caching,sqlserver"
     }
 }
