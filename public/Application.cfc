@@ -145,6 +145,25 @@ component output="false" {
 		// Need to setup the wheels struct up here since it's used to store debugging info below if this is a reload request.
 		application.wo.$initializeRequestScope();
 
+		// IP-based access to publicComponent/debug GUI (only if allowed in settings)
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "allowIPBasedDebugAccess")) {
+			if (application.wheels.environment != 'development' && application.wheels.allowIPBasedDebugAccess ?: false) {
+				local.clientIP = CGI.REMOTE_ADDR;
+				local.allowedIPs = application.wheels.debugAccessIPs ?: [];
+
+				if (arrayContains(local.allowedIPs, local.clientIP)) {
+					application.wheels.enablePublicComponent = true;
+					application.wheels.showDebugInformation = true;
+					application.wheels.showErrorInformation = true;
+
+					// Enable the main GUI Component
+					if (application.wheels.enablePublicComponent) {
+						application.wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
+					}
+				}
+			}
+		}
+
 		// Reload application by calling onApplicationStart if requested.
 		if (
 			StructKeyExists(url, "reload")

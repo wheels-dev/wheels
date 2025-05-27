@@ -94,4 +94,53 @@ You really don't want random users hitting ?reload=development on a production s
 If you're deploying to a container based environment, or one that you _know_ you'll never want to switch out of production mode, you can disable URL based environment switching completely via:\
 `set(allowEnvironmentSwitchViaUrl = false);`
 
-This is just an additional check to ensure that your production mode acts in the way you expect! Application reloading is still allowed, but the configuration can not be altered.\
+This is just an additional check to ensure that your production mode acts in the way you expect! Application reloading is still allowed, but the configuration can not be altered.
+
+## IP-Based Debug Access in Non-Development Environments
+
+By default, Wheels only enables the debug GUI (wheels interface) and debug information in the development environment. However, there may be situations where you need access to these debugging tools in other environments like testing, production, or maintenance - but only for specific IP addresses.
+
+CFWheels provides IP-based access control for the debug GUI and debug information through two configuration settings:
+
+### Configuration Settings
+
+Add these settings to your environment-specific configuration files (e.g., `app/config/production/settings.cfm`):
+
+```cfml
+// Define allowed IP addresses that can access debug features
+set(debugAccessIPs = ["203.0.113.45", "198.51.100.22", "127.0.0.1"]);
+
+// Enable IP-based debug access control
+set(allowIPBasedDebugAccess = true);
+```
+
+### How It Works
+
+When these settings are configured:
+
+1. In the development environment, the debug GUI is always accessible regardless of IP address.
+2. In other environments (testing, production), the debug GUI and debug information will only be enabled for requests coming from IP addresses listed in the `debugAccessIPs` array.
+3. If a request comes from an IP address not in the list, the debug GUI and debug information remain disabled, maintaining security in production environments.
+
+### Example Configuration
+
+Here's a typical setup for different environments:
+
+**Development** (`app/config/development/settings.cfm`):
+```cfml
+// Debug GUI is enabled by default in development, no additional settings needed
+```
+
+**Testing** (`app/config/testing/settings.cfm`):
+```cfml
+set(debugAccessIPs = ["127.0.0.1", "192.168.1.100"]);
+set(allowIPBasedDebugAccess = true);
+```
+
+**Production** (`app/config/production/settings.cfm`):
+```cfml
+set(debugAccessIPs = ["10.0.0.5"]); // Only specific admin IPs
+set(allowIPBasedDebugAccess = true);
+```
+
+This feature allows administrators to access debugging tools in production or other environments while keeping them secure from regular users, providing a flexible way to troubleshoot issues in all environments without compromising security.
