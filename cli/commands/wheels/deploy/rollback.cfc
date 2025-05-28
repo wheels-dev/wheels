@@ -7,7 +7,7 @@
  * wheels deploy:rollback --servers=192.168.1.100
  * {code}
  */
-component extends="../../base" {
+component extends="./base" {
 
     /**
      * @tag Specific tag to rollback to

@@ -8,7 +8,7 @@
  * wheels deploy:secrets list
  * {code}
  */
-component extends="base" {
+component extends="./base" {
 
     /**
      * @action Action to perform (push, pull, set, list, remove)
@@ -259,7 +259,7 @@ EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
             var lines = listToArray(envContent, chr(10));
             
             for (var line in lines) {
-                if (line contains "=" && !line starts with "#") {
+                if (Find("=", line) && Left(Trim(line), 1) != "##") {
                     var key = listFirst(line, "=");
                     envSecrets[key] = true;
                 }
@@ -289,7 +289,7 @@ EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
             var newContent = [];
             
             for (var line in lines) {
-                if (!(line starts with arguments.key & "=")) {
+                if (!(Left(line, Len(arguments.key & "=")) == arguments.key & "=")) {
                     newContent.append(line);
                 }
             }
@@ -339,7 +339,7 @@ EOF && chmod 600 /opt/#serviceName#/.kamal/secrets'");
                     var lines = listToArray(envContent, chr(10));
                     
                     for (var line in lines) {
-                        if (line contains "=" && !line starts with "#") {
+                        if (Find("=", line) && Left(Trim(line), 1) != "##") {
                             var key = trim(listFirst(line, "="));
                             var value = listRest(line, "=");
                             

@@ -7,7 +7,7 @@
  * wheels deploy:stop --remove
  * {code}
  */
-component extends="../../base" {
+component extends="./base" {
 
     /**
      * @servers Stop on specific servers (comma-separated)

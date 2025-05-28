@@ -7,7 +7,7 @@
  * wheels deploy:exec "mysql -u root -p" --service=db --interactive
  * {code}
  */
-component extends="../../base" {
+component extends="./base" {
 
     /**
      * @command Command to execute in container

@@ -7,7 +7,7 @@
  * wheels deploy:lock status
  * {code}
  */
-component extends="../../base" {
+component extends="./base" {
 
     /**
      * @action Lock action (acquire, release, status)

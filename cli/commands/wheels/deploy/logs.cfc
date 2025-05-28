@@ -7,7 +7,7 @@
  * wheels deploy:logs --servers=192.168.1.100 --service=db
  * {code}
  */
-component extends="../../base" {
+component extends="./base" {
 
     /**
      * @servers Specific servers to check (comma-separated)

@@ -8,7 +8,7 @@
  * wheels deploy:proxy remove
  * {code}
  */
-component extends="base" {
+component extends="./base" {
 
     /**
      * @action Proxy action (boot, status, reboot, remove, details)
@@ -285,54 +285,56 @@ EOF'");
     }
     
     private string function generateProxyConfig(required struct config, required string server) {
-        var compose = "version: '3.8'
-
-services:
-  wheels-proxy:
-    image: traefik:v3.0
-    container_name: wheels-proxy
-    restart: unless-stopped
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./letsencrypt:/letsencrypt
-      - ./config:/config
-    command:
-      # API
-      - --api.dashboard=false
-      
-      # Docker provider
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=wheels
-      
-      # Entrypoints
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      
-      # HTTP to HTTPS redirect
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      
-      # Let's Encrypt
-      - --certificatesresolvers.letsencrypt.acme.email=admin@#arguments.config.domain ?: 'example.com'#
-      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
-      
-      # Logging
-      - --log.level=INFO
-      - --accesslog=true
-    networks:
-      - wheels
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.api.service=noop@internal
-
-networks:
-  wheels:
-    external: true";
+        savecontent variable="compose" {
+            writeOutput("version: '3.8'" & chr(10));
+            writeOutput(chr(10));
+            writeOutput("services:" & chr(10));
+            writeOutput("  wheels-proxy:" & chr(10));
+            writeOutput("    image: traefik:v3.0" & chr(10));
+            writeOutput("    container_name: wheels-proxy" & chr(10));
+            writeOutput("    restart: unless-stopped" & chr(10));
+            writeOutput("    ports:" & chr(10));
+            writeOutput("      - '80:80'" & chr(10));
+            writeOutput("      - '443:443'" & chr(10));
+            writeOutput("    volumes:" & chr(10));
+            writeOutput("      - /var/run/docker.sock:/var/run/docker.sock:ro" & chr(10));
+            writeOutput("      - ./letsencrypt:/letsencrypt" & chr(10));
+            writeOutput("      - ./config:/config" & chr(10));
+            writeOutput("    command:" & chr(10));
+            writeOutput("      ## API" & chr(10));
+            writeOutput("      - --api.dashboard=false" & chr(10));
+            writeOutput("      " & chr(10));
+            writeOutput("      ## Docker provider" & chr(10));
+            writeOutput("      - --providers.docker=true" & chr(10));
+            writeOutput("      - --providers.docker.exposedbydefault=false" & chr(10));
+            writeOutput("      - --providers.docker.network=wheels" & chr(10));
+            writeOutput("      " & chr(10));
+            writeOutput("      ## Entrypoints" & chr(10));
+            writeOutput("      - --entrypoints.web.address=:80" & chr(10));
+            writeOutput("      - --entrypoints.websecure.address=:443" & chr(10));
+            writeOutput("      " & chr(10));
+            writeOutput("      ## HTTP to HTTPS redirect" & chr(10));
+            writeOutput("      - --entrypoints.web.http.redirections.entrypoint.to=websecure" & chr(10));
+            writeOutput("      - --entrypoints.web.http.redirections.entrypoint.scheme=https" & chr(10));
+            writeOutput("      " & chr(10));
+            writeOutput("      ## Let's Encrypt" & chr(10));
+            writeOutput("      - --certificatesresolvers.letsencrypt.acme.email=admin@#arguments.config.domain ?: 'example.com'#" & chr(10));
+            writeOutput("      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json" & chr(10));
+            writeOutput("      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web" & chr(10));
+            writeOutput("      " & chr(10));
+            writeOutput("      ## Logging" & chr(10));
+            writeOutput("      - --log.level=INFO" & chr(10));
+            writeOutput("      - --accesslog=true" & chr(10));
+            writeOutput("    networks:" & chr(10));
+            writeOutput("      - wheels" & chr(10));
+            writeOutput("    labels:" & chr(10));
+            writeOutput("      - traefik.enable=true" & chr(10));
+            writeOutput("      - traefik.http.routers.api.service=noop@internal" & chr(10));
+            writeOutput(chr(10));
+            writeOutput("networks:" & chr(10));
+            writeOutput("  wheels:" & chr(10));
+            writeOutput("    external: true");
+        };
         
         return compose;
     }
