@@ -18,7 +18,7 @@
 * [CLI Overview](command-line-tools/cli-overview.md)
 * [Quick Start Guide](command-line-tools/quick-start.md)
 * [Command Reference](command-line-tools/commands/README.md)
-	* [Core Commands](command-line-tools/commands/README.md)
+	* Core Commands
 		* [wheels init](command-line-tools/commands/core/init.md)
 		* [wheels info](command-line-tools/commands/core/info.md)
 		* [wheels reload](command-line-tools/commands/core/reload.md)
@@ -36,6 +36,8 @@
 	* [Testing Commands](command-line-tools/commands/testing/test.md)
 		* [wheels test](command-line-tools/commands/testing/test.md)
 		* [wheels test run](command-line-tools/commands/testing/test-run.md)
+		* Plugins *
+		* Testing *
 * CLI Development Guides
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
   * [Service Architecture](command-line-tools/cli-guides/service-architecture.md)
