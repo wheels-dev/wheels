@@ -26,7 +26,7 @@ component  extends="base"  {
 			.yellowBoldLine( "Current Working Directory: #current.directory#")
 			.yellowBoldLine( "CommandBox Module Root: #current.moduleRoot#")
 			.yellowBoldLine( "Current Wheels Version in this directory: #current.wheelsVersion#")
-			.yellowBoldLine( "=====================================================================" );
+			.yellowBoldLine( "====================================================================" );
 	}
 
 }
