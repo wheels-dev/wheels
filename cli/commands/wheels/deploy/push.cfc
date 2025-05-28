@@ -7,7 +7,7 @@
  * wheels deploy:push --no-build --rolling
  * {code}
  */
-component extends="base" {
+component extends="./base" {
 
     /**
      * @tag Docker image tag (defaults to timestamp)

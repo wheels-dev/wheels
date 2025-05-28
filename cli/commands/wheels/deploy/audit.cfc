@@ -7,7 +7,7 @@
  * wheels deploy:audit --filter=deployment
  * {code}
  */
-component extends="base" {
+component extends="./base" {
 
     /**
      * @lines Number of audit entries to show

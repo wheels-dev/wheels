@@ -7,7 +7,7 @@
  * wheels deploy:status --detailed
  * {code}
  */
-component extends="../../base" {
+component extends="./base" {
 
     /**
      * @servers Check specific servers (comma-separated)

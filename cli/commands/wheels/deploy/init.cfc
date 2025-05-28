@@ -7,7 +7,7 @@
  * wheels deploy:init --servers=192.168.1.100,192.168.1.101
  * {code}
  */
-component extends="../../base" {
+component extends="./base" {
 
     /**
      * @provider Cloud provider (digitalocean, aws, linode, custom)
@@ -168,20 +168,25 @@ component extends="../../base" {
         if (!fileExists(envPath)) {
             print.yellowLine("Creating .env.deploy template...");
             
-            var envContent = "# Production Environment Variables
-DB_HOST=db
-DB_PORT=#getDBPort(arguments.db)#
-DB_NAME=#arguments.appName#_production
-DB_USERNAME=#arguments.appName#_user
-DB_PASSWORD=change_me_to_secure_password
-
-WHEELS_ENV=production
-WHEELS_RELOAD_PASSWORD=change_me_to_secure_password
-SECRET_KEY_BASE=#generateSecretKey()#
-
-# Additional configuration
-APP_URL=https://#arguments.domain#
-";
+            // Generate a random secret key
+            var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            var secretKey = "";
+            for (var i = 1; i <= 64; i++) {
+                secretKey &= mid(chars, randRange(1, len(chars)), 1);
+            }
+            savecontent variable="envContent" {
+                writeOutput("## Production Environment Variables" & chr(10));
+                writeOutput("DB_HOST=db" & chr(10));
+                writeOutput("DB_PORT=#getDBPort(arguments.db)#" & chr(10));
+                writeOutput("DB_NAME=#arguments.appName#_production" & chr(10));
+                writeOutput("DB_USERNAME=#arguments.appName#_user" & chr(10));
+                writeOutput("DB_PASSWORD=change_me_to_secure_password" & chr(10) & chr(10));
+                writeOutput("WHEELS_ENV=production" & chr(10));
+                writeOutput("WHEELS_RELOAD_PASSWORD=change_me_to_secure_password" & chr(10));
+                writeOutput("SECRET_KEY_BASE=#secretKey#" & chr(10) & chr(10));
+                writeOutput("## Additional configuration" & chr(10));
+                writeOutput("APP_URL=https://#arguments.domain#" & chr(10));
+            };
             fileWrite(envPath, envContent);
         }
         
@@ -201,58 +206,48 @@ APP_URL=https://#arguments.domain#
         var dockerfile = "";
         
         if (arguments.cfengine == "lucee") {
-            dockerfile = "FROM lucee/lucee:5.4
-
-# Install additional dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
-WORKDIR /var/www
-
-# Copy application files
-COPY . /var/www/
-
-# Install CommandBox for dependency management
-RUN curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add -
-RUN echo "deb https://downloads.ortussolutions.com/debs/noarch /" | tee -a /etc/apt/sources.list.d/commandbox.list
-RUN apt-get update && apt-get install -y commandbox
-
-# Install dependencies
-RUN box install
-
-# Configure Lucee
-COPY deploy/lucee-config.xml /opt/lucee/web/lucee-web.xml.cfm
-
-# Expose port
-EXPOSE 3000
-
-# Start command
-CMD ["box", "server", "start", "--console", "--force", "port=3000"]";
+            savecontent variable="dockerfile" {
+                writeOutput("FROM lucee/lucee:5.4" & chr(10) & chr(10));
+                writeOutput("## Install additional dependencies" & chr(10));
+                writeOutput("RUN apt-get update && apt-get install -y \" & chr(10));
+                writeOutput("    curl \" & chr(10));
+                writeOutput("    git \" & chr(10));
+                writeOutput("    && rm -rf /var/lib/apt/lists/*" & chr(10) & chr(10));
+                writeOutput("## Set working directory" & chr(10));
+                writeOutput("WORKDIR /var/www" & chr(10) & chr(10));
+                writeOutput("## Copy application files" & chr(10));
+                writeOutput("COPY . /var/www/" & chr(10) & chr(10));
+                writeOutput("## Install CommandBox for dependency management" & chr(10));
+                writeOutput("RUN curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add -" & chr(10));
+                writeOutput("RUN echo ""deb https://downloads.ortussolutions.com/debs/noarch /"" | tee -a /etc/apt/sources.list.d/commandbox.list" & chr(10));
+                writeOutput("RUN apt-get update && apt-get install -y commandbox" & chr(10) & chr(10));
+                writeOutput("## Install dependencies" & chr(10));
+                writeOutput("RUN box install" & chr(10) & chr(10));
+                writeOutput("## Configure Lucee" & chr(10));
+                writeOutput("COPY deploy/lucee-config.xml /opt/lucee/web/lucee-web.xml.cfm" & chr(10) & chr(10));
+                writeOutput("## Expose port" & chr(10));
+                writeOutput("EXPOSE 3000" & chr(10) & chr(10));
+                writeOutput("## Start command" & chr(10));
+                writeOutput("CMD [""box"", ""server"", ""start"", ""--console"", ""--force"", ""port=3000""]");
+            };
         } else {
-            dockerfile = "FROM adobecoldfusion/coldfusion:latest
-
-# Set working directory  
-WORKDIR /app
-
-# Copy application files
-COPY . /app/
-
-# Install CommandBox for dependency management
-RUN curl -fsSl https://www.ortussolutions.com/parent/download/commandbox/type/bin -o /tmp/box && \
-    chmod +x /tmp/box && \
-    mv /tmp/box /usr/local/bin/box
-
-# Install dependencies
-RUN box install
-
-# Expose port
-EXPOSE 3000
-
-# Start command
-CMD ["box", "server", "start", "--console", "--force", "cfengine=adobe@2023", "port=3000"]";
+            savecontent variable="dockerfile" {
+                writeOutput("FROM adobecoldfusion/coldfusion:latest" & chr(10) & chr(10));
+                writeOutput("## Set working directory" & chr(10));
+                writeOutput("WORKDIR /app" & chr(10) & chr(10));
+                writeOutput("## Copy application files" & chr(10));
+                writeOutput("COPY . /app/" & chr(10) & chr(10));
+                writeOutput("## Install CommandBox for dependency management" & chr(10));
+                writeOutput("RUN curl -fsSl https://www.ortussolutions.com/parent/download/commandbox/type/bin -o /tmp/box && \" & chr(10));
+                writeOutput("    chmod +x /tmp/box && \" & chr(10));
+                writeOutput("    mv /tmp/box /usr/local/bin/box" & chr(10) & chr(10));
+                writeOutput("## Install dependencies" & chr(10));
+                writeOutput("RUN box install" & chr(10) & chr(10));
+                writeOutput("## Expose port" & chr(10));
+                writeOutput("EXPOSE 3000" & chr(10) & chr(10));
+                writeOutput("## Start command" & chr(10));
+                writeOutput("CMD [""box"", ""server"", ""start"", ""--console"", ""--force"", ""cfengine=adobe@2023"", ""port=3000""]");
+            };
         }
         
         return dockerfile;

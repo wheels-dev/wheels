@@ -8,7 +8,7 @@
  * wheels deploy:hooks run pre-deploy
  * {code}
  */
-component extends="base" {
+component extends="./base" {
 
     /**
      * @action Hook action (create, list, edit, run, remove)
@@ -94,114 +94,99 @@ component extends="base" {
         var content = "";
         
         if (arguments.template == "cfml") {
-            content = "#!/usr/bin/env box
-
-/**
- * Deployment hook: #arguments.hookName#
- * 
- * Available environment variables:
- * - KAMAL_VERSION - Current deployment version/tag
- * - KAMAL_SERVICE_NAME - Service name from deploy.json
- * - KAMAL_HOSTS - Comma-separated list of deployment hosts
- * - KAMAL_COMMAND - The command being run
- * - KAMAL_SUBCOMMAND - The subcommand being run
- * - KAMAL_ROLE - Current role (web, worker, etc.)
- * - KAMAL_DESTINATION - Deployment destination/environment
- */
-
-// Your custom logic here
-print.line(""Running #arguments.hookName# hook..."");
-
-// Example: Validate deployment
-if (arguments.hookName == ""pre-deploy"") {
-    // Run tests
-    command(""wheels test app"").run();
-    
-    // Check for uncommitted changes
-    var gitStatus = command(""git status --porcelain"").run(returnOutput=true);
-    if (len(trim(gitStatus))) {
-        print.redLine(""Uncommitted changes detected!"");
-        print.line(gitStatus);
-        abort;
-    }
-}
-
-// Example: Notify deployment
-if (arguments.hookName == ""post-deploy"") {
-    var version = systemSettings.getSystemSetting(""KAMAL_VERSION"", """");
-    print.greenLine(""Successfully deployed version: "" & version);
-    
-    // Send notification (Slack, email, etc.)
-    // http.post(""https://hooks.slack.com/..."", {text: ""Deployed "" & version});
-}
-
-print.greenLine(""✓ Hook completed successfully"");";
+            savecontent variable="content" {
+                writeOutput("##!/usr/bin/env box" & chr(10) & chr(10));
+                writeOutput("/**" & chr(10));
+                writeOutput(" * Deployment hook: #arguments.hookName#" & chr(10));
+                writeOutput(" * " & chr(10));
+                writeOutput(" * Available environment variables:" & chr(10));
+                writeOutput(" * - KAMAL_VERSION - Current deployment version/tag" & chr(10));
+                writeOutput(" * - KAMAL_SERVICE_NAME - Service name from deploy.json" & chr(10));
+                writeOutput(" * - KAMAL_HOSTS - Comma-separated list of deployment hosts" & chr(10));
+                writeOutput(" * - KAMAL_COMMAND - The command being run" & chr(10));
+                writeOutput(" * - KAMAL_SUBCOMMAND - The subcommand being run" & chr(10));
+                writeOutput(" * - KAMAL_ROLE - Current role (web, worker, etc.)" & chr(10));
+                writeOutput(" * - KAMAL_DESTINATION - Deployment destination/environment" & chr(10));
+                writeOutput(" */" & chr(10) & chr(10));
+                writeOutput("// Your custom logic here" & chr(10));
+                writeOutput('print.line("Running #arguments.hookName# hook...");' & chr(10) & chr(10));
+                writeOutput("// Example: Validate deployment" & chr(10));
+                writeOutput('if (arguments.hookName == "pre-deploy") {' & chr(10));
+                writeOutput("    // Run tests" & chr(10));
+                writeOutput('    command("wheels test app").run();' & chr(10) & chr(10));
+                writeOutput("    // Check for uncommitted changes" & chr(10));
+                writeOutput('    var gitStatus = command("git status --porcelain").run(returnOutput=true);' & chr(10));
+                writeOutput("    if (len(trim(gitStatus))) {" & chr(10));
+                writeOutput('        print.redLine("Uncommitted changes detected!");' & chr(10));
+                writeOutput("        print.line(gitStatus);" & chr(10));
+                writeOutput("        abort;" & chr(10));
+                writeOutput("    }" & chr(10));
+                writeOutput("}" & chr(10) & chr(10));
+                writeOutput("// Example: Notify deployment" & chr(10));
+                writeOutput('if (arguments.hookName == "post-deploy") {' & chr(10));
+                writeOutput('    var version = systemSettings.getSystemSetting("KAMAL_VERSION", "");' & chr(10));
+                writeOutput('    print.greenLine("Successfully deployed version: " & version);' & chr(10) & chr(10));
+                writeOutput("    // Send notification (Slack, email, etc.)" & chr(10));
+                writeOutput('    // http.post("https://hooks.slack.com/...", {text: "Deployed " & version});' & chr(10));
+                writeOutput("}" & chr(10) & chr(10));
+                writeOutput('print.greenLine("✓ Hook completed successfully");');
+            };
         } else {
-            content = "#!/usr/bin/env bash
-
-# Deployment hook: #arguments.hookName#
-#
-# Available environment variables:
-# - KAMAL_VERSION - Current deployment version/tag
-# - KAMAL_SERVICE_NAME - Service name from deploy.json
-# - KAMAL_HOSTS - Comma-separated list of deployment hosts
-# - KAMAL_COMMAND - The command being run
-# - KAMAL_SUBCOMMAND - The subcommand being run
-# - KAMAL_ROLE - Current role (web, worker, etc.)
-# - KAMAL_DESTINATION - Deployment destination/environment
-
-set -e
-
-echo ""Running #arguments.hookName# hook...""
-
-# Your custom logic here
-case ""#arguments.hookName#"" in
-    pre-connect)
-        # Example: Test SSH connectivity
-        echo ""Testing SSH connectivity...""
-        for host in ${KAMAL_HOSTS//,/ }; do
-            ssh -o ConnectTimeout=5 root@$host 'echo ""Connected to $(hostname)""' || exit 1
-        done
-        ;;
-        
-    pre-build)
-        # Example: Run tests before building
-        echo ""Running tests...""
-        wheels test app || exit 1
-        
-        # Check for uncommitted changes
-        if [ -n ""$(git status --porcelain)"" ]; then
-            echo ""ERROR: Uncommitted changes detected!""
-            git status --short
-            exit 1
-        fi
-        ;;
-        
-    pre-deploy)
-        # Example: Backup database
-        echo ""Creating database backup...""
-        # mysqldump -h db.example.com -u user -p database > backup-$(date +%Y%m%d-%H%M%S).sql
-        ;;
-        
-    post-deploy)
-        # Example: Clear caches, notify team
-        echo ""Deployment completed for version: $KAMAL_VERSION""
-        
-        # Clear application caches
-        # wheels reload
-        
-        # Send notification
-        # curl -X POST https://hooks.slack.com/... -d '{""text"":""Deployed version '$KAMAL_VERSION'""}'
-        ;;
-        
-    rollback)
-        # Example: Restore from backup
-        echo ""Rolling back deployment...""
-        # Restore database, clear caches, etc.
-        ;;
-esac
-
-echo ""✓ Hook completed successfully""";
+            savecontent variable="content" {
+                writeOutput("##!/usr/bin/env bash" & chr(10) & chr(10));
+                writeOutput("## Deployment hook: #arguments.hookName#" & chr(10));
+                writeOutput("##" & chr(10));
+                writeOutput("## Available environment variables:" & chr(10));
+                writeOutput("## - KAMAL_VERSION - Current deployment version/tag" & chr(10));
+                writeOutput("## - KAMAL_SERVICE_NAME - Service name from deploy.json" & chr(10));
+                writeOutput("## - KAMAL_HOSTS - Comma-separated list of deployment hosts" & chr(10));
+                writeOutput("## - KAMAL_COMMAND - The command being run" & chr(10));
+                writeOutput("## - KAMAL_SUBCOMMAND - The subcommand being run" & chr(10));
+                writeOutput("## - KAMAL_ROLE - Current role (web, worker, etc.)" & chr(10));
+                writeOutput("## - KAMAL_DESTINATION - Deployment destination/environment" & chr(10) & chr(10));
+                writeOutput("set -e" & chr(10) & chr(10));
+                writeOutput('echo "Running #arguments.hookName# hook..."' & chr(10) & chr(10));
+                writeOutput("## Your custom logic here" & chr(10));
+                writeOutput('case "#arguments.hookName#" in' & chr(10));
+                writeOutput("    pre-connect)" & chr(10));
+                writeOutput("        ## Example: Test SSH connectivity" & chr(10));
+                writeOutput('        echo "Testing SSH connectivity..."' & chr(10));
+                writeOutput("        for host in ${KAMAL_HOSTS//,/ }; do" & chr(10));
+                writeOutput("            ssh -o ConnectTimeout=5 root@$host 'echo ""Connected to $(hostname)""' || exit 1" & chr(10));
+                writeOutput("        done" & chr(10));
+                writeOutput("        ;;" & chr(10) & chr(10));
+                writeOutput("    pre-build)" & chr(10));
+                writeOutput("        ## Example: Run tests before building" & chr(10));
+                writeOutput('        echo "Running tests..."' & chr(10));
+                writeOutput("        wheels test app || exit 1" & chr(10) & chr(10));
+                writeOutput("        ## Check for uncommitted changes" & chr(10));
+                writeOutput('        if [ -n "$(git status --porcelain)" ]; then' & chr(10));
+                writeOutput('            echo "ERROR: Uncommitted changes detected!"' & chr(10));
+                writeOutput("            git status --short" & chr(10));
+                writeOutput("            exit 1" & chr(10));
+                writeOutput("        fi" & chr(10));
+                writeOutput("        ;;" & chr(10) & chr(10));
+                writeOutput("    pre-deploy)" & chr(10));
+                writeOutput("        ## Example: Backup database" & chr(10));
+                writeOutput('        echo "Creating database backup..."' & chr(10));
+                writeOutput("        ## mysqldump -h db.example.com -u user -p database > backup-$(date +%Y%m%d-%H%M%S).sql" & chr(10));
+                writeOutput("        ;;" & chr(10) & chr(10));
+                writeOutput("    post-deploy)" & chr(10));
+                writeOutput("        ## Example: Clear caches, notify team" & chr(10));
+                writeOutput('        echo "Deployment completed for version: $KAMAL_VERSION"' & chr(10) & chr(10));
+                writeOutput("        ## Clear application caches" & chr(10));
+                writeOutput("        ## wheels reload" & chr(10) & chr(10));
+                writeOutput("        ## Send notification" & chr(10));
+                writeOutput("        ## curl -X POST https://hooks.slack.com/... -d '{""text"":""Deployed version \$KAMAL_VERSION""}'" & chr(10));
+                writeOutput("        ;;" & chr(10) & chr(10));
+                writeOutput("    rollback)" & chr(10));
+                writeOutput("        ## Example: Restore from backup" & chr(10));
+                writeOutput('        echo "Rolling back deployment..."' & chr(10));
+                writeOutput("        ## Restore database, clear caches, etc." & chr(10));
+                writeOutput("        ;;" & chr(10));
+                writeOutput("esac" & chr(10) & chr(10));
+                writeOutput('echo "✓ Hook completed successfully"');
+            };
         }
         
         // Write hook file
