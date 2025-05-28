@@ -36,11 +36,11 @@
 	* [Testing Commands](command-line-tools/commands/testing/test.md)
 		* [wheels test](command-line-tools/commands/testing/test.md)
 		* [wheels test run](command-line-tools/commands/testing/test-run.md)
-* [CLI Development Guides](command-line-tools/guides/creating-commands.md)
-  * [Creating Commands](command-line-tools/guides/creating-commands.md)
-  * [Service Architecture](command-line-tools/guides/service-architecture.md)
-  * [Migrations Guide](command-line-tools/guides/migrations.md)
-  * [Testing Guide](command-line-tools/guides/testing.md)
+* [CLI Development Guides]
+  * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
+  * [Service Architecture](command-line-tools/cli-guides/service-architecture.md)
+  * [Migrations Guide](command-line-tools/cli-guides/migrations.md)
+  * [Testing Guide](command-line-tools/cli-guides/testing.md)
 
 ## Working with Wheels
 
