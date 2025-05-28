@@ -16,9 +16,9 @@ export const useDatabaseStore = defineStore('database', () => {
       connectionInfo: {
         host: 'mysql',
         port: 3306,
-        database: 'cfwheels',
-        username: 'cfwheels',
-        password: 'cfwheels'
+        database: 'wheels',
+        username: 'wheels',
+        password: 'wheels'
       }
     },
     {
@@ -31,9 +31,9 @@ export const useDatabaseStore = defineStore('database', () => {
       connectionInfo: {
         host: 'sqlserver',
         port: 1433,
-        database: 'cfwheels',
+        database: 'wheels',
         username: 'sa',
-        password: 'CFWheels123'
+        password: 'Wheels123'
       }
     },
     {
@@ -45,9 +45,9 @@ export const useDatabaseStore = defineStore('database', () => {
       connectionInfo: {
         host: 'postgresql',
         port: 5432,
-        database: 'cfwheels',
+        database: 'wheels',
         username: 'postgres',
-        password: 'cfwheels'
+        password: 'wheels'
       }
     },
     {

@@ -722,7 +722,7 @@ docker compose --profile db up -d
 
 ```bash
 # Using the CLI inside a container
-docker exec -it cfwheels-lucee5-1 wheels test run
+docker exec -it wheels-lucee5-1 wheels test run
 
 # Direct URL access
 curl http://localhost:60005/wheels/testbox?format=json&db=mysql

@@ -1,10 +1,10 @@
 # Wheels CLI Documentation
 
-Welcome to the comprehensive documentation for the Wheels CLI - a powerful command-line interface for the CFWheels framework.
+Welcome to the comprehensive documentation for the Wheels CLI - a powerful command-line interface for the Wheels framework.
 
 ## What is Wheels CLI?
 
-Wheels CLI is a CommandBox module that provides a comprehensive set of tools for developing CFWheels applications. It offers:
+Wheels CLI is a CommandBox module that provides a comprehensive set of tools for developing Wheels applications. It offers:
 
 - **Code Generation** - Quickly scaffold models, controllers, views, and complete CRUD operations
 - **Database Migrations** - Manage database schema changes with version control
@@ -150,17 +150,17 @@ wheels security scan
 
 ## Version Compatibility
 
-| Wheels CLI | CFWheels | CommandBox | CFML Engine |
+| Wheels CLI | Wheels | CommandBox | CFML Engine |
 |------------|----------|------------|-------------|
 | 3.0.x | 2.5+ | 5.0+ | Lucee 5.3+, Adobe 2018+ |
 | 2.0.x | 2.0-2.4 | 4.0+ | Lucee 5.2+, Adobe 2016+ |
 
 ## Community & Support
 
-- **Documentation**: [https://docs.cfwheels.org](https://docs.cfwheels.org)
-- **GitHub**: [https://github.com/cfwheels/cfwheels](https://github.com/cfwheels/cfwheels)
+- **Documentation**: [https://docs.wheels.dev](https://docs.wheels.dev)
+- **GitHub**: [https://github.com/wheels-dev/wheels](https://github.com/wheels-dev/wheels)
 - **Slack**: [CFML Slack](https://cfml.slack.com) - #wheels channel
-- **Forums**: [https://groups.google.com/forum/#!forum/cfwheels](https://groups.google.com/forum/#!forum/cfwheels)
+- **Forums**: [https://groups.google.com/forum/#!forum/wheels](https://groups.google.com/forum/#!forum/wheels)
 
 ## Contributing
 

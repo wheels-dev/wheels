@@ -806,14 +806,14 @@ Wheels can return your test results in either HTML, JSON, TXT or JUnit formats, 
 
 ### Running Tests with Docker
 
-CFWheels provides a comprehensive Docker-based testing environment that allows you to run tests across multiple CFML engines and databases simultaneously. This is especially useful for ensuring compatibility across different environments.
+Wheels provides a comprehensive Docker-based testing environment that allows you to run tests across multiple CFML engines and databases simultaneously. This is especially useful for ensuring compatibility across different environments.
 
 #### Using the TestUI
 
 The easiest way to run tests in Docker is through the TestUI, which provides a modern web interface for managing tests:
 
 ```bash
-# From the CFWheels root directory
+# From the Wheels root directory
 docker compose --profile ui up -d
 ```
 
@@ -917,4 +917,4 @@ Caveat: The test suite request must complete without uncaught exceptions. If an 
 
 ### Learn By Example: Wheels Core
 
-The Wheels core uses this test framework for its unit test suite and contains a wealth of useful examples. They can all be found in the [`tests_testbox` folder](https://github.com/cfwheels/cfwheels/tree/develop/vendor/wheels/tests_testbox) of the Wheels git repo.
+The Wheels core uses this test framework for its unit test suite and contains a wealth of useful examples. They can all be found in the [`tests_testbox` folder](https://github.com/wheels-dev/wheels/tree/develop/vendor/wheels/tests_testbox) of the Wheels git repo.

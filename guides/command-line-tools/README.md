@@ -102,5 +102,5 @@ Welcome to the comprehensive documentation for the Wheels CLI. This documentatio
 ## Getting Help
 
 - Use `wheels [command] --help` for command-specific help
-- Visit the [Wheels Documentation](https://docs.cfwheels.org)
-- Report issues on [GitHub](https://github.com/cfwheels/cfwheels)
+- Visit the [Wheels Documentation](https://docs.wheels.dev)
+- Report issues on [GitHub](https://github.com/wheels-dev/wheels)

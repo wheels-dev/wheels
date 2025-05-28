@@ -1,6 +1,6 @@
-# CFWheels TestUI
+# Wheels TestUI
 
-A modern test runner interface for CFWheels framework testing.
+A modern test runner interface for Wheels framework testing.
 
 ## Features
 
@@ -29,7 +29,7 @@ The TestUI is integrated with Docker for easy setup and development.
 #### Production Mode
 
 ```bash
-# From the CFWheels root directory
+# From the Wheels root directory
 docker compose --profile ui up -d
 ```
 
@@ -115,7 +115,7 @@ See [DOCKER-INTEGRATION.md](./DOCKER-INTEGRATION.md) for detailed information on
 
 The following pre-defined container profiles are available:
 
-- **Core Tests Profile**: Minimal setup for running core CFWheels tests
+- **Core Tests Profile**: Minimal setup for running core Wheels tests
 - **Full Test Suite Profile**: Complete setup for running all tests across all engines and databases
 
 ## Development

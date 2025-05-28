@@ -25,7 +25,7 @@ class TestService {
       {
         id: 'core',
         name: 'Core Tests',
-        description: 'Tests for CFWheels core functionality',
+        description: 'Tests for Wheels core functionality',
         path: '/core'
       },
       {

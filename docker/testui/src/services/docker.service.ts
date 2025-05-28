@@ -109,7 +109,7 @@ class DockerService {
    */
   private processContainers(apiContainers: any[]): Container[] {
     return apiContainers.map(container => {
-      // Look for CFWheels-specific labels
+      // Look for Wheels-specific labels
       const labels = container.Labels || {};
       
       // Try to determine container type from labels or image name
@@ -132,15 +132,15 @@ class DockerService {
       // Calculate uptime if container is running
       const uptime = this.calculateUptime(status, container.Status);
       
-      // Determine if this is a CFWheels container
-      const isCFWheelsContainer = name.includes('cfwheels') || 
+      // Determine if this is a Wheels container
+      const isWheelsContainer = name.includes('cfwheels') || 
                                  name.includes('wheels') ||
                                  labels['com.github.cfwheels'] !== undefined;
       
-      // Extract CFWheels-specific metadata if available
-      const cfwheelsType = labels['com.github.cfwheels.type'] || null;
-      const cfwheelsName = labels['com.github.cfwheels.name'] || null;
-      const cfwheelsVersion = labels['com.github.cfwheels.version'] || null;
+      // Extract Wheels-specific metadata if available
+      const wheelsType = labels['com.github.cfwheels.type'] || null;
+      const wheelsName = labels['com.github.cfwheels.name'] || null;
+      const wheelsVersion = labels['com.github.cfwheels.version'] || null;
       
       // Build the container object
       return {
@@ -154,10 +154,10 @@ class DockerService {
         created: new Date(container.Created * 1000).toISOString(),
         uptime,
         labels: container.Labels || {},
-        isCFWheelsContainer,
-        cfwheelsType,
-        cfwheelsName,
-        cfwheelsVersion
+        isWheelsContainer,
+        wheelsType,
+        wheelsName,
+        wheelsVersion
       };
     });
   }

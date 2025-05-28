@@ -1,6 +1,6 @@
 <template>
   <div class="container-fluid py-4">
-    <h1 class="mb-4 fs-2">CFWheels Test Runner</h1>
+    <h1 class="mb-4 fs-2">Wheels Test Runner</h1>
     
     <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
       <!-- Test Runner Card -->
@@ -14,7 +14,7 @@
               </div>
               <h5 class="card-title mb-0">Run Tests</h5>
             </div>
-            <p class="card-text">Configure and run CFWheels tests across different engines and databases.</p>
+            <p class="card-text">Configure and run Wheels tests across different engines and databases.</p>
           </div>
           <div class="card-footer bg-transparent border-top-0 text-end">
             <router-link to="/tests" class="btn btn-primary">
@@ -35,10 +35,10 @@
               </div>
               <h5 class="card-title mb-0">Documentation</h5>
             </div>
-            <p class="card-text">View CFWheels documentation and testing guides.</p>
+            <p class="card-text">View Wheels documentation and testing guides.</p>
           </div>
           <div class="card-footer bg-transparent border-top-0 text-end">
-            <a href="https://guides.cfwheels.org" target="_blank" class="btn btn-info text-white">
+            <a href="https://guides.wheels.dev" target="_blank" class="btn btn-info text-white">
               <i class="bi bi-book-fill me-1"></i> View Docs
             </a>
           </div>

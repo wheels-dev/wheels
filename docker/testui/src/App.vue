@@ -6,7 +6,7 @@
           <div class="logo-container me-2">
             <img
               :src="theme === 'dark' ? '/wheels_logo_transparancy_white.png' : '/wheels_logo_transparancy_black.png'"
-              alt="CFWheels Logo"
+              alt="Wheels Logo"
               height="30"
               class="d-inline-block align-top"
             />
@@ -56,7 +56,7 @@
 
     <footer class="footer py-3 mt-auto" :class="theme === 'dark' ? 'bg-dark text-light border-top border-secondary' : 'bg-light text-dark border-top'">
       <div class="container text-center">
-        <span>CFWheels Test Environment</span>
+        <span>Wheels Test Environment</span>
         <span class="badge bg-primary ms-2">v2.0.0</span>
       </div>
     </footer>

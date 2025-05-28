@@ -15,11 +15,31 @@
 
 ## Command Line Tools
 
-* [CLI Commands](command-line-tools/cli-commands.md)
-* [wheels - commands](command-line-tools/wheels-commands.md)
-* [wheels generate - commands](command-line-tools/wheels-generate-commands.md)
-* [wheels dbmigrate - commands](command-line-tools/wheels-dbmigrate-commands.md)
-* [wheels plugins - commands](command-line-tools/wheels-plugins-commands.md)
+* [CLI Overview](command-line-tools/README.md)
+* [Quick Start Guide](command-line-tools/guides/quick-start.md)
+* [Core Commands](command-line-tools/commands/README.md)
+  * [wheels init](command-line-tools/commands/core/init.md)
+  * [wheels info](command-line-tools/commands/core/info.md)
+  * [wheels reload](command-line-tools/commands/core/reload.md)
+  * [wheels deps](command-line-tools/commands/core/deps.md)
+  * [wheels destroy](command-line-tools/commands/core/destroy.md)
+  * [wheels watch](command-line-tools/commands/core/watch.md)
+* [Code Generation](command-line-tools/commands/generate/app.md)
+  * [wheels generate app](command-line-tools/commands/generate/app.md)
+  * [wheels generate controller](command-line-tools/commands/generate/controller.md)
+  * [wheels generate model](command-line-tools/commands/generate/model.md)
+  * [wheels scaffold](command-line-tools/commands/generate/scaffold.md)
+* [Database Operations](command-line-tools/commands/database/dbmigrate-info.md)
+  * [wheels dbmigrate info](command-line-tools/commands/database/dbmigrate-info.md)
+  * [wheels dbmigrate latest](command-line-tools/commands/database/dbmigrate-latest.md)
+* [Testing Commands](command-line-tools/commands/testing/test.md)
+  * [wheels test](command-line-tools/commands/testing/test.md)
+  * [wheels test run](command-line-tools/commands/testing/test-run.md)
+* [CLI Development Guides](command-line-tools/guides/creating-commands.md)
+  * [Creating Commands](command-line-tools/guides/creating-commands.md)
+  * [Service Architecture](command-line-tools/guides/service-architecture.md)
+  * [Migrations Guide](command-line-tools/guides/migrations.md)
+  * [Testing Guide](command-line-tools/guides/testing.md)
 
 ## Working with Wheels
 
@@ -103,7 +123,7 @@
 
 ## External Links
 
-* [Source Code](https://github.com/cfwheels/cfwheels)
-* [Issue Tracker](https://github.com/cfwheels/cfwheels/issues)
+* [Source Code](https://github.com/wheels-dev/wheels)
+* [Issue Tracker](https://github.com/wheels-dev/wheels/issues)
 * [Sponsor Us](https://opencollective.com/cfwheels)
-* [Community](https://github.com/cfwheels/cfwheels/discussions)
+* [Community](https://github.com/wheels-dev/wheels/discussions)
