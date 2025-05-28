@@ -145,22 +145,36 @@ component output="false" {
 		// Need to setup the wheels struct up here since it's used to store debugging info below if this is a reload request.
 		application.wo.$initializeRequestScope();
 
-		// IP-based access to publicComponent/debug GUI (only if allowed in settings)
-		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "allowIPBasedDebugAccess")) {
-			if (application.wheels.environment != 'development' && application.wheels.allowIPBasedDebugAccess ?: false) {
-				local.clientIP = CGI.REMOTE_ADDR;
-				local.allowedIPs = application.wheels.debugAccessIPs ?: [];
+		// IP-based access to public Component/debug GUI (only if allowed in settings)
+		if (!structKeyExists(application.wheels, "debugIPAccess")) {
+			application.wheels.debugIPAccess.originalEnablePublicComponent = application.wheels.enablePublicComponent;
+			application.wheels.debugIPAccess.originalShowDebugInformation  = application.wheels.showDebugInformation;
+			application.wheels.debugIPAccess.originalShowErrorInformation  = application.wheels.showErrorInformation;
+		}
 
-				if (arrayContains(local.allowedIPs, local.clientIP)) {
-					application.wheels.enablePublicComponent = true;
-					application.wheels.showDebugInformation = true;
-					application.wheels.showErrorInformation = true;
+		// Conditional override for allowed IPs (but only in non-dev mode)
+		if (
+			StructKeyExists(application.wheels, "allowIPBasedDebugAccess") &&
+			application.wheels.environment != "development" &&
+			(application.wheels.allowIPBasedDebugAccess)
+		) {
+			local.clientIP = CGI.HTTP_X_FORWARDED_FOR ?: CGI.REMOTE_ADDR;
+			local.allowedIPs = application.wheels.debugAccessIPs;
 
-					// Enable the main GUI Component
-					if (application.wheels.enablePublicComponent) {
-						application.wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
-					}
+			if (arrayContains(local.allowedIPs, local.clientIP)) {
+				// Temporarily override — per request
+				application.wheels.enablePublicComponent = true;
+				application.wheels.showDebugInformation = true;
+				application.wheels.showErrorInformation = true;
+
+				// Enable the main GUI Component
+				if (application.wheels.enablePublicComponent) {
+					application.wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
 				}
+			} else {
+				application.wheels.enablePublicComponent = application.wheels.debugIPAccess.originalEnablePublicComponent;
+				application.wheels.showDebugInformation = application.wheels.debugIPAccess.originalShowDebugInformation;
+				application.wheels.showErrorInformation = application.wheels.debugIPAccess.originalShowErrorInformation;
 			}
 		}
 
