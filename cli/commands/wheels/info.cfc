@@ -17,16 +17,16 @@ component  extends="base"  {
 			moduleRoot		= expandPath("/cfwheels-cli/"),
 			wheelsVersion	= $getWheelsVersion()
 		};
-		print.redLine(" ,-----.,------.,--.   ,--.,--.                   ,--.            ,-----.,--.   ,--. ")
-			.redLine("'  .--./|  .---'|  |   |  ||  ,---.  ,---.  ,---. |  | ,---.     '  .--./|  |   |  | ")
-			.redLine("|  |    |  `--, |  |.'.|  ||  .-.  || .-. :| .-. :|  |(  .-'     |  |    |  |   |  | ")
-			.redLine("'  '--'\|  |`   |   ,'.   ||  | |  |\   --.\   --.|  |.-'  `)    '  '--'\|  '--.|  | ")
-			.redLine(" `-----'`--'    '--'   '--'`--' `--' `----' `----'`--'`----'      `-----'`-----'`--' ")
-			.yellowBoldLine( "=================================== Wheels CLI ===================================" )
+		print.redLine(",--.   ,--.,--.                   ,--.            ,-----.,--.   ,--. ")
+			.redLine("|  |   |  ||  ,---.  ,---.  ,---. |  | ,---.     '  .--./|  |   |  | ")
+			.redLine("|  |.'.|  ||  .-.  || .-. :| .-. :|  |(  .-'     |  |    |  |   |  | ")
+			.redLine("|   ,'.   ||  | |  |\   --.\   --.|  |.-'  `)    '  '--'\|  '--.|  | ")
+			.redLine("'--'   '--'`--' `--' `----' `----'`--'`----'      `-----'`-----'`--' ")
+			.yellowBoldLine( "============================ Wheels CLI ============================" )
 			.yellowBoldLine( "Current Working Directory: #current.directory#")
 			.yellowBoldLine( "CommandBox Module Root: #current.moduleRoot#")
 			.yellowBoldLine( "Current Wheels Version in this directory: #current.wheelsVersion#")
-			.yellowBoldLine( "====================================================================================" );
+			.yellowBoldLine( "=====================================================================" );
 	}
 
 }
