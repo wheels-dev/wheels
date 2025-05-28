@@ -41,7 +41,9 @@
       "mcp__puppeteer__puppeteer_select",
       "mcp__puppeteer__puppeteer_evaluate",
       "Bash(docker build:*)",
-      "Bash(docker:*)"
+      "Bash(docker:*)",
+      "Bash(box exit)",
+      "Bash(box version:*)"
     ],
     "deny": []
   }
