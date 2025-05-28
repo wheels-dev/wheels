@@ -42,8 +42,8 @@ class PreflightService {
         },
         {
           id: 'check_wheels',
-          name: 'Check CFWheels Application',
-          description: 'Verify that the CFWheels application is properly initialized',
+          name: 'Check Wheels Application',
+          description: 'Verify that the Wheels application is properly initialized',
           status: PreflightStepStatus.Pending,
           dependsOn: ['check_connection']
         }

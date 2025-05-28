@@ -15,7 +15,7 @@ We'll learn by building part of a sample user management application. This tutor
 {% hint style="info" %}
 **Download source code**
 
-You can download all the source code for this sample application from [https://github.com/dhgassoc/Cfwheels-Beginner-Tutorial-Hello-Database](https://github.com/dhgassoc/Cfwheels-Beginner-Tutorial-Hello-Database)
+You can download all the source code for this sample application from [https://github.com/dhgassoc/Wheels-Beginner-Tutorial-Hello-Database](https://github.com/dhgassoc/Wheels-Beginner-Tutorial-Hello-Database)
 {% endhint %}
 
 ### Setting up the Data Source

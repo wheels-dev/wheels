@@ -43,7 +43,9 @@
       "Bash(docker build:*)",
       "Bash(docker:*)",
       "Bash(box exit)",
-      "Bash(box version:*)"
+      "Bash(box version:*)",
+      "Bash(rg:*)",
+      "Bash(true)"
     ],
     "deny": []
   }

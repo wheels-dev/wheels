@@ -103,7 +103,7 @@
 
 ## External Links
 
-* [Source Code](https://github.com/cfwheels/cfwheels)
-* [Issue Tracker](https://github.com/cfwheels/cfwheels/issues)
+* [Source Code](https://github.com/wheels-dev/wheels)
+* [Issue Tracker](https://github.com/wheels-dev/wheels/issues)
 * [Sponsor Us](https://opencollective.com/cfwheels)
-* [Community](https://github.com/cfwheels/cfwheels/discussions)
+* [Community](https://github.com/wheels-dev/wheels/discussions)

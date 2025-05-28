@@ -26,7 +26,7 @@
 	set(URLRewriting="On");
 
 	// Reload your application with ?reload=true&password=wheels.dev
-	set(reloadPassword="wheels.dev");
+	set(reloadPassword="wheels-dev");
 
 	// CLI-Appends-Here
 </cfscript>

@@ -9,12 +9,12 @@ export interface Container {
   ports: Record<string, string>;
   created: string;
   uptime?: string;
-  // Additional fields for CFWheels containers
+  // Additional fields for Wheels containers
   labels?: Record<string, string>;
-  isCFWheelsContainer?: boolean;
-  cfwheelsType?: string | null;
-  cfwheelsName?: string | null;
-  cfwheelsVersion?: string | null;
+  isWheelsContainer?: boolean;
+  wheelsType?: string | null;
+  wheelsName?: string | null;
+  wheelsVersion?: string | null;
 }
 
 // Test status enum

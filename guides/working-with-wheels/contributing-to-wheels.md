@@ -9,9 +9,9 @@ description: >-
 
 ## Repository
 
-The official Git repository for Wheels is located at our [GitHub repository](https://github.com/cfwheels/cfwheels).
+The official Git repository for Wheels is located at our [GitHub repository](https://github.com/wheels-dev/wheels).
 
-Anyone may fork the  `cfwheels` repository, make changes, and submit a pull request.
+Anyone may fork the  `wheels` repository, make changes, and submit a pull request.
 
 ## Core Team Has Write Access
 
@@ -28,15 +28,15 @@ This does not restrict you from being able to contribute. See "Process for Imple
 
 Here's the process that we'd like for you to follow. This process is in place mainly to encourage everyone to communicate openly. This gives us the opportunity to have a great peer-review process, which will result in quality. Who doesn't like quality?
 
-1. Open an issue in the [issue tracker](https://github.com/cfwheels/cfwheels/issues), outlining the changes or additions that you would like to make.
+1. Open an issue in the [issue tracker](https://github.com/wheels-dev/wheels/issues), outlining the changes or additions that you would like to make.
 2. A member of the core team will review your submission and leave feedback if necessary.
 3. Once the core team member is satisfied with the scope of the issue, they will indicate so in a comment to the issue. This is your green light to start working. Get to coding, grasshopper!
-4. Need help or running across any issues while coding? Start a [Discussion](https://github.com/cfwheels/cfwheels/discussions).
+4. Need help or running across any issues while coding? Start a [Discussion](https://github.com/wheels-dev/wheels/discussions).
 5. When you have implemented your enhancement or change, use your Git repository to create a pull request with your changes.
    * You should annotate your commits with the issue number as `#55` if the code issue is `55`
 6. A core team member will review it and post any necessary feedback in the issue tracker.
 7. Once everything is resolved, a core team member will merge your commit into the Git repository.
-8. If needed, open an issue to have the additions and changes in your revision documented in the [CHANGELOG](https://github.com/cfwheels/cfwheels/blob/main/CHANGELOG.md). You may claim the issue if you'd like to do this, but it's entirely your choice.
+8. If needed, open an issue to have the additions and changes in your revision documented in the [CHANGELOG](https://github.com/wheels-dev/wheels/blob/main/CHANGELOG.md). You may claim the issue if you'd like to do this, but it's entirely your choice.
 
 ## Developing with Docker
 
@@ -47,7 +47,7 @@ CFWheels now includes a comprehensive Docker-based test environment that makes i
 
 ## Code Style
 
-All framework code should use the guidelines at [https://github.com/cfwheels/cfwheels/wiki/Code-Style-Guide](https://github.com/cfwheels/cfwheels/wiki/Code-Style-Guide). This will make things more readable and will keep everyone on the same page. If you're working on code and notice any violations of the official style, feel free to correct it!
+All framework code should use the guidelines at [https://github.com/wheels-dev/wheels/wiki/Code-Style-Guide](https://github.com/wheels-dev/wheels/wiki/Code-Style-Guide). This will make things more readable and will keep everyone on the same page. If you're working on code and notice any violations of the official style, feel free to correct it!
 
 Additionally, we recommend that any applications written using the Wheels framework follow the same style. This is optional, of course, but still strongly recommended.
 

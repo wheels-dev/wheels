@@ -5,29 +5,8 @@ networks:
     driver: bridge
 
 services:
-  # API Server for Docker command execution - DISABLED
-  # The API approach for starting containers had permission issues
-  # Now the UI just shows docker commands for users to run manually
-  # testui-api:
-  #   profiles: ["ui", "all"]
-  #   build:
-  #     context: ./docker/testui
-  #     dockerfile: Dockerfile.api
-  #   image: cfwheels-testui-api:v1.0.1
-  #   ports:
-  #     - "3001:3001"
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #     - ./:/cfwheels-test-suite:ro
-  #   environment:
-  #     - NODE_ENV=production
-  #     - PORT=3001
-  #   networks:
-  #     - cfwheels-network
-
   # Modern TestUI
   testui:
-    profiles: ["ui", "all"]
     build:
       context: ./docker/testui
     image: cfwheels-testui:v2.0.0
@@ -58,7 +37,6 @@ services:
       - cfwheels-network
 
   lucee5:
-    profiles: ["lucee", "quick-test", "all"]
     build:
       context: ./
       dockerfile: ./docker/lucee@5/Dockerfile
@@ -75,7 +53,6 @@ services:
       - "60005:60005"
 
   lucee6:
-    profiles: ["lucee", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/lucee@6/Dockerfile
@@ -92,7 +69,6 @@ services:
       - "60006:60006"
 
   adobe2018:
-    profiles: ["adobe", "legacy", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2018/Dockerfile
@@ -109,7 +85,6 @@ services:
       - "62018:62018"
 
   adobe2021:
-    profiles: ["adobe", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2021/Dockerfile
@@ -126,7 +101,6 @@ services:
       - "62021:62021"
 
   adobe2023:
-    profiles: ["adobe", "current", "compatibility", "all"]
     build:
       context: ./
       dockerfile: ./docker/adobe@2023/Dockerfile
@@ -143,7 +117,6 @@ services:
       - "62023:62023"
 
   mysql:
-    profiles: ["db", "mysql", "quick-test", "compatibility", "all"]
     image: mysql:8.0
     restart: always
     environment:
@@ -163,7 +136,6 @@ services:
       - mysql_data:/var/lib/mysql
 
   postgres:
-    profiles: ["db", "postgres", "all"]
     image: postgres:14
     restart: always
     environment:
@@ -182,7 +154,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   sqlserver:
-    profiles: ["db", "sqlserver", "advanced", "all"]
     build:
       context: ./
       dockerfile: ./docker/sqlserver/Dockerfile_CICD

@@ -1,10 +1,10 @@
-# Using the CFWheels Test Environment
+# Using the Wheels Test Environment
 
-CFWheels includes a comprehensive test environment specifically designed for testing the core framework itself. This environment is crucial for contributors to ensure their changes pass all tests across multiple platforms before submitting pull requests. This guide covers how to use the Docker-based test environment effectively.
+Wheels includes a comprehensive test environment specifically designed for testing the core framework itself. This environment is crucial for contributors to ensure their changes pass all tests across multiple platforms before submitting pull requests. This guide covers how to use the Docker-based test environment effectively.
 
 ## Overview
 
-The CFWheels test environment uses Docker containers to provide a standardized setup for testing core framework functionality across:
+The Wheels test environment uses Docker containers to provide a standardized setup for testing core framework functionality across:
 
 - Multiple CFML engines (Lucee 5/6, Adobe ColdFusion 2018/2021/2023)
 - Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2)
@@ -13,7 +13,7 @@ The CFWheels test environment uses Docker containers to provide a standardized s
 
 This containerized approach ensures that all core framework tests run consistently across platforms, helping maintain compatibility across all supported environments.
 
-> **Important**: This test environment is specifically for running the core framework tests to validate contributions to the CFWheels project. If you're looking to test your own CFWheels-based application, please refer to [Testing Your Application](testing-your-application.md) for guidance on setting up tests within your application.
+> **Important**: This test environment is specifically for running the core framework tests to validate contributions to the Wheels project. If you're looking to test your own Wheels-based application, please refer to [Testing Your Application](testing-your-application.md) for guidance on setting up tests within your application.
 
 ## Prerequisites
 
@@ -26,13 +26,13 @@ To use the CFWheels core test environment, you'll need:
 
 ## Setting Up the Test Environment
 
-### 1. Clone the CFWheels Repository
+### 1. Clone the Wheels Repository
 
-If you haven't already done so, clone the CFWheels repository:
+If you haven't already done so, clone the Wheels repository:
 
 ```bash
-git clone https://github.com/cfwheels/cfwheels.git
-cd cfwheels
+git clone https://github.com/wheels-dev/wheels.git
+cd wheels
 ```
 
 ### 2. Install Dependencies with CommandBox
@@ -120,7 +120,7 @@ docker compose --profile lucee --profile mysql --profile ui up -d
 
 ## Running Core Framework Tests
 
-When contributing to CFWheels, it's essential to run tests against various engine-database combinations to ensure compatibility. Here's how to run tests in different scenarios:
+When contributing to Wheels, it's essential to run tests against various engine-database combinations to ensure compatibility. Here's how to run tests in different scenarios:
 
 ### Via the TestUI
 
@@ -244,7 +244,7 @@ The TestUI includes features to help manage the test environment:
 
 ## Creating New Core Framework Tests
 
-When contributing to CFWheels, you may need to create new tests for your code changes:
+When contributing to Wheels, you may need to create new tests for your code changes:
 
 1. Create a new test file in the appropriate directory:
    - For core functions: `/tests/functions/YourTest.cfc`
@@ -338,6 +338,6 @@ docker compose --profile all up -d
 
 ## Conclusion
 
-The CFWheels test environment is a critical tool for ensuring that contributions to the core framework work consistently across all supported platforms. By thoroughly testing your changes across different CFML engines and databases, you help maintain the high quality and broad compatibility that CFWheels users expect.
+The Wheels test environment is a critical tool for ensuring that contributions to the core framework work consistently across all supported platforms. By thoroughly testing your changes across different CFML engines and databases, you help maintain the high quality and broad compatibility that Wheels users expect.
 
 After verifying that your changes pass all tests, you're ready to submit a pull request. For detailed instructions on the PR process, see [Submitting Pull Requests](submitting-pull-requests.md).

@@ -1,6 +1,6 @@
-# Submitting Pull Requests to CFWheels
+# Submitting Pull Requests to Wheels
 
-This guide provides a step-by-step process for contributing code to CFWheels through pull requests (PRs). It covers the entire workflow from setting up your development environment to getting your PR merged into the project.
+This guide provides a step-by-step process for contributing code to Wheels through pull requests (PRs). It covers the entire workflow from setting up your development environment to getting your PR merged into the project.
 
 ## Prerequisites
 
@@ -10,15 +10,15 @@ Before you start contributing, make sure you have:
 2. Git installed on your local machine
 3. Docker installed (for running the test environment)
 4. Basic knowledge of Git commands and GitHub workflows
-5. Familiarity with CFWheels and CFML
+5. Familiarity with Wheels and CFML
 
 ## Setting Up Your Development Environment
 
-### 1. Fork the CFWheels Repository
+### 1. Fork the Wheels Repository
 
-Start by forking the CFWheels repository to your own GitHub account:
+Start by forking the Wheels repository to your own GitHub account:
 
-1. Visit [https://github.com/cfwheels/cfwheels](https://github.com/cfwheels/cfwheels)
+1. Visit [https://github.com/wheels-dev/wheels](https://github.com/wheels-dev/wheels)
 2. Click the "Fork" button in the upper right corner
 3. Select your GitHub account as the destination
 
@@ -27,16 +27,16 @@ Start by forking the CFWheels repository to your own GitHub account:
 Clone your fork to your local machine:
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/cfwheels.git
-cd cfwheels
+git clone https://github.com/YOUR-USERNAME/wheels.git
+cd wheels
 ```
 
 ### 3. Add the Upstream Repository
 
-Add the main CFWheels repository as an "upstream" remote to keep your fork in sync:
+Add the main Wheels repository as an "upstream" remote to keep your fork in sync:
 
 ```bash
-git remote add upstream https://github.com/cfwheels/cfwheels.git
+git remote add upstream https://github.com/wheels-dev/wheels.git
 ```
 
 ### 4. Set Up Docker Test Environment
@@ -83,7 +83,7 @@ Replace `NUMBER` with the issue number from GitHub. Use descriptive branch names
 
 Now you can start coding! Remember to:
 
-- Follow the [Code Style Guide](https://github.com/cfwheels/cfwheels/wiki/Code-Style-Guide)
+- Follow the [Code Style Guide](https://github.com/wheels-dev/wheels/wiki/Code-Style-Guide)
 - Add comments where appropriate
 - Write tests for your changes
 - Keep your changes focused on addressing the specific issue
@@ -149,7 +149,7 @@ Create a pull request from your branch to the CFWheels develop branch:
 
 1. Go to your fork on GitHub
 2. Click the "Compare & Pull Request" button for your branch
-3. Set the base repository to `cfwheels/cfwheels` and the base branch to `develop`
+3. Set the base repository to `wheels-dev/wheels` and the base branch to `develop`
 4. Fill out the PR template with:
    - A clear description of the changes
    - Reference to the issue being addressed
@@ -261,13 +261,13 @@ For changes that might impact performance:
 
 ### Cross-Engine Compatibility
 
-Remember that CFWheels supports multiple CFML engines:
+Remember that Wheels supports multiple CFML engines:
 - Test on both Lucee and Adobe ColdFusion
 - Avoid engine-specific features or provide alternatives
 - Use the Docker environment to verify compatibility
 
 ## Conclusion
 
-Contributing to CFWheels through pull requests is a rewarding way to improve the framework and help the CFML community. By following this process, you'll help ensure that your contributions are high-quality, well-tested, and efficiently integrated into the project.
+Contributing to Wheels through pull requests is a rewarding way to improve the framework and help the CFML community. By following this process, you'll help ensure that your contributions are high-quality, well-tested, and efficiently integrated into the project.
 
 For more information on using the test environment, see [Using the Test Environment](using-the-test-environment.md).
