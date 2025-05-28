@@ -42,7 +42,7 @@ Commands for generating application code and resources.
 | `wheels generate property` | | Add model property | [Details](generate/property.md) |
 | `wheels generate route` | | Generate route | [Details](generate/route.md) |
 | `wheels generate resource` | | REST resource | [Details](generate/resource.md) |
-| `wheels generate api-resource` | | API resource | [Details](generate/api-resource.md) |
+| `wheels generate api-resource` | | API resource (**Currently broken**) | [Details](generate/api-resource.md) |
 | `wheels generate frontend` | | Frontend code | [Details](generate/frontend.md) |
 | `wheels generate test` | | Generate tests | [Details](generate/test.md) |
 | `wheels generate snippets` | | Code snippets | [Details](generate/snippets.md) |
@@ -119,6 +119,7 @@ Commands for managing development environments.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
+| `wheels env` | Environment management base command | [Details](environment/env.md) |
 | `wheels env setup [name]` | Setup environment | [Details](environment/env-setup.md) |
 | `wheels env list` | List environments | [Details](environment/env-list.md) |
 | `wheels env switch [name]` | Switch environment | [Details](environment/env-switch.md) |
@@ -129,6 +130,7 @@ Commands for managing Wheels plugins.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
+| `wheels plugins` | Plugin management base command | [Details](plugins/plugins.md) |
 | `wheels plugins list` | List plugins | [Details](plugins/plugins-list.md) |
 | `wheels plugins install [name]` | Install plugin | [Details](plugins/plugins-install.md) |
 | `wheels plugins remove [name]` | Remove plugin | [Details](plugins/plugins-remove.md) |
@@ -144,6 +146,7 @@ Commands for analyzing code quality and patterns.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
+| `wheels analyze` | Code analysis base command | [Details](analysis/analyze.md) |
 | `wheels analyze code` | Analyze code quality | [Details](analysis/analyze-code.md) |
 | `wheels analyze performance` | Performance analysis | [Details](analysis/analyze-performance.md) |
 | `wheels analyze security` | Security analysis (deprecated) | [Details](analysis/analyze-security.md) |
@@ -154,6 +157,7 @@ Commands for security scanning and hardening.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
+| `wheels security` | Security management base command | [Details](security/security.md) |
 | `wheels security scan` | Scan for vulnerabilities | [Details](security/security-scan.md) |
 
 ### Security Options
@@ -167,6 +171,7 @@ Commands for optimizing application performance.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
+| `wheels optimize` | Optimization base command | [Details](performance/optimize.md) |
 | `wheels optimize performance` | Optimize application | [Details](performance/optimize-performance.md) |
 
 ## Documentation Commands
@@ -175,6 +180,7 @@ Commands for generating and serving documentation.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
+| `wheels docs` | Documentation base command (**Currently broken**) | [Details](documentation/docs.md) |
 | `wheels docs generate` | Generate documentation | [Details](documentation/docs-generate.md) |
 | `wheels docs serve` | Serve documentation | [Details](documentation/docs-serve.md) |
 
@@ -183,6 +189,50 @@ Commands for generating and serving documentation.
 - `--format` - Output format (html, markdown)
 - `--output` - Output directory
 - `--port` - Server port
+
+## CI/CD Commands
+
+Commands for continuous integration and deployment workflows.
+
+| Command | Description | Documentation |
+|---------|-------------|---------------|
+| `wheels ci init` | Initialize CI/CD configuration | [Details](ci/ci-init.md) |
+
+## Docker Commands
+
+Commands for Docker container management and deployment.
+
+| Command | Description | Documentation |
+|---------|-------------|---------------|
+| `wheels docker init` | Initialize Docker configuration | [Details](docker/docker-init.md) |
+| `wheels docker deploy` | Deploy using Docker | [Details](docker/docker-deploy.md) |
+
+## Deployment Commands
+
+Commands for managing application deployments.
+
+| Command | Description | Documentation |
+|---------|-------------|---------------|
+| `wheels deploy` | Deployment base command | [Details](deploy/deploy.md) |
+| `wheels deploy audit` | Audit deployment configuration | [Details](deploy/deploy-audit.md) |
+| `wheels deploy exec` | Execute deployment | [Details](deploy/deploy-exec.md) |
+| `wheels deploy hooks` | Manage deployment hooks | [Details](deploy/deploy-hooks.md) |
+| `wheels deploy init` | Initialize deployment | [Details](deploy/deploy-init.md) |
+| `wheels deploy lock` | Lock deployment state | [Details](deploy/deploy-lock.md) |
+| `wheels deploy logs` | View deployment logs | [Details](deploy/deploy-logs.md) |
+| `wheels deploy proxy` | Configure deployment proxy | [Details](deploy/deploy-proxy.md) |
+| `wheels deploy push` | Push deployment | [Details](deploy/deploy-push.md) |
+| `wheels deploy rollback` | Rollback deployment | [Details](deploy/deploy-rollback.md) |
+| `wheels deploy secrets` | Manage deployment secrets | [Details](deploy/deploy-secrets.md) |
+| `wheels deploy setup` | Setup deployment environment | [Details](deploy/deploy-setup.md) |
+| `wheels deploy status` | Check deployment status | [Details](deploy/deploy-status.md) |
+| `wheels deploy stop` | Stop deployment | [Details](deploy/deploy-stop.md) |
+
+### Deployment Options
+
+- `--environment` - Target environment
+- `--force` - Force deployment
+- `--dry-run` - Preview changes without deploying
 
 ## Command Patterns
 
@@ -248,6 +298,20 @@ wheels dbmigrate info
 | `3` | File not found |
 | `4` | Permission denied |
 | `5` | Database error |
+
+## Command Status Notes
+
+Some commands in the Wheels CLI are currently in various states of development or maintenance:
+
+### Broken Commands
+- `wheels docs` - Base documentation command is currently broken
+- `wheels generate api-resource` - API resource generation is currently broken
+
+### Disabled Commands
+The following commands exist in the codebase but are currently disabled:
+- Some CI and Docker commands have disabled variants in the codebase
+
+These commands may be re-enabled in future versions of Wheels.
 
 ## See Also
 

@@ -36,7 +36,7 @@
 	* [Testing Commands](command-line-tools/commands/testing/test.md)
 		* [wheels test](command-line-tools/commands/testing/test.md)
 		* [wheels test run](command-line-tools/commands/testing/test-run.md)
-* [CLI Development Guides]
+* CLI Development Guides
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
   * [Service Architecture](command-line-tools/cli-guides/service-architecture.md)
   * [Migrations Guide](command-line-tools/cli-guides/migrations.md)

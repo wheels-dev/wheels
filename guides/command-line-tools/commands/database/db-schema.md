@@ -1,0 +1,361 @@
+# db schema
+
+Export and import database schema definitions.
+
+## Synopsis
+
+```bash
+wheels db schema [command] [options]
+```
+
+## Description
+
+The `db schema` command provides tools for exporting database schemas to files and importing them back. This is useful for version control, documentation, sharing database structures, and setting up new environments.
+
+## Subcommands
+
+### `export`
+Export database schema to a file
+
+### `import`
+Import database schema from a file
+
+### `diff`
+Compare two schema files or database states
+
+### `validate`
+Validate a schema file without importing
+
+## Global Options
+
+### `--env`
+- **Type:** String
+- **Default:** `development`
+- **Description:** The environment to work with
+
+### `--datasource`
+- **Type:** String
+- **Default:** Application default
+- **Description:** Specific datasource to use
+
+### `--format`
+- **Type:** String
+- **Default:** `sql`
+- **Options:** `sql`, `json`, `xml`, `cfm`
+- **Description:** Output format for schema
+
+## Export Command
+
+### Synopsis
+```bash
+wheels db schema export [options]
+```
+
+### Options
+
+#### `--output`
+- **Type:** String
+- **Default:** `db/schema.sql`
+- **Description:** Output file path
+
+#### `--tables`
+- **Type:** String
+- **Default:** All tables
+- **Description:** Comma-separated list of tables to export
+
+#### `--no-data`
+- **Type:** Boolean
+- **Default:** `true`
+- **Description:** Export structure only, no data
+
+#### `--include-drops`
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Include DROP statements
+
+#### `--include-indexes`
+- **Type:** Boolean
+- **Default:** `true`
+- **Description:** Include index definitions
+
+#### `--include-constraints`
+- **Type:** Boolean
+- **Default:** `true`
+- **Description:** Include foreign key constraints
+
+### Examples
+
+```bash
+# Export entire schema
+wheels db schema export
+
+# Export specific tables
+wheels db schema export --tables=user,order,product
+
+# Export as JSON
+wheels db schema export --format=json --output=db/schema.json
+
+# Export with DROP statements
+wheels db schema export --include-drops --output=db/recreate-schema.sql
+```
+
+## Import Command
+
+### Synopsis
+```bash
+wheels db schema import [options]
+```
+
+### Options
+
+#### `--input`
+- **Type:** String
+- **Default:** `db/schema.sql`
+- **Description:** Input file path
+
+#### `--dry-run`
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Preview import without executing
+
+#### `--force`
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Drop existing objects before import
+
+#### `--skip-errors`
+- **Type:** Boolean
+- **Default:** `false`
+- **Description:** Continue on errors
+
+### Examples
+
+```bash
+# Import schema
+wheels db schema import
+
+# Import from specific file
+wheels db schema import --input=db/production-schema.sql
+
+# Preview import
+wheels db schema import --dry-run
+
+# Force recreate schema
+wheels db schema import --force
+```
+
+## Diff Command
+
+### Synopsis
+```bash
+wheels db schema diff [source] [target] [options]
+```
+
+### Options
+
+#### `--output`
+- **Type:** String
+- **Default:** Console output
+- **Description:** Save diff to file
+
+#### `--format`
+- **Type:** String
+- **Default:** `text`
+- **Options:** `text`, `sql`, `html`
+- **Description:** Diff output format
+
+### Examples
+
+```bash
+# Compare dev and production
+wheels db schema diff --env=development --env=production
+
+# Compare schema files
+wheels db schema diff db/schema-v1.sql db/schema-v2.sql
+
+# Generate migration SQL
+wheels db schema diff --env=development --env=production --format=sql
+```
+
+## Use Cases
+
+### Version Control
+Track schema changes in git:
+```bash
+# Export schema after migrations
+wheels dbmigrate latest
+wheels db schema export
+
+# Commit schema file
+git add db/schema.sql
+git commit -m "Update database schema"
+```
+
+### Environment Setup
+Set up new developer environment:
+```bash
+# Clone repository
+git clone repo-url
+
+# Import schema
+wheels db schema import
+
+# Run any pending migrations
+wheels dbmigrate latest
+```
+
+### Database Documentation
+Generate schema documentation:
+```bash
+# Export as JSON for documentation tools
+wheels db schema export --format=json --output=docs/database-schema.json
+
+# Export with comments
+wheels db schema export --include-comments --output=docs/schema-annotated.sql
+```
+
+### Continuous Integration
+Validate schema in CI:
+```bash
+# Export current schema
+wheels db schema export --output=current-schema.sql
+
+# Compare with committed schema
+wheels db schema diff db/schema.sql current-schema.sql
+```
+
+### Backup and Recovery
+Create schema backups:
+```bash
+# Backup before major changes
+wheels db schema export --output=backups/schema-$(date +%Y%m%d).sql
+
+# Include drops for full recreate
+wheels db schema export --include-drops --output=backups/recreate-$(date +%Y%m%d).sql
+```
+
+## Schema File Formats
+
+### SQL Format (Default)
+```sql
+-- Generated by CFWheels
+-- Date: 2024-01-15 10:30:00
+
+CREATE TABLE user (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    email VARCHAR(150) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX idx_user_email ON user(email);
+```
+
+### JSON Format
+```json
+{
+  "version": "1.0",
+  "generated": "2024-01-15T10:30:00Z",
+  "tables": {
+    "user": {
+      "columns": {
+        "id": {
+          "type": "integer",
+          "primaryKey": true,
+          "autoIncrement": true
+        },
+        "username": {
+          "type": "string",
+          "length": 50,
+          "nullable": false
+        }
+      },
+      "indexes": {
+        "idx_user_email": {
+          "columns": ["email"],
+          "unique": true
+        }
+      }
+    }
+  }
+}
+```
+
+### CFM Format
+```cfm
+<cfscript>
+schema = {
+    tables: {
+        user: {
+            columns: [
+                {name: "id", type: "integer", primaryKey: true},
+                {name: "username", type: "string", length: 50},
+                {name: "email", type: "string", length: 150}
+            ],
+            indexes: [
+                {name: "idx_user_email", columns: ["email"], unique: true}
+            ]
+        }
+    }
+};
+</cfscript>
+```
+
+## Best Practices
+
+### 1. Regular Exports
+Export schema after each migration:
+```bash
+# In deployment script
+wheels dbmigrate latest
+wheels db schema export
+git add db/schema.sql
+git commit -m "Update schema after migrations"
+```
+
+### 2. Environment Comparison
+Regularly compare environments:
+```bash
+# Weekly check
+wheels db schema diff --env=development --env=production
+```
+
+### 3. Schema Validation
+Validate before deployment:
+```bash
+# In CI pipeline
+wheels db schema validate --input=db/schema.sql
+```
+
+### 4. Backup Strategy
+Maintain schema history:
+```bash
+# Before major updates
+wheels db schema export --output=db/history/schema-$(git rev-parse --short HEAD).sql
+```
+
+## Integration with Migrations
+
+### Schema vs Migrations
+- Migrations: Incremental changes
+- Schema: Current state snapshot
+
+### Workflow
+1. Run migrations: `wheels dbmigrate latest`
+2. Export schema: `wheels db schema export`
+3. Commit both: `git add db/migrate/* db/schema.sql`
+
+## Notes
+
+- Schema export captures current database state
+- Some database-specific features may not export perfectly
+- Always review exported schemas before importing
+- Use migrations for incremental changes, schemas for full setup
+
+## Related Commands
+
+- [`wheels dbmigrate latest`](dbmigrate-latest.md) - Run all migrations
+- [`wheels dbmigrate info`](dbmigrate-info.md) - View migration status
+- [`wheels db seed`](db-seed.md) - Seed database with data
+- [`wheels generate model`](../generate/model.md) - Generate models from schema
