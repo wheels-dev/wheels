@@ -168,9 +168,7 @@ component output="false" {
 				application.wheels.showErrorInformation = true;
 
 				// Enable the main GUI Component
-				if (application.wheels.enablePublicComponent) {
-					application.wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
-				}
+				application.wheels.public = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Public", method = "$init");
 			} else {
 				application.wheels.enablePublicComponent = application.wheels.debugIPAccess.originalEnablePublicComponent;
 				application.wheels.showDebugInformation = application.wheels.debugIPAccess.originalShowDebugInformation;
