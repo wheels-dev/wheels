@@ -15,7 +15,7 @@
 
 ## Command Line Tools
 
-* [CLI Overview](command-line-tools/README.md)
+* [CLI Overview](command-line-tools/index.md)
 * [Quick Start Guide](command-line-tools/guides/quick-start.md)
 * [Core Commands](command-line-tools/commands/README.md)
   * [wheels init](command-line-tools/commands/core/init.md)
