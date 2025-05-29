@@ -21,21 +21,7 @@
     "type":"commandbox-modules",
     "keywords":"wheels.dev,wheels,cli,commands",
     "private":false,
-    "dependencies":{
-        "testbox-cli":"^2.0.0",
-        "commandbox-migrations":"^5.0.0",
-        "commandbox-dotenv":"^3.0.0"
-    },
-    "devDependencies":{
-        "testbox":"^5.0.0"
-    },
-    "installPaths":{
-        "testbox":"testbox/",
-        "testbox-cli":"modules/testbox-cli/",
-        "commandbox-migrations":"modules/commandbox-migrations/",
-        "commandbox-dotenv":"modules/commandbox-dotenv/"
-    },
-    "scripts":{
+        "scripts":{
         "postVersion":"package set location='cfwheels/wheels-cli#v`package version`'",
         "postPublish":"!git push --follow-tags",
         "patch-release":"bump --patch && publish",
