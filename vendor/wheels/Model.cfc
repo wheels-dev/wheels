@@ -413,36 +413,12 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 		// copy class variables from the object in the application scope
 		if (!StructKeyExists(variables.wheels, "class")) {
-			local.lockName = "classLock_#arguments.name#_#application.applicationName#";
-			$simpleLock(
-				execute = "$modelInitializationLock",
-				name = local.lockName,
-				type = "exclusive"
-			);
-
 			if (StructKeyExists(application.wheels.models, arguments.name)) {
 				variables.wheels.class = application.wheels.models[arguments.name].$classData();
 			} else {
-				// if the model is not in the application cache, attempt to load it dynamically in case of race conditions
-				try {
-					// dynamically load the model by name
-					model(arguments.name);
-					if (StructKeyExists(application.wheels.models, arguments.name)) {
-						// if successfully loaded, retrieve class data from it
-						variables.wheels.class = application.wheels.models[arguments.name].$classData();
-					} else {
-						// if still not found, fall back to an empty default structure to prevent runtime errors
-						variables.wheels.class = {};
-						variables.wheels.class.modelName = arguments.name;
-						variables.wheels.class.properties = {};
-						variables.wheels.class.associations = {};
-					}
-				} catch (any e) {
-					// as a safety net, catch any loading errors and use a blank fallback structure
-					variables.wheels.class = {};
-					variables.wheels.class.modelName = arguments.name;
-					variables.wheels.class.properties = {};
-					variables.wheels.class.associations = {};
+				model(arguments.name);
+				if (StructKeyExists(application.wheels.models, arguments.name)) {
+					variables.wheels.class = application.wheels.models[arguments.name].$classData();
 				}
 			}
 		}
@@ -467,14 +443,6 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	 */
 	public struct function $classData() {
 		return variables.wheels.class;
-	}
-	
-	/**
-	 * Empty function for use with $simpleLock in $initModelObject.
-	 * This is just a placeholder that gets called within the lock.
-	 */
-	public void function $modelInitializationLock() {
-		// This function intentionally left empty
 	}
 
 
