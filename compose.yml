@@ -132,6 +132,22 @@ services:
     ports:
       - "62023:62023"
 
+  adobe2025:
+    build:
+      context: ./
+      dockerfile: ./docker/adobe@2025/Dockerfile
+    image: cfwheels-test-adobe2025:v1.0.0
+    volumes:
+      - ./:/cfwheels-test-suite
+      - type: bind
+        source: ./docker/adobe@2025/server.json
+        target: /cfwheels-test-suite/server.json
+      - type: bind
+        source: ./docker/adobe@2025/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
+    ports:
+      - "62025:62025"
+
   mysql:
     image: mysql:8.0
     restart: always

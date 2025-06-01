@@ -42,6 +42,22 @@ jobs:
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
+          # Adobe ColdFusion 2025 experimental tests (non-blocking)
+          - cfengine: "adobe@2025"
+            dbengine: "mysql"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "adobe@2025"
+            dbengine: "postgres"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "adobe@2025"
+            dbengine: "sqlserver"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
         exclude:
           # - cfengine: lucee@5
           #   dbengine: mysql
@@ -83,6 +99,8 @@ jobs:
           #   dbengine: sqlserver
           - cfengine: adobe@2023
             dbengine: h2
+          - cfengine: adobe@2025
+            dbengine: h2
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -117,8 +135,8 @@ jobs:
         run: |
           box server start serverConfigFile="server.json" --noSaveSettings --debug
 
-      - name: Running onServerInstall Script for Adobe2021 and Adobe2023
-        if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }}
+      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
+        if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
         run: box run-script onServerInstall
 
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
