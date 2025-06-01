@@ -68,6 +68,22 @@ services:
     ports:
       - "60006:60006"
 
+  lucee7:
+    build:
+      context: ./
+      dockerfile: ./docker/lucee@7/Dockerfile
+    image: cfwheels-test-lucee7:v1.0.0
+    volumes:
+      - ./:/cfwheels-test-suite
+      - type: bind
+        source: ./docker/lucee@7/server.json
+        target: /cfwheels-test-suite/server.json
+      - type: bind
+        source: ./docker/lucee@7/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
+    ports:
+      - "60007:60007"
+
   adobe2018:
     build:
       context: ./
