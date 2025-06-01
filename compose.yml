@@ -214,7 +214,33 @@ services:
         reservations:
           memory: 2G
 
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    restart: always
+    environment:
+      ORACLE_PASSWORD: wheelstestdb
+      ORACLE_DATABASE: wheelstestdb
+      APP_USER: wheelstestdb
+      APP_USER_PASSWORD: wheelstestdb
+    ports:
+      - "1522:1521"
+    healthcheck:
+      test: ["CMD", "sqlplus", "-S", "wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb", "<<<", "SELECT 1 FROM DUAL;"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
 volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
+  oracle_data:

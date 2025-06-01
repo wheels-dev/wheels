@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         cfengine: [ "lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023" ]
-        dbengine: ["mysql", "postgres", "sqlserver", "h2"]
+        dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
         commandbox_version: [ "6.2.1" ]
         jdkVersion: [ "21" ]
         experimental: [false]
@@ -39,6 +39,11 @@ jobs:
             experimental: true
           - cfengine: "lucee@7"
             dbengine: "sqlserver"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "oracle"
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
@@ -83,6 +88,8 @@ jobs:
           #   dbengine: sqlserver
           - cfengine: adobe@2018
             dbengine: h2
+          - cfengine: adobe@2018
+            dbengine: oracle
           # - cfengine: adobe@2021
           #   dbengine: mysql
           # - cfengine: adobe@2021
@@ -91,6 +98,8 @@ jobs:
           #   dbengine: sqlserver
           - cfengine: adobe@2021
             dbengine: h2
+          - cfengine: adobe@2021
+            dbengine: oracle
           # - cfengine: adobe@2023
           #   dbengine: mysql
           # - cfengine: adobe@2023
@@ -99,8 +108,12 @@ jobs:
           #   dbengine: sqlserver
           - cfengine: adobe@2023
             dbengine: h2
+          - cfengine: adobe@2023
+            dbengine: oracle
           - cfengine: adobe@2025
             dbengine: h2
+          - cfengine: adobe@2025
+            dbengine: oracle
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
