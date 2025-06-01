@@ -20,6 +20,6 @@
 	},
 	"cfconfigFile":"CFConfig.json",
 	"scripts":{
-        "onServerInstall":"cfpm install image,mail,zip,caching,graphql"
+        "onServerInstall":"cfpm install image,mail,zip,caching,graphql,graphqlclient"
     }
 }
