@@ -1,8 +1,8 @@
 <!--- cfformat-ignore-start ---><cfoutput><cfsilent>
 <cfif testResults.numErrors || testResults.numFailures>
-	<cfheader statuscode="417" statustext="Expectation Failed" />
+	<cfheader statuscode="417"/>
 <cfelse>
-	<cfheader statuscode="200" statustext="OK" />
+	<cfheader statuscode="200"/>
 </cfif>
 <cfsetting showdebugoutput="false">
 <cfset request.wheels.showDebugInformation = false>

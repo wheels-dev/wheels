@@ -21,9 +21,9 @@
         cfheader(name="Access-Control-Allow-Origin", value="*");
         DeJsonResult = DeserializeJSON(result);
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-            cfheader(statustext="Expectation Failed", statuscode=417);
+            cfheader(statuscode=417);
         } else {
-            cfheader(statustext="OK", statuscode=200);
+            cfheader(statuscode=200);
         }
         // Check if 'only' parameter is provided in the URL
         if (structKeyExists(url, "only") && url.only eq "failure,error") {
