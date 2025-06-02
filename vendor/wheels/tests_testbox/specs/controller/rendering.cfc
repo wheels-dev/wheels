@@ -238,7 +238,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is rendering text with doesnt hijack status", () => {
-				cfheader(statustext = "Leave me be", statuscode = 403)
+				cfheader(statuscode = 403)
 				_controller.renderText(text = "OMG!")
 
 				expect(application.wo.$statusCode()).toBe(403)
@@ -294,7 +294,7 @@ component extends="testbox.system.BaseSpec" {
 
 			beforeEach(() => {
 				params = {controller = "test", action = "test"}
-				cfheader(statustext = "OK", statuscode = 200);
+				cfheader(statuscode = 200);
 			})
 
 			afterEach(() => {

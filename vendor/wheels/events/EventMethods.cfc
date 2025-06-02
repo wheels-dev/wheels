@@ -69,7 +69,7 @@ component extends="wheels.Global" {
 					Throw(object = arguments.exception);
 				}
 			} else {
-				$header(statusCode = 500, statusText = "Internal Server Error");
+				$header(statusCode = 500);
 				local.rv = $includeAndReturnOutput(
 					$template = "#application.wheels.eventPath#/onerror.cfm",
 					eventName = arguments.eventName,
@@ -135,7 +135,7 @@ component extends="wheels.Global" {
 				}
 			}
 			if (!local.makeException) {
-				$header(statusCode = 503, statustext = "Service Unavailable");
+				$header(statusCode = 503);
 
 				// Set the content to be displayed in maintenance mode to a request variable and exit the function.
 				// This variable is then checked in the Wheels $request function (which is what sets what to render).
@@ -208,7 +208,7 @@ component extends="wheels.Global" {
 
 	public void function $runOnMissingTemplate(required targetpage) {
 		if (!application.wheels.showErrorInformation) {
-			$header(statusCode = 404, statustext = "Not Found");
+			$header(statusCode = 404);
 		}
 		$includeAndOutput(template = "#application.wheels.eventPath#/onmissingtemplate.cfm");
 		abort;
