@@ -346,10 +346,10 @@ component {
 					break;
 				case "struct":
 				case "structs":
-					local.rv = arrayToStruct($serializeQueryToStructs(query = local.findAll.query, argumentCollection = arguments));
+					local.rv = $serializeQueryToStructs(query = local.findAll.query, argumentCollection = arguments);
 					break;
 				case "array":
-					local.rv = $serializeQueryToStructs(query = local.findAll.query, argumentCollection = arguments);
+					local.rv = $serializeQueryToArray(query = local.findAll.query, argumentCollection = arguments);
 					break;
 				case "object":
 				case "objects":
