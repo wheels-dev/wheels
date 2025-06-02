@@ -68,6 +68,22 @@ services:
     ports:
       - "60006:60006"
 
+  lucee7:
+    build:
+      context: ./
+      dockerfile: ./docker/lucee@7/Dockerfile
+    image: cfwheels-test-lucee7:v1.0.0
+    volumes:
+      - ./:/cfwheels-test-suite
+      - type: bind
+        source: ./docker/lucee@7/server.json
+        target: /cfwheels-test-suite/server.json
+      - type: bind
+        source: ./docker/lucee@7/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
+    ports:
+      - "60007:60007"
+
   adobe2018:
     build:
       context: ./
@@ -115,6 +131,22 @@ services:
         target: /cfwheels-test-suite/app/config/settings.cfm
     ports:
       - "62023:62023"
+
+  adobe2025:
+    build:
+      context: ./
+      dockerfile: ./docker/adobe@2025/Dockerfile
+    image: cfwheels-test-adobe2025:v1.0.0
+    volumes:
+      - ./:/cfwheels-test-suite
+      - type: bind
+        source: ./docker/adobe@2025/server.json
+        target: /cfwheels-test-suite/server.json
+      - type: bind
+        source: ./docker/adobe@2025/settings.cfm
+        target: /cfwheels-test-suite/app/config/settings.cfm
+    ports:
+      - "62025:62025"
 
   mysql:
     image: mysql:8.0
@@ -182,7 +214,33 @@ services:
         reservations:
           memory: 2G
 
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    restart: always
+    environment:
+      ORACLE_PASSWORD: wheelstestdb
+      ORACLE_DATABASE: wheelstestdb
+      APP_USER: wheelstestdb
+      APP_USER_PASSWORD: wheelstestdb
+    ports:
+      - "1522:1521"
+    healthcheck:
+      test: ["CMD", "sqlplus", "-S", "wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb", "<<<", "SELECT 1 FROM DUAL;"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
 volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
+  oracle_data:

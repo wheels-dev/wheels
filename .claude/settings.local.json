@@ -45,7 +45,8 @@
       "Bash(box exit)",
       "Bash(box version:*)",
       "Bash(rg:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

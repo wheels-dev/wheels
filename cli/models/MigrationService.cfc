@@ -78,10 +78,6 @@ component {
         string model = "",
         string type = "create"
     ) {
-        var content = 'component extends="wheels.migrator.Migration" {' & chr(10) & chr(10);
-        content &= '    function up() {' & chr(10);
-        content &= '        transaction {' & chr(10);
-        
         // Determine table name
         var tableName = len(arguments.table) ? arguments.table : "";
         if (!len(tableName) && len(arguments.model)) {
@@ -91,85 +87,57 @@ component {
             tableName = extractTableFromName(arguments.className);
         }
         
+        // Determine template file based on type
+        var templateFile = "";
         switch (arguments.type) {
             case "create":
-                content &= generateCreateTableContent(tableName);
+                templateFile = "create-table.txt";
                 break;
             case "modify":
-                content &= generateModifyTableContent(tableName);
-                break;
-            case "drop":
-                content &= generateDropTableContent(tableName);
+                templateFile = "change-table.txt";
                 break;
             default:
-                content &= '            // Add your migration code here' & chr(10);
+                templateFile = "blank.txt";
         }
         
-        content &= '        }' & chr(10);
-        content &= '    }' & chr(10) & chr(10);
+        // Load and process template
+        return loadAndProcessTemplate(
+            templateFile = templateFile,
+            tableName = tableName,
+            className = arguments.className
+        );
+    }
+    
+    /**
+     * Load and process template file
+     */
+    private function loadAndProcessTemplate(
+        required string templateFile,
+        required string tableName,
+        required string className
+    ) {
+        var templatePath = resolvePath("cli/templates/dbmigrate/" & arguments.templateFile);
         
-        content &= '    function down() {' & chr(10);
-        content &= '        transaction {' & chr(10);
-        
-        switch (arguments.type) {
-            case "create":
-                content &= '            dropTable("' & tableName & '");' & chr(10);
-                break;
-            default:
-                content &= '            // Add your rollback code here' & chr(10);
+        // Read template file
+        if (!fileExists(templatePath)) {
+            throw(
+                type = "MigrationService.TemplateNotFound",
+                message = "Migration template not found",
+                detail = "The template file '" & arguments.templateFile & "' was not found at: " & templatePath
+            );
         }
         
-        content &= '        }' & chr(10);
-        content &= '    }' & chr(10) & chr(10);
-        content &= '}';
+        var content = fileRead(templatePath);
+        
+        // Replace template placeholders
+        content = replace(content, "|tableName|", arguments.tableName, "all");
+        content = replace(content, "|DBMigrateExtends|", "wheels.migrator.Migration", "all");
+        content = replace(content, "|DBMigrateDescription|", "Migration: " & arguments.className, "all");
+        content = replace(content, "|force|", "false", "all");
+        content = replace(content, "|id|", "true", "all");
+        content = replace(content, "|primaryKey|", "id", "all");
         
         return content;
-    }
-    
-    /**
-     * Generate create table content
-     */
-    private function generateCreateTableContent(required string tableName) {
-        var content = '            t = createTable(name="' & arguments.tableName & '");' & chr(10);
-        content &= '            t.primaryKey();' & chr(10);
-        content &= '            ' & chr(10);
-        content &= '            // Add your columns here' & chr(10);
-        content &= '            // t.string(columnName="name", null=false);' & chr(10);
-        content &= '            // t.text(columnName="description");' & chr(10);
-        content &= '            // t.integer(columnName="status", default=1);' & chr(10);
-        content &= '            // t.decimal(columnName="price", precision=10, scale=2);' & chr(10);
-        content &= '            // t.boolean(columnName="active", default=true);' & chr(10);
-        content &= '            // t.date(columnName="birthDate");' & chr(10);
-        content &= '            // t.datetime(columnName="publishedAt");' & chr(10);
-        content &= '            ' & chr(10);
-        content &= '            t.timestamps();' & chr(10);
-        content &= '            t.create();' & chr(10);
-        
-        return content;
-    }
-    
-    /**
-     * Generate modify table content
-     */
-    private function generateModifyTableContent(required string tableName) {
-        var content = '            t = changeTable(name="' & arguments.tableName & '");' & chr(10);
-        content &= '            ' & chr(10);
-        content &= '            // Add your modifications here' & chr(10);
-        content &= '            // t.addColumn(columnName="newColumn", columnType="string");' & chr(10);
-        content &= '            // t.changeColumn(columnName="existingColumn", columnType="text");' & chr(10);
-        content &= '            // t.removeColumn(columnName="oldColumn");' & chr(10);
-        content &= '            // t.renameColumn(columnName="oldName", newColumnName="newName");' & chr(10);
-        content &= '            ' & chr(10);
-        content &= '            t.change();' & chr(10);
-        
-        return content;
-    }
-    
-    /**
-     * Generate drop table content
-     */
-    private function generateDropTableContent(required string tableName) {
-        return '            dropTable("' & arguments.tableName & '");' & chr(10);
     }
     
     /**

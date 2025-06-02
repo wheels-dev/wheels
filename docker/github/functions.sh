@@ -10,6 +10,9 @@ get_port () {
     lucee@6)
       echo -n "60006"
       ;;
+    lucee@7)
+      echo -n "60007"
+      ;;
     adobe2016)
       echo -n "62016"
       ;;
@@ -22,6 +25,9 @@ get_port () {
     adobe@2023)
       echo -n "62023"
       ;;
+    adobe@2025)
+      echo -n "62025"
+      ;;
     mysql56)
       echo -n "3306"
       ;;
@@ -33,6 +39,9 @@ get_port () {
       ;;
     h2)
       echo -n "9092"
+      ;;
+    oracle)
+      echo -n "1521"
       ;;
     *)
       echo -n "unknown"
