@@ -106,6 +106,14 @@ component {
             processed = replace(processed, "|Actions|", "", "all");
         }
         
+        // Process form fields if properties are provided (must happen before object name replacements)
+        if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties)) {
+            var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName);
+            processed = replace(processed, "|FormFields|", formFieldsCode, "all");
+        } else {
+            processed = replace(processed, "|FormFields|", "", "all");
+        }
+        
         // Process pipe-delimited placeholders (used in CRUD templates)
         // Generate object name variations from model or controller name
         if (structKeyExists(arguments.context, "modelName")) {
@@ -114,14 +122,6 @@ component {
             processed = replace(processed, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(modelName)), "all");
             processed = replace(processed, "|ObjectNameSingularC|", modelName, "all");
             processed = replace(processed, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
-        }
-        
-        // Process form fields if properties are provided
-        if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties)) {
-            var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName);
-            processed = replace(processed, "|FormFields|", formFieldsCode, "all");
-        } else {
-            processed = replace(processed, "|FormFields|", "", "all");
         }
         
         return processed;

@@ -48,11 +48,9 @@ component {
             
             // 2. Generate Migration
             try {
-                var migrationPath = migrationService.createMigration(
-                    name = "create_#variables.helpers.pluralize(lCase(arguments.name))#_table",
-                    table = variables.helpers.pluralize(lCase(arguments.name)),
-                    model = arguments.name,
-                    type = "create",
+                var migrationPath = createMigrationWithProperties(
+                    name = arguments.name,
+                    properties = parseProperties(arguments.properties),
                     baseDirectory = arguments.baseDirectory
                 );
                 
@@ -172,6 +170,179 @@ component {
     }
     
     /**
+     * Create migration with properties
+     */
+    private function createMigrationWithProperties(
+        required string name,
+        required array properties,
+        string baseDirectory = ""
+    ) {
+        var timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
+        var tableName = variables.helpers.pluralize(lCase(arguments.name));
+        var className = "create_#tableName#_table";
+        var fileName = timestamp & "_" & className & ".cfc";
+        var migrationDir = resolvePath("app/migrator/migrations", arguments.baseDirectory);
+        
+        // Create migrations directory if it doesn't exist
+        if (!directoryExists(migrationDir)) {
+            directoryCreate(migrationDir, true);
+        }
+        
+        var migrationPath = migrationDir & "/" & fileName;
+        
+        // Generate migration content with properties
+        var content = generateMigrationContentWithProperties(
+            className = className,
+            tableName = tableName,
+            properties = arguments.properties
+        );
+        
+        // Write migration file
+        fileWrite(migrationPath, content);
+        
+        return "app/migrator/migrations/" & fileName;
+    }
+    
+    /**
+     * Generate migration content with properties
+     */
+    private function generateMigrationContentWithProperties(
+        required string className,
+        required string tableName,
+        required array properties
+    ) {
+        var content = '/*' & chr(10);
+        content &= '  |----------------------------------------------------------------------------------------------|' & chr(10);
+        content &= '	| Parameter  | Required | Type    | Default | Description                                      |' & chr(10);
+        content &= '  |----------------------------------------------------------------------------------------------|' & chr(10);
+        content &= '	| name       | Yes      | string  |         | table name, in pluralized form                   |' & chr(10);
+        content &= '	| force      | No       | boolean | false   | drop existing table of same name before creating |' & chr(10);
+        content &= '	| id         | No       | boolean | true    | if false, defines a table with no primary key    |' & chr(10);
+        content &= '	| primaryKey | No       | string  | id      | overrides default primary key name               |' & chr(10);
+        content &= '  |----------------------------------------------------------------------------------------------|' & chr(10);
+        content &= chr(10);
+        content &= '    EXAMPLE:' & chr(10);
+        content &= '      t = createTable(name=''employees'', force=false, id=true, primaryKey=''empId'');' & chr(10);
+        content &= '			t.string(columnNames=''firstName,lastName'', default='''', null=true, limit=''255'');' & chr(10);
+        content &= '			t.text(columnNames=''bio'', default='''', null=true);' & chr(10);
+        content &= '			t.timestamps();' & chr(10);
+        content &= '			t.create();' & chr(10);
+        content &= '*/' & chr(10);
+        content &= 'component extends="wheels.migrator.Migration" hint="Migration: #arguments.className#" {' & chr(10);
+        content &= chr(10);
+        content &= '	function up() {' & chr(10);
+        content &= '		transaction {' & chr(10);
+        content &= '			try {' & chr(10);
+        content &= '				t = createTable(name = ''#arguments.tableName#'', force=''false'', id=''true'', primaryKey=''id'');' & chr(10);
+        
+        // Add properties
+        for (var prop in arguments.properties) {
+            var cfType = mapToCFWheelsType(prop.type);
+            var params = 'columnNames=''#prop.name#''';
+            
+            if (prop.default != "") {
+                params &= ', default=''#prop.default#''';
+            } else {
+                params &= ', default=''''';
+            }
+            
+            params &= ', null=' & (!prop.required ? 'true' : 'false');
+            
+            // Add type-specific parameters
+            switch (cfType) {
+                case "string":
+                    params &= ', limit=''255''';
+                    break;
+                case "decimal":
+                    params &= ', precision=''10'', scale=''2''';
+                    break;
+                case "integer":
+                    params &= ', limit=''11''';
+                    break;
+            }
+            
+            content &= '				t.#cfType#(#params#);' & chr(10);
+        }
+        
+        content &= '				t.timestamps();' & chr(10);
+        content &= '				t.create();' & chr(10);
+        content &= '			} catch (any e) {' & chr(10);
+        content &= '				local.exception = e;' & chr(10);
+        content &= '			}' & chr(10);
+        content &= chr(10);
+        content &= '			if (StructKeyExists(local, "exception")) {' & chr(10);
+        content &= '				transaction action="rollback";' & chr(10);
+        content &= '				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");' & chr(10);
+        content &= '			} else {' & chr(10);
+        content &= '				transaction action="commit";' & chr(10);
+        content &= '			}' & chr(10);
+        content &= '		}' & chr(10);
+        content &= '	}' & chr(10);
+        content &= chr(10);
+        content &= '	function down() {' & chr(10);
+        content &= '		transaction {' & chr(10);
+        content &= '			try {' & chr(10);
+        content &= '				dropTable(''#arguments.tableName#'');' & chr(10);
+        content &= '			} catch (any e) {' & chr(10);
+        content &= '				local.exception = e;' & chr(10);
+        content &= '			}' & chr(10);
+        content &= chr(10);
+        content &= '			if (StructKeyExists(local, "exception")) {' & chr(10);
+        content &= '				transaction action="rollback";' & chr(10);
+        content &= '				Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");' & chr(10);
+        content &= '			} else {' & chr(10);
+        content &= '				transaction action="commit";' & chr(10);
+        content &= '			}' & chr(10);
+        content &= '		}' & chr(10);
+        content &= '	}' & chr(10);
+        content &= chr(10);
+        content &= '}' & chr(10);
+        
+        return content;
+    }
+    
+    /**
+     * Map property type to CFWheels migration type
+     */
+    private function mapToCFWheelsType(required string type) {
+        switch (lCase(arguments.type)) {
+            case "string":
+                return "string";
+            case "text":
+                return "text";
+            case "integer":
+            case "int":
+                return "integer";
+            case "biginteger":
+            case "bigint":
+                return "biginteger";
+            case "float":
+            case "double":
+                return "float";
+            case "decimal":
+            case "numeric":
+                return "decimal";
+            case "boolean":
+            case "bool":
+                return "boolean";
+            case "date":
+                return "date";
+            case "datetime":
+            case "timestamp":
+                return "datetime";
+            case "time":
+                return "time";
+            case "binary":
+            case "blob":
+                return "binary";
+            case "uuid":
+                return "uniqueidentifier";
+            default:
+                return "string";
+        }
+    }
+    
+    /**
      * Parse properties string into structured array
      */
     private function parseProperties(required string propertiesString) {
@@ -271,6 +442,16 @@ component {
         }
         
         return false;
+    }
+    
+    /**
+     * Resolve path relative to base directory
+     */
+    private function resolvePath(required string path, string baseDirectory = "") {
+        if (len(arguments.baseDirectory)) {
+            return arguments.baseDirectory & "/" & arguments.path;
+        }
+        return arguments.path;
     }
     
     /**

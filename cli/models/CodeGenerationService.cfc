@@ -219,6 +219,9 @@ component {
                 case "edit":
                     arguments.template = "crud/edit.txt";
                     break;
+                case "_form":
+                    arguments.template = "crud/_form.txt";
+                    break;
                 default:
                     arguments.template = "ViewContent.txt";
             }
