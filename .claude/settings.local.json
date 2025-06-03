@@ -54,7 +54,10 @@
       "Bash(/Users/peter/projects/wheels/cli/workspace/test-scaffolding-final.sh:*)",
       "Bash(box server forget:*)",
       "Bash(box server:*)",
-      "Bash(box install:*)"
+      "Bash(box install:*)",
+      "Bash(box help wheels:*)",
+      "Bash(./comprehensive-test-suite.sh:*)",
+      "Bash(./test-cli-commands.sh:*)"
     ],
     "deny": []
   }
