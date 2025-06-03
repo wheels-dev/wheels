@@ -445,22 +445,46 @@ component aliases='wheels g resource' extends="../base" {
         var routesPath = fileSystemUtil.resolvePath("app/config/routes.cfm");
         
         if (!fileExists(routesPath)) {
-            // Create basic routes file if it doesn't exist
-            var routesContent = chr(60) & "cfscript" & chr(62) & chr(10);
-            routesContent &= "// Routes" & chr(10);
-            routesContent &= chr(60) & "/cfscript" & chr(62) & chr(10);
-            fileWrite(routesPath, routesContent);
+            return false;
         }
         
         var content = fileRead(routesPath);
-        var resourceRoute = arguments.options.api ? '.apiResource("' & arguments.obj.objectNamePlural & '")' : '.resources("' & arguments.obj.objectNamePlural & '")';
+        var resourceName = arguments.obj.objectNamePlural;
+        var resourceRoute = arguments.options.api ? '.apiResource("' & resourceName & '")' : '.resources("' & resourceName & '")';
         
         // Check if route already exists
-        if (!find(resourceRoute, content)) {
-            // Insert before closing tag
-            content = reReplace(content, chr(60) & "/cfscript" & chr(62), resourceRoute & '.end();' & chr(10) & chr(60) & '/cfscript' & chr(62));
+        if (find(resourceRoute, content)) {
+            return false;
+        }
+        
+        // Find the CLI-Appends-Here marker and add route there
+        var markerPattern = '// CLI-Appends-Here';
+        var indent = '';
+        
+        // Try to find marker with various indentation levels
+        if (find(chr(9) & chr(9) & chr(9) & markerPattern, content)) {
+            indent = chr(9) & chr(9) & chr(9);
+        } else if (find(chr(9) & chr(9) & markerPattern, content)) {
+            indent = chr(9) & chr(9);
+        } else if (find(chr(9) & markerPattern, content)) {
+            indent = chr(9);
+        }
+        
+        var fullMarkerPattern = indent & markerPattern;
+        var inject = indent & resourceRoute;
+        
+        if (find(fullMarkerPattern, content)) {
+            // Replace the marker with the new route followed by the marker on a new line
+            content = replace(content, fullMarkerPattern, inject & chr(10) & fullMarkerPattern, 'all');
             fileWrite(routesPath, content);
             return true;
+        } else {
+            // If no marker found, try to add before .end()
+            if (find('.end()', content)) {
+                content = replace(content, '.end()', resourceRoute & chr(10) & chr(9) & chr(9) & chr(9) & '.end()', 'all');
+                fileWrite(routesPath, content);
+                return true;
+            }
         }
         
         return false;

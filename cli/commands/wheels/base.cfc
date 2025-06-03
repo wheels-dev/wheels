@@ -334,7 +334,23 @@ component excludeFromHelp=true {
   				return loc.result;
   			}
   		} else {
-  			print.line(helpers.stripTags(Formatter.unescapeHTML(loc.filecontent)));
+  			// Check if this is likely an application error
+  			if (find("<title>", loc.filecontent) && find("error", lCase(loc.filecontent))) {
+  				print.redLine("Your application appears to have an error that's preventing CLI access.");
+  				print.line("");
+  				print.yellowLine("Common causes:");
+  				print.line("  - Syntax errors in routes.cfm or other configuration files");
+  				print.line("  - Missing required files or directories");
+  				print.line("  - Database connection issues");
+  				print.line("");
+  				print.yellowLine("To debug:");
+  				print.line("  1. Visit your application in a browser: #replace(targetURL, '?controller=wheels&action=wheels&view=cli&command=info', '')#");
+  				print.line("  2. Fix any errors shown");
+  				print.line("  3. Try the CLI command again");
+  			} else {
+  				print.line(helpers.stripTags(Formatter.unescapeHTML(loc.filecontent)));
+  			}
+  			print.line("");
   			print.line("Tried #targetURL#");
   			error("Error returned from DBMigrate Bridge");
   		}

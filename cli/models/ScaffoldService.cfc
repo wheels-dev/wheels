@@ -229,20 +229,39 @@ component {
             if (fileExists(routesPath)) {
                 var content = fileRead(routesPath);
                 var resourceName = lCase(variables.helpers.pluralize(arguments.name));
-                var resourceLine = 'resources(name="#resourceName#");';
+                var resourceRoute = '.resources("' & resourceName & '")';
                 
                 // Check if resource already exists
-                if (!findNoCase(resourceName, content)) {
-                    // Find a good place to insert (before end() if exists)
-                    if (findNoCase("end()", content)) {
-                        content = replaceNoCase(content, "end()", resourceLine & chr(10) & chr(10) & "end()", "one");
-                    } else {
-                        // Just append
-                        content &= chr(10) & chr(10) & resourceLine;
+                if (!findNoCase(resourceRoute, content)) {
+                    // Find the CLI-Appends-Here marker and add route there
+                    var markerPattern = '// CLI-Appends-Here';
+                    var indent = '';
+                    
+                    // Try to find marker with various indentation levels
+                    if (find(chr(9) & chr(9) & chr(9) & markerPattern, content)) {
+                        indent = chr(9) & chr(9) & chr(9);
+                    } else if (find(chr(9) & chr(9) & markerPattern, content)) {
+                        indent = chr(9) & chr(9);
+                    } else if (find(chr(9) & markerPattern, content)) {
+                        indent = chr(9);
                     }
                     
-                    fileWrite(routesPath, content);
-                    return true;
+                    var fullMarkerPattern = indent & markerPattern;
+                    var inject = indent & resourceRoute;
+                    
+                    if (find(fullMarkerPattern, content)) {
+                        // Replace the marker with the new route followed by the marker on a new line
+                        content = replace(content, fullMarkerPattern, inject & chr(10) & fullMarkerPattern, 'all');
+                        fileWrite(routesPath, content);
+                        return true;
+                    } else {
+                        // If no marker found, try to add before .end()
+                        if (find('.end()', content)) {
+                            content = replace(content, '.end()', resourceRoute & chr(10) & chr(9) & chr(9) & chr(9) & '.end()', 'all');
+                            fileWrite(routesPath, content);
+                            return true;
+                        }
+                    }
                 }
             }
         } catch (any e) {

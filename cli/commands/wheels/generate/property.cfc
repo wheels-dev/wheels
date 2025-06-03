@@ -86,16 +86,31 @@ component aliases='wheels g property'  extends="../base"  {
 		print.line("Attempting to migrate to latest DB schema");
 
 		// Insert form field
-		print.line("Inserting field into view form");
-		$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.columnType, action="input");
+		var formPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/_form.cfm");
+		if (fileExists(formPath)) {
+			print.line("Inserting field into view form");
+			$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.columnType, action="input");
+		} else {
+			print.yellowLine("Warning: _form.cfm not found at #formPath#, skipping form field injection");
+		}
 
 		// Insert field into index listing
-		print.line("Inserting field into into index listing");
-		$injectIntoIndex(objectnames=obj, property=arguments.columnName, type=arguments.columnType);
+		var indexPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/index.cfm");
+		if (fileExists(indexPath)) {
+			print.line("Inserting field into into index listing");
+			$injectIntoIndex(objectnames=obj, property=arguments.columnName, type=arguments.columnType);
+		} else {
+			print.yellowLine("Warning: index.cfm not found at #indexPath#, skipping index field injection");
+		}
 
 		// Insert default output
-		print.line("Inserting output into views");
-		$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.columnType, action="output");
+		var showPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/show.cfm");
+		if (fileExists(showPath)) {
+			print.line("Inserting output into views");
+			$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.columnType, action="output");
+		} else {
+			print.yellowLine("Warning: show.cfm not found at #showPath#, skipping show field injection");
+		}
 
 		print.yellowline( "Migrating DB" ).toConsole();
 		if(confirm("Would you like to migrate the database now? [y/n]")){
