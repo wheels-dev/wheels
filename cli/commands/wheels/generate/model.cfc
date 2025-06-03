@@ -21,6 +21,8 @@ component aliases='wheels g model' extends="../base" {
      * @belongs-to.hint Parent model relationships (comma-separated)
      * @has-many.hint Child model relationships (comma-separated)
      * @has-one.hint One-to-one relationships (comma-separated)
+     * @primary-key.hint Primary key column name(s) (default: id)
+     * @table-name.hint Custom database table name
      * @description.hint Model description
      * @force.hint Overwrite existing files
      */
@@ -28,9 +30,11 @@ component aliases='wheels g model' extends="../base" {
         required string name,
         boolean migration = true,
         string properties = "",
-        string belongsTo = "",
-        string hasMany = "",
-        string hasOne = "",
+        string "belongs-to" = "",
+        string "has-many" = "",
+        string "has-one" = "",
+        string "primary-key" = "id",
+        string "table-name" = "",
         string description = "",
         boolean force = false
     ) {
@@ -50,9 +54,9 @@ component aliases='wheels g model' extends="../base" {
         // Add relationship properties
         parsedProperties = addRelationshipProperties(
             parsedProperties,
-            arguments.belongsTo,
-            arguments.hasMany,
-            arguments.hasOne
+            arguments["belongs-to"],
+            arguments["has-many"],
+            arguments["has-one"]
         );
         
         // Generate model
@@ -61,7 +65,9 @@ component aliases='wheels g model' extends="../base" {
             description = arguments.description,
             force = arguments.force,
             properties = parsedProperties,
-            baseDirectory = getCWD()
+            baseDirectory = getCWD(),
+            primaryKey = arguments["primary-key"],
+            tableName = arguments["table-name"]
         );
         
         if (result.success) {
@@ -104,7 +110,7 @@ component aliases='wheels g model' extends="../base" {
                  .line("2. Add validation rules if needed")
                  .line("3. Run migrations: wheels dbmigrate up");
             
-            if (len(arguments.belongsTo) || len(arguments.hasMany) || len(arguments.hasOne)) {
+            if (len(arguments["belongs-to"]) || len(arguments["has-many"]) || len(arguments["has-one"])) {
                 print.line("4. Ensure related models exist");
             }
         } else {

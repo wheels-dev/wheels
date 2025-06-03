@@ -10,11 +10,11 @@
 component extends="base" {
     
     /**
-     * @subcommand.hint Subcommand to execute (generate, serve)
-     * @subcommand.options generate,serve
+     * @sub-command.hint Subcommand to execute (generate, serve)
+     * @sub-command.options generate,serve
      */
-    function run(string subcommand = "") {
-        if (!len(arguments.subcommand)) {
+    function run(string "sub-command" = "") {
+        if (!len(arguments["sub-command"])) {
             print.line();
             print.boldMagentaLine("📚 Wheels Documentation Generator");
             print.line();
@@ -28,10 +28,10 @@ component extends="base" {
         
         // Forward all remaining arguments to the subcommand
         var args = duplicate(arguments);
-        structDelete(args, "subcommand");
+        structDelete(args, "sub-command");
         
         // Show help for the subcommands since we can't delegate directly
-        switch(arguments.subcommand) {
+        switch(arguments["sub-command"]) {
             case "generate":
                 print.line();
                 print.boldGreenLine("📝 Generate Documentation");
@@ -61,7 +61,7 @@ component extends="base" {
                 print.line("  wheels docs:serve --port=3000 --open");
                 break;
             default:
-                error("Unknown subcommand: #arguments.subcommand#");
+                error("Unknown subcommand: #arguments["sub-command"]#");
         }
     }
 }

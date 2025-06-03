@@ -15,7 +15,7 @@ component aliases='wheels g test' extends="../base"  {
 	/**
 	 * @type.hint Type of test: model, controller, view, unit, integration
 	 * @type.options model,controller,view,unit,integration
-	 * @objectname.hint Name of object/class to test
+	 * @target.hint Name of object/class to test
 	 * @name.hint Name of the action/view (for view tests)
 	 * @crud.hint Generate CRUD test methods
 	 * @mock.hint Generate mock objects
@@ -23,13 +23,13 @@ component aliases='wheels g test' extends="../base"  {
 	 **/
 	function run(
 		required string type,
-		required string objectname,
+		required string target,
 		string name="",
 		boolean crud=false,
 		boolean mock=false,
 		boolean open=false
 	){
-		var obj = helpers.getNameVariants(listLast( arguments.objectname, '/\' ));
+		var obj = helpers.getNameVariants(listLast( arguments.target, '/\' ));
 		var testsdirectory = fileSystemUtil.resolvePath( "tests/Testbox/specs" );
 
 		// Validate directories
@@ -37,7 +37,7 @@ component aliases='wheels g test' extends="../base"  {
 			error( "[#testsdirectory#] can't be found. Are you running this from your site root?" );
  		}
  		if( arguments.type == "view" && !len(arguments.name)){
- 			error( "If creating a view, we need to know the name of the view as well as the objectname");
+ 			error( "If creating a view, we need to know the name of the view as well as the target");
  		}
 
  		// Handle type
