@@ -72,18 +72,45 @@ component {
      * Analyze a directory recursively
      */
     private function analyzeDirectory(required string path, required struct results, required string severity) {
-        var files = directoryList(
-            arguments.path, 
-            true, 
-            "path", 
-            "*.cfc|*.cfm", 
-            "name asc"
-        );
-        
-        for (var file in files) {
-            if (!isExcluded(file)) {
-                analyzeFile(file, arguments.results, arguments.severity);
+        try {
+            // First get a count to show progress
+            print.text("Scanning for files... ").toConsole();
+            
+            var files = directoryList(
+                arguments.path, 
+                true, 
+                "path", 
+                "*.cfc|*.cfm", 
+                "name asc"
+            );
+            
+            print.line("Found #arrayLen(files)# files");
+            
+            // Process files with progress indicator
+            var fileCount = 0;
+            var totalFiles = arrayLen(files);
+            
+            for (var file in files) {
+                if (!isExcluded(file)) {
+                    fileCount++;
+                    if (fileCount % 10 == 0) {
+                        print.text(".").toConsole();
+                    }
+                    if (fileCount % 100 == 0) {
+                        print.line(" (#fileCount#/#totalFiles#)");
+                    }
+                    analyzeFile(file, arguments.results, arguments.severity);
+                }
             }
+            
+            if (fileCount % 100 != 0) {
+                print.line(" (#fileCount#/#totalFiles#)");
+            }
+            
+        } catch (any e) {
+            // If directory listing fails or takes too long
+            print.redLine("Error scanning directory: #e.message#");
+            print.yellowLine("Try analyzing a more specific path or subdirectory");
         }
     }
     
@@ -387,13 +414,27 @@ component {
             "node_modules/",
             ".git/",
             "testbox/",
-            "tests/"
+            "tests/",
+            "build/",
+            "dist/",
+            ".svn/",
+            "bower_components/",
+            "packages/",
+            "coldbox/",
+            "modules/",
+            "includes/testbox/",
+            "WEB-INF/"
         ];
         
         for (var pattern in excludePatterns) {
             if (findNoCase(pattern, arguments.path)) {
                 return true;
             }
+        }
+        
+        // Also exclude minified files
+        if (reFindNoCase("\.(min\.(js|css)|bundle\.js)$", arguments.path)) {
+            return true;
         }
         
         return false;

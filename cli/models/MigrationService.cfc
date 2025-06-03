@@ -116,7 +116,13 @@ component {
         required string tableName,
         required string className
     ) {
-        var templatePath = resolvePath("cli/templates/dbmigrate/" & arguments.templateFile);
+        // First try app/snippets directory (preferred)
+        var templatePath = resolvePath("app/snippets/dbmigrate/" & arguments.templateFile);
+        
+        // If not found, try the module templates directory
+        if (!fileExists(templatePath)) {
+            templatePath = expandPath("/wheels-cli/templates/dbmigrate/" & arguments.templateFile);
+        }
         
         // Read template file
         if (!fileExists(templatePath)) {

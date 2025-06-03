@@ -46,7 +46,12 @@
       "Bash(box version:*)",
       "Bash(rg:*)",
       "Bash(true)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(cat:*)",
+      "Bash(./test-fixes.sh:*)",
+      "Bash(./cli/workspace/test-fixes.sh:*)",
+      "Bash(./cli/workspace/test-scaffolding.sh:*)",
+      "Bash(/Users/peter/projects/wheels/cli/workspace/test-scaffolding-final.sh:*)"
     ],
     "deny": []
   }
