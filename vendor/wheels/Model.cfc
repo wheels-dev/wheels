@@ -413,12 +413,28 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 		// copy class variables from the object in the application scope
 		if (!StructKeyExists(variables.wheels, "class")) {
+			// First check if the model exists in application cache
 			if (StructKeyExists(application.wheels.models, arguments.name)) {
 				variables.wheels.class = application.wheels.models[arguments.name].$classData();
 			} else {
-				model(arguments.name);
-				if (StructKeyExists(application.wheels.models, arguments.name)) {
-					variables.wheels.class = application.wheels.models[arguments.name].$classData();
+				try {
+					model(arguments.name);
+					// Check again if the model was successfully loaded
+					if (StructKeyExists(application.wheels.models, arguments.name)) {
+						variables.wheels.class = application.wheels.models[arguments.name].$classData();
+					} else {
+						Throw(
+							type="Wheels.ModelNotFound",
+							message="Model '#arguments.name#' could not be found or initialized.",
+							extendedInfo="Ensure the model exists with proper configuration. Check if the model name is spelled correctly and the file exists in the models directory."
+						);
+					}
+				} catch (any e) {
+					Throw(
+						type="Wheels.ModelInitializationFailed",
+						message="Failed to initialize model '#arguments.name#'.",
+						extendedInfo="Error details: #e.message# - #e.detail#"
+					);
 				}
 			}
 		}
@@ -427,7 +443,6 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		if (IsQuery(arguments.properties) && arguments.properties.recordCount != 0) {
 			arguments.properties = $queryRowToStruct(argumentCollection = arguments);
 		}
-
 		if (IsStruct(arguments.properties) && !StructIsEmpty(arguments.properties)) {
 			$setProperties(properties = arguments.properties, setOnModel = true, $useFilterLists = arguments.useFilterLists);
 		}
