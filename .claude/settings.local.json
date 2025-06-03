@@ -61,7 +61,8 @@
       "Bash(box reload:*)",
       "Bash(/usr/local/bin/box:*)",
       "Bash(/Users/peter/projects/wheels/cli/workspace/testcli/test-cli-fixes.sh)",
-      "Bash(wheels test:*)"
+      "Bash(wheels test:*)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }

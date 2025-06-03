@@ -398,12 +398,24 @@ component aliases='wheels g resource' extends="../base" {
             var migrationPath = "#migrationDir#/#files[1]#";
             var content = fileRead(migrationPath);
             
-            // Replace the up() method content
-            content = reReplace(content, "function up\(\)\s*\{[^}]*\}", "function up() {" & chr(10) & migrationContent & chr(10) & "    }");
+            // Find positions of up() and down() functions
+            var upMatch = reFind("function up\(\)\s*\{[^}]*// your code goes here", content, 1, true);
+            var downMatch = reFind("function down\(\)\s*\{[^}]*// your code goes here", content, 1, true);
             
-            // Add down() method content
-            var downContent = '        t = dropTable("' & obj.objectNamePlural & '");';
-            content = reReplace(content, "function down\(\)\s*\{[^}]*\}", "function down() {" & chr(10) & downContent & chr(10) & "    }");
+            // Replace down() first (it's later in the file)
+            if (downMatch.pos[1]) {
+                var downContent = 'dropTable("' & obj.objectNamePlural & '");';
+                content = mid(content, 1, downMatch.pos[1] - 1) & 
+                         replace(mid(content, downMatch.pos[1], downMatch.len[1]), "// your code goes here", downContent) &
+                         mid(content, downMatch.pos[1] + downMatch.len[1]);
+            }
+            
+            // Then replace up()
+            if (upMatch.pos[1]) {
+                content = mid(content, 1, upMatch.pos[1] - 1) & 
+                         replace(mid(content, upMatch.pos[1], upMatch.len[1]), "// your code goes here", migrationContent) &
+                         mid(content, upMatch.pos[1] + upMatch.len[1]);
+            }
             
             fileWrite(migrationPath, content);
             
@@ -414,8 +426,7 @@ component aliases='wheels g resource' extends="../base" {
     }
     
     private function generateMigrationContent(obj, options) {
-        var content = '        t = createTable(name="' & obj.objectNamePlural & '");' & chr(10);
-        content &= '        t.primaryKey();' & chr(10);
+        var content = '        t = createTable(name="' & obj.objectNamePlural & '", id=true, primaryKey="id");' & chr(10);
         
         // Add attributes
         if (len(options.attributes)) {

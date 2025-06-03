@@ -45,7 +45,7 @@ component  aliases='wheels g route' extends="../base"  {
 		if (len(arguments.get)) {
 			var parts = listToArray(arguments.get, ",");
 			if (arrayLen(parts) == 2) {
-				inject = '.get(pattern="' & trim(parts[1]) & '", to="' & replace(trim(parts[2]), "#", "##", "all") & '")';
+				inject = '.get(pattern="' & trim(parts[1]) & '", to="' & trim(parts[2]) & '")';
 			} else {
 				inject = '.get(pattern="' & arguments.get & '")';
 			}
@@ -53,7 +53,7 @@ component  aliases='wheels g route' extends="../base"  {
 		} else if (len(arguments.post)) {
 			var parts = listToArray(arguments.post, ",");
 			if (arrayLen(parts) == 2) {
-				inject = '.post(pattern="' & trim(parts[1]) & '", to="' & replace(trim(parts[2]), "#", "##", "all") & '")';
+				inject = '.post(pattern="' & trim(parts[1]) & '", to="' & trim(parts[2]) & '")';
 			} else {
 				inject = '.post(pattern="' & arguments.post & '")';
 			}
@@ -61,7 +61,7 @@ component  aliases='wheels g route' extends="../base"  {
 		} else if (len(arguments.put)) {
 			var parts = listToArray(arguments.put, ",");
 			if (arrayLen(parts) == 2) {
-				inject = '.put(pattern="' & trim(parts[1]) & '", to="' & replace(trim(parts[2]), "#", "##", "all") & '")';
+				inject = '.put(pattern="' & trim(parts[1]) & '", to="' & trim(parts[2]) & '")';
 			} else {
 				inject = '.put(pattern="' & arguments.put & '")';
 			}
@@ -69,7 +69,7 @@ component  aliases='wheels g route' extends="../base"  {
 		} else if (len(arguments.patch)) {
 			var parts = listToArray(arguments.patch, ",");
 			if (arrayLen(parts) == 2) {
-				inject = '.patch(pattern="' & trim(parts[1]) & '", to="' & replace(trim(parts[2]), "#", "##", "all") & '")';
+				inject = '.patch(pattern="' & trim(parts[1]) & '", to="' & trim(parts[2]) & '")';
 			} else {
 				inject = '.patch(pattern="' & arguments.patch & '")';
 			}
@@ -77,7 +77,7 @@ component  aliases='wheels g route' extends="../base"  {
 		} else if (len(arguments.delete)) {
 			var parts = listToArray(arguments.delete, ",");
 			if (arrayLen(parts) == 2) {
-				inject = '.delete(pattern="' & trim(parts[1]) & '", to="' & replace(trim(parts[2]), "#", "##", "all") & '")';
+				inject = '.delete(pattern="' & trim(parts[1]) & '", to="' & trim(parts[2]) & '")';
 			} else {
 				inject = '.delete(pattern="' & arguments.delete & '")';
 			}
