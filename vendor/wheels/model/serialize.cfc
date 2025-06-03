@@ -9,15 +9,32 @@ component {
 		string returnIncluded = "true"
 	) {
 		// grab our objects as structs first so we don't waste cpu creating objects we don't need
-		local.rv = $serializeQueryToStructs(argumentCollection = arguments);
-		local.rv = $serializeStructsToObjects(structs = local.rv, argumentCollection = arguments);
+		local.rv = $serializeQueryToArray(argumentCollection = arguments);
+		local.rv = $serializeArrayToObjects(structs = local.rv, argumentCollection = arguments);
 		return local.rv;
 	}
 
 	/**
 	 * Internal function.
 	 */
-	public any function $serializeStructsToObjects(
+	public any function $serializeQueryToStructs(
+		required query query,
+		required string include,
+		required string callbacks,
+		required string returnIncluded
+	) {
+		local.rv = {};
+		local.serialized = $serializeQueryToArray(argumentCollection = arguments);
+		for (local.i = 1; local.i <= arrayLen(local.serialized); local.i++) {
+			local.rv[local.i] = local.serialized[local.i];
+		}
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 */
+	public any function $serializeArrayToObjects(
 		required any structs,
 		required string include,
 		required string callbacks,
@@ -69,7 +86,7 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public any function $serializeQueryToStructs(
+	public any function $serializeQueryToArray(
 		required query query,
 		required string include,
 		required string callbacks,
