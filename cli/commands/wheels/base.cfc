@@ -4,7 +4,7 @@
 component excludeFromHelp=true {
 	property name='serverService' inject='ServerService';
 	property name='Formatter'     inject='Formatter';
-	property name='Helpers'       inject='helpers@wheels';
+	property name='Helpers'       inject='helpers@wheels-cli';
 	property name='packageService' inject='packageService';
 	property name="ConfigService" inject="ConfigService";
 	property name="JSONService" inject="JSONService";
@@ -308,9 +308,31 @@ component excludeFromHelp=true {
 		var serverInfo=$getServerInfo();
 		var geturl=serverInfo.serverUrl;
 		
-		// For Wheels apps with public webroot, we need to add /public to the URL
-		// Check if public/index.cfm exists
-		if (fileExists(fileSystemUtil.resolvePath("public/index.cfm"))) {
+		// Don't add /public if server is already using public as webroot
+		// This is determined by checking server.json configuration
+		var serverJSON = fileSystemUtil.resolvePath("server.json");
+		var addPublic = false;
+		
+		if (fileExists(serverJSON)) {
+			try {
+				var serverConfig = deserializeJSON(fileRead(serverJSON));
+				// Check if webroot is set to public
+				if (!structKeyExists(serverConfig, "web") || !structKeyExists(serverConfig.web, "webroot") || 
+					!findNoCase("public", serverConfig.web.webroot)) {
+					// Webroot is NOT public, so we might need to add /public
+					if (fileExists(fileSystemUtil.resolvePath("public/index.cfm"))) {
+						addPublic = true;
+					}
+				}
+			} catch (any e) {
+				// If we can't read server.json, fall back to old behavior
+				if (fileExists(fileSystemUtil.resolvePath("public/index.cfm"))) {
+					addPublic = true;
+				}
+			}
+		}
+		
+		if (addPublic) {
 			getURL &= "/public";
 		}
 		

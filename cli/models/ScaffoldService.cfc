@@ -2,7 +2,7 @@ component {
     
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
     property name="migrationService" inject="MigrationService@wheels-cli";
-    property name="helpers" inject="helpers@wheels";
+    property name="helpers" inject="helpers@wheels-cli";
     
     /**
      * Generate a complete scaffold (model, controller, views, migration)
@@ -89,13 +89,15 @@ component {
                 // Creating views...
                 var viewActions = ["index", "show", "new", "edit", "_form"];
                 var viewsCreated = 0;
+                var parsedProperties = parseProperties(arguments.properties);
                 
                 for (var action in viewActions) {
                     var viewResult = codeGenerationService.generateView(
                         name = variables.helpers.pluralize(arguments.name),
                         action = action,
                         force = arguments.force,
-                        baseDirectory = arguments.baseDirectory
+                        baseDirectory = arguments.baseDirectory,
+                        properties = parsedProperties
                     );
                     
                     if (viewResult.success) {

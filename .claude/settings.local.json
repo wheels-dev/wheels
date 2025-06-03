@@ -57,7 +57,11 @@
       "Bash(box install:*)",
       "Bash(box help wheels:*)",
       "Bash(./comprehensive-test-suite.sh:*)",
-      "Bash(./test-cli-commands.sh:*)"
+      "Bash(./test-cli-commands.sh:*)",
+      "Bash(box reload:*)",
+      "Bash(/usr/local/bin/box:*)",
+      "Bash(/Users/peter/projects/wheels/cli/workspace/testcli/test-cli-fixes.sh)",
+      "Bash(wheels test:*)"
     ],
     "deny": []
   }

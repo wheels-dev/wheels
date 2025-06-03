@@ -61,7 +61,7 @@ component {
             .to("#moduleMapping#.models.CodeGenerationService");
         binder.map("ScaffoldService@wheels-cli")
             .to("#moduleMapping#.models.ScaffoldService");
-        binder.map("helpers@wheels")
+        binder.map("helpers@wheels-cli")
             .to("#moduleMapping#.models.helpers");
         
         log.info('Wheels CLI Module loaded successfully.');

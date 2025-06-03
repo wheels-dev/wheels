@@ -1,5 +1,6 @@
 component {
     
+    property name="helpers" inject="helpers@wheels-cli";
     
     /**
      * Generate file from template
@@ -66,11 +67,11 @@ component {
             
             // Generate variations of the name
             processed = reReplace(processed, "\{\{nameSingular\}\}", name, "all");
-            processed = reReplace(processed, "\{\{namePlural\}\}", pluralize(name), "all");
+            processed = reReplace(processed, "\{\{namePlural\}\}", variables.helpers.pluralize(name), "all");
             processed = reReplace(processed, "\{\{nameSingularLower\}\}", lCase(name), "all");
-            processed = reReplace(processed, "\{\{namePluralLower\}\}", lCase(pluralize(name)), "all");
+            processed = reReplace(processed, "\{\{namePluralLower\}\}", lCase(variables.helpers.pluralize(name)), "all");
             processed = reReplace(processed, "\{\{nameSingularUpper\}\}", uCase(name), "all");
-            processed = reReplace(processed, "\{\{namePluralUpper\}\}", uCase(pluralize(name)), "all");
+            processed = reReplace(processed, "\{\{namePluralUpper\}\}", uCase(variables.helpers.pluralize(name)), "all");
         }
         
         // Process relationships
@@ -110,9 +111,17 @@ component {
         if (structKeyExists(arguments.context, "modelName")) {
             var modelName = arguments.context.modelName;
             processed = replace(processed, "|ObjectNameSingular|", lCase(modelName), "all");
-            processed = replace(processed, "|ObjectNamePlural|", lCase(pluralize(modelName)), "all");
+            processed = replace(processed, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(modelName)), "all");
             processed = replace(processed, "|ObjectNameSingularC|", modelName, "all");
-            processed = replace(processed, "|ObjectNamePluralC|", pluralize(modelName), "all");
+            processed = replace(processed, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
+        }
+        
+        // Process form fields if properties are provided
+        if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties)) {
+            var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName);
+            processed = replace(processed, "|FormFields|", formFieldsCode, "all");
+        } else {
+            processed = replace(processed, "|FormFields|", "", "all");
         }
         
         return processed;
@@ -144,6 +153,55 @@ component {
         }
         
         return arrayToList(code, chr(10));
+    }
+    
+    /**
+     * Generate form fields code based on properties
+     */
+    private function generateFormFieldsCode(required array properties, required string modelName) {
+        var fields = [];
+        var objectName = lCase(arguments.modelName);
+        
+        for (var prop in arguments.properties) {
+            var fieldCode = "";
+            var fieldName = prop.name;
+            var fieldType = prop.keyExists("type") ? prop.type : "string";
+            var fieldLabel = variables.helpers.capitalize(fieldName);
+            
+            // Generate appropriate form field based on type
+            switch(lCase(fieldType)) {
+                case "boolean":
+                    fieldCode = '##checkBox(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                    break;
+                case "text":
+                case "longtext":
+                    fieldCode = '##textArea(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                    break;
+                case "integer":
+                case "biginteger":
+                case "decimal":
+                case "float":
+                    fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                    break;
+                case "date":
+                    fieldCode = '##dateSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                    break;
+                case "datetime":
+                case "timestamp":
+                    fieldCode = '##dateTimeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                    break;
+                case "time":
+                    fieldCode = '##timeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                    break;
+                default:
+                    // Default to text field for string and unknown types
+                    fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+            }
+            
+            arrayAppend(fields, fieldCode);
+        }
+        
+        return arrayToList(fields, chr(10));
     }
     
     /**
@@ -210,42 +268,6 @@ component {
         }
         
         return arrayToList(code, chr(10));
-    }
-    
-    /**
-     * Simple pluralization helper
-     */
-    private function pluralize(required string word) {
-        var singular = trim(arguments.word);
-        
-        // Handle common irregular plurals
-        var irregulars = {
-            "person" = "people",
-            "child" = "children",
-            "man" = "men",
-            "woman" = "women",
-            "tooth" = "teeth",
-            "foot" = "feet",
-            "mouse" = "mice",
-            "goose" = "geese"
-        };
-        
-        if (structKeyExists(irregulars, lCase(singular))) {
-            return irregulars[lCase(singular)];
-        }
-        
-        // Handle regular pluralization rules
-        if (reFind("(s|ss|sh|ch|x|z)$", singular)) {
-            return singular & "es";
-        } else if (reFind("y$", singular) && !reFind("[aeiou]y$", singular)) {
-            return left(singular, len(singular) - 1) & "ies";
-        } else if (reFind("f$", singular)) {
-            return left(singular, len(singular) - 1) & "ves";
-        } else if (reFind("fe$", singular)) {
-            return left(singular, len(singular) - 2) & "ves";
-        } else {
-            return singular & "s";
-        }
     }
     
     /**

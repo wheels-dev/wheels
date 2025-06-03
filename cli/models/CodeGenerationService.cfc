@@ -1,7 +1,50 @@
 component {
     
     property name="templateService" inject="TemplateService@wheels-cli";
-    property name="helpers" inject="helpers@wheels";
+    property name="helpers" inject="helpers@wheels-cli";
+    
+    /**
+     * Initialize the service
+     */
+    public function init() {
+        return this;
+    }
+    
+    /**
+     * Local capitalize function to avoid injection timing issues
+     */
+    private function capitalize(required string str) {
+        if (structKeyExists(variables, "helpers") && isObject(variables.helpers)) {
+            return variables.helpers.capitalize(arguments.str);
+        }
+        // Fallback implementation
+        return uCase(left(arguments.str, 1)) & mid(arguments.str, 2, len(arguments.str)-1);
+    }
+    
+    /**
+     * Local pluralize function to avoid injection timing issues
+     */
+    private function pluralize(required string word) {
+        if (structKeyExists(variables, "helpers") && isObject(variables.helpers)) {
+            return variables.helpers.pluralize(arguments.word);
+        }
+        // Simple fallback - just add 's'
+        return arguments.word & "s";
+    }
+    
+    /**
+     * Local singularize function to avoid injection timing issues
+     */
+    private function singularize(required string word) {
+        if (structKeyExists(variables, "helpers") && isObject(variables.helpers)) {
+            return variables.helpers.singularize(arguments.word);
+        }
+        // Simple fallback - remove trailing 's' if present
+        if (right(arguments.word, 1) == "s") {
+            return left(arguments.word, len(arguments.word) - 1);
+        }
+        return arguments.word;
+    }
     
     /**
      * Generate a model file
@@ -14,8 +57,8 @@ component {
         array properties = [],
         string baseDirectory = ""
     ) {
-        var modelName = helpers.capitalize(arguments.name);
-        var fileName = helpers.pluralize(modelName) & ".cfc";
+        var modelName = capitalize(arguments.name);
+        var fileName = modelName & ".cfc";
         var filePath = resolvePath("models/#fileName#", arguments.baseDirectory);
         
         // Check if file exists
@@ -30,7 +73,7 @@ component {
         // Prepare template context
         var context = {
             modelName: modelName,
-            tableName: helpers.pluralize(lCase(modelName)),
+            tableName: pluralize(lCase(modelName)),
             extends: len(arguments.extends) ? arguments.extends : "Model",
             description: arguments.description,
             properties: arguments.properties,
@@ -74,7 +117,7 @@ component {
         array actions = [],
         string baseDirectory = ""
     ) {
-        var controllerName = helpers.capitalize(arguments.name);
+        var controllerName = capitalize(arguments.name);
         var fileName = controllerName & ".cfc";
         var filePath = resolvePath("controllers/#fileName#", arguments.baseDirectory);
         
@@ -99,7 +142,7 @@ component {
         // Prepare template context
         var context = {
             controllerName: controllerName,
-            modelName: helpers.singularize(controllerName),
+            modelName: singularize(controllerName),
             extends: len(arguments.extends) ? arguments.extends : "Controller",
             description: arguments.description,
             actions: arguments.actions,
@@ -138,9 +181,10 @@ component {
         required string action,
         string template = "",
         boolean force = false,
-        string baseDirectory = ""
+        string baseDirectory = "",
+        array properties = []
     ) {
-        var controllerName = helpers.capitalize(arguments.name);
+        var controllerName = capitalize(arguments.name);
         var viewDir = resolvePath("views/#lCase(controllerName)#", arguments.baseDirectory);
         var fileName = arguments.action & ".cfm";
         var filePath = viewDir & "/" & fileName;
@@ -183,9 +227,10 @@ component {
         // Prepare template context
         var context = {
             controllerName: controllerName,
-            modelName: helpers.singularize(controllerName),
+            modelName: singularize(controllerName),
             action: arguments.action,
-            timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
+            timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss"),
+            properties: arguments.properties
         };
         
         // Generate from template
@@ -244,7 +289,7 @@ component {
         
         // Generate controller
         var controllerResult = generateController(
-            name = helpers.pluralize(arguments.name),
+            name = pluralize(arguments.name),
             rest = true,
             force = arguments.force
         );
@@ -264,7 +309,7 @@ component {
             var viewActions = ["index", "show", "new", "edit"];
             for (var action in viewActions) {
                 var viewResult = generateView(
-                    name = helpers.pluralize(arguments.name),
+                    name = pluralize(arguments.name),
                     action = action,
                     force = arguments.force
                 );
@@ -375,19 +420,19 @@ component {
                     case "belongsTo":
                         arrayAppend(associations.belongsTo, {
                             name: prop.name,
-                            class: prop.keyExists("class") ? prop.class : helpers.capitalize(prop.name)
+                            class: prop.keyExists("class") ? prop.class : capitalize(prop.name)
                         });
                         break;
                     case "hasMany":
                         arrayAppend(associations.hasMany, {
                             name: prop.name,
-                            class: prop.keyExists("class") ? prop.class : helpers.capitalize(helpers.singularize(prop.name))
+                            class: prop.keyExists("class") ? prop.class : capitalize(singularize(prop.name))
                         });
                         break;
                     case "hasOne":
                         arrayAppend(associations.hasOne, {
                             name: prop.name,
-                            class: prop.keyExists("class") ? prop.class : helpers.capitalize(prop.name)
+                            class: prop.keyExists("class") ? prop.class : capitalize(prop.name)
                         });
                         break;
                 }
