@@ -11,6 +11,8 @@ component aliases='wheels g model' extends="../base" {
     
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
     property name="migrationService" inject="MigrationService@wheels-cli";
+    property name="scaffoldService" inject="ScaffoldService@wheels-cli";
+    property name="helpers" inject="helpers@wheels-cli";
     
     /**
      * @name.hint Name of the model to create (singular form)
@@ -71,13 +73,23 @@ component aliases='wheels g model' extends="../base" {
                      .yellowLine("📄 Creating migration...");
                 
                 try {
-                    var migrationPath = migrationService.createMigration(
-                        name = "create_#helpers.pluralize(lCase(arguments.name))#_table",
-                        table = helpers.pluralize(lCase(arguments.name)),
-                        model = arguments.name,
-                        type = "create",
-                        baseDirectory = getCWD()
-                    );
+                    // Use scaffoldService to create migration with properties
+                    var migrationPath = "";
+                    if (arrayLen(parsedProperties)) {
+                        migrationPath = scaffoldService.createMigrationWithProperties(
+                            name = arguments.name,
+                            properties = parsedProperties,
+                            baseDirectory = getCWD()
+                        );
+                    } else {
+                        migrationPath = migrationService.createMigration(
+                            name = "create_#helpers.pluralize(lCase(arguments.name))#_table",
+                            table = helpers.pluralize(lCase(arguments.name)),
+                            model = arguments.name,
+                            type = "create",
+                            baseDirectory = getCWD()
+                        );
+                    }
                     
                     print.greenLine("✅ Created migration: #migrationPath#");
                 } catch (any e) {

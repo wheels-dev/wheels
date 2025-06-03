@@ -172,7 +172,7 @@ component {
     /**
      * Create migration with properties
      */
-    private function createMigrationWithProperties(
+    public function createMigrationWithProperties(
         required string name,
         required array properties,
         string baseDirectory = ""
@@ -240,13 +240,13 @@ component {
             var cfType = mapToCFWheelsType(prop.type);
             var params = 'columnNames=''#prop.name#''';
             
-            if (prop.default != "") {
+            if (structKeyExists(prop, "default") && prop.default != "") {
                 params &= ', default=''#prop.default#''';
             } else {
                 params &= ', default=''''';
             }
             
-            params &= ', null=' & (!prop.required ? 'true' : 'false');
+            params &= ', null=' & (structKeyExists(prop, "required") && prop.required ? 'false' : 'true');
             
             // Add type-specific parameters
             switch (cfType) {
