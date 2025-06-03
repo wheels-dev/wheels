@@ -269,6 +269,20 @@ component excludeFromHelp=true {
 					local.serverURL = "http://" & local.host & ":" & local.port;
 					return local;
 				}
+				
+				// Also check for port directly in server config root
+				if (structKeyExists(serverConfig, "port") && serverConfig.port > 0) {
+					local.port = serverConfig.port;
+					local.host = structKeyExists(serverConfig, "host") ? serverConfig.host : "localhost";
+					
+					// If host is "localhost", convert to 127.0.0.1 for consistency
+					if (local.host == "localhost") {
+						local.host = "127.0.0.1";
+					}
+					
+					local.serverURL = "http://" & local.host & ":" & local.port;
+					return local;
+				}
 			} catch (any e) {
 				// Continue to fallback
 			}
@@ -276,10 +290,17 @@ component excludeFromHelp=true {
 		
 		// Fall back to original method
 		var serverDetails = serverService.resolveServerDetails( serverProps={ webroot=getCWD() } );
-  		local.host              = serverDetails.serverInfo.host;
-  		local.port              = serverDetails.serverInfo.port;
-  		local.serverURL		  = "http://" & local.host & ":" & local.port;
-	  	return local;
+		
+		// Check if we got a valid port from serverService
+		if (structKeyExists(serverDetails, "serverInfo") && structKeyExists(serverDetails.serverInfo, "port") && serverDetails.serverInfo.port > 0) {
+			local.host = serverDetails.serverInfo.host;
+			local.port = serverDetails.serverInfo.port;
+			local.serverURL = "http://" & local.host & ":" & local.port;
+			return local;
+		}
+		
+		// If we still don't have a valid port, throw an error
+		error("Unable to determine server port. Please ensure your server is running or that server.json contains a valid port configuration.");
 	}
 
 	// Construct remote URL depending on wheels version
