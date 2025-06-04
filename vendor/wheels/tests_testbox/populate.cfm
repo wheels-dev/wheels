@@ -63,7 +63,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "authors,cities,classifications,comments,galleries,photos,posts,profiles,shops,trucks,tags,users,collisiontests,combikeys,tblusers,sqltypes,CATEGORIES,migratorversions">
+<cfset local.tables = "authors,cities,classifications,comments,galleries,photos,posts,profiles,shops,trucks,tags,users,collisiontests,combikeys,tblusers,sqltypes,CATEGORIES,TESTMODELS,migratorversions">
 <cfloop list="#local.tables#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
@@ -302,6 +302,15 @@ CREATE TABLE CATEGORIES
 ) #local.storageEngine#
 </cfquery>
 
+<cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
+CREATE TABLE TESTMODELS
+(
+	ID #local.identityColumnType#
+	,model_name varchar(100) NOT NULL
+	,PRIMARY KEY(ID)
+) #local.storageEngine#
+</cfquery>
+
 <!--- create views --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
 CREATE VIEW userphotos AS
@@ -533,3 +542,7 @@ FROM users u INNER JOIN galleries g ON u.id = g.userid
 <!--- uppercase table --->
 <cfset model("category").create(category_name = "Quick Brown Foxes")>
 <cfset model("category").create(category_name = "Lazy Dogs")>
+
+<!--- TestModel --->
+
+<cfset model("TestModel").create(model_name = "TestModel1")>
