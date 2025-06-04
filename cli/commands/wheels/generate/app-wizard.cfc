@@ -27,13 +27,12 @@
  * All these three commands call the same wizard.
  *
  **/
-component aliases="wheels g app-wizard" extends="../base" {
+component aliases="wheels g app-wizard, wheels new" extends="../base" {
 
   /**
    * Initialize the command
    */
   function init() {
-    super.init();
     return this;
   }
 
@@ -44,7 +43,7 @@ component aliases="wheels g app-wizard" extends="../base" {
     boolean force   = false
    ) {
     // Initialize rails service
-    var rails = application.wirebox.getInstance("RailsOutputService");
+    var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
     
     var appContent      = fileRead( getTemplate( '/ConfigAppContent.txt' ) );
     var routesContent   = fileRead( getTemplate( '/ConfigRoutes.txt' ) );

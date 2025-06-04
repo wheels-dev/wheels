@@ -10,14 +10,13 @@ component
    * Initialize the command
    */
   function init() {
-    super.init();
     return this;
   }
 
   function run() 
   {
     // Initialize rails service
-    var rails = application.wirebox.getInstance("RailsOutputService");
+    var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
     
     arguments.directory = fileSystemUtil.resolvePath( 'app' );
 

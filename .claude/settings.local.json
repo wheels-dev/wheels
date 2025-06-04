@@ -79,7 +79,11 @@
       "Bash(zip:*)",
       "Bash(exit)",
       "Bash(wheels scaffold Product name:string description:text price:decimal stock:integer active:boolean)",
-      "Bash(/Users/peter/projects/wheels/cli/box wheels scaffold Product name:string description:text price:decimal stock:integer active:boolean)"
+      "Bash(/Users/peter/projects/wheels/cli/box wheels scaffold Product name:string description:text price:decimal stock:integer active:boolean)",
+      "Bash(for:*)",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(done)"
     ],
     "deny": []
   }

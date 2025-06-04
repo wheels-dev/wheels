@@ -20,7 +20,6 @@
 	 * Initialize the command
 	 */
 	function init() {
-		super.init();
 		return this;
 	}
 
@@ -46,7 +45,7 @@
 		number scale) {
 
 		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService");
+		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
 		
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-column.txt"));

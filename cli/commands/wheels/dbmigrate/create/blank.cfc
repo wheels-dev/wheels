@@ -8,7 +8,6 @@ component aliases='wheels db create blank' extends="../../base"  {
 	 * Initialize the command
 	 */
 	function init() {
-		super.init();
 		return this;
 	}
 
@@ -20,7 +19,7 @@ component aliases='wheels db create blank' extends="../../base"  {
 	 **/
 	function run(required string name) {
 		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService");
+		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
 		
 		// Output Rails-style header
 		rails.header("🗛️", "Migration Generation");

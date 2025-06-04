@@ -16,7 +16,6 @@ component aliases='wheels g test' extends="../base"  {
 	 * Initialize the command
 	 */
 	function init() {
-		super.init();
 		return this;
 	}
 
@@ -38,7 +37,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean open=false
 	){
 		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService");
+		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
 		
 		var obj = helpers.getNameVariants(listLast( arguments.target, '/\' ));
 		var testsdirectory = fileSystemUtil.resolvePath( "tests/Testbox/specs" );

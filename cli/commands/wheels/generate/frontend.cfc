@@ -13,7 +13,6 @@ component extends="../base" {
      * Initialize the command
      */
     function init() {
-        super.init();
         return this;
     }
 
@@ -28,7 +27,7 @@ component extends="../base" {
         boolean api=false
     ) {
         // Initialize rails service
-        var rails = application.wirebox.getInstance("RailsOutputService");
+        var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
         
         // Output Rails-style header
         rails.header("🌐", "Frontend Generation");

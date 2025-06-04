@@ -105,7 +105,7 @@ component {
 		boolean indent = false
 	) {
 		var padding = arguments.indent ? variables.actionPadding + variables.indentSize : variables.actionPadding;
-		var actionText = arguments.action.rightJustify(padding);
+		var actionText = rJustify(arguments.action, padding);
 		
 		switch(arguments.color) {
 			case "green":

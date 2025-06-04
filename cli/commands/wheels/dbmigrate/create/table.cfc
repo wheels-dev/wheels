@@ -16,7 +16,6 @@
 	 * Initialize the command
 	 */
 	function init() {
-		super.init();
 		return this;
 	}
 
@@ -36,7 +35,7 @@
 		string primaryKey="id") {
 		
 		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService");
+		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
 
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-table.txt"));

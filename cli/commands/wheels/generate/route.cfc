@@ -13,7 +13,6 @@ component  aliases='wheels g route' extends="../base"  {
 	 * Initialize the command
 	 */
 	function init() {
-		super.init();
 		return this;
 	}
 
@@ -38,7 +37,7 @@ component  aliases='wheels g route' extends="../base"  {
 		string root = ""
 	) {
 		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService");
+		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
 		
 		// Validate that at least one route option is provided
 		if (!len(arguments.objectname) && !len(arguments.get) && !len(arguments.post) && 
