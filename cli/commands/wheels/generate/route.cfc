@@ -9,6 +9,15 @@
  **/
 component  aliases='wheels g route' extends="../base"  {
 
+	/**
+	 * Initialize the command
+	 */
+	function init() {
+		super.init();
+		variables.rails = application.wirebox.getInstance("RailsOutputService");
+		return this;
+	}
+
   /**
    * @objectname     The name of the resource/route to add
    * @get            Create a GET route with pattern,handler format
@@ -91,7 +100,7 @@ component  aliases='wheels g route' extends="../base"  {
 			
 			// Check if route already exists
 			if (findNoCase('.resources("' & obj.objectNamePlural & '")', content)) {
-				print.yellowLine('Route for "#obj.objectNamePlural#" already exists in routes.cfm');
+				rails.skip("config/routes.cfm (resources route for #obj.objectNamePlural# already exists)");
 				return;
 			}
 			
@@ -122,7 +131,12 @@ component  aliases='wheels g route' extends="../base"  {
 		content = replace(content, markerPattern, inject & cr & markerPattern, 'all');
 		
 		file action='write' file='#target#' mode='777' output='#trim(content)#';
-		print.line('Added #routeType# route to routes.cfm');
+		
+		// Output Rails-style message
+		rails.header("🛤️", "Route Generation");
+		rails.route(inject);
+		rails.update("config/routes.cfm");
+		rails.success("Route added successfully!");
 	}
 
 }

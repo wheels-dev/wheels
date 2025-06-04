@@ -24,3 +24,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Follow Wheels validation/callback patterns in models
 - Use transactions for database tests
 - Use TestBox for writing tests with describe/it syntax
+
+## CLI Commands
+
+- Don't mix positional and named attribute when calling CLI commands
+- Named attributes should use attribute=value syntax
+- Boolean attributes can use --attribute as a shortcut instead of attribute=true
+- Parameter syntax - CommandBox requires named attributes (name=value) instead of mixing positional and named parameters

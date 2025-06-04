@@ -17,6 +17,15 @@
  component aliases='wheels db create column' extends="../../base"  {
 
 	/**
+	 * Initialize the command
+	 */
+	function init() {
+		super.init();
+		variables.rails = application.wirebox.getInstance("RailsOutputService");
+		return this;
+	}
+
+	/**
 	 * Usage: wheels dbmigrate create column [tablename] [force] [id] [primaryKey]
 	 * @name.hint The Object Name
 	 * @dataType.hint The column type to add
@@ -80,8 +89,20 @@
 		//content=replaceNoCase(content, "|precision|", "#precision#", "all");
 		//content=replaceNoCase(content, "|scale|", "#scale#", "all");
 
+		// Output Rails-style header
+		rails.header("🗛️", "Migration Generation");
+		
 		// Make File
-		$createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments.columnName)),	action="create_column",	content=content);
+		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments.columnName)),	action="create_column",	content=content);
+		
+		rails.create(migrationPath);
+		rails.success("Column migration created successfully!");
+		
+		var nextSteps = [];
+		arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
+		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
+		arrayAppend(nextSteps, "Or run all pending migrations: wheels dbmigrate latest");
+		rails.nextSteps(nextSteps);
 	}
 
 	function $constructArguments(args, string operator=","){

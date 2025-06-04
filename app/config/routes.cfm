@@ -5,6 +5,7 @@
 	// See https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing for more info.
 
 	mapper()
+		.resources("products")
 		// CLI-Appends-Here
 
 		// The "wildcard" call below enables automatic mapping of "controller/action" type routes.

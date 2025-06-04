@@ -10,6 +10,15 @@
 component extends="../base" {
 
     /**
+     * Initialize the command
+     */
+    function init() {
+        super.init();
+        variables.rails = application.wirebox.getInstance("RailsOutputService");
+        return this;
+    }
+
+    /**
      * @framework Frontend framework to use (react, vue, alpine)
      * @path Directory to install frontend (defaults to /app/assets/frontend)
      * @api Generate API endpoint for frontend
@@ -19,13 +28,9 @@ component extends="../base" {
         string path="app/assets/frontend",
         boolean api=false
     ) {
-        // Welcome message
-        print.line();
-        print.boldMagentaLine("Wheels Frontend Generator");
-        print.line();
+        // Output Rails-style header
+        rails.header("🌐", "Frontend Generation");
         
-        print.line();
-        print.boldGreenLine("This feature is currently under development");
-        print.line();
+        rails.error("This feature is currently under development");
     }
 }

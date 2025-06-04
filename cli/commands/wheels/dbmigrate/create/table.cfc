@@ -13,6 +13,15 @@
  component aliases='wheels db create table' extends="../../base"  {
 
 	/**
+	 * Initialize the command
+	 */
+	function init() {
+		super.init();
+		variables.rails = application.wirebox.getInstance("RailsOutputService");
+		return this;
+	}
+
+	/**
 	 * I create a migration file in /db/migrate
 	 *
 	 * Usage: wheels dbmigrate create table [name] [force] [id] [primary-key]
@@ -36,7 +45,19 @@
 		content=replaceNoCase(content, "|id|", "#id#", "all");
 		content=replaceNoCase(content, "|primaryKey|", "#arguments.primaryKey#", "all");
 
+		// Output Rails-style header
+		rails.header("🗛️", "Migration Generation");
+		
 		// Make File
-		 $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);
+		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);
+		
+		rails.create(migrationPath);
+		rails.success("Table migration created successfully!");
+		
+		var nextSteps = [];
+		arrayAppend(nextSteps, "Edit the migration to add columns: #migrationPath#");
+		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
+		arrayAppend(nextSteps, "Generate a model for this table: wheels generate model #arguments.name#");
+		rails.nextSteps(nextSteps);
 	}
 }

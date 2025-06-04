@@ -13,6 +13,15 @@
 component aliases='wheels g test' extends="../base"  {
 
 	/**
+	 * Initialize the command
+	 */
+	function init() {
+		super.init();
+		variables.rails = application.wirebox.getInstance("RailsOutputService");
+		return this;
+	}
+
+	/**
 	 * @type.hint Type of test: model, controller, view, unit, integration
 	 * @type.options model,controller,view,unit,integration
 	 * @target.hint Name of object/class to test
@@ -85,7 +94,7 @@ component aliases='wheels g test' extends="../base"  {
 
  		if( fileExists( testPath ) ) {
 			if( !confirm( "[#testPath#] already exists. Overwrite? [y/n]" ) ){
-				print.line( "Cancelled." );
+				rails.skip(testPath & " (cancelled by user)");
 				return;
 			}
  		}
@@ -96,17 +105,26 @@ component aliases='wheels g test' extends="../base"  {
 		// Get test content - enhanced with CRUD and mock options
 		var testContent = generateTestContent(arguments.type, obj, arguments.crud, arguments.mock);
 		
+		// Output Rails-style header
+		rails.header("🧪", "Test Generation");
+		
 		file action='write' file='#testPath#' mode ='777' output='#trim( testContent )#';
-		print.greenLine( 'Created test: #testPath#' );
+		rails.create(testPath);
 		
 		if (arguments.open) {
 			openPath(testPath);
 		}
 		
-		// Suggest running the test
-		print.line()
-			 .yellowLine("Run your test with:")
-			 .line("wheels test run --filter=#obj.objectNameSingular#");
+		rails.success("Test created successfully!");
+		
+		// Suggest next steps
+		var nextSteps = [];
+		arrayAppend(nextSteps, "Run your test with: wheels test run --filter=#obj.objectNameSingular#");
+		if (!arguments.open) {
+			arrayAppend(nextSteps, "Open the test file: #testPath#");
+		}
+		arrayAppend(nextSteps, "Add more test cases to cover edge cases");
+		rails.nextSteps(nextSteps);
 	}
 	
 	/**
