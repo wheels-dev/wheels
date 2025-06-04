@@ -75,7 +75,9 @@
       "Bash(# Get list of unique parameters with better formatting\necho \"## All Unique Parameters Used in CLI Commands\" > /Users/peter/projects/wheels/parameter-list.md\necho \"\" >> /Users/peter/projects/wheels/parameter-list.md\necho \"Total unique parameters: 70\" >> /Users/peter/projects/wheels/parameter-list.md\necho \"\" >> /Users/peter/projects/wheels/parameter-list.md\n\n# Group parameters by category\necho \"### Name/Identifier Parameters\" >> /Users/peter/projects/wheels/parameter-list.md\nfor file in /Users/peter/projects/wheels/cli/commands/wheels/**/*.cfc; do\n    grep -oE '\\* @[a-zA-Z-]+\\.hint' \"$file\" 2>/dev/null | sed 's/\\* @//' | sed 's/\\.hint//'\ndone | sort -u | grep -E \"(name|Name)\" | while read p; do echo \"- $p\"; done >> /Users/peter/projects/wheels/parameter-list.md\n\necho \"\" >> /Users/peter/projects/wheels/parameter-list.md\necho \"### Type Parameters\" >> /Users/peter/projects/wheels/parameter-list.md\nfor file in /Users/peter/projects/wheels/cli/commands/wheels/**/*.cfc; do\n    grep -oE '\\* @[a-zA-Z-]+\\.hint' \"$file\" 2>/dev/null | sed 's/\\* @//' | sed 's/\\.hint//'\ndone | sort -u | grep -iE \"(type|Type)\" | while read p; do echo \"- $p\"; done >> /Users/peter/projects/wheels/parameter-list.md\n\necho \"\" >> /Users/peter/projects/wheels/parameter-list.md\necho \"### Boolean Flags\" >> /Users/peter/projects/wheels/parameter-list.md\nfor file in /Users/peter/projects/wheels/cli/commands/wheels/**/*.cfc; do\n    grep -oE '\\* @[a-zA-Z-]+\\.hint' \"$file\" 2>/dev/null | sed 's/\\* @//' | sed 's/\\.hint//'\ndone | sort -u | grep -vE \"(name|Name|type|Type|description|format|output|path)\" | while read p; do echo \"- $p\"; done >> /Users/peter/projects/wheels/parameter-list.md\n\ncat /Users/peter/projects/wheels/parameter-list.md)",
       "Bash(git restore:*)",
       "Bash(wheels generate model:*)",
-      "Bash(box repl:*)"
+      "Bash(box repl:*)",
+      "Bash(zip:*)",
+      "Bash(exit)"
     ],
     "deny": []
   }
