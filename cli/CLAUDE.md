@@ -31,3 +31,7 @@ This is the Wheels CLI, a CommandBox module that provides command-line tools for
 - Then use the `wheels` commands to run a particular CLI command
 - First create an app with the `wheels g app` command.
 - Then start the web server with `server start` commandbox command
+
+## Things to remember
+- Don't add the Claude signature to commit messages
+- Don't add the Claude signature to PR reviews
