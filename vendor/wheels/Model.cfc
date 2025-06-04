@@ -413,15 +413,26 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 		// copy class variables from the object in the application scope
 		if (!StructKeyExists(variables.wheels, "class")) {
+			local.lockName = "classLock" & application.applicationName;
 			// First check if the model exists in application cache
 			if (StructKeyExists(application.wheels.models, arguments.name)) {
-				variables.wheels.class = application.wheels.models[arguments.name].$classData();
+				variables.wheels.class = $simpleLock(
+					execute = "$classData",
+					name = local.lockName,
+					object = application.wheels.models[arguments.name],
+					type = "readOnly"
+				);
 			} else {
 				try {
 					model(arguments.name);
 					// Check again if the model was successfully loaded
 					if (StructKeyExists(application.wheels.models, arguments.name)) {
-						variables.wheels.class = application.wheels.models[arguments.name].$classData();
+						variables.wheels.class = $simpleLock(
+							execute = "$classData",
+							name = local.lockName,
+							object = application.wheels.models[arguments.name],
+							type = "readOnly"
+						);
 					} else {
 						Throw(
 							type="Wheels.ModelNotFound",
