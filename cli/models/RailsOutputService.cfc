@@ -1,10 +1,11 @@
 component {
 
+	property name="print" inject="PrintBuffer";
+	
 	/**
 	 * Initialize the Rails Output Service
 	 */
 	function init() {
-		variables.print = application.wirebox.getInstance("PrintBuffer");
 		variables.actionPadding = 12;
 		variables.indentSize = 2;
 		return this;
@@ -124,7 +125,7 @@ component {
 				print.text(actionText);
 		}
 		
-		print.line("  " & arguments.target);
+		print.line("  " & arguments.target).toConsole();
 	}
 
 	/**
@@ -133,7 +134,7 @@ component {
 	 * @message The header message
 	 */
 	function header(required string emoji, required string message) {
-		print.line().line(arguments.emoji & " " & arguments.message).line();
+		print.line().line(arguments.emoji & " " & arguments.message).line().toConsole();
 	}
 
 	/**
@@ -141,7 +142,7 @@ component {
 	 * @message The success message
 	 */
 	function success(required string message) {
-		print.line().greenBoldLine("✅ " & arguments.message);
+		print.line().greenBoldLine("✅ " & arguments.message).toConsole();
 	}
 
 	/**
@@ -149,7 +150,7 @@ component {
 	 * @message The error message
 	 */
 	function error(required string message) {
-		print.line().redBoldLine("❌ " & arguments.message);
+		print.line().redBoldLine("❌ " & arguments.message).toConsole();
 	}
 
 	/**
@@ -167,14 +168,14 @@ component {
 			print.line("   " & i & ". " & arguments.steps[i]);
 		}
 		
-		print.line();
+		print.line().toConsole();
 	}
 
 	/**
 	 * Output a blank line
 	 */
 	function line() {
-		print.line();
+		print.line().toConsole();
 		return this;
 	}
 

@@ -6,6 +6,7 @@
 
 	mapper()
 		.resources("products")
+		.resources("posts")
 		// CLI-Appends-Here
 
 		// The "wildcard" call below enables automatic mapping of "controller/action" type routes.

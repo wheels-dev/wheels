@@ -77,7 +77,7 @@ component aliases="wheels g app" extends="../base" {
   ) {
     // Initialize rails service
     var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
-    
+
     // set defaults based on app name
     if ( !len( arguments.directory ) ) {
       arguments.directory = '#getCWD()##arguments.name#';
@@ -120,6 +120,7 @@ component aliases="wheels g app" extends="../base" {
       save                    = false,
       saveDev                 = false,
       production              = false,
+			verbose								  = true,
       currentWorkingDirectory = arguments.directory
     );
 
