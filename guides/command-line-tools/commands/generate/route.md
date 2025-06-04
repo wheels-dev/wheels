@@ -5,57 +5,72 @@ Generate route definitions for your application.
 ## Synopsis
 
 ```bash
-wheels generate route [pattern] [options]
-wheels g route [pattern] [options]
+wheels generate route [objectname] [options]
+wheels g route [objectname] [options]
 ```
 
 ## Description
 
-The `wheels generate route` command helps you create route definitions in your Wheels application. It can generate individual routes, RESTful resources, nested routes, and complex routing patterns while maintaining proper syntax and organization in your routes file.
+The `wheels generate route` command helps you create route definitions in your Wheels application's `/config/routes.cfm` file. It can generate individual routes with different HTTP methods, RESTful resources, or root routes.
 
 ## Arguments
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `pattern` | Route pattern or resource name | Required |
+| `objectname` | The name of the resource/route to add | Optional |
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--to` | Controller#action destination | Required for non-resource |
-| `--method` | HTTP method (GET, POST, PUT, DELETE) | `GET` |
-| `--name` | Route name for URL helpers | Auto-generated |
-| `--resource` | Generate RESTful resource routes | `false` |
-| `--api` | Generate API routes (no new/edit) | `false` |
-| `--nested` | Parent resource for nesting | |
-| `--only` | Only include specific actions | All actions |
-| `--except` | Exclude specific actions | |
-| `--namespace` | Wrap in namespace | |
-| `--constraints` | Add route constraints | |
-| `--force` | Add even if route exists | `false` |
-| `--help` | Show help information | |
+| `get` | Create a GET route (pattern,handler format) | |
+| `post` | Create a POST route (pattern,handler format) | |
+| `put` | Create a PUT route (pattern,handler format) | |
+| `patch` | Create a PATCH route (pattern,handler format) | |
+| `delete` | Create a DELETE route (pattern,handler format) | |
+| `--resources` | Create a resources route | `false` |
+| `root` | Create a root route with handler | |
 
 ## Examples
 
-### Basic Route
+### Resources Route (default)
 ```bash
-wheels generate route "/about" --to="pages#about" --name="about"
+wheels generate route products
 ```
 
 Generates in `/config/routes.cfm`:
 ```cfm
-<cfset get(name="about", pattern="/about", to="pages##about")>
+.resources("products")
 ```
 
-### POST Route
+### GET Route
 ```bash
-wheels generate route "/contact" --to="contact#send" --method="POST" --name="sendContact"
+wheels generate route get="/about,pages#about"
 ```
 
 Generates:
 ```cfm
-<cfset post(name="sendContact", pattern="/contact", to="contact##send")>
+.get(pattern="/about", to="pages#about")
+```
+
+### POST Route
+```bash
+wheels generate route post="/contact,contact#send"
+```
+
+Generates:
+```cfm
+.post(pattern="/contact", to="contact#send")
+```
+
+### Root Route
+```bash
+wheels generate route root="pages#home"
+```
+
+Generates:
+```cfm
+.root(to="pages#home")
 ```
 
 ### RESTful Resource
@@ -89,7 +104,7 @@ Generates:
 
 ### Nested Resources
 ```bash
-wheels generate route comments --resource --nested="posts"
+wheels generate route comments --resource nested="posts"
 ```
 
 Generates:
@@ -107,7 +122,7 @@ Creates routes like:
 
 ### Dynamic Segments
 ```bash
-wheels generate route "/users/[key]/profile" --to="users#profile" --name="userProfile"
+wheels generate route "/users/[key]/profile" to="users#profile" name="userProfile"
 ```
 
 Generates:
@@ -117,7 +132,7 @@ Generates:
 
 ### Optional Segments
 ```bash
-wheels generate route "/blog/[year]/[month?]/[day?]" --to="blog#archive" --name="blogArchive"
+wheels generate route "/blog/[year]/[month?]/[day?]" to="blog#archive" name="blogArchive"
 ```
 
 Generates:
@@ -127,7 +142,7 @@ Generates:
 
 ### Wildcards
 ```bash
-wheels generate route "/docs/*" --to="documentation#show" --name="docs"
+wheels generate route "/docs/*" to="documentation#show" name="docs"
 ```
 
 Generates:
@@ -139,7 +154,7 @@ Generates:
 
 ### With Constraints
 ```bash
-wheels generate route "/users/[id]" --to="users#show" --constraints="id=[0-9]+"
+wheels generate route "/users/[id]" to="users#show" constraints="id=[0-9]+"
 ```
 
 Generates:
@@ -149,7 +164,7 @@ Generates:
 
 ### Namespace Routes
 ```bash
-wheels generate route users --resource --namespace="admin"
+wheels generate route users --resource namespace="admin"
 ```
 
 Generates:
@@ -161,7 +176,7 @@ Generates:
 
 ### Module Routes
 ```bash
-wheels generate route dashboard --resource --namespace="admin" --module="backend"
+wheels generate route dashboard --resource namespace="admin" module="backend"
 ```
 
 Generates:
@@ -175,7 +190,7 @@ Generates:
 
 ### Shallow Nesting
 ```bash
-wheels generate route comments --resource --nested="posts" --shallow
+wheels generate route comments --resource nested="posts" --shallow
 ```
 
 Generates:
@@ -189,7 +204,7 @@ Generates:
 
 ### Member Routes
 ```bash
-wheels generate route "products/[key]/activate" --to="products#activate" --method="PUT" --member
+wheels generate route "products/[key]/activate" to="products#activate" method="PUT" --member
 ```
 
 Generates:
@@ -201,7 +216,7 @@ Generates:
 
 ### Collection Routes
 ```bash
-wheels generate route "products/search" --to="products#search" --collection
+wheels generate route "products/search" to="products#search" --collection
 ```
 
 Generates:
@@ -291,12 +306,12 @@ Generated routes create URL helpers:
 
 ### Pattern Constraints
 ```bash
-wheels generate route "/posts/[year]/[month]" --to="posts#archive" --constraints="year=[0-9]{4},month=[0-9]{2}"
+wheels generate route "/posts/[year]/[month]" to="posts#archive" constraints="year=[0-9]{4},month=[0-9]{2}"
 ```
 
 ### Format Constraints
 ```bash
-wheels generate route "/api/users" --to="api/users#index" --format="json"
+wheels generate route "/api/users" to="api/users#index" format="json"
 ```
 
 Generates:

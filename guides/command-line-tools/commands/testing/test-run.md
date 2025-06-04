@@ -12,26 +12,17 @@ wheels test run [spec] [options]
 
 The `wheels test run` command executes your application's TestBox test suite with support for watching, filtering, and various output formats. This is the primary command for running your application tests (as opposed to framework tests).
 
-## Arguments
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `spec` | Specific test spec or directory | All tests |
-
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--watch` | Watch for changes and rerun | `false` |
-| `--reporter` | TestBox reporter | `simple` |
-| `--recurse` | Recurse directories | `true` |
-| `--bundles` | Test bundles to run | |
-| `--labels` | Filter by labels | |
-| `--excludes` | Patterns to exclude | |
-| `--filter` | Test name filter | |
-| `--outputFile` | Output results to file | |
-| `--verbose` | Verbose output | `false` |
-| `--help` | Show help information | |
+| `filter` | Filter tests by pattern or name | |
+| `group` | Run specific test group | |
+| `--coverage` | Generate coverage report (boolean flag) | `false` |
+| `reporter` | Test reporter format: console, junit, json, tap | `console` |
+| `--watch` | Watch for file changes and rerun tests (boolean flag) | `false` |
+| `--verbose` | Verbose output (boolean flag) | `false` |
+| `--fail-fast` | Stop on first test failure (boolean flag) | `false` |
 
 ## Examples
 
@@ -40,14 +31,10 @@ The `wheels test run` command executes your application's TestBox test suite wit
 wheels test run
 ```
 
-### Run specific test file
+### Filter tests by pattern
 ```bash
-wheels test run tests/models/UserTest.cfc
-```
-
-### Run tests in directory
-```bash
-wheels test run tests/controllers/
+wheels test run filter="User"
+wheels test run filter="test_user_validation"
 ```
 
 ### Watch mode
@@ -55,26 +42,32 @@ wheels test run tests/controllers/
 wheels test run --watch
 ```
 
-### Run specific bundles
+### Run specific test group
 ```bash
-wheels test run --bundles=models,controllers
+wheels test run group="unit"
+wheels test run group="integration"
 ```
 
-### Filter by labels
+### Generate coverage report
 ```bash
-wheels test run --labels=unit,critical
+wheels test run --coverage
 ```
 
 ### Use different reporter
 ```bash
-wheels test run --reporter=json
-wheels test run --reporter=junit
-wheels test run --reporter=text
+wheels test run reporter=json
+wheels test run reporter=junit
+wheels test run reporter=tap
 ```
 
-### Save results to file
+### Stop on first failure
 ```bash
-wheels test run --reporter=junit --outputFile=test-results.xml
+wheels test run --fail-fast
+```
+
+### Verbose output with coverage
+```bash
+wheels test run --verbose --coverage reporter=console
 ```
 
 ## Test Structure
@@ -237,7 +230,7 @@ Time: 80ms
 
 ### Simple (Default)
 ```bash
-wheels test run --reporter=simple
+wheels test run reporter=simple
 ```
 - Colored console output
 - Shows progress dots
@@ -245,7 +238,7 @@ wheels test run --reporter=simple
 
 ### Text
 ```bash
-wheels test run --reporter=text
+wheels test run reporter=text
 ```
 - Plain text output
 - Good for CI systems
@@ -253,7 +246,7 @@ wheels test run --reporter=text
 
 ### JSON
 ```bash
-wheels test run --reporter=json
+wheels test run reporter=json
 ```
 ```json
 {
@@ -268,7 +261,7 @@ wheels test run --reporter=json
 
 ### JUnit
 ```bash
-wheels test run --reporter=junit --outputFile=results.xml
+wheels test run reporter=junit outputFile=results.xml
 ```
 - JUnit XML format
 - For CI integration
@@ -276,7 +269,7 @@ wheels test run --reporter=junit --outputFile=results.xml
 
 ### TAP
 ```bash
-wheels test run --reporter=tap
+wheels test run reporter=tap
 ```
 - Test Anything Protocol
 - Cross-language format
@@ -286,10 +279,10 @@ wheels test run --reporter=tap
 ### By Bundle
 ```bash
 # Run only model tests
-wheels test run --bundles=models
+wheels test run bundles=models
 
 # Run multiple bundles
-wheels test run --bundles=models,controllers
+wheels test run bundles=models,controllers
 ```
 
 ### By Label
@@ -301,30 +294,30 @@ it("can authenticate", function() {
 
 ```bash
 # Run only critical tests
-wheels test run --labels=critical
+wheels test run labels=critical
 
 # Run auth OR api tests
-wheels test run --labels=auth,api
+wheels test run labels=auth,api
 ```
 
 ### By Name Filter
 ```bash
 # Run tests matching pattern
-wheels test run --filter="user"
-wheels test run --filter="validate*"
+wheels test run filter="user"
+wheels test run filter="validate*"
 ```
 
 ### Exclude Patterns
 ```bash
 # Skip slow tests
-wheels test run --excludes="*slow*,*integration*"
+wheels test run excludes="*slow*,*integration*"
 ```
 
 ## Parallel Execution
 
 Run tests in parallel threads:
 ```bash
-wheels test run --threads=4
+wheels test run threads=4
 ```
 
 Benefits:
@@ -336,7 +329,7 @@ Benefits:
 
 Generate coverage reports:
 ```bash
-wheels test run --coverage --coverageOutputDir=coverage/
+wheels test run --coverage coverageOutputDir=coverage/
 ```
 
 View report:
@@ -412,7 +405,7 @@ function loadFixtures() {
 ```yaml
 - name: Run tests
   run: |
-    wheels test run --reporter=junit --outputFile=test-results.xml
+    wheels test run reporter=junit outputFile=test-results.xml
     
 - name: Upload results
   uses: actions/upload-artifact@v2
@@ -427,7 +420,7 @@ function loadFixtures() {
 # .git/hooks/pre-commit
 
 echo "Running tests..."
-wheels test run --labels=unit
+wheels test run labels=unit
 
 if [ $? -ne 0 ]; then
     echo "Tests failed. Commit aborted."
@@ -439,13 +432,13 @@ fi
 
 1. **Use labels** for fast feedback
    ```bash
-   wheels test run --labels=unit  # Fast
-   wheels test run --labels=integration  # Slow
+   wheels test run labels=unit  # Fast
+   wheels test run labels=integration  # Slow
    ```
 
 2. **Parallel execution**
    ```bash
-   wheels test run --threads=4
+   wheels test run threads=4
    ```
 
 3. **Watch specific directories**
@@ -455,7 +448,7 @@ fi
 
 4. **Skip slow tests during development**
    ```bash
-   wheels test run --excludes="*integration*"
+   wheels test run excludes="*integration*"
    ```
 
 ## Common Issues

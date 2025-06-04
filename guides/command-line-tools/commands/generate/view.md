@@ -5,72 +5,71 @@ Generate view files for controllers.
 ## Synopsis
 
 ```bash
-wheels generate view [controller] [actions] [options]
-wheels g view [controller] [actions] [options]
+wheels generate view [objectName] [name] [template]
+wheels g view [objectName] [name] [template]
 ```
 
 ## Description
 
-The `wheels generate view` command creates view files for specified controller actions. It can generate individual views, sets of views for RESTful actions, or custom view templates with various layout options.
+The `wheels generate view` command creates view files for controllers. It can generate individual views using templates or create blank view files.
 
 ## Arguments
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `controller` | Controller name (singular or plural) | Required |
-| `actions` | Comma-separated list of actions | `index` |
+| `objectName` | View path folder (e.g., user) | Required |
+| `name` | Name of the file to create (e.g., edit) | Required |
+| `template` | Optional template to use | |
 
-## Options
+## Template Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--template` | View template to use | `default` |
-| `--layout` | Include layout wrapper | `true` |
-| `--partial` | Generate as partial (prefix with _) | `false` |
-| `--format` | File format (cfm, htm, html) | `cfm` |
-| `--rest` | Generate RESTful views | `false` |
-| `--force` | Overwrite existing files | `false` |
-| `--help` | Show help information | |
+Available templates:
+- `crud/_form` - Form partial for new/edit views
+- `crud/edit` - Edit form view
+- `crud/index` - List/index view
+- `crud/new` - New form view
+- `crud/show` - Show/detail view
 
 ## Examples
 
-### Basic view
+### Basic view (no template)
 ```bash
-wheels generate view products index
+wheels generate view user show
 ```
-Creates: `/views/products/index.cfm`
+Creates: `/views/users/show.cfm` with empty content
 
-### Multiple views
+### View with CRUD template
 ```bash
-wheels generate view products index,show,new,edit
+wheels generate view user show crud/show
 ```
-Creates multiple view files in `/views/products/`
+Creates: `/views/users/show.cfm` using the show template
 
-### RESTful views
+### Edit form with template
 ```bash
-wheels generate view products --rest
+wheels generate view user edit crud/edit
 ```
-Generates all RESTful views:
-- `index.cfm` - List view
-- `show.cfm` - Detail view
-- `new.cfm` - Create form
-- `edit.cfm` - Edit form
-- `_form.cfm` - Shared form partial
+Creates: `/views/users/edit.cfm` using the edit template
 
-### Partial view
+### Form partial
 ```bash
-wheels generate view products sidebar --partial
+wheels generate view user _form crud/_form
 ```
-Creates: `/views/products/_sidebar.cfm`
+Creates: `/views/users/_form.cfm` using the form partial template
 
-### Custom template
+### Index view
 ```bash
-wheels generate view reports dashboard --template=dashboard
+wheels generate view product index crud/index
 ```
+Creates: `/views/products/index.cfm` using the index template
 
 ## Generated Code Examples
 
-### Default Template (index.cfm)
+### Without Template (blank file)
+```cfm
+<!--- View file created by wheels generate view --->
+```
+
+### With CRUD Index Template
 ```cfm
 <h1>Products</h1>
 

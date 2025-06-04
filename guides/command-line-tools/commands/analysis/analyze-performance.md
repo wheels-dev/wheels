@@ -5,14 +5,16 @@ Analyzes application performance, identifying bottlenecks and optimization oppor
 ## Usage
 
 ```bash
-wheels analyze performance [--profile=<duration>] [--threshold=<ms>] [--format=<format>]
+wheels analyze performance [--target=<target>] [--duration=<seconds>] [--report] [--threshold=<ms>] [--profile]
 ```
 
 ## Parameters
 
-- `--profile` - (Optional) Duration to profile the application (e.g., `30s`, `5m`). Default: `60s`
-- `--threshold` - (Optional) Minimum execution time in milliseconds to report. Default: `100`
-- `--format` - (Optional) Output format: `console`, `json`, `csv`. Default: `console`
+- `--target` - (Optional) Analysis target: `all`, `controller`, `view`, `query`, `memory`. Default: `all`
+- `--duration` - (Optional) Duration to run analysis in seconds. Default: `30`
+- `--report` - (Optional) Generate HTML performance report
+- `--threshold` - (Optional) Performance threshold in milliseconds. Default: `100`
+- `--profile` - (Optional) Enable profiling mode
 
 ## Description
 
@@ -32,9 +34,14 @@ The `analyze performance` command profiles your CFWheels application to identify
 wheels analyze performance
 ```
 
-### Profile for 5 minutes
+### Analyze for 60 seconds with profiling
 ```bash
-wheels analyze performance --profile=5m
+wheels analyze performance --duration=60 --profile
+```
+
+### Focus on database queries only
+```bash
+wheels analyze performance --target=query
 ```
 
 ### Show only slow operations (>500ms)
@@ -42,9 +49,14 @@ wheels analyze performance --profile=5m
 wheels analyze performance --threshold=500
 ```
 
-### Export results as CSV
+### Generate HTML performance report
 ```bash
-wheels analyze performance --format=csv > performance-report.csv
+wheels analyze performance --report
+```
+
+### Complete analysis with all options
+```bash
+wheels analyze performance --target=all --duration=60 --threshold=200 --profile --report
 ```
 
 ## Output

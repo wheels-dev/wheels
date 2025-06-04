@@ -26,11 +26,11 @@ The `wheels generate app` command creates a new Wheels application with a comple
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--reloadPassword` | Set reload password | `wheels` |
-| `--datasourceName` | Database datasource name | App name |
-| `--cfmlEngine` | CFML engine (lucee/adobe) | `lucee` |
-| `--useBootstrap` | Include Bootstrap CSS | `false` |
-| `--setupH2` | Setup H2 embedded database | `false` |
+| `reload-password` | Set reload password | `wheels` |
+| `datasource-name` | Database datasource name | App name |
+| `cfml-engine` | CFML engine (lucee/adobe) | `lucee` |
+| `--use-bootstrap` | Include Bootstrap CSS | `false` |
+| `--setup-h2` | Setup H2 embedded database | `false` |
 | `--init` | Initialize as CLI-enabled app | `true` |
 | `--force` | Overwrite existing directory | `false` |
 | `--help` | Show help information | |
@@ -96,22 +96,22 @@ wheels generate app myapp Base ./projects/
 
 ### Create with Bootstrap
 ```bash
-wheels generate app portfolio --useBootstrap
+wheels generate app portfolio --use-bootstrap
 ```
 
 ### Create with H2 database
 ```bash
-wheels generate app demo --setupH2
+wheels generate app demo --setup-h2
 ```
 
 ### Create with all options
 ```bash
 wheels generate app enterprise HelloDynamic ./apps/ \
-  --reloadPassword=secret \
-  --datasourceName=enterprise_db \
-  --cfmlEngine=adobe \
-  --useBootstrap \
-  --setupH2
+  reload-password=secret \
+  datasource-name=enterprise_db \
+  cfml-engine=adobe \
+  --use-bootstrap \
+  --setup-h2
 ```
 
 ## Generated Structure
@@ -182,7 +182,7 @@ myapp/
 
 ### With H2 (Embedded)
 ```bash
-wheels generate app myapp --setupH2
+wheels generate app myapp --setup-h2
 ```
 - No external database needed
 - Perfect for development
@@ -191,7 +191,7 @@ wheels generate app myapp --setupH2
 ### With External Database
 1. Create application:
    ```bash
-   wheels generate app myapp --datasourceName=myapp_db
+   wheels generate app myapp datasource-name=myapp_db
    ```
 
 2. Configure in CommandBox:

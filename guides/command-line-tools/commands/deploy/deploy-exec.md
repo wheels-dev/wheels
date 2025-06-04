@@ -1,273 +1,226 @@
 # wheels deploy exec
 
-Execute a deployment to the specified target environment.
+Execute commands in deployed containers.
 
 ## Synopsis
 
 ```bash
-wheels deploy exec [target] [options]
+wheels deploy:exec <command> [options]
 ```
 
 ## Description
 
-The `wheels deploy exec` command performs the actual deployment of your Wheels application to a configured target environment. It handles file synchronization, runs deployment hooks, and manages the deployment lifecycle.
+The `wheels deploy:exec` command allows you to execute commands inside deployed Docker containers on your servers. This is useful for running administrative tasks, debugging, or accessing services directly.
 
 ## Arguments
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `target` | Deployment target (production, staging, etc.) | Required |
+- `command` - Command to execute in container (required)
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--tag` | Git tag or commit to deploy | Latest commit |
-| `--branch` | Git branch to deploy | Configured branch |
-| `--force` | Force deployment even with uncommitted changes | `false` |
-| `--skip-hooks` | Skip pre/post deployment hooks | `false` |
-| `--skip-tests` | Skip test execution | `false` |
-| `--skip-assets` | Skip asset compilation | `false` |
-| `--dry-run` | Preview deployment without executing | `false` |
-| `--verbose` | Show detailed output | `false` |
-| `--timeout` | Deployment timeout in seconds | `300` |
-| `--help` | Show help information |
+- `servers=<string>` - Execute on specific servers (comma-separated list)
+- `service=<string>` - Service to execute in: app or db (default: app)
+- `--interactive` - Run command interactively (default: false)
 
 ## Examples
 
-### Deploy to production
+### List files in application container
 ```bash
-wheels deploy exec production
+wheels deploy:exec "ls -la"
 ```
 
-### Deploy specific tag
+### Run database migrations
 ```bash
-wheels deploy exec production --tag=v1.2.3
+wheels deploy:exec "box run-script migrate"
 ```
 
-### Deploy with dry run
+### Access CommandBox REPL interactively
 ```bash
-wheels deploy exec staging --dry-run
+wheels deploy:exec "box repl" --interactive
 ```
 
-### Force deployment
+### Execute MySQL commands in database container
 ```bash
-wheels deploy exec production --force
+wheels deploy:exec "mysql -u root -p" service=db --interactive
 ```
 
-### Deploy without hooks
+### Check application logs
 ```bash
-wheels deploy exec staging --skip-hooks
+wheels deploy:exec "tail -f logs/application.log"
 ```
 
-### Verbose deployment
+### Execute on specific server
 ```bash
-wheels deploy exec production --verbose
+wheels deploy:exec "df -h" servers=web1.example.com
 ```
 
-## Deployment Process
+## How It Works
 
-1. **Pre-flight Checks**:
-   - Verify target configuration
-   - Check Git status
-   - Validate dependencies
-   - Test connectivity
+The command:
+1. Connects to target servers via SSH
+2. Determines the container name based on service
+3. Executes the command using `docker exec`
+4. Returns the output or provides interactive access
 
-2. **Preparation**:
-   - Create release directory
-   - Export code from repository
-   - Install dependencies
-   - Compile assets
+## Service Selection
 
-3. **Synchronization**:
-   - Upload files to target
-   - Exclude ignored files
-   - Preserve shared resources
+### Application Container (default)
+```bash
+# Executes in the main application container
+wheels deploy:exec "ls -la"
+```
 
-4. **Activation**:
-   - Update symbolic links
-   - Run database migrations
-   - Clear caches
-   - Reload application
+### Database Container
+```bash
+# Executes in the database container
+wheels deploy:exec "mysql -u root -p" service=db --interactive
+```
 
-5. **Cleanup**:
-   - Remove old releases
-   - Clean temporary files
-   - Update deployment log
+## Interactive vs Non-Interactive
+
+### Non-Interactive (default)
+- Command runs and returns output
+- Suitable for simple commands
+- Output is captured and displayed
+
+### Interactive Mode
+- Provides terminal access
+- Required for commands needing input
+- Useful for REPL, database shells, etc.
 
 ## Output Example
 
+### Non-interactive command
 ```
-Deploying to production...
-✓ Pre-flight checks passed
-✓ Creating release 20240115120000
-✓ Exporting code from main branch
-✓ Installing dependencies
-✓ Compiling assets
-✓ Uploading files to prod.example.com
-  → Transferred 1,234 files (45.6 MB)
-✓ Running pre-deployment hooks
-  → npm run build
-  → box install --production
-✓ Activating release
-✓ Running post-deployment hooks
-  → wheels dbmigrate latest
-  → wheels reload production
-✓ Cleaning up old releases
-✓ Deployment completed successfully!
+Wheels Deploy Remote Execution
+==================================================
+Executing: ls -la
+Container: myapp
 
-Deployment Summary:
-- Target: production
-- Release: 20240115120000
-- Duration: 2m 34s
-- Status: SUCCESS
+total 24
+drwxr-xr-x 1 root root 4096 Jan 15 14:30 .
+drwxr-xr-x 1 root root 4096 Jan 15 14:30 ..
+drwxr-xr-x 1 root root 4096 Jan 15 14:30 app
+drwxr-xr-x 1 root root 4096 Jan 15 14:30 config
+-rw-r--r-- 1 root root  512 Jan 15 14:30 box.json
+-rw-r--r-- 1 root root  256 Jan 15 14:30 server.json
 ```
 
-## Deployment Strategies
+### Multiple servers
+```
+Wheels Deploy Remote Execution
+==================================================
+Executing: uptime
+Container: myapp
 
-### Rolling Deployment
+Server: web1.example.com
+------------------------------
+ 14:35:22 up 45 days,  3:21,  0 users,  load average: 0.15, 0.12, 0.18
+
+Server: web2.example.com
+------------------------------
+ 14:35:23 up 32 days,  7:45,  0 users,  load average: 0.23, 0.19, 0.21
+```
+
+## Common Use Cases
+
+### Administrative Tasks
 ```bash
-wheels deploy exec production
-```
-- Gradual rollout
-- Zero downtime
-- Automatic rollback on failure
+# Clear application cache
+wheels deploy:exec "box run-script clearCache"
 
-### Blue-Green Deployment
+# Run scheduled tasks
+wheels deploy:exec "box task run maintenance"
+
+# Check disk usage
+wheels deploy:exec "df -h /app"
+```
+
+### Database Operations
 ```bash
-wheels deploy exec production --strategy=blue-green
-```
-- Instant switching
-- Full rollback capability
-- Requires double resources
+# MySQL backup
+wheels deploy:exec "mysqldump -u root myapp > /backup/myapp.sql" service=db
 
-### Canary Deployment
+# PostgreSQL vacuum
+wheels deploy:exec "psql -U postgres -c 'VACUUM ANALYZE;'" service=db
+
+# Check database size
+wheels deploy:exec "mysql -u root -e 'SELECT table_schema, SUM(data_length + index_length) / 1024 / 1024 AS size_mb FROM information_schema.tables GROUP BY table_schema;'" service=db
+```
+
+### Debugging
 ```bash
-wheels deploy exec production --strategy=canary --percentage=10
-```
-- Gradual traffic shift
-- Risk mitigation
-- Performance monitoring
+# View application logs
+wheels deploy:exec "tail -n 100 /app/logs/application.log"
 
-## Hook Execution
+# Check running processes
+wheels deploy:exec "ps aux"
 
-### Pre-deployment Hooks
-Executed before deployment:
-```json
-"pre-deploy": [
-  "npm test",
-  "npm run build",
-  "box install --production"
-]
+# Monitor resource usage
+wheels deploy:exec "top -b -n 1"
+
+# Check environment variables
+wheels deploy:exec "env | grep WHEELS"
 ```
 
-### Post-deployment Hooks
-Executed after activation:
-```json
-"post-deploy": [
-  "wheels dbmigrate latest",
-  "wheels reload production",
-  "npm run cache:clear",
-  "curl -X POST https://api.example.com/deploy-notification"
-]
-```
-
-## Rollback Handling
-
-If deployment fails:
-1. Automatic rollback triggered
-2. Previous release restored
-3. Rollback hooks executed
-4. Notifications sent
-
-Manual rollback:
+### File Management
 ```bash
-wheels deploy rollback production
+# Create backup
+wheels deploy:exec "tar -czf /tmp/backup.tar.gz /app/uploads"
+
+# Check file permissions
+wheels deploy:exec "ls -la /app/config"
+
+# Remove old logs
+wheels deploy:exec "find /app/logs -name '*.log' -mtime +30 -delete"
 ```
 
-## Environment Variables
+## Security Considerations
 
-Available during deployment:
+1. **Command Injection**: Commands are passed directly to the shell
+2. **Permissions**: Runs with container user permissions
+3. **Sensitive Data**: Be careful with commands that expose secrets
+4. **Audit Trail**: Commands are not logged by default
 
-| Variable | Description |
-|----------|-------------|
-| `WHEELS_DEPLOY_TARGET` | Target environment name |
-| `WHEELS_DEPLOY_RELEASE` | Release timestamp |
-| `WHEELS_DEPLOY_BRANCH` | Git branch |
-| `WHEELS_DEPLOY_TAG` | Git tag (if specified) |
-| `WHEELS_DEPLOY_USER` | User executing deployment |
+## Limitations
 
-## Dry Run Mode
+- Cannot execute commands requiring GUI
+- Interactive mode requires TTY support
+- Output limited by SSH buffer size
+- No automatic error handling
 
-Preview deployment without changes:
-```bash
-wheels deploy exec production --dry-run
-```
+## Best Practices
 
-Shows:
-- Files to be transferred
-- Hooks to be executed
-- Resources to be created
-- Estimated deployment time
+1. **Quote Complex Commands**: Use quotes for commands with special characters
+2. **Test First**: Test commands locally before running in production
+3. **Use Service Parameter**: Specify service explicitly for clarity
+4. **Avoid Sensitive Output**: Redirect sensitive data to files
+5. **Check Exit Codes**: Verify command success in scripts
 
-## Error Handling
+## Troubleshooting
 
-Common errors and solutions:
+### Container Not Found
+- Verify deployment is active
+- Check container name matches service name
+- Ensure Docker is running
 
-1. **Connection Failed**
-   - Check SSH keys/credentials
-   - Verify network connectivity
-   - Confirm server accessibility
+### Permission Denied
+- Check SSH user has Docker access
+- Verify container user permissions
+- Use sudo if necessary (configure in deploy.json)
 
-2. **Permission Denied**
-   - Check user permissions
-   - Verify directory ownership
-   - Review deployment path
+### Command Not Found
+- Ensure command exists in container
+- Check PATH environment variable
+- Use full path to executables
 
-3. **Hook Failed**
-   - Check hook commands
-   - Verify dependencies
-   - Review error logs
-
-4. **Disk Space**
-   - Check available space
-   - Clean old releases
-   - Review keep-releases setting
-
-## Performance Optimization
-
-- Use `--skip-assets` if assets pre-built
-- Enable compression for transfers
-- Parallelize hook execution
-- Use incremental deployments
-
-## Monitoring
-
-Track deployment metrics:
-- Deployment duration
-- Transfer size
-- Success/failure rate
-- Rollback frequency
-
-## Use Cases
-
-1. **Automated Deployment**: CI/CD pipeline integration
-2. **Scheduled Releases**: Deploy during maintenance windows
-3. **Emergency Hotfix**: Quick production patches
-4. **Feature Deployment**: Deploy specific features
-5. **A/B Testing**: Deploy variants for testing
-
-## Notes
-
-- Always test in staging first
-- Monitor application after deployment
-- Keep deployment logs for auditing
-- Have rollback plan ready
-- Coordinate with team for production deployments
+### Interactive Mode Issues
+- Ensure terminal supports TTY
+- Use SSH directly for complex interactions
+- Check SSH client configuration
 
 ## See Also
 
-- [wheels deploy](deploy.md) - Deployment overview
-- [wheels deploy status](deploy-status.md) - Check deployment status
-- [wheels deploy rollback](deploy-rollback.md) - Rollback deployment
-- [wheels deploy logs](deploy-logs.md) - View deployment logs
+- [wheels deploy:status](deploy-status.md) - Check deployment status
+- [wheels deploy:logs](deploy-logs.md) - View deployment logs
+- [wheels deploy:push](deploy-push.md) - Deploy application

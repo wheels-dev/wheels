@@ -17,30 +17,26 @@ The `wheels generate resource` command creates a complete RESTful resource inclu
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `name` | Resource name (typically singular) | Required |
-| `properties` | Property definitions (name:type) | |
+| `name` | Resource name (singular) | Required |
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--skip-model` | Skip model generation | `false` |
-| `--skip-controller` | Skip controller generation | `false` |
-| `--skip-views` | Skip view generation | `false` |
-| `--skip-route` | Skip route generation | `false` |
-| `--skip-migration` | Skip migration generation | `false` |
-| `--skip-tests` | Skip test generation | `false` |
-| `--api` | Generate API-only resource | `false` |
-| `--namespace` | Namespace for the resource | |
-| `--parent` | Parent resource for nesting | |
-| `--force` | Overwrite existing files | `false` |
-| `--help` | Show help information | |
+| `--api` | Generate API-only resource (no views) | `false` |
+| `--tests` | Generate associated tests | `true` |
+| `--migration` | Generate database migration | `true` |
+| `belongs-to` | Parent model relationships (comma-separated) | |
+| `has-many` | Child model relationships (comma-separated) | |
+| `attributes` | Model attributes (name:type,email:string) | |
+| `--open` | Open generated files | `false` |
+| `--scaffold` | Generate with full CRUD operations | `true` |
 
 ## Examples
 
 ### Basic Resource
 ```bash
-wheels generate resource product name:string price:float description:text
+wheels generate resource product attributes="name:string,price:float,description:text"
 ```
 
 Generates:
@@ -53,7 +49,7 @@ Generates:
 
 ### API Resource
 ```bash
-wheels generate resource api/product name:string price:float --api
+wheels generate resource product attributes="name:string,price:float" --api
 ```
 
 Generates:
@@ -63,9 +59,9 @@ Generates:
 - Migration: `/db/migrate/[timestamp]_create_products.cfc`
 - Tests: API-focused test files
 
-### Nested Resource
+### Resource with Associations
 ```bash
-wheels generate resource comment content:text approved:boolean --parent=post
+wheels generate resource comment attributes="content:text,approved:boolean" belongs-to="post,user"
 ```
 
 Generates nested structure with proper associations and routing.
@@ -352,7 +348,7 @@ component extends="Controller" {
 
 ### Generate Nested Resource
 ```bash
-wheels generate resource review rating:integer comment:text --parent=product
+wheels generate resource review rating:integer comment:text parent=product
 ```
 
 ### Nested Model
@@ -419,7 +415,7 @@ wheels generate resource product --skip-model --skip-migration
 
 ### Namespace Resources
 ```bash
-wheels generate resource admin/product name:string --namespace=admin
+wheels generate resource admin/product name:string namespace=admin
 ```
 
 Creates:
@@ -429,7 +425,7 @@ Creates:
 
 ### Custom Templates
 ```bash
-wheels generate resource product name:string --template=custom
+wheels generate resource product name:string template=custom
 ```
 
 ## Testing

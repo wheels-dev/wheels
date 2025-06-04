@@ -1,19 +1,19 @@
 # plugins install
 
-Installs a CFWheels plugin from various sources including ForgeBox, GitHub, or local files.
+Installs a CFWheels CLI plugin from various sources including ForgeBox, GitHub, or local files.
 
 ## Usage
 
 ```bash
-wheels plugins install <plugin> [--version=<version>] [--force] [--save]
+wheels plugins install <name> [--dev] [--global] [--version=<version>]
 ```
 
 ## Parameters
 
-- `plugin` - (Required) Plugin name, ForgeBox slug, GitHub URL, or local path
-- `--version` - (Optional) Specific version to install. Default: latest
-- `--force` - (Optional) Force installation even if plugin exists
-- `--save` - (Optional) Save plugin to box.json dependencies
+- `name` - (Required) Plugin name or repository URL
+- `--dev` - (Optional) Install as development dependency
+- `--global` - (Optional) Install globally
+- `--version` - (Optional) Specific version to install
 
 ## Description
 
@@ -34,12 +34,12 @@ The command automatically:
 
 ### Install from ForgeBox
 ```bash
-wheels plugins install authentication
+wheels plugins install wheels-vue-cli
 ```
 
 ### Install specific version
 ```bash
-wheels plugins install dbmigrate --version=3.0.0
+wheels plugins install wheels-docker --version=2.0.0
 ```
 
 ### Install from GitHub
@@ -47,19 +47,19 @@ wheels plugins install dbmigrate --version=3.0.0
 wheels plugins install https://github.com/user/wheels-plugin
 ```
 
-### Install from local file
+### Install as development dependency
 ```bash
-wheels plugins install /path/to/plugin.zip
+wheels plugins install wheels-docker --dev
 ```
 
-### Force reinstall
+### Install globally
 ```bash
-wheels plugins install routing --force
+wheels plugins install wheels-cli-tools --global
 ```
 
-### Install and save to dependencies
+### Install with multiple options
 ```bash
-wheels plugins install cache-manager --save
+wheels plugins install wheels-testing --dev --version=1.5.0
 ```
 
 ## Installation Process
@@ -75,22 +75,17 @@ wheels plugins install cache-manager --save
 ## Output
 
 ```
-Installing plugin: authentication
-==================================
+📦 Installing plugin: wheels-vue-cli...
 
-Downloading from ForgeBox... ✓
-Checking compatibility... ✓
-Creating backup... ✓
-Installing plugin files... ✓
-Installing dependencies... ✓
-Running setup scripts... ✓
+✅ Plugin installed successfully
+```
 
-Plugin 'authentication' (v2.1.0) installed successfully!
+If installation fails:
+```
+📦 Installing plugin: invalid-plugin...
 
-Post-installation notes:
-- Run 'wheels reload' to activate the plugin
-- Check documentation at /plugins/authentication/README.md
-- Configure settings in /config/authentication.cfm
+❌ Plugin installation failed
+Error: Plugin not found in repository
 ```
 
 ## Plugin Sources

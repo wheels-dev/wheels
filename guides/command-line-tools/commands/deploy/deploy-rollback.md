@@ -1,264 +1,200 @@
 # wheels deploy rollback
 
-Rollback a deployment to a previous release.
+Rollback to a previous deployment.
 
 ## Synopsis
 
 ```bash
-wheels deploy rollback [target] [options]
+wheels deploy:rollback [options]
 ```
 
 ## Description
 
-The `wheels deploy rollback` command reverts your application to a previous deployment release. It provides quick recovery from failed deployments or problematic releases by switching back to a known-good state.
-
-## Arguments
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `target` | Deployment target to rollback | Required |
+The `wheels deploy:rollback` command reverts your application to a previous deployment by switching to an earlier Docker image version. It provides quick recovery from failed deployments or problematic releases by pulling and running a previous known-good image.
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--release` | Specific release to rollback to | Previous release |
-| `--steps` | Number of releases to rollback | `1` |
-| `--skip-hooks` | Skip rollback hooks | `false` |
-| `--force` | Force rollback without confirmation | `false` |
-| `--dry-run` | Preview rollback without executing | `false` |
-| `--verbose` | Show detailed output | `false` |
-| `--help` | Show help information |
+- `tag=<string>` - Specific tag to rollback to (if not provided, shows available versions)
+- `servers=<string>` - Rollback specific servers (comma-separated list)
+- `--force` - Skip confirmation prompt (default: false)
 
 ## Examples
 
-### Rollback to previous release
+### Interactive rollback (shows available versions)
 ```bash
-wheels deploy rollback production
+wheels deploy:rollback
 ```
 
-### Rollback multiple releases
+### Rollback to specific version
 ```bash
-wheels deploy rollback production --steps=2
+wheels deploy:rollback tag=v1.0.0
 ```
 
-### Rollback to specific release
+### Rollback specific servers
 ```bash
-wheels deploy rollback production --release=20240114093045
-```
-
-### Preview rollback
-```bash
-wheels deploy rollback production --dry-run
+wheels deploy:rollback servers=web1.example.com,web2.example.com
 ```
 
 ### Force rollback without confirmation
 ```bash
-wheels deploy rollback production --force
+wheels deploy:rollback tag=v1.0.0 --force
 ```
 
 ## Rollback Process
 
-1. **Validation**:
-   - Verify target configuration
-   - Check available releases
-   - Validate rollback target
+The rollback follows these steps:
+
+1. **Image Discovery** (if no tag specified):
+   - Connect to first server
+   - List available Docker images
+   - Display versions with creation dates
+   - Allow user to select version
 
 2. **Confirmation**:
-   - Display current release
-   - Show target release
+   - Display selected version
+   - Show target servers
    - Request confirmation (unless --force)
 
-3. **Execution**:
-   - Switch symbolic links
-   - Run rollback hooks
-   - Restore shared resources
-   - Clear caches
+3. **Execution** (for each server):
+   - Check if image exists locally
+   - Pull image from registry if needed
+   - Update docker-compose.yml with selected image
+   - Stop current container
+   - Start container with rollback image
+   - Wait for health check
 
 4. **Verification**:
-   - Test application health
-   - Verify services running
-   - Check error logs
+   - Perform health checks
+   - Report success/failure for each server
 
-## Output Example
+## Interactive Rollback Example
 
 ```
-Rolling back production deployment...
+Wheels Deployment Rollback
+==================================================
+Fetching available images from servers...
 
-Current Release: 20240115120000
-Target Release:  20240114093045
+Available versions:
+--------------------------------------------------
+1. Tag: v2.1.0 (Created: 2024-01-15 12:00:00)
+2. Tag: v2.0.0 (Created: 2024-01-14 09:30:45)
+3. Tag: v1.9.5 (Created: 2024-01-13 15:45:22)
+4. Tag: v1.9.0 (Created: 2024-01-12 10:11:33)
 
-Changes to be reverted:
-- 45 files modified
-- 3 database migrations
-- 2 configuration changes
+Select version to rollback to (1-4): 2
 
-? Proceed with rollback? (y/N) y
+WARNING: This will rollback to version: v2.0.0
+Target servers: web1.example.com, web2.example.com
 
-✓ Switching to release 20240114093045
-✓ Running rollback hooks
-  → Reverting database migrations
-  → Clearing application cache
-  → Restarting services
-✓ Verifying application health
-✓ Rollback completed successfully!
+Are you sure you want to continue? (yes/no): yes
 
-Rollback Summary:
-- From: 20240115120000
-- To:   20240114093045
-- Duration: 45s
-- Status: SUCCESS
+Rolling back to: registry.example.com/myuser/myapp:v2.0.0
+
+Rolling back: web1.example.com
+------------------------------
+Checking for image...
+Image not found locally, pulling from registry...
+Updating configuration...
+Performing rollback...
+Waiting for health check...
+✓ Rollback successful on web1.example.com
+
+Rolling back: web2.example.com
+------------------------------
+Checking for image...
+Updating configuration...
+Performing rollback...
+Waiting for health check...
+✓ Rollback successful on web2.example.com
+
+Rollback completed!
+Rolled back to: registry.example.com/myuser/myapp:v2.0.0
 ```
 
-## Available Releases
+## Configuration
 
-List available releases:
-```bash
-wheels deploy status production --releases
+The rollback uses the same configuration from `config/deploy.yml` as the deployment:
+
+```yaml
+service: myapp
+image: myapp
+
+registry:
+  server: registry.example.com
+  username: myuser
+
+servers:
+  web:
+    - web1.example.com
+    - web2.example.com
+
+ssh:
+  user: deploy
+
+healthcheck:
+  path: /health
+  port: 3000
+  interval: 30
 ```
 
-Output:
-```
-Available releases for production:
-1. 20240115120000 (current)
-2. 20240114093045
-3. 20240113154522
-4. 20240112101133
-5. 20240111163421
-```
+## Health Checks
 
-## Rollback Hooks
+The rollback performs health checks after switching images:
+- Uses the health check configuration from deploy.yml
+- Timeout is hardcoded to 60 seconds for rollbacks
+- If health check fails, the rollback is reported as failed
 
-Configure rollback-specific hooks:
+## Docker Image Management
 
-```json
-{
-  "hooks": {
-    "rollback": [
-      "wheels dbmigrate down --steps=1",
-      "wheels reload production",
-      "npm run cache:clear",
-      "curl -X POST https://api.example.com/rollback-notification"
-    ]
-  }
-}
-```
-
-## Database Rollback
-
-Handling database changes during rollback:
-
-1. **Automatic Migration Rollback**:
-   ```bash
-   wheels dbmigrate down --to=20240114093045
-   ```
-
-2. **Manual Intervention**:
-   - Some changes may require manual rollback
-   - Data migrations might not be reversible
-   - Always backup before deployment
-
-## Rollback Strategies
-
-### Immediate Rollback
-Quick switch to previous release:
-```bash
-wheels deploy rollback production
-```
-
-### Staged Rollback
-Gradual rollback with canary:
-```bash
-wheels deploy rollback production --strategy=canary --percentage=10
-```
-
-### Blue-Green Rollback
-Instant switch between environments:
-```bash
-wheels deploy rollback production --strategy=blue-green
-```
+The rollback command:
+- Lists images matching the configured registry/username/image pattern
+- Shows creation timestamps to help identify versions
+- Pulls images from registry if not available locally
+- Uses the same docker-compose.yml generation as deployments
 
 ## Emergency Rollback
 
-For critical situations:
+For critical situations where interactive selection isn't feasible:
 
 ```bash
-# Skip all checks and hooks
-wheels deploy rollback production --force --skip-hooks
+# Direct rollback to known version
+wheels deploy:rollback tag=v1.9.5 --force
 
-# Direct symbolic link switch (last resort)
-ssh deploy@prod.example.com "cd /var/www/app && ln -sfn releases/20240114093045 current"
+# Rollback specific problematic server
+wheels deploy:rollback tag=v1.9.5 servers=web2.example.com --force
 ```
 
-## Rollback Validation
+## Manual Rollback (Last Resort)
 
-After rollback, verify:
+If the rollback command fails:
 
-1. **Application Health**:
-   ```bash
-   wheels deploy status production --health
-   ```
+```bash
+# SSH to server and manually switch images
+ssh deploy@web1.example.com
+cd /opt/myapp
+docker-compose down
+# Edit docker-compose.yml to use previous image
+docker-compose up -d
+```
 
-2. **Service Status**:
-   ```bash
-   ssh deploy@prod.example.com "systemctl status cfml-app"
-   ```
+## Best Practices
 
-3. **Error Logs**:
-   ```bash
-   wheels deploy logs production --tail=100 --filter=error
-   ```
+1. **Tag Releases Properly**: Use semantic versioning for easy identification
+2. **Keep Images Available**: Don't prune old images too aggressively
+3. **Test Rollbacks**: Practice rollback procedures in staging
+4. **Monitor After Rollback**: Verify application functionality
+5. **Document Issues**: Record why rollback was needed
 
-## Preventing Rollback Issues
+## Limitations
 
-1. **Keep Sufficient Releases**:
-   - Configure `keepReleases` appropriately
-   - Don't set too low (minimum 3-5)
-
-2. **Test Rollback Procedures**:
-   - Practice in staging environment
-   - Document manual procedures
-   - Automate where possible
-
-3. **Database Considerations**:
-   - Design reversible migrations
-   - Backup before deployment
-   - Test rollback scenarios
-
-## Rollback Limitations
-
-- Shared files/directories not rolled back
-- User-uploaded content preserved
-- External service changes not reverted
-- Some database changes irreversible
-
-## Use Cases
-
-1. **Failed Deployment**: Immediate recovery from deployment failure
-2. **Performance Issues**: Revert problematic release
-3. **Critical Bugs**: Quick fix by reverting
-4. **Testing Rollback**: Verify rollback procedures work
-5. **Compliance**: Revert unauthorized changes
-
-## Monitoring After Rollback
-
-- Check application performance
-- Monitor error rates
-- Verify user functionality
-- Review system resources
-- Analyze root cause
-
-## Notes
-
-- Always investigate why rollback was needed
-- Document rollback incidents
-- Update deployment procedures based on learnings
-- Consider implementing better pre-deployment testing
-- Communicate rollback to stakeholders
+- Requires Docker images to be available (locally or in registry)
+- Database changes are not rolled back automatically
+- Environment file changes persist
+- Shared volumes (storage, logs) are not affected
 
 ## See Also
 
-- [wheels deploy exec](deploy-exec.md) - Execute deployment
-- [wheels deploy status](deploy-status.md) - Check deployment status
-- [wheels deploy logs](deploy-logs.md) - View deployment logs
+- [wheels deploy:push](deploy-push.md) - Deploy application
+- [wheels deploy:status](deploy-status.md) - Check deployment status
+- [wheels deploy:logs](deploy-logs.md) - View deployment logs
 - [wheels dbmigrate down](../database/dbmigrate-down.md) - Rollback migrations

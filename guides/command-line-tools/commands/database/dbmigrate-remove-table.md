@@ -5,74 +5,48 @@ Generate a migration file for dropping a database table.
 ## Synopsis
 
 ```bash
-wheels dbmigrate remove table <table_name> [options]
+wheels dbmigrate remove table name=<table_name>
 ```
+
+Alias: `wheels db remove table`
 
 ## Description
 
-The `dbmigrate remove table` command generates a migration file that drops an existing database table. The generated migration includes both the drop operation and a reversible up method that recreates the table structure, making the migration fully reversible.
+The `dbmigrate remove table` command generates a migration file that drops an existing database table. The generated migration includes a dropTable() call in the up() method.
 
-## Arguments
+## Parameters
 
-### `<table_name>`
-- **Type:** String
-- **Required:** Yes
-- **Description:** The name of the table to drop
-
-## Options
-
-### `--datasource`
-- **Type:** String
-- **Default:** Application default
-- **Description:** Target datasource for the migration
-
-### `--force`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Skip safety prompts and generate migration immediately
-
-### `--no-backup`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Don't include table structure backup in the down() method
-
-### `--cascade`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Include CASCADE option to drop dependent objects
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | The name of the table to remove |
 
 ## Examples
 
 ### Basic table removal
 ```bash
-wheels dbmigrate remove table temp_import_data
+wheels dbmigrate remove table name=temp_import_data
 ```
 
-### Remove table with cascade
+### Remove user table
 ```bash
-wheels dbmigrate remove table user --cascade
+wheels dbmigrate remove table name=user
 ```
 
-### Force removal without prompts
+### Remove archive table
 ```bash
-wheels dbmigrate remove table obsolete_log --force
-```
-
-### Remove without backup structure
-```bash
-wheels dbmigrate remove table temporary_data --no-backup
+wheels dbmigrate remove table name=orders_archive_2023
 ```
 
 ## Generated Migration Example
 
 For the command:
 ```bash
-wheels dbmigrate remove table product_archive
+wheels dbmigrate remove table name=product_archive
 ```
 
 Generates:
 ```cfml
-component extends="wheels.migrator.Migration" hint="Drop product_archive table" {
+component extends="wheels.migrator.Migration" hint="remove product_archive table" {
 
     function up() {
         transaction {
@@ -82,14 +56,8 @@ component extends="wheels.migrator.Migration" hint="Drop product_archive table" 
 
     function down() {
         transaction {
-            // Recreate table structure for rollback
-            createTable(name="product_archive") {
-                t.increments("id");
-                t.string("name");
-                t.text("description");
-                t.decimal("price", precision=10, scale=2);
-                t.timestamps();
-            }
+            // Add code here to recreate the table if needed for rollback
+            // createTable(name="product_archive") { ... }
         }
     }
 
@@ -102,36 +70,36 @@ component extends="wheels.migrator.Migration" hint="Drop product_archive table" 
 Clean up temporary or staging tables:
 ```bash
 # Remove import staging table
-wheels dbmigrate remove table temp_customer_import
+wheels dbmigrate remove table name=temp_customer_import
 
 # Remove data migration table
-wheels dbmigrate remove table migration_backup_20240115
+wheels dbmigrate remove table name=migration_backup_20240115
 ```
 
 ### Refactoring Database Schema
 Remove tables during schema refactoring:
 ```bash
 # Remove old table after data migration
-wheels dbmigrate remove table legacy_orders --force
+wheels dbmigrate remove table name=legacy_orders
 
-# Remove normalized table
-wheels dbmigrate remove table user_preferences_old
+# Remove deprecated table
+wheels dbmigrate remove table name=user_preferences_old
 ```
 
 ### Cleaning Up Failed Features
 Remove tables from cancelled features:
 ```bash
 # Remove tables from abandoned feature
-wheels dbmigrate remove table beta_feature_data
-wheels dbmigrate remove table beta_feature_settings
+wheels dbmigrate remove table name=beta_feature_data
+wheels dbmigrate remove table name=beta_feature_settings
 ```
 
 ### Archive Table Cleanup
 Remove old archive tables:
 ```bash
 # Remove yearly archive tables
-wheels dbmigrate remove table orders_archive_2020
-wheels dbmigrate remove table orders_archive_2021
+wheels dbmigrate remove table name=orders_archive_2020
+wheels dbmigrate remove table name=orders_archive_2021
 ```
 
 ## Safety Considerations
@@ -151,12 +119,12 @@ Consider objects that depend on the table:
 - Triggers
 - Application code
 
-### Using CASCADE
-The `--cascade` option drops dependent objects:
-```bash
-# Drops table and all dependent objects
-wheels dbmigrate remove table user --cascade
-```
+### Handling Dependencies
+Be aware of dependent objects when removing tables:
+- Foreign key constraints
+- Views that reference the table
+- Stored procedures using the table
+- Application code dependencies
 
 ## Best Practices
 
@@ -164,31 +132,29 @@ wheels dbmigrate remove table user --cascade
 Add clear documentation about why the table is being removed:
 ```bash
 # Create descriptive migration
-wheels dbmigrate remove table obsolete_analytics_cache
+wheels dbmigrate remove table name=obsolete_analytics_cache
 
-# Then edit the migration to add comments
-component extends="wheels.migrator.Migration" 
-  hint="Remove obsolete_analytics_cache table - replaced by Redis caching" {
+# Then edit the migration file to add detailed comments about why it's being removed
 ```
 
 ### 2. Backup Data First
 Before removing tables, create data backups:
 ```bash
-# First create backup migration
-wheels dbmigrate create blank --name=backup_user_preferences_data
+# First backup the data
+wheels db schema format=sql > backup_before_removal.sql
 
-# Then remove table
-wheels dbmigrate remove table user_preferences
+# Then create removal migration
+wheels dbmigrate remove table name=user_preferences
 ```
 
 ### 3. Staged Removal
 For production systems, consider staged removal:
 ```bash
 # Stage 1: Rename table (keep for rollback)
-wheels dbmigrate create blank --name=rename_orders_to_orders_deprecated
+wheels dbmigrate create blank name=rename_orders_to_orders_deprecated
 
 # Stage 2: After verification period, remove
-wheels dbmigrate remove table orders_deprecated
+wheels dbmigrate remove table name=orders_deprecated
 ```
 
 ### 4. Check Dependencies
@@ -204,33 +170,13 @@ WHERE table_schema = DATABASE()
 AND view_definition LIKE '%table_name%';
 ```
 
-## Migration Structure Details
+## Migration Structure
 
-### With Backup (Default)
-The generated down() method includes table structure:
-```cfml
-function down() {
-    transaction {
-        createTable(name="product") {
-            t.increments("id");
-            // All columns recreated
-            t.timestamps();
-        }
-        // Indexes recreated
-        addIndex(table="product", column="sku", unique=true);
-    }
-}
-```
+The generated migration contains:
+- An `up()` method with `dropTable()` 
+- An empty `down()` method for you to implement rollback logic if needed
 
-### Without Backup
-With `--no-backup`, down() is simpler:
-```cfml
-function down() {
-    transaction {
-        announce("Table structure not backed up - manual recreation required");
-    }
-}
-```
+You should edit the `down()` method to add table recreation logic if you want the migration to be reversible.
 
 ## Recovery Strategies
 
@@ -242,11 +188,11 @@ function down() {
 ### Preserving Table Structure
 Before removal, capture structure:
 ```bash
-# Export table structure
-wheels db schema --table=user_preferences > user_preferences_backup.sql
+# Export entire database schema
+wheels db schema format=sql --save file=schema_backup.sql
 
-# Then remove
-wheels dbmigrate remove table user_preferences
+# Then remove table
+wheels dbmigrate remove table name=user_preferences
 ```
 
 ## Notes

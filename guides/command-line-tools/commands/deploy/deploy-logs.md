@@ -1,204 +1,226 @@
 # deploy logs
 
-View and manage deployment logs for troubleshooting and monitoring.
+View deployment logs from servers.
 
 ## Synopsis
 
 ```bash
-wheels deploy logs [options]
+wheels deploy:logs [options]
 ```
 
 ## Description
 
-The `wheels deploy logs` command provides access to deployment logs, allowing you to view, search, and export logs from past and current deployments. This is essential for troubleshooting deployment issues, auditing deployment history, and monitoring deployment progress.
+The `wheels deploy:logs` command allows you to view Docker container logs from your deployed application and database containers. This is essential for troubleshooting issues, monitoring application behavior, and debugging production problems.
 
 ## Options
 
-- `--deployment-id, -d` - Specific deployment ID to view logs for
-- `--environment, -e` - Filter logs by environment (default: all)
-- `--tail, -f` - Follow log output in real-time
-- `--lines, -n` - Number of lines to display (default: 100)
-- `--since` - Show logs since timestamp (e.g., "2023-01-01", "1h", "30m")
-- `--until` - Show logs until timestamp
-- `--grep, -g` - Filter logs by pattern (regex supported)
-- `--level` - Filter by log level (debug, info, warn, error)
-- `--format` - Output format (text, json, csv) (default: text)
-- `--output, -o` - Export logs to file
-- `--no-color` - Disable colored output
+- `servers=<string>` - Specific servers to check (comma-separated list)
+- `tail=<number>` - Number of lines to show (default: 100)
+- `--follow` - Follow log output in real-time (default: false)
+- `service=<string>` - Service to show logs for: app or db (default: app)
+- `since=<string>` - Show logs since timestamp (e.g., "2023-01-01", "1h", "5m")
 
 ## Examples
 
-### View recent deployment logs
+### View recent application logs
 ```bash
-wheels deploy logs
+wheels deploy:logs
 ```
 
-### Follow current deployment logs
+### Follow logs in real-time
 ```bash
-wheels deploy logs --tail
+wheels deploy:logs --follow
 ```
 
-### View specific deployment logs
+### View last 50 lines from specific server
 ```bash
-wheels deploy logs --deployment-id dep-123456
+wheels deploy:logs tail=50 servers=web1.example.com
 ```
 
-### Filter by time range
+### View database logs
 ```bash
-wheels deploy logs --since "1 hour ago" --until "30 minutes ago"
+wheels deploy:logs service=db
 ```
 
-### Search for errors
+### View logs from the last hour
 ```bash
-wheels deploy logs --grep "error|failed" --level error
+wheels deploy:logs since=1h
 ```
 
-### Export logs to file
+### Follow database logs from specific server
 ```bash
-wheels deploy logs --deployment-id dep-123456 --output deployment.log
+wheels deploy:logs service=db --follow servers=web2.example.com
 ```
 
-### View logs in JSON format
+### View logs since specific date
 ```bash
-wheels deploy logs --format json --lines 50
+wheels deploy:logs since=2024-01-15
 ```
 
-## Log Levels
+## How It Works
 
-Logs are categorized by severity:
+The command:
+1. Connects to target servers via SSH
+2. Executes `docker logs` on the specified container
+3. Streams or displays the output based on options
+4. Supports multiple servers with clear separation
 
-- **DEBUG**: Detailed diagnostic information
-- **INFO**: General informational messages
-- **WARN**: Warning messages for potential issues
-- **ERROR**: Error messages for failures
-- **FATAL**: Critical errors causing deployment failure
+## Output Example
 
-## Log Structure
-
-Each log entry contains:
-- Timestamp
-- Log level
-- Deployment stage
-- Component/service
-- Message
-- Additional metadata
-
-Example log entry:
+### Single server logs
 ```
-2023-12-01 14:23:45 [INFO] [pre-deploy] [backup] Starting database backup
-2023-12-01 14:23:47 [INFO] [pre-deploy] [backup] Backup completed successfully
-2023-12-01 14:23:48 [INFO] [deploy] [app] Deploying application version 2.1.0
-2023-12-01 14:23:52 [ERROR] [deploy] [app] Failed to start service: connection refused
+Wheels Deployment Logs
+==================================================
+
+[2024-01-15 14:30:00] INFO: Server started on port 3000
+[2024-01-15 14:30:01] INFO: Database connection established
+[2024-01-15 14:30:02] INFO: Wheels application initialized
+[2024-01-15 14:35:00] INFO: Request processed: GET /
+[2024-01-15 14:40:00] WARN: Slow query detected (1.2s)
+[2024-01-15 14:45:00] ERROR: Failed to send email: SMTP connection refused
+```
+
+### Multiple servers
+```
+Wheels Deployment Logs
+==================================================
+
+=== Server: web1.example.com ===
+
+[2024-01-15 14:30:00] INFO: Server started on port 3000
+[2024-01-15 14:35:00] INFO: Health check passed
+
+=== Server: web2.example.com ===
+
+[2024-01-15 14:30:05] INFO: Server started on port 3000
+[2024-01-15 14:35:05] INFO: Health check passed
 ```
 
 ## Use Cases
 
 ### Real-time monitoring
 ```bash
-# Monitor ongoing deployment
-wheels deploy logs --tail --deployment-id current
+# Monitor application logs
+wheels deploy:logs --follow
+
+# Monitor database logs
+wheels deploy:logs service=db --follow
 ```
 
-### Troubleshooting failures
+### Troubleshooting errors
 ```bash
-# Find errors in recent deployments
-wheels deploy logs --since "1 day ago" --level error
+# View recent errors (combine with grep)
+wheels deploy:logs tail=500 | grep ERROR
 
-# Search for specific error
-wheels deploy logs --grep "database connection" --level error
+# Check specific time period
+wheels deploy:logs since=30m | grep -i error
 ```
 
-### Audit trail
+### Database debugging
 ```bash
-# Export deployment logs for audit
-wheels deploy logs \
-  --since "2023-01-01" \
-  --until "2023-12-31" \
-  --format csv \
-  --output audit-2023.csv
+# View database startup logs
+wheels deploy:logs service=db tail=200
+
+# Monitor database queries
+wheels deploy:logs service=db --follow | grep Query
 ```
 
 ### Performance analysis
 ```bash
-# Find slow operations
-wheels deploy logs --grep "took [0-9]+ seconds" | grep -E "took [0-9]{3,} seconds"
+# Find slow queries
+wheels deploy:logs service=db since=1h | grep "Slow query"
+
+# Check request processing times
+wheels deploy:logs since=1h | grep "Request processed"
 ```
 
-## Advanced Filtering
+## Time Formats
 
-### Complex grep patterns
+The `since` parameter accepts various formats:
+- Relative: `5m`, `2h`, `1d`, `1w`
+- ISO 8601: `2024-01-15T14:30:00`
+- Date only: `2024-01-15`
+- Docker format: `2024-01-15T14:30:00.000000000Z`
+
+## Service Selection
+
+### Application logs (default)
+Shows logs from the main application container:
 ```bash
-# Find database-related errors
-wheels deploy logs --grep "database|sql|connection.*error"
-
-# Find deployment timing
-wheels deploy logs --grep "(started|completed|failed).*deploy"
+wheels deploy:logs
 ```
 
-### Multiple filters
+### Database logs
+Shows logs from the database container:
 ```bash
-# Production errors in last hour
-wheels deploy logs \
-  --environment production \
-  --level error \
-  --since "1 hour ago"
+wheels deploy:logs service=db
 ```
-
-### Log aggregation
-```bash
-# Count errors by component
-wheels deploy logs --level error --format json | \
-  jq -r '.component' | sort | uniq -c
-```
-
-## Log Retention
-
-- Logs are retained based on environment settings
-- Default retention periods:
-  - Production: 90 days
-  - Staging: 30 days
-  - Development: 7 days
-- Archived logs available through backup systems
 
 ## Best Practices
 
-1. **Use appropriate filters**: Narrow down logs to relevant entries
-2. **Export important logs**: Save logs for failed deployments
-3. **Monitor in real-time**: Use --tail for active deployments
-4. **Regular log review**: Periodically review logs for patterns
-5. **Set up alerts**: Configure alerts for error patterns
-6. **Maintain log hygiene**: Ensure logs are meaningful and not excessive
-
-## Integration
-
-Log viewing integrates with:
-- Monitoring systems (Datadog, New Relic, etc.)
-- Log aggregation services (ELK stack, Splunk)
-- Alerting systems for error notifications
-- CI/CD pipelines for deployment history
+1. **Use tail wisely**: Start with reasonable line counts to avoid overwhelming output
+2. **Follow sparingly**: Use --follow only when actively monitoring
+3. **Filter at source**: Use `since` to reduce data transfer
+4. **Combine with tools**: Pipe to grep, awk, or other tools for analysis
+5. **Monitor both services**: Check both app and database logs when troubleshooting
 
 ## Troubleshooting
 
+### Container not found
+- Verify deployment is active with `wheels deploy:status`
+- Check service name matches (app or db)
+- Ensure container is running
+
 ### No logs appearing
-```bash
-# Check deployment status
-wheels deploy status
+- Container might be new with no logs yet
+- Check if logging is configured correctly
+- Verify Docker logging driver settings
 
-# Verify deployment ID
-wheels deploy list --recent
+### SSH timeout
+- Logs might be very large
+- Use `tail` parameter to limit output
+- Use `since` to reduce time range
+
+### Permission denied
+- Ensure SSH user has Docker access
+- Check if user is in docker group
+- Verify sudo permissions if needed
+
+## Advanced Usage
+
+### Export logs to file
+```bash
+# Save logs for analysis
+wheels deploy:logs tail=1000 > app-logs.txt
+
+# Save database logs
+wheels deploy:logs service=db since=1d > db-logs.txt
 ```
 
-### Log export failing
+### Continuous monitoring with timestamps
 ```bash
-# Check available disk space
-df -h
-
-# Try smaller time range or line limit
-wheels deploy logs --lines 1000 --output partial.log
+# Add timestamps if not present
+wheels deploy:logs --follow | while read line; do
+  echo "$(date '+%Y-%m-%d %H:%M:%S') $line"
+done
 ```
+
+### Log analysis pipeline
+```bash
+# Count errors by type
+wheels deploy:logs since=1h | grep ERROR | cut -d: -f3- | sort | uniq -c | sort -nr
+```
+
+## Notes
+
+- Logs are retrieved directly from Docker containers
+- No log rotation or management is performed by this command
+- Large log files may take time to transfer
+- Follow mode requires stable SSH connection
+- Container must be running to view logs
 
 ## See Also
 
-- [deploy status](deploy-status.md) - Check deployment status
-- [deploy exec](deploy-exec.md) - Execute deployment
-- [deploy audit](deploy-audit.md) - Audit deployment configuration
+- [wheels deploy:status](deploy-status.md) - Check deployment status
+- [wheels deploy:exec](deploy-exec.md) - Execute commands in containers
+- [wheels deploy:push](deploy-push.md) - Deploy application

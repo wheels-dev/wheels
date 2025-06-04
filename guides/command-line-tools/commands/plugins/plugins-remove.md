@@ -1,18 +1,18 @@
 # plugins remove
 
-Removes an installed plugin from your CFWheels application.
+Removes an installed Wheels CLI plugin.
 
 ## Usage
 
 ```bash
-wheels plugins remove <plugin> [--backup] [--force]
+wheels plugins remove <name> [--global] [--force]
 ```
 
 ## Parameters
 
-- `plugin` - (Required) Name of the plugin to remove
-- `--backup` - (Optional) Create a backup before removal. Default: true
-- `--force` - (Optional) Force removal even if other plugins depend on it
+- `name` - (Required) Plugin name to remove
+- `--global` - (Optional) Remove globally installed plugin
+- `--force` - (Optional) Force removal without confirmation
 
 ## Description
 
@@ -28,23 +28,22 @@ The `plugins remove` command safely uninstalls a plugin from your CFWheels appli
 
 ### Basic plugin removal
 ```bash
-wheels plugins remove authentication
+wheels plugins remove wheels-vue-cli
 ```
 
-### Remove without backup
+### Remove global plugin
 ```bash
-wheels plugins remove cache-manager --no-backup
+wheels plugins remove wheels-docker --global
 ```
 
-### Force removal (ignore dependencies)
+### Force removal (skip confirmation)
 ```bash
-wheels plugins remove routing --force
+wheels plugins remove wheels-testing --force
 ```
 
-### Remove multiple plugins
+### Remove global plugin without confirmation
 ```bash
-wheels plugins remove plugin1
-wheels plugins remove plugin2
+wheels plugins remove wheels-cli-tools --global --force
 ```
 
 ## Removal Process
@@ -58,55 +57,31 @@ wheels plugins remove plugin2
 
 ## Output
 
+### With confirmation prompt (default)
 ```
-Removing plugin: authentication
-================================
+Are you sure you want to remove the plugin 'wheels-vue-cli'? (y/n): y
+🗑️  Removing plugin: wheels-vue-cli...
 
-Checking dependencies... ✓
-Creating backup at /backups/plugins/authentication-2.1.0-20240115.zip... ✓
-Deactivating plugin... ✓
-Removing plugin files... ✓
-Cleaning configuration... ✓
-
-Plugin 'authentication' removed successfully!
-
-Note: Backup saved to /backups/plugins/authentication-2.1.0-20240115.zip
-      You may need to restart your application.
+✅ Plugin removed successfully
 ```
 
-## Dependency Handling
-
-If other plugins depend on the one being removed:
-
+### With force flag
 ```
-Cannot remove plugin: routing
-=============================
+🗑️  Removing plugin: wheels-vue-cli...
 
-The following plugins depend on 'routing':
-- advanced-routing (v1.2.0)
-- api-framework (v3.0.1)
-
-Options:
-1. Remove dependent plugins first
-2. Use --force to remove anyway (may break functionality)
+✅ Plugin removed successfully
 ```
 
-## Backup Management
-
-Backups are stored in `/backups/plugins/` with timestamp:
-- Format: `[plugin-name]-[version]-[timestamp].zip`
-- Example: `authentication-2.1.0-20240115143022.zip`
-
-### Restore from backup
-```bash
-# Manually restore a plugin
-wheels plugins install /backups/plugins/authentication-2.1.0-20240115.zip
+### Cancellation
+```
+Are you sure you want to remove the plugin 'wheels-vue-cli'? (y/n): n
+Plugin removal cancelled.
 ```
 
 ## Notes
 
-- Always restart your application after removing plugins
-- Backups are kept for 30 days by default
-- Some plugins may leave configuration files that need manual cleanup
-- Database tables created by plugins are not automatically removed
+- The `--force` flag skips the confirmation prompt
+- Use `--global` to remove plugins installed globally
 - Use `wheels plugins list` to verify removal
+- Some plugins may require manual cleanup of configuration files
+- Restart your application after removing plugins that affect core functionality

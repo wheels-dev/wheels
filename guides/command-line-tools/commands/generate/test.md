@@ -221,6 +221,20 @@ wheels generate test controller products
 ```
 
 Generates `/tests/controllers/ProductsTest.cfc`:
+
+### View Test
+```bash
+wheels generate test view products --name=index
+```
+
+Generates a test for the products/index view.
+
+### CRUD Tests
+```bash
+wheels generate test controller products --crud
+```
+
+Generates complete CRUD test methods for the controller.
 ```cfc
 component extends="wheels.Test" {
     

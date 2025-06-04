@@ -5,15 +5,16 @@ Scans your CFWheels application for security vulnerabilities and provides remedi
 ## Usage
 
 ```bash
-wheels security scan [--level=<level>] [--fix] [--report=<file>] [--exclude=<patterns>]
+wheels security scan [path] [--fix] [--report=<format>] [--severity=<level>] [--output=<file>]
 ```
 
 ## Parameters
 
-- `--level` - (Optional) Scan level: `basic`, `standard`, `comprehensive`. Default: `standard`
-- `--fix` - (Optional) Automatically fix safe issues
-- `--report` - (Optional) Save detailed report to file
-- `--exclude` - (Optional) Comma-separated patterns to exclude from scan
+- `path` - (Optional) Path to scan. Default: current directory (`.`)
+- `--fix` - (Optional) Attempt to fix issues automatically
+- `--report` - (Optional) Report format: `console`, `json`, `html`. Default: `console`
+- `--severity` - (Optional) Minimum severity to report: `low`, `medium`, `high`, `critical`. Default: `medium`
+- `--output` - (Optional) Output file for report
 
 ## Description
 
@@ -35,45 +36,49 @@ The `security scan` command performs comprehensive security analysis of your CFW
 wheels security scan
 ```
 
-### Comprehensive scan with auto-fix
+### Scan with auto-fix
 ```bash
-wheels security scan --level=comprehensive --fix
+wheels security scan --fix
 ```
 
-### Generate security report
+### Generate HTML security report
 ```bash
-wheels security scan --report=security-audit.html
+wheels security scan --report=html --output=security-audit.html
 ```
 
-### Exclude test files
+### Scan specific directory with high severity only
 ```bash
-wheels security scan --exclude="tests/*,temp/*"
+wheels security scan app/models --severity=high
 ```
 
-### Quick basic scan
+### JSON report for CI/CD integration
 ```bash
-wheels security scan --level=basic
+wheels security scan --report=json --output=scan-results.json
 ```
 
-## Scan Levels
+## Severity Levels
 
-### Basic
-- Configuration checks
-- Known vulnerability patterns
-- Dependency scanning
+The `--severity` parameter filters which issues are reported:
 
-### Standard (Default)
-- All basic checks
-- Code analysis for common vulnerabilities
-- Authentication/authorization review
-- Input validation checks
+### Low
+- Code style issues that could lead to vulnerabilities
+- Missing best practices
+- Informational findings
 
-### Comprehensive
-- All standard checks
-- Deep code flow analysis
-- Third-party integration security
-- Performance impact analysis
-- Custom vulnerability rules
+### Medium (Default)
+- Potential security issues requiring review
+- Missing security headers
+- Weak configurations
+
+### High
+- Confirmed vulnerabilities with moderate impact
+- Authentication/authorization issues
+- Data validation problems
+
+### Critical
+- Severe vulnerabilities requiring immediate attention
+- SQL injection risks
+- Remote code execution possibilities
 
 ## Output
 
@@ -173,7 +178,7 @@ Machine-readable format for CI/CD integration
 # Example GitHub Actions
 - name: Security Scan
   run: |
-    wheels security scan --level=standard --report=scan.json
+    wheels security scan --severity=medium --report=json --output=scan.json
     if [ $? -ne 0 ]; then
       echo "Security vulnerabilities found"
       exit 1
@@ -183,7 +188,7 @@ Machine-readable format for CI/CD integration
 ### Pre-commit Hook
 ```bash
 #!/bin/bash
-wheels security scan --level=basic
+wheels security scan --severity=high
 if [ $? -ne 0 ]; then
   echo "Commit blocked: Security issues detected"
   exit 1

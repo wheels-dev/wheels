@@ -2,34 +2,27 @@
 
 Base command for environment management in Wheels applications.
 
-## Synopsis
+## Usage
 
 ```bash
-wheels env [subcommand] [options]
+wheels env [subcommand]
 ```
 
 ## Description
 
-The `wheels env` command provides comprehensive environment management for Wheels applications. It handles environment configuration, switching between environments, and managing environment-specific settings.
+The `wheels env` command provides environment management for Wheels applications. It handles environment configuration, switching between environments, and managing environment-specific settings.
 
 ## Subcommands
 
 | Command | Description |
 |---------|-------------|
+| `list` | List all configured environments |
 | `setup` | Setup a new environment |
-| `list` | List available environments |
 | `switch` | Switch to a different environment |
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
-| `--version` | Show version information |
 
 ## Direct Usage
 
-When called without subcommands, displays current environment:
+When called without subcommands, displays help information:
 
 ```bash
 wheels env
@@ -37,28 +30,37 @@ wheels env
 
 Output:
 ```
-Current Environment: development
-Configuration File: /config/development/settings.cfm
-Database: wheels_dev
-Mode: development
-Debug: enabled
+🌍 Wheels Environment Management
+
+Available commands:
+
+  wheels env list
+    List all configured environments
+
+  wheels env setup <environment>
+    Setup a new environment (development, staging, production)
+    Options: --template=docker --database=postgres
+
+  wheels env switch <environment>
+    Switch to a different environment
+
+Examples:
+  wheels env setup development
+  wheels env setup production --template=docker --database=postgres
+  wheels env switch staging
 ```
 
 ## Examples
 
-### Show current environment
-```bash
-wheels env
-```
-
-### Quick environment info
-```bash
-wheels env --info
-```
-
 ### List all environments
 ```bash
 wheels env list
+```
+
+### Setup new environment
+```bash
+wheels env setup development
+wheels env setup production --template=docker --database=postgres
 ```
 
 ### Switch environment

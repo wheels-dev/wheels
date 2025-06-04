@@ -1,19 +1,19 @@
 # docs serve
 
-Serves generated documentation locally with live reload for development and review.
+Serves generated documentation locally for development and review.
 
 ## Usage
 
 ```bash
-wheels docs serve [--port=<port>] [--host=<host>] [--open] [--watch]
+wheels docs serve [--root=<dir>] [--port=<port>] [--open] [--watch]
 ```
 
 ## Parameters
 
-- `--port` - (Optional) Port number to serve on. Default: `4000`
-- `--host` - (Optional) Host to bind to. Default: `localhost`
-- `--open` - (Optional) Open browser automatically after starting
-- `--watch` - (Optional) Watch for changes and regenerate. Default: true
+- `--root` - (Optional) Root directory to serve. Default: `docs/api`
+- `--port` - (Optional) Port to serve on. Default: `35729`
+- `--open` - (Optional) Open browser automatically. Default: `true`
+- `--watch` - (Optional) Watch for changes and regenerate. Default: `false`
 
 ## Description
 
@@ -37,179 +37,95 @@ wheels docs serve
 wheels docs serve --port=8080
 ```
 
-### Open in browser automatically
+### Serve from custom directory
 ```bash
-wheels docs serve --open
+wheels docs serve --root=public/api-docs
 ```
 
-### Serve without watching for changes
+### Serve with file watching
 ```bash
-wheels docs serve --no-watch
+wheels docs serve --watch
 ```
 
-### Bind to all interfaces
+### Serve without opening browser
 ```bash
-wheels docs serve --host=0.0.0.0
+wheels docs serve --open=false
+```
+
+### Custom configuration
+```bash
+wheels docs serve --root=docs/generated --port=3000 --watch
 ```
 
 ## Server Output
 
 ```
-Starting documentation server...
-================================
-
-Configuration:
-- Documentation path: /docs/generated/
-- Server URL: http://localhost:4000
-- Live reload: enabled
-- File watching: enabled
+🌐 Starting documentation server...
 
 Server started successfully!
-- Local: http://localhost:4000
-- Network: http://192.168.1.100:4000
+- URL: http://localhost:35729
+- Root: /docs/api
+- Auto-open: enabled
 
 Press Ctrl+C to stop the server
+```
 
-[2024-01-15 14:30:22] Serving documentation...
-[2024-01-15 14:30:45] GET / - 200 OK (15ms)
-[2024-01-15 14:30:46] GET /models/user.html - 200 OK (8ms)
-[2024-01-15 14:31:02] File changed: /app/models/User.cfc
-[2024-01-15 14:31:02] Regenerating documentation...
-[2024-01-15 14:31:05] Documentation updated - reloading browsers
+If documentation is not found:
+```
+Documentation directory not found: /docs/api
+
+💡 Tip: Run 'wheels docs generate' first to create documentation
 ```
 
 ## Features
 
-### Live Reload
-When `--watch` is enabled, the server:
-- Monitors source files for changes
-- Automatically regenerates affected documentation
-- Refreshes browser without manual reload
+### File Watching
+When `--watch` is enabled, the server monitors documentation files for changes and can trigger regeneration.
 
-### Search Functionality
-- Full-text search across all documentation
-- Instant results as you type
-- Keyboard navigation (Ctrl+K or Cmd+K)
-- Search history
-
-### Navigation
-```
-Documentation Structure:
-/                     # Home page with overview
-/models/              # All models documentation
-/models/user.html     # Specific model docs
-/controllers/         # Controller documentation  
-/api/                 # API reference
-/guides/              # Custom guides
-/search               # Search page
-```
-
-### Print Support
-- Optimized CSS for printing
-- Clean layout without navigation
-- Page breaks at logical points
-- Print entire docs or single pages
+### Browser Integration
+With `--open=true` (default), the server automatically opens your default browser to the documentation URL.
 
 ## Development Workflow
 
-### Typical usage during development:
+### Typical usage:
 ```bash
-# Terminal 1: Start the docs server
-wheels docs serve --open
-
-# Terminal 2: Make code changes
-# Edit your models/controllers
-# Documentation auto-updates
-
-# Terminal 3: Generate fresh docs if needed
+# Step 1: Generate documentation
 wheels docs generate
+
+# Step 2: Serve documentation
+wheels docs serve
+
+# Step 3: Make changes and regenerate
+wheels docs generate
+# Browser will show updated docs
 ```
 
-### Review workflow:
+### Custom workflow:
 ```bash
-# Generate and serve for team review
-wheels docs generate --format=html
-wheels docs serve --port=3000 --host=0.0.0.0
-
-# Share URL with team
-echo "Documentation available at http://$(hostname -I | awk '{print $1}'):3000"
-```
-
-## Configuration
-
-### Server Configuration
-Create `/config/docs-server.json`:
-```json
-{
-  "server": {
-    "port": 4000,
-    "host": "localhost",
-    "baseUrl": "/docs",
-    "cors": true
-  },
-  "watch": {
-    "enabled": true,
-    "paths": ["app/", "config/"],
-    "ignore": ["*.log", "temp/"],
-    "delay": 1000
-  },
-  "features": {
-    "search": true,
-    "print": true,
-    "offline": true,
-    "analytics": false
-  }
-}
-```
-
-### Custom Headers
-```json
-{
-  "headers": {
-    "Cache-Control": "no-cache",
-    "X-Frame-Options": "SAMEORIGIN",
-    "Content-Security-Policy": "default-src 'self'"
-  }
-}
-```
-
-## Access Control
-
-### Basic Authentication
-```bash
-wheels docs serve --auth=username:password
-```
-
-### IP Restrictions
-```bash
-wheels docs serve --allow="192.168.1.0/24,10.0.0.0/8"
+# Generate and serve from custom location
+wheels docs generate --output=public/docs
+wheels docs serve --root=public/docs --port=8080
 ```
 
 ## Troubleshooting
 
-### Common Issues
-
-**Port already in use:**
+### Port already in use
 ```bash
-Error: Port 4000 is already in use
-
-# Solution: Use a different port
-wheels docs serve --port=4001
+# Use a different port
+wheels docs serve --port=8081
 ```
 
-**Cannot access from network:**
+### Documentation not found
 ```bash
-# Bind to all interfaces
-wheels docs serve --host=0.0.0.0
-
-# Check firewall settings
+# Make sure to generate docs first
+wheels docs generate
+wheels docs serve
 ```
 
-**Documentation not updating:**
+### Browser doesn't open
 ```bash
-# Force regeneration
-wheels docs generate --force
-wheels docs serve --watch
+# Manually navigate to the URL shown
+# Or check your default browser settings
 ```
 
 ## Notes

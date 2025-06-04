@@ -8,23 +8,22 @@ Run all pending database migrations to bring database to latest version.
 wheels dbmigrate latest
 ```
 
+Alias: `wheels db latest`
+
 ## Description
 
 The `wheels dbmigrate latest` command runs all pending migrations in chronological order, updating your database schema to the latest version. This is the most commonly used migration command.
 
-## Options
+## Parameters
 
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
+None.
 
 ## How It Works
 
-1. Checks current database version
-2. Identifies all pending migrations
-3. Runs each migration in order
-4. Updates version after each success
-5. Stops on first error
+1. Retrieves current database version and latest version
+2. Executes `dbmigrate exec` with the latest version
+3. Automatically runs `dbmigrate info` after completion
+4. Updates version tracking after successful migration
 
 ## Example Output
 
@@ -208,16 +207,16 @@ function up() {
 }
 ```
 
-## Dry Run
+## Checking Migrations
 
-Preview migrations without running:
+Preview migrations before running:
 
 ```bash
 # Check what would run
 wheels dbmigrate info
 
 # Review migration files
-ls db/migrate/
+ls app/migrator/migrations/
 ```
 
 ## Performance Considerations

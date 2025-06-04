@@ -1,133 +1,155 @@
 # wheels deps
 
-Manage application dependencies.
+Manage Wheels-specific dependencies and plugins.
 
 ## Synopsis
 
 ```bash
-wheels deps
+wheels deps <action> [name] [version]
 ```
 
 ## Description
 
-The `wheels deps` command helps manage your Wheels application's dependencies, including CFML modules, Wheels plugins, and JavaScript packages.
+The `wheels deps` command helps manage Wheels plugins and dependencies in your application.
 
-## Options
+## Arguments
 
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `action` | **Required** - Action to perform: `list`, `install`, `update`, `remove`, `report` | None |
+| `name` | Plugin/dependency name (required for install/update/remove actions) | None |
+| `version` | Specific version to install (optional, for install action only) | Latest version |
 
-## Features
+## Actions
 
-1. **Dependency Analysis**
-   - Scans `box.json` for CFML dependencies
-   - Checks `package.json` for Node.js dependencies
-   - Identifies Wheels plugins
-
-2. **Version Checking**
-   - Compares installed vs required versions
-   - Identifies outdated packages
-   - Shows available updates
-
-3. **Dependency Installation**
-   - Installs missing dependencies
-   - Updates outdated packages
-   - Resolves version conflicts
-
-## Output Example
-
-```
-╔═══════════════════════════════════════════════╗
-║          Dependency Analysis                  ║
-╚═══════════════════════════════════════════════╝
-
-CFML Dependencies (box.json):
-✓ wheels          2.5.0    (up to date)
-✓ cbvalidation    3.0.0    (up to date)
-⚠ sqlbuilder      1.2.0    (1.3.0 available)
-✗ testbox         Missing  (4.5.0 required)
-
-Wheels Plugins:
-✓ multimodule     1.0.0    (active)
-✓ scaffold        2.1.0    (active)
-
-Node Dependencies (package.json):
-✓ webpack         5.88.0   (up to date)
-✓ babel-core      7.22.0   (up to date)
-
-Status: 1 missing, 1 outdated
-
-Would you like to:
-[1] Install missing dependencies
-[2] Update outdated dependencies
-[3] Update all dependencies
-[4] Exit
-
-Choice:
-```
-
-## Dependency Sources
-
-### CFML Dependencies (`box.json`)
-```json
-{
-  "dependencies": {
-    "wheels": "^2.5.0",
-    "testbox": "^4.5.0"
-  }
-}
-```
-
-### Wheels Plugins
-Located in `/plugins` directory or installed via ForgeBox.
-
-### Node Dependencies (`package.json`)
-```json
-{
-  "dependencies": {
-    "webpack": "^5.88.0"
-  }
-}
-```
-
-## Commands Executed
-
-Behind the scenes, `wheels deps` runs:
+### List
+Display all installed plugins and dependencies.
 
 ```bash
-# For CFML dependencies
-box install
-
-# For Node dependencies
-npm install
-
-# For Wheels plugins
-wheels plugins list
+wheels deps list
 ```
 
-## Use Cases
+Output shows:
+- Plugin name
+- Version
+- Author
+- Status (Enabled/Disabled)
 
-- Check dependency status before deployment
-- Ensure all team members have same dependencies
-- Update dependencies safely
-- Troubleshoot missing functionality
+### Install
+Install a new plugin or dependency.
+
+```bash
+wheels deps install <name>
+wheels deps install <name> <version>
+```
+
+Examples:
+```bash
+wheels deps install multimodule
+wheels deps install scaffold 2.1.0
+```
+
+### Update
+Update an existing plugin or dependency.
+
+```bash
+wheels deps update <name>
+```
+
+Example:
+```bash
+wheels deps update multimodule
+```
+
+### Remove
+Remove a plugin or dependency.
+
+```bash
+wheels deps remove <name>
+```
+
+Example:
+```bash
+wheels deps remove oldplugin
+```
+
+**Note**: Remove action will ask for confirmation before proceeding.
+
+### Report
+Generate a comprehensive dependency report.
+
+```bash
+wheels deps report
+```
+
+The report includes:
+- All installed plugins
+- Version information
+- Dependencies between plugins
+- Compatibility status
+- Export to file
+
+## Output Examples
+
+### List Output
+```
+Installed Plugins:
+
+Plugin        Version    Author         Status
+----------    -------    ------------   --------
+multimodule   1.0.0      Chris Peters   Enabled
+scaffold      2.1.0      Tom Bellinson  Enabled
+database      1.5.0      Per Djurner    Disabled
+```
+
+### Install Output
+```
+Installing multimodule...
+✅ multimodule installed successfully
+Version: 1.0.0
+```
+
+### Report Output
+```
+Dependency Report:
+
+Plugins:
+Plugin        Version    Dependencies
+----------    -------    --------------
+multimodule   1.0.0      None
+scaffold      2.1.0      multimodule
+
+Compatibility:
+Component    Version    Status        Notes
+---------    -------    -----------   ----------------
+wheels       2.5.0      Compatible    
+lucee        5.3.10     Compatible    
+```
+
+## Error Handling
+
+Common errors:
+- Plugin not found
+- Version conflicts
+- Missing dependencies
+- Network connectivity issues
 
 ## Best Practices
 
-1. Run after pulling new code
-2. Check before deployments
-3. Update dependencies incrementally
-4. Test after updates
+1. **Before Installing**: Check compatibility with `wheels deps report`
+2. **Regular Updates**: Keep plugins updated for security
+3. **Test After Changes**: Run tests after installing/updating
+4. **Document Dependencies**: Keep track of required plugins
 
 ## Notes
 
-- Requires `box.json` for CFML dependencies
-- Optional `package.json` for Node dependencies
-- Some plugins may require manual configuration
+- Plugins are installed to the `/plugins` directory
+- Some plugins may require configuration after installation
+- Use `wheels plugins list` for more detailed plugin management
 
 ## See Also
 
-- [wheels plugins list](../plugins/plugins-list.md) - List installed plugins
+- [wheels plugins install](../plugins/plugins-install.md) - Install plugins with more options
+- [wheels plugins list](../plugins/plugins-list.md) - List plugins with filtering
+- [wheels plugins remove](../plugins/plugins-remove.md) - Remove plugins
 - [wheels init](init.md) - Initialize application
-- [wheels test](../testing/test.md) - Test after dependency updates

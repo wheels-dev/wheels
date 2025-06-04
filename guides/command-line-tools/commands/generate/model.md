@@ -23,13 +23,15 @@ The `wheels generate model` command creates a new model CFC file with optional p
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--migration` | Generate migration file | `true` |
-| `--properties` | Properties list (name:type) | |
-| `--belongs-to` | Belongs to associations | |
-| `--has-many` | Has many associations | |
-| `--has-one` | Has one associations | |
+| `--migration` | Generate database migration | `true` |
+| `properties` | Model properties (format: name:type,name2:type2) | |
+| `belongs-to` | Parent model relationships (comma-separated) | |
+| `has-many` | Child model relationships (comma-separated) | |
+| `has-one` | One-to-one relationships (comma-separated) | |
+| `primary-key` | Primary key column name(s) | `id` |
+| `table-name` | Custom database table name | |
+| `description` | Model description | |
 | `--force` | Overwrite existing files | `false` |
-| `--help` | Show help information | |
 
 ## Examples
 
@@ -43,12 +45,12 @@ Creates:
 
 ### Model with properties
 ```bash
-wheels generate model user --properties="firstName:string,lastName:string,email:string,age:integer"
+wheels generate model user properties="firstName:string,lastName:string,email:string,age:integer"
 ```
 
 ### Model with associations
 ```bash
-wheels generate model post --belongs-to="user" --has-many="comments"
+wheels generate model post belongs-to="user" has-many="comments"
 ```
 
 ### Model without migration
@@ -59,9 +61,9 @@ wheels generate model setting --migration=false
 ### Complex model
 ```bash
 wheels generate model product \
-  --properties="name:string,price:decimal,stock:integer,active:boolean" \
-  --belongs-to="category,brand" \
-  --has-many="reviews,orderItems"
+  properties="name:string,price:decimal,stock:integer,active:boolean" \
+  belongs-to="category,brand" \
+  has-many="reviews,orderItems"
 ```
 
 ## Property Types
@@ -318,7 +320,7 @@ private function setDefaults() {
 
 Generate model tests:
 ```bash
-wheels generate model user --properties="email:string,name:string"
+wheels generate model user properties="email:string,name:string"
 wheels generate test model user
 ```
 

@@ -1,83 +1,42 @@
 # dbmigrate reset
 
-Reset all database migrations by rolling back all executed migrations and optionally re-running them.
+Reset all database migrations by migrating to version 0.
 
 ## Synopsis
 
 ```bash
-wheels dbmigrate reset [options]
+wheels dbmigrate reset
 ```
+
+Alias: `wheels db reset`
 
 ## Description
 
-The `dbmigrate reset` command provides a way to completely reset your database migrations. It rolls back all executed migrations in reverse order and can optionally re-run them all. This is particularly useful during development when you need to start fresh or when testing migration sequences.
+The `dbmigrate reset` command resets your database by migrating to version 0, effectively rolling back all executed migrations. This is useful during development when you need to start fresh.
 
-## Options
+## Parameters
 
-### `--env`
-- **Type:** String
-- **Default:** `development`
-- **Description:** The environment to reset migrations in
-
-### `--datasource`
-- **Type:** String
-- **Default:** Application default
-- **Description:** Specify a custom datasource for the reset
-
-### `--remigrate`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** After rolling back all migrations, run them all again
-
-### `--verbose`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Display detailed output during reset
-
-### `--force`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Skip confirmation prompts (use with caution)
-
-### `--dry-run`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Preview the reset without executing it
+None.
 
 ## Examples
 
-### Reset all migrations (rollback only)
+### Reset all migrations
 ```bash
 wheels dbmigrate reset
 ```
 
-### Reset and re-run all migrations
-```bash
-wheels dbmigrate reset --remigrate
-```
-
-### Reset in testing environment with verbose output
-```bash
-wheels dbmigrate reset --env=testing --verbose
-```
-
-### Force reset without confirmation
-```bash
-wheels dbmigrate reset --force --remigrate
-```
-
-### Preview reset operation
-```bash
-wheels dbmigrate reset --dry-run --verbose
-```
+This will migrate the database to version 0, rolling back all migrations.
 
 ## Use Cases
 
 ### Fresh Development Database
 Start with a clean slate during development:
 ```bash
-# Reset and rebuild database schema
-wheels dbmigrate reset --remigrate --verbose
+# Reset all migrations
+wheels dbmigrate reset
+
+# Re-run all migrations
+wheels dbmigrate latest
 
 # Seed with test data
 wheels db seed
@@ -110,8 +69,9 @@ wheels dbmigrate latest
 Reset database for each test run:
 ```bash
 # CI script
-wheels dbmigrate reset --env=testing --force --remigrate
-wheels test run --env=testing
+wheels dbmigrate reset
+wheels dbmigrate latest
+wheels test run
 ```
 
 ## Important Warnings
@@ -123,8 +83,7 @@ wheels test run --env=testing
 Using this command in production is strongly discouraged. If you must use it in production:
 1. Take a complete database backup
 2. Put the application in maintenance mode
-3. Use the confirmation prompts (don't use --force)
-4. Have a rollback plan ready
+3. Have a rollback plan ready
 
 ### Migration Dependencies
 The reset process rolls back migrations in reverse chronological order. Ensure all your down() methods are properly implemented.
@@ -134,16 +93,13 @@ The reset process rolls back migrations in reverse chronological order. Ensure a
 1. **Development Only**: Primarily use this command in development environments
 2. **Backup First**: Always backup your database before resetting
 3. **Test Down Methods**: Ensure all migrations have working down() methods
-4. **Use Confirmation**: Don't use --force unless in automated environments
-5. **Document Usage**: If used in production, document when and why
+4. **Document Usage**: If used in production, document when and why
 
 ## Process Flow
 
-1. Confirms the operation (unless --force is used)
-2. Retrieves all executed migrations
-3. Rolls back each migration in reverse order
-4. Clears the migration tracking table
-5. If --remigrate is specified, runs all migrations again
+1. Displays "Resetting Database Schema"
+2. Executes `dbmigrate exec version=0`
+3. Automatically runs `dbmigrate info` to show the reset status
 
 ## Notes
 

@@ -5,42 +5,27 @@ Generate a migration file for adding columns to an existing database table.
 ## Synopsis
 
 ```bash
-wheels dbmigrate create column <table_name> <column_name>:<type>[:options] [more_columns...] [options]
+wheels dbmigrate create column name=<table_name> data-type=<type> column-name=<column> [options]
 ```
+
+Alias: `wheels db create column`
 
 ## Description
 
-The `dbmigrate create column` command generates a migration file that adds one or more columns to an existing database table. It supports all standard column types and options, making it easy to evolve your database schema incrementally.
+The `dbmigrate create column` command generates a migration file that adds a column to an existing database table. It supports standard column types and various options for column configuration.
 
-## Arguments
+## Parameters
 
-### `<table_name>`
-- **Type:** String
-- **Required:** Yes
-- **Description:** The name of the table to add columns to
-
-### `<column_name>:<type>[:options]`
-- **Type:** String
-- **Required:** Yes (at least one)
-- **Format:** `name:type:option1:option2=value`
-- **Description:** Column definition(s) to add
-
-## Options
-
-### `--datasource`
-- **Type:** String
-- **Default:** Application default
-- **Description:** Target datasource for the migration
-
-### `--after`
-- **Type:** String
-- **Default:** None
-- **Description:** Position new column(s) after specified column
-
-### `--force`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Overwrite existing migration file
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `name` | string | Yes | - | The name of the database table to modify |
+| `data-type` | string | Yes | - | The column type to add |
+| `column-name` | string | No | - | The column name to add |
+| `default` | any | No | - | The default value to set for the column |
+| `--null` | boolean | No | true | Should the column allow nulls |
+| `limit` | number | No | - | The character limit of the column |
+| `precision` | number | No | - | The precision of the numeric column |
+| `scale` | number | No | - | The scale of the numeric column |
 
 ## Column Types
 
@@ -57,59 +42,59 @@ The `dbmigrate create column` command generates a migration file that adds one o
 - `timestamp` - TIMESTAMP
 - `binary` - BLOB/BINARY
 
-## Column Options
+## Migration File Naming
 
-- `:null` - Allow NULL values
-- `:default=value` - Set default value
-- `:limit=n` - Set column length
-- `:precision=n` - Set decimal precision
-- `:scale=n` - Set decimal scale
-- `:index` - Create an index on this column
-- `:unique` - Add unique constraint
+The generated migration file will be named with a timestamp and description:
+```
+[timestamp]_create_column_[columnname]_in_[tablename]_table.cfc
+```
+
+Example:
+```
+20240125160000_create_column_email_in_user_table.cfc
+```
 
 ## Examples
 
-### Add a single column
+### Add a simple column
 ```bash
-wheels dbmigrate create column user email:string
+wheels dbmigrate create column name=user data-type=string column-name=email
 ```
 
-### Add multiple columns
+### Add column with default value
 ```bash
-wheels dbmigrate create column product sku:string:unique weight:decimal:precision=8:scale=2 is_featured:boolean:default=false
+wheels dbmigrate create column name=user data-type=boolean column-name=is_active default=true
 ```
 
-### Add column with positioning
+### Add nullable column with limit
 ```bash
-wheels dbmigrate create column user middle_name:string:null --after=first_name
+wheels dbmigrate create column name=user data-type=string column-name=bio --null=true limit=500
 ```
 
-### Add columns with indexes
+### Add decimal column with precision
 ```bash
-wheels dbmigrate create column order shipped_at:datetime:index tracking_number:string:index
+wheels dbmigrate create column name=product data-type=decimal column-name=price precision=10 scale=2
 ```
 
 ## Generated Migration Example
 
 For the command:
 ```bash
-wheels dbmigrate create column user phone:string:null country_code:string:limit=2:default='US'
+wheels dbmigrate create column name=user data-type=string column-name=phone --null=true
 ```
 
 Generates:
 ```cfml
-component extends="wheels.migrator.Migration" hint="Add columns to user table" {
+component extends="wheels.migrator.Migration" hint="create column phone in user table" {
 
     function up() {
         transaction {
-            addColumn(table="user", column="phone", type="string", null=true);
-            addColumn(table="user", column="country_code", type="string", limit=2, default="US");
+            addColumn(table="user", columnType="string", columnName="phone", null=true);
         }
     }
 
     function down() {
         transaction {
-            removeColumn(table="user", column="country_code");
             removeColumn(table="user", column="phone");
         }
     }
@@ -120,39 +105,25 @@ component extends="wheels.migrator.Migration" hint="Add columns to user table" {
 ## Use Cases
 
 ### Adding User Preferences
-Add preference columns to user table:
+Add preference column to user table:
 ```bash
-wheels dbmigrate create column user \
-  newsletter_subscribed:boolean:default=true \
-  notification_email:boolean:default=true \
-  theme_preference:string:default='light'
+# Create separate migrations for each column
+wheels dbmigrate create column name=user data-type=boolean column-name=newsletter_subscribed default=true
+wheels dbmigrate create column name=user data-type=string column-name=theme_preference default="light"
 ```
 
 ### Adding Audit Fields
-Add tracking columns to any table:
+Add tracking column to any table:
 ```bash
-wheels dbmigrate create column product \
-  last_modified_by:integer:null \
-  last_modified_at:datetime:null \
-  version:integer:default=1
+wheels dbmigrate create column name=product data-type=integer column-name=last_modified_by --null=true
+wheels dbmigrate create column name=product data-type=datetime column-name=last_modified_at --null=true
 ```
 
-### Adding Calculated Fields
-Add columns for denormalized/cached data:
+### Adding Price Fields
+Add decimal columns for pricing:
 ```bash
-wheels dbmigrate create column order \
-  item_count:integer:default=0 \
-  subtotal:decimal:precision=10:scale=2:default=0 \
-  tax_amount:decimal:precision=10:scale=2:default=0
-```
-
-### Adding Search Columns
-Add columns optimized for searching:
-```bash
-wheels dbmigrate create column article \
-  search_text:text:null \
-  slug:string:unique:index \
-  tags:string:null
+wheels dbmigrate create column name=product data-type=decimal column-name=price precision=10 scale=2 default=0
+wheels dbmigrate create column name=product data-type=decimal column-name=cost precision=10 scale=2
 ```
 
 ## Best Practices
@@ -161,50 +132,43 @@ wheels dbmigrate create column article \
 For existing tables with data, make new columns nullable or provide defaults:
 ```bash
 # Good - nullable
-wheels dbmigrate create column user bio:text:null
+wheels dbmigrate create column name=user data-type=text column-name=bio --null=true
 
 # Good - with default
-wheels dbmigrate create column user status:string:default='active'
+wheels dbmigrate create column name=user data-type=string column-name=status default="active"
 
-# Bad - will fail if table has data
-wheels dbmigrate create column user required_field:string
+# Bad - will fail if table has data (not nullable, no default)
+wheels dbmigrate create column name=user data-type=string column-name=required_field --null=false
 ```
 
 ### 2. Use Appropriate Types
 Choose the right column type for your data:
 ```bash
 # For short text
-wheels dbmigrate create column user username:string:limit=50
+wheels dbmigrate create column name=user data-type=string column-name=username limit=50
 
 # For long text
-wheels dbmigrate create column post content:text
+wheels dbmigrate create column name=post data-type=text column-name=content
 
 # For money
-wheels dbmigrate create column invoice amount:decimal:precision=10:scale=2
+wheels dbmigrate create column name=invoice data-type=decimal column-name=amount precision=10 scale=2
 ```
 
-### 3. Plan for Indexes
-Add indexes for columns used in queries:
+### 3. One Column Per Migration
+This command creates one column at a time:
 ```bash
-# Add indexed column
-wheels dbmigrate create column order customer_email:string:index
-
-# Or create separate index migration
-wheels dbmigrate create blank --name=add_order_customer_email_index
+# Create separate migrations for related columns
+wheels dbmigrate create column name=customer data-type=string column-name=address_line1
+wheels dbmigrate create column name=customer data-type=string column-name=city
+wheels dbmigrate create column name=customer data-type=string column-name=state limit=2
 ```
 
-### 4. Group Related Changes
-Add related columns in a single migration:
-```bash
-# Add all address fields together
-wheels dbmigrate create column customer \
-  address_line1:string \
-  address_line2:string:null \
-  city:string \
-  state:string:limit=2 \
-  postal_code:string:limit=10 \
-  country:string:limit=2:default='US'
-```
+### 4. Plan Your Schema
+Think through column requirements before creating:
+- Data type and size
+- Null constraints
+- Default values
+- Index requirements
 
 ## Advanced Scenarios
 
@@ -212,25 +176,18 @@ wheels dbmigrate create column customer \
 Add foreign key columns with appropriate types:
 ```bash
 # Add foreign key column
-wheels dbmigrate create column order customer_id:integer:index
+wheels dbmigrate create column name=order data-type=integer column-name=customer_id
 
-# Then create constraint in blank migration
-wheels dbmigrate create blank --name=add_order_customer_foreign_key
+# Then create index in separate migration
+wheels dbmigrate create blank name=add_order_customer_id_index
 ```
 
-### Adding JSON Columns
-For databases that support JSON:
+### Complex Column Types
+For special column types, use blank migrations:
 ```bash
-# Create blank migration for JSON column
-wheels dbmigrate create blank --name=add_user_preferences_json
-# Then manually add JSON column type
-```
-
-### Positional Columns
-Control column order in table:
-```bash
-# Add after specific column
-wheels dbmigrate create column user display_name:string --after=username
+# Create blank migration for custom column types
+wheels dbmigrate create blank name=add_user_preferences_json
+# Then manually add the column with custom SQL
 ```
 
 ## Common Pitfalls
@@ -238,20 +195,20 @@ wheels dbmigrate create column user display_name:string --after=username
 ### 1. Non-Nullable Without Default
 ```bash
 # This will fail if table has data
-wheels dbmigrate create column user required_field:string
+wheels dbmigrate create column name=user data-type=string column-name=required_field --null=false
 
 # Do this instead
-wheels dbmigrate create column user required_field:string:default='TBD'
+wheels dbmigrate create column name=user data-type=string column-name=required_field default="TBD"
 ```
 
 ### 2. Changing Column Types
 This command adds columns, not modifies them:
 ```bash
-# Wrong - trying to change type
-wheels dbmigrate create column user age:integer
+# Wrong - trying to change existing column type
+wheels dbmigrate create column name=user data-type=integer column-name=age
 
 # Right - use blank migration for modifications
-wheels dbmigrate create blank --name=change_user_age_to_integer
+wheels dbmigrate create blank name=change_user_age_to_integer
 ```
 
 ## Notes

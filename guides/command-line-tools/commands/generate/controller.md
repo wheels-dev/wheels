@@ -17,17 +17,17 @@ The `wheels generate controller` command creates a new controller CFC file with 
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `name` | Controller name (singular or plural) | Required |
-| `actions` | Comma-separated list of actions | `index` |
+| `name` | Name of the controller to create (usually plural) | Required |
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--rest` | Generate RESTful actions | `false` |
-| `--api` | Generate API controller (no views) | `false` |
+| `actions` | Actions to generate (comma-delimited, default: CRUD for REST) | |
+| `--rest` | Generate RESTful controller with CRUD actions | `false` |
+| `--api` | Generate API controller (no view-related actions) | `false` |
+| `description` | Controller description | |
 | `--force` | Overwrite existing files | `false` |
-| `--help` | Show help information | |
 
 ## Examples
 
@@ -41,7 +41,7 @@ Creates:
 
 ### Controller with multiple actions
 ```bash
-wheels generate controller products index,show,new,create,edit,update,delete
+wheels generate controller products actions="index,show,new,create,edit,update,delete"
 ```
 Creates controller with all CRUD actions and corresponding views.
 
@@ -68,7 +68,7 @@ Creates:
 
 ### Custom actions
 ```bash
-wheels generate controller reports dashboard,monthly,yearly,export
+wheels generate controller reports actions="dashboard,monthly,yearly,export"
 ```
 
 ## Generated Code

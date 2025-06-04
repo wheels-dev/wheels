@@ -1,246 +1,190 @@
 # deploy push
 
-Push deployment artifacts to target environment.
+Deploy your Wheels application to configured servers.
 
 ## Synopsis
 
 ```bash
-wheels deploy push [options]
+wheels deploy:push [options]
 ```
 
 ## Description
 
-The `wheels deploy push` command transfers deployment artifacts, configuration files, and application code to the target deployment environment. It handles file synchronization, artifact validation, and ensures secure transfer of deployment packages.
+The `wheels deploy:push` command builds and deploys your Wheels application to configured servers using Docker. It handles Docker image building, pushing to registry, and deploying to target servers with optional rolling deployments for zero-downtime updates.
 
 ## Options
 
-- `--environment, -e` - Target environment (default: production)
-- `--artifact` - Path to deployment artifact or directory
-- `--config` - Configuration file to include
-- `--exclude` - Files/patterns to exclude from deployment
-- `--dry-run` - Simulate push without actual transfer
-- `--force` - Force push even if validation fails
-- `--parallel` - Number of parallel upload threads
-- `--compress` - Compression method (gzip, bzip2, none)
-- `--checksum` - Verify file integrity with checksums
-- `--bandwidth` - Limit bandwidth usage (e.g., "1M", "500K")
+- `tag=<string>` - Docker image tag (defaults to timestamp format: yyyymmddHHmmss)
+- `--build` - Build Docker image locally (default: true, use --no-build to skip)
+- `--push` - Push image to registry (default: true, use --no-push to skip)
+- `--rolling` - Use rolling deployment for zero-downtime updates (default: true, use --no-rolling to disable)
+- `servers=<string>` - Deploy to specific servers (comma-separated list)
+- `destination=<string>` - Deployment destination/environment
+- `timeout=<number>` - Deployment timeout in seconds (default: 600)
+- `health-timeout=<number>` - Health check timeout in seconds (default: 300)
 
 ## Examples
 
-### Basic push
+### Basic deployment
 ```bash
-wheels deploy push --environment production
+wheels deploy:push
 ```
 
-### Push specific artifact
+### Deploy with specific tag
 ```bash
-wheels deploy push --artifact dist/app-v2.1.0.tar.gz
+wheels deploy:push tag=v1.0.0
 ```
 
-### Dry run to see what would be pushed
+### Skip building and just deploy existing image
 ```bash
-wheels deploy push --dry-run
+wheels deploy:push tag=v1.0.0 --no-build
 ```
 
-### Push with exclusions
+### Deploy to specific servers
 ```bash
-wheels deploy push --exclude "*.log,tmp/*,node_modules"
+wheels deploy:push servers=web1.example.com,web2.example.com
 ```
 
-### Limited bandwidth push
+### Deploy without rolling updates (with downtime)
 ```bash
-wheels deploy push --bandwidth 1M
+wheels deploy:push --no-rolling
 ```
 
-## Artifact Types
-
-### Application bundles
+### Deploy with custom timeouts
 ```bash
-# Push application bundle
-wheels deploy push --artifact app-bundle.tar.gz
+wheels deploy:push timeout=900 health-timeout=600
 ```
 
-### Docker images
-```bash
-# Push Docker image
-wheels deploy push --artifact myapp:v2.1.0 --type docker
+## Deployment Process
+
+The deployment follows these steps:
+
+1. **Lock Acquisition**: Acquire deployment lock to prevent concurrent deployments
+2. **Pre-connect Hook**: Execute pre-connect lifecycle hook
+3. **Tag Generation**: Generate timestamp-based tag if not provided
+4. **Pre-build Hook**: Execute pre-build lifecycle hook
+5. **Docker Build**: Build Docker image (if --build is enabled)
+6. **Registry Push**: Push image to configured registry (if --push is enabled)
+7. **Pre-deploy Hook**: Execute pre-deploy lifecycle hook
+8. **Server Deployment**: Deploy to each target server
+   - Copy environment configuration
+   - Generate docker-compose.yml
+   - Pull new image
+   - Perform rolling deployment or restart
+   - Clean up old images
+9. **Post-deploy Hook**: Execute post-deploy lifecycle hook
+10. **Lock Release**: Release deployment lock
+
+## Rolling Deployment
+
+When `--rolling` is enabled (default), the deployment:
+- Scales up the service to run old and new containers simultaneously
+- Waits for health checks to pass on new containers
+- Removes old containers only after successful health checks
+- Rolls back automatically if health checks fail
+
+## Health Checks
+
+The deployment uses health checks defined in your deploy.yml configuration:
+```yaml
+healthcheck:
+  path: /health
+  port: 3000
+  interval: 30
+  timeout: 10
+  retries: 3
 ```
 
-### Static assets
-```bash
-# Push static files
-wheels deploy push --artifact public/ --compress gzip
+## Deployment Hooks
+
+Lifecycle hooks are executed at various stages:
+- `pre-connect`: Before connecting to servers
+- `pre-build`: Before building Docker image
+- `pre-deploy`: Before deploying to servers
+- `post-deploy`: After successful deployment
+
+## Configuration
+
+The deployment uses configuration from `config/deploy.yml`:
+```yaml
+service: myapp
+image: myapp
+
+registry:
+  server: registry.example.com
+  username: myuser
+
+servers:
+  web:
+    - web1.example.com
+    - web2.example.com
+
+ssh:
+  user: deploy
+
+env:
+  clear:
+    WHEELS_ENV: production
+    PORT: 3000
+
+healthcheck:
+  path: /health
+  port: 3000
+  interval: 30
+
+traefik:
+  enabled: true
+  labels:
+    traefik.http.routers.myapp.rule: Host(`myapp.example.com`)
 ```
 
-### Configuration files
-```bash
-# Push config separately
-wheels deploy push --config production.env --encrypt
-```
+## Environment Variables
 
-## Push Process
+Environment variables are loaded from `.env.deploy` file and copied to target servers.
 
-1. **Validation**: Verify artifacts and environment
-2. **Compression**: Compress files if specified
-3. **Checksum**: Generate integrity checksums
-4. **Transfer**: Upload to target environment
-5. **Verification**: Confirm successful transfer
-6. **Notification**: Report push status
+## Docker Compose Generation
+
+The command generates a docker-compose.yml file on target servers with:
+- Service configuration
+- Environment variables
+- Port mappings
+- Volume mounts
+- Health checks
+- Traefik labels (if enabled)
+- Database services (if configured)
 
 ## Use Cases
 
-### CI/CD pipeline push
+### Production deployment with specific version
 ```bash
-# Build and push in CI/CD
-npm run build
-wheels deploy push --artifact dist/ --environment staging
+wheels deploy:push tag=v2.0.0
 ```
 
-### Multi-environment push
+### Deploy pre-built image from CI/CD
 ```bash
-# Push to multiple environments
-for env in staging production; do
-  wheels deploy push --environment $env --artifact release.tar.gz
-done
+# Image already built and pushed by CI
+wheels deploy:push tag=build-123 --no-build --no-push
 ```
 
-### Incremental push
+### Deploy to staging servers only
 ```bash
-# Push only changed files
-wheels deploy push --incremental --since "1 hour ago"
+wheels deploy:push servers=staging1.example.com destination=staging
 ```
 
-### Secure push with encryption
+### Emergency deployment without health checks
 ```bash
-# Encrypt sensitive files during push
-wheels deploy push \
-  --artifact app.tar.gz \
-  --config secrets.env \
-  --encrypt
-```
-
-## Transfer Methods
-
-### Direct transfer
-Default method for simple deployments:
-```bash
-wheels deploy push --method direct
-```
-
-### S3 bucket transfer
-For AWS deployments:
-```bash
-wheels deploy push \
-  --method s3 \
-  --bucket my-deploy-bucket \
-  --artifact app.tar.gz
-```
-
-### Registry push
-For containerized applications:
-```bash
-wheels deploy push \
-  --method registry \
-  --registry hub.example.com \
-  --artifact myapp:latest
-```
-
-## Validation
-
-The push command performs several validations:
-
-### Pre-push validation
-- Artifact integrity check
-- Environment accessibility
-- Space availability
-- Permission verification
-
-### Post-push validation
-- Transfer completion
-- Checksum verification
-- Artifact extraction test
-- Configuration validation
-
-## Progress Monitoring
-
-```bash
-# Show detailed progress
-wheels deploy push --verbose
-
-# Output example:
-Uploading app-v2.1.0.tar.gz to production
-[████████████████████████████████] 100% 45.2MB/45.2MB
-✓ Upload complete
-✓ Checksum verified
-✓ Artifact validated
-```
-
-## Error Handling
-
-### Retry failed pushes
-```bash
-# Auto-retry on failure
-wheels deploy push --retry 3 --retry-delay 30
-```
-
-### Resume interrupted push
-```bash
-# Resume from last checkpoint
-wheels deploy push --resume
-```
-
-### Rollback on failure
-```bash
-# Automatic rollback if push fails
-wheels deploy push --rollback-on-failure
+wheels deploy:push --no-rolling health-timeout=0
 ```
 
 ## Best Practices
 
-1. **Always validate**: Use --dry-run before actual push
-2. **Use checksums**: Enable checksum verification
-3. **Compress large artifacts**: Reduce transfer time and bandwidth
-4. **Exclude unnecessary files**: Use .deployignore file
-5. **Monitor transfer**: Watch for errors during push
-6. **Test in staging**: Always push to staging before production
-7. **Keep artifacts versioned**: Use semantic versioning
-
-## Configuration
-
-### .deployignore file
-```gitignore
-# Files to exclude from deployment
-*.log
-*.tmp
-.env.local
-node_modules/
-test/
-docs/
-```
-
-### Push configuration
-```yaml
-# deploy.yml
-push:
-  compression: gzip
-  checksum: sha256
-  parallel: 4
-  exclude:
-    - "*.log"
-    - "tmp/*"
-  retry:
-    attempts: 3
-    delay: 30
-```
-
-## Integration
-
-Push operations integrate with:
-- CI/CD systems for automated deployments
-- Artifact repositories (Nexus, Artifactory)
-- Container registries (Docker Hub, ECR)
-- CDN services for static assets
-- Monitoring systems for transfer tracking
+1. **Use semantic versioning**: Tag releases with version numbers
+2. **Test in staging first**: Deploy to staging before production
+3. **Monitor deployments**: Check logs and health status
+4. **Use rolling deployments**: Minimize downtime with --rolling
+5. **Configure health checks**: Ensure proper health check endpoints
+6. **Set appropriate timeouts**: Adjust timeouts based on app startup time
+7. **Use deployment locks**: Prevent concurrent deployments
 
 ## See Also
 

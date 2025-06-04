@@ -5,39 +5,18 @@ Rollback the last executed database migration.
 ## Synopsis
 
 ```bash
-wheels dbmigrate down [options]
+wheels dbmigrate down
 ```
+
+Alias: `wheels db down`
 
 ## Description
 
 The `dbmigrate down` command reverses the last executed migration by running its `down()` method. This is useful for undoing database changes when issues are discovered or when you need to modify a migration. The command ensures safe rollback of schema changes while maintaining database integrity.
 
-## Options
+## Parameters
 
-### `--env`
-- **Type:** String
-- **Default:** `development`
-- **Description:** The environment to rollback the migration in
-
-### `--datasource`
-- **Type:** String
-- **Default:** Application default
-- **Description:** Specify a custom datasource for the rollback
-
-### `--verbose`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Display detailed output during rollback
-
-### `--force`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Force rollback even if there are warnings
-
-### `--dry-run`
-- **Type:** Boolean
-- **Default:** `false`
-- **Description:** Preview the rollback without executing it
+None.
 
 ## Examples
 
@@ -46,20 +25,7 @@ The `dbmigrate down` command reverses the last executed migration by running its
 wheels dbmigrate down
 ```
 
-### Rollback in production with confirmation
-```bash
-wheels dbmigrate down --env=production --verbose
-```
-
-### Preview rollback without executing
-```bash
-wheels dbmigrate down --dry-run
-```
-
-### Force rollback with custom datasource
-```bash
-wheels dbmigrate down --datasource=legacyDB --force
-```
+This will execute the down() method of the most recently applied migration, reverting the database changes.
 
 ## Use Cases
 
@@ -93,17 +59,17 @@ wheels dbmigrate down
 wheels dbmigrate up
 ```
 
-### Emergency Production Rollback
-When a production migration causes issues:
+### Emergency Rollback
+When a migration causes issues:
 ```bash
 # Check current migration status
-wheels dbmigrate info --env=production
+wheels dbmigrate info
 
 # Rollback the problematic migration
-wheels dbmigrate down --env=production --verbose
+wheels dbmigrate down
 
 # Verify rollback
-wheels dbmigrate info --env=production
+wheels dbmigrate info
 ```
 
 ## Important Considerations
@@ -128,8 +94,11 @@ Be cautious when rolling back migrations that other migrations depend on. This c
 
 - Only the last executed migration can be rolled back with this command
 - To rollback multiple migrations, run the command multiple times
+- If already at version 0, displays: "We're already on zero! No migrations to go to"
+- Automatically runs `dbmigrate info` after successful rollback
 - The migration version is removed from the database tracking table upon successful rollback
 - Some operations (like dropping columns with data) cannot be fully reversed
+- When migrating to version 0, displays: "Database should now be empty."
 
 ## Related Commands
 

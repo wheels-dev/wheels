@@ -1,160 +1,152 @@
 # wheels destroy
 
-Remove generated code and files.
+Remove generated code and files associated with a model, controller, views, and tests.
 
 ## Synopsis
 
 ```bash
-wheels destroy [type] [name] [options]
+wheels destroy <name>
+wheels d <name>
 ```
 
 ## Description
 
-The `wheels destroy` command reverses the actions of generator commands, removing files and code that were previously generated. It's useful for cleaning up mistakes or removing features.
+The `wheels destroy` command removes all files and code associated with a resource that was previously generated. It's useful for cleaning up mistakes or removing features completely. This command will also drop the associated database table and remove resource routes.
 
 ## Arguments
 
 | Argument | Description | Required |
 |----------|-------------|----------|
-| `type` | Type of resource to destroy | Yes |
-| `name` | Name of the resource | Yes |
-
-## Resource Types
-
-- `controller` - Remove a controller and its views
-- `model` - Remove a model
-- `view` - Remove a specific view
-- `scaffold` - Remove entire scaffolding
-- `migration` - Remove a migration file
-- `test` - Remove test files
+| `name` | Name of the resource to destroy | Yes |
 
 ## Options
 
-| Option | Description |
-|--------|-------------|
-| `--force` | Skip confirmation prompts |
-| `--dry-run` | Show what would be removed without doing it |
-| `--help` | Show help information |
+This command has no additional options. It always prompts for confirmation before proceeding.
+
+## What Gets Removed
+
+When you destroy a resource, the following items are deleted:
+- Model file (`/app/models/[Name].cfc`)
+- Controller file (`/app/controllers/[Names].cfc`)
+- Views directory (`/app/views/[names]/`)
+- Model test file (`/tests/Testbox/specs/models/[Name].cfc`)
+- Controller test file (`/tests/Testbox/specs/controllers/[Names].cfc`)
+- View test directory (`/tests/Testbox/specs/views/[names]/`)
+- Resource route entry in `/app/config/routes.cfm`
+- Database table (if confirmed)
 
 ## Examples
 
-### Remove a controller
+### Basic destroy
 ```bash
-wheels destroy controller users
+wheels destroy user
 ```
-Removes:
-- `/controllers/Users.cfc`
-- `/views/users/` directory and all views
 
-### Remove a model
-```bash
-wheels destroy model user
+This will prompt:
 ```
-Removes:
-- `/models/User.cfc`
-- Related test files
+================================================
+= Watch Out!                                   =
+================================================
+This will delete the associated database table 'users', and
+the following files and directories:
 
-### Remove scaffolding
-```bash
-wheels destroy scaffold product
+/app/models/User.cfc
+/app/controllers/Users.cfc
+/app/views/users/
+/tests/Testbox/specs/models/User.cfc
+/tests/Testbox/specs/controllers/Users.cfc
+/tests/Testbox/specs/views/users/
+/app/config/routes.cfm
+.resources("users")
+
+Are you sure? [y/n]
 ```
-Removes:
-- `/models/Product.cfc`
-- `/controllers/Products.cfc`
-- `/views/products/` directory
-- All CRUD views
-- Test files
 
-### Remove a specific view
+### Using the alias
 ```bash
-wheels destroy view users/edit
-```
-Removes:
-- `/views/users/edit.cfm`
-
-### Remove a migration
-```bash
-wheels destroy migration CreateUsersTable
-```
-Removes:
-- Migration file from `/db/migrate/`
-
-### Dry run to preview
-```bash
-wheels destroy scaffold order --dry-run
-```
-Shows what would be removed without deleting
-
-### Force removal without confirmation
-```bash
-wheels destroy model tempdata --force
+wheels d product
 ```
 
 ## Confirmation
 
-By default, the command asks for confirmation:
+The command always asks for confirmation and shows exactly what will be deleted:
 
 ```
-The following files will be removed:
-- /models/User.cfc
-- /tests/models/UserTest.cfc
+================================================
+= Watch Out!                                   =
+================================================
+This will delete the associated database table 'users', and
+the following files and directories:
 
-Are you sure you want to proceed? (y/N):
+/app/models/User.cfc
+/app/controllers/Users.cfc
+/app/views/users/
+/tests/Testbox/specs/models/User.cfc
+/tests/Testbox/specs/controllers/Users.cfc
+/tests/Testbox/specs/views/users/
+/app/config/routes.cfm
+.resources("users")
+
+Are you sure? [y/n]
 ```
 
 ## Safety Features
 
-1. **Confirmation Required**: Always asks unless `--force` is used
-2. **Dry Run Mode**: Preview changes with `--dry-run`
-3. **No Database Changes**: Only removes files, not database tables
-4. **Git Awareness**: Warns if files have uncommitted changes
+1. **Confirmation Required**: Always asks for confirmation before proceeding
+2. **Shows All Changes**: Lists all files and directories that will be deleted
+3. **Database Migration**: Creates and runs a migration to drop the table
+4. **Route Cleanup**: Automatically removes resource routes from routes.cfm
 
-## What's NOT Removed
+## What Gets Destroyed
 
-- Database tables or columns
-- Routes (must be manually removed)
-- References in other files
-- Git history
+1. **Files Deleted**:
+   - Model file
+   - Controller file 
+   - Views directory and all view files
+   - Test files (model, controller, and view tests)
+
+2. **Database Changes**:
+   - Creates a migration to drop the table
+   - Runs `wheels dbmigrate latest` to execute the migration
+
+3. **Route Changes**:
+   - Removes `.resources("name")` from routes.cfm
+   - Cleans up extra whitespace
 
 ## Best Practices
 
-1. Always use `--dry-run` first
-2. Commit changes before destroying
-3. Check for file dependencies
-4. Update routes manually
-5. Remove database tables separately
+1. **Commit First**: Always commit your changes before destroying
+2. **Review Carefully**: Read the confirmation list carefully
+3. **Check Dependencies**: Make sure other code doesn't depend on what you're destroying
+4. **Backup Database**: Have a database backup before running in production
 
 ## Common Workflows
 
-### Undo a scaffold
+### Undo a generated resource
 ```bash
-# First, see what would be removed
-wheels destroy scaffold product --dry-run
-
-# If okay, proceed
-wheels destroy scaffold product
-
-# Remove the database table
-wheels dbmigrate create remove_table products
-wheels dbmigrate latest
+# Generated the wrong name
+wheels generate resource prduct  # Oops, typo!
+wheels destroy prduct            # Remove it
+wheels generate resource product # Create correct one
 ```
 
-### Clean up a mistake
+### Clean up after experimentation
 ```bash
-# Accidentally created wrong controller
-wheels generate controller userss  # Oops, typo!
-wheels destroy controller userss   # Fix it
-wheels generate controller users   # Create correct one
+# Try out a feature
+wheels generate scaffold blog_post title:string content:text
+# Decide you don't want it
+wheels destroy blog_post
 ```
 
 ## Notes
 
 - Cannot be undone - files are permanently deleted
-- Does not remove custom code added to generated files
-- Works only with files created by generators
+- Database table is dropped via migration
+- Resource routes are automatically removed from routes.cfm
+- Only works with resources that follow Wheels naming conventions
 
 ## See Also
 
-- [wheels generate controller](../generate/controller.md) - Generate controllers
-- [wheels generate model](../generate/model.md) - Generate models
-- [wheels scaffold](../generate/scaffold.md) - Generate scaffolding
+- [wheels generate resource](../generate/resource.md) - Generate resources
+- [wheels generate scaffold](../generate/scaffold.md) - Generate scaffolding
+- [wheels dbmigrate remove table](../database/dbmigrate-remove-table.md) - Remove database tables

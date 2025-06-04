@@ -5,15 +5,16 @@ Analyzes code quality in your CFWheels application, checking for best practices,
 ## Usage
 
 ```bash
-wheels analyze code [path] [--type=<type>] [--format=<format>] [--output=<file>]
+wheels analyze code [path] [--fix] [--format=<format>] [--severity=<severity>] [--report]
 ```
 
 ## Parameters
 
-- `path` - (Optional) Specific file or directory to analyze. Defaults to entire application.
-- `--type` - (Optional) Type of analysis: `all`, `complexity`, `standards`, `duplication`. Default: `all`
-- `--format` - (Optional) Output format: `console`, `json`, `html`. Default: `console`
-- `--output` - (Optional) File path to save analysis results
+- `path` - (Optional) Path to analyze. Default: current directory (`.`)
+- `--fix` - (Optional) Attempt to fix issues automatically
+- `--format` - (Optional) Output format: `console`, `json`, `junit`. Default: `console`
+- `--severity` - (Optional) Minimum severity level: `info`, `warning`, `error`. Default: `warning`
+- `--report` - (Optional) Generate HTML report
 
 ## Description
 
@@ -39,19 +40,29 @@ wheels analyze code
 wheels analyze code app/controllers
 ```
 
-### Check only for code duplication
+### Auto-fix issues
 ```bash
-wheels analyze code --type=duplication
+wheels analyze code --fix
 ```
 
 ### Generate HTML report
 ```bash
-wheels analyze code --format=html --output=reports/code-analysis.html
+wheels analyze code --report
 ```
 
-### Analyze complexity for models
+### Analyze with JSON output for CI/CD
 ```bash
-wheels analyze code app/models --type=complexity
+wheels analyze code --format=json
+```
+
+### Check only errors (skip warnings)
+```bash
+wheels analyze code --severity=error
+```
+
+### Analyze and fix specific path with report
+```bash
+wheels analyze code app/models --fix --report
 ```
 
 ## Output
@@ -67,6 +78,7 @@ The command provides detailed feedback including:
 ## Notes
 
 - Large codebases may take several minutes to analyze
-- The complexity threshold can be configured in settings
-- HTML reports include interactive charts and detailed breakdowns
-- Integration with CI/CD pipelines is supported via JSON output
+- The `--fix` flag will automatically fix issues where possible
+- HTML reports are saved to the `reports/` directory with timestamps
+- Integration with CI/CD pipelines is supported via JSON and JUnit output formats
+- Use `.wheelscheck` config file for custom rules and configurations

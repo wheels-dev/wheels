@@ -147,7 +147,7 @@ Save and reuse configurations:
 
 ### Use Profile
 ```bash
-wheels generate app-wizard --profile=enterprise-api
+wheels generate app-wizard profile=enterprise-api
 ```
 
 ### List Profiles
@@ -272,7 +272,7 @@ Add templates to `~/.wheels/templates/`:
 
 Generate with CI configuration:
 ```bash
-wheels generate app-wizard --ci=github
+wheels generate app-wizard ci=github
 ```
 
 Includes:
@@ -284,7 +284,7 @@ Includes:
 
 Generate with IDE files:
 ```bash
-wheels generate app-wizard --ide=vscode
+wheels generate app-wizard ide=vscode
 ```
 
 Includes:

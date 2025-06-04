@@ -5,15 +5,15 @@ Automatically applies performance optimizations to your CFWheels application bas
 ## Usage
 
 ```bash
-wheels optimize performance [--target=<area>] [--aggressive] [--backup] [--dry-run]
+wheels optimize performance [target] [--aggressive] [--dry-run] [--backup]
 ```
 
 ## Parameters
 
-- `--target` - (Optional) Specific area to optimize: `all`, `database`, `caching`, `assets`, `code`. Default: `all`
+- `target` - (Optional) Target area to optimize. Default: current directory
 - `--aggressive` - (Optional) Apply aggressive optimizations that may change behavior
-- `--backup` - (Optional) Create backup before applying changes. Default: true
 - `--dry-run` - (Optional) Show what would be changed without applying
+- `--backup` - (Optional) Create backup before applying changes
 
 ## Description
 
@@ -33,24 +33,24 @@ The `optimize performance` command automatically implements performance improvem
 wheels optimize performance
 ```
 
-### Optimize database only
+### Optimize specific directory
 ```bash
-wheels optimize performance --target=database
+wheels optimize performance app/models
 ```
 
-### Preview changes
+### Preview changes without applying
 ```bash
 wheels optimize performance --dry-run
 ```
 
-### Aggressive optimization
+### Aggressive optimization with backup
 ```bash
-wheels optimize performance --aggressive
+wheels optimize performance --aggressive --backup
 ```
 
-### Skip backup
+### Optimize entire application aggressively
 ```bash
-wheels optimize performance --no-backup
+wheels optimize performance . --aggressive
 ```
 
 ## Optimization Targets

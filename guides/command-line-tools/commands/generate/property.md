@@ -5,31 +5,31 @@ Add properties to existing model files.
 ## Synopsis
 
 ```bash
-wheels generate property [model] [properties] [options]
-wheels g property [model] [properties] [options]
+wheels generate property [name] [options]
+wheels g property [name] [options]
 ```
 
 ## Description
 
-The `wheels generate property` command adds new properties to existing model files. It can add simple properties, associations, calculated properties, and validations while maintaining proper code formatting and structure.
+The `wheels generate property` command generates a database migration to add a property to an existing model and scaffolds it into `_form.cfm` and `show.cfm` views.
 
 ## Arguments
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `model` | Model name to add properties to | Required |
-| `properties` | Property definitions (name:type:options) | Required |
+| `name` | Table name | Required |
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--migrate` | Generate migration for database changes | `true` |
-| `--validate` | Add validation rules | `true` |
-| `--defaults` | Include default values | `false` |
-| `--callbacks` | Generate property callbacks | `false` |
-| `--force` | Overwrite without confirmation | `false` |
-| `--help` | Show help information | |
+| `column-name` | Name of column | Required |
+| `data-type` | Type of column | `string` |
+| `default` | Default value for column | |
+| `--null` | Whether to allow null values | |
+| `limit` | Character or integer size limit for column | |
+| `precision` | Precision value for decimal columns | |
+| `scale` | Scale value for decimal columns | |
 
 ## Property Syntax
 
@@ -38,46 +38,44 @@ The `wheels generate property` command adds new properties to existing model fil
 propertyName:type:option1:option2
 ```
 
-### Supported Types
-- `string` - VARCHAR(255)
-- `text` - TEXT/CLOB
-- `integer` - INT
-- `float` - DECIMAL
-- `boolean` - BIT/BOOLEAN
-- `date` - DATE
-- `datetime` - DATETIME
-- `timestamp` - TIMESTAMP
-- `binary` - BLOB
-
-### Property Options
-- `required` - Not null
-- `unique` - Unique constraint
-- `index` - Create index
-- `default=value` - Default value
-- `limit=n` - Character limit
-- `precision=n` - Decimal precision
-- `scale=n` - Decimal scale
+### Data Type Options
+- `biginteger` - Large integer
+- `binary` - Binary data
+- `boolean` - Boolean (true/false)
+- `date` - Date only
+- `datetime` - Date and time
+- `decimal` - Decimal numbers
+- `float` - Floating point
+- `integer` - Integer
+- `string` - Variable character (VARCHAR)
+- `text` - Long text
+- `time` - Time only
+- `timestamp` - Timestamp
+- `uuid` - UUID/GUID
 
 ## Examples
 
-### Add single property
+### String property
 ```bash
-wheels generate property user email:string:required:unique
+wheels generate property user column-name=firstname
 ```
+Creates a string/textField property called `firstname` on the User model.
 
-### Add multiple properties
+### Boolean property with default
 ```bash
-wheels generate property product "sku:string:required:unique price:float:required stock:integer:default=0"
+wheels generate property user column-name=isActive data-type=boolean default=0
 ```
+Creates a boolean/checkbox property with default value of 0 (false).
 
-### Add text property with validation
+### Datetime property
 ```bash
-wheels generate property post content:text:required:limit=5000
+wheels generate property user column-name=lastloggedin data-type=datetime
 ```
+Creates a datetime property on the User model.
 
-### Add association
+### Decimal property with precision
 ```bash
-wheels generate property order userId:integer:required:belongsTo=user
+wheels generate property product column-name=price data-type=decimal precision=10 scale=2
 ```
 
 ### Add calculated property

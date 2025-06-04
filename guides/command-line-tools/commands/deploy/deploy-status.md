@@ -1,271 +1,282 @@
 # deploy status
 
-Check the current status of deployments and deployment infrastructure.
+Check deployment status across all servers.
 
 ## Synopsis
 
 ```bash
-wheels deploy status [options]
+wheels deploy:status [options]
 ```
 
 ## Description
 
-The `wheels deploy status` command provides comprehensive information about deployment status, including active deployments, environment health, recent deployment history, and system readiness. It's essential for monitoring deployment progress and troubleshooting issues.
+The `wheels deploy:status` command checks the deployment status across all configured servers, including SSH connectivity, Docker status, container health, and optional database status. It provides a comprehensive view of your deployed application's health.
 
 ## Options
 
-- `--environment, -e` - Target environment (default: all)
-- `--deployment-id, -d` - Check specific deployment status
-- `--detailed` - Show detailed status information
-- `--health` - Include health check results
-- `--history` - Show deployment history
-- `--limit` - Number of historical deployments to show
-- `--format` - Output format (text, json, yaml) (default: text)
-- `--watch` - Continuously monitor status
-- `--interval` - Update interval in seconds for watch mode
+- `servers=<string>` - Check specific servers (comma-separated list)
+- `--detailed` - Show detailed container information (default: false)
+- `--logs` - Show recent container logs (default: false)
 
 ## Examples
 
 ### Basic status check
 ```bash
-wheels deploy status
+wheels deploy:status
 ```
 
-### Check specific environment
+### Check specific servers
 ```bash
-wheels deploy status --environment production
+wheels deploy:status servers=web1.example.com,web2.example.com
 ```
 
-### Monitor active deployment
+### Detailed status with container information
 ```bash
-wheels deploy status --deployment-id dep-123456 --watch
+wheels deploy:status --detailed
 ```
 
-### View deployment history
+### Status with recent logs
 ```bash
-wheels deploy status --history --limit 10
+wheels deploy:status --logs
 ```
 
-### Detailed status with health checks
+### Complete status check with all details
 ```bash
-wheels deploy status --detailed --health
-```
-
-### Export status as JSON
-```bash
-wheels deploy status --format json > status.json
+wheels deploy:status --detailed --logs
 ```
 
 ## Status Information
 
-The command displays various status components:
+The command checks the following components for each server:
 
-### Deployment Status
-- **Active**: Currently deploying
-- **Completed**: Successfully deployed
-- **Failed**: Deployment failed
-- **Rolled Back**: Deployment was rolled back
-- **Pending**: Waiting to start
-- **Cancelled**: Deployment was cancelled
+### Connection Status
+- **SSH Connection**: Verifies SSH connectivity to the server
+- **Docker Availability**: Checks if Docker is installed and running
 
-### Environment Health
-- **Healthy**: All services operational
-- **Degraded**: Some services experiencing issues
-- **Unhealthy**: Critical services down
-- **Unknown**: Unable to determine status
+### Container Status
+- **Container Running**: Checks if the application container is running
+- **Container Health**: Shows container status (Up/Down time)
+- **Image Version**: Displays the current Docker image in use
 
-### Service Status
-- Application servers
-- Database connections
-- Cache services
-- Queue workers
-- Background jobs
-- External integrations
+### Health Checks
+- **HTTP Health Check**: Tests the configured health endpoint
+- **Response Code**: Verifies HTTP 200 response
+
+### Database Status (if configured)
+- **Database Container**: Checks if database container is running
+- **Database Health**: Shows database container status
 
 ## Output Examples
 
 ### Basic status output
 ```
-Deployment Status for Production
-================================
-Current Version: v2.1.0
-Last Deployment: 2023-12-01 14:30:00
-Status: Healthy
-Uptime: 5d 12h 45m
+Wheels Deployment Status
+==================================================
+Checking 2 server(s)...
 
-Active Deployments:
-  None
+Server: web1.example.com
+----------------------------------------
+✓ SSH Connection OK
+✓ Docker Running
+✓ Container Running
+  Status: Up 2 hours
+  Image: registry.example.com/myuser/myapp:v2.1.0
+✓ Health Check Passed
 
-Recent Deployments:
-  dep-123456 | v2.1.0 | 2023-12-01 14:30:00 | Completed
-  dep-123455 | v2.0.9 | 2023-11-30 10:15:00 | Completed
-  dep-123454 | v2.0.8 | 2023-11-29 16:45:00 | Rolled Back
+Server: web2.example.com
+----------------------------------------
+✓ SSH Connection OK
+✓ Docker Running
+✓ Container Running
+  Status: Up 2 hours
+  Image: registry.example.com/myuser/myapp:v2.1.0
+✓ Health Check Passed
+
+==================================================
+Overall Status: ✓ All Systems Healthy
 ```
 
-### Detailed status output
+### Detailed status output with --detailed
 ```
-Environment: Production
-=======================
-Infrastructure:
-  Provider: AWS
-  Region: us-east-1
-  Instances: 4/4 healthy
-  Load Balancer: Active
-  SSL Certificate: Valid (expires in 45 days)
+Wheels Deployment Status
+==================================================
+Checking 2 server(s)...
 
-Services:
-  ✓ Web Server: Running (4 instances)
-  ✓ Database: Connected (Primary + 1 Replica)
-  ✓ Cache: Connected (Redis 6.2)
-  ✓ Queue: Processing (245 jobs/min)
-  ⚠ Email Service: Degraded (high latency)
+Server: web1.example.com
+----------------------------------------
+✓ SSH Connection OK
+✓ Docker Running
+✓ Container Running
+  Status: Up 2 hours
+  Image: registry.example.com/myuser/myapp:v2.1.0
+✓ Health Check Passed
 
-Resources:
-  CPU Usage: 45% average
-  Memory Usage: 62% average
-  Disk Usage: 38% (152GB free)
-  Network I/O: Normal
+Container Details:
+Created: 2024-01-15T14:30:00Z
+State: running
+RestartCount: 0
+Ports: 3000->3000/tcp
+Disk Usage: 45% (120GB available)
 
-Recent Errors: 0
-Recent Warnings: 3
+Database Status:
+✓ Database Running
+  Status: Up 2 hours
+
+==================================================
+Overall Status: ✓ All Systems Healthy
+```
+
+## Status Output with Logs
+
+When using the `--logs` flag:
+```
+Server: web1.example.com
+----------------------------------------
+✓ SSH Connection OK
+✓ Docker Running
+✓ Container Running
+  Status: Up 2 hours
+  Image: registry.example.com/myuser/myapp:v2.1.0
+✓ Health Check Passed
+
+Recent Logs:
+----------------------------------------
+[2024-01-15 14:30:00] INFO: Server started on port 3000
+[2024-01-15 14:30:01] INFO: Database connection established
+[2024-01-15 14:30:02] INFO: Health check endpoint ready
+[2024-01-15 14:35:00] INFO: Request processed successfully
+----------------------------------------
 ```
 
 ## Use Cases
 
 ### Pre-deployment check
 ```bash
-# Verify environment is ready for deployment
-wheels deploy status --environment production --health
+# Verify all servers are healthy before deployment
+wheels deploy:status
 if [ $? -eq 0 ]; then
-  wheels deploy exec
+  wheels deploy:push
 fi
 ```
 
-### Monitoring deployment progress
+### Post-deployment verification
 ```bash
-# Watch active deployment
-wheels deploy exec &
-DEPLOY_ID=$!
-wheels deploy status --deployment-id $DEPLOY_ID --watch --interval 5
+# Check status after deployment
+wheels deploy:push tag=v2.1.0
+sleep 30
+wheels deploy:status --detailed
 ```
 
 ### Health monitoring script
 ```bash
 #!/bin/bash
-# Check all environments
-for env in production staging development; do
-  echo "Checking $env..."
-  wheels deploy status --environment $env --health --format json > status-$env.json
+# Regular health check
+while true; do
+  wheels deploy:status
+  sleep 300  # Check every 5 minutes
 done
 ```
 
-### CI/CD integration
+### Troubleshooting specific server
 ```bash
-# Wait for deployment to complete
-wheels deploy status --deployment-id $DEPLOY_ID --watch
-EXIT_CODE=$?
-if [ $EXIT_CODE -ne 0 ]; then
-  echo "Deployment failed"
-  exit 1
-fi
+# Check single problematic server
+wheels deploy:status servers=web2.example.com --detailed --logs
 ```
 
-## Health Checks
+## Configuration
 
-The status command performs various health checks:
+The status command uses configuration from `config/deploy.yml`:
 
-### Application health
-- HTTP endpoint availability
-- Response time verification
-- Error rate monitoring
+```yaml
+service: myapp
 
-### Database health
-- Connection pool status
-- Query performance
-- Replication lag
+servers:
+  web:
+    - web1.example.com
+    - web2.example.com
 
-### Infrastructure health
-- Server availability
-- Resource utilization
-- Network connectivity
+ssh:
+  user: deploy
 
-### Integration health
-- External API connectivity
-- Third-party service status
-- CDN availability
+healthcheck:
+  path: /health
+  port: 3000
+  interval: 30
 
-## Deployment History
+accessories:
+  db:
+    image: mysql:8.0
+    volumes:
+      - db_data:/var/lib/mysql
+```
 
-View historical deployment information:
+## Error States
 
-```bash
-# Last 20 deployments
-wheels deploy status --history --limit 20
+### SSH Connection Failed
+```
+Server: web1.example.com
+----------------------------------------
+✗ SSH Connection Failed
+  Error: Unable to connect to server
+```
 
-# Filter by date range
-wheels deploy status --history --since "2023-11-01" --until "2023-12-01"
+### Container Not Running
+```
+Server: web1.example.com
+----------------------------------------
+✓ SSH Connection OK
+✓ Docker Running
+✗ Container Not Running
+```
 
-# Failed deployments only
-wheels deploy status --history --filter failed
+### Health Check Failed
+```
+Server: web1.example.com
+----------------------------------------
+✓ SSH Connection OK
+✓ Docker Running
+✓ Container Running
+  Status: Up 5 minutes
+  Image: registry.example.com/myuser/myapp:v2.1.0
+✗ Health Check Failed
+  HTTP Status: 503
 ```
 
 ## Best Practices
 
-1. **Regular monitoring**: Check status before and after deployments
-2. **Automate checks**: Include status checks in deployment scripts
-3. **Set up alerts**: Configure alerts for status changes
-4. **Document issues**: Keep records of status anomalies
-5. **Monitor trends**: Track status patterns over time
-6. **Health endpoints**: Ensure proper health check endpoints
-7. **Quick response**: Address issues promptly
-
-## Integration
-
-Status monitoring integrates with:
-- Monitoring dashboards (Grafana, Datadog)
-- Alerting systems (PagerDuty, Opsgenie)
-- CI/CD pipelines for deployment validation
-- Slack/Teams for status notifications
-
-### Slack notification example
-```bash
-# Send status to Slack
-STATUS=$(wheels deploy status --format json)
-curl -X POST $SLACK_WEBHOOK -d "{
-  \"text\": \"Deployment Status\",
-  \"attachments\": [{
-    \"color\": \"good\",
-    \"text\": \"$STATUS\"
-  }]
-}"
-```
+1. **Regular monitoring**: Run status checks after deployments
+2. **Configure health endpoints**: Ensure `/health` endpoint is properly implemented
+3. **Monitor all servers**: Don't assume all servers are in the same state
+4. **Check before deployment**: Verify environment health before deploying
+5. **Use detailed mode**: Use `--detailed` for troubleshooting
+6. **Review logs**: Use `--logs` when investigating issues
+7. **Automate checks**: Include status checks in deployment scripts
 
 ## Troubleshooting
 
-### Status check failures
-```bash
-# Verbose output for debugging
-wheels deploy status --verbose --debug
+### SSH Connection Issues
+- Verify SSH key is configured correctly
+- Check network connectivity to servers
+- Ensure user has proper permissions
 
-# Check specific component
-wheels deploy status --component database
+### Container Not Found
+- Verify deployment was successful
+- Check if container name matches service name
+- Ensure Docker is running on the server
 
-# Force refresh
-wheels deploy status --force-refresh
-```
+### Health Check Failures
+- Verify health endpoint path is correct
+- Check if application is fully started
+- Review application logs for errors
+- Ensure port is accessible
 
-### Incomplete status data
-```bash
-# Increase timeout
-wheels deploy status --timeout 60
-
-# Check individual services
-wheels deploy status --service web
-wheels deploy status --service database
-```
+### Database Issues
+- Verify database container is running
+- Check database connection settings
+- Review database logs
 
 ## See Also
 
-- [deploy logs](deploy-logs.md) - View deployment logs
-- [deploy audit](deploy-audit.md) - Audit deployment configuration
-- [deploy exec](deploy-exec.md) - Execute deployment
+- [wheels deploy:push](deploy-push.md) - Deploy application
+- [wheels deploy:rollback](deploy-rollback.md) - Rollback deployment
+- [wheels deploy:logs](deploy-logs.md) - View deployment logs

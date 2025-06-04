@@ -16,17 +16,11 @@ The `wheels test coverage` command runs your test suite while collecting code co
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--bundles` | Specific test bundles to include | All bundles |
-| `--specs` | Specific test specs to run | All specs |
-| `--format` | Report format (html, json, xml, console) | `html` |
-| `--output` | Output directory for reports | `./coverage` |
-| `--threshold` | Minimum coverage percentage required | `0` |
-| `--include` | Paths to include in coverage | `app/**` |
-| `--exclude` | Paths to exclude from coverage | `tests/**,vendor/**` |
-| `--fail-on-low` | Fail if coverage below threshold | `false` |
-| `--open` | Open HTML report after generation | `true` |
-| `--verbose` | Show detailed output | `false` |
-| `--help` | Show help information |
+| `--type` | Type of tests to run: app, core, or plugin | `app` |
+| `--servername` | Name of server to reload | (current server) |
+| `--reload` | Force a reload of wheels | `false` |
+| `--debug` | Show debug info | `false` |
+| `--output-dir` | Directory to output the coverage report | `tests/coverageReport` |
 
 ## Examples
 
@@ -35,29 +29,24 @@ The `wheels test coverage` command runs your test suite while collecting code co
 wheels test coverage
 ```
 
-### Set coverage threshold
+### Generate coverage for core tests
 ```bash
-wheels test coverage --threshold=80 --fail-on-low
-```
-
-### Generate multiple formats
-```bash
-wheels test coverage --format=html,json,xml
-```
-
-### Coverage for specific bundles
-```bash
-wheels test coverage --bundles=models,controllers
+wheels test coverage --type=core
 ```
 
 ### Custom output directory
 ```bash
-wheels test coverage --output=./reports/coverage
+wheels test coverage --output-dir=reports/coverage
 ```
 
-### Exclude specific paths
+### Force reload before coverage
 ```bash
-wheels test coverage --exclude="app/legacy/**,app/temp/**"
+wheels test coverage --reload --debug
+```
+
+### Coverage for specific server
+```bash
+wheels test coverage --servername=myapp
 ```
 
 ## What It Does

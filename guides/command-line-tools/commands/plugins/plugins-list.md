@@ -1,17 +1,18 @@
 # plugins list
 
-Lists all installed plugins in your CFWheels application with version and status information.
+Lists installed Wheels CLI plugins or shows available plugins from ForgeBox.
 
 ## Usage
 
 ```bash
-wheels plugins list [--format=<format>] [--status=<status>]
+wheels plugins list [--global] [--format=<format>] [--available]
 ```
 
 ## Parameters
 
-- `--format` - (Optional) Output format: `table`, `json`, `simple`. Default: `table`
-- `--status` - (Optional) Filter by status: `all`, `active`, `inactive`. Default: `all`
+- `--global` - (Optional) Show globally installed plugins
+- `--format` - (Optional) Output format: `table`, `json`. Default: `table`
+- `--available` - (Optional) Show available plugins from ForgeBox
 
 ## Description
 
@@ -25,14 +26,14 @@ The `plugins list` command displays information about all plugins installed in y
 
 ## Examples
 
-### List all plugins
+### List all local plugins
 ```bash
 wheels plugins list
 ```
 
-### Show only active plugins
+### Show globally installed plugins
 ```bash
-wheels plugins list --status=active
+wheels plugins list --global
 ```
 
 ### Export as JSON
@@ -40,27 +41,31 @@ wheels plugins list --status=active
 wheels plugins list --format=json
 ```
 
-### Simple listing (names only)
+### Show available plugins from ForgeBox
 ```bash
-wheels plugins list --format=simple
+wheels plugins list --available
 ```
 
 ## Output
 
 ### Table Format (Default)
 ```
-CFWheels Plugins
-================
+🧩 Installed Wheels CLI Plugins
 
-Name                Version    Status    Compatible    Description
------------------------------------------------------------------
-Authentication      2.1.0      Active    ✓            User authentication and authorization
-DBMigrate          3.0.2      Active    ✓            Database migration management
-Routing            1.5.1      Active    ✓            Advanced routing capabilities
-TestBox            2.0.0      Inactive  ✓            Enhanced testing framework
-CacheManager       1.2.3      Active    ✗            Advanced caching (requires update)
+Name                Version    Description
+---------------------------------------------
+wheels-vue-cli      1.2.0     Vue.js integration for Wheels
+wheels-docker       2.0.1     Docker deployment tools
+wheels-testing      1.5.0     Advanced testing utilities
 
-Total: 5 plugins (4 active, 1 inactive)
+Total: 3 plugins
+```
+
+### Available Plugins from ForgeBox
+```
+================ Available Wheels Plugins From ForgeBox ======================
+[Lists all available cfwheels-plugins from ForgeBox]
+=============================================================================
 ```
 
 ### JSON Format
@@ -68,33 +73,18 @@ Total: 5 plugins (4 active, 1 inactive)
 {
   "plugins": [
     {
-      "name": "Authentication",
-      "version": "2.1.0",
-      "status": "active",
-      "compatible": true,
-      "description": "User authentication and authorization",
-      "author": "CFWheels Team",
-      "dependencies": []
+      "name": "wheels-vue-cli",
+      "version": "1.2.0",
+      "description": "Vue.js integration for Wheels"
     }
-  ],
-  "summary": {
-    "total": 5,
-    "active": 4,
-    "inactive": 1
-  }
+  ]
 }
 ```
 
-## Plugin Statuses
-
-- **Active**: Plugin is loaded and functioning
-- **Inactive**: Plugin is installed but not loaded
-- **Error**: Plugin failed to load (check logs)
-- **Incompatible**: Plugin requires different CFWheels version
-
 ## Notes
 
-- Plugins are loaded from the `/plugins` directory
-- Plugin order matters for dependencies
-- Incompatible plugins may cause application errors
+- Local plugins are stored in your project
+- Global plugins are available to all projects
 - Use `wheels plugins install` to add new plugins
+- Use `wheels plugins remove` to uninstall plugins
+- The `--available` flag queries the ForgeBox registry

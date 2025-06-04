@@ -5,231 +5,290 @@ Initialize deployment configuration for your Wheels application.
 ## Synopsis
 
 ```bash
-wheels deploy init [target] [options]
+wheels deploy:init [options]
 ```
 
 ## Description
 
-The `wheels deploy init` command creates and configures deployment settings for your Wheels application. It generates deployment configuration files and sets up target environments.
-
-## Arguments
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `target` | Deployment target name (production, staging, dev) | Interactive prompt |
+The `wheels deploy:init` command creates a deployment configuration file (`deploy.json`), generates a Dockerfile, and sets up environment templates for deploying your Wheels application using Docker and container orchestration.
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--type` | Deployment type (ssh, ftp, rsync, git, docker) | `ssh` |
-| `--host` | Target host or server | Interactive prompt |
-| `--port` | Connection port | `22` (SSH), `21` (FTP) |
-| `--path` | Remote deployment path | `/var/www/html` |
-| `--user` | Remote user | Current user |
-| `--branch` | Git branch to deploy | `main` |
-| `--strategy` | Deployment strategy (rolling, blue-green, canary) | `rolling` |
-| `--keep-releases` | Number of releases to keep | `5` |
-| `--force` | Overwrite existing configuration | `false` |
-| `--help` | Show help information |
+- `provider=<string>` - Cloud provider: digitalocean, aws, linode, custom (default: custom)
+- `servers=<string>` - Comma-separated list of server IPs for custom provider
+- `domain=<string>` - Primary domain for the application
+- `app-name=<string>` - Application name for deployment
+- `db=<string>` - Database type: mysql, postgres, mssql (default: mysql)
+- `cfengine=<string>` - CF engine: lucee, adobe (default: lucee)
+- `environment=<string>` - Environment name (creates deploy.{environment}.json)
+- `--force` - Overwrite existing deploy.json (default: false)
 
 ## Examples
 
 ### Interactive initialization
 ```bash
-wheels deploy init
+wheels deploy:init
 ```
 
-### Initialize production target
+### Initialize with custom servers
 ```bash
-wheels deploy init production --host=prod.example.com --path=/var/www/app
+wheels deploy:init provider=custom servers=192.168.1.100,192.168.1.101 domain=myapp.com
 ```
 
-### Initialize with Git deployment
+### Initialize for DigitalOcean
 ```bash
-wheels deploy init staging --type=git --branch=develop
+wheels deploy:init provider=digitalocean domain=myapp.com app-name=myapp
 ```
 
-### Initialize Docker deployment
+### Initialize with PostgreSQL and Adobe ColdFusion
 ```bash
-wheels deploy init production --type=docker --host=swarm.example.com
+wheels deploy:init db=postgres cfengine=adobe domain=myapp.com
 ```
 
-### Initialize with specific strategy
+### Initialize for staging environment
 ```bash
-wheels deploy init production --strategy=blue-green --keep-releases=3
+wheels deploy:init environment=staging servers=staging.example.com
+```
+
+### Force overwrite existing configuration
+```bash
+wheels deploy:init --force domain=myapp.com
 ```
 
 ## What It Does
 
-1. **Creates deployment configuration**:
-   - `.wheels-deploy.json` in project root
-   - Target-specific settings
-   - Deployment credentials (encrypted)
+The init command creates three key files:
 
-2. **Sets up deployment structure**:
-   - Release directories
-   - Shared directories (uploads, logs)
-   - Symbolic links
+1. **deploy.json** (or deploy.{environment}.json):
+   - Docker registry configuration
+   - Server list and SSH settings
+   - Environment variables
+   - Health check configuration
+   - Database and Traefik settings
 
-3. **Configures deployment hooks**:
-   - Pre-deployment tasks
-   - Post-deployment tasks
-   - Rollback procedures
+2. **Dockerfile**:
+   - Base image for your CF engine (Lucee/Adobe)
+   - Application dependencies
+   - CommandBox installation
+   - Port configuration
 
-4. **Validates configuration**:
-   - Tests connection to target
-   - Verifies permissions
-   - Checks dependencies
+3. **.env.deploy**:
+   - Environment variable template
+   - Database credentials placeholder
+   - Generated secret key
+   - Production settings
 
-## Configuration Structure
-
-Generated `.wheels-deploy.json`:
+## Generated deploy.json Structure
 
 ```json
 {
-  "version": "1.0",
-  "targets": {
-    "production": {
-      "type": "ssh",
-      "host": "prod.example.com",
-      "port": 22,
-      "user": "deploy",
-      "path": "/var/www/app",
-      "branch": "main",
-      "strategy": "rolling",
-      "keepReleases": 5,
-      "shared": {
-        "dirs": ["logs", "uploads", "temp"],
-        "files": [".env", "config/production.json"]
+  "service": "myapp",
+  "image": "myapp",
+  "servers": {
+    "web": ["192.168.1.100", "192.168.1.101"]
+  },
+  "registry": {
+    "server": "ghcr.io",
+    "username": "your-github-username"
+  },
+  "env": {
+    "clear": {
+      "CFENGINE": "lucee",
+      "DB_TYPE": "mysql",
+      "WHEELS_ENV": "production"
+    },
+    "secret": [
+      "DB_PASSWORD",
+      "WHEELS_RELOAD_PASSWORD",
+      "SECRET_KEY_BASE"
+    ]
+  },
+  "ssh": {
+    "user": "root"
+  },
+  "builder": {
+    "multiarch": false
+  },
+  "healthcheck": {
+    "path": "/",
+    "port": 3000,
+    "interval": 30
+  },
+  "accessories": {
+    "db": {
+      "image": "mysql:8",
+      "host": "db",
+      "port": 3306,
+      "env": {
+        "clear": {},
+        "secret": []
       },
-      "hooks": {
-        "pre-deploy": [
-          "npm run build",
-          "box install --production"
-        ],
-        "post-deploy": [
-          "wheels dbmigrate latest",
-          "wheels reload production",
-          "npm run cache:clear"
-        ],
-        "rollback": [
-          "wheels reload production"
-        ]
-      },
-      "exclude": [
-        ".git",
-        ".gitignore",
-        "node_modules",
-        "tests",
-        "*.log"
+      "volumes": [
+        "/var/lib/mysql:/var/lib/mysql"
       ]
     }
   },
-  "defaults": {
-    "timeout": 300,
-    "retries": 3,
-    "notifications": {
-      "slack": {
-        "webhook": "https://hooks.slack.com/..."
-      }
+  "traefik": {
+    "enabled": true,
+    "options": {
+      "publish": ["443:443"],
+      "volume": []
+    },
+    "args": {
+      "entryPoints.web.address": ":80",
+      "entryPoints.websecure.address": ":443",
+      "certificatesresolvers.letsencrypt.acme.email": "admin@myapp.com"
+    },
+    "labels": {
+      "traefik.http.routers.myapp.rule": "Host(`myapp.com`)",
+      "traefik.http.routers.myapp.entrypoints": "websecure",
+      "traefik.http.routers.myapp.tls.certresolver": "letsencrypt"
     }
   }
 }
 ```
 
-## Deployment Types
+## Generated Dockerfile
 
-### SSH Deployment
-- Secure shell access
-- Rsync for file transfer
-- Full control over deployment
+### For Lucee
+```dockerfile
+FROM lucee/lucee:5.4
 
-### FTP Deployment
-- Legacy support
-- Simple file transfer
-- Limited automation
+# Install additional dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-### Git Deployment
-- Git-based workflows
-- Post-receive hooks
-- Version control integration
+# Set working directory
+WORKDIR /var/www
 
-### Docker Deployment
-- Container orchestration
-- Image-based deployment
-- Scalable infrastructure
+# Copy application files
+COPY . /var/www/
 
-## Shared Resources
+# Install CommandBox for dependency management
+RUN curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add -
+RUN echo "deb https://downloads.ortussolutions.com/debs/noarch /" | tee -a /etc/apt/sources.list.d/commandbox.list
+RUN apt-get update && apt-get install -y commandbox
 
-Shared directories and files persist across deployments:
-- **Directories**: User uploads, logs, cache
-- **Files**: Environment configs, secrets
+# Install dependencies
+RUN box install
 
-## Deployment Hooks
+# Configure Lucee
+COPY deploy/lucee-config.xml /opt/lucee/web/lucee-web.xml.cfm
 
-### Pre-deployment
-- Build assets
-- Run tests
-- Backup database
+# Expose port
+EXPOSE 3000
 
-### Post-deployment
-- Run migrations
-- Clear caches
-- Restart services
-- Send notifications
+# Start command
+CMD ["box", "server", "start", "--console", "--force", "port=3000"]
+```
 
-### Rollback
-- Restore previous release
-- Revert database
-- Clear caches
+### For Adobe ColdFusion
+```dockerfile
+FROM adobecoldfusion/coldfusion:latest
+
+# Set working directory
+WORKDIR /app
+
+# Copy application files
+COPY . /app/
+
+# Install CommandBox
+RUN curl -fsSl https://www.ortussolutions.com/parent/download/commandbox/type/bin -o /tmp/box && \
+    chmod +x /tmp/box && \
+    mv /tmp/box /usr/local/bin/box
+
+# Install dependencies
+RUN box install
+
+# Expose port
+EXPOSE 3000
+
+# Start command
+CMD ["box", "server", "start", "--console", "--force", "cfengine=adobe@2023", "port=3000"]
+```
+
+## Generated .env.deploy Template
+
+```bash
+# Production Environment Variables
+DB_HOST=db
+DB_PORT=3306
+DB_NAME=myapp_production
+DB_USERNAME=myapp_user
+DB_PASSWORD=change_me_to_secure_password
+
+WHEELS_ENV=production
+WHEELS_RELOAD_PASSWORD=change_me_to_secure_password
+SECRET_KEY_BASE=<64-character-generated-key>
+
+# Additional configuration
+APP_URL=https://myapp.com
+```
+
+## Database Configuration
+
+The command configures database accessories based on your selection:
+
+### MySQL
+- Image: mysql:8
+- Port: 3306
+- Volume: /var/lib/mysql
+
+### PostgreSQL
+- Image: postgres:15
+- Port: 5432
+- Volume: /var/lib/postgresql
+
+### SQL Server
+- Image: mcr.microsoft.com/mssql/server:2022-latest
+- Port: 1433
+- Volume: /var/lib/mssql
+
+## Traefik Configuration
+
+Automatic HTTPS with Let's Encrypt:
+- HTTP to HTTPS redirection
+- Automatic SSL certificate generation
+- Domain-based routing
+- WebSocket support
 
 ## Interactive Mode
 
-When run without arguments, the command enters interactive mode:
+When parameters are not provided, the command prompts for:
+- Application name (reads from server.json if available)
+- Primary domain
+- Server IPs (for custom provider)
 
-```
-? Select deployment target: (Use arrow keys)
-❯ production
-  staging
-  development
-  + Add new target
+## Next Steps
 
-? Deployment type: (Use arrow keys)
-❯ SSH (Recommended)
-  Git
-  Docker
-  FTP
+After running init:
+1. Review and update `deploy.json` with your settings
+2. Update `.env.deploy` with production credentials
+3. Configure registry access (GitHub, Docker Hub, etc.)
+4. Set up SSH access to your servers
+5. Run `wheels deploy:setup` to provision servers
+6. Run `wheels deploy:push` to deploy
 
-? Target host: prod.example.com
-? Remote path: /var/www/app
-? Remote user: deploy
-```
+## Best Practices
 
-## Security Considerations
+1. **Use environment-specific configs**: Create separate configs for staging/production
+2. **Secure credentials**: Never commit `.env.deploy` to version control
+3. **Test locally first**: Build and run Docker image locally
+4. **Use SSH keys**: Configure passwordless SSH access
+5. **Configure health checks**: Ensure your app has a working health endpoint
 
-1. **Credentials**: Stored encrypted in config
-2. **SSH Keys**: Recommended over passwords
-3. **Permissions**: Least privilege principle
-4. **Secrets**: Use environment variables
+## Security Notes
 
-## Use Cases
-
-1. **New Project**: Set up deployment pipeline
-2. **Migration**: Move from manual to automated deployment
-3. **Multi-Environment**: Configure staging and production
-4. **Team Setup**: Share deployment configuration
-
-## Notes
-
-- Run from project root directory
-- Requires appropriate server access
-- Test with staging environment first
-- Back up existing configuration before overwriting
+- Generated secret keys are cryptographically random
+- Passwords in `.env.deploy` must be changed before deployment
+- Use secrets management for production credentials
+- Configure firewall rules on target servers
+- Use read-only filesystem where possible
 
 ## See Also
 
-- [wheels deploy](deploy.md) - Deployment overview
-- [wheels deploy setup](deploy-setup.md) - Setup deployment environment
-- [wheels deploy exec](deploy-exec.md) - Execute deployment
-- [wheels deploy secrets](deploy-secrets.md) - Manage secrets
+- [wheels deploy:setup](deploy-setup.md) - Setup deployment environment
+- [wheels deploy:push](deploy-push.md) - Deploy application
+- [wheels deploy:secrets](deploy-secrets.md) - Manage deployment secrets

@@ -6,15 +6,24 @@
 
 The `analyze security` command has been moved to provide better organization and expanded functionality. 
 
-### Old Command
+### Old Command (Still Works)
 ```bash
-wheels analyze security
+wheels analyze security [path] [--fix] [--report=<format>] [--severity=<level>] [--deep]
 ```
 
 ### New Command
 ```bash
-wheels security scan
+wheels security scan [path] [--fix] [--output=<format>] [--detailed]
 ```
+
+## Parameter Mapping
+
+When called, the deprecated command forwards parameters to the new command:
+- `path` → `path`
+- `--fix` → `--fix`
+- `--report` → `--output`
+- `--severity` → (handled internally)
+- `--deep` → `--detailed`
 
 ## Why the Change?
 

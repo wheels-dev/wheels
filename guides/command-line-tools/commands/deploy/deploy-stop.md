@@ -1,286 +1,190 @@
 # deploy stop
 
-Stop an active deployment or deployment services.
+Stop deployed containers on servers.
 
 ## Synopsis
 
 ```bash
-wheels deploy stop [options]
+wheels deploy:stop [options]
 ```
 
 ## Description
 
-The `wheels deploy stop` command halts active deployments, stops deployment services, or shuts down deployed applications. It provides controlled shutdown capabilities for maintenance, emergency stops, or cleanup operations.
+The `wheels deploy:stop` command stops Docker containers on your deployment servers. It can either stop containers (keeping them for later restart) or completely remove them. This is useful for maintenance, troubleshooting, or decommissioning deployments.
 
 ## Options
 
-- `--deployment-id, -d` - Specific deployment to stop
-- `--environment, -e` - Target environment (default: production)
-- `--force` - Force stop without graceful shutdown
-- `--timeout` - Graceful shutdown timeout in seconds (default: 300)
-- `--service` - Stop specific service only
-- `--all` - Stop all deployments and services
-- `--reason` - Reason for stopping (required for audit)
-- `--notify` - Send notifications about stop action
-- `--backup` - Create backup before stopping
+- `servers=<string>` - Stop on specific servers (comma-separated list)
+- `--remove` - Remove containers after stopping (default: false)
+- `--force` - Skip confirmation prompt (default: false)
 
 ## Examples
 
-### Stop active deployment
+### Stop containers on all servers
 ```bash
-wheels deploy stop --deployment-id dep-123456 --reason "User requested"
+wheels deploy:stop
 ```
 
-### Emergency stop
+### Stop containers on specific servers
 ```bash
-wheels deploy stop --force --reason "Critical error detected"
+wheels deploy:stop servers=web1.example.com,web2.example.com
 ```
 
-### Graceful shutdown
+### Stop and remove containers
 ```bash
-wheels deploy stop --timeout 600 --reason "Scheduled maintenance"
+wheels deploy:stop --remove
 ```
 
-### Stop specific service
+### Force stop without confirmation
 ```bash
-wheels deploy stop --service web --environment staging
+wheels deploy:stop --force
 ```
 
-### Stop all services
+### Stop and remove on specific server
 ```bash
-wheels deploy stop --all --environment development
+wheels deploy:stop servers=web1.example.com --remove --force
 ```
 
-## Stop Types
+## How It Works
 
-### Graceful stop
-Default behavior that ensures clean shutdown:
-```bash
-wheels deploy stop --reason "Maintenance window"
+The stop command:
+1. Connects to target servers via SSH
+2. Navigates to the deployment directory (`/opt/{serviceName}`)
+3. Executes `docker compose stop` (or `docker compose down` with --remove)
+4. Optionally removes volumes with --remove flag
+
+## Stop vs Remove
+
+### Stop (default)
+- Stops running containers
+- Preserves container state and data
+- Containers can be restarted later
+- Uses `docker compose stop`
+
+### Remove (--remove flag)
+- Stops and removes containers
+- Removes container volumes
+- Complete cleanup of deployment
+- Uses `docker compose down -v`
+
+## Output Example
+
 ```
+Wheels Deploy Stop
+==================================================
+WARNING: This will stop your application on the following servers:
+web1.example.com, web2.example.com
 
-Process:
-1. Stop accepting new requests
-2. Complete active requests
-3. Flush caches and buffers
-4. Close database connections
-5. Terminate processes
+Are you sure you want to continue? (yes/no): yes
 
-### Force stop
-Immediate termination for emergencies:
-```bash
-wheels deploy stop --force --reason "Security incident"
-```
+Server: web1.example.com
+------------------------------
+Stopping containers...
+✓ Containers stopped successfully
 
-Process:
-1. Send SIGTERM to all processes
-2. Wait 10 seconds
-3. Send SIGKILL if needed
-4. Force close connections
+Server: web2.example.com
+------------------------------
+Stopping containers...
+✓ Containers stopped successfully
 
-### Partial stop
-Stop specific components:
-```bash
-# Stop web servers only
-wheels deploy stop --service web
+Operation completed.
 
-# Stop background workers
-wheels deploy stop --service workers
-
-# Stop specific instance
-wheels deploy stop --instance i-1234567890
+To restart: wheels deploy:push --no-build
+To remove completely: wheels deploy:stop --remove
 ```
 
 ## Use Cases
 
-### Maintenance window
+### Temporary maintenance
 ```bash
-# Stop for maintenance
-wheels deploy stop \
-  --environment production \
-  --reason "Database maintenance" \
-  --notify \
-  --backup
+# Stop containers for maintenance
+wheels deploy:stop
 
-# Perform maintenance...
+# Perform maintenance tasks...
 
-# Restart services
-wheels deploy exec
+# Restart containers
+wheels deploy:push --no-build
 ```
 
-### Emergency response
+### Troubleshooting
 ```bash
-# Immediate stop for security issue
-wheels deploy stop \
-  --force \
-  --all \
-  --reason "Security breach detected" \
-  --notify
+# Stop problematic server
+wheels deploy:stop servers=web2.example.com
+
+# Debug issue...
+
+# Restart after fix
+wheels deploy:push servers=web2.example.com --no-build
 ```
 
-### Rolling stop
+### Complete removal
 ```bash
-# Stop instances one by one
-for instance in $(wheels deploy status --format json | jq -r '.instances[]'); do
-  wheels deploy stop --instance $instance --timeout 300
-  sleep 30
-done
+# Remove deployment completely
+wheels deploy:stop --remove --force
 ```
 
-### Scheduled stop
+### Emergency stop
 ```bash
-# Stop at specific time
-echo "wheels deploy stop --reason 'Scheduled shutdown'" | at 02:00
+# Quick stop without prompts
+wheels deploy:stop --force
 ```
-
-## Stop Process Details
-
-### Pre-stop actions
-1. Validate stop request
-2. Check for active operations
-3. Create backup if requested
-4. Send notifications
-5. Update deployment status
-
-### Stop sequence
-1. Mark deployment as stopping
-2. Stop load balancer traffic
-3. Drain active connections
-4. Stop application services
-5. Stop background jobs
-6. Release resources
-7. Update status to stopped
-
-### Post-stop actions
-1. Verify all services stopped
-2. Log stop completion
-3. Send completion notifications
-4. Update monitoring systems
-5. Release deployment locks
-
-## Service-Specific Stops
-
-### Web servers
-```bash
-wheels deploy stop --service web --drain-timeout 300
-```
-- Stops accepting new connections
-- Completes active requests
-- Removes from load balancer
-
-### Database
-```bash
-wheels deploy stop --service database --backup
-```
-- Creates final backup
-- Closes all connections
-- Flushes buffers
-- Stops database service
-
-### Cache services
-```bash
-wheels deploy stop --service cache --persist
-```
-- Persists cache to disk
-- Stops cache service
-- Preserves cache data
-
-### Queue workers
-```bash
-wheels deploy stop --service workers --complete-jobs
-```
-- Stops accepting new jobs
-- Completes current jobs
-- Gracefully shuts down
 
 ## Best Practices
 
-1. **Always provide reasons**: Document why services were stopped
-2. **Use graceful stops**: Allow services to shut down cleanly
-3. **Create backups**: Backup before stopping production services
-4. **Notify stakeholders**: Inform team about stop actions
-5. **Monitor stop process**: Ensure services stop correctly
-6. **Plan restarts**: Have restart procedures ready
-7. **Test stop procedures**: Practice emergency stops
+1. **Confirm before stopping**: Always verify servers unless using --force
+2. **Check status first**: Run `wheels deploy:status` before stopping
+3. **Use --remove carefully**: This permanently removes containers and volumes
+4. **Document stops**: Keep track of why containers were stopped
+5. **Plan restarts**: Know how to restart containers quickly
+6. **Test in staging**: Practice stop/start procedures in non-production
 
-## Error Handling
+## Container Management
 
-### Stop failures
+### Restart stopped containers
 ```bash
-# If graceful stop fails, force stop
-wheels deploy stop --reason "Maintenance"
-if [ $? -ne 0 ]; then
-  wheels deploy stop --force --reason "Graceful stop failed"
-fi
+# Quick restart without rebuilding
+wheels deploy:push --no-build --no-push
 ```
 
-### Hung processes
+### Check container status
 ```bash
-# Check for processes that won't stop
-wheels deploy status --detailed
-
-# Force stop specific process
-wheels deploy stop --force --process-id 12345
+# Verify containers are stopped
+wheels deploy:status
 ```
 
-### Rollback after stop
+### Clean up old images
 ```bash
-# If stop causes issues, quickly restart
-wheels deploy stop --reason "Configuration change"
-# ... issues detected ...
-wheels deploy exec --emergency
+# After stopping, clean up disk space
+wheels deploy:exec "docker image prune -f"
 ```
 
-## Integration
+## Troubleshooting
 
-Stop operations integrate with:
-- Monitoring systems for stop alerts
-- Load balancers for traffic management
-- Backup systems for pre-stop backups
-- Notification systems for team alerts
+### Containers won't stop
+- Check for hung processes inside containers
+- Use `docker ps` directly on the server
+- May need to use `docker kill` as last resort
 
-### Monitoring integration
-```bash
-# Stop with monitoring notification
-wheels deploy stop \
-  --reason "Planned maintenance" \
-  --notify-monitoring \
-  --expected-downtime 3600
-```
+### Permission errors
+- Ensure SSH user has Docker permissions
+- Check if user is in docker group
+- Verify sudo access if needed
 
-### Load balancer integration
-```bash
-# Remove from load balancer before stop
-wheels deploy proxy route --backend app-01 --weight 0
-sleep 300  # Allow connections to drain
-wheels deploy stop --instance app-01
-```
+### Restart issues
+- Ensure `.env.deploy` file still exists
+- Check if volumes were removed with --remove
+- Verify Docker daemon is running
 
-## Recovery
+## Notes
 
-### Restart after stop
-```bash
-# Normal restart
-wheels deploy exec
-
-# Quick restart with previous config
-wheels deploy exec --quick-start
-
-# Restart specific services
-wheels deploy start --service web
-```
-
-### Verify recovery
-```bash
-# Check services are running
-wheels deploy status --health
-
-# Monitor logs
-wheels deploy logs --tail --since "stop completed"
-```
+- Stop command uses Docker Compose commands
+- Confirmation prompt helps prevent accidental stops
+- Remove flag permanently deletes container data
+- Stopped containers retain their configuration
+- Works with the deployment structure created by deploy:init
 
 ## See Also
 
-- [deploy exec](deploy-exec.md) - Start deployment
-- [deploy status](deploy-status.md) - Check deployment status
-- [deploy rollback](deploy-rollback.md) - Rollback deployment
+- [wheels deploy:push](deploy-push.md) - Deploy/restart application
+- [wheels deploy:status](deploy-status.md) - Check deployment status
+- [wheels deploy:logs](deploy-logs.md) - View container logs

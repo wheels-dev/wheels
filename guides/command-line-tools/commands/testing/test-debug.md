@@ -12,60 +12,52 @@ wheels test debug [spec] [options]
 
 The `wheels test debug` command provides advanced debugging capabilities for your test suite. It helps identify why tests are failing, diagnose test environment issues, and provides detailed execution traces for troubleshooting complex test problems.
 
-## Arguments
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `spec` | Specific test spec to debug | All tests |
-
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--bundles` | Test bundles to debug | All bundles |
-| `--labels` | Filter by test labels | None |
-| `--breakpoint` | Set breakpoint at test | None |
-| `--step` | Step through test execution | `false` |
-| `--trace` | Show execution trace | `false` |
-| `--verbose` | Verbose output level (1-3) | `1` |
-| `--slow` | Highlight slow tests (ms) | `1000` |
-| `--dump-context` | Dump test context | `false` |
-| `--inspect` | Enable remote debugging | `false` |
-| `--port` | Debug port for inspection | `9229` |
-| `--pause-on-failure` | Pause when test fails | `false` |
-| `--replay` | Replay failed tests | `false` |
-| `--help` | Show help information |
+| `type` | Type of tests to run: app, core, or plugin | `app` |
+| `spec` | Specific test spec to run (e.g., models.user) | |
+| `servername` | Name of server to reload | (current server) |
+| `--reload` | Force a reload of wheels (boolean flag) | `false` |
+| `--break-on-failure` | Stop test execution on first failure (boolean flag) | `true` |
+| `output-level` | Output verbosity: 1=minimal, 2=normal, 3=verbose | `3` |
 
 ## Examples
 
-### Debug specific test
+### Debug all app tests
 ```bash
-wheels test debug UserModelTest
+wheels test debug
 ```
 
-### Debug with execution trace
+### Debug specific test spec
 ```bash
-wheels test debug --trace
+wheels test debug spec=models.user
 ```
 
-### Step through test execution
+### Debug with minimal output
 ```bash
-wheels test debug UserModelTest.testValidation --step
+wheels test debug output-level=1
 ```
 
-### Debug with breakpoints
+### Debug without stopping on failure
 ```bash
-wheels test debug --breakpoint=UserModelTest.testLogin:15
+wheels test debug --break-on-failure=false
+```
+
+### Debug core framework tests
+```bash
+wheels test debug type=core --reload
 ```
 
 ### Enable remote debugging
 ```bash
-wheels test debug --inspect --port=9229
+wheels test debug --inspect port=9229
 ```
 
 ### Debug slow tests
 ```bash
-wheels test debug --slow=500 --verbose=2
+wheels test debug slow=500 verbose=2
 ```
 
 ## Debug Output
@@ -91,7 +83,7 @@ Status: RUNNING
 ```
 
 ### Verbose Trace Output
-With `--trace --verbose=3`:
+With `--trace verbose=3`:
 ```
 🔍 Test Execution Trace
 ======================
@@ -163,7 +155,7 @@ function testComplexLogic() {
 
 Or via command line:
 ```bash
-wheels test debug --breakpoint=OrderTest.testCalculateTotal:25
+wheels test debug breakpoint=OrderTest.testCalculateTotal:25
 ```
 
 ## Test Context Inspection
@@ -199,7 +191,7 @@ Component State:
 ## Performance Analysis
 
 ### Slow Test Detection
-With `--slow=500`:
+With `slow=500`:
 ```
 ⚠️ Slow Tests Detected
 =====================
@@ -234,7 +226,7 @@ Connect with Chrome DevTools:
 
 ### Debug Protocol
 ```bash
-wheels test debug --inspect-brk --port=9230
+wheels test debug --inspect-brk port=9230
 ```
 - `--inspect`: Enable debugging
 - `--inspect-brk`: Break on first line
@@ -365,13 +357,13 @@ diff working.log failing.log
 ### Test Pollution
 Debug test isolation:
 ```bash
-wheels test debug --trace --verbose=3 | grep -E "(setup|teardown|transaction)"
+wheels test debug --trace verbose=3 | grep -E "(setup|teardown|transaction)"
 ```
 
 ### Race Conditions
 Debug timing issues:
 ```bash
-wheels test debug --slow=100 --trace
+wheels test debug slow=100 --trace
 ```
 
 ### Database State

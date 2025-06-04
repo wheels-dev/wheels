@@ -5,15 +5,17 @@ Generates documentation for your CFWheels application from code comments and ann
 ## Usage
 
 ```bash
-wheels docs generate [--format=<format>] [--output=<path>] [--include=<patterns>] [--theme=<theme>]
+wheels docs generate [--output=<dir>] [--format=<format>] [--template=<template>] [--include=<components>] [--serve] [--verbose]
 ```
 
 ## Parameters
 
-- `--format` - (Optional) Output format: `html`, `markdown`, `json`. Default: `html`
-- `--output` - (Optional) Output directory path. Default: `/docs/generated`
-- `--include` - (Optional) Patterns to include: `all`, `api`, `models`, `controllers`. Default: `all`
-- `--theme` - (Optional) Documentation theme: `default`, `minimal`, `gitbook`. Default: `default`
+- `--output` - (Optional) Output directory for docs. Default: `docs/api`
+- `--format` - (Optional) Documentation format: `html`, `json`, `markdown`. Default: `html`
+- `--template` - (Optional) Documentation template to use: `default`, `bootstrap`, `minimal`. Default: `default`
+- `--include` - (Optional) Components to include: `models`, `controllers`, `views`, `services`. Default: `models,controllers`
+- `--serve` - (Optional) Start local server after generation
+- `--verbose` - (Optional) Verbose output
 
 ## Description
 
@@ -38,19 +40,24 @@ wheels docs generate
 wheels docs generate --format=markdown
 ```
 
-### Generate API documentation only
+### Generate with Bootstrap template
 ```bash
-wheels docs generate --include=api --output=/public/api-docs
+wheels docs generate --template=bootstrap
 ```
 
-### Use GitBook theme
+### Generate and serve immediately
 ```bash
-wheels docs generate --theme=gitbook
+wheels docs generate --serve
 ```
 
-### Generate for specific components
+### Generate specific components with verbose output
 ```bash
-wheels docs generate --include="models,controllers"
+wheels docs generate --include=models,controllers,services --verbose
+```
+
+### Custom output directory
+```bash
+wheels docs generate --output=public/api-docs --format=html
 ```
 
 ## Documentation Sources

@@ -8,55 +8,50 @@ Display database migration status and information.
 wheels dbmigrate info
 ```
 
+Alias: `wheels db info`
+
 ## Description
 
 The `wheels dbmigrate info` command shows the current state of database migrations, including which migrations have been run, which are pending, and the current database version.
 
-## Options
+## Parameters
 
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
+None.
 
 ## Output
 
 The command displays:
 
-1. **Current Version**: The latest migration that has been run
-2. **Available Migrations**: All migration files found
-3. **Migration Status**: Which migrations are completed vs pending
-4. **Database Details**: Connection information
+1. **Datasource**: The database connection being used
+2. **Database Type**: The type of database (MySQL, PostgreSQL, etc.)
+3. **Total Migrations**: Count of all migration files found
+4. **Available Migrations**: Number of pending migrations
+5. **Current Version**: The latest migration that has been run
+6. **Latest Version**: The newest migration available
+7. **Migration List**: All migrations with their status (migrated or pending)
 
 ## Example Output
 
 ```
-╔═══════════════════════════════════════════════╗
-║         Database Migration Status             ║
-╚═══════════════════════════════════════════════╝
-
-Current Version: 20240115120000
-Database: myapp_development
-Connection: MySQL 8.0
-
-╔═══════════════════════════════════════════════╗
-║              Migration History                ║
-╚═══════════════════════════════════════════════╝
-
-✓ 20240101100000_create_users_table.cfc
-✓ 20240105150000_create_products_table.cfc
-✓ 20240110090000_add_email_to_users.cfc
-✓ 20240115120000_create_orders_table.cfc
-○ 20240120140000_add_status_to_orders.cfc (pending)
-○ 20240125160000_create_categories_table.cfc (pending)
-
-Status: 4 completed, 2 pending
-
-To run pending migrations, use: wheels dbmigrate latest
++-----------------------------------------+-----------------------------------------+
+| Datasource: myapp_development           | Total Migrations: 6                     |
+| Database Type: MySQL                    | Available Migrations: 2                 |
+|                                         | Current Version: 20240115120000         |
+|                                         | Latest Version: 20240125160000          |
++-----------------------------------------+-----------------------------------------+
++----------+------------------------------------------------------------------------+
+| migrated | 20240101100000_create_users_table.cfc                                 |
+| migrated | 20240105150000_create_products_table.cfc                              |
+| migrated | 20240110090000_add_email_to_users.cfc                                 |
+| migrated | 20240115120000_create_orders_table.cfc                                |
+|          | 20240120140000_add_status_to_orders.cfc                               |
+|          | 20240125160000_create_categories_table.cfc                            |
++----------+------------------------------------------------------------------------+
 ```
 
 ## Migration Files Location
 
-Migrations are stored in `/db/migrate/` and follow the naming convention:
+Migrations are stored in `/app/migrator/migrations/` and follow the naming convention:
 ```
 [timestamp]_[description].cfc
 ```
@@ -132,7 +127,7 @@ Status: 3 completed, 3 pending
 ## Troubleshooting
 
 ### Migration Not Showing
-- Check file is in `/db/migrate/`
+- Check file is in `/app/migrator/migrations/`
 - Verify `.cfc` extension
 - Ensure proper timestamp format
 

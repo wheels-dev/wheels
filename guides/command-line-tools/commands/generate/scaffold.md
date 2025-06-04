@@ -22,14 +22,13 @@ The `wheels scaffold` command generates a complete CRUD (Create, Read, Update, D
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--properties` | Model properties (name:type) | |
-| `--belongs-to` | Belongs to associations | |
-| `--has-many` | Has many associations | |
-| `--api` | Generate API-only scaffold | `false` |
+| `properties` | Model properties (format: name:type,name2:type2) | |
+| `belongs-to` | Parent model relationships (comma-separated) | |
+| `has-many` | Child model relationships (comma-separated) | |
+| `--api` | Generate API-only scaffold (no views) | `false` |
 | `--tests` | Generate test files | `true` |
-| `--migrate` | Run migration after generation | `false` |
+| `--migrate` | Run migrations after scaffolding | `false` |
 | `--force` | Overwrite existing files | `false` |
-| `--help` | Show help information | |
 
 ## Examples
 
@@ -40,23 +39,23 @@ wheels scaffold product
 
 ### Scaffold with properties
 ```bash
-wheels scaffold product --properties="name:string,price:decimal,stock:integer"
+wheels scaffold product properties="name:string,price:decimal,stock:integer"
 ```
 
 ### Scaffold with associations
 ```bash
-wheels scaffold order --properties="total:decimal,status:string" \
-  --belongs-to="user" --has-many="orderItems"
+wheels scaffold order properties="total:decimal,status:string" \
+  belongs-to="user" has-many="orderItems"
 ```
 
 ### API scaffold
 ```bash
-wheels scaffold product --api --properties="name:string,price:decimal"
+wheels scaffold product --api properties="name:string,price:decimal"
 ```
 
 ### Scaffold with auto-migration
 ```bash
-wheels scaffold category --properties="name:string" --migrate
+wheels scaffold category properties="name:string" --migrate
 ```
 
 ## What Gets Generated
@@ -100,7 +99,7 @@ wheels scaffold category --properties="name:string" --migrate
 
 ## Generated Files Example
 
-For `wheels scaffold product --properties="name:string,price:decimal,stock:integer"`:
+For `wheels scaffold product properties="name:string,price:decimal,stock:integer"`:
 
 ### Model: `/models/Product.cfc`
 ```cfc
@@ -348,7 +347,7 @@ Scaffold generates everything at once:
 
 ```bash
 # Scaffold does all of this:
-wheels generate model product --properties="name:string,price:decimal"
+wheels generate model product properties="name:string,price:decimal"
 wheels generate controller products --rest
 wheels generate view products index,show,new,edit,_form
 wheels generate test model product

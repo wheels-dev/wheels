@@ -1,33 +1,31 @@
 # wheels watch
 
-Watch for file changes and automatically reload the application.
+Watch Wheels application files for changes and automatically reload the application.
 
 ## Synopsis
 
 ```bash
-wheels watch [path] [--extensions] [--exclude] [--reload-mode]
+wheels watch [options]
 ```
 
 ## Description
 
-The `wheels watch` command monitors your application files for changes and automatically triggers actions like reloading the application or running tests. This provides a smooth development workflow with instant feedback.
+The `wheels watch` command monitors your application files for changes and automatically triggers actions like reloading the application, running tests, or executing custom commands. This provides a smooth development workflow with instant feedback.
 
 ## Arguments
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `path` | Directory to watch | `.` (current directory) |
+| `includeDirs` | Comma-delimited list of directories to watch | `controllers,models,views,config,migrator/migrations` |
+| `excludeFiles` | Comma-delimited list of file patterns to ignore | (none) |
+| `interval` | Interval in seconds to check for changes | `1` |
+| `reload` | Reload framework on changes | `true` |
+| `tests` | Run tests on changes | `false` |
+| `migrations` | Run migrations on schema changes | `false` |
+| `command` | Custom command to run on changes | (none) |
+| `debounce` | Debounce delay in milliseconds | `500` |
 
-## Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--extensions` | File extensions to watch | `.cfc,.cfm,.json` |
-| `--exclude` | Paths to exclude | `temp/,logs/,.git/` |
-| `--reload-mode` | Reload mode when changes detected | `development` |
-| `--test` | Run tests on change | `false` |
-| `--debounce` | Milliseconds to wait before reacting | `500` |
-| `--help` | Show help information | |
+**Note**: In CommandBox, boolean flags are specified with `--flagname` and value parameters with `paramname=value`.
 
 ## Examples
 
@@ -35,168 +33,163 @@ The `wheels watch` command monitors your application files for changes and autom
 ```bash
 wheels watch
 ```
-Watches current directory for `.cfc`, `.cfm`, and `.json` changes
+Watches default directories for changes and reloads the application
 
-### Watch specific directory
+### Watch with tests
 ```bash
-wheels watch ./src
+wheels watch --tests
+```
+Runs tests automatically when files change
+
+### Watch specific directories
+```bash
+wheels watch includeDirs="controllers,models"
 ```
 
-### Watch additional file types
+### Exclude file patterns
 ```bash
-wheels watch --extensions=".cfc,.cfm,.js,.css"
+wheels watch excludeFiles="*.txt,*.log"
 ```
 
-### Exclude directories
+### Watch with all features
 ```bash
-wheels watch --exclude="node_modules/,temp/,logs/"
+wheels watch --reload --tests --migrations
 ```
 
-### Auto-run tests
+### Custom command on changes
 ```bash
-wheels watch --test
+wheels watch command="wheels test run"
 ```
 
-### Custom debounce timing
+### Adjust check interval
 ```bash
-wheels watch --debounce=1000
+wheels watch interval=2 debounce=1000
 ```
 
-## Default Behavior
+### Disable reload but run tests
+```bash
+wheels watch reload=false --tests
+```
 
-When a file change is detected:
+## What It Does
 
-1. **CFC Files** (models, controllers)
-   - Triggers application reload
-   - Clears relevant caches
-   - Runs tests if `--test` enabled
+The watch command starts with:
+1. An initial scan of all watched directories to establish baseline
+2. Displays count of files being monitored
+3. Checks for changes at the specified interval
 
-2. **CFM Files** (views)
-   - Clears view cache
-   - No full reload needed
-
-3. **Config Files** (.json, settings.cfm)
-   - Full application reload
-   - Re-reads configuration
+When changes are detected:
+- **With `--reload`**: Reloads the application
+- **With `--tests`**: Runs tests (smart filtering based on changed files)
+- **With `--migrations`**: Runs migrations if schema files changed
+- **With `--command`**: Executes the specified command
 
 ## Output Example
 
 ```
-[Wheels Watch] Monitoring for changes...
-[Wheels Watch] Watching: /Users/myapp
-[Wheels Watch] Extensions: .cfc, .cfm, .json
-[Wheels Watch] Excluded: temp/, logs/, .git/
+🔄 Wheels Watch Mode
+Monitoring files for changes...
+Press Ctrl+C to stop watching
 
-[12:34:56] Change detected: models/User.cfc
-[12:34:56] Reloading application...
-[12:34:57] ✓ Application reloaded successfully
+✓ Will reload framework on changes
+✓ Will run tests on changes
 
-[12:35:23] Change detected: views/users/index.cfm
-[12:35:23] Clearing view cache...
-[12:35:23] ✓ View cache cleared
+Watching 145 files across 5 directories
 
-[12:36:45] Multiple changes detected:
-  - controllers/Products.cfc
-  - models/Product.cfc
-[12:36:45] Reloading application...
-[12:36:46] ✓ Application reloaded successfully
-[12:36:46] Running tests...
-[12:36:48] ✓ All tests passed (15 specs, 0 failures)
+📝 Detected changes:
+  ~ /app/models/User.cfc (modified)
+  + /app/models/Profile.cfc (new)
+
+🔄 Reloading application...
+✅ Application reloaded successfully at 14:32:15
+
+🧪 Running tests...
+✅ All actions completed, watching for more changes...
 ```
 
-## Advanced Configuration
+## File Exclusion
 
-Create `.wheels-watch.json` for project-specific settings:
+The `excludeFiles` parameter supports patterns:
+- `*.txt` - Exclude all .txt files
+- `*.log` - Exclude all .log files
+- `temp.cfc` - Exclude specific file name
+- Multiple patterns: `excludeFiles="*.txt,*.log,temp.*"`
 
-```json
-{
-  "extensions": [".cfc", ".cfm", ".js", ".css"],
-  "exclude": ["node_modules/", "temp/", ".git/", "logs/"],
-  "reload": {
-    "mode": "development",
-    "debounce": 500
-  },
-  "test": {
-    "enabled": true,
-    "on": ["models/", "controllers/"],
-    "command": "wheels test run"
-  },
-  "custom": [
-    {
-      "pattern": "assets/",
-      "command": "npm run build"
-    }
-  ]
-}
-```
+## Smart Test Running
+
+When `--tests` is enabled, the command intelligently determines which tests to run:
+- Changes to models run model tests
+- Changes to controllers run controller tests
+- Multiple changes batch test execution
+
+## Migration Detection
+
+With `--migrations` enabled, the command detects:
+- New migration files in `/migrator/migrations/`
+- Changes to schema files
+- Automatically runs `wheels dbmigrate up`
 
 ## Performance Considerations
 
-- Large directories may slow down watching
-- Use `--exclude` to skip unnecessary paths
-- Increase `--debounce` for grouped changes
-- Consider watching specific subdirectories
+- Initial scan time depends on project size
+- Use `includeDirs` to limit scope
+- Use `excludeFiles` to skip large files
+- Adjust `interval` for less frequent checks
+- Use `debounce` to batch rapid changes
 
-## Integration with Editors
-
-### VS Code
-Add to `.vscode/tasks.json`:
-```json
-{
-  "label": "Wheels Watch",
-  "type": "shell",
-  "command": "wheels watch",
-  "problemMatcher": [],
-  "isBackground": true
-}
-```
-
-### Sublime Text
-Create build system:
-```json
-{
-  "cmd": ["wheels", "watch"],
-  "working_dir": "${project_path}"
-}
-```
-
-## Common Patterns
+## Common Workflows
 
 ### Development Workflow
 ```bash
 # Terminal 1: Run server
 box server start
 
-# Terminal 2: Watch for changes
-wheels watch --test
+# Terminal 2: Watch with reload and tests
+wheels watch --reload --tests
 ```
 
 ### Frontend + Backend
 ```bash
-wheels watch --extensions=".cfc,.cfm,.js,.vue" \
-  --custom='{"pattern":"src/","command":"npm run build"}'
+# Watch backend files and run build command
+wheels watch command="npm run build"
 ```
 
 ### Test-Driven Development
 ```bash
-wheels watch models/ controllers/ --test --reload-mode=testing
+# Focus on models and controllers with tests
+wheels watch includeDirs="models,controllers" --tests
 ```
+
+### Database Development
+```bash
+# Watch for migration changes
+wheels watch includeDirs="migrator/migrations" --migrations
+```
+
+## Best Practices
+
+1. **Start Simple**: Use `wheels watch` with defaults first
+2. **Add Features Gradually**: Enable tests, migrations as needed
+3. **Optimize Scope**: Use `includeDirs` for faster performance
+4. **Exclude Wisely**: Skip log files, temp files, etc.
+5. **Batch Changes**: Increase debounce for multiple file saves
 
 ## Troubleshooting
 
-- **Too many file descriptors**: Increase system limits or exclude more directories
-- **Changes not detected**: Check file extensions and excluded paths
-- **Slow response**: Increase debounce time or watch specific directories
-- **Tests failing**: Ensure test environment is properly configured
+- **High CPU Usage**: Reduce check frequency with `interval`
+- **Missed Changes**: Check excluded patterns
+- **Reload Errors**: Ensure reload password is configured
+- **Test Failures**: Run tests manually to debug
 
 ## Notes
 
-- Requires file system events support
-- Some network drives may not support watching
-- Symbolic links are followed by default
+- Changes are tracked by file modification time
+- New files are automatically detected
+- Deleted files are removed from tracking
+- Press Ctrl+C to stop watching
 
 ## See Also
 
 - [wheels reload](reload.md) - Manual application reload
-- [wheels test run](../testing/test-run.md) - Run tests
-- [wheels config set](../config/config-set.md) - Configure watch settings
+- [wheels test run](../testing/test-run.md) - Run tests manually
+- [wheels dbmigrate up](../database/dbmigrate-up.md) - Run migrations
