@@ -414,39 +414,32 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		// copy class variables from the object in the application scope
 		if (!StructKeyExists(variables.wheels, "class")) {
 			local.lockName = "classLock" & application.applicationName;
-			// First check if the model exists in application cache
-			if (StructKeyExists(application.wheels.models, arguments.name)) {
-				variables.wheels.class = $simpleLock(
-					execute = "$classData",
-					name = local.lockName,
-					object = application.wheels.models[arguments.name],
-					type = "readOnly"
-				);
-			} else {
+			
+			if ( !structKeyExists( application.wheels.models, arguments.name ) ) {
 				try {
-					model(arguments.name);
-					// Check again if the model was successfully loaded
-					if (StructKeyExists(application.wheels.models, arguments.name)) {
-						variables.wheels.class = $simpleLock(
-							execute = "$classData",
-							name = local.lockName,
-							object = application.wheels.models[arguments.name],
-							type = "readOnly"
-						);
-					} else {
-						Throw(
-							type="Wheels.ModelNotFound",
-							message="Model '#arguments.name#' could not be found or initialized.",
-							extendedInfo="Ensure the model exists with proper configuration. Check if the model name is spelled correctly and the file exists in the models directory."
-						);
-					}
-				} catch (any e) {
-					Throw(
-						type="Wheels.ModelInitializationFailed",
-						message="Failed to initialize model '#arguments.name#'.",
-						extendedInfo="Error details: #e.message# - #e.detail#"
+					model( arguments.name );
+					local.modelObj = application.wheels.models[ arguments.name ];
+				}
+				catch ( any e ) {
+					throw(
+						type         = "Wheels.ModelInitializationFailed",
+						message      = "Failed to initialize model '#arguments.name#'.",
+						extendedInfo = "Error details: " & e.message
 					);
 				}
+			}
+
+			if ( structKeyExists( application.wheels.models, arguments.name ) ) {
+				// Fast path: model is already in the application cache
+				local.modelObj = application.wheels.models[ arguments.name ];
+
+				// At this point, local.modelObj is guaranteed to exist
+				variables.wheels.class = $simpleLock(
+					execute = "$classData",
+					name    = local.lockName,
+					object  = local.modelObj,
+					type    = "readOnly"
+				);
 			}
 		}
 
