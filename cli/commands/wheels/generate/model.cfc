@@ -18,11 +18,11 @@ component aliases='wheels g model' extends="../base" {
      * @name.hint Name of the model to create (singular form)
      * @migration.hint Generate database migration (default: true)
      * @properties.hint Model properties (format: name:type,name2:type2)
-     * @belongs-to.hint Parent model relationships (comma-separated)
-     * @has-many.hint Child model relationships (comma-separated)
-     * @has-one.hint One-to-one relationships (comma-separated)
-     * @primary-key.hint Primary key column name(s) (default: id)
-     * @table-name.hint Custom database table name
+     * @belongsTo.hint Parent model relationships (comma-separated)
+     * @hasMany.hint Child model relationships (comma-separated)
+     * @hasOne.hint One-to-one relationships (comma-separated)
+     * @primaryKey.hint Primary key column name(s) (default: id)
+     * @tableName.hint Custom database table name
      * @description.hint Model description
      * @force.hint Overwrite existing files
      */
@@ -30,11 +30,11 @@ component aliases='wheels g model' extends="../base" {
         required string name,
         boolean migration = true,
         string properties = "",
-        string "belongs-to" = "",
-        string "has-many" = "",
-        string "has-one" = "",
-        string "primary-key" = "id",
-        string "table-name" = "",
+        string belongsTo = "",
+        string hasMany = "",
+        string hasOne = "",
+        string primaryKey = "id",
+        string tableName = "",
         string description = "",
         boolean force = false
     ) {
@@ -54,9 +54,9 @@ component aliases='wheels g model' extends="../base" {
         // Add relationship properties
         parsedProperties = addRelationshipProperties(
             parsedProperties,
-            arguments["belongs-to"],
-            arguments["has-many"],
-            arguments["has-one"]
+            arguments.belongsTo,
+            arguments.hasMany,
+            arguments.hasOne
         );
         
         // Generate model
@@ -66,8 +66,11 @@ component aliases='wheels g model' extends="../base" {
             force = arguments.force,
             properties = parsedProperties,
             baseDirectory = getCWD(),
-            primaryKey = arguments["primary-key"],
-            tableName = arguments["table-name"]
+            belongsTo = arguments.belongsTo,
+            hasMany = arguments.hasMany,
+            hasOne = arguments.hasOne,
+            primaryKey = arguments.primaryKey,
+            tableName = arguments.tableName
         );
         
         if (result.success) {
@@ -110,7 +113,7 @@ component aliases='wheels g model' extends="../base" {
                  .line("2. Add validation rules if needed")
                  .line("3. Run migrations: wheels dbmigrate up");
             
-            if (len(arguments["belongs-to"]) || len(arguments["has-many"]) || len(arguments["has-one"])) {
+            if (len(arguments.belongsTo) || len(arguments.hasMany) || len(arguments.hasOne)) {
                 print.line("4. Ensure related models exist");
             }
         } else {

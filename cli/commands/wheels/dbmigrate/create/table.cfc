@@ -19,13 +19,13 @@
 	 * @name.hint The Object Name
 	 * @force.hint Force Creation
 	 * @id.hint Auto create ID column as autoincrement ID
-	 * @primary-key.hint overrides default primary key name
+	 * @primaryKey.hint overrides default primary key name
 	 **/
 	function run(
 		required string name,
 		boolean force    = false,
 		boolean id 		 = true,
-		string "primary-key"="id") {
+		string primaryKey="id") {
 
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-table.txt"));
@@ -34,7 +34,7 @@
 		content=replaceNoCase(content, "|tableName|", "#name#", "all");
 		content=replaceNoCase(content, "|force|", "#force#", "all");
 		content=replaceNoCase(content, "|id|", "#id#", "all");
-		content=replaceNoCase(content, "|primaryKey|", "#arguments["primary-key"]#", "all");
+		content=replaceNoCase(content, "|primaryKey|", "#arguments.primaryKey#", "all");
 
 		// Make File
 		 $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);

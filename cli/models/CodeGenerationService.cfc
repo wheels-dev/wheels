@@ -55,7 +55,12 @@ component {
         string description = "",
         boolean force = false,
         array properties = [],
-        string baseDirectory = ""
+        string baseDirectory = "",
+        string belongsTo = "",
+        string hasMany = "",
+        string hasOne = "",
+        string primaryKey = "",
+        string tableName = ""
     ) {
         var modelName = capitalize(arguments.name);
         var fileName = modelName & ".cfc";
@@ -73,11 +78,15 @@ component {
         // Prepare template context
         var context = {
             modelName: modelName,
-            tableName: pluralize(lCase(modelName)),
+            tableName: len(arguments.tableName) ? arguments.tableName : pluralize(lCase(modelName)),
             extends: len(arguments.extends) ? arguments.extends : "Model",
             description: arguments.description,
             properties: arguments.properties,
-            timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
+            timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss"),
+            belongsTo: arguments.belongsTo,
+            hasMany: arguments.hasMany,
+            hasOne: arguments.hasOne,
+            primaryKey: arguments.primaryKey
         };
         
         // Process associations from properties

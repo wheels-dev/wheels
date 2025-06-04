@@ -28,6 +28,10 @@ component {
         }
         
         var templateContent = fileRead(templatePath);
+        
+        // Debug: write what we're reading
+        fileWrite("/tmp/template-debug2.txt", "Template path used: #templatePath#" & chr(10) & "Template content:" & chr(10) & templateContent & chr(10) & chr(10) & "Context passed:" & chr(10) & serializeJSON(arguments.context));
+        
         var processedContent = processTemplate(templateContent, arguments.context);
         
         // Ensure destination directory exists
@@ -48,7 +52,12 @@ component {
         var processed = arguments.content;
         
         // Replace {{variable}} with context values
+        var skipKeys = ["belongsTo", "hasMany", "hasOne", "belongsToRelationships", "hasManyRelationships"];
         for (var key in arguments.context) {
+            // Skip special keys that need custom processing
+            if (arrayFindNoCase(skipKeys, key)) {
+                continue;
+            }
             var value = arguments.context[key];
             // Handle arrays and structs differently
             if (isArray(value) || isStruct(value)) {
@@ -74,16 +83,30 @@ component {
             processed = reReplace(processed, "\{\{namePluralUpper\}\}", uCase(variables.helpers.pluralize(name)), "all");
         }
         
-        // Process relationships
-        if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
-            var belongsToCode = generateBelongsToCode(arguments.context.belongsTo);
+        // Process relationships (check both lowercase and uppercase keys)
+        var belongsToValue = "";
+        if (structKeyExists(arguments.context, "belongsTo")) {
+            belongsToValue = arguments.context.belongsTo;
+        } else if (structKeyExists(arguments.context, "BELONGSTO")) {
+            belongsToValue = arguments.context.BELONGSTO;
+        }
+        
+        if (len(belongsToValue)) {
+            var belongsToCode = generateBelongsToCode(belongsToValue);
             processed = reReplace(processed, "\{\{belongsToRelationships\}\}", belongsToCode, "all");
         } else {
             processed = reReplace(processed, "\{\{belongsToRelationships\}\}", "", "all");
         }
         
-        if (structKeyExists(arguments.context, "hasMany") && len(arguments.context.hasMany)) {
-            var hasManyCode = generateHasManyCode(arguments.context.hasMany);
+        var hasManyValue = "";
+        if (structKeyExists(arguments.context, "hasMany")) {
+            hasManyValue = arguments.context.hasMany;
+        } else if (structKeyExists(arguments.context, "HASMANY")) {
+            hasManyValue = arguments.context.HASMANY;
+        }
+        
+        if (len(hasManyValue)) {
+            var hasManyCode = generateHasManyCode(hasManyValue);
             processed = reReplace(processed, "\{\{hasManyRelationships\}\}", hasManyCode, "all");
         } else {
             processed = reReplace(processed, "\{\{hasManyRelationships\}\}", "", "all");
@@ -135,7 +158,7 @@ component {
         var code = [];
         
         for (var rel in relationships) {
-            arrayAppend(code, "        belongsTo('#trim(rel)#');");
+            arrayAppend(code, "		belongsTo('#trim(rel)#');");
         }
         
         return arrayToList(code, chr(10));
@@ -149,7 +172,7 @@ component {
         var code = [];
         
         for (var rel in relationships) {
-            arrayAppend(code, "        hasMany('#trim(rel)#');");
+            arrayAppend(code, "		hasMany('#trim(rel)#');");
         }
         
         return arrayToList(code, chr(10));

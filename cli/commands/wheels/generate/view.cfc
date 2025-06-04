@@ -16,17 +16,17 @@
 component aliases='wheels g view' extends="../base"  {
 
 	/**
-	 * @object-name.hint View path folder, i.e user
+	 * @objectName.hint View path folder, i.e user
 	 * @name.hint Name of the file to create, i.e, edit
 	 * @template.hint optional template (used in Scaffolding)
 	 * @template.options crud/_form,crud/edit,crud/index,crud/new,crud/show
 	 **/
 	function run(
-		required string "object-name",
+		required string objectName,
 		required string name,
 		string template=""
 	){
-		var obj = helpers.getNameVariants(listLast( arguments["object-name"], '/\' ));
+		var obj = helpers.getNameVariants(listLast( arguments.objectName, '/\' ));
 		var viewdirectory     = fileSystemUtil.resolvePath( "app/views" );
 		var directory 		  = fileSystemUtil.resolvePath( "app/views" & "/" & obj.objectNamePlural);
 		print.line( "Creating View File..." ).toConsole();

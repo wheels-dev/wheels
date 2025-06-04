@@ -15,7 +15,7 @@ component extends="wheels-cli.models.BaseCommand" {
      * @reporter.options console,junit,json,tap
      * @watch.hint Watch for file changes and rerun tests
      * @verbose.hint Verbose output
-     * @fail-fast.hint Stop on first test failure
+     * @failFast.hint Stop on first test failure
      */
     function run(
         string filter = "",
@@ -24,7 +24,7 @@ component extends="wheels-cli.models.BaseCommand" {
         string reporter = "console",
         boolean watch = false,
         boolean verbose = false,
-        boolean "fail-fast" = false
+        boolean failFast = false
     ) {
         // Validate we're in a Wheels project
         if (!isWheelsProject()) {

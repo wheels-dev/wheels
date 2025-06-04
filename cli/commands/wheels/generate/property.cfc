@@ -34,9 +34,9 @@ component aliases='wheels g property'  extends="../base"  {
 
 	/**
 	 * @name.hint Table Name
-	 * @column-name.hint Name of Column
-	 * @data-type.hint Type of Column
-	 * @data-type.options biginteger,binary,boolean,date,datetime,decimal,float,integer,string,limit,text,time,timestamp,uuid
+	 * @columnName.hint Name of Column
+	 * @dataType.hint Type of Column
+	 * @dataType.options biginteger,binary,boolean,date,datetime,decimal,float,integer,string,limit,text,time,timestamp,uuid
 	 * @default.hint Default Value for column
 	 * @null.hint Whether to allow null values
 	 * @limit.hint character or integer size limit for column
@@ -45,8 +45,8 @@ component aliases='wheels g property'  extends="../base"  {
 	 **/
 	function run(
 		required string name,
-		required string "column-name",
-		string "data-type"="string",
+		required string columnName,
+		string dataType="string",
 		any default="",
 		boolean null=true,
 		number limit=0,
@@ -60,22 +60,22 @@ component aliases='wheels g property'  extends="../base"  {
     	// Check for existence of model file: NB, DB columns can of course exist without a model file,
     	// But we should confirm they've got it correct.
     	if(!fileExists(fileSystemUtil.resolvePath("app/models/#obj.objectNameSingularC#.cfc"))){
-    		if(!confirm("Hold On! We couldn't find a corresponding Model at /app/models/#obj.objectNameSingularC#.cfc: are you sure you wish to add the property '#arguments["column-name"]#' to #obj.objectNamePlural#? [y/n]")){
+    		if(!confirm("Hold On! We couldn't find a corresponding Model at /app/models/#obj.objectNameSingularC#.cfc: are you sure you wish to add the property '#arguments.columnName#' to #obj.objectNamePlural#? [y/n]")){
     			print.line("Fair enough. Aborting!");
     			return;
     		}
     	}
 
     	// Set booleans to have a default value of 0 if not specified
-    	if(arguments["data-type"] == "boolean" && len(arguments.default) == 0 ){
+    	if(arguments.dataType == "boolean" && len(arguments.default) == 0 ){
     		arguments.default=0;
     	}
     	// NB wheels default is lowercase column names
 		command('wheels dbmigrate create column')
 			.params(
 				name=obj.objectNamePlural,
-				"column-name"=lcase(arguments["column-name"]),
-				"data-type"=arguments["data-type"],
+				columnName=lcase(arguments.columnName),
+				dataType=arguments.dataType,
 				default=arguments.default,
 				null=arguments.null,
 				limit=arguments.limit,
@@ -89,7 +89,7 @@ component aliases='wheels g property'  extends="../base"  {
 		var formPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/_form.cfm");
 		if (fileExists(formPath)) {
 			print.line("Inserting field into view form");
-			$injectIntoView(objectnames=obj, property=arguments["column-name"], type=arguments["data-type"], action="input");
+			$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.dataType, action="input");
 		} else {
 			print.yellowLine("Warning: _form.cfm not found at #formPath#, skipping form field injection");
 		}
@@ -98,7 +98,7 @@ component aliases='wheels g property'  extends="../base"  {
 		var indexPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/index.cfm");
 		if (fileExists(indexPath)) {
 			print.line("Inserting field into into index listing");
-			$injectIntoIndex(objectnames=obj, property=arguments["column-name"], type=arguments["data-type"]);
+			$injectIntoIndex(objectnames=obj, property=arguments.columnName, type=arguments.dataType);
 		} else {
 			print.yellowLine("Warning: index.cfm not found at #indexPath#, skipping index field injection");
 		}
@@ -107,7 +107,7 @@ component aliases='wheels g property'  extends="../base"  {
 		var showPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/show.cfm");
 		if (fileExists(showPath)) {
 			print.line("Inserting output into views");
-			$injectIntoView(objectnames=obj, property=arguments["column-name"], type=arguments["data-type"], action="output");
+			$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.dataType, action="output");
 		} else {
 			print.yellowLine("Warning: show.cfm not found at #showPath#, skipping show field injection");
 		}

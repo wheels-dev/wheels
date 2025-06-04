@@ -10,7 +10,7 @@ component extends="base" {
 
 	/**
 	* @type.hint Either Core, App or the name of the plugin
-	* @server-name.hint Server name to run the tests against
+	* @serverName.hint Server name to run the tests against
 	* @reload.hint Force Reload
 	* @debug.hint Output passing tests as well as failing ones
 	* @format.hint Force a specific return format for debug
@@ -18,7 +18,7 @@ component extends="base" {
 	*/
 	function run(
 		string type="app",
-		string "server-name",
+		string serverName,
 		boolean reload=true,
 		boolean debug=false,
 		string format="json",
@@ -43,7 +43,7 @@ component extends="base" {
 	*/
 	  function $buildTestSuite(
 	  	required string type,
-	  	string "server-name"="",
+	  	string serverName="",
 	  	boolean reload=true,
 	  	boolean debug=false,
 	  	string format="json",

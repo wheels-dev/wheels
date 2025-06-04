@@ -31,6 +31,8 @@ component {
             var modelResult = codeGenerationService.generateModel(
                 name = arguments.name,
                 properties = parseProperties(arguments.properties),
+                belongsTo = arguments.belongsTo,
+                hasMany = arguments.hasMany,
                 force = arguments.force,
                 baseDirectory = arguments.baseDirectory
             );

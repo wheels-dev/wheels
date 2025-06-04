@@ -19,8 +19,8 @@
 	/**
 	 * Usage: wheels dbmigrate create column [tablename] [force] [id] [primaryKey]
 	 * @name.hint The Object Name
-	 * @data-type.hint The column type to add
-	 * @column-name.hint The column name to add
+	 * @dataType.hint The column type to add
+	 * @columnName.hint The column name to add
 	 * @default.hint The default value to set for the column
 	 * @null.hint Should the column allow nulls
 	 * @limit.hint The character limit of the column
@@ -29,8 +29,8 @@
 	 **/
 	function run(
 		required string name,
-		required string "data-type",
-		string "column-name"="",
+		required string dataType,
+		string columnName="",
 		any default,
 		boolean null=true,
 		number limit,
@@ -44,8 +44,8 @@
 
 		// Changes here
 		content=replaceNoCase(content, "|tableName|", "#name#", "all");
-		content=replaceNoCase(content, "|columnType|", "#arguments["data-type"]#", "all");
-		content=replaceNoCase(content, "|columnName|", "#arguments["column-name"]#", "all");
+		content=replaceNoCase(content, "|columnType|", "#arguments.dataType#", "all");
+		content=replaceNoCase(content, "|columnName|", "#arguments.columnName#", "all");
 		//content=replaceNoCase(content, "|referenceName|", "#referenceName#", "all");
 
 		// Construct additional arguments(only add/replace if passed through)
@@ -81,7 +81,7 @@
 		//content=replaceNoCase(content, "|scale|", "#scale#", "all");
 
 		// Make File
-		$createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments["column-name"])),	action="create_column",	content=content);
+		$createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments.columnName)),	action="create_column",	content=content);
 	}
 
 	function $constructArguments(args, string operator=","){
