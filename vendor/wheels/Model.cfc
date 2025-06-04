@@ -411,12 +411,14 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		request.wheels.tickCountId = Right(request.wheels.tickCountId, 12) + 1;
 		variables.wheels.tickCountId = request.wheels.tickCountId;
 
-		// copy class variables from the object in the application scope
+		// Only do work if we haven’t already loaded the class data for this request
 		if (!StructKeyExists(variables.wheels, "class")) {
+			// Build a unique lock name per application
 			local.lockName = "classLock" & application.applicationName;
 			
 			if ( !structKeyExists( application.wheels.models, arguments.name ) ) {
 				try {
+					// Slow path: try to load the model into the application cache
 					model( arguments.name );
 					local.modelObj = application.wheels.models[ arguments.name ];
 				}
@@ -429,6 +431,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 				}
 			}
 
+			// Attempt to grab the already‐loaded model object, or force‐load it
 			if ( structKeyExists( application.wheels.models, arguments.name ) ) {
 				// Fast path: model is already in the application cache
 				local.modelObj = application.wheels.models[ arguments.name ];
