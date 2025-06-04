@@ -34,7 +34,6 @@ component aliases="wheels g app-wizard" extends="../base" {
    */
   function init() {
     super.init();
-    variables.rails = application.wirebox.getInstance("RailsOutputService");
     return this;
   }
 
@@ -44,6 +43,9 @@ component aliases="wheels g app-wizard" extends="../base" {
   function run(
     boolean force   = false
    ) {
+    // Initialize rails service
+    var rails = application.wirebox.getInstance("RailsOutputService");
+    
     var appContent      = fileRead( getTemplate( '/ConfigAppContent.txt' ) );
     var routesContent   = fileRead( getTemplate( '/ConfigRoutes.txt' ) );
 

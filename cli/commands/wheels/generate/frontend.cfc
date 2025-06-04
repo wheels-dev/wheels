@@ -14,7 +14,6 @@ component extends="../base" {
      */
     function init() {
         super.init();
-        variables.rails = application.wirebox.getInstance("RailsOutputService");
         return this;
     }
 
@@ -28,6 +27,9 @@ component extends="../base" {
         string path="app/assets/frontend",
         boolean api=false
     ) {
+        // Initialize rails service
+        var rails = application.wirebox.getInstance("RailsOutputService");
+        
         // Output Rails-style header
         rails.header("🌐", "Frontend Generation");
         

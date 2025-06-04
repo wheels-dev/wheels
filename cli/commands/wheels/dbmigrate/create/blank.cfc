@@ -9,7 +9,6 @@ component aliases='wheels db create blank' extends="../../base"  {
 	 */
 	function init() {
 		super.init();
-		variables.rails = application.wirebox.getInstance("RailsOutputService");
 		return this;
 	}
 
@@ -20,6 +19,9 @@ component aliases='wheels db create blank' extends="../../base"  {
 	 * @name.hint The Name of the migration file 
 	 **/
 	function run(required string name) {
+		// Initialize rails service
+		var rails = application.wirebox.getInstance("RailsOutputService");
+		
 		// Output Rails-style header
 		rails.header("🗛️", "Migration Generation");
 

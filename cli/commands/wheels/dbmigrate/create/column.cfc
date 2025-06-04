@@ -21,7 +21,6 @@
 	 */
 	function init() {
 		super.init();
-		variables.rails = application.wirebox.getInstance("RailsOutputService");
 		return this;
 	}
 
@@ -46,6 +45,9 @@
 		number precision,
 		number scale) {
 
+		// Initialize rails service
+		var rails = application.wirebox.getInstance("RailsOutputService");
+		
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-column.txt"));
 		var argumentArr=[];

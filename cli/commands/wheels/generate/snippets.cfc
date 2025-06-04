@@ -11,12 +11,14 @@ component
    */
   function init() {
     super.init();
-    variables.rails = application.wirebox.getInstance("RailsOutputService");
     return this;
   }
 
   function run() 
   {
+    // Initialize rails service
+    var rails = application.wirebox.getInstance("RailsOutputService");
+    
     arguments.directory = fileSystemUtil.resolvePath( 'app' );
 
     // Output Rails-style header

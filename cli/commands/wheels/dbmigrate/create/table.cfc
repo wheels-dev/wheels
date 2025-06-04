@@ -17,7 +17,6 @@
 	 */
 	function init() {
 		super.init();
-		variables.rails = application.wirebox.getInstance("RailsOutputService");
 		return this;
 	}
 
@@ -35,6 +34,9 @@
 		boolean force    = false,
 		boolean id 		 = true,
 		string primaryKey="id") {
+		
+		// Initialize rails service
+		var rails = application.wirebox.getInstance("RailsOutputService");
 
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-table.txt"));

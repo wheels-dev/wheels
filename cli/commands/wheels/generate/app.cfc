@@ -40,7 +40,6 @@ component aliases="wheels g app, wheels new" extends="../base" {
    */
   function init( ) {
     super.init();
-    variables.rails = application.wirebox.getInstance("RailsOutputService");
     // Map these shortcut names to the actual ForgeBox slugs
     variables.templateMap = {
       'Base'        : 'cfwheels-base-template',
@@ -77,6 +76,9 @@ component aliases="wheels g app, wheels new" extends="../base" {
     boolean init    = false,
     boolean force   = false
   ) {
+    // Initialize rails service
+    var rails = application.wirebox.getInstance("RailsOutputService");
+    
     // set defaults based on app name
     if ( !len( arguments.directory ) ) {
       arguments.directory = '#getCWD()##arguments.name#';
