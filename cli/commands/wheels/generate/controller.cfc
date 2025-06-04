@@ -10,6 +10,7 @@
 component aliases="wheels g controller" extends="../base" {
     
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
+    property name="railsOutput" inject="RailsOutputService@wheels-cli";
     
     /**
      * @name.hint Name of the controller to create (usually plural)
@@ -39,8 +40,7 @@ component aliases="wheels g controller" extends="../base" {
             return;
         }
         
-        print.yellowLine("🎮 Generating controller: #arguments.name#")
-             .line();
+        railsOutput.header("🎮", "Generating controller: #arguments.name#");
         
         // Parse actions
         var actionList = [];
@@ -67,12 +67,11 @@ component aliases="wheels g controller" extends="../base" {
         );
         
         if (result.success) {
-            print.greenLine("✅ Created controller: #result.path#");
+            railsOutput.create(result.path);
             
             // Generate views for non-API controllers
             if (!arguments.api && arguments.rest) {
-                print.line()
-                     .yellowLine("📄 Creating views...");
+                railsOutput.invoke("views");
                 
                 var viewActions = ["index", "show", "new", "edit"];
                 var viewsCreated = 0;
@@ -87,34 +86,35 @@ component aliases="wheels g controller" extends="../base" {
                         );
                         
                         if (viewResult.success) {
+                            railsOutput.create(viewResult.path, true);
                             viewsCreated++;
                         }
                     }
                 }
                 
-                if (viewsCreated > 0) {
-                    print.greenLine("✅ Created #viewsCreated# view files");
-                }
+                // Remove this block since we're showing each file individually
             }
             
             // Show next steps
-            print.line()
-                 .yellowLine("📋 Next steps:")
-                 .line("1. Review the generated controller")
-                 .line("2. Implement action logic");
+            var nextSteps = [
+                "Review the generated controller at #result.path#",
+                "Implement action logic for #arrayToList(actionList, ', ')#"
+            ];
             
             if (arguments.rest) {
-                print.line("3. Add route resources to config/routes.cfm:")
-                     .line("   resources('" & lCase(arguments.name) & "');");
+                arrayAppend(nextSteps, "Add route to config/routes.cfm: resources('" & lCase(arguments.name) & "');");
             } else {
-                print.line("3. Add routes to config/routes.cfm");
+                arrayAppend(nextSteps, "Add routes to config/routes.cfm");
             }
             
-            if (!arguments.api) {
-                print.line("4. Customize the views as needed");
+            if (!arguments.api && viewsCreated > 0) {
+                arrayAppend(nextSteps, "Customize the views as needed");
             }
+            
+            railsOutput.success("Controller generation complete!");
+            railsOutput.nextSteps(nextSteps);
         } else {
-            print.redLine("❌ Failed to generate controller: #result.error#");
+            railsOutput.error("Failed to generate controller: #result.error#");
             setExitCode(1);
         }
     }

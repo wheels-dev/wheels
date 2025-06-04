@@ -14,6 +14,7 @@
  * {code}
  **/
 component aliases='wheels g view' extends="../base"  {
+	property name="railsOutput" inject="RailsOutputService@wheels-cli";
 
 	/**
 	 * @objectName.hint View path folder, i.e user
@@ -29,7 +30,7 @@ component aliases='wheels g view' extends="../base"  {
 		var obj = helpers.getNameVariants(listLast( arguments.objectName, '/\' ));
 		var viewdirectory     = fileSystemUtil.resolvePath( "app/views" );
 		var directory 		  = fileSystemUtil.resolvePath( "app/views" & "/" & obj.objectNamePlural);
-		print.line( "Creating View File..." ).toConsole();
+		railsOutput.header("📄", "Generating view: #arguments.objectName#/#arguments.name#");
 
 		// Validate directory
 		if( !directoryExists( viewdirectory ) ) {
@@ -38,9 +39,8 @@ component aliases='wheels g view' extends="../base"  {
 
  		// Validate views subdirectory, create if doesnt' exist
  		if( !directoryExists( directory ) ) {
- 			print.line( "#directory# doesnt exist... creating" ).toConsole();
  			directoryCreate(directory);
- 			print.line( "#directory# created" ).toConsole();
+ 			railsOutput.create("app/views/" & obj.objectNamePlural);
  		}
 
 		//Copy template files to the application folder if they do not exist there
@@ -59,13 +59,27 @@ component aliases='wheels g view' extends="../base"  {
 
 		if(fileExists(viewPath)){
 			if( confirm( '#viewName# already exists in target directory. Do you want to overwrite? [y/n]' ) ) {
-			    print.greenLine( 'Ok, going to overwrite...' ).toConsole();
+			    railsOutput.update("app/views/" & obj.objectNamePlural & "/" & viewName);
 			} else {
-			    print.boldRedLine( 'Ok, aborting!' );
+			    railsOutput.skip("app/views/" & obj.objectNamePlural & "/" & viewName);
 			    return;
 			}
+		} else {
+			railsOutput.create("app/views/" & obj.objectNamePlural & "/" & viewName);
 		}
 		file action='write' file='#viewPath#' mode ='777' output='#trim( viewContent )#';
-		print.line( 'Created #viewName#' );
+		
+		railsOutput.success("View generation complete!");
+		
+		var nextSteps = [
+			"Review the generated view at app/views/" & obj.objectNamePlural & "/" & viewName,
+			"Customize the HTML content as needed"
+		];
+		
+		if (len(arguments.template)) {
+			arrayAppend(nextSteps, "The view was generated using the '" & arguments.template & "' template");
+		}
+		
+		railsOutput.nextSteps(nextSteps);
 	}
 }

@@ -13,6 +13,7 @@ component aliases='wheels g model' extends="../base" {
     property name="migrationService" inject="MigrationService@wheels-cli";
     property name="scaffoldService" inject="ScaffoldService@wheels-cli";
     property name="helpers" inject="helpers@wheels-cli";
+    property name="railsOutput" inject="RailsOutputService@wheels-cli";
     
     /**
      * @name.hint Name of the model to create (singular form)
@@ -45,8 +46,7 @@ component aliases='wheels g model' extends="../base" {
             return;
         }
         
-        print.yellowLine("🏗️  Generating model: #arguments.name#")
-             .line();
+        railsOutput.header("🏗️", "Generating model: #arguments.name#");
         
         // Parse properties
         var parsedProperties = parseProperties(arguments.properties);
@@ -74,12 +74,11 @@ component aliases='wheels g model' extends="../base" {
         );
         
         if (result.success) {
-            print.greenLine("✅ Created model: #result.path#");
+            railsOutput.create(result.path);
             
             // Generate migration if requested
             if (arguments.migration) {
-                print.line()
-                     .yellowLine("📄 Creating migration...");
+                railsOutput.invoke("dbmigrate");
                 
                 try {
                     // Use scaffoldService to create migration with properties
@@ -100,24 +99,27 @@ component aliases='wheels g model' extends="../base" {
                         );
                     }
                     
-                    print.greenLine("✅ Created migration: #migrationPath#");
+                    railsOutput.create(migrationPath, true);
                 } catch (any e) {
-                    print.redLine("❌ Failed to create migration: #e.message#");
+                    railsOutput.error("Failed to create migration: #e.message#");
                 }
             }
             
             // Show next steps
-            print.line()
-                 .yellowLine("📋 Next steps:")
-                 .line("1. Review the generated model")
-                 .line("2. Add validation rules if needed")
-                 .line("3. Run migrations: wheels dbmigrate up");
+            var nextSteps = [
+                "Review the generated model at #result.path#",
+                "Add validation rules if needed",
+                "Run migrations: wheels dbmigrate up"
+            ];
             
             if (len(arguments.belongsTo) || len(arguments.hasMany) || len(arguments.hasOne)) {
-                print.line("4. Ensure related models exist");
+                arrayAppend(nextSteps, "Ensure related models exist");
             }
+            
+            railsOutput.success("Model generation complete!");
+            railsOutput.nextSteps(nextSteps);
         } else {
-            print.redLine("❌ Failed to generate model: #result.error#");
+            railsOutput.error("Failed to generate model: #result.error#");
             setExitCode(1);
         }
     }

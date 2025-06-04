@@ -7,6 +7,7 @@
 component aliases='wheels g resource' extends="../base" {
     
     property name="templateService" inject="TemplateService@wheels-cli";
+    property name="railsOutput" inject="RailsOutputService@wheels-cli";
     
     /**
      * @name.hint Resource name (singular)
@@ -39,44 +40,50 @@ component aliases='wheels g resource' extends="../base" {
         var obj = helpers.getNameVariants(arguments.name);
         var generatedFiles = [];
         
-        print.yellowLine("🚀 Generating resource: #arguments.name#")
-             .line();
+        railsOutput.header("🚀", "Generating resource: #arguments.name#");
         
         // Generate model
         var modelPath = generateModel(obj, arguments);
         arrayAppend(generatedFiles, modelPath);
-        print.greenLine("✓ Created model: #modelPath#");
+        railsOutput.create(modelPath);
         
         // Generate controller
         var controllerPath = generateController(obj, arguments);
         arrayAppend(generatedFiles, controllerPath);
-        print.greenLine("✓ Created controller: #controllerPath#");
+        railsOutput.create(controllerPath);
         
         // Generate views (unless API-only)
         if (!arguments.api) {
             var viewPaths = generateViews(obj, arguments);
             generatedFiles.addAll(viewPaths);
-            print.greenLine("✓ Created #arrayLen(viewPaths)# view files");
+            for (var viewPath in viewPaths) {
+                railsOutput.create(viewPath);
+            }
         }
         
         // Generate routes
         var routesAdded = addRoutes(obj, arguments);
         if (routesAdded) {
-            print.greenLine("✓ Added routes to config/routes.cfm");
+            var routeType = arguments.api ? "apiResource" : "resources";
+            railsOutput.route(routeType & "('" & lCase(arguments.name) & "')");
         }
         
         // Generate tests
         if (arguments.tests) {
+            railsOutput.invoke("test");
             var testPaths = generateTests(obj, arguments);
             generatedFiles.addAll(testPaths);
-            print.greenLine("✓ Created #arrayLen(testPaths)# test files");
+            for (var testPath in testPaths) {
+                railsOutput.create(testPath, true);
+            }
         }
         
         // Generate migration
         if (arguments.migration) {
+            railsOutput.invoke("dbmigrate");
             var migrationPath = generateMigration(obj, arguments);
             arrayAppend(generatedFiles, migrationPath);
-            print.greenLine("✓ Created migration: #migrationPath#");
+            railsOutput.create(migrationPath, true);
         }
         
         // Display summary
@@ -545,23 +552,18 @@ component aliases='wheels g resource' extends="../base" {
     }
     
     private function displayGenerationSummary(generatedFiles, options) {
-        print.line()
-             .boldGreenLine("✨ Resource generation complete!")
-             .line()
-             .yellowLine("Generated files:");
+        railsOutput.success("Resource generation complete!");
         
-        for (var file in arguments.generatedFiles) {
-            print.line("  - " & file);
-        }
-        
-        print.line()
-             .cyanLine("Next steps:")
-             .line("  1. Run migrations: wheels dbmigrate up")
-             .line("  2. Reload your application");
+        var nextSteps = [
+            "Run migrations: wheels dbmigrate up",
+            "Reload your application"
+        ];
         
         if (arguments.options.tests) {
-            print.line("  3. Run tests: wheels test run");
+            arrayAppend(nextSteps, "Run tests: wheels test run");
         }
+        
+        railsOutput.nextSteps(nextSteps);
     }
     
     private function openPath(required string path) {
