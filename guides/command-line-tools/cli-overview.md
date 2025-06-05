@@ -62,7 +62,7 @@ Generate complete applications or individual components:
 wheels new blog
 
 # Generate complete CRUD scaffolding
-wheels scaffold post --properties="title:string,content:text,published:boolean"
+wheels scaffold name=post properties=title:string,content:text,published:boolean
 
 # Generate individual components
 wheels generate model user

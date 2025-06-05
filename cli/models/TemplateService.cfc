@@ -28,10 +28,6 @@ component {
         }
         
         var templateContent = fileRead(templatePath);
-        
-        // Debug: write what we're reading
-        fileWrite("/tmp/template-debug2.txt", "Template path used: #templatePath#" & chr(10) & "Template content:" & chr(10) & templateContent & chr(10) & chr(10) & "Context passed:" & chr(10) & serializeJSON(arguments.context));
-        
         var processedContent = processTemplate(templateContent, arguments.context);
         
         // Ensure destination directory exists
@@ -137,7 +133,28 @@ component {
             processed = replace(processed, "|FormFields|", "", "all");
         }
         
-        // Process pipe-delimited placeholders (used in CRUD templates)
+        // Process CLI-Appends markers for index and show views BEFORE replacing object name placeholders
+        if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties)) {
+            // Process index view table headers
+            if (find("<!--- CLI-Appends-thead-Here --->", processed)) {
+                var theadCode = generateIndexTableHeaders(arguments.context.properties);
+                processed = replace(processed, "<!--- CLI-Appends-thead-Here --->", theadCode, "all");
+            }
+            
+            // Process index view table body
+            if (find("<!--- CLI-Appends-tbody-Here --->", processed)) {
+                var tbodyCode = generateIndexTableBody(arguments.context.properties);
+                processed = replace(processed, "<!--- CLI-Appends-tbody-Here --->", tbodyCode, "all");
+            }
+            
+            // Process show view properties
+            if (find("<!--- CLI-Appends-Here --->", processed)) {
+                var showCode = generateShowViewProperties(arguments.context.properties, arguments.context.modelName);
+                processed = replace(processed, "<!--- CLI-Appends-Here --->", showCode, "all");
+            }
+        }
+        
+        // Process pipe-delimited placeholders (used in CRUD templates) AFTER processing CLI-Appends
         // Generate object name variations from model or controller name
         if (structKeyExists(arguments.context, "modelName")) {
             var modelName = arguments.context.modelName;
@@ -291,6 +308,60 @@ component {
         }
         
         return arrayToList(code, chr(10));
+    }
+    
+    /**
+     * Generate table headers for index view
+     */
+    private function generateIndexTableHeaders(required array properties) {
+        var headers = [];
+        
+        for (var prop in arguments.properties) {
+            var headerName = variables.helpers.capitalize(prop.name);
+            arrayAppend(headers, '<th>#headerName#</th>');
+        }
+        
+        return arrayToList(headers, chr(10) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9));
+    }
+    
+    /**
+     * Generate table body cells for index view
+     */
+    private function generateIndexTableBody(required array properties) {
+        var cells = [];
+        
+        for (var prop in arguments.properties) {
+            var cellCode = '<td>' & chr(10);
+            cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.#prop.name###' & chr(10);
+            cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '</td>';
+            arrayAppend(cells, cellCode);
+        }
+        
+        return arrayToList(cells, chr(10) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9));
+    }
+    
+    /**
+     * Generate property display for show view
+     */
+    private function generateShowViewProperties(required array properties, required string modelName) {
+        var displayCode = [];
+        var objectName = lCase(arguments.modelName);
+        
+        for (var prop in arguments.properties) {
+            var propDisplay = '<p>' & chr(10);
+            propDisplay &= chr(9) & '<strong>#variables.helpers.capitalize(prop.name)#:</strong> ##encodeForHTML(|ObjectNameSingular|.#prop.name#)##' & chr(10);
+            propDisplay &= '</p>';
+            arrayAppend(displayCode, propDisplay);
+        }
+        
+        // Add action links after properties
+        arrayAppend(displayCode, '');
+        arrayAppend(displayCode, '<p>');
+        arrayAppend(displayCode, chr(9) & '##linkTo(route="edit|ObjectNameSingularC|", key=|ObjectNameSingular|.key(), text="Edit", class="btn btn-primary")##');
+        arrayAppend(displayCode, chr(9) & '##linkTo(route="|ObjectNamePlural|", text="Back to List", class="btn btn-default")##');
+        arrayAppend(displayCode, '</p>');
+        
+        return arrayToList(displayCode, chr(10));
     }
     
     /**

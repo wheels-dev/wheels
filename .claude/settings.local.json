@@ -83,7 +83,8 @@
       "Bash(for:*)",
       "Bash(do)",
       "Bash(echo:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(wheels destroy:*)"
     ],
     "deny": []
   }

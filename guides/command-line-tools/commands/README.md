@@ -260,7 +260,7 @@ wheels new myapp         # Same as: wheels generate app myapp
 
 **Creating a new feature:**
 ```bash
-wheels scaffold product --properties="name:string,price:decimal"
+wheels scaffold name=product properties=name:string,price:decimal
 wheels dbmigrate latest
 wheels test run
 ```

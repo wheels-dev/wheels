@@ -72,7 +72,7 @@ Let's create a blog post feature:
 ### 1. Generate Scaffold
 
 ```bash
-wheels scaffold post --properties="title:string,content:text,published:boolean"
+wheels scaffold name=post properties=title:string,content:text,published:boolean
 ```
 
 This generates:
@@ -161,7 +161,7 @@ wheels dbmigrate latest
 
 ```bash
 # Generate user model
-wheels scaffold user --properties="email:string,password:string,admin:boolean"
+wheels scaffold name=user properties=email:string,password:string,admin:boolean
 
 # Generate session controller
 wheels generate controller sessions new,create,delete

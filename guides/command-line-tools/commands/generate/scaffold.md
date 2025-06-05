@@ -5,7 +5,7 @@ Generate complete CRUD scaffolding for a resource.
 ## Synopsis
 
 ```bash
-wheels scaffold [name] [options]
+wheels scaffold name=[resourceName] [options]
 ```
 
 ## Description
@@ -34,28 +34,28 @@ The `wheels scaffold` command generates a complete CRUD (Create, Read, Update, D
 
 ### Basic scaffold
 ```bash
-wheels scaffold product
+wheels scaffold name=product
 ```
 
 ### Scaffold with properties
 ```bash
-wheels scaffold product properties="name:string,price:decimal,stock:integer"
+wheels scaffold name=product properties=name:string,price:decimal,stock:integer
 ```
 
 ### Scaffold with associations
 ```bash
-wheels scaffold order properties="total:decimal,status:string" \
-  belongs-to="user" has-many="orderItems"
+wheels scaffold name=order properties=total:decimal,status:string \
+  belongsTo=user hasMany=orderItems
 ```
 
 ### API scaffold
 ```bash
-wheels scaffold product --api properties="name:string,price:decimal"
+wheels scaffold name=product api=true properties=name:string,price:decimal
 ```
 
 ### Scaffold with auto-migration
 ```bash
-wheels scaffold category properties="name:string" --migrate
+wheels scaffold name=category properties=name:string migrate=true
 ```
 
 ## What Gets Generated
@@ -99,7 +99,7 @@ wheels scaffold category properties="name:string" --migrate
 
 ## Generated Files Example
 
-For `wheels scaffold product properties="name:string,price:decimal,stock:integer"`:
+For `wheels scaffold name=product properties=name:string,price:decimal,stock:integer`:
 
 ### Model: `/models/Product.cfc`
 ```cfc
