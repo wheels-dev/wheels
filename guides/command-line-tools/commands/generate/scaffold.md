@@ -332,6 +332,66 @@ function init() {
 }
 ```
 
+## Template Customization
+
+The scaffold command uses templates to generate code. You can customize these templates to match your project's coding standards and markup preferences.
+
+### Template Override System
+
+The CLI uses a template override system that allows you to customize the generated code:
+
+1. **CLI Templates** - Default templates are located in the CLI module at `/cli/templates/`
+2. **App Templates** - Custom templates in your application at `/app/snippets/` **override** the CLI templates
+
+This means you can modify the generated code structure by creating your own templates in the `/app/snippets/` directory.
+
+### How It Works
+
+When generating code, the CLI looks for templates in this order:
+1. First checks `/app/snippets/[template-name]`
+2. Falls back to `/cli/templates/[template-name]` if not found in app
+
+### Customizing Templates
+
+To customize scaffold output:
+
+1. **Copy the template** you want to customize from `/cli/templates/` to `/app/snippets/`
+2. **Modify the template** to match your project's needs
+3. **Run scaffold** - it will use your custom template
+
+Example for customizing the form template:
+```bash
+# Create the crud directory in your app
+mkdir -p app/snippets/crud
+
+# Copy the form template
+cp /path/to/wheels/cli/templates/crud/_form.txt app/snippets/crud/
+
+# Edit the template to match your markup
+# The CLI will now use your custom template
+```
+
+### Available Templates
+
+Templates used by scaffold command:
+- `crud/index.txt` - Index/list view
+- `crud/show.txt` - Show single record view  
+- `crud/new.txt` - New record form view
+- `crud/edit.txt` - Edit record form view
+- `crud/_form.txt` - Form partial shared by new/edit
+- `ModelContent.txt` - Model file structure
+- `ControllerContent.txt` - Controller file structure
+
+### Template Placeholders
+
+Templates use placeholders that get replaced during generation:
+- `|ObjectNameSingular|` - Lowercase singular name (e.g., "product")
+- `|ObjectNamePlural|` - Lowercase plural name (e.g., "products")
+- `|ObjectNameSingularC|` - Capitalized singular name (e.g., "Product")
+- `|ObjectNamePluralC|` - Capitalized plural name (e.g., "Products")
+- `|FormFields|` - Generated form fields based on properties
+- `<!--- CLI-Appends-Here --->` - Marker for future CLI additions
+
 ## Best Practices
 
 1. **Properties**: Define all needed properties upfront
@@ -340,6 +400,7 @@ function init() {
 4. **Testing**: Always generate and run tests
 5. **Routes**: Use RESTful resources when possible
 6. **Security**: Add authentication/authorization
+7. **Templates**: Customize templates in `/app/snippets/` to match your project standards
 
 ## Comparison with Individual Generators
 

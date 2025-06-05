@@ -120,10 +120,20 @@ component extends="commandbox.system.BaseCommand" {
 ### Core Services
 
 #### TemplateService
-Manages code generation templates:
-- Load templates
-- Variable substitution
-- Custom template support
+Manages code generation templates with override system:
+- **Template Loading**: Searches app snippets first, then CLI templates
+- **Variable Substitution**: Replaces placeholders with actual values
+- **Custom Template Support**: Apps can override any CLI template
+- **Path Resolution**: `app/snippets/` overrides `/cli/templates/`
+- **Dynamic Content**: Generates form fields, validations, relationships
+
+Key features:
+- Template hierarchy allows project customization
+- Preserves markers for future CLI additions
+- Supports conditional logic in templates
+- Handles both simple and complex placeholders
+
+See [Template System Guide](template-system.md) for detailed documentation.
 
 #### MigrationService
 Handles database migrations:

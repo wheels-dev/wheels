@@ -126,7 +126,7 @@ component {
         }
         
         // Process form fields if properties are provided (must happen before object name replacements)
-        if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties)) {
+        if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
             var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName);
             processed = replace(processed, "|FormFields|", formFieldsCode, "all");
         } else {
