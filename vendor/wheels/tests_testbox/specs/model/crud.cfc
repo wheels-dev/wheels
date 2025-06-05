@@ -1524,7 +1524,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("table name with star translates to all fields", () => {
 				postModel = g.model("post")
-				r = postModel.$createSQLFieldList(clause = "select", list = "posts.*", include = "", returnAs = "query")
+				r = postModel.$createSQLFieldList(clause = "select", list = "_c_o_r_e_posts.*", include = "", returnAs = "query")
 				props = postModel.$classData().properties
 
 				expect(ListLen(r)).toBe(StructCount(props))
