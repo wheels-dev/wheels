@@ -10,7 +10,7 @@
 component extends="base" {
     
     property name="scaffoldService" inject="ScaffoldService@wheels-cli";
-    property name="railsOutput" inject="RailsOutputService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     property name="helpers" inject="helpers@wheels-cli";
     
     /**
@@ -36,16 +36,16 @@ component extends="base" {
         // Validate scaffold
         var validation = scaffoldService.validateScaffold(arguments.name, getCWD());
         if (!validation.valid) {
-            railsOutput.error("Cannot scaffold '#arguments.name#':");
+            detailOutput.error("Cannot scaffold '#arguments.name#':");
             for (var error in validation.errors) {
-                railsOutput.getPrint().redLine("   • #error#");
+                detailOutput.getPrint().redLine("   • #error#");
             }
             setExitCode(1);
             return;
         }
         
         // Generate scaffold
-        railsOutput.header("🏗️", "Scaffolding resource: #arguments.name#");
+        detailOutput.header("🏗️", "Scaffolding resource: #arguments.name#");
         
         var result = scaffoldService.generateScaffold(
             name = arguments.name,
@@ -59,9 +59,9 @@ component extends="base" {
         );
         
         if (!result.success) {
-            railsOutput.error("Scaffolding failed!");
+            detailOutput.error("Scaffolding failed!");
             for (var error in result.errors) {
-                railsOutput.getPrint().redLine("   • #error#");
+                detailOutput.getPrint().redLine("   • #error#");
             }
             setExitCode(1);
             return;
@@ -69,17 +69,17 @@ component extends="base" {
         
         // Run migrations if requested
         if (arguments.migrate) {
-            railsOutput.invoke("dbmigrate");
+            detailOutput.invoke("dbmigrate");
             command('wheels dbmigrate up').run();
         } else {
             // Ask to migrate
             if (confirm("Would you like to run migrations now? [y/n]")) {
-                railsOutput.invoke("dbmigrate");
+                detailOutput.invoke("dbmigrate");
                 command('wheels dbmigrate up').run();
             }
         }
         
-        railsOutput.success("Scaffold complete! Your #arguments.name# resource is ready to use.");
+        detailOutput.success("Scaffold complete! Your #arguments.name# resource is ready to use.");
         
         var nextSteps = [
             "Start your server: server start",
@@ -90,6 +90,6 @@ component extends="base" {
             arrayPrepend(nextSteps, "Run migrations: wheels dbmigrate up");
         }
         
-        railsOutput.nextSteps(nextSteps);
+        detailOutput.nextSteps(nextSteps);
     }
 }

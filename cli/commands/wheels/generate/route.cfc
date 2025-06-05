@@ -36,8 +36,8 @@ component  aliases='wheels g route' extends="../base"  {
 		boolean resources = false,
 		string root = ""
 	) {
-		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+		// Initialize detail service
+		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
 		// Validate that at least one route option is provided
 		if (!len(arguments.objectname) && !len(arguments.get) && !len(arguments.post) && 
@@ -101,7 +101,7 @@ component  aliases='wheels g route' extends="../base"  {
 			
 			// Check if route already exists
 			if (findNoCase('.resources("' & obj.objectNamePlural & '")', content)) {
-				rails.skip("config/routes.cfm (resources route for #obj.objectNamePlural# already exists)");
+				details.skip("config/routes.cfm (resources route for #obj.objectNamePlural# already exists)");
 				return;
 			}
 			
@@ -133,11 +133,11 @@ component  aliases='wheels g route' extends="../base"  {
 		
 		file action='write' file='#target#' mode='777' output='#trim(content)#';
 		
-		// Output Rails-style message
-		rails.header("🛤️", "Route Generation");
-		rails.route(inject);
-		rails.update("config/routes.cfm");
-		rails.success("Route added successfully!");
+		// Output detail message
+		details.header("🛤️", "Route Generation");
+		details.route(inject);
+		details.update("config/routes.cfm");
+		details.success("Route added successfully!");
 	}
 
 }

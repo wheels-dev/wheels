@@ -3,7 +3,7 @@ component {
 	property name="print" inject="PrintBuffer";
 	
 	/**
-	 * Initialize the Rails Output Service
+	 * Initialize the Detail Output Service
 	 */
 	function init() {
 		variables.actionPadding = 12;

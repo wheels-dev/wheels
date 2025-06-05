@@ -15,29 +15,29 @@ component
 
   function run() 
   {
-    // Initialize rails service
-    var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+    // Initialize detail service
+    var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
     
     arguments.directory = fileSystemUtil.resolvePath( 'app' );
 
-    // Output Rails-style header
-    rails.header("📦", "Snippet Generation");
+    // Output detail header
+    details.header("📦", "Snippet Generation");
 
     // Validate the provided directory
     if (!directoryExists(arguments.directory)) {
-      rails.error('[#arguments.directory#] can''t be found. Are you running this command from your application root?');
+      details.error('[#arguments.directory#] can''t be found. Are you running this command from your application root?');
       return;
     }
 
     ensureSnippetTemplatesExist();
 
-    rails.create("app/snippets/");
-    rails.success("Snippets successfully generated!");
+    details.create("app/snippets/");
+    details.success("Snippets successfully generated!");
     
     var nextSteps = [];
     arrayAppend(nextSteps, "View your snippets in app/snippets/");
     arrayAppend(nextSteps, "Use these as templates for generating code");
-    rails.nextSteps(nextSteps);
+    details.nextSteps(nextSteps);
   }
 
 }

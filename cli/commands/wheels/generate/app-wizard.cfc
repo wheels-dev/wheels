@@ -42,14 +42,14 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
   function run(
     boolean force   = false
    ) {
-    // Initialize rails service
-    var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+    // Initialize detail service
+    var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
     
     var appContent      = fileRead( getTemplate( '/ConfigAppContent.txt' ) );
     var routesContent   = fileRead( getTemplate( '/ConfigRoutes.txt' ) );
 
     // ---------------- Welcome
-    rails.header("🧿", "Wheels Application Wizard");
+    details.header("🧿", "Wheels Application Wizard");
     print.line()
       .cyanLine( "Welcome to the Wheels app wizard!" )
       .cyanLine( "I'll help you create a new Wheels application." )
@@ -212,7 +212,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
         initWizard      = true).run();
 
     } else {
-      rails.skip( "Application creation cancelled by user" );
+      details.skip( "Application creation cancelled by user" );
     }
 
   }

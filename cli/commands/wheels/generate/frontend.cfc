@@ -26,12 +26,12 @@ component extends="../base" {
         string path="app/assets/frontend",
         boolean api=false
     ) {
-        // Initialize rails service
-        var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+        // Initialize detail service
+        var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
         
-        // Output Rails-style header
-        rails.header("🌐", "Frontend Generation");
+        // Output detail header
+        details.header("🌐", "Frontend Generation");
         
-        rails.error("This feature is currently under development");
+        details.error("This feature is currently under development");
     }
 }

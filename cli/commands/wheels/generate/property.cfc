@@ -31,7 +31,7 @@
  *
  **/
 component aliases='wheels g property'  extends="../base"  {
-	property name="railsOutput" inject="RailsOutputService@wheels-cli";
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
 	/**
 	 * @name.hint Table Name
@@ -57,14 +57,14 @@ component aliases='wheels g property'  extends="../base"  {
 
     	var obj = helpers.getNameVariants(arguments.name);
     	
-    	railsOutput.header("🏗️", "Generating property: #arguments.columnName# for #arguments.name#");
+    	detailOutput.header("🏗️", "Generating property: #arguments.columnName# for #arguments.name#");
 
     	// Quick Sanity Checks: are we actually adding a property to an existing model?
     	// Check for existence of model file: NB, DB columns can of course exist without a model file,
     	// But we should confirm they've got it correct.
     	if(!fileExists(fileSystemUtil.resolvePath("app/models/#obj.objectNameSingularC#.cfc"))){
     		if(!confirm("Hold On! We couldn't find a corresponding Model at /app/models/#obj.objectNameSingularC#.cfc: are you sure you wish to add the property '#arguments.columnName#' to #obj.objectNamePlural#? [y/n]")){
-    			railsOutput.error("Aborting property generation.");
+    			detailOutput.error("Aborting property generation.");
     			return;
     		}
     	}
@@ -74,7 +74,7 @@ component aliases='wheels g property'  extends="../base"  {
     		arguments.default=0;
     	}
     	// NB wheels default is lowercase column names
-    	railsOutput.invoke("dbmigrate");
+    	detailOutput.invoke("dbmigrate");
 		command('wheels dbmigrate create column')
 			.params(
 				name=obj.objectNamePlural,
@@ -92,30 +92,30 @@ component aliases='wheels g property'  extends="../base"  {
 		var formPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/_form.cfm");
 		if (fileExists(formPath)) {
 			$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.dataType, action="input");
-			railsOutput.update("app/views/#obj.objectNamePlural#/_form.cfm");
+			detailOutput.update("app/views/#obj.objectNamePlural#/_form.cfm");
 		} else {
-			railsOutput.skip("app/views/#obj.objectNamePlural#/_form.cfm");
+			detailOutput.skip("app/views/#obj.objectNamePlural#/_form.cfm");
 		}
 
 		// Insert field into index listing
 		var indexPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/index.cfm");
 		if (fileExists(indexPath)) {
 			$injectIntoIndex(objectnames=obj, property=arguments.columnName, type=arguments.dataType);
-			railsOutput.update("app/views/#obj.objectNamePlural#/index.cfm");
+			detailOutput.update("app/views/#obj.objectNamePlural#/index.cfm");
 		} else {
-			railsOutput.skip("app/views/#obj.objectNamePlural#/index.cfm");
+			detailOutput.skip("app/views/#obj.objectNamePlural#/index.cfm");
 		}
 
 		// Insert default output
 		var showPath = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/show.cfm");
 		if (fileExists(showPath)) {
 			$injectIntoView(objectnames=obj, property=arguments.columnName, type=arguments.dataType, action="output");
-			railsOutput.update("app/views/#obj.objectNamePlural#/show.cfm");
+			detailOutput.update("app/views/#obj.objectNamePlural#/show.cfm");
 		} else {
-			railsOutput.skip("app/views/#obj.objectNamePlural#/show.cfm");
+			detailOutput.skip("app/views/#obj.objectNamePlural#/show.cfm");
 		}
 
-		railsOutput.success("Property generation complete!");
+		detailOutput.success("Property generation complete!");
 		
 		var nextSteps = [
 			"Review the generated migration",
@@ -126,10 +126,10 @@ component aliases='wheels g property'  extends="../base"  {
 			arrayAppend(nextSteps, "Review the updated view files");
 		}
 		
-		railsOutput.nextSteps(nextSteps);
+		detailOutput.nextSteps(nextSteps);
 		
 		if(confirm("Would you like to migrate the database now? [y/n]")){
-			railsOutput.invoke("dbmigrate");
+			detailOutput.invoke("dbmigrate");
 			command('wheels dbmigrate latest').run();
 	    }
 	}

@@ -34,8 +34,8 @@
 		boolean id 		 = true,
 		string primaryKey="id") {
 		
-		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+		// Initialize detail service
+		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-table.txt"));
@@ -46,19 +46,19 @@
 		content=replaceNoCase(content, "|id|", "#id#", "all");
 		content=replaceNoCase(content, "|primaryKey|", "#arguments.primaryKey#", "all");
 
-		// Output Rails-style header
-		rails.header("🗛️", "Migration Generation");
+		// Output detail header
+		details.header("🗛️", "Migration Generation");
 		
 		// Make File
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);
 		
-		rails.create(migrationPath);
-		rails.success("Table migration created successfully!");
+		details.create(migrationPath);
+		details.success("Table migration created successfully!");
 		
 		var nextSteps = [];
 		arrayAppend(nextSteps, "Edit the migration to add columns: #migrationPath#");
 		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
 		arrayAppend(nextSteps, "Generate a model for this table: wheels generate model #arguments.name#");
-		rails.nextSteps(nextSteps);
+		details.nextSteps(nextSteps);
 	}
 }

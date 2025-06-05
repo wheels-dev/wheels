@@ -44,8 +44,8 @@
 		number precision,
 		number scale) {
 
-		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+		// Initialize detail service
+		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-column.txt"));
@@ -90,20 +90,20 @@
 		//content=replaceNoCase(content, "|precision|", "#precision#", "all");
 		//content=replaceNoCase(content, "|scale|", "#scale#", "all");
 
-		// Output Rails-style header
-		rails.header("🗛️", "Migration Generation");
+		// Output detail header
+		details.header("🗛️", "Migration Generation");
 		
 		// Make File
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments.columnName)),	action="create_column",	content=content);
 		
-		rails.create(migrationPath);
-		rails.success("Column migration created successfully!");
+		details.create(migrationPath);
+		details.success("Column migration created successfully!");
 		
 		var nextSteps = [];
 		arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
 		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
 		arrayAppend(nextSteps, "Or run all pending migrations: wheels dbmigrate latest");
-		rails.nextSteps(nextSteps);
+		details.nextSteps(nextSteps);
 	}
 
 	function $constructArguments(args, string operator=","){

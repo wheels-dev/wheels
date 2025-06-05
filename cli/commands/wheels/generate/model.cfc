@@ -13,7 +13,7 @@ component aliases='wheels g model' extends="../base" {
     property name="migrationService" inject="MigrationService@wheels-cli";
     property name="scaffoldService" inject="ScaffoldService@wheels-cli";
     property name="helpers" inject="helpers@wheels-cli";
-    property name="railsOutput" inject="RailsOutputService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @name.hint Name of the model to create (singular form)
@@ -46,7 +46,7 @@ component aliases='wheels g model' extends="../base" {
             return;
         }
         
-        railsOutput.header("🏗️", "Generating model: #arguments.name#");
+        detailOutput.header("🏗️", "Generating model: #arguments.name#");
         
         // Parse properties
         var parsedProperties = parseProperties(arguments.properties);
@@ -74,11 +74,11 @@ component aliases='wheels g model' extends="../base" {
         );
         
         if (result.success) {
-            railsOutput.create(result.path);
+            detailOutput.create(result.path);
             
             // Generate migration if requested
             if (arguments.migration) {
-                railsOutput.invoke("dbmigrate");
+                detailOutput.invoke("dbmigrate");
                 
                 try {
                     // Use scaffoldService to create migration with properties
@@ -99,9 +99,9 @@ component aliases='wheels g model' extends="../base" {
                         );
                     }
                     
-                    railsOutput.create(migrationPath, true);
+                    detailOutput.create(migrationPath, true);
                 } catch (any e) {
-                    railsOutput.error("Failed to create migration: #e.message#");
+                    detailOutput.error("Failed to create migration: #e.message#");
                 }
             }
             
@@ -116,10 +116,10 @@ component aliases='wheels g model' extends="../base" {
                 arrayAppend(nextSteps, "Ensure related models exist");
             }
             
-            railsOutput.success("Model generation complete!");
-            railsOutput.nextSteps(nextSteps);
+            detailOutput.success("Model generation complete!");
+            detailOutput.nextSteps(nextSteps);
         } else {
-            railsOutput.error("Failed to generate model: #result.error#");
+            detailOutput.error("Failed to generate model: #result.error#");
             setExitCode(1);
         }
     }

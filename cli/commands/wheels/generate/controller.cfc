@@ -10,7 +10,7 @@
 component aliases="wheels g controller" extends="../base" {
     
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
-    property name="railsOutput" inject="RailsOutputService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @name.hint Name of the controller to create (usually plural)
@@ -40,7 +40,7 @@ component aliases="wheels g controller" extends="../base" {
             return;
         }
         
-        railsOutput.header("🎮", "Generating controller: #arguments.name#");
+        detailOutput.header("🎮", "Generating controller: #arguments.name#");
         
         // Parse actions
         var actionList = [];
@@ -67,11 +67,11 @@ component aliases="wheels g controller" extends="../base" {
         );
         
         if (result.success) {
-            railsOutput.create(result.path);
+            detailOutput.create(result.path);
             
             // Generate views for non-API controllers
             if (!arguments.api && arguments.rest) {
-                railsOutput.invoke("views");
+                detailOutput.invoke("views");
                 
                 var viewActions = ["index", "show", "new", "edit"];
                 var viewsCreated = 0;
@@ -86,7 +86,7 @@ component aliases="wheels g controller" extends="../base" {
                         );
                         
                         if (viewResult.success) {
-                            railsOutput.create(viewResult.path, true);
+                            detailOutput.create(viewResult.path, true);
                             viewsCreated++;
                         }
                     }
@@ -111,10 +111,10 @@ component aliases="wheels g controller" extends="../base" {
                 arrayAppend(nextSteps, "Customize the views as needed");
             }
             
-            railsOutput.success("Controller generation complete!");
-            railsOutput.nextSteps(nextSteps);
+            detailOutput.success("Controller generation complete!");
+            detailOutput.nextSteps(nextSteps);
         } else {
-            railsOutput.error("Failed to generate controller: #result.error#");
+            detailOutput.error("Failed to generate controller: #result.error#");
             setExitCode(1);
         }
     }

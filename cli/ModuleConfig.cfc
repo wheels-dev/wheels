@@ -63,8 +63,8 @@ component {
             .to("#moduleMapping#.models.ScaffoldService");
         binder.map("helpers@wheels-cli")
             .to("#moduleMapping#.models.helpers");
-        binder.map("RailsOutputService@wheels-cli")
-            .to("#moduleMapping#.models.RailsOutputService");
+        binder.map("DetailOutputService@wheels-cli")
+            .to("#moduleMapping#.models.DetailOutputService");
         
         log.info('Wheels CLI Module loaded successfully.');
     }

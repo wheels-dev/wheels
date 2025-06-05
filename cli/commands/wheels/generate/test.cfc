@@ -36,8 +36,8 @@ component aliases='wheels g test' extends="../base"  {
 		boolean mock=false,
 		boolean open=false
 	){
-		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+		// Initialize detail service
+		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
 		var obj = helpers.getNameVariants(listLast( arguments.target, '/\' ));
 		var testsdirectory = fileSystemUtil.resolvePath( "tests/Testbox/specs" );
@@ -95,7 +95,7 @@ component aliases='wheels g test' extends="../base"  {
 
  		if( fileExists( testPath ) ) {
 			if( !confirm( "[#testPath#] already exists. Overwrite? [y/n]" ) ){
-				rails.skip(testPath & " (cancelled by user)");
+				details.skip(testPath & " (cancelled by user)");
 				return;
 			}
  		}
@@ -106,17 +106,17 @@ component aliases='wheels g test' extends="../base"  {
 		// Get test content - enhanced with CRUD and mock options
 		var testContent = generateTestContent(arguments.type, obj, arguments.crud, arguments.mock);
 		
-		// Output Rails-style header
-		rails.header("🧪", "Test Generation");
+		// Output detail header
+		details.header("🧪", "Test Generation");
 		
 		file action='write' file='#testPath#' mode ='777' output='#trim( testContent )#';
-		rails.create(testPath);
+		details.create(testPath);
 		
 		if (arguments.open) {
 			openPath(testPath);
 		}
 		
-		rails.success("Test created successfully!");
+		details.success("Test created successfully!");
 		
 		// Suggest next steps
 		var nextSteps = [];
@@ -125,7 +125,7 @@ component aliases='wheels g test' extends="../base"  {
 			arrayAppend(nextSteps, "Open the test file: #testPath#");
 		}
 		arrayAppend(nextSteps, "Add more test cases to cover edge cases");
-		rails.nextSteps(nextSteps);
+		details.nextSteps(nextSteps);
 	}
 	
 	/**

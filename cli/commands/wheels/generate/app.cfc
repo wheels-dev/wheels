@@ -75,8 +75,8 @@ component aliases="wheels g app" extends="../base" {
     boolean init    = false,
     boolean force   = false
   ) {
-    // Initialize rails service
-    var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+    // Initialize detail service
+    var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 
     // set defaults based on app name
     if ( !len( arguments.directory ) ) {
@@ -89,19 +89,19 @@ component aliases="wheels g app" extends="../base" {
     // This will make the directory canonical and absolute
     arguments.directory = resolvePath( arguments.directory );
 
-    // Output Rails-style header
-    rails.header("🚀", "Creating new Wheels application: #arguments.name#");
+    // Output detail header
+    details.header("🚀", "Creating new Wheels application: #arguments.name#");
 
     // Validate directory, if it doesn't exist, create it.
     if ( !directoryExists( arguments.directory ) ) {
       directoryCreate( arguments.directory );
-      rails.create(arguments.directory);
+      details.create(arguments.directory);
     } else {
       if ( arrayLen( directoryList( arguments.directory, false ) ) && !force) {
-        rails.error( 'The target directory is not empty. Use --force to force the installation into a none empty directory.' );
+        details.error( 'The target directory is not empty. Use --force to force the installation into a none empty directory.' );
         return;
       }
-      rails.identical(arguments.directory);
+      details.identical(arguments.directory);
     }
 
 
@@ -112,8 +112,8 @@ component aliases="wheels g app" extends="../base" {
     }
 
     // Install the template
-    rails.line();
-    rails.getPrint().yellowLine( "📦 Installing application template: #arguments.template#" );
+    details.line();
+    details.getPrint().yellowLine( "📦 Installing application template: #arguments.template#" );
     packageService.installPackage(
       ID                      = arguments.template,
       directory               = arguments.directory,
@@ -127,43 +127,43 @@ component aliases="wheels g app" extends="../base" {
     command( 'cd "#arguments.directory#"' ).run();
 
     // Setting Application Name
-    rails.line();
-    rails.getPrint().yellowLine( "🔧 Configuring application..." );
+    details.line();
+    details.getPrint().yellowLine( "🔧 Configuring application..." );
     command( 'tokenReplace' ).params( path = 'app/config/app.cfm', token = '|appName|', replacement = arguments.name ).run();
-    rails.update("app/config/app.cfm", true);
+    details.update("app/config/app.cfm", true);
     command( 'tokenReplace' ).params( path = 'server.json', token = '|appName|', replacement = arguments.name ).run();
-    rails.update("server.json", true);
+    details.update("server.json", true);
 
     // Setting Reload Password
     command( 'tokenReplace' )
       .params( path = 'app/config/settings.cfm', token = '|reloadPassword|', replacement = arguments.reloadPassword )
       .run();
-    rails.update("app/config/settings.cfm (reload password)", true);
+    details.update("app/config/settings.cfm (reload password)", true);
 
     // Setting Datasource Name
     command( 'tokenReplace' )
       .params( path = 'app/config/settings.cfm', token = '|datasourceName|', replacement = arguments.datasourceName )
       .run();
-    rails.update("app/config/settings.cfm (datasource)", true);
+    details.update("app/config/settings.cfm (datasource)", true);
 
     // Setting cfml Engine Name
     command( 'tokenReplace' )
       .params( path = 'server.json', token = '|cfmlEngine|', replacement = arguments.cfmlEngine )
       .run();
-    rails.update("server.json (CFML engine)", true);
+    details.update("server.json (CFML engine)", true);
 
 
     // Create h2 embedded db by adding an application.cfc level datasource
     if ( arguments.setupH2 ) {
-      rails.line();
-      rails.getPrint().yellowLine( "🗝️ Database Configuration" );
+      details.line();
+      details.getPrint().yellowLine( "🗝️ Database Configuration" );
       var datadirectory = fileSystemUtil.resolvePath( 'db/h2/' );
 
       if ( !directoryExists( datadirectory ) ) {
         directoryCreate( datadirectory );
-        rails.create("db/h2/", true);
+        details.create("db/h2/", true);
       } else {
-        rails.identical("db/h2/", true);
+        details.identical("db/h2/", true);
       }
       var datasourceConfig = 'this.datasources[''#arguments.datasourceName#''] = {
           class: ''org.h2.Driver''
@@ -179,7 +179,7 @@ component aliases="wheels g app" extends="../base" {
       command( 'tokenReplace' )
         .params( path = 'app/config/app.cfm', token = '// CLI-Appends-Here', replacement = datasourceConfig )
         .run();
-      rails.update("app/config/app.cfm (H2 datasource)", true);
+      details.update("app/config/app.cfm (H2 datasource)", true);
 
     // Init, if not a package as a Box Package
     if ( arguments.init && !packageService.isPackage( arguments.directory ) ) {
@@ -221,14 +221,14 @@ component aliases="wheels g app" extends="../base" {
 
     // Definitely refactor this into some sort of templating system?
     if(useBootstrap){
-      rails.line();
-      rails.getPrint().yellowLine( "🎨 Installing Bootstrap..." );
+      details.line();
+      details.getPrint().yellowLine( "🎨 Installing Bootstrap..." );
 
       // Replace Default Template with something more sensible
       var bsLayout=fileRead( getTemplate('/bootstrap/layout.cfm' ) );
       bsLayout = replaceNoCase( bsLayout, "|appName|", arguments.name, 'all' );
       file action='write' file='#fileSystemUtil.resolvePath("app/views/layout.cfm")#' mode ='777' output='#trim(bsLayout)#';
-      rails.update("app/views/layout.cfm", true);
+      details.update("app/views/layout.cfm", true);
 
       // Add Bootstrap default form settings
       var bsSettings=fileRead( getTemplate('/bootstrap/settings.cfm' ) );
@@ -236,7 +236,7 @@ component aliases="wheels g app" extends="../base" {
       command( 'tokenReplace' )
         .params( path = 'app/config/settings.cfm', token = '// CLI-Appends-Here', replacement = bsSettings )
         .run();
-      rails.update("app/config/settings.cfm (Bootstrap settings)", true);
+      details.update("app/config/settings.cfm (Bootstrap settings)", true);
 
       // New Flashwrapper Plugin needed - install it via Forgebox
       command( 'install cfwheels-flashmessages-bootstrap' ).run();
@@ -245,7 +245,7 @@ component aliases="wheels g app" extends="../base" {
 
     }
 
-    rails.success("Application created successfully!");
+    details.success("Application created successfully!");
 
     // Build next steps
     var nextSteps = [];
@@ -253,8 +253,8 @@ component aliases="wheels g app" extends="../base" {
 
     if ( arguments.setupH2 ) {
       arrayAppend(nextSteps, "Start server and install H2 extension: start && install && restart");
-      rails.line();
-      rails.getPrint().yellowLine("🛠️ Installing H2 database extension...");
+      details.line();
+      details.getPrint().yellowLine("🛠️ Installing H2 database extension...");
       command( 'start && install && restart' ).run();
     } else {
       arrayAppend(nextSteps, "Configure your datasource in Lucee/ACF admin");
@@ -264,7 +264,7 @@ component aliases="wheels g app" extends="../base" {
     arrayAppend(nextSteps, "Generate your first model: wheels generate model User");
     arrayAppend(nextSteps, "Generate a controller: wheels generate controller Users");
 
-    rails.nextSteps(nextSteps);
+    details.nextSteps(nextSteps);
   }
 
   /**

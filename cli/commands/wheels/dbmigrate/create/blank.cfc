@@ -18,11 +18,11 @@ component aliases='wheels db create blank' extends="../../base"  {
 	 * @name.hint The Name of the migration file 
 	 **/
 	function run(required string name) {
-		// Initialize rails service
-		var rails = application.wirebox.getInstance("RailsOutputService@wheels-cli");
+		// Initialize detail service
+		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
-		// Output Rails-style header
-		rails.header("🗛️", "Migration Generation");
+		// Output detail header
+		details.header("🗛️", "Migration Generation");
 
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/blank.txt")); 
@@ -30,12 +30,12 @@ component aliases='wheels db create blank' extends="../../base"  {
 		// Make File
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="",	content=content);
 		
-		rails.create(migrationPath);
-		rails.success("Blank migration created successfully!");
+		details.create(migrationPath);
+		details.success("Blank migration created successfully!");
 		
 		var nextSteps = [];
 		arrayAppend(nextSteps, "Edit the migration file: #migrationPath#");
 		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
-		rails.nextSteps(nextSteps);
+		details.nextSteps(nextSteps);
 	}
 }
