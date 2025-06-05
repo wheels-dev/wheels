@@ -8,41 +8,26 @@ component extends="testbox.system.BaseSpec" {
 
 			it("should handle concurrent model access with cacheModelConfig=false", () => {
 				application.wheels.cacheModelConfig = false;
-				modelName = "TestModels";
+				modelName = "UserBlank";
 				g.model(modelName);
 
 				values = [];
-				for (i = 1; i <= 30; i++) {
+				for (i = 1; i <= 1000; i++) {
 					arrayAppend(values, "*");
 				}
 
-				if (structKeyExists(server, "lucee")) {
-					// Parallel map (only Lucee supports this)
-					results = values.map((v, i) => {
-						try {
-							if (randRange(1, 5) == 1) {
-								structClear(application.wheels.models);
-							}
-							obj = g.model(modelName);
-							return { success: isObject(obj), error: "" };
-						} catch (any e) {
-							return { success: false, error: e.message & " " & e.detail };
+				// Sequential map for Adobe ColdFusion
+				results = values.map(function(v, i) {
+					try {
+						if (randRange(1, 5) == 1) {
+							structClear(application.wheels.models);
 						}
-					}, true, 20);
-				} else {
-					// Sequential map for Adobe ColdFusion
-					results = values.map(function(v, i) {
-						try {
-							if (randRange(1, 5) == 1) {
-								structClear(application.wheels.models);
-							}
-							obj = g.model(modelName);
-							return { success: isObject(obj), error: "" };
-						} catch (any e) {
-							return { success: false, error: e.message & " " & e.detail };
-						}
-					});
-				}
+						obj = g.model(modelName);
+						return { success: isObject(obj), error: "" };
+					} catch (any e) {
+						return { success: false, error: e.message & " " & e.detail };
+					}
+				});
 
 				errors = results.filter(function(r) {
 					return !r.success;
