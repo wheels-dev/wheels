@@ -14,7 +14,10 @@
       "Bash(mv:*)",
       "Bash(mkdir:*)",
       "Bash(cp:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(cat:*)",
+      "Bash(unzip:*)",
+      "Bash(true)"
     ],
     "deny": []
   }

@@ -49,12 +49,48 @@ jobs:
         run: |
           ant -DisPreRelease=${{ env.CFWHEELS_PRERELEASE }} -Dcfwheels.version=${{ env.CFWHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
 
-      - name: Upload CFWheels Artifacts
-        id: Upload-CFWheels-Artifacts
+      - name: Upload CFWheels Core Artifact
+        id: Upload-CFWheels-Core
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-variants
+          name: cfwheels-core
+          path: |
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.zip
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.md5
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.sha512
+            artifacts/cfwheels/cfwheels-be.zip
+
+      - name: Upload CFWheels Base Template Artifact
+        id: Upload-CFWheels-Base
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfwheels-base-template
+          path: |
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.zip
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.md5
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.sha512
+            artifacts/cfwheels/cfwheels-base-template-be.zip
+
+      - name: Upload Wheels CLI Artifact
+        id: Upload-Wheels-CLI
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-cli
+          path: |
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.zip
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.md5
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/cfwheels/wheels-cli-be.zip
+
+      - name: Upload All CFWheels Artifacts (Combined)
+        id: Upload-All-Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfwheels-all-variants
           path: |
             artifacts/**/*
 

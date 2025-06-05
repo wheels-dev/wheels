@@ -2,8 +2,11 @@ I want to test the wheels cli command: $ARGUMENTS
 
 1. Use the `workspace` directory in the root as a sandbox are to test wheels cli commands.
 2. To run the CLI command we need to launch CommandBox with the `box` command.
+
+If $ARGUMENTS is equal to `generate app` or `g app` then skip steps 3 and 4
 3. Then create a app with the `wheels g app` command.
 4. Then start the web server with `server start` commandbox command.
+
 5. Then you can run various CLI commands in this case `wheels $ARGUMENTS`
 6. Use poppeteer to check to see if the desire results are achieved in the app
 7. If Errors are thrown, analyze and fix the root cause of the error.
