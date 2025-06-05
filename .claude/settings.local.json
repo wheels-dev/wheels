@@ -4,7 +4,17 @@
       "Bash(box)",
       "Bash(ls:*)",
       "Bash(box wheels g:*)",
-      "Bash(box wheels scaffold:*)"
+      "Bash(cd:*)",
+      "Bash(box:*)",
+      "Bash(rm:*)",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_click",
+      "Bash(find:*)",
+      "Bash(mv:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
