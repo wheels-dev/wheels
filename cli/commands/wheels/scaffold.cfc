@@ -16,8 +16,8 @@ component extends="base" {
     /**
      * @name.hint Name of resource to scaffold (singular)
      * @properties.hint Model properties (format: name:type,name2:type2)
-     * @belongs-to.hint Parent model relationships (comma-separated)
-     * @has-many.hint Child model relationships (comma-separated)
+     * @belongsTo.hint Parent model relationships (comma-separated)
+     * @hasMany.hint Child model relationships (comma-separated)
      * @api.hint Generate API-only scaffold (no views)
      * @tests.hint Generate test files (default: true)
      * @migrate.hint Run migrations after scaffolding

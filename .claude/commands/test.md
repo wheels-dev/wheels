@@ -12,8 +12,9 @@ I want to test the wheels cli command: $ARGUMENTS
 10. If changes are made to the CLI command then reload Commandbox with `box reload` or `exit` followed by `box` to reload the changes.
 11. To restart the webserver use `server restart` or `server stop` followed by `server start`.
 12. Keep in mind that commanbox doesn't like to mix named attributes and positional attributes.
-13. Iterate until the command is error free and achieves the desired functionality.
-14. Once finished:
+13. Iterate until the command is error free and achieves the desired functionality is achieved.
+14. Fix all issues identified.
+15. Once finished:
     - stop the server with `server stop` command
 		- destroy the server with `server forget` command
 		- remove the app directory from the `workspace` directory

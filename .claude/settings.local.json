@@ -84,8 +84,13 @@
       "Bash(do)",
       "Bash(echo:*)",
       "Bash(done)",
-      "Bash(wheels destroy:*)"
-    ],
+			"Bash(wheels *)",
+			"echo '*'",
+			"Bash(box)"
+			"box",
+			"Bash(echo 'wheels *' | box)",
+			"Bash(server status)"
+		],
     "deny": []
   }
 }
