@@ -1,0 +1,5 @@
+{
+  "name": "CFML Development",
+  "image": "mcr.microsoft.com/devcontainers/universal:2-ubuntu",
+  "postCreateCommand": "curl -fsSL https://downloads.ortussolutions.com/ortussolutions/commandbox/6.2.0/commandbox-bin-6.2.0.zip -o /tmp/commandbox.zip && unzip /tmp/commandbox.zip -d /tmp && chmod +x /tmp/box && sudo mv /tmp/box /usr/local/bin/ && rm /tmp/commandbox.zip"
+}
