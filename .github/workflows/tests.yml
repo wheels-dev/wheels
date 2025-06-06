@@ -156,6 +156,14 @@ jobs:
         run: |
           docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
 
+      - name: Upload Test Results Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Test Results Engine ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+          path: |
+            /tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt
+
       - name: Failure Debugging Info
         if: ${{ failure() }}
         run: |
