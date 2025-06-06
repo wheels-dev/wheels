@@ -1,5 +1,5 @@
 /**
- * Tasks for running CFWheels test suite
+ * Tasks for running Wheels test suite
  *
  * NOTE: These don't currently work as 127.0.0.1 is the localhost of the commandbox server, not the github VM
  */

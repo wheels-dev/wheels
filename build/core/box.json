@@ -8,16 +8,16 @@
     "directory":"vendor/wheels",
     "createPackageDirectory":true,
     "packageDirectory":"vendor/wheels",
-		"homepage":"https://cfwheels.org/",
-    "documentation":"https://docs.cfwheels.org/",
-    "changelog":"https://github.com/cfwheels/cfwheels/blob/master/CHANGELOG.md",
-    "bugs":"https://github.com/cfwheels/cfwheels/issues",
+		"homepage":"https://wheels.org/",
+    "documentation":"https://docs.wheels.org/",
+    "changelog":"https://github.com/wheels/wheels/blob/master/CHANGELOG.md",
+    "bugs":"https://github.com/wheels/wheels/issues",
 		"contributors":[
 			"Peter Amiri <peter@alurium.com>"
 		],
     "repository":{
         "type":"git",
-        "URL":"https://github.com/cfwheels/cfwheels"
+        "URL":"https://github.com/wheels/wheels"
     },
     "keywords":[
         "mvc",
@@ -35,7 +35,7 @@
     "license":[
         {
             "type":"Apache License 2.0",
-            "URL":"https://github.com/cfwheels/cfwheels/blob/master/LICENSE"
+            "URL":"https://github.com/wheels/wheels/blob/master/LICENSE"
         }
     ]
 }

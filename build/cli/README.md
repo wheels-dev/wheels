@@ -1,6 +1,6 @@
 # Wheels CLI
 
-The official Command Line Interface for the CFWheels framework.
+The official Command Line Interface for the wheels framework.
 
 ## Installation
 
@@ -41,12 +41,12 @@ wheels dbmigrate latest
 ## Documentation
 
 Full documentation is available at:
-https://guides.cfwheels.org/docs/command-line-tools/cli-commands
+https://guides.wheels.org/docs/command-line-tools/cli-commands
 
 ## Requirements
 
 - CommandBox 5.0+
-- CFWheels 3.0+
+- wheels 3.0+
 
 ## License
 
