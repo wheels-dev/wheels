@@ -1,9 +1,9 @@
-import type { 
-  Container, 
-  CfmlEngine, 
-  Database, 
-  CfmlEngineType, 
-  DatabaseType 
+import type {
+  Container,
+  CfmlEngine,
+  Database,
+  CfmlEngineType,
+  DatabaseType
 } from '@/types';
 import { api } from '@/utils/api';
 
@@ -18,12 +18,12 @@ class DockerService {
   private _cachedEngines: Record<string, Container> = {};
   private _cachedDatabases: Record<string, Container> = {};
   private CACHE_TTL: number = 5000; // 5 seconds cache TTL
-  
+
   // Getter to check if we're using mock data
   get usingMockData(): boolean {
     return this._usingMockData;
   }
-  
+
   /**
    * Get all containers from Docker API
    * Includes caching with TTL to avoid making too many requests
@@ -35,17 +35,17 @@ class DockerService {
       console.log('Using cached container data...');
       return this._cachedContainers;
     }
-    
+
     console.log('Fetching containers from Docker API...');
-    
+
     try {
       // Get all containers including stopped ones
       console.log('API Request:', `${this.apiBase}/containers/json?all=true`);
       const response = await api.get<any[]>(`${this.apiBase}/containers/json?all=true`);
-      
+
       // Log the full response for debugging
       console.log('API Response Status:', response.status);
-      
+
       if (response.error || !response.data) {
         console.error('Error fetching containers:', response.error);
         if (this._cachedContainers) {
@@ -54,11 +54,11 @@ class DockerService {
         }
         return this.getMockContainers();
       }
-      
+
       // Check if we got an HTML response instead of JSON
       if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
         console.error('Received HTML instead of JSON. Docker API proxy issue detected.');
-        
+
         // Use cache if available or fall back to mock data
         if (this._cachedContainers) {
           console.log('Using last cached container data due to API format error...');
@@ -66,7 +66,7 @@ class DockerService {
         }
         return this.getMockContainers();
       }
-      
+
       // Ensure data is an array
       if (!Array.isArray(response.data)) {
         console.error('API response is not an array:', typeof response.data);
@@ -75,35 +75,35 @@ class DockerService {
         }
         return this.getMockContainers();
       }
-      
+
       // Reset mock data flag since we're using real data
       this._usingMockData = false;
-      
+
       // Process containers and map to our model
       const containers = this.processContainers(response.data);
-      
+
       // Update cache and timestamp
       this._cachedContainers = containers;
       this._lastContainerCheck = now;
-      
+
       // Update engine and database caches
       this.updateEngineAndDatabaseCaches(containers);
-      
+
       return containers;
     } catch (error) {
       console.error('Error in getContainers:', error);
-      
+
       // Use cache if available
       if (this._cachedContainers) {
         console.log('Using cached container data due to API error...');
         return this._cachedContainers;
       }
-      
+
       // Fall back to mock data
       return this.getMockContainers();
     }
   }
-  
+
   /**
    * Process container data from Docker API and convert to our Container model
    */
@@ -111,37 +111,37 @@ class DockerService {
     return apiContainers.map(container => {
       // Look for Wheels-specific labels
       const labels = container.Labels || {};
-      
+
       // Try to determine container type from labels or image name
       const containerType = this.determineContainerType(container);
-      
+
       // Map container state to status string
       const status = this.mapContainerStatus(container.State, container.Status);
-      
+
       // Extract health status if available
       const health = this.extractHealthStatus(container);
-      
+
       // Extract container name without leading slash
-      const name = container.Names && container.Names.length > 0 
-        ? container.Names[0].replace(/^\//, '') 
+      const name = container.Names && container.Names.length > 0
+        ? container.Names[0].replace(/^\//, '')
         : container.Id.substring(0, 12);
-      
+
       // Map ports
       const ports = this.extractContainerPorts(container);
-      
+
       // Calculate uptime if container is running
       const uptime = this.calculateUptime(status, container.Status);
-      
+
       // Determine if this is a Wheels container
-      const isWheelsContainer = name.includes('cfwheels') || 
+      const isWheelsContainer = name.includes('cfwheels') ||
                                  name.includes('wheels') ||
                                  labels['com.github.cfwheels'] !== undefined;
-      
+
       // Extract Wheels-specific metadata if available
       const wheelsType = labels['com.github.cfwheels.type'] || null;
       const wheelsName = labels['com.github.cfwheels.name'] || null;
-      const wheelsVersion = labels['com.github.cfwheels.version'] || null;
-      
+      const wheelsVersion = labels['com.github.wheels.version'] || null;
+
       // Build the container object
       return {
         id: container.Id,
@@ -161,56 +161,56 @@ class DockerService {
       };
     });
   }
-  
+
   /**
    * Determine container type from image name and labels
    */
   private determineContainerType(container: any): 'engine' | 'database' | 'other' {
     // Check labels first (more reliable)
     const labels = container.Labels || {};
-    
+
     if (labels['com.github.cfwheels.type'] === 'engine') return 'engine';
     if (labels['com.github.cfwheels.type'] === 'database') return 'database';
-    
+
     // Fall back to image name pattern matching
     const image = container.Image || '';
-    
+
     if (image.includes('lucee') || image.includes('adobe') || image.includes('coldfusion')) {
       return 'engine';
-    } else if (image.includes('mysql') || 
-               image.includes('postgres') || 
+    } else if (image.includes('mysql') ||
+               image.includes('postgres') ||
                image.includes('sqlserver') ||
                image.includes('mssql') ||
                image.includes('h2') ||
                image.includes('oracle')) {
       return 'database';
     }
-    
+
     // Check container name as last resort
-    const name = container.Names && container.Names.length > 0 
-      ? container.Names[0].replace(/^\//, '') 
+    const name = container.Names && container.Names.length > 0
+      ? container.Names[0].replace(/^\//, '')
       : '';
-    
+
     if (name.includes('lucee') || name.includes('adobe') || name.includes('coldfusion')) {
       return 'engine';
-    } else if (name.includes('mysql') || 
-               name.includes('postgres') || 
+    } else if (name.includes('mysql') ||
+               name.includes('postgres') ||
                name.includes('sqlserver') ||
                name.includes('mssql') ||
                name.includes('h2') ||
                name.includes('oracle')) {
       return 'database';
     }
-    
+
     return 'other';
   }
-  
+
   /**
    * Map Docker container state to our status enum
    */
   private mapContainerStatus(state: string, statusDetail: string): 'running' | 'stopped' | 'starting' | 'stopping' | 'error' | 'unknown' {
     if (!state) return 'unknown';
-    
+
     switch (state.toLowerCase()) {
       case 'running':
         return 'running';
@@ -227,7 +227,7 @@ class DockerService {
         return 'unknown';
     }
   }
-  
+
   /**
    * Extract health status from container status
    */
@@ -239,23 +239,23 @@ class DockerService {
       if (healthStatus === 'unhealthy') return 'unhealthy';
       if (healthStatus === 'starting') return 'starting';
     }
-    
+
     // Fall back to parsing the Status string
     if (container.Status) {
       if (container.Status.includes('(healthy)')) return 'healthy';
       if (container.Status.includes('(unhealthy)')) return 'unhealthy';
       if (container.Status.includes('(health: starting)')) return 'starting';
     }
-    
+
     return undefined;
   }
-  
+
   /**
    * Extract container ports mappings
    */
   private extractContainerPorts(container: any): Record<string, string> {
     const ports: Record<string, string> = {};
-    
+
     if (container.Ports && Array.isArray(container.Ports)) {
       container.Ports.forEach((port: any) => {
         if (port.PublicPort && port.PrivatePort) {
@@ -263,20 +263,20 @@ class DockerService {
         }
       });
     }
-    
+
     return ports;
   }
-  
+
   /**
    * Calculate container uptime from status string
    */
   private calculateUptime(status: string, statusDetail?: string): string | undefined {
     if (status !== 'running' || !statusDetail) return undefined;
-    
+
     const uptimeMatch = statusDetail.match(/Up (.*?)( \(|$)/);
     return uptimeMatch ? uptimeMatch[1] : undefined;
   }
-  
+
   /**
    * Update the engine and database caches based on container list
    */
@@ -284,7 +284,7 @@ class DockerService {
     // Reset caches
     this._cachedEngines = {};
     this._cachedDatabases = {};
-    
+
     // Populate caches
     containers.forEach(container => {
       if (container.type === 'engine') {
@@ -316,27 +316,27 @@ class DockerService {
       }
     });
   }
-  
+
   /**
    * Get container for a specific CFML engine
    */
   async getEngineContainer(engine: CfmlEngineType | CfmlEngine): Promise<Container | null> {
     // Extract engine key (either from string or object)
-    const engineKey = typeof engine === 'string' 
-      ? engine.toLowerCase() 
+    const engineKey = typeof engine === 'string'
+      ? engine.toLowerCase()
       : engine.type.toLowerCase();
-    
+
     // Check cache first
     if (this._cachedEngines[engineKey]) {
       return this._cachedEngines[engineKey];
     }
-    
+
     // If not in cache, refresh containers and try again
     await this.getContainers(true);
-    
+
     return this._cachedEngines[engineKey] || null;
   }
-  
+
   /**
    * Get container for a specific database
    */
@@ -345,7 +345,7 @@ class DockerService {
     const dbKey = typeof database === 'string'
       ? database.toLowerCase()
       : database.type.toLowerCase();
-    
+
     // H2 is a special case - it's embedded in Lucee, not a separate container
     if (dbKey === 'h2') {
       // Return a virtual container for H2
@@ -363,18 +363,18 @@ class DockerService {
         cfwheelsName: 'h2'
       };
     }
-    
+
     // Check cache first
     if (this._cachedDatabases[dbKey]) {
       return this._cachedDatabases[dbKey];
     }
-    
+
     // If not in cache, refresh containers and try again
     await this.getContainers(true);
-    
+
     return this._cachedDatabases[dbKey] || null;
   }
-  
+
   /**
    * Start a Docker container
    * @deprecated Now showing commands to user instead of executing
@@ -390,21 +390,21 @@ class DockerService {
   async startService(profile: string | null, service?: string): Promise<void> {
     throw new Error('Service start is now handled by showing commands to user');
   }
-  
+
   /**
    * Stop a Docker container
    */
   async stopContainer(id: string): Promise<void> {
     console.log(`Stopping container ${id}...`);
-    
+
     try {
       const response = await api.post(`${this.apiBase}/containers/${id}/stop`);
-      
+
       if (response.error) {
         console.error(`Error stopping container ${id}:`, response.error);
         throw new Error(response.error);
       }
-      
+
       // Force refresh of containers after action
       setTimeout(() => this.getContainers(true), 500);
     } catch (error) {
@@ -412,21 +412,21 @@ class DockerService {
       throw error;
     }
   }
-  
+
   /**
    * Restart a Docker container
    */
   async restartContainer(id: string): Promise<void> {
     console.log(`Restarting container ${id}...`);
-    
+
     try {
       const response = await api.post(`${this.apiBase}/containers/${id}/restart`);
-      
+
       if (response.error) {
         console.error(`Error restarting container ${id}:`, response.error);
         throw new Error(response.error);
       }
-      
+
       // Force refresh of containers after action
       setTimeout(() => this.getContainers(true), 500);
     } catch (error) {
@@ -434,25 +434,25 @@ class DockerService {
       throw error;
     }
   }
-  
+
   /**
    * Get logs for a Docker container
    */
   async getContainerLogs(id: string, tail: number = 100): Promise<string[]> {
     console.log(`Getting logs for container ${id}...`);
-    
+
     try {
       // Note: Docker API returns logs as a stream, so we need to handle differently
       // Here we're using the logs?stderr=1&stdout=1&tail=100 endpoint to get recent logs
       const response = await api.get<string>(
         `${this.apiBase}/containers/${id}/logs?stderr=1&stdout=1&tail=${tail}`
       );
-      
+
       if (response.error || !response.data) {
         console.error(`Error getting logs for container ${id}:`, response.error);
         return [];
       }
-      
+
       // Split the response into lines and filter out empty ones
       return response.data
         .split('\n')
@@ -472,7 +472,7 @@ class DockerService {
       return [];
     }
   }
-  
+
   /**
    * Check if a specific port is available on the host
    */
@@ -480,7 +480,7 @@ class DockerService {
     try {
       // Use Docker API to check if any container is using this port
       const containers = await this.getContainers();
-      
+
       // Check if any container is using this port
       for (const container of containers) {
         for (const [containerPort, hostPort] of Object.entries(container.ports)) {
@@ -490,7 +490,7 @@ class DockerService {
           }
         }
       }
-      
+
       // Port seems available
       return true;
     } catch (error) {
@@ -498,23 +498,23 @@ class DockerService {
       return false;
     }
   }
-  
+
   /**
    * Get Docker Compose profiles in the project
    */
   async getContainerProfiles(): Promise<string[]> {
     console.log('Getting container profiles from compose.yml...');
-    
+
     // This is specific to our docker-compose setup
     // We can extract profiles from the Docker API using the "com.docker.compose.project" label
     try {
       const containers = await this.getContainers();
       const profiles = new Set<string>();
-      
+
       // Look for actual profiles in container labels
       containers.forEach(container => {
         const labels = container.labels || {};
-        
+
         // Extract profile information from labels
         for (const [key, value] of Object.entries(labels)) {
           if (key === 'com.docker.compose.profiles' && value) {
@@ -524,7 +524,7 @@ class DockerService {
           }
         }
       });
-      
+
       // If we didn't find any profiles from labels, return default hardcoded ones
       if (profiles.size === 0) {
         return [
@@ -537,21 +537,21 @@ class DockerService {
           'compatibility'
         ];
       }
-      
+
       return Array.from(profiles);
     } catch (error) {
       console.error('Error in getContainerProfiles:', error);
       return [];
     }
   }
-  
+
   /**
    * Start a Docker Compose profile
    * Note: This would typically require direct access to the docker-compose CLI
    */
   async startProfile(profile: string): Promise<void> {
     console.log(`Starting profile ${profile}...`);
-    
+
     // This would typically be implemented using docker-compose commands
     // For this implementation, we'll need to start containers that match the profile
     try {
@@ -560,7 +560,7 @@ class DockerService {
       // access to the docker-compose CLI
       console.warn('Profile start functionality requires direct access to docker-compose CLI');
       console.warn('This is not implemented directly through the Docker API');
-      
+
       // For now, we'll just log that this would need to be implemented differently
       return;
     } catch (error) {
@@ -568,36 +568,36 @@ class DockerService {
       throw error;
     }
   }
-  
+
   /**
    * Get Docker info
    */
   async getDockerInfo(): Promise<any> {
     try {
       const response = await api.get(`${this.apiBase}/info`);
-      
+
       if (response.error || !response.data) {
         console.error('Error fetching Docker info:', response.error);
         return {};
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Error in getDockerInfo:', error);
       return {};
     }
   }
-  
+
   /**
    * Mock container data for display when Docker API is unavailable
    */
   private getMockContainers(): Container[] {
     console.log('Using mock container data...');
     this._usingMockData = true;
-    
+
     // Generate fresh timestamps
     const now = new Date().toISOString();
-    
+
     return [
       // CFML Engines
       {
@@ -676,7 +676,7 @@ class DockerService {
         cfwheelsName: 'adobe2023',
         cfwheelsVersion: 'v1.0.1'
       },
-      
+
       // Databases
       {
         id: 'mock-mysql',

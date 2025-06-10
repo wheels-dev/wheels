@@ -1,6 +1,6 @@
 # This workflow tests the CFWheels code using many permutations in the matrix.
 # If successful, then it creates the bleeding edge artifact and publishes it to ForgeBox
-name: CFWheels Snapshots
+name: Wheels Snapshots
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
       - develop
 
 env:
-  CFWHEELS_PRERELEASE: false
+  WHEELS_PRERELEASE: false
 
 jobs:
   tests:

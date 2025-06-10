@@ -1,4 +1,4 @@
-# cfwheels-base-template
+# wheels-base-template
 
 This is a blank application written in Wheels.dev
 

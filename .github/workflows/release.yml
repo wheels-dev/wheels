@@ -1,6 +1,6 @@
 # This workflow is used to release master releases and also by the snapshot workflow
 # to release snapshots.
-name: CFWheels Release
+name: Wheels Release
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
         required: true
 
 env:
-  CFWHEELS_PRERELEASE: false
+  WHEELS_PRERELEASE: false
 
 jobs:
   #############################################
@@ -36,7 +36,7 @@ jobs:
         id: Calculate-Version-And-Branch
         run: |
           cat box.json
-          echo "CFWHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
+          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
           # main or snapshot
           echo "BRANCH=main" >> $GITHUB_ENV
           if [ $GITHUB_REF == 'refs/heads/develop' ]
@@ -44,34 +44,34 @@ jobs:
             echo "BRANCH=develop" >> $GITHUB_ENV
           fi
 
-      - name: Build CFWheels Variants for ${{ env.BRANCH }} v${{ env.CFWHEELS_VERSION }}
-        id: Build-CFWheels-Variants
+      - name: Build Wheels Variants for ${{ env.BRANCH }} v${{ env.WHEELS_VERSION }}
+        id: Build-Wheels-Variants
         run: |
-          ant -DisPreRelease=${{ env.CFWHEELS_PRERELEASE }} -Dcfwheels.version=${{ env.CFWHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
+          ant -DisPreRelease=${{ env.WHEELS_PRERELEASE }} -Dwheels.version=${{ env.WHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
 
-      - name: Upload CFWheels Core Artifact
-        id: Upload-CFWheels-Core
+      - name: Upload Wheels Core Artifact
+        id: Upload-Wheels-Core
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-core
+          name: wheels-core
           path: |
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.zip
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.md5
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.sha512
-            artifacts/cfwheels/cfwheels-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.sha512
+            artifacts/wheels/wheels-be.zip
 
-      - name: Upload CFWheels Base Template Artifact
-        id: Upload-CFWheels-Base
+      - name: Upload Wheels Base Template Artifact
+        id: Upload-Wheels-Base
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-base-template
+          name: wheels-base-template
           path: |
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.zip
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.md5
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.sha512
-            artifacts/cfwheels/cfwheels-base-template-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/wheels/wheels-base-template-be.zip
 
       - name: Upload Wheels CLI Artifact
         id: Upload-Wheels-CLI
@@ -80,17 +80,17 @@ jobs:
         with:
           name: wheels-cli
           path: |
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.sha512
-            artifacts/cfwheels/wheels-cli-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/wheels/wheels-cli-be.zip
 
-      - name: Upload All CFWheels Artifacts (Combined)
+      - name: Upload All Wheels Artifacts (Combined)
         id: Upload-All-Artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-all-variants
+          name: wheels-all-variants
           path: |
             artifacts/**/*
 
