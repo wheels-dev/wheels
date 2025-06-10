@@ -260,6 +260,10 @@ component {
 			application.$wheels.showDebugInformation = false;
 		}
 
+		// IP based restriction settings
+		application.$wheels.debugAccessIPs = [];
+		application.$wheels.allowIPBasedDebugAccess = false;
+
 		// Asset path settings.
 		// assetPaths can be struct with two keys, http and https, if no https struct key, http is used for secure and non-secure.
 		// Example: {http="asset0.domain1.com,asset2.domain1.com,asset3.domain1.com", https="secure.domain1.com"}

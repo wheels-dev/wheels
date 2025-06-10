@@ -291,9 +291,9 @@ struct function $returnInternalDocumentation(required array documentScope, requi
 	local.rv["sections"] = $populateDocSections(local.rv.functions);
 
 	// Look for [see:something] tags to pull in other function param hints
-	for (i = 1; i LTE ArrayLen(local.rv["functions"]); i = i + 1) {
+	for (local.i = 1; i LTE ArrayLen(local.rv["functions"]); i = i + 1) {
 		if (StructKeyExists(local.rv["functions"][i], "parameters")) {
-			for (p = 1; p LTE ArrayLen(local.rv["functions"][i]["parameters"]); p = p + 1) {
+			for (local.p = 1; p LTE ArrayLen(local.rv["functions"][i]["parameters"]); p = p + 1) {
 				if (StructKeyExists(local.rv["functions"][i]["parameters"][p], "hint")) {
 					local.rv["functions"][i]["parameters"][p]["hint"] = $replaceSeeTag(
 						local.rv["functions"][i]["parameters"][p]["hint"],

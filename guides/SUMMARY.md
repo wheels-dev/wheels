@@ -15,11 +15,102 @@
 
 ## Command Line Tools
 
-* [CLI Commands](command-line-tools/cli-commands.md)
-* [wheels - commands](command-line-tools/wheels-commands.md)
-* [wheels generate - commands](command-line-tools/wheels-generate-commands.md)
-* [wheels dbmigrate - commands](command-line-tools/wheels-dbmigrate-commands.md)
-* [wheels plugins - commands](command-line-tools/wheels-plugins-commands.md)
+* [CLI Overview](command-line-tools/cli-overview.md)
+* [Quick Start Guide](command-line-tools/quick-start.md)
+* [Command Reference](command-line-tools/commands/README.md)
+  * Core Commands
+    * [wheels init](command-line-tools/commands/core/init.md)
+    * [wheels info](command-line-tools/commands/core/info.md)
+    * [wheels reload](command-line-tools/commands/core/reload.md)
+    * [wheels deps](command-line-tools/commands/core/deps.md)
+    * [wheels destroy](command-line-tools/commands/core/destroy.md)
+    * [wheels watch](command-line-tools/commands/core/watch.md)
+  * Code Generation
+    * [wheels generate app](command-line-tools/commands/generate/app.md)
+    * [wheels generate app-wizard](command-line-tools/commands/generate/app-wizard.md)
+    * [wheels generate controller](command-line-tools/commands/generate/controller.md)
+    * [wheels generate model](command-line-tools/commands/generate/model.md)
+    * [wheels generate view](command-line-tools/commands/generate/view.md)
+    * [wheels generate property](command-line-tools/commands/generate/property.md)
+    * [wheels generate route](command-line-tools/commands/generate/route.md)
+    * [wheels generate resource](command-line-tools/commands/generate/resource.md)
+    * [wheels generate api-resource](command-line-tools/commands/generate/api-resource.md)
+    * [wheels generate frontend](command-line-tools/commands/generate/frontend.md)
+    * [wheels generate test](command-line-tools/commands/generate/test.md)
+    * [wheels generate snippets](command-line-tools/commands/generate/snippets.md)
+    * [wheels scaffold](command-line-tools/commands/generate/scaffold.md)
+  * Database Commands
+    * [wheels dbmigrate info](command-line-tools/commands/database/dbmigrate-info.md)
+    * [wheels dbmigrate latest](command-line-tools/commands/database/dbmigrate-latest.md)
+    * [wheels dbmigrate up](command-line-tools/commands/database/dbmigrate-up.md)
+    * [wheels dbmigrate down](command-line-tools/commands/database/dbmigrate-down.md)
+    * [wheels dbmigrate reset](command-line-tools/commands/database/dbmigrate-reset.md)
+    * [wheels dbmigrate exec](command-line-tools/commands/database/dbmigrate-exec.md)
+    * [wheels dbmigrate create blank](command-line-tools/commands/database/dbmigrate-create-blank.md)
+    * [wheels dbmigrate create table](command-line-tools/commands/database/dbmigrate-create-table.md)
+    * [wheels dbmigrate create column](command-line-tools/commands/database/dbmigrate-create-column.md)
+    * [wheels dbmigrate remove table](command-line-tools/commands/database/dbmigrate-remove-table.md)
+    * [wheels db schema](command-line-tools/commands/database/db-schema.md)
+    * [wheels db seed](command-line-tools/commands/database/db-seed.md)
+  * Testing Commands
+    * [wheels test](command-line-tools/commands/testing/test.md)
+    * [wheels test run](command-line-tools/commands/testing/test-run.md)
+    * [wheels test coverage](command-line-tools/commands/testing/test-coverage.md)
+    * [wheels test debug](command-line-tools/commands/testing/test-debug.md)
+  * Configuration Commands
+    * [wheels config list](command-line-tools/commands/config/config-list.md)
+    * [wheels config set](command-line-tools/commands/config/config-set.md)
+    * [wheels config env](command-line-tools/commands/config/config-env.md)
+  * Environment Management
+    * [wheels env](command-line-tools/commands/environment/env.md)
+    * [wheels env setup](command-line-tools/commands/environment/env-setup.md)
+    * [wheels env list](command-line-tools/commands/environment/env-list.md)
+    * [wheels env switch](command-line-tools/commands/environment/env-switch.md)
+  * Plugin Management
+    * [wheels plugins](command-line-tools/commands/plugins/plugins.md)
+    * [wheels plugins list](command-line-tools/commands/plugins/plugins-list.md)
+    * [wheels plugins install](command-line-tools/commands/plugins/plugins-install.md)
+    * [wheels plugins remove](command-line-tools/commands/plugins/plugins-remove.md)
+  * Code Analysis
+    * [wheels analyze](command-line-tools/commands/analysis/analyze.md)
+    * [wheels analyze code](command-line-tools/commands/analysis/analyze-code.md)
+    * [wheels analyze performance](command-line-tools/commands/analysis/analyze-performance.md)
+    * [wheels analyze security](command-line-tools/commands/analysis/analyze-security.md)
+  * Security Commands
+    * [wheels security](command-line-tools/commands/security/security.md)
+    * [wheels security scan](command-line-tools/commands/security/security-scan.md)
+  * Performance Commands
+    * [wheels optimize](command-line-tools/commands/performance/optimize.md)
+    * [wheels optimize performance](command-line-tools/commands/performance/optimize-performance.md)
+  * Documentation Commands
+    * [wheels docs](command-line-tools/commands/documentation/docs.md)
+    * [wheels docs generate](command-line-tools/commands/documentation/docs-generate.md)
+    * [wheels docs serve](command-line-tools/commands/documentation/docs-serve.md)
+  * CI/CD Commands
+    * [wheels ci init](command-line-tools/commands/ci/ci-init.md)
+  * Docker Commands
+    * [wheels docker init](command-line-tools/commands/docker/docker-init.md)
+    * [wheels docker deploy](command-line-tools/commands/docker/docker-deploy.md)
+  * Deployment Commands
+    * [wheels deploy](command-line-tools/commands/deploy/deploy.md)
+    * [wheels deploy audit](command-line-tools/commands/deploy/deploy-audit.md)
+    * [wheels deploy exec](command-line-tools/commands/deploy/deploy-exec.md)
+    * [wheels deploy hooks](command-line-tools/commands/deploy/deploy-hooks.md)
+    * [wheels deploy init](command-line-tools/commands/deploy/deploy-init.md)
+    * [wheels deploy lock](command-line-tools/commands/deploy/deploy-lock.md)
+    * [wheels deploy logs](command-line-tools/commands/deploy/deploy-logs.md)
+    * [wheels deploy proxy](command-line-tools/commands/deploy/deploy-proxy.md)
+    * [wheels deploy push](command-line-tools/commands/deploy/deploy-push.md)
+    * [wheels deploy rollback](command-line-tools/commands/deploy/deploy-rollback.md)
+    * [wheels deploy secrets](command-line-tools/commands/deploy/deploy-secrets.md)
+    * [wheels deploy setup](command-line-tools/commands/deploy/deploy-setup.md)
+    * [wheels deploy status](command-line-tools/commands/deploy/deploy-status.md)
+    * [wheels deploy stop](command-line-tools/commands/deploy/deploy-stop.md)
+* CLI Development Guides
+  * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
+  * [Service Architecture](command-line-tools/cli-guides/service-architecture.md)
+  * [Migrations Guide](command-line-tools/cli-guides/migrations.md)
+  * [Testing Guide](command-line-tools/cli-guides/testing.md)
 
 ## Working with Wheels
 
@@ -28,7 +119,9 @@
 * [Directory Structure](working-with-wheels/directory-structure.md)
 * [Switching Environments](working-with-wheels/switching-environments.md)
 * [Testing Your Application](working-with-wheels/testing-your-application.md)
+* [Using the Test Environment](working-with-wheels/using-the-test-environment.md)
 * [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
+* [Submitting Pull Requests](working-with-wheels/submitting-pull-requests.md)
 * [Documenting your Code](working-with-wheels/documenting-your-code.md)
 
 ## Handling Requests with Controllers
@@ -101,7 +194,7 @@
 
 ## External Links
 
-* [Source Code](https://github.com/cfwheels/cfwheels)
-* [Issue Tracker](https://github.com/cfwheels/cfwheels/issues)
+* [Source Code](https://github.com/wheels-dev/wheels)
+* [Issue Tracker](https://github.com/wheels-dev/wheels/issues)
 * [Sponsor Us](https://opencollective.com/cfwheels)
-* [Community](https://github.com/cfwheels/cfwheels/discussions)
+* [Community](https://github.com/wheels-dev/wheels/discussions)

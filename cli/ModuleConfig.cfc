@@ -1,31 +1,76 @@
 component {
-
-    // Module Properties
-    this.autoMapModels  = true;
-    this.modelNamespace = "wheels";
-
-    function configure(){
-        interceptors = [
-            { class='#moduleMapping#.interceptors.postInstall' }
-        ];
+    this.title = "Wheels CLI";
+    this.author = "Wheels.dev Team";
+    this.description = "Modern CLI for Wheels Framework";
+    this.version = "3.0.28";
+    this.autoMapModels = false;
+    this.cfmapping = "wheels-cli";
+    this.modelNamespace = "wheels-cli";
+    
+    // Dependencies
+    this.dependencies = [
+        "testbox-cli",
+        "commandbox-migrations"
+    ];
+    
+    function configure() {
+        // Settings
         settings = {
-            "modulePath": modulePath
-        }
+            // Module path
+            "modulePath": modulePath,
+            // Default template repository
+            templateRepository: "https://github.com/wheels-dev/wheels-templates",
+            // Testing configuration
+            testbox: {
+                runner: "/tests/runner.cfm",
+                coverage: true,
+                watchPaths: ["models/**", "handlers/**", "views/**"]
+            },
+            // Migration configuration
+            migrations: {
+                defaultDirectory: "db/migrations",
+                seedDirectory: "db/seeds"
+            }
+        };
         
-        // Register StyleHelper as a singleton
-        binder.map("StyleHelper@wheels")
-            .to("#moduleMapping#.models.StyleHelper")
-            .asSingleton();
+        // Interceptors
+        interceptors = [
+            { class = "#moduleMapping#.interceptors.postInstall" }
+        ];
     }
-
-    // Runs when module is loaded
-    function onLoad(){
-        log.info('Wheels Module loaded successfully.' );
+    
+    function onLoad() {
+        // Register helper services
+        binder.map("TemplateService@wheels-cli")
+            .to("#moduleMapping#.models.TemplateService");
+        binder.map("TestService@wheels-cli")
+            .to("#moduleMapping#.models.TestService");
+        binder.map("MigrationService@wheels-cli")
+            .to("#moduleMapping#.models.MigrationService");
+        binder.map("AnalysisService@wheels-cli")
+            .to("#moduleMapping#.models.AnalysisService");
+        binder.map("PluginService@wheels-cli")
+            .to("#moduleMapping#.models.PluginService");
+        binder.map("EnvironmentService@wheels-cli")
+            .to("#moduleMapping#.models.EnvironmentService");
+        binder.map("SecurityService@wheels-cli")
+            .to("#moduleMapping#.models.SecurityService");
+        binder.map("OptimizationService@wheels-cli")
+            .to("#moduleMapping#.models.OptimizationService");
+        binder.map("CodeGenerationService@wheels-cli")
+            .to("#moduleMapping#.models.CodeGenerationService");
+        binder.map("ScaffoldService@wheels-cli")
+            .to("#moduleMapping#.models.ScaffoldService");
+        binder.map("helpers@wheels-cli")
+            .to("#moduleMapping#.models.helpers");
+        binder.map("DetailOutputService@wheels-cli")
+            .to("#moduleMapping#.models.DetailOutputService");
+        
+        log.info('Wheels CLI Module loaded successfully.');
     }
-
-    // Runs when module is unloaded
-    function onUnLoad(){
-        log.info('Wheels Module unloaded successfully.' );
+    
+    function onUnLoad() {
+        log.info('Wheels CLI Module unloaded successfully.');
     }
 
 }

@@ -348,6 +348,9 @@ component {
 				case "structs":
 					local.rv = $serializeQueryToStructs(query = local.findAll.query, argumentCollection = arguments);
 					break;
+				case "array":
+					local.rv = $serializeQueryToArray(query = local.findAll.query, argumentCollection = arguments);
+					break;
 				case "object":
 				case "objects":
 					local.rv = $serializeQueryToObjects(query = local.findAll.query, argumentCollection = arguments);
@@ -357,7 +360,7 @@ component {
 						Throw(
 							type = "Wheels.IncorrectArgumentValue",
 							message = "Incorrect Arguments",
-							extendedInfo = "The `returnAs` may be either `query`, `struct(s)`, `object(s)` or `sql`."
+							extendedInfo = "The `returnAs` may be either `query`, `struct(s)`, `object(s)`, `array` or `sql`."
 						);
 					}
 			}
@@ -467,7 +470,7 @@ component {
 			arguments.count = 1;
 		}
 		local.rv = findAll(argumentCollection = arguments);
-		if (IsArray(local.rv)) {
+		if (IsArray(local.rv) && arguments.returnAs != 'array') {
 			if (ArrayLen(local.rv)) {
 				local.rv = local.rv[1];
 			} else {

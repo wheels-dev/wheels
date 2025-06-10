@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  testui-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE=/api
+      - VITE_MOCK_API=true
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

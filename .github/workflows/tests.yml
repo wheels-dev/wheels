@@ -15,18 +15,46 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cfengine: [ "lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023" ]
-        dbengine: ["mysql", "postgres", "sqlserver_cicd", "h2"]
-        commandbox_version: [ "6.2.1" ]
-        jdkVersion: [ "21" ]
+        cfengine:
+          ["lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023"]
+        dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
+        commandbox_version: ["6.2.1"]
+        jdkVersion: ["21"]
         experimental: [false]
+        include:
+          # Lucee 7 experimental tests (non-blocking)
+          - cfengine: "lucee@7"
+            dbengine: "h2"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "mysql"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "postgres"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "sqlserver"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "oracle"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
         exclude:
           # - cfengine: lucee@5
           #   dbengine: mysql
           # - cfengine: lucee@5
           #   dbengine: postgres
           # - cfengine: lucee@5
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           # - cfengine: lucee@5
           #   dbengine: h2
           # - cfengine: lucee@6
@@ -34,7 +62,7 @@ jobs:
           # - cfengine: lucee@6
           #   dbengine: postgres
           # - cfengine: lucee@6
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           # - cfengine: lucee@6
           #   dbengine: h2
           # - cfengine: adobe@2018
@@ -42,25 +70,41 @@ jobs:
           # - cfengine: adobe@2018
           #   dbengine: postgres
           # - cfengine: adobe@2018
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           - cfengine: adobe@2018
             dbengine: h2
+          - cfengine: adobe@2018
+            dbengine: oracle
           # - cfengine: adobe@2021
           #   dbengine: mysql
           # - cfengine: adobe@2021
           #   dbengine: postgres
           # - cfengine: adobe@2021
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           - cfengine: adobe@2021
             dbengine: h2
+          - cfengine: adobe@2021
+            dbengine: oracle
           # - cfengine: adobe@2023
           #   dbengine: mysql
           # - cfengine: adobe@2023
           #   dbengine: postgres
           # - cfengine: adobe@2023
-          #   dbengine: sqlserver_cicd
+          #   dbengine: sqlserver
           - cfengine: adobe@2023
             dbengine: h2
+          - cfengine: adobe@2023
+            dbengine: oracle
+          - cfengine: adobe@2025
+            dbengine: h2
+          - cfengine: adobe@2025
+            dbengine: oracle
+          - cfengine: adobe@2025
+            dbengine: mysql
+          - cfengine: adobe@2025
+            dbengine: postgres
+          - cfengine: adobe@2025
+            dbengine: sqlserver
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -95,8 +139,8 @@ jobs:
         run: |
           box server start serverConfigFile="server.json" --noSaveSettings --debug
 
-      - name: Running onServerInstall Script for Adobe2021 and Adobe2023
-        if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }}
+      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
+        if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
         run: box run-script onServerInstall
 
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}

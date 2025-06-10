@@ -41,7 +41,7 @@ component output="false" extends="wheels.Global"{
 		local.plugins = {};
 		local.folders = $folders();
 		// Within plugin folders, grab info about each plugin and package up into a struct.
-		for (i = 1; i <= local.folders.recordCount; i++) {
+		for (local.i = 1; i <= local.folders.recordCount; i++) {
 			// For *nix, we need a case-sensitive name for the plugin component, so we must reference its CFC file name.
 			local.subfolder = DirectoryList("#local.folders["directory"][i]#/#local.folders["name"][i]#", false, "query");
 			local.pluginCfc = $query(
@@ -62,7 +62,7 @@ component output="false" extends="wheels.Global"{
 		// get all plugin zip files
 		local.plugins = {};
 		local.files = $files();
-		for (i = 1; i <= local.files.recordCount; i++) {
+		for (local.i = 1; i <= local.files.recordCount; i++) {
 			local.name = ListFirst(local.files["name"][i], "-");
 			local.temp = {};
 			local.temp.file = $fullPathToPlugin(local.files["name"][i]);

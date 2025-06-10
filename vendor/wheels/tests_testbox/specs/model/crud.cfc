@@ -627,6 +627,34 @@ component extends="testbox.system.BaseSpec" {
 				expect(q.recordcount).toBeFalse()
 			})
 
+			it("function findByKey returns empty array when record not found with return as equal array", () => {
+				q = user.findByKey(key = 999999999, returnAs = "array")
+
+				expect(q).toBeArray()
+				expect(arrayLen(q)).toBe(0)
+			})
+
+			it("function findByKey returns empty struct when record not found with return as equal struct", () => {
+				q = user.findByKey(key = 999999999, returnAs = "struct")
+
+				expect(q).toBeStruct()
+				expect(structIsEmpty(q)).toBeTrue()
+			})
+
+			it("function findByKey returns SQL when record not found with return as equal sql", () => {
+				q = user.findByKey(key = 999999999, returnAs = "sql")
+
+				expect(q).toBeString()
+				expect(q).toInclude("SELECT")
+			})
+
+			it("function findByKey returns empty object when record not found with return as equal object", () => {
+				q = user.findByKey(key = 999999999, returnAs = "object")
+
+				expect(q).toBeFalse()
+			})
+
+
 			it("function findOne works", () => {
 				e = user.findOne(where = "lastname = 'Petruzzi'")
 
@@ -643,6 +671,33 @@ component extends="testbox.system.BaseSpec" {
 				e = user.findOne(where = "lastname = 'somenamenotfound'", returnAs = "query")
 
 				expect(e.recordCount).toBeFalse()
+			})
+
+			it("function findOne returns empty array when record not found with return as equal array", () => {
+				e = user.findOne(where = "lastname = 'somenamenotfound'", returnAs = "array")
+
+				expect(e).toBeArray()
+				expect(arrayLen(e)).toBe(0)
+			})
+
+			it("function findOne returns empty struct when record not found with return as equal struct", () => {
+				e = user.findOne(where = "lastname = 'somenamenotfound'", returnAs = "struct")
+
+				expect(e).toBeStruct()
+				expect(structIsEmpty(e)).toBeTrue()
+			})
+
+			it("function findOne returns SQL string when record not found with return as equal sql", () => {
+				e = user.findOne(where = "lastname = 'somenamenotfound'", returnAs = "sql")
+
+				expect(e).toBeString()
+				expect(e).toInclude("SELECT") // SQL is returned regardless of record presence
+			})
+
+			it("function findOne returns null when record not found with return as equal object", () => {
+				e = user.findOne(where = "lastname = 'somenamenotfound'", returnAs = "object")
+
+				expect(e).toBeFalse()
 			})
 
 			it("function findOne returns false when record not found with inner join include", () => {
@@ -710,6 +765,16 @@ component extends="testbox.system.BaseSpec" {
 				expect(q).toBeBoolean()
 				expect(q).toBeFalse()
 
+				q = user.findByKey(key = "0", returnas = "struct")
+				
+				expect(q).toBeStruct()
+				expect(q).toBeEmpty()
+
+				q = user.findByKey(key = "0", returnas = "array")
+				
+				expect(q).toBeArray()
+				expect(q).toBeEmpty()
+
 				/* readd when we have implemented the code to throw an error when an incorrect returnAs value is passed in
 				q = raised('user.findByKey(key="0", returnas="objects")')
 				r = "Wheels.IncorrectArgumentValue"
@@ -733,6 +798,16 @@ component extends="testbox.system.BaseSpec" {
 				expect(q).toBeBoolean()
 				expect(q).toBeFalse()
 
+				q = user.findOne(where = "id = 0", returnas = "struct")
+
+				expect(q).toBeStruct()
+				expect(q).toBeEmpty()
+
+				q = user.findOne(where = "id = 0", returnas = "array")
+
+				expect(q).toBeArray()
+				expect(q).toBeEmpty()
+
 				/* readd when we have implemented the code to throw an error when an incorrect returnAs value is passed in
 				q = raised('user.findOne(where="id = 0", returnas="objects")')
 				r = "Wheels.IncorrectArgumentValue"
@@ -749,6 +824,13 @@ component extends="testbox.system.BaseSpec" {
 
 			it("function findAll returns correct type when returnAs is struct when no records", () => {
 				q = user.findAll(where = "id = 0", returnas = "structs")
+
+				expect(q).toBeStruct()
+				expect(q).toBeEmpty()
+			})
+
+			it("function findAll returns correct type when returnAs is array when no records", () => {
+				q = user.findAll(where = "id = 0", returnas = "array")
 
 				expect(q).toBeArray()
 				expect(q).toBeEmpty()

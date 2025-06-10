@@ -16,7 +16,14 @@ WEB-INF
 /migrator/sql/
 /vendor/testbox/
 /vendor/wirebox/
+/cli/workspace/
+/cli/simpletestapp/
 
 settings.json
 settings.xml
 *.db
+.claude/settings.local.json
+cli/tests/
+test-output/
+workspace/**
+!workspace/.keep

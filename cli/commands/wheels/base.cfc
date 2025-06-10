@@ -4,11 +4,10 @@
 component excludeFromHelp=true {
 	property name='serverService' inject='ServerService';
 	property name='Formatter'     inject='Formatter';
-	property name='Helpers'       inject='helpers@wheels';
+	property name='Helpers'       inject='helpers@wheels-cli';
 	property name='packageService' inject='packageService';
 	property name="ConfigService" inject="ConfigService";
 	property name="JSONService" inject="JSONService";
-	property name="Style" inject="StyleHelper@wheels";
 
 //=====================================================================
 //= 	Scaffolding
@@ -22,8 +21,22 @@ component excludeFromHelp=true {
 		if(!directoryExists( fileSystemUtil.resolvePath("vendor/wheels") ) ){
 			error("We're currently looking in #getCWD()#, but can't find a /wheels/ folder?");
 		}
+		// Check vendor/wheels/box.json first for wheels-core version
+		if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/box.json"))){
+			local.wheelsBoxJSON = packageService.readPackageDescriptorRaw( fileSystemUtil.resolvePath("vendor/wheels") );
+			if(structKeyExists(local.wheelsBoxJSON, "version")){
+				return local.wheelsBoxJSON.version;
+			}
+		}
 		if(fileExists(fileSystemUtil.resolvePath("box.json"))){
 			local.boxJSON = packageService.readPackageDescriptorRaw( getCWD() );
+			// Check if wheels-core is in dependencies
+			if(structKeyExists(local.boxJSON, "dependencies") && structKeyExists(local.boxJSON.dependencies, "wheels-core")){
+				// Extract version from dependency string like "^3.0.0-SNAPSHOT+695"
+				local.wheelsDep = local.boxJSON.dependencies["wheels-core"];
+				local.wheelsDep = reReplace(local.wheelsDep, "[\^~>=<]", "", "all");
+				return local.wheelsDep;
+			}
 			return local.boxJSON.version;
 		} else if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/events/onapplicationstart.cfm"))) { 
 			var output = command( 'cd vendor\wheels' ).run( returnOutput=true );
@@ -237,18 +250,93 @@ component excludeFromHelp=true {
 
 	// Get information about the currently running server so we can send commmands
 	function $getServerInfo(){
+		// First, try to read port from server.json if it exists
+		var serverJSON = fileSystemUtil.resolvePath("server.json");
+		if (fileExists(serverJSON)) {
+			try {
+				var serverConfig = deserializeJSON(fileRead(serverJSON));
+				
+				// Check for port in web.port
+				if (structKeyExists(serverConfig, "web") && structKeyExists(serverConfig.web, "port") && serverConfig.web.port > 0) {
+					local.port = serverConfig.web.port;
+					local.host = structKeyExists(serverConfig.web, "host") ? serverConfig.web.host : "localhost";
+					
+					// If host is "localhost", convert to 127.0.0.1 for consistency
+					if (local.host == "localhost") {
+						local.host = "127.0.0.1";
+					}
+					
+					local.serverURL = "http://" & local.host & ":" & local.port;
+					return local;
+				}
+				
+				// Also check for port directly in server config root
+				if (structKeyExists(serverConfig, "port") && serverConfig.port > 0) {
+					local.port = serverConfig.port;
+					local.host = structKeyExists(serverConfig, "host") ? serverConfig.host : "localhost";
+					
+					// If host is "localhost", convert to 127.0.0.1 for consistency
+					if (local.host == "localhost") {
+						local.host = "127.0.0.1";
+					}
+					
+					local.serverURL = "http://" & local.host & ":" & local.port;
+					return local;
+				}
+			} catch (any e) {
+				// Continue to fallback
+			}
+		}
+		
+		// Fall back to original method
 		var serverDetails = serverService.resolveServerDetails( serverProps={ webroot=getCWD() } );
-  		local.host              = serverDetails.serverInfo.host;
-  		local.port              = serverDetails.serverInfo.port;
-  		local.serverURL		  = "http://" & local.host & ":" & local.port;
-	  	return local;
+		
+		// Check if we got a valid port from serverService
+		if (structKeyExists(serverDetails, "serverInfo") && structKeyExists(serverDetails.serverInfo, "port") && serverDetails.serverInfo.port > 0) {
+			local.host = serverDetails.serverInfo.host;
+			local.port = serverDetails.serverInfo.port;
+			local.serverURL = "http://" & local.host & ":" & local.port;
+			return local;
+		}
+		
+		// If we still don't have a valid port, throw an error
+		error("Unable to determine server port. Please ensure your server is running or that server.json contains a valid port configuration.");
 	}
 
 	// Construct remote URL depending on wheels version
 	string function $getBridgeURL() {
 		var serverInfo=$getServerInfo();
 		var geturl=serverInfo.serverUrl;
-  			getURL &= "/?controller=wheels&action=wheels&view=cli";
+		
+		// Don't add /public if server is already using public as webroot
+		// This is determined by checking server.json configuration
+		var serverJSON = fileSystemUtil.resolvePath("server.json");
+		var addPublic = false;
+		
+		if (fileExists(serverJSON)) {
+			try {
+				var serverConfig = deserializeJSON(fileRead(serverJSON));
+				// Check if webroot is set to public
+				if (!structKeyExists(serverConfig, "web") || !structKeyExists(serverConfig.web, "webroot") || 
+					!findNoCase("public", serverConfig.web.webroot)) {
+					// Webroot is NOT public, so we might need to add /public
+					if (fileExists(fileSystemUtil.resolvePath("public/index.cfm"))) {
+						addPublic = true;
+					}
+				}
+			} catch (any e) {
+				// If we can't read server.json, fall back to old behavior
+				if (fileExists(fileSystemUtil.resolvePath("public/index.cfm"))) {
+					addPublic = true;
+				}
+			}
+		}
+		
+		if (addPublic) {
+			getURL &= "/public";
+		}
+		
+		getURL &= "/?controller=wheels&action=wheels&view=cli";
   		return geturl;
 	}
 
@@ -268,7 +356,23 @@ component excludeFromHelp=true {
   				return loc.result;
   			}
   		} else {
-  			print.line(helpers.stripTags(Formatter.unescapeHTML(loc.filecontent)));
+  			// Check if this is likely an application error
+  			if (find("<title>", loc.filecontent) && find("error", lCase(loc.filecontent))) {
+  				print.redLine("Your application appears to have an error that's preventing CLI access.");
+  				print.line("");
+  				print.yellowLine("Common causes:");
+  				print.line("  - Syntax errors in routes.cfm or other configuration files");
+  				print.line("  - Missing required files or directories");
+  				print.line("  - Database connection issues");
+  				print.line("");
+  				print.yellowLine("To debug:");
+  				print.line("  1. Visit your application in a browser: #replace(targetURL, '?controller=wheels&action=wheels&view=cli&command=info', '')#");
+  				print.line("  2. Fix any errors shown");
+  				print.line("  3. Try the CLI command again");
+  			} else {
+  				print.line(helpers.stripTags(Formatter.unescapeHTML(loc.filecontent)));
+  			}
+  			print.line("");
   			print.line("Tried #targetURL#");
   			error("Error returned from DBMigrate Bridge");
   		}
@@ -313,7 +417,7 @@ component excludeFromHelp=true {
 			if ( directoryExists( current.webRoot & "app/snippets" ) ) {
 					var templateDirectory=current.webRoot & "app/snippets";
 			} else if ( directoryExists( current.moduleRoot & "templates" ) ) {
-					var templateDirectory=current.webRoot & "app/snippets";
+					var templateDirectory=current.moduleRoot & "templates";
 			} else {
 					error( "#templateDirectory# Template Directory can't be found." );
 			}
@@ -329,6 +433,11 @@ component excludeFromHelp=true {
 			moduleRoot  = expandPath("/wheels-cli/templates/"),
 			targetDir   = getCWD() & "app/snippets/"
 		};
+
+		// Only proceed if the app folder exists
+		if (!directoryExists(current.webRoot & "app/")) {
+			return;
+		}
 	
 		// Create target directory if it doesn't exist
 		if (!directoryExists(current.targetDir)) {
@@ -336,10 +445,8 @@ component excludeFromHelp=true {
 		}
 	
 		// List of root-level files and folders to exclude
-		var excludedRootFiles = [
-			"BoxJSON.txt", "ConfigAppContent.txt", "ConfigDataSourceH2Content.txt", "ConfigReloadPasswordContent.txt", "ConfigRoutes.txt", "WheelsBoxJSON.txt"
-		];
-		var excludedFolders = ["bootstrap"];
+		var excludedRootFiles = [];
+		var excludedFolders = [];
 	
 		// Get all entries in the templates directory
 		var entries = directoryList(current.moduleRoot, false, "query");

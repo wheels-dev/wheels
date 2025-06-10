@@ -139,5 +139,61 @@ component extends="testbox.system.BaseSpec" {
 				expect(r.static).toBeTrue()
 			})
 		})
+
+		describe("Tests for clearCachableActions(action)", () => {
+
+			beforeEach(() => {
+				_controller = application.wo.controller(name = "dummy")
+				_controller.$clearCachableActions()
+			})
+
+			it("clears a specific cached action when only one is matched", () => {
+				_controller.caches(actions = "dummy1,dummy2", time = 10, static = true)
+				_controller.clearCachableActions("dummy1")
+				r = _controller.$cachableActions()
+
+				expect(r).toHaveLength(1)
+				expect(r[1].action).toBe("dummy2")
+			})
+
+			it("clears multiple specified cached actions", () => {
+				_controller.caches(actions = "dummy1,dummy2,dummy3", time = 5)
+				_controller.clearCachableActions("dummy1,dummy3")
+				r = _controller.$cachableActions()
+
+				expect(r).toHaveLength(1)
+				expect(r[1].action).toBe("dummy2")
+			})
+
+			it("clears nothing if specified action is not cached", () => {
+				_controller.caches(actions = "dummy1,dummy2")
+
+				_controller.clearCachableActions("doesNotExist")
+
+				r = _controller.$cachableActions()
+
+				expect(r).toHaveLength(2)
+				expect(r[1].action).toBe("dummy1")
+				expect(r[2].action).toBe("dummy2")
+			})
+
+			it("is case-insensitive when matching actions", () => {
+				_controller.caches(actions = "Dummy1,Dummy2")
+				_controller.clearCachableActions("dummy1")
+				r = _controller.$cachableActions()
+
+				expect(r).toHaveLength(1)
+				expect(r[1].action).toBe("Dummy2")
+			})
+
+			it("clears all when no action is passed (backward compatibility)", () => {
+				_controller.caches(actions = "dummy1,dummy2")
+				_controller.clearCachableActions()
+				r = _controller.$cachableActions()
+
+				expect(r).toHaveLength(0)
+			})
+		})
+
 	}
 }

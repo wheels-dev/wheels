@@ -26,3 +26,12 @@ This is the Wheels CLI, a CommandBox module that provides command-line tools for
 - Follow MVC pattern when creating new features
 - Maintain backward compatibility when possible
 - Refer to CLI-IMPROVEMENTS.md for planned enhancements and architectural goals
+- To run the CLI commands we need to launch CommandBox with the `box` command
+- The CLI is installed with `box install wheels-cli` command
+- Then use the `wheels` commands to run a particular CLI command
+- First create an app with the `wheels g app` command.
+- Then start the web server with `server start` commandbox command
+
+## Things to remember
+- Don't add the Claude signature to commit messages
+- Don't add the Claude signature to PR reviews

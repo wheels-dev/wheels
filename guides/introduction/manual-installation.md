@@ -14,7 +14,7 @@ So, here are the simple steps you need to follow to get rolling on Wheels...
 
 You have 2 choices when downloading Wheels. You can either use the latest official release of Wheels, or you can take a walk on the wild side and go with the latest committed source code in our Git repository.
 
-The latest official releases can always be found in the [Releases](https://github.com/cfwheels/cfwheels/releases) section of GitHub, and the Git repository is available at our [GitHub repo](https://github.com/cfwheels/cfwheels).
+The latest official releases can always be found in the [Releases](https://github.com/wheels-dev/wheels/releases) section of GitHub, and the Git repository is available at our [GitHub repo](https://github.com/wheels-dev/wheels).
 
 In most cases, we recommend going with the official release because it's well documented and has been through a lot of bug testing. Only if you're in desperate need of a feature that has not been released yet would we advise you to go with the version stored in the Git `master` branch.
 

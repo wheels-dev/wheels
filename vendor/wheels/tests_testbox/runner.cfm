@@ -8,117 +8,118 @@
     testBox.setBundles(local.sortedArray)
 
     setTestboxEnvironment()
+    if (!structKeyExists(url, "format") || url.format eq "html") {
+        result = testBox.run(
+            reporter = "testbox.system.reports.JSONReporter"
+        );
+    }
+    else if(url.format eq "json"){
+        result = testBox.run(
+            reporter = "testbox.system.reports.JSONReporter"
+        );
+        cfcontent(type="application/json");
+        cfheader(name="Access-Control-Allow-Origin", value="*");
+        DeJsonResult = DeserializeJSON(result);
+        if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
+            cfheader(statustext="Expectation Failed", statuscode=417);
+        } else {
+            cfheader(statustext="OK", statuscode=200);
+        }
+        // Check if 'only' parameter is provided in the URL
+        if (structKeyExists(url, "only") && url.only eq "failure,error") {
+            allBundles = DeJsonResult.bundleStats;
+            if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){  
 
-    if(structKeyExists(url, "format")){
-        if(url.format eq "json"){
-            result = testBox.run(
-                reporter = "testbox.system.reports.JSONReporter"
-            );
-            cfcontent(type="application/json");
-            cfheader(name="Access-Control-Allow-Origin", value="*");
-            DeJsonResult = DeserializeJSON(result);
-            if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-                cfheader(statustext="Expectation Failed", statuscode=417);
-            } else {
-                cfheader(statustext="OK", statuscode=200);
-            }
-            // Check if 'only' parameter is provided in the URL
-            if (structKeyExists(url, "only") && url.only eq "failure,error") {
-                allBundles = DeJsonResult.bundleStats;
-                if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){  
-
-                    // Filter test results
-                    filteredBundles = [];
-                    
-                    for (bundle in DeJsonResult.bundleStats) {
-                        if (bundle.totalError > 0 || bundle.totalFail > 0) {
-                            filteredSuites = [];
-                    
-                            for (suite in bundle.suiteStats) {
-                                if (suite.totalError > 0 || suite.totalFail > 0) {
-                                    filteredSpecs = [];
-                    
-                                    for (spec in suite.specStats) {
-                                        if (spec.status eq "Error" || spec.status eq "Failed") {
-                                            arrayAppend(filteredSpecs, spec);
-                                        }
-                                    }
-                    
-                                    if (arrayLen(filteredSpecs) > 0) {
-                                        suite.specStats = filteredSpecs;
-                                        arrayAppend(filteredSuites, suite);
-                                    }
-                                }
-                            }
-                    
-                            if (arrayLen(filteredSuites) > 0) {
-                                bundle.suiteStats = filteredSuites;
-                                arrayAppend(filteredBundles, bundle);
-                            }
-                        }
-                    }
+                // Filter test results
+                filteredBundles = [];
                 
-                    DeJsonResult.bundleStats = filteredBundles;
-                    // Update the result with filtered data
-
-                    count = 1;
-                    for(bundle in allBundles){
-                        writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
-                        writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
-                        writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
-                        writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
-                        writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
-                        if(bundle.totalFail > 0 || bundle.totalError > 0){
-                            for(suite in DeJsonResult.bundleStats[count].suiteStats){
-                                writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
-                                for(spec in suite.specStats){
-                                    writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
-                                    writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
-                                    writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                for (bundle in DeJsonResult.bundleStats) {
+                    if (bundle.totalError > 0 || bundle.totalFail > 0) {
+                        filteredSuites = [];
+                
+                        for (suite in bundle.suiteStats) {
+                            if (suite.totalError > 0 || suite.totalFail > 0) {
+                                filteredSpecs = [];
+                
+                                for (spec in suite.specStats) {
+                                    if (spec.status eq "Error" || spec.status eq "Failed") {
+                                        arrayAppend(filteredSpecs, spec);
+                                    }
+                                }
+                
+                                if (arrayLen(filteredSpecs) > 0) {
+                                    suite.specStats = filteredSpecs;
+                                    arrayAppend(filteredSuites, suite);
                                 }
                             }
-                            count += 1;
                         }
-                        writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
-                    }
-                    
-                }else{
-                    for(bundle in DeJsonResult.bundleStats){
-                        writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
-                        writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
-                        writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
-                        writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
-                        writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                
+                        if (arrayLen(filteredSuites) > 0) {
+                            bundle.suiteStats = filteredSuites;
+                            arrayAppend(filteredBundles, bundle);
+                        }
                     }
                 }
+            
+                DeJsonResult.bundleStats = filteredBundles;
+                // Update the result with filtered data
+
+                count = 1;
+                for(bundle in allBundles){
+                    writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
+                    writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
+                    writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
+                    writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
+                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                    if(bundle.totalFail > 0 || bundle.totalError > 0){
+                        for(suite in DeJsonResult.bundleStats[count].suiteStats){
+                            writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                            for(spec in suite.specStats){
+                                writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
+                                writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
+                                writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                            }
+                        }
+                        count += 1;
+                    }
+                    writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                }
+                
             }else{
-                writeOutput(result)
+                for(bundle in DeJsonResult.bundleStats){
+                    writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
+                    writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
+                    writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
+                    writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
+                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                }
             }
-        }
-        else if (url.format eq "txt") {
-            result = testBox.run(
-                reporter = "testbox.system.reports.TextReporter"
-            )        
-            cfcontent(type="text/plain");
-            writeOutput(result)
-        }
-        else if(url.format eq "junit"){
-            result = testBox.run(
-                reporter = "testbox.system.reports.ANTJUnitReporter"
-            )
-            cfcontent(type="text/xml");
+        }else{
             writeOutput(result)
         }
     }
-    else{
+    else if (url.format eq "txt") {
         result = testBox.run(
-            reporter = "testbox.system.reports.SimpleReporter"
+            reporter = "testbox.system.reports.TextReporter"
+        )        
+        cfcontent(type="text/plain");
+        writeOutput(result)
+    }
+    else if(url.format eq "junit"){
+        result = testBox.run(
+            reporter = "testbox.system.reports.ANTJUnitReporter"
         )
+        cfcontent(type="text/xml");
         writeOutput(result)
     }
     // reset the original environment
     application.wheels = application.$$$wheels
     structDelete(application, "$$$wheels")
+    if(!structKeyExists(url, "format") || url.format eq "html"){
+        // Use our html template
+        type = "Core";
+        include "html.cfm";
+    }
 
     private function setTestboxEnvironment() {
         // creating backup for original environment

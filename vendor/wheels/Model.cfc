@@ -411,22 +411,45 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		request.wheels.tickCountId = Right(request.wheels.tickCountId, 12) + 1;
 		variables.wheels.tickCountId = request.wheels.tickCountId;
 
-		// copy class variables from the object in the application scope
+		// Only do work if we haven’t already loaded the class data for this request
 		if (!StructKeyExists(variables.wheels, "class")) {
+			// Build a unique lock name per application
 			local.lockName = "classLock" & application.applicationName;
-			variables.wheels.class = $simpleLock(
-				execute = "$classData",
-				name = local.lockName,
-				object = application.wheels.models[arguments.name],
-				type = "readOnly"
-			);
+			
+			if ( !structKeyExists( application.wheels.models, arguments.name ) ) {
+				try {
+					// Slow path: try to load the model into the application cache
+					model( arguments.name );
+					local.modelObj = application.wheels.models[ arguments.name ];
+				}
+				catch ( any e ) {
+					throw(
+						type         = "Wheels.ModelInitializationFailed",
+						message      = "Failed to initialize model '#arguments.name#'.",
+						extendedInfo = "Error details: " & e.message
+					);
+				}
+			}
+
+			// Attempt to grab the already‐loaded model object, or force‐load it
+			if ( structKeyExists( application.wheels.models, arguments.name ) ) {
+				// Fast path: model is already in the application cache
+				local.modelObj = application.wheels.models[ arguments.name ];
+
+				// At this point, local.modelObj is guaranteed to exist
+				variables.wheels.class = $simpleLock(
+					execute = "$classData",
+					name    = local.lockName,
+					object  = local.modelObj,
+					type    = "readOnly"
+				);
+			}
 		}
 
 		// setup object properties in the this scope
 		if (IsQuery(arguments.properties) && arguments.properties.recordCount != 0) {
 			arguments.properties = $queryRowToStruct(argumentCollection = arguments);
 		}
-
 		if (IsStruct(arguments.properties) && !StructIsEmpty(arguments.properties)) {
 			$setProperties(properties = arguments.properties, setOnModel = true, $useFilterLists = arguments.useFilterLists);
 		}
@@ -443,6 +466,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	public struct function $classData() {
 		return variables.wheels.class;
 	}
+
 
 	/**
 	 * Internal function.

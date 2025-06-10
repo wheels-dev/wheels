@@ -1,89 +1,121 @@
 /**
- * I generate a controller in /controllers/NAME.cfc
- * Actions are passed in as arguments:
- *
- * Create a user controller with full CRUD methods
- * {code:bash}
- * wheels generate controller user
- * {code}
- *
- * Create a user object with just "index" and "customaction" methods
- *
- * {code:bash}
- * wheels generate controller user index,customaction
- * {code}
- **/
-component
-  aliases="wheels g controller"
-  extends="../base"
-{
-
-  /**
-   * @name.hint       Name of the controller to create without the .cfc
-   * @actionList.hint optional list of actions, comma delimited
-   * @directory.hint  if for some reason you don't have your controllers in /controllers/
-   **/
-  function run(
-    required string name,
-    string actionList = '',
-    directory         = 'app/controllers'
-  ) {
-    var obj             = helpers.getNameVariants( arguments.name );
-    arguments.directory = fileSystemUtil.resolvePath( arguments.directory );
-
-    print.line( 'Creating Controller...' ).toConsole();
-
-    // Validate directory
-    if ( !directoryExists( arguments.directory ) ) {
-      error( '[#arguments.directory#] can''t be found. Are you running this from your site root?' );
-    }
-
-    // If custom actions passed in as arguments, then use them, otherwise use CRUD
-    var actionContent = '';
-
-    if ( len( arguments.actionList ) && arguments.actionList != 'CRUD' ) {
-      var allactions        = '';
-      var controllerContent = fileRead( getTemplate( '/ControllerContent.txt' ) );
-      // Loop Over actions to generate them
-      for ( var thisAction in listToArray( arguments.actionList ) ) {
-        if ( thisAction == 'init' ) {
-          continue;
+ * Generate a controller in /controllers/NAME.cfc
+ * 
+ * Examples:
+ * wheels generate controller Users
+ * wheels generate controller Users --rest
+ * wheels generate controller Users --actions=index,show,custom
+ * wheels generate controller Api/V1/Users --api
+ */
+component aliases="wheels g controller" extends="../base" {
+    
+    property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
+    /**
+     * @name.hint Name of the controller to create (usually plural)
+     * @actions.hint Actions to generate (comma-delimited, default: CRUD for REST)
+     * @rest.hint Generate RESTful controller with CRUD actions
+     * @api.hint Generate API controller (no view-related actions)
+     * @description.hint Controller description
+     * @force.hint Overwrite existing files
+     */
+    function run(
+        required string name,
+        string actions = "",
+        boolean rest = false,
+        boolean api = false,
+        string description = "",
+        boolean force = false
+    ) {
+        // Handle API flag implies REST
+        if (arguments.api) {
+            arguments.rest = true;
         }
-        allactions = allactions & $returnAction( thisAction );
-        print.yellowLine( 'Generated Action: #thisAction#' );
-      }
-      actionContent = allactions;
-    } else {
-      //Copy template files to the application folder if they do not exist there
-      ensureSnippetTemplatesExist();
-      // Do Crud: overrwrite whole controllerContent with CRUD template
-      controllerContent = fileRead(fileSystemUtil.resolvePath('app/snippets/CRUDContent.txt'));
-      print.yellowLine( 'Generating CRUD' );
+        
+        // Validate controller name
+        var validation = codeGenerationService.validateName(listLast(arguments.name, "/"), "controller");
+        if (!validation.valid) {
+            error("Invalid controller name: " & arrayToList(validation.errors, ", "));
+            return;
+        }
+        
+        detailOutput.header("🎮", "Generating controller: #arguments.name#");
+        
+        // Parse actions
+        var actionList = [];
+        if (len(arguments.actions)) {
+            actionList = listToArray(arguments.actions);
+        } else if (arguments.rest) {
+            if (arguments.api) {
+                actionList = ["index", "show", "create", "update", "delete"];
+            } else {
+                actionList = ["index", "show", "new", "create", "edit", "update", "delete"];
+            }
+        } else {
+            actionList = ["index"];
+        }
+        
+        // Generate controller
+        var result = codeGenerationService.generateController(
+            name = arguments.name,
+            description = arguments.description,
+            rest = arguments.rest,
+            force = arguments.force,
+            actions = actionList,
+            baseDirectory = getCWD()
+        );
+        
+        if (result.success) {
+            detailOutput.create(result.path);
+            
+            // Generate views for non-API controllers
+            if (!arguments.api && arguments.rest) {
+                detailOutput.invoke("views");
+                
+                var viewActions = ["index", "show", "new", "edit"];
+                var viewsCreated = 0;
+                
+                for (var action in viewActions) {
+                    if (arrayFindNoCase(actionList, action)) {
+                        var viewResult = codeGenerationService.generateView(
+                            name = arguments.name,
+                            action = action,
+                            force = arguments.force,
+                            baseDirectory = getCWD()
+                        );
+                        
+                        if (viewResult.success) {
+                            detailOutput.create(viewResult.path, true);
+                            viewsCreated++;
+                        }
+                    }
+                }
+                
+                // Remove this block since we're showing each file individually
+            }
+            
+            // Show next steps
+            var nextSteps = [
+                "Review the generated controller at #result.path#",
+                "Implement action logic for #arrayToList(actionList, ', ')#"
+            ];
+            
+            if (arguments.rest) {
+                arrayAppend(nextSteps, "Add route to config/routes.cfm: resources('" & lCase(arguments.name) & "');");
+            } else {
+                arrayAppend(nextSteps, "Add routes to config/routes.cfm");
+            }
+            
+            if (!arguments.api && viewsCreated > 0) {
+                arrayAppend(nextSteps, "Customize the views as needed");
+            }
+            
+            detailOutput.success("Controller generation complete!");
+            detailOutput.nextSteps(nextSteps);
+        } else {
+            detailOutput.error("Failed to generate controller: #result.error#");
+            setExitCode(1);
+        }
     }
-
-    // Inject actions in controller content
-    controllerContent = replaceNoCase(
-      controllerContent,
-      '|actions|',
-      actionContent,
-      'all'
-    );
-    // Replace Object tokens
-    controllerContent = $replaceDefaultObjectNames( controllerContent, obj );
-
-    var controllerName = obj.objectNamePluralC & '.cfc';
-    var controllerPath = directory & '/' & controllerName;
-
-    if ( fileExists( controllerPath ) ) {
-      if ( confirm( '#controllerName# already exists in target directory. Do you want to overwrite? [y/n]' ) ) {
-        print.greenLine( 'Ok, going to overwrite...' ).toConsole();
-      } else {
-        print.boldRedLine( 'Ok, aborting!' );
-        return;
-      }
-    }
-    file action="write" file="#controllerPath#" mode="777" output="#trim( controllerContent )#";
-    print.line( 'Created #controllerName#' );
-  }
-
 }

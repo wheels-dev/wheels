@@ -1,35 +1,42 @@
 /**
- * wheels dbmigrate create column [tablename] [force] [id] [primaryKey]
+ * wheels dbmigrate create column [tablename] [data-type] [column-name]
  * 
- * wheels dbmigrate create table [name] [force] [id] [primaryKey]
- * | Parameter  | Required | Default | Description                                         |
- * | ---------- | -------- | ------- | --------------------------------------------------- |
- * | name       | true     |         | The name of the database table to modify            |
- * | columnType | true     |         | The column type to add                              |
- * | columnName | false    |         | The column name to add                              |
- * | default    | false    |         | The default value to set for the column             |
- * | null       | false    | true    | Should the column allow nulls                       |
- * | limit      | false    |         | The character limit of the column                   |
- * | precision  | false    |         | The percision of the numeric column                 |
- * | scale      | false    |         | The scale of the numeric column                     |
+ * wheels dbmigrate create column [name] [data-type] [column-name]
+ * | Parameter   | Required | Default | Description                                         |
+ * | ----------- | -------- | ------- | --------------------------------------------------- |
+ * | name        | true     |         | The name of the database table to modify            |
+ * | data-type   | true     |         | The column type to add                              |
+ * | column-name | false    |         | The column name to add                              |
+ * | default     | false    |         | The default value to set for the column             |
+ * | null        | false    | true    | Should the column allow nulls                       |
+ * | limit       | false    |         | The character limit of the column                   |
+ * | precision   | false    |         | The precision of the numeric column                 |
+ * | scale       | false    |         | The scale of the numeric column                     |
  * 
  **/
  component aliases='wheels db create column' extends="../../base"  {
 
 	/**
+	 * Initialize the command
+	 */
+	function init() {
+		return this;
+	}
+
+	/**
 	 * Usage: wheels dbmigrate create column [tablename] [force] [id] [primaryKey]
 	 * @name.hint The Object Name
-	 * @columnType.hint The column type to add
+	 * @dataType.hint The column type to add
 	 * @columnName.hint The column name to add
 	 * @default.hint The default value to set for the column
 	 * @null.hint Should the column allow nulls
 	 * @limit.hint The character limit of the column
-	 * @precision.hint The percision of the numeric column
+	 * @precision.hint The precision of the numeric column
 	 * @scale.hint The scale of the numeric column
 	 **/
 	function run(
 		required string name,
-		required string columnType,
+		required string dataType,
 		string columnName="",
 		any default,
 		boolean null=true,
@@ -37,6 +44,9 @@
 		number precision,
 		number scale) {
 
+		// Initialize detail service
+		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
+		
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-column.txt"));
 		var argumentArr=[];
@@ -44,8 +54,8 @@
 
 		// Changes here
 		content=replaceNoCase(content, "|tableName|", "#name#", "all");
-		content=replaceNoCase(content, "|columnType|", "#columnType#", "all");
-		content=replaceNoCase(content, "|columnName|", "#columnName#", "all");
+		content=replaceNoCase(content, "|columnType|", "#arguments.dataType#", "all");
+		content=replaceNoCase(content, "|columnName|", "#arguments.columnName#", "all");
 		//content=replaceNoCase(content, "|referenceName|", "#referenceName#", "all");
 
 		// Construct additional arguments(only add/replace if passed through)
@@ -80,8 +90,20 @@
 		//content=replaceNoCase(content, "|precision|", "#precision#", "all");
 		//content=replaceNoCase(content, "|scale|", "#scale#", "all");
 
+		// Output detail header
+		details.header("🗛️", "Migration Generation");
+		
 		// Make File
-		$createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments.columnName)),	action="create_column",	content=content);
+		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments.columnName)),	action="create_column",	content=content);
+		
+		details.create(migrationPath);
+		details.success("Column migration created successfully!");
+		
+		var nextSteps = [];
+		arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
+		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
+		arrayAppend(nextSteps, "Or run all pending migrations: wheels dbmigrate latest");
+		details.nextSteps(nextSteps);
 	}
 
 	function $constructArguments(args, string operator=","){

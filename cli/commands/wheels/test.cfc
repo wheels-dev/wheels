@@ -10,7 +10,7 @@ component extends="base" {
 
 	/**
 	* @type.hint Either Core, App or the name of the plugin
-	* @servername.hint Servername to run the tests against
+	* @serverName.hint Server name to run the tests against
 	* @reload.hint Force Reload
 	* @debug.hint Output passing tests as well as failing ones
 	* @format.hint Force a specific return format for debug
@@ -18,7 +18,7 @@ component extends="base" {
 	*/
 	function run(
 		string type="app",
-		string servername,
+		string serverName,
 		boolean reload=true,
 		boolean debug=false,
 		string format="json",
@@ -39,22 +39,22 @@ component extends="base" {
 		We then need to know the target server IP, port, and the location/query string of the tests
 		We're always going to want to return JSON.
 
-	  		wheels test [type]	[serverName] [reload] [debug] [format]
+	  		wheels test [type]	[server-name] [reload] [debug] [format]
 	*/
 	  function $buildTestSuite(
 	  	required string type,
-	  	string servername="",
+	  	string serverName="",
 	  	boolean reload=true,
 	  	boolean debug=false,
 	  	string format="json",
 		string adapter=""
 	  ){
 	  		// Get Server Details from CB
-	  		var serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments.servername } );
+	  		var serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments["server-name"] } );
 	  		// Massage into something more managable
 	  		var loc ={
 	  			type              = arguments.type,
-	  			servername        = arguments.servername,
+	  			servername        = arguments["server-name"],
 	  			serverdefaultName = serverDetails.defaultName,
 	  			configFile        = serverDetails.defaultServerConfigFile,
 	  			host              = serverDetails.serverInfo.host,
@@ -79,10 +79,17 @@ component extends="base" {
 							   & "&type=#loc.type#"
 							   & "&format=#loc.format#"
 							   & "&reload=#loc.reload#";
+			} else {
+				// Default for plugin or other types
+				loc.testurl = "http://" & loc.host & ":" & loc.port
+							   & "/" & "?controller=tests&action=runner&view=runner"
+							   & "&type=#loc.type#"
+							   & "&format=#loc.format#"
+							   & "&reload=#loc.reload#";
 			}
 	  		// Optional Adapter Override
 	  		if(len(loc.adapter)){
-	  			loc.testurl&="&adapter=#loc.adapter#";
+	  			loc.testurl&="&adapter=#loc.adapter#"
 	  		}
 	  		return loc;
 	  }

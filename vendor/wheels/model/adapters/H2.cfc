@@ -166,7 +166,7 @@ component extends="Base" output=false {
 		}
 		arguments.type = "columns";
 		local.columns = $dbinfo(argumentCollection = arguments);
-		for (i = 1; i <= local.columns.recordCount; i++) {
+		for (local.i = 1; i <= local.columns.recordCount; i++) {
 			if (ListFind(pkList, local.columns["COLUMN_NAME"][i])) {
 				QuerySetCell(local.columns, "IS_PRIMARYKEY", "YES", i);
 			}

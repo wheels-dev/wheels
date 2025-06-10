@@ -27,12 +27,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
+        id: Checkout-Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Setup Environment Variables For Build Process
-        id: current_version
+        id: Calculate-Version-And-Branch
         run: |
           cat box.json
           echo "CFWHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
@@ -44,19 +45,58 @@ jobs:
           fi
 
       - name: Build CFWheels Variants for ${{ env.BRANCH }} v${{ env.CFWHEELS_VERSION }}
+        id: Build-CFWheels-Variants
         run: |
           ant -DisPreRelease=${{ env.CFWHEELS_PRERELEASE }} -Dcfwheels.version=${{ env.CFWHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
 
-      - name: Upload CFWheels Artifacts
+      - name: Upload CFWheels Core Artifact
+        id: Upload-CFWheels-Core
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-variants
+          name: cfwheels-core
+          path: |
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.zip
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.md5
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.sha512
+            artifacts/cfwheels/cfwheels-be.zip
+
+      - name: Upload CFWheels Base Template Artifact
+        id: Upload-CFWheels-Base
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfwheels-base-template
+          path: |
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.zip
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.md5
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.sha512
+            artifacts/cfwheels/cfwheels-base-template-be.zip
+
+      - name: Upload Wheels CLI Artifact
+        id: Upload-Wheels-CLI
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-cli
+          path: |
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.zip
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.md5
+            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/cfwheels/wheels-cli-be.zip
+
+      - name: Upload All CFWheels Artifacts (Combined)
+        id: Upload-All-Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfwheels-all-variants
           path: |
             artifacts/**/*
 
       # publish core package
       - uses: pixl8/github-action-box-publish@v4
+        id: Publish-Core-Package
         with:
           forgebox_user: wheels-dev
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
@@ -66,6 +106,7 @@ jobs:
 
       # publish base package
       - uses: pixl8/github-action-box-publish@v4
+        id: Publish-Base-Template
         with:
           forgebox_user: wheels-dev
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
@@ -73,14 +114,22 @@ jobs:
         env:
           BOXJSON_DIR: /build-cfwheels-base/cfwheels
 
-      - name: Inform Slack
-        if: ${{ always() }}
-        uses: rtCamp/action-slack-notify@v2
+      # publish CLI package
+      - uses: pixl8/github-action-box-publish@v4
+        id: Publish-CLI-Package
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
         env:
-          SLACK_CHANNEL: coding
-          SLACK_COLOR: ${{ job.status }} # or a specific color like 'green' or '#ff00ff'
-          SLACK_ICON_EMOJI: ":bell:"
-          SLACK_TITLE: "Wheels Build"
-          SLACK_MESSAGE: 'Wheels ${{ env.CFWHEELS_VERSION }} Built with ${{ job.status }}!'
-          SLACK_USERNAME: CI
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          BOXJSON_DIR: /build-cfwheels-cli/wheels-cli
+
+#      - name: Post Slack Message
+#        id: Post-Slack-Message
+#        uses: act10ns/slack@v2
+#        with:
+#          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+#          status: ${{ job.status }}
+#          steps: ${{ toJson(steps) }}
+#          channel: '#wheels-dev'
+#        if: always()

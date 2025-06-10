@@ -1,10 +1,10 @@
 # cfwheels-base-template
 
-This is a blank application written in CFWheels. 
+This is a blank application written in Wheels.dev
 
 ## As an Application
 
-As an application, this is a starting point for a modern CFWheels application with Bootstrap integration.
+As an application, this is a starting point for a modern Wheels application with Bootstrap integration.
 
 ## As a ForgeBox Package
 
@@ -12,15 +12,15 @@ As a ForgeBox package there is some interesting things going on here. Although t
 
 ```
 "Dependencies":{
-  "cfwheels":"^2.0.0"
+  "wheels-core":"^3.0.0"
 }
 ```
 
-The core files are put into the `wheels/` folder according to these settings.
+The core files are put into the `vendor/wheels/` folder according to these settings.
 
 ```
 "installPaths":{
-  "cfwheels":"wheels/"
+  "wheels-core":"vendor/wheels/"
 }
 ```
 
@@ -31,11 +31,11 @@ To install this package you'll need to have a running CommandBox installation. T
 ```
 box
 mkdir myapp --cd
-install cfwheels-base-template
+install wheels-base-template
 ```
 
 This could be shortened to a single command run in an empty directory:
 
 ```
-box install cfwheels-base-template
+box install wheels-base-template
 ```

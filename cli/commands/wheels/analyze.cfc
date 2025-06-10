@@ -1,171 +1,198 @@
 /**
- * Identify performance bottlenecks in applications
+ * Analyze your Wheels application for performance, security, and code quality
  * 
  * {code:bash}
  * wheels analyze
- * wheels analyze --target=controller
- * wheels analyze --target=view
- * wheels analyze --target=query
- * wheels analyze --target=memory
+ * wheels analyze performance
+ * wheels analyze code
+ * wheels analyze security
+ * wheels analyze --type=all
  * {code}
  */
 component extends="base" {
 
     /**
-     * @target Analysis target (controller, view, query, memory, or all)
-     * @duration Duration to run analysis in seconds
+     * @type Analysis type (performance, code, security, or all)
+     * @type.options performance,code,security,all
      * @report Generate HTML report
-     * @threshold Threshold for reporting issues (1-10, where 10 is most severe)
+     * @path Path to analyze (default: current directory)
+     * @format Output format (console, json, html)
+     * @format.options console,json,html
      */
     function run(
-        string target="all",
-        numeric duration=60,
+        string type="all",
         boolean report=true,
-        numeric threshold=5
+        string path=".",
+        string format="console"
     ) {
         // Welcome message
         print.line();
-        print.boldMagentaLine("Wheels Performance Analyzer");
+        print.boldMagentaLine("🔍 Wheels Application Analyzer");
         print.line();
         
-        // Validate target
-        local.validTargets = ["all", "controller", "view", "query", "memory"];
-        if (!arrayContains(local.validTargets, lCase(arguments.target))) {
-            error("Invalid target: #arguments.target#. Please choose from: #arrayToList(local.validTargets)#");
+        // Validate type
+        local.validTypes = ["all", "performance", "code", "security"];
+        if (!arrayContainsNoCase(local.validTypes, arguments.type)) {
+            error("Invalid type: #arguments.type#. Please choose from: #arrayToList(local.validTypes)#");
         }
         
-        // Create URL parameters
-        local.urlParams = "&command=analyze&target=#arguments.target#&duration=#arguments.duration#&threshold=#arguments.threshold#";
-        
-        if (arguments.report) {
-            local.urlParams &= "&report=true";
+        // Run appropriate analysis
+        if (arguments.type == "all" || arguments.type == "performance") {
+            runPerformanceAnalysis(argumentCollection=arguments);
         }
         
-        // Start the analysis
-        print.line("Starting performance analysis for #arguments.target#...");
-        print.line("This will run for #arguments.duration# seconds. Please wait...");
+        if (arguments.type == "all" || arguments.type == "code") {
+            runCodeAnalysis(argumentCollection=arguments);
+        }
+        
+        if (arguments.type == "all" || arguments.type == "security") {
+            runSecurityAnalysis(argumentCollection=arguments);
+        }
+    }
+    
+    /**
+     * Run performance analysis
+     */
+    private function runPerformanceAnalysis(argumentCollection) {
         print.line();
+        print.yellowBoldLine("⚡ Performance Analysis");
+        print.line("────────────────────────");
         
-        // Update progress while waiting for the analysis to complete
-        local.startTime = getTickCount();
-        local.endTime = local.startTime + (arguments.duration * 1000);
+        // Delegate to existing performance analysis logic
+        command("wheels analyze performance")
+            .params(argumentCollection=arguments)
+            .run();
+    }
+    
+    /**
+     * Run code quality analysis
+     */
+    private function runCodeAnalysis(argumentCollection) {
+        print.line();
+        print.yellowBoldLine("📝 Code Quality Analysis");
+        print.line("────────────────────────");
         
-        // Enable data collection
-        local.startResult = $sendToCliCommand(urlstring=local.urlParams & "&action=start");
-        
-        // Display progress
-        while (getTickCount() < local.endTime) {
-            local.elapsedSeconds = int((getTickCount() - local.startTime) / 1000);
-            local.percentComplete = int((local.elapsedSeconds / arguments.duration) * 100);
-            
-            print.line("Progress: #local.percentComplete#% complete (#local.elapsedSeconds# of #arguments.duration# seconds)");
-            sleep(5000); // Update every 5 seconds
-            
-            // Get intermediate results if available
-            if (local.elapsedSeconds >= arguments.duration / 2) {
-                local.progressResult = $sendToCliCommand(urlstring=local.urlParams & "&action=progress");
-                
-                if (structKeyExists(local.progressResult, "progress") && isStruct(local.progressResult.progress)) {
-                    print.line();
-                    print.yellowLine("Interim Results:");
-                    
-                    if (structKeyExists(local.progressResult.progress, "requestCount")) {
-                        print.line("Requests processed: #local.progressResult.progress.requestCount#");
-                    }
-                    
-                    if (structKeyExists(local.progressResult.progress, "avgResponseTime")) {
-                        print.line("Average response time: #local.progressResult.progress.avgResponseTime# ms");
-                    }
-                    
-                    print.line();
-                }
-            }
-        }
-        
-        // Get final results
-        local.result = $sendToCliCommand(urlstring=local.urlParams & "&action=stop");
+        var analysisService = getInstance("AnalysisService@wheels-cli");
+        var results = analysisService.analyze(
+            path = arguments.path,
+            severity = "info"
+        );
         
         // Display results
-        if (structKeyExists(local.result, "analysis") && isStruct(local.result.analysis)) {
-            print.boldGreenLine("Analysis Complete!");
+        if (arguments.format == "console") {
+            displayCodeAnalysisResults(results);
+        } else if (arguments.format == "json") {
+            print.line(serializeJSON(results, true));
+        } else if (arguments.format == "html" && arguments.report) {
+            generateHTMLReport(results, "code-analysis");
+        }
+    }
+    
+    /**
+     * Run security analysis
+     */
+    private function runSecurityAnalysis(argumentCollection) {
+        print.line();
+        print.yellowBoldLine("🔒 Security Analysis");
+        print.line("────────────────────────");
+        
+        command("wheels analyze security")
+            .params(argumentCollection=arguments)
+            .run();
+    }
+    
+    /**
+     * Display code analysis results
+     */
+    private function displayCodeAnalysisResults(required struct results) {
+        if (results.totalIssues == 0) {
+            print.greenLine("✅ No issues found!");
+            return;
+        }
+        
+        print.line("Found #results.totalIssues# issues:");
+        print.line("  🔴 Errors: #results.summary.errors#");
+        print.line("  🟡 Warnings: #results.summary.warnings#");
+        print.line("  🔵 Info: #results.summary.info#");
+        print.line();
+        
+        // Display issues by file
+        for (var filePath in results.files) {
+            var fileIssues = results.files[filePath];
+            print.boldLine("📄 #filePath#");
+            
+            for (var issue in fileIssues) {
+                var icon = "";
+                switch(issue.severity) {
+                    case "error": icon = "🔴"; break;
+                    case "warning": icon = "🟡"; break;
+                    case "info": icon = "🔵"; break;
+                }
+                
+                print.line("  #icon# Line #issue.line#: #issue.message# (#issue.rule#)");
+            }
             print.line();
-            
-            // Display summary
-            if (structKeyExists(local.result.analysis, "summary")) {
-                print.boldYellowLine("Summary:");
-                print.line();
-                
-                local.summary = local.result.analysis.summary;
-                
-                if (structKeyExists(local.summary, "requestCount")) {
-                    print.line("Requests processed: #local.summary.requestCount#");
-                }
-                
-                if (structKeyExists(local.summary, "avgResponseTime")) {
-                    print.line("Average response time: #local.summary.avgResponseTime# ms");
-                }
-                
-                if (structKeyExists(local.summary, "maxResponseTime")) {
-                    print.line("Maximum response time: #local.summary.maxResponseTime# ms");
-                }
-                
-                if (structKeyExists(local.summary, "avgMemoryUsage")) {
-                    print.line("Average memory usage: #local.summary.avgMemoryUsage# MB");
-                }
-                
-                if (structKeyExists(local.summary, "maxMemoryUsage")) {
-                    print.line("Maximum memory usage: #local.summary.maxMemoryUsage# MB");
-                }
-                
-                if (structKeyExists(local.summary, "issueCount")) {
-                    print.line("Issues detected: #local.summary.issueCount#");
-                }
-                
-                print.line();
-            }
-            
-            // Display detailed results by target
-            if (arguments.target == "all" || arguments.target == "controller") {
-                displayControllerAnalysis(local.result.analysis);
-            }
-            
-            if (arguments.target == "all" || arguments.target == "view") {
-                displayViewAnalysis(local.result.analysis);
-            }
-            
-            if (arguments.target == "all" || arguments.target == "query") {
-                displayQueryAnalysis(local.result.analysis);
-            }
-            
-            if (arguments.target == "all" || arguments.target == "memory") {
-                displayMemoryAnalysis(local.result.analysis);
-            }
-            
-            // If a report was generated, show the path
-            if (arguments.report && structKeyExists(local.result, "reportPath")) {
-                print.line();
-                print.greenLine("HTML report generated at: #local.result.reportPath#");
-            }
-            
-            // Display recommendations
-            if (structKeyExists(local.result.analysis, "recommendations") && isArray(local.result.analysis.recommendations)) {
-                print.line();
-                print.boldYellowLine("Recommendations:");
-                print.line();
-                
-                for (local.i = 1; local.i <= arrayLen(local.result.analysis.recommendations); local.i++) {
-                    local.rec = local.result.analysis.recommendations[local.i];
-                    print.yellowLine("#local.i#. #local.rec.title#");
-                    print.line("   #local.rec.description#");
-                    print.line();
-                }
-            }
-        } else {
-            print.boldRedLine("Failed to complete analysis");
-            if (structKeyExists(local.result, "message")) {
-                print.redLine(local.result.message);
+        }
+    }
+    
+    /**
+     * Generate HTML report
+     */
+    private function generateHTMLReport(required struct results, required string reportType) {
+        var reportPath = fileSystemUtil.resolvePath("reports/#arguments.reportType#-#dateFormat(now(), 'yyyymmdd-HHmmss')#.html");
+        var reportDir = getDirectoryFromPath(reportPath);
+        
+        if (!directoryExists(reportDir)) {
+            directoryCreate(reportDir);
+        }
+        
+        // Generate HTML content
+        var html = generateReportHTML(arguments.results, arguments.reportType);
+        fileWrite(reportPath, html);
+        
+        print.greenLine("📊 HTML report generated: #reportPath#");
+    }
+    
+    /**
+     * Generate HTML content for report
+     */
+    private function generateReportHTML(required struct results, required string reportType) {
+        // Simple HTML report template
+        return '<!DOCTYPE html>
+<html>
+<head>
+    <title>Wheels ' & arguments.reportType & ' Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .summary { background: ##f0f0f0; padding: 15px; border-radius: 5px; }
+        .issue { margin: 10px 0; padding: 10px; border-left: 3px solid ##ddd; }
+        .error { border-color: ##ff0000; }
+        .warning { border-color: ##ffaa00; }
+        .info { border-color: ##0099ff; }
+    </style>
+</head>
+<body>
+    <h1>Wheels ' & arguments.reportType & ' Report</h1>
+    <div class="summary">
+        <h2>Summary</h2>
+        <pre>' & serializeJSON(arguments.results.summary, true) & '</pre>
+    </div>
+    <h2>Details</h2>
+    <pre>' & serializeJSON(arguments.results, true) & '</pre>
+</body>
+</html>';
+    }
+    
+    /**
+     * Helper to check if array contains value (case insensitive)
+     */
+    private function arrayContainsNoCase(required array arr, required string value) {
+        for (var item in arguments.arr) {
+            if (compareNoCase(item, arguments.value) == 0) {
+                return true;
             }
         }
+        return false;
     }
     
     /**
