@@ -13,8 +13,8 @@ echo "Building Wheels Base Template v${VERSION}"
 
 # Setup directories
 BUILD_DIR="build-wheels-base"
-EXPORT_DIR="artifacts/build-wheels-base/${VERSION}"
-BE_EXPORT_DIR="artifacts/build-wheels-base"
+EXPORT_DIR="artifacts/wheels/${VERSION}"
+BE_EXPORT_DIR="artifacts/wheels"
 
 # Cleanup and create directories
 rm -rf "${BUILD_DIR}"

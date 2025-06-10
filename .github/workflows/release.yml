@@ -61,11 +61,10 @@ jobs:
         with:
           name: wheels-base-template
           path: |
-            pwd
-            artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
-            artifacts/build-wheels-base/wheels-base-template-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/wheels/wheels-base-template-be.zip
 
       - name: Publish Wheels Base Template Package
         id: Publish-Base-Template
@@ -75,8 +74,7 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /artifacts/build-wheels-base
-          VERSION_NUMBER: ${{ env.WHEELS_VERSION }}
+          BOXJSON_DIR: /build-wheels-base
 
       - name: Build Wheels Core
         id: Build-Wheels-Core
@@ -90,10 +88,10 @@ jobs:
         with:
           name: wheels-core
           path: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.sha512
-            artifacts/wheels/wheels-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+            artifacts/wheels/wheels-core-be.zip
 
       - name: Publish Wheels Core package
         id: Publish-Core-Package
@@ -131,3 +129,12 @@ jobs:
           force: "true"
         env:
           BOXJSON_DIR: /build-wheels-cli/wheels-cli
+
+      - name: Upload All Wheels Artifacts (Combined)
+        id: Upload-All-Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-all-variants
+          path: |
+            artifacts/**/*
