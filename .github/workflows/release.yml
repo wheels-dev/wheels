@@ -48,15 +48,15 @@ jobs:
       - name: Make build scripts executable
         run: chmod +x build/scripts/*.sh
 
-      - name: Build Wheels Core
-        id: Build-Wheels-Core
-        run: |
-          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-
       - name: Build Wheels Base Template
         id: Build-Wheels-Base
         run: |
           ./build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Build Wheels Core
+        id: Build-Wheels-Core
+        run: |
+          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Build Wheels CLI
         id: Build-Wheels-CLI

@@ -13,36 +13,36 @@ echo "Building Wheels Base Template v${VERSION}"
 
 # Setup directories
 BUILD_DIR="build-wheels-base"
-EXPORT_DIR="artifacts/wheels/${VERSION}"
-BE_EXPORT_DIR="artifacts/wheels"
+EXPORT_DIR="artifacts/build-wheels-base/${VERSION}"
+BE_EXPORT_DIR="artifacts/build-wheels-base"
 
 # Cleanup and create directories
 rm -rf "${BUILD_DIR}"
-mkdir -p "${BUILD_DIR}/wheels"
+mkdir -p "${BUILD_DIR}"
 mkdir -p "${EXPORT_DIR}"
 mkdir -p "${BE_EXPORT_DIR}"
 
 # Create build label file
 BUILD_LABEL="wheels-base-template-${VERSION}-$(date +%Y%m%d%H%M%S)"
-echo "Built on $(date)" > "${BUILD_DIR}/wheels/${BUILD_LABEL}"
+echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 
 # Copy base template files
 echo "Copying base template files..."
-cp -r app "${BUILD_DIR}/wheels/"
-cp -r public "${BUILD_DIR}/wheels/"
-cp -r tests "${BUILD_DIR}/wheels/"
+cp -r app "${BUILD_DIR}/"
+cp -r public "${BUILD_DIR}/"
+cp -r tests "${BUILD_DIR}/"
 
 # Copy vendor directory from build/base if it exists
 if [ -d "build/base/vendor" ]; then
-    cp -r build/base/vendor "${BUILD_DIR}/wheels/"
+    cp -r build/base/vendor "${BUILD_DIR}/"
 fi
 
 # Copy template files, overwriting defaults
-cp build/base/box.json "${BUILD_DIR}/wheels/box.json"
-cp build/base/README.md "${BUILD_DIR}/wheels/README.md"
-cp build/base/server.json "${BUILD_DIR}/wheels/server.json"
-cp build/base/app/config/app.cfm "${BUILD_DIR}/wheels/app/config/app.cfm"
-cp build/base/app/config/settings.cfm "${BUILD_DIR}/wheels/app/config/settings.cfm"
+cp build/base/box.json "${BUILD_DIR}/box.json"
+cp build/base/README.md "${BUILD_DIR}/README.md"
+cp build/base/server.json "${BUILD_DIR}/server.json"
+cp build/base/app/config/app.cfm "${BUILD_DIR}/app/config/app.cfm"
+cp build/base/app/config/settings.cfm "${BUILD_DIR}/app/config/settings.cfm"
 
 # Replace version placeholders
 echo "Replacing version placeholders..."
@@ -70,7 +70,7 @@ fi
 
 # Create ZIP file
 echo "Creating ZIP package..."
-cd "${BUILD_DIR}" && zip -r "../${EXPORT_DIR}/wheels-base-template-${VERSION}.zip" wheels/ && cd ..
+cd "${BUILD_DIR}" && zip -r "../${EXPORT_DIR}/wheels-base-template-${VERSION}.zip" ./ && cd ..
 
 # Generate checksums
 echo "Generating checksums..."
