@@ -103,7 +103,7 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /build-cfwheels-core/cfwheels
+          BOXJSON_DIR: /build-wheels-core/wheels
 
       # publish base package
       - uses: pixl8/github-action-box-publish@v4
@@ -113,7 +113,7 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /build-cfwheels-base/cfwheels
+          BOXJSON_DIR: /build-wheels-base/wheels
 
       # publish CLI package
       - uses: pixl8/github-action-box-publish@v4
@@ -123,7 +123,7 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /build-cfwheels-cli/wheels-cli
+          BOXJSON_DIR: /build-wheels-cli/wheels-cli
 
 #      - name: Post Slack Message
 #        id: Post-Slack-Message
