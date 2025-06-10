@@ -95,9 +95,15 @@ publish_package() {
         echo "WARNING: box.json contains directory/package directives that might cause issues!"
     fi
     
-    # Set up CommandBox environment
-    export FORGEBOX_USERNAME="$FORGEBOX_USER"
-    export FORGEBOX_PASSWORD="$FORGEBOX_PASS"
+    # Login to ForgeBox first
+    echo "Logging into ForgeBox..."
+    box forgebox login username="$FORGEBOX_USER" password="$FORGEBOX_PASS"
+    
+    if [ $? -ne 0 ]; then
+        echo "✗ Failed to login to ForgeBox"
+        exit 1
+    fi
+    echo "✓ Successfully logged into ForgeBox"
     
     # Build the publish command with verbose output
     PUBLISH_CMD="box publish --verbose"
@@ -116,6 +122,8 @@ publish_package() {
         echo "✓ Successfully published $PACKAGE_NAME to ForgeBox"
     else
         echo "✗ Failed to publish $PACKAGE_NAME to ForgeBox"
+        # Log out before exiting on error
+        box forgebox logout
         exit 1
     fi
     
@@ -152,6 +160,10 @@ main() {
     
     # Publish Wheels CLI
     publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
+    
+    # Log out of ForgeBox
+    echo "Logging out of ForgeBox..."
+    box forgebox logout
     
     echo "=========================================="
     echo "All packages published successfully!"
