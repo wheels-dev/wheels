@@ -6,7 +6,7 @@
     "location":"forgeboxStorage",
     "slug":"wheels-base-template",
     "createPackageDirectory":false,
-    "type":"wheels-templates",
+    "type":"cfwheels-templates",
     "keywords":[
 			"mvc",
 			"rails",
@@ -14,13 +14,13 @@
 			"wheels",
 			"core"
 		],
-    "homepage":"https://wheels.org/",
-    "documentation":"https://docs.wheels.org/",
+    "homepage":"https://wheels.dev/",
+    "documentation":"https://wheels.dev/docs",
     "repository":{
 			"type":"git",
-			"URL":"https://github.com/wheels/wheels"
+			"URL":"https://github.com/wheels-dev/wheels"
 		},
-    "bugs":"https://github.com/wheels/wheels/issues",
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
 		"contributors":[
 			"Peter Amiri <peter@alurium.com>"
 		],
@@ -40,7 +40,7 @@
 				"testbox":"vendor/testbox/"
     },
     "dependencies":{
-        "wheels-core":"^@build.version@",
+        "wheels-core":"@build.version@",
 				"wirebox":"^7",
 				"testbox":"^5"
     },

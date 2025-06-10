@@ -8,22 +8,22 @@
     "directory":"vendor/wheels",
     "createPackageDirectory":true,
     "packageDirectory":"vendor/wheels",
-		"homepage":"https://wheels.org/",
-    "documentation":"https://docs.wheels.org/",
-    "changelog":"https://github.com/wheels/wheels/blob/master/CHANGELOG.md",
-    "bugs":"https://github.com/wheels/wheels/issues",
+		"homepage":"https://wheels.dev/",
+    "documentation":"https://wheels.dev/docs",
+    "changelog":"https://github.com/wheels-dev/wheels/blob/master/CHANGELOG.md",
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
 		"contributors":[
 			"Peter Amiri <peter@alurium.com>"
 		],
     "repository":{
         "type":"git",
-        "URL":"https://github.com/wheels/wheels"
+        "URL":"https://github.com/wheels-dev/wheels"
     },
     "keywords":[
         "mvc",
         "rails",
         "wheels",
-        "wheels",
+        "wheels.dev",
         "core"
     ],
     "ignore":[

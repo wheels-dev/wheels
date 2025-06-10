@@ -10,13 +10,13 @@
     "documentation":"https://guides.wheels.org/docs/command-line-tools/cli-commands",
     "repository":{
         "type":"GIT",
-        "URL":"https://github.com/wheels/wheels-cli"
+        "URL":"https://github.com/wheels-dev/wheels"
     },
-    "bugs":"https://github.com/wheels/wheels-cli/issues",
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
     "slug":"wheels-cli",
     "shortDescription":"Wheels.dev CLI Commands",
-    "description":"Command Line Interface for wheels framework providing code generation, database migrations, testing, and development tools",
-    "instructions":"Install via CommandBox by typing 'install wheels-cli'",
+    "description":"Command Line Interface for Wheels framework providing code generation, database migrations, testing, and development tools",
+    "instructions":"Install via CommandBox by typing 'box install wheels-cli'",
     "changelog":"",
     "type":"commandbox-modules",
     "keywords":"wheels.dev,wheels,cli,commands",
