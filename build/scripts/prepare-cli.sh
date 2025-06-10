@@ -31,13 +31,17 @@ rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --ex
 cp build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
 cp build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
 
-# Remove directory packaging directives that confuse ForgeBox
+# Update box.json for ForgeBox publishing
 echo "Adjusting box.json for ForgeBox..."
 if command -v jq >/dev/null 2>&1; then
-    jq 'del(.directory, .packageDirectory, .createPackageDirectory)' "${BUILD_DIR}/wheels-cli/box.json" > "${BUILD_DIR}/wheels-cli/box.json.tmp" && mv "${BUILD_DIR}/wheels-cli/box.json.tmp" "${BUILD_DIR}/wheels-cli/box.json"
+    # Update directory settings for proper packaging
+    # Keep directory as empty string (it's already empty in CLI)
+    jq 'del(.packageDirectory) | .createPackageDirectory = false' "${BUILD_DIR}/wheels-cli/box.json" > "${BUILD_DIR}/wheels-cli/box.json.tmp" && mv "${BUILD_DIR}/wheels-cli/box.json.tmp" "${BUILD_DIR}/wheels-cli/box.json"
 else
     # Fallback to sed if jq is not available
-    sed -i.bak '/"directory":/d; /"packageDirectory":/d; /"createPackageDirectory":/d' "${BUILD_DIR}/wheels-cli/box.json" && rm "${BUILD_DIR}/wheels-cli/box.json.bak"
+    sed -i.bak 's/"createPackageDirectory"[[:space:]]*:[[:space:]]*true/"createPackageDirectory":false/' "${BUILD_DIR}/wheels-cli/box.json"
+    sed -i.bak '/"packageDirectory":/d' "${BUILD_DIR}/wheels-cli/box.json"
+    rm -f "${BUILD_DIR}/wheels-cli/box.json.bak"
 fi
 
 # Replace version placeholders

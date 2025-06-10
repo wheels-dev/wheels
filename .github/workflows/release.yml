@@ -46,7 +46,10 @@ jobs:
           fi
 
       - name: Make build scripts executable
-        run: chmod +x build/scripts/*.sh
+        run: |
+          chmod +x build/scripts/*.sh
+          # List scripts for verification
+          ls -la build/scripts/
 
       #############################################
       # Prepare and Publish to ForgeBox
@@ -56,40 +59,23 @@ jobs:
         run: |
           ./build/scripts/prepare-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
-      - name: Publish Wheels Base Template to ForgeBox
-        uses: pixl8/github-action-box-publish@v4
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-wheels-base
-
       - name: Prepare Wheels Core for ForgeBox
         run: |
           ./build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-
-      - name: Publish Wheels Core to ForgeBox
-        uses: pixl8/github-action-box-publish@v4
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-wheels-core/wheels
 
       - name: Prepare Wheels CLI for ForgeBox
         run: |
           ./build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
-      - name: Publish Wheels CLI to ForgeBox
-        uses: pixl8/github-action-box-publish@v4
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-wheels-cli/wheels-cli
+      - name: Install CommandBox
+        run: |
+          curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
+          echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
+          sudo apt-get update && sudo apt-get install -y commandbox
+
+      - name: Publish All Packages to ForgeBox
+        run: |
+          ./build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true"
 
       #############################################
       # Build Artifacts for GitHub
