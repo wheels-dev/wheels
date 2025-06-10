@@ -45,10 +45,23 @@ jobs:
             echo "BRANCH=develop" >> $GITHUB_ENV
           fi
 
-      - name: Build Wheels Variants for ${{ env.BRANCH }} v${{ env.WHEELS_VERSION }}
-        id: Build-Wheels-Variants
+      - name: Make build scripts executable
+        run: chmod +x build/scripts/*.sh
+
+      - name: Build Wheels Core
+        id: Build-Wheels-Core
         run: |
-          ant -DisPreRelease=${{ env.WHEELS_PRERELEASE }} -Dwheels.version=${{ env.WHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
+          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Build Wheels Base Template
+        id: Build-Wheels-Base
+        run: |
+          ./build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Build Wheels CLI
+        id: Build-Wheels-CLI
+        run: |
+          ./build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Upload Wheels Core Artifact
         id: Upload-Wheels-Core
@@ -95,35 +108,35 @@ jobs:
           path: |
             artifacts/**/*
 
-      # publish core package
-      - uses: pixl8/github-action-box-publish@v4
+      - name: Publish core package
         id: Publish-Core-Package
+        uses: pixl8/github-action-box-publish@v4
         with:
           forgebox_user: wheels-dev
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /build-wheels-core/wheels
+          BOXJSON_DIR: build-wheels-core/wheels
 
-      # publish base package
-      - uses: pixl8/github-action-box-publish@v4
+      - name: Publish base package
         id: Publish-Base-Template
+        uses: pixl8/github-action-box-publish@v4
         with:
           forgebox_user: wheels-dev
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /build-wheels-base/wheels
+          BOXJSON_DIR: build-wheels-base/wheels
 
-      # publish CLI package
-      - uses: pixl8/github-action-box-publish@v4
+      - name: Publish CLI package
         id: Publish-CLI-Package
+        uses: pixl8/github-action-box-publish@v4
         with:
           forgebox_user: wheels-dev
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /build-wheels-cli/wheels-cli
+          BOXJSON_DIR: build-wheels-cli/wheels-cli
 
 #      - name: Post Slack Message
 #        id: Post-Slack-Message
