@@ -1,0 +1,178 @@
+# This workflow demonstrates an inline build approach that minimizes file copying
+# by building and publishing directly without intermediate directories
+name: Wheels Release (Inline Build)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_call:
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      FORGEBOX_API_TOKEN:
+        required: true
+      FORGEBOX_PASS:
+        required: true
+
+env:
+  WHEELS_PRERELEASE: false
+
+jobs:
+  build:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Environment Variables
+        run: |
+          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
+          echo "BRANCH=${{ github.ref == 'refs/heads/develop' && 'develop' || 'main' }}" >> $GITHUB_ENV
+
+      - name: Build and Publish Wheels Core
+        run: |
+          # Create temporary workspace
+          TEMP_DIR=$(mktemp -d)
+          cp -r vendor/wheels/* "$TEMP_DIR/"
+          cp build/core/box.json "$TEMP_DIR/"
+          cp build/core/README.md "$TEMP_DIR/"
+          
+          # Replace versions
+          if [ "${{ env.WHEELS_PRERELEASE }}" = "true" ]; then
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/@build\.number@/${{ github.run_number }}/g" {} \;
+          elif [ "${{ env.BRANCH }}" = "develop" ]; then
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/+@build\.number@/-snapshot/g" {} \;
+          else
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/@build\.number@/${{ github.run_number }}/g" {} \;
+          fi
+          
+          # Move to expected location for publishing
+          mkdir -p build-wheels-core
+          mv "$TEMP_DIR" build-wheels-core/wheels
+          
+          # Create artifacts
+          mkdir -p artifacts/wheels/${{ env.WHEELS_VERSION }}
+          cd build-wheels-core && zip -r ../artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-${{ env.WHEELS_VERSION }}.zip wheels/ && cd ..
+          
+          # Create checksums
+          cd artifacts/wheels/${{ env.WHEELS_VERSION }}
+          md5sum wheels-core-${{ env.WHEELS_VERSION }}.zip > wheels-core-${{ env.WHEELS_VERSION }}.md5
+          sha512sum wheels-core-${{ env.WHEELS_VERSION }}.zip > wheels-core-${{ env.WHEELS_VERSION }}.sha512
+          cd ../../..
+          
+          # Create bleeding edge
+          mkdir -p artifacts/wheels
+          cp artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-${{ env.WHEELS_VERSION }}.zip artifacts/wheels/wheels-core-be.zip
+
+      - name: Build and Publish Wheels Base Template
+        run: |
+          # Create temporary workspace
+          TEMP_DIR=$(mktemp -d)
+          mkdir -p "$TEMP_DIR/wheels"
+          cp -r app public tests "$TEMP_DIR/wheels/"
+          [ -d "build/base/vendor" ] && cp -r build/base/vendor "$TEMP_DIR/wheels/"
+          
+          # Copy templates
+          cp build/base/box.json "$TEMP_DIR/wheels/"
+          cp build/base/README.md "$TEMP_DIR/wheels/"
+          cp build/base/server.json "$TEMP_DIR/wheels/"
+          cp build/base/app/config/app.cfm "$TEMP_DIR/wheels/app/config/"
+          cp build/base/app/config/settings.cfm "$TEMP_DIR/wheels/app/config/"
+          
+          # Replace versions
+          if [ "${{ env.WHEELS_PRERELEASE }}" = "true" ]; then
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/@build\.number@/${{ github.run_number }}/g" {} \;
+          elif [ "${{ env.BRANCH }}" = "develop" ]; then
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/+@build\.number@/-snapshot/g" {} \;
+          else
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/@build\.number@/${{ github.run_number }}/g" {} \;
+          fi
+          
+          # Move to expected location
+          mkdir -p build-wheels-base
+          mv "$TEMP_DIR/wheels" build-wheels-base/
+          
+          # Create artifacts
+          cd build-wheels-base && zip -r ../artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-${{ env.WHEELS_VERSION }}.zip wheels/ && cd ..
+          
+          # Create checksums
+          cd artifacts/wheels/${{ env.WHEELS_VERSION }}
+          md5sum wheels-base-template-${{ env.WHEELS_VERSION }}.zip > wheels-base-template-${{ env.WHEELS_VERSION }}.md5
+          sha512sum wheels-base-template-${{ env.WHEELS_VERSION }}.zip > wheels-base-template-${{ env.WHEELS_VERSION }}.sha512
+          cd ../../..
+          
+          # Create bleeding edge
+          cp artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-${{ env.WHEELS_VERSION }}.zip artifacts/wheels/wheels-base-template-be.zip
+
+      - name: Build and Publish Wheels CLI
+        run: |
+          # Create temporary workspace
+          TEMP_DIR=$(mktemp -d)
+          mkdir -p "$TEMP_DIR/wheels-cli"
+          rsync -a --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --exclude='.git*' cli/ "$TEMP_DIR/wheels-cli/"
+          
+          # Copy templates
+          cp build/cli/box.json "$TEMP_DIR/wheels-cli/"
+          cp build/cli/README.md "$TEMP_DIR/wheels-cli/"
+          
+          # Replace versions
+          if [ "${{ env.WHEELS_PRERELEASE }}" = "true" ]; then
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfc" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/@build\.number@/${{ github.run_number }}/g" {} \;
+          elif [ "${{ env.BRANCH }}" = "develop" ]; then
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfc" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/+@build\.number@/-snapshot/g" {} \;
+          else
+            find "$TEMP_DIR" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfc" \) -exec sed -i "s/@build\.version@/${{ env.WHEELS_VERSION }}/g; s/@build\.number@/${{ github.run_number }}/g" {} \;
+          fi
+          
+          # Move to expected location
+          mkdir -p build-wheels-cli
+          mv "$TEMP_DIR/wheels-cli" build-wheels-cli/
+          
+          # Create artifacts
+          cd build-wheels-cli && zip -r ../artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-${{ env.WHEELS_VERSION }}.zip wheels-cli/ && cd ..
+          
+          # Create checksums
+          cd artifacts/wheels/${{ env.WHEELS_VERSION }}
+          md5sum wheels-cli-${{ env.WHEELS_VERSION }}.zip > wheels-cli-${{ env.WHEELS_VERSION }}.md5
+          sha512sum wheels-cli-${{ env.WHEELS_VERSION }}.zip > wheels-cli-${{ env.WHEELS_VERSION }}.sha512
+          cd ../../..
+          
+          # Create bleeding edge
+          cp artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-${{ env.WHEELS_VERSION }}.zip artifacts/wheels/wheels-cli-be.zip
+
+      - name: Upload All Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-all-variants
+          path: artifacts/**/*
+
+      - name: Publish Core to ForgeBox
+        uses: pixl8/github-action-box-publish@v4
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
+        env:
+          BOXJSON_DIR: /build-wheels-core/wheels
+
+      - name: Publish Base Template to ForgeBox
+        uses: pixl8/github-action-box-publish@v4
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
+        env:
+          BOXJSON_DIR: /build-wheels-base/wheels
+
+      - name: Publish CLI to ForgeBox
+        uses: pixl8/github-action-box-publish@v4
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
+        env:
+          BOXJSON_DIR: /build-wheels-cli/wheels-cli

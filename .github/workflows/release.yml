@@ -116,7 +116,7 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: build-wheels-core/wheels
+          BOXJSON_DIR: /build-wheels-core/wheels
 
       - name: Publish base package
         id: Publish-Base-Template
@@ -126,7 +126,7 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: build-wheels-base/wheels
+          BOXJSON_DIR: /build-wheels-base/wheels
 
       - name: Publish CLI package
         id: Publish-CLI-Package
@@ -136,7 +136,7 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: build-wheels-cli/wheels-cli
+          BOXJSON_DIR: /build-wheels-cli/wheels-cli
 
 #      - name: Post Slack Message
 #        id: Post-Slack-Message
