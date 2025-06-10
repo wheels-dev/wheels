@@ -1379,7 +1379,7 @@ component extends="testbox.system.BaseSpec" {
 						page = 1,
 						perPage = 3,
 						include = "comments",
-						order = "posts.createdAt DESC,posts.id DESC,comments.createdAt"
+						order = "_c_o_r_e_posts.createdAt DESC,_c_o_r_e_posts.id DESC,comments.createdAt"
 					)
 
 					expect(result['title'][1]).toBe("Title for fifth test post")
