@@ -63,6 +63,18 @@ jobs:
         run: |
           ./build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
+      - name: Upload Wheels Base Template Artifact
+        id: Upload-Wheels-Base
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-base-template
+          path: |
+            artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+            artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+            artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/build-wheels-base/wheels-base-template-be.zip
+
       - name: Upload Wheels Core Artifact
         id: Upload-Wheels-Core
         if: success()
@@ -74,18 +86,6 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-*.sha512
             artifacts/wheels/wheels-be.zip
-
-      - name: Upload Wheels Base Template Artifact
-        id: Upload-Wheels-Base
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-base-template
-          path: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
-            artifacts/wheels/wheels-base-template-be.zip
 
       - name: Upload Wheels CLI Artifact
         id: Upload-Wheels-CLI
