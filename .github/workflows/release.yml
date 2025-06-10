@@ -51,6 +51,7 @@ jobs:
       - name: Build Wheels Base Template
         id: Build-Wheels-Base
         run: |
+          pwd
           ./build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Upload Wheels Base Template Artifact
@@ -60,6 +61,7 @@ jobs:
         with:
           name: wheels-base-template
           path: |
+            pwd
             artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
             artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
             artifacts/build-wheels-base/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
