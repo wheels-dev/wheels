@@ -17,7 +17,13 @@
       "Bash(git add:*)",
       "Bash(cat:*)",
       "Bash(unzip:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(chmod:*)",
+      "Bash(./build/scripts/build-all.sh:*)",
+      "Bash(./build/scripts/build-core.sh:*)",
+      "Bash(bash:*)",
+      "Bash(git restore:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
