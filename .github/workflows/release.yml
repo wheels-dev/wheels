@@ -48,15 +48,60 @@ jobs:
       - name: Make build scripts executable
         run: chmod +x build/scripts/*.sh
 
-      - name: Build Wheels Base Template
-        id: Build-Wheels-Base
+      #############################################
+      # Prepare and Publish to ForgeBox
+      #############################################
+      
+      - name: Prepare Wheels Base Template for ForgeBox
         run: |
-          pwd
+          ./build/scripts/prepare-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Publish Wheels Base Template to ForgeBox
+        uses: pixl8/github-action-box-publish@v4
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
+        env:
+          BOXJSON_DIR: /build-wheels-base
+
+      - name: Prepare Wheels Core for ForgeBox
+        run: |
+          ./build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Publish Wheels Core to ForgeBox
+        uses: pixl8/github-action-box-publish@v4
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
+        env:
+          BOXJSON_DIR: /build-wheels-core/wheels
+
+      - name: Prepare Wheels CLI for ForgeBox
+        run: |
+          ./build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Publish Wheels CLI to ForgeBox
+        uses: pixl8/github-action-box-publish@v4
+        with:
+          forgebox_user: wheels-dev
+          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
+          force: "true"
+        env:
+          BOXJSON_DIR: /build-wheels-cli/wheels-cli
+
+      #############################################
+      # Build Artifacts for GitHub
+      #############################################
+
+      - name: Build All Wheels Artifacts
+        run: |
           ./build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Upload Wheels Base Template Artifact
-        id: Upload-Wheels-Base
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: wheels-base-template
@@ -66,24 +111,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
             artifacts/wheels/wheels-base-template-be.zip
 
-      - name: Publish Wheels Base Template Package
-        id: Publish-Base-Template
-        uses: pixl8/github-action-box-publish@v4
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-wheels-base
-
-      - name: Build Wheels Core
-        id: Build-Wheels-Core
-        run: |
-          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-
       - name: Upload Wheels Core Artifact
-        id: Upload-Wheels-Core
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: wheels-core
@@ -93,24 +121,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
             artifacts/wheels/wheels-core-be.zip
 
-      - name: Publish Wheels Core package
-        id: Publish-Core-Package
-        uses: pixl8/github-action-box-publish@v4
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-wheels-core/wheels
-
-      - name: Build Wheels CLI
-        id: Build-Wheels-CLI
-        run: |
-          ./build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-
       - name: Upload Wheels CLI Artifact
-        id: Upload-Wheels-CLI
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: wheels-cli
@@ -120,19 +131,7 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
             artifacts/wheels/wheels-cli-be.zip
 
-      - name: Publish Wheels CLI package
-        id: Publish-CLI-Package
-        uses: pixl8/github-action-box-publish@v4
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-wheels-cli/wheels-cli
-
       - name: Upload All Wheels Artifacts (Combined)
-        id: Upload-All-Artifacts
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: wheels-all-variants

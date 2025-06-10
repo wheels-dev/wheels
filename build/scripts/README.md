@@ -2,6 +2,20 @@
 
 This directory contains the build scripts that replace the previous Ant-based build system. These scripts are used by the GitHub Actions workflow to build the three Wheels variants: Core, Base Template, and CLI.
 
+## Two Types of Scripts
+
+### 1. Prepare Scripts (for ForgeBox Publishing)
+- `prepare-core.sh`, `prepare-base.sh`, `prepare-cli.sh`
+- These scripts prepare the directory structure WITHOUT creating ZIP files
+- Used by the ForgeBox publish action which creates its own packages
+- Files remain in place for the publish action to package
+
+### 2. Build Scripts (for GitHub Artifacts)
+- `build-core.sh`, `build-base.sh`, `build-cli.sh`
+- These scripts create complete ZIP packages with checksums
+- Used for creating GitHub release artifacts
+- Creates both versioned and bleeding-edge (-be) packages
+
 ## Scripts
 
 ### Individual Build Scripts
