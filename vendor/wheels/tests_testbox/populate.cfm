@@ -181,7 +181,7 @@ CREATE TABLE _c_o_r_e_posts
 <!--- Add index for posts.authorid (only for SQL Server and MySQL/MariaDB) --->
 <cfif local.db IS "microsoftsqlserver" OR local.db IS "mysql">
     <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-    	CREATE INDEX idx_posts_authorid ON posts(authorid)
+    	CREATE INDEX idx_posts_authorid ON _c_o_r_e_posts(authorid)
     </cfquery>
 </cfif>
 
