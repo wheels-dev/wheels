@@ -25,6 +25,9 @@ jobs:
   build:
     name: Build & Publish Release
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: /home/runner/work/wheels-dev/wheels
     steps:
       - name: Checkout Repository
         id: Checkout-Repository
