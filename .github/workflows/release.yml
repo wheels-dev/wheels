@@ -73,7 +73,8 @@ jobs:
           forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
           force: "true"
         env:
-          BOXJSON_DIR: /build-wheels-base/
+          BOXJSON_DIR: artifacts/build-wheels-base/
+          VERSION_NUMBER: ${{ env.WHEELS_VERSION }}
 
       - name: Build Wheels Core
         id: Build-Wheels-Core

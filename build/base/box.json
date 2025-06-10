@@ -1,6 +1,6 @@
 {
     "name":"Wheels Base Template",
-    "version":"@build.version@",
+    "version":"${VERSION_NUMBER}",
     "author":"Wheels Core Team and Community",
     "shortDescription":"Wheels Framework Base Template",
     "location":"forgeboxStorage",
@@ -40,7 +40,7 @@
 				"testbox":"vendor/testbox/"
     },
     "dependencies":{
-        "wheels-core":"@build.version@",
+        "wheels-core":"${VERSION_NUMBER}",
 				"wirebox":"^7",
 				"testbox":"^5"
     },
