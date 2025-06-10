@@ -23,7 +23,8 @@
       "Bash(./build/scripts/build-core.sh:*)",
       "Bash(bash:*)",
       "Bash(git restore:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": []
   }
