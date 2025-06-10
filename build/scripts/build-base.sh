@@ -46,24 +46,24 @@ cp build/base/app/config/settings.cfm "${BUILD_DIR}/app/config/settings.cfm"
 
 # Replace version placeholders
 echo "Replacing version placeholders..."
-find "${BUILD_DIR}/wheels" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
+find "${BUILD_DIR}" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
     sed -i.bak "s/@build\.version@/${VERSION}/g" "$file" && rm "${file}.bak"
 done
 
 # Handle build number based on release type
 if [ "${IS_PRERELEASE}" = "true" ]; then
     # PreRelease: use build number as-is
-    find "${BUILD_DIR}/wheels" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
+    find "${BUILD_DIR}" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
         sed -i.bak "s/@build\.number@/${BUILD_NUMBER}/g" "$file" && rm "${file}.bak"
     done
 elif [ "${BRANCH}" = "develop" ]; then
     # Snapshot: replace +@build.number@ with -snapshot
-    find "${BUILD_DIR}/wheels" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
+    find "${BUILD_DIR}" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
         sed -i.bak "s/+@build\.number@/-snapshot/g" "$file" && rm "${file}.bak"
     done
 else
     # Regular release: use build number as-is
-    find "${BUILD_DIR}/wheels" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
+    find "${BUILD_DIR}" -type f -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" | while read file; do
         sed -i.bak "s/@build\.number@/${BUILD_NUMBER}/g" "$file" && rm "${file}.bak"
     done
 fi
