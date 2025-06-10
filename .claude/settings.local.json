@@ -24,7 +24,9 @@
       "Bash(bash:*)",
       "Bash(git restore:*)",
       "Bash(git commit:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(./build/scripts/debug-forgebox.sh:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }
