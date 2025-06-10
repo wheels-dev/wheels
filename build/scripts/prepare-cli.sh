@@ -31,6 +31,15 @@ rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --ex
 cp build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
 cp build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
 
+# Remove directory packaging directives that confuse ForgeBox
+echo "Adjusting box.json for ForgeBox..."
+if command -v jq >/dev/null 2>&1; then
+    jq 'del(.directory, .packageDirectory, .createPackageDirectory)' "${BUILD_DIR}/wheels-cli/box.json" > "${BUILD_DIR}/wheels-cli/box.json.tmp" && mv "${BUILD_DIR}/wheels-cli/box.json.tmp" "${BUILD_DIR}/wheels-cli/box.json"
+else
+    # Fallback to sed if jq is not available
+    sed -i.bak '/"directory":/d; /"packageDirectory":/d; /"createPackageDirectory":/d' "${BUILD_DIR}/wheels-cli/box.json" && rm "${BUILD_DIR}/wheels-cli/box.json.bak"
+fi
+
 # Replace version placeholders
 echo "Replacing version placeholders..."
 find "${BUILD_DIR}/wheels-cli" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) | while read file; do
