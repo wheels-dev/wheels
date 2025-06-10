@@ -15,10 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cfengine: [ "lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023" ]
+        cfengine:
+          ["lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023"]
         dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
-        commandbox_version: [ "6.2.1" ]
-        jdkVersion: [ "21" ]
+        commandbox_version: ["6.2.1"]
+        jdkVersion: ["21"]
         experimental: [false]
         include:
           # Lucee 7 experimental tests (non-blocking)
@@ -44,22 +45,6 @@ jobs:
             experimental: true
           - cfengine: "lucee@7"
             dbengine: "oracle"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          # Adobe ColdFusion 2025 experimental tests (non-blocking)
-          - cfengine: "adobe@2025"
-            dbengine: "mysql"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "adobe@2025"
-            dbengine: "postgres"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "adobe@2025"
-            dbengine: "sqlserver"
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
@@ -114,6 +99,12 @@ jobs:
             dbengine: h2
           - cfengine: adobe@2025
             dbengine: oracle
+          - cfengine: adobe@2025
+            dbengine: mysql
+          - cfengine: adobe@2025
+            dbengine: postgres
+          - cfengine: adobe@2025
+            dbengine: sqlserver
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
