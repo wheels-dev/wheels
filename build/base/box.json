@@ -48,7 +48,7 @@
     "license":[
         {
             "type":"Apache License 2.0",
-            "URL":"https://github.com/wheels/wheels/blob/master/LICENSE"
+            "URL":"https://github.com/wheels-dev/wheels/blob/master/LICENSE"
         }
     ],
     "scripts":{

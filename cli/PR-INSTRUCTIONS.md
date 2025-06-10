@@ -33,7 +33,7 @@ Added comprehensive documentation in the `docs/` directory covering all CLI comm
 ---
 
 To create this pull request manually:
-1. Go to: https://github.com/cfwheels/wheels-cli/pulls
+1. Go to: https://github.com/wheels-dev/wheels/pulls
 2. Click "New pull request"
 3. Select the source branch: "feature/cli-improvements"
 4. Select the target branch: "main"
