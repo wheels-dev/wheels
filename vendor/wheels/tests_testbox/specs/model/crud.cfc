@@ -551,16 +551,16 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is selecting calculated property when implicitly selecting fields", () => {
-				posts = g.model("Post").findAll(select="_c_o_r_e_posts.id,_c_o_r_e_posts.title,_c_o_r_e_posts.authorid,_c_o_r_e_comments.id AS commentid,_c_o_r_e_comments.name,titleAlias", include="Comments")
+				posts = g.model("Post").findAll(select="_c_o_r_e_posts.id,_c_o_r_e_posts.title,_c_o_r_e_posts.authorid,_c_o_r_e_comments.id AS commentid,_c_o_r_e_comments.name,titleAlias", include="_c_o_r_e_comments")
 
 				expect(isDefined("posts.titleAlias")).toBeTrue()
 			})
 
 			it("is selecting ambiguous column name using alias", () => {
-				loc.query = g.model("Post").findAll(select="createdat,commentcreatedat,commentbody", include="Comments")
+				loc.query = g.model("Post").findAll(select="createdat,_c_o_r_e_commentcreatedat,_c_o_r_e_commentbody", include="_c_o_r_e_comments")
 	    		loc.columnList = ListSort(loc.query.columnList, "text")
 
-	    		expect(loc.columnList).toBe("commentbody,commentcreatedat,createdat")
+	    		expect(loc.columnList).toBe("createdat,_c_o_r_e_commentbody,_c_o_r_e_commentcreatedat")
 			})
 		})
 
@@ -1333,13 +1333,13 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is working with include", () => {
-				result = g.model("post").findAll(include = "comments", order = "createdAt DESC,id DESC,name")
+				result = g.model("post").findAll(include = "_c_o_r_e_comments", order = "createdAt DESC,id DESC,name")
 
 				expect(result['title'][1]).toBe("Title for fifth test post")
 			})
 
 			it("is working with include and identical columns", () => {
-				result = g.model("post").findAll(include = "comments", order = "createdAt,createdAt")
+				result = g.model("post").findAll(include = "_c_o_r_e_comments", order = "createdAt,createdAt")
 
 				expect(result['title'][1]).toBe("Title for first test post")
 			})
@@ -1363,7 +1363,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("is working with paginated include and identical columns", () => {
 				if (g.get("adaptername") != "MySQL") {
-					result = g.model("post").findAll(page = 1, perPage = 3, include = "comments", order = "createdAt,createdAt")
+					result = g.model("post").findAll(page = 1, perPage = 3, include = "_c_o_r_e_comments", order = "createdAt,createdAt")
 
 					expect(result['title'][1]).toBe("Title for first test post")
 				} else {
@@ -1378,7 +1378,7 @@ component extends="testbox.system.BaseSpec" {
 					result = g.model("post").findAll(
 						page = 1,
 						perPage = 3,
-						include = "comments",
+						include = "_c_o_r_e_comments",
 						order = "_c_o_r_e_posts.createdAt DESC,_c_o_r_e_posts.id DESC,_c_o_r_e_comments.createdAt"
 					)
 
@@ -1778,7 +1778,7 @@ component extends="testbox.system.BaseSpec" {
 				transaction action="begin"	{
 					loc.query0 = g.model("Post").findAll(where="averagerating = '5.0'")
 					expect(loc.query0.recordcount).toBe(0)
-					loc.query1 = g.model("Post").updateAll(averagerating = "5.0", where = "_c_o_r_e_comments.postid = '1'", include = "Comments")
+					loc.query1 = g.model("Post").updateAll(averagerating = "5.0", where = "_c_o_r_e_comments.postid = '1'", include = "_c_o_r_e_comments")
 					loc.query2 = g.model("Post").findAll(where="averagerating = '5.0'")
 					transaction action="rollback";
 				}
