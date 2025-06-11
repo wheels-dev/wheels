@@ -22,7 +22,7 @@ jobs:
         jdkVersion: ["21"]
         experimental: [false]
         include:
-          Lucee 7 experimental tests (non-blocking)
+          # Lucee 7 experimental tests (non-blocking)
           - cfengine: "lucee@7"
             dbengine: "h2"
             commandbox_version: "6.2.1"
