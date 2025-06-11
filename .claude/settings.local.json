@@ -30,7 +30,9 @@
       "mcp__puppeteer__puppeteer_evaluate",
       "Bash(git -C /Users/peter/projects/wheels status)",
       "Bash(.claude/scripts/cli/test-cli-command.sh:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(/project:cli:test \"wheels init\")",
+      "Bash(/Users/peter/projects/wheels/test-core-commands.sh:*)"
     ],
     "deny": []
   }
