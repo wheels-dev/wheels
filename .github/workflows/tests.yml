@@ -165,7 +165,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Test Results Engine ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+          name: test-results-${{ matrix.cfengine }}-${{ matrix.dbengine }}
           path: |
             /tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt
 
@@ -180,7 +180,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: workflow-logs-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          name: logs-${{ matrix.cfengine }}-${{ matrix.dbengine }}
           path: |
             ${{ runner.temp }}/_runner_diag/
             ${{ runner.temp }}/_github_workflow/

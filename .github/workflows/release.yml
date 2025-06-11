@@ -90,7 +90,7 @@ jobs:
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-base-template
+          name: build-artifacts-base-template
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
@@ -100,7 +100,7 @@ jobs:
       - name: Upload Wheels Core Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-core
+          name: build-artifacts-core
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
@@ -110,7 +110,7 @@ jobs:
       - name: Upload Wheels CLI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-cli
+          name: build-artifacts-cli
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
@@ -120,7 +120,7 @@ jobs:
       - name: Upload All Wheels Artifacts (Combined)
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-all-variants
+          name: build-artifacts-all
           path: |
             artifacts/**/*
 
@@ -128,7 +128,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: workflow-logs-release
+          name: logs-release
           path: |
             ${{ runner.temp }}/_runner_diag/
             ${{ runner.temp }}/_github_workflow/
