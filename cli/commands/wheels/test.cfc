@@ -39,7 +39,7 @@ component extends="base" {
 		We then need to know the target server IP, port, and the location/query string of the tests
 		We're always going to want to return JSON.
 
-	  		wheels test [type]	[server-name] [reload] [debug] [format]
+	  		wheels test [type]	[serverName] [reload] [debug] [format]
 	*/
 	  function $buildTestSuite(
 	  	required string type,
@@ -49,16 +49,17 @@ component extends="base" {
 	  	string format="json",
 		string adapter=""
 	  ){
-	  		// Get Server Details from CB
-	  		var serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments["server-name"] } );
+	  		// Get Server Details
+	  		var serverInfo = $getServerInfo();
+	  		var serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments.serverName } );
 	  		// Massage into something more managable
 	  		var loc ={
 	  			type              = arguments.type,
-	  			servername        = arguments["server-name"],
+	  			servername        = arguments.serverName,
 	  			serverdefaultName = serverDetails.defaultName,
 	  			configFile        = serverDetails.defaultServerConfigFile,
-	  			host              = serverDetails.serverInfo.host,
-	  			port              = serverDetails.serverInfo.port,
+	  			host              = serverInfo.host,
+	  			port              = serverInfo.port,
 	  			format 			  = arguments.format,
 	  			debug             = arguments.debug,
 	  			reload            = arguments.reload,

@@ -288,6 +288,36 @@ component excludeFromHelp=true {
 			}
 		}
 		
+		// Try to get server status using box server status command
+		try {
+			var serverStatusResult = command("server status").params(getCWD()).run(returnOutput=true);
+			
+			// Parse the output to find the port
+			// Looking for pattern like "http://127.0.0.1:63155" or "(running)  http://127.0.0.1:63155"
+			var portMatch = reFindNoCase("https?://[^:]+:(\d+)", serverStatusResult, 1, true);
+			if (arrayLen(portMatch.pos) >= 2 && portMatch.pos[2] > 0) {
+				local.port = mid(serverStatusResult, portMatch.pos[2], portMatch.len[2]);
+				
+				// Extract host from the same match
+				var hostMatch = reFindNoCase("https?://([^:]+):", serverStatusResult, 1, true);
+				if (arrayLen(hostMatch.pos) >= 2 && hostMatch.pos[2] > 0) {
+					local.host = mid(serverStatusResult, hostMatch.pos[2], hostMatch.len[2]);
+				} else {
+					local.host = "127.0.0.1";
+				}
+				
+				local.serverURL = "http://" & local.host & ":" & local.port;
+				return local;
+			}
+			
+			// Check if server is not running
+			if (findNoCase("stopped", serverStatusResult) || findNoCase("not running", serverStatusResult)) {
+				error("Server is not running. Please start the server using 'box server start' before running database migrations.");
+			}
+		} catch (any e) {
+			// Continue to next fallback
+		}
+		
 		// Fall back to original method
 		var serverDetails = serverService.resolveServerDetails( serverProps={ webroot=getCWD() } );
 		
