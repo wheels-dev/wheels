@@ -21,90 +21,90 @@ jobs:
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
         experimental: [false]
-        # include:
-          # Lucee 7 experimental tests (non-blocking)
-          # - cfengine: "lucee@7"
-          #   dbengine: "h2"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee@7"
-          #   dbengine: "mysql"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee@7"
-          #   dbengine: "postgres"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee@7"
-          #   dbengine: "sqlserver"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee@7"
-          #   dbengine: "oracle"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
+        include:
+          Lucee 7 experimental tests (non-blocking)
+          - cfengine: "lucee@7"
+            dbengine: "h2"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "mysql"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "postgres"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "sqlserver"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "oracle"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
         exclude:
-          - cfengine: lucee@5
-            dbengine: mysql
-          - cfengine: lucee@5
-            dbengine: postgres
-          - cfengine: lucee@5
-            dbengine: sqlserver
-          - cfengine: lucee@5
-            dbengine: h2
-          - cfengine: lucee@5
-            dbengine: oracle
-          - cfengine: lucee@6
-            dbengine: mysql
-          - cfengine: lucee@6
-            dbengine: postgres
-          - cfengine: lucee@6
-            dbengine: sqlserver
+          # - cfengine: lucee@5
+          #   dbengine: mysql
+          # - cfengine: lucee@5
+          #   dbengine: postgres
+          # - cfengine: lucee@5
+          #   dbengine: sqlserver
+          # - cfengine: lucee@5
+          #   dbengine: h2
+          # - cfengine: lucee@5
+          #   dbengine: oracle
+          # - cfengine: lucee@6
+          #   dbengine: mysql
+          # - cfengine: lucee@6
+          #   dbengine: postgres
+          # - cfengine: lucee@6
+          #   dbengine: sqlserver
           # - cfengine: lucee@6
           #   dbengine: h2
-          - cfengine: lucee@6
-            dbengine: oracle
-          - cfengine: lucee@7
-            dbengine: mysql
-          - cfengine: lucee@7
-            dbengine: postgres
-          - cfengine: lucee@7
-            dbengine: sqlserver
-          - cfengine: lucee@7
+          # - cfengine: lucee@6
+          #   dbengine: oracle
+          # - cfengine: lucee@7
+          #   dbengine: mysql
+          # - cfengine: lucee@7
+          #   dbengine: postgres
+          # - cfengine: lucee@7
+          #   dbengine: sqlserver
+          # - cfengine: lucee@7
+          #   dbengine: h2
+          # - cfengine: lucee@7
+          #   dbengine: oracle
+          # - cfengine: adobe@2018
+          #   dbengine: mysql
+          # - cfengine: adobe@2018
+          #   dbengine: postgres
+          # - cfengine: adobe@2018
+          #   dbengine: sqlserver
+          - cfengine: adobe@2018
             dbengine: h2
-          - cfengine: lucee@7
-            dbengine: oracle
-          - cfengine: adobe@2018
-            dbengine: mysql
-          - cfengine: adobe@2018
-            dbengine: postgres
-          - cfengine: adobe@2018
-            dbengine: sqlserver
-          - cfengine: adobe@2018
-            dbengine: h2
           - cfengine: adobe@2018
             dbengine: oracle
-          - cfengine: adobe@2021
-            dbengine: mysql
-          - cfengine: adobe@2021
-            dbengine: postgres
-          - cfengine: adobe@2021
-            dbengine: sqlserver
+          # - cfengine: adobe@2021
+          #   dbengine: mysql
+          # - cfengine: adobe@2021
+          #   dbengine: postgres
+          # - cfengine: adobe@2021
+          #   dbengine: sqlserver
           - cfengine: adobe@2021
             dbengine: h2
           - cfengine: adobe@2021
             dbengine: oracle
-          - cfengine: adobe@2023
-            dbengine: mysql
-          - cfengine: adobe@2023
-            dbengine: postgres
-          - cfengine: adobe@2023
-            dbengine: sqlserver
+          # - cfengine: adobe@2023
+          #   dbengine: mysql
+          # - cfengine: adobe@2023
+          #   dbengine: postgres
+          # - cfengine: adobe@2023
+          #   dbengine: sqlserver
           - cfengine: adobe@2023
             dbengine: h2
           - cfengine: adobe@2023
@@ -175,3 +175,12 @@ jobs:
           box version
           box server info serverConfigFile="server.json" --json
           box server log serverConfigFile="server.json"
+
+      - name: Upload Workflow Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-logs-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          path: |
+            ${{ runner.temp }}/_runner_diag/
+            ${{ runner.temp }}/_github_workflow/

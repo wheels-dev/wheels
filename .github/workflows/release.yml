@@ -123,3 +123,12 @@ jobs:
           name: wheels-all-variants
           path: |
             artifacts/**/*
+
+      - name: Upload Workflow Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-logs-release
+          path: |
+            ${{ runner.temp }}/_runner_diag/
+            ${{ runner.temp }}/_github_workflow/
