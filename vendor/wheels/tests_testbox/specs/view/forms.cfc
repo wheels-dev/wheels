@@ -94,6 +94,57 @@ component extends="testbox.system.BaseSpec" {
 
 				expect(e).toBe(r)
 			})
+			
+			it("encodes HTML content when encode=true", () => {
+				r = _controller.buttonTag(content = "Button with <strong>bold</strong> text", encode = true)
+				e = '<button type="submit" value="save">Button with &lt;strong&gt;bold&lt;&##x2f;strong&gt; text</button>'
+				
+				expect(e).toBe(r)
+			})
+			
+			it("does not encode HTML content when encode=false", () => {
+				r = _controller.buttonTag(content = "Button with <strong>bold</strong> text", encode = false)
+				e = '<button type="submit" value="save">Button with <strong>bold</strong> text</button>'
+				
+				expect(e).toBe(r)
+			})
+			
+			it("encodes HTML attributes when encode=true", () => {
+				r = _controller.buttonTag(
+					content = "Click me", 
+					class = 'btn btn-danger" onclick="alert(\"xss\")',
+					encode = true
+				)
+				e = '<button class="btn&##x20;btn-danger&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" type="submit" value="save">Click me</button>'
+				
+				expect(e).toBe(r)
+			})
+			
+			it("handles complex HTML content with encode=true", () => {
+				htmlContent = 'Button with <strong>bold</strong> and <script>alert("XSS")</script>'
+				r = _controller.buttonTag(content = htmlContent, encode = true)
+				e = '<button type="submit" value="save">Button with &lt;strong&gt;bold&lt;&##x2f;strong&gt; and &lt;script&gt;alert&##x28;&quot;XSS&quot;&##x29;&lt;&##x2f;script&gt;</button>'
+				
+				expect(e).toBe(r)
+			})
+			
+			it("handles both attributes and content correctly when encode=attributes", () => {
+				r = _controller.buttonTag(
+					content = "Button with <strong>bold</strong> text",
+					class = 'button" onclick="alert(\"xss\")',
+					encode = "attributes"
+				)
+				e = '<button class="button&quot;&##x20;onclick&##x3d;&quot;alert&##x28;&quot;xss&quot;&##x29;" type="submit" value="save">Button with <strong>bold</strong> text</button>'
+				
+				expect(e).toBe(r)
+			})
+			
+			it("supports HTML entities in content with encode=false", () => {
+				r = _controller.buttonTag(content = "Button with &lt;strong&gt;HTML entities&lt;/strong&gt;", encode = false)
+				e = '<button type="submit" value="save">Button with &lt;strong&gt;HTML entities&lt;/strong&gt;</button>'
+				
+				expect(e).toBe(r)
+			})
 		})
 
 		describe("Tests that checkbox", () => {
