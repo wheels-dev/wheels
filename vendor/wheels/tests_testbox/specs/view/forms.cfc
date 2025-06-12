@@ -228,6 +228,15 @@ component extends="testbox.system.BaseSpec" {
 
 				expect(e).toBe(r)
 			})
+
+			it("encodes HTML in value when encode=false", () => {
+				_controller = g.controller(name = "ControllerWithModel")
+
+				e = _controller.hiddenField(objectName = "user", property = "firstname", encode = "false")
+				r = '<input id="user-firstname" name="user[firstname]" type="hidden" value="Tony">'
+
+				expect(e).toBe(r)
+			})
 		})
 
 		describe("Tests that hiddenFieldTag", () => {
@@ -237,6 +246,24 @@ component extends="testbox.system.BaseSpec" {
 
 				e = _controller.hiddenFieldTag(name = "userId", value = "tony")
 				r = '<input id="userId" name="userId" type="hidden" value="tony">'
+
+				expect(e).toBe(r)
+			})
+
+			it("encodes HTML in value when encode=true", () => {
+				_controller = g.controller(name = "dummy")
+
+				e = _controller.hiddenFieldTag(name = "userId", value = "tony with <strong>bold</strong> text", encode = "true")
+				r = '<input id="userId" name="userId" type="hidden" value="tony&##x20;with&##x20;&lt;strong&gt;bold&lt;&##x2f;strong&gt;&##x20;text">'
+
+				expect(e).toBe(r)
+			})
+			
+			it("encodes HTML in value when encode=false", () => {
+				_controller = g.controller(name = "dummy")
+
+				e = _controller.hiddenFieldTag(name = "userId", value = "tony with <strong>bold</strong> text", encode = "false")
+				r = '<input id="userId" name="userId" type="hidden" value="tony with <strong>bold</strong> text">'
 
 				expect(e).toBe(r)
 			})
