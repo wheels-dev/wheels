@@ -1,5 +1,13 @@
 <cfscript>
 
+	public void function deleteMigratorVersions(required numeric levelId) {
+		queryExecute(
+			"DELETE FROM migratorversions WHERE level_id = :levelId",
+			{ levelId = arguments.levelId },
+			{ datasource = application.wheels.dataSourceName }
+		);
+	}
+
 	public any function $cleanSqlDirectory() {
 		local.path = migrator.paths.sql;
 		if (DirectoryExists(local.path)) {
