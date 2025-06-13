@@ -179,6 +179,7 @@ component {
 		application.$wheels.writeMigratorSQLFiles = false;
 		application.$wheels.migratorObjectCase = "lower";
 		application.$wheels.allowMigrationDown = false;
+		application.$wheels.migrationLevel = 1;
 		if (application.$wheels.environment == "development") {
 			application.$wheels.allowMigrationDown = true;
 		}

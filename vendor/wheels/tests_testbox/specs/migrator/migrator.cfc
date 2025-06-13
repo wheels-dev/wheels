@@ -38,10 +38,10 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that getCurrentMigrationVersion", () => {
 
 			it("is returning expected value", () => {
-				for (local.table in ["bunyips", "dropbears", "hoopsnakes", "migratorversions", "_c_o_r_e_levels"]) {
+				for (local.table in ["bunyips", "dropbears", "hoopsnakes"]) {
 					migration.dropTable(local.table)
 				}
-
+				deleteMigratorVersions(2);
 				expected = "002"
 				migrator.migrateTo(expected)
 				actual = migrator.getCurrentMigrationVersion()
@@ -55,9 +55,10 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that migrateTo", () => {
 
 			beforeEach(() => {
-				for (local.table in ["bunyips", "dropbears", "hoopsnakes", "migrations", "migratorversions", "_c_o_r_e_levels"]) {
+				for (local.table in ["bunyips", "dropbears", "hoopsnakes", "migrations"]) {
 					migration.dropTable(local.table)
 				}
+				deleteMigratorVersions(2);
 				$cleanSqlDirectory()
 				originalWriteMigratorSQLFiles = Duplicate(application.wheels.writeMigratorSQLFiles)
 				originalMigratorTableName = Duplicate(application.wheels.migratorTableName)

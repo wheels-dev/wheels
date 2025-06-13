@@ -242,7 +242,7 @@ component output="false" extends="wheels.Global"{
 		if (!StructKeyExists(request, "$wheelsDebugSQL"))
 			$query(
 				datasource = application[local.appKey].dataSourceName,
-				sql = "INSERT INTO #application[local.appKey].migratorTableName# (version) VALUES ('#$sanitiseVersion(arguments.version)#')"
+				sql = "INSERT INTO #application[local.appKey].migratorTableName# (version, level_id) VALUES ('#$sanitiseVersion(arguments.version)#', #application[local.appKey].migrationLevel#)"
 			);
 	}
 
@@ -325,9 +325,30 @@ component output="false" extends="wheels.Global"{
 	private string function $getVersionsPreviouslyMigrated() {
 		local.appKey = $appKey();
 		try {
+			local.levelsCheck = $query(
+				datasource = application[local.appKey].dataSourceName,
+				sql = "SELECT * FROM _c_o_r_e_levels LIMIT 1"
+			);
+		} catch (any e) {
+			if (application[local.appKey].createMigratorTable) {
+				$query(
+					datasource = application[local.appKey].dataSourceName,
+					sql = "CREATE TABLE _c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))"
+				);
+				$query(
+					datasource = application[local.appKey].dataSourceName,
+					sql = "INSERT INTO _c_o_r_e_levels (id, name, description) VALUES (1, 'App', 'Application level migrations')"
+				);
+				$query(
+					datasource = application[local.appKey].dataSourceName,
+					sql = "INSERT INTO _c_o_r_e_levels (id, name, description) VALUES (2, 'Test', 'Test level migrations')"
+				);
+			}
+		}
+		try {
 			local.migratedVersions = $query(
 				datasource = application[local.appKey].dataSourceName,
-				sql = "SELECT version FROM #application[local.appKey].migratorTableName# ORDER BY version ASC"
+				sql = "SELECT version FROM #application[local.appKey].migratorTableName# WHERE level_id = #application[local.appKey].migrationLevel# ORDER BY version ASC"
 			);
 			if (!local.migratedVersions.recordcount) {
 				return 0;
@@ -338,7 +359,7 @@ component output="false" extends="wheels.Global"{
 			if (application[local.appKey].createMigratorTable) {
 				$query(
 					datasource = application[local.appKey].dataSourceName,
-					sql = "CREATE TABLE #application[local.appKey].migratorTableName# (version VARCHAR(25))"
+					sql = "CREATE TABLE #application[local.appKey].migratorTableName# (version VARCHAR(25), level_id INT NOT NULL DEFAULT 1)"
 				);
 			}
 			return 0;
