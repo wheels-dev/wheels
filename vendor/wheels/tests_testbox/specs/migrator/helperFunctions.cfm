@@ -3,7 +3,12 @@
 	public void function deleteMigratorVersions(required numeric levelId) {
 		queryExecute(
 			"DELETE FROM migratorversions WHERE level_id = :levelId",
-			{ levelId = arguments.levelId },
+			{
+				levelId = {
+					value      = arguments.levelId,
+					cfsqltype  = "cf_sql_integer"
+				}
+        	},
 			{ datasource = application.wheels.dataSourceName }
 		);
 	}

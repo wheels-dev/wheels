@@ -324,10 +324,24 @@ component output="false" extends="wheels.Global"{
 	 */
 	private string function $getVersionsPreviouslyMigrated() {
 		local.appKey = $appKey();
+
+		/* Choose appropriate SQL syntax for LIMIT based on database engine */
+		local.info = $dbinfo(
+			type = "version",
+			datasource = application.wheels.dataSourceName,
+			username = application.wheels.dataSourceUserName,
+			password = application.wheels.dataSourcePassword
+		);
+		if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)){
+			local.sql = "SELECT TOP 1 * FROM _c_o_r_e_levels"
+		} else{
+			local.sql = "SELECT * FROM _c_o_r_e_levels LIMIT 1";
+		}
+
 		try {
 			local.levelsCheck = $query(
 				datasource = application[local.appKey].dataSourceName,
-				sql = "SELECT * FROM _c_o_r_e_levels LIMIT 1"
+				sql = local.sql
 			);
 		} catch (any e) {
 			if (application[local.appKey].createMigratorTable) {
