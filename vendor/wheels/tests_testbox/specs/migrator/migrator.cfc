@@ -140,7 +140,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("uses specified versions table name", () => {
-				tableName = "migratorversions"
+				tableName = "_c_o_r_e_migrator_versions"
 				application.wheels.migratorTableName = tableName
 
 				migrator.migrateTo(001)
@@ -161,8 +161,8 @@ component extends="testbox.system.BaseSpec" {
 				t = migration.createTable(name = tableName)
 				t.string(columnNames = "name", default = "", null = true, limit = 255)
 				t.create()
-				migration.removeRecord(table = "migratorversions")
-				migration.addRecord(table = "migratorversions", version = "001")
+				migration.removeRecord(table = "_c_o_r_e_migrator_versions")
+				migration.addRecord(table = "_c_o_r_e_migrator_versions", version = "001")
 
 				$cleanSqlDirectory()
 			})

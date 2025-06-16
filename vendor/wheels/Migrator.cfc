@@ -242,7 +242,7 @@ component output="false" extends="wheels.Global"{
 		if (!StructKeyExists(request, "$wheelsDebugSQL"))
 			$query(
 				datasource = application[local.appKey].dataSourceName,
-				sql = "INSERT INTO #application[local.appKey].migratorTableName# (version, level_id) VALUES ('#$sanitiseVersion(arguments.version)#', #application[local.appKey].migrationLevel#)"
+				sql = "INSERT INTO #application[local.appKey].migratorTableName# (version, core_level) VALUES ('#$sanitiseVersion(arguments.version)#', #application[local.appKey].migrationLevel#)"
 			);
 	}
 
@@ -362,7 +362,7 @@ component output="false" extends="wheels.Global"{
 		try {
 			local.migratedVersions = $query(
 				datasource = application[local.appKey].dataSourceName,
-				sql = "SELECT version FROM #application[local.appKey].migratorTableName# WHERE level_id = #application[local.appKey].migrationLevel# ORDER BY version ASC"
+				sql = "SELECT version FROM #application[local.appKey].migratorTableName# WHERE core_level = #application[local.appKey].migrationLevel# ORDER BY version ASC"
 			);
 			if (!local.migratedVersions.recordcount) {
 				return 0;
@@ -371,10 +371,30 @@ component output="false" extends="wheels.Global"{
 			}
 		} catch (any e) {
 			if (application[local.appKey].createMigratorTable) {
-				$query(
-					datasource = application[local.appKey].dataSourceName,
-					sql = "CREATE TABLE #application[local.appKey].migratorTableName# (version VARCHAR(25), level_id INT NOT NULL DEFAULT 1)"
-				);
+				try {
+					$query(
+						datasource = application[local.appKey].dataSourceName,
+						sql = "SELECT version FROM migratorversions"
+					);
+					if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)) {
+						local.sql = "EXEC sp_rename 'migratorversions', '#application[local.appKey].migratorTableName#'"
+					} else {
+						local.sql = "ALTER TABLE migratorversions RENAME TO #application[local.appKey].migratorTableName#";
+					}
+					$query(
+						datasource = application[local.appKey].dataSourceName,
+						sql = local.sql
+					);
+					$query(
+						datasource = application[local.appKey].dataSourceName,
+						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD core_level INT NOT NULL DEFAULT 1;"
+					);
+				} catch ( any e ) {
+					$query(
+						datasource = application[local.appKey].dataSourceName,
+						sql = "CREATE TABLE #application[local.appKey].migratorTableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)"
+					);
+				}
 			}
 			return 0;
 		}
