@@ -137,6 +137,9 @@
         application.wo.set(modelPath = local.AssetPath & "models")
         application.wo.set(wheelsComponentPath = "/wheels")
 
+        /* set migration level for tests*/
+        application.wheels.migrationLevel = 2;
+        
         /* turn off default validations for testing */
         application.wheels.automaticValidations = false
         application.wheels.assetQueryString = false
