@@ -149,6 +149,10 @@ component extends="wheels.migrator.Migration" {
             t.string(columnName="name");
             t.integer(columnName="age");
             t.boolean(columnName="active", default=true);
+            t.text(columnName="description");
+            // MySQL only: use size parameter for larger text fields
+            t.text(columnName="content", size="mediumtext"); // 16MB
+            t.text(columnName="largeContent", size="longtext"); // 4GB
             t.timestamps();
             t.create();
         }
