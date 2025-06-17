@@ -7,15 +7,13 @@ component {
 	 *
 	 * @encode [see:styleSheetLinkTag].
 	 */
-	public string function csrfMetaTags(boolean encode) {
+	public string function csrfMetaTags() {
 		$args(name = "csrfMetaTags", args = arguments);
 		local.metaTags = $tag(name = "meta", attributes = {name = "csrf-param", content = "authenticityToken"});
 		local.metaTags &= $tag(
 			name = "meta",
-			attributes = {name = "csrf-token", content = $generateAuthenticityToken()},
-			encode = arguments.encode
+			attributes = {name = "csrf-token", content = $generateAuthenticityToken()}
 		);
-
 		return local.metaTags;
 	}
 
