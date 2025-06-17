@@ -32,7 +32,8 @@
       "Bash(.claude/scripts/cli/test-cli-command.sh:*)",
       "Bash(timeout:*)",
       "Bash(/project:cli:test \"wheels init\")",
-      "Bash(/Users/peter/projects/wheels/test-core-commands.sh:*)"
+      "Bash(/Users/peter/projects/wheels/test-core-commands.sh:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }
