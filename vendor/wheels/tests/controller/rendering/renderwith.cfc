@@ -260,4 +260,47 @@ component extends="wheels.tests.Test" {
 		assert("actual EQ expected");
 	}
 
+	// Test renderWith doesn't require view for JSON when auto-generating
+	function test_render_with_json_no_view_required() {
+		params = {controller = "ApiTest", action = "renderWithJson", format = "json"};
+		_controller = controller("ApiTest", params);
+		local.data = {test = true, message = "No view needed"};
+		// This should work without throwing ViewNotFound
+		_controller.renderWith(data = local.data);
+		assert("IsJSON(_controller.response()) eq true");
+		assert("_controller.response() Contains 'No view needed'");
+	}
+
+	// Test renderWith doesn't require view for XML when auto-generating
+	function test_render_with_xml_no_view_required() {
+		params = {controller = "ApiTest", action = "renderWithXml", format = "xml"};
+		_controller = controller("ApiTest", params);
+		local.data = {test = true, message = "XML without view"};
+		// This should work without throwing ViewNotFound
+		_controller.renderWith(data = local.data);
+		assert("IsXML(_controller.response()) eq true");
+	}
+
+	// Test renderWith respects onlyProvides
+	function test_render_with_only_provides() {
+		params = {controller = "ApiTest", action = "renderWithJson", format = "json"};
+		_controller = controller("ApiTest", params);
+		// ApiTest controller uses onlyProvides("json,xml")
+		local.data = {restricted = true};
+		_controller.renderWith(data = local.data);
+		assert("IsJSON(_controller.response()) eq true");
+	}
+
+	// Test renderWith sets response properly (addressing bug fix)
+	function test_render_with_sets_response() {
+		params = {controller = "test", action = "test2", format = "json"};
+		_controller = controller("test", params);
+		_controller.provides("json");
+		local.data = {verified = true, timestamp = Now()};
+		_controller.renderWith(data = local.data);
+		// Verify response is set (not just returned)
+		assert("Len(_controller.response()) gt 0");
+		assert("IsJSON(_controller.response()) eq true");
+	}
+
 }
