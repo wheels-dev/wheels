@@ -23,7 +23,7 @@
 	set(URLRewriting="On");
 
 	// Reload your application with ?reload=true&password=|reloadPassword|
-	set(reloadPassword="wheelstestdb");
+	set(reloadPassword="");
 
 	// CLI-Appends-Here
 </cfscript>
