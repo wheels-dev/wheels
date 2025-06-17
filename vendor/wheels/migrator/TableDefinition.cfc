@@ -86,6 +86,19 @@ component extends="Base" {
 		arguments.adapter = this.adapter;
 		arguments.name = arguments.columnName;
 		arguments.type = arguments.columnType;
+		
+		if (StructKeyExists(arguments, "size") 
+			&& arguments.columnType == "text" 
+			&& arguments.adapter.adapterName() == "MySQL") {
+
+			local.size = LCase(arguments.size);
+			if (ListFindNoCase("mediumtext,longtext", local.size)) {
+				arguments.type = local.size;
+			} else {
+				arguments.type = "text";
+			}
+		}
+
 		local.column = CreateObject("component", "ColumnDefinition").init(argumentCollection = arguments);
 		ArrayAppend(this.columns, local.column);
 		return this;
@@ -262,12 +275,19 @@ component extends="Base" {
 	}
 
 	/**
-	 * adds text columns to table definition
+	 * Adds text columns to table definition.
+	 *
+	 * In MySQL databases, you can specify different text sizes:
+	 * - Regular TEXT (65KB) - default when no size is specified
+	 * - MEDIUMTEXT (16MB) - specify size="mediumtext"
+	 * - LONGTEXT (4GB) - specify size="longtext"
+	 *
+	 * For other database engines, the size parameter is ignored and the default text type is used.
 	 *
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]
 	 */
-	public any function text(string columnNames, string default, boolean null) {
+	public any function text(string columnNames, string default, boolean null, string size) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "text";
 		local.iEnd = ListLen(arguments.columnNames);

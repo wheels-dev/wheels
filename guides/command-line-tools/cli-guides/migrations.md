@@ -85,6 +85,8 @@ function up() {
         // Column types
         t.string("name", limit=100);
         t.text("description");
+        t.text("content", size="mediumtext"); // MySQL only: mediumtext (16MB)
+        t.text("longDescription", size="longtext"); // MySQL only: longtext (4GB)
         t.integer("quantity");
         t.bigInteger("views");
         t.float("weight");
