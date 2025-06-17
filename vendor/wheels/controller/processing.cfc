@@ -145,23 +145,63 @@ component {
 			$invoke(method = "onMissingMethod", invokeArgs = local.invokeArgs);
 		}
 		if (!$performedRenderOrRedirect()) {
-			try {
-				renderView();
-			} catch (any e) {
-				local.file = $get("viewPath")
-				& "/"
-				& LCase(ListChangeDelims(variables.$class.name, '/', '.'))
-				& "/"
-				& LCase(arguments.action)
-				& ".cfm";
-				if (FileExists(ExpandPath(local.file))) {
-					Throw(object = e);
-				} else {
-					$throwErrorOrShow404Page(
-						type = "Wheels.ViewNotFound",
-						message = "Could not find the view page for the `#arguments.action#` action in the `#variables.$class.name#` controller.",
-						extendedInfo = "Create a file named `#LCase(arguments.action)#.cfm` in the `app/views/#LCase(ListChangeDelims(variables.$class.name, '/', '.'))#` directory (create the directory as well if it doesn't already exist)."
+			// Check if we should skip automatic view rendering
+			local.contentType = $requestContentType();
+			local.acceptableFormats = $acceptableFormats(action = arguments.action);
+			
+			// Only attempt to render a view if:
+			// 1. The content type is html OR
+			// 2. The content type is in the acceptable formats AND a format-specific template exists
+			local.shouldRenderView = true;
+			
+			if (local.contentType != "html") {
+				// For non-HTML formats, check if we should skip view rendering
+				if (!ListFindNoCase(local.acceptableFormats, local.contentType)) {
+					// Format not acceptable for this action
+					local.shouldRenderView = false;
+				} else if (ListFindNoCase("json,xml", local.contentType)) {
+					// JSON and XML can be auto-generated, so check if a template exists
+					local.templateName = $generateRenderWithTemplatePath(
+						controller = variables.params.controller,
+						action = arguments.action,
+						template = "",
+						contentType = local.contentType
 					);
+					if (!$formatTemplatePathExists($name = local.templateName)) {
+						// No template exists and these formats can be auto-generated
+						local.shouldRenderView = false;
+					}
+				}
+			}
+			
+			if (local.shouldRenderView) {
+				try {
+					renderView();
+				} catch (any e) {
+					local.file = $get("viewPath")
+					& "/"
+					& LCase(ListChangeDelims(variables.$class.name, '/', '.'))
+					& "/"
+					& LCase(arguments.action)
+					& ".cfm";
+					if (FileExists(ExpandPath(local.file))) {
+						Throw(object = e);
+					} else {
+						// For non-HTML formats, provide a more helpful error message
+						if (local.contentType != "html") {
+							$throwErrorOrShow404Page(
+								type = "Wheels.ViewNotFound",
+								message = "No content was rendered for the `#arguments.action#` action in the `#variables.$class.name#` controller.",
+								extendedInfo = "For content type `#local.contentType#`, either: 1) Call a render function (renderText, renderWith, etc.) in your action, 2) Create a view template named `#LCase(arguments.action)#.#local.contentType#.cfm`, or 3) Use onlyProvides() to restrict acceptable formats."
+							);
+						} else {
+							$throwErrorOrShow404Page(
+								type = "Wheels.ViewNotFound",
+								message = "Could not find the view page for the `#arguments.action#` action in the `#variables.$class.name#` controller.",
+								extendedInfo = "Create a file named `#LCase(arguments.action)#.cfm` in the `app/views/#LCase(ListChangeDelims(variables.$class.name, '/', '.'))#` directory (create the directory as well if it doesn't already exist)."
+							);
+						}
+					}
 				}
 			}
 		}
