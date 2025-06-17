@@ -33,7 +33,10 @@
       "Bash(timeout:*)",
       "Bash(/project:cli:test \"wheels init\")",
       "Bash(/Users/peter/projects/wheels/test-core-commands.sh:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(server start)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)"
     ],
     "deny": []
   }
