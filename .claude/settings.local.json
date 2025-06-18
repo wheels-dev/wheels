@@ -47,7 +47,9 @@
       "WebFetch(domain:www.forgebox.io)",
       "Bash(./fix-subdomains.sh:*)",
       "Bash(git pull:*)",
-      "Bash(gh pr checkout:*)"
+      "Bash(gh pr checkout:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)"
     ],
     "deny": []
   }
