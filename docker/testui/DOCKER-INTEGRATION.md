@@ -1,6 +1,6 @@
-# Docker Integration Guide for CFWheels TestUI
+# Docker Integration Guide for Wheels TestUI
 
-This document provides instructions for running the new CFWheels TestUI with Docker.
+This document provides instructions for running the new Wheels TestUI with Docker.
 
 ## Prerequisites
 
@@ -15,14 +15,14 @@ The TestUI consists of two services:
 
 ## Using Docker Compose
 
-The TestUI has been integrated into the main CFWheels `compose.yml` file. You can run it using the following commands:
+The TestUI has been integrated into the main Wheels `compose.yml` file. You can run it using the following commands:
 
 ### Production Mode
 
 To run the TestUI in production mode:
 
 ```bash
-# From the root CFWheels directory
+# From the root Wheels directory
 docker compose --profile ui up -d
 ```
 

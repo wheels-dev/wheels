@@ -17,10 +17,10 @@ This containerized approach ensures that all core framework tests run consistent
 
 ## Prerequisites
 
-To use the CFWheels core test environment, you'll need:
+To use the Wheels core test environment, you'll need:
 
 1. [Docker](https://www.docker.com/products/docker-desktop/) installed and running
-2. [Git](https://git-scm.com/downloads) to clone the CFWheels repository
+2. [Git](https://git-scm.com/downloads) to clone the Wheels repository
 3. [CommandBox](https://www.ortussolutions.com/products/commandbox) installed to manage dependencies and run commands
 4. Basic familiarity with command-line operations
 

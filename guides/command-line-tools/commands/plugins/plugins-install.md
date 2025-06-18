@@ -1,6 +1,6 @@
 # plugins install
 
-Installs a CFWheels CLI plugin from various sources including ForgeBox, GitHub, or local files.
+Installs a Wheels CLI plugin from various sources including ForgeBox, GitHub, or local files.
 
 ## Usage
 
@@ -17,7 +17,7 @@ wheels plugins install <name> [--dev] [--global] [--version=<version>]
 
 ## Description
 
-The `plugins install` command downloads and installs CFWheels plugins into your application. It supports multiple installation sources:
+The `plugins install` command downloads and installs Wheels plugins into your application. It supports multiple installation sources:
 
 - **ForgeBox Registry**: Official and community plugins
 - **GitHub Repositories**: Direct installation from GitHub
@@ -118,7 +118,7 @@ wheels plugins install https://example.com/plugin.zip
 
 ## Notes
 
-- Plugins must be compatible with your CFWheels version
+- Plugins must be compatible with your Wheels version
 - Always backup your application before installing plugins
 - Some plugins require manual configuration after installation
 - Use `wheels plugins list` to verify installation

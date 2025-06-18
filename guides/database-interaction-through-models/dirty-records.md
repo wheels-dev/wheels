@@ -29,7 +29,7 @@ post = model("post").findByKey(1);
 result = post.hasChanged();
 ```
 
-Here we are using the [hasChanged()](https://api.wheels.dev/model.haschanged.html) method to see if any of the object properties has changed.
+Here we are using the [hasChanged()](https://wheels.dev/api/v3.0.0/model.haschanged.html) method to see if any of the object properties has changed.
 
 By the way, when we are talking about "change" in Wheels, we always mean whether or not an object's properties have changed compared to what is stored in the columns they map to in the database table.
 
@@ -44,13 +44,13 @@ result = post.hasChanged();
 
 Now result will be `true` because what is stored in `post.title` differs from what is stored in the `title`column for this record in the `posts` table (well, unless the title was "A New Post Title" even before the change, in which case the result would still be `false`).
 
-When calling [hasChanged()](https://api.wheels.dev/model.haschanged.html) with no arguments, Wheels will check **all** properties on the object and return `true` if any of them have changed. If you want to see if a specific property has changed, you can pass in `property="title"` to it or use the dynamic method [XXXHasChanged()](https://api.wheels.dev/model.haschanged.html). Replace `XXX` with the name of the property. In our case, the method would then be named `titleHasChanged()`.
+When calling [hasChanged()](https://wheels.dev/api/v3.0.0/model.haschanged.html) with no arguments, Wheels will check **all** properties on the object and return `true` if any of them have changed. If you want to see if a specific property has changed, you can pass in `property="title"` to it or use the dynamic method `[propertyName]HasChanged()`. Replace `[propertyName]` with the name of the property. In our case, the method would then be named `titleHasChanged()`.
 
-If you want to see what a value was before a change was made, you can do so by calling [changedFrom()](https://api.wheels.dev/model.changedfrom.html) and passing in the name of a property. This can also be done with the dynamic [XXXChangedFrom()](https://api.wheels.dev/model.changedfrom.html) method.
+If you want to see what a value was before a change was made, you can do so by calling [changedFrom()](https://wheels.dev/api/v3.0.0/model.changedfrom.html) and passing in the name of a property. This can also be done with the dynamic `[propertyName]ChangedFrom()` method.
 
-When an object is in a changed state, there are a couple of methods you can use to report back on these changes. [changedProperties()](https://api.wheels.dev/model.changedproperties.html) will give you a list of the property names that have been changed. [allChanges()](https://api.wheels.dev/model.allchanges.html) returns a struct containing all the changes (both the property names and the changed values themselves).
+When an object is in a changed state, there are a couple of methods you can use to report back on these changes. [changedProperties()](https://wheels.dev/api/v3.0.0/model.changedproperties.html) will give you a list of the property names that have been changed. [allChanges()](https://wheels.dev/api/v3.0.0/model.allchanges.html) returns a struct containing all the changes (both the property names and the changed values themselves).
 
-If you have made changes to an object and for some reason you want to revert it back, you can do so by calling [reload()](https://api.wheels.dev/model.reload.html) on it. This will query the database and update the object properties with their corresponding values from the database.
+If you have made changes to an object and for some reason you want to revert it back, you can do so by calling [reload()](https://wheels.dev/api/v3.0.0/model.reload.html) on it. This will query the database and update the object properties with their corresponding values from the database.
 
 OK, let's save the object to the database now and see how that affects things.
 
@@ -71,6 +71,6 @@ It's worth noting here that Wheels makes good use of this change tracking intern
 
 ### One "Gotcha" About Tracking Changes
 
-If you create a brand new object with the [new()](https://api.wheels.dev/model.new.html) method and call [hasChanged()](https://api.wheels.dev/model.haschanged.html) on it, it will return `true`. The reason for this seemingly unexpected behavior is that change is always viewed from the database's perspective. The [hasChanged()](https://api.wheels.dev/model.haschanged.html) method will return `true` in this case because it is different from what is stored in the database (i.e. it doesn't exist at all in the database yet).
+If you create a brand new object with the [new()](https://wheels.dev/api/v3.0.0/model.new.html) method and call [hasChanged()](https://wheels.dev/api/v3.0.0/model.haschanged.html) on it, it will return `true`. The reason for this seemingly unexpected behavior is that change is always viewed from the database's perspective. The [hasChanged()](https://wheels.dev/api/v3.0.0/model.haschanged.html) method will return `true` in this case because it is different from what is stored in the database (i.e. it doesn't exist at all in the database yet).
 
-If you would simply like to know if an object exists in the database or not, you can use the [isNew()](https://api.wheels.dev/model.isnew.html) method.
+If you would simply like to know if an object exists in the database or not, you can use the [isNew()](https://wheels.dev/api/v3.0.0/model.isnew.html) method.

@@ -43,7 +43,7 @@ It is also important to note that although you can overwrite functions, they are
 
 ### Example: Overriding timeAgoInWords()
 
-Let's say that we wanted Wheels's built-in function [timeAgoInWords()](https://api.wheels.dev/controller.timeAgoInWords.html) to return the time followed by the string " (approximately)":
+Let's say that we wanted Wheels's built-in function [timeAgoInWords()](https://wheels.dev/api/v3.0.0/controller.timeAgoInWords.html) to return the time followed by the string " (approximately)":
 
 {% code title="timeAgoInWords.cfc" %}
 ```javascript

@@ -62,7 +62,7 @@ By default, view files are named after the action names and are stored in folder
 
 In our `/site-map/search-engines` URL example, the corresponding view file would be stored at `app/views/sitemap/searchengines.cfm`.
 
-For information on overriding this behavior, refer to documentation for the [renderView()](https://api.wheels.dev/controller.renderview.html) function and read the [Pages](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/pages) chapter.
+For information on overriding this behavior, refer to documentation for the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function and read the [Pages](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/pages) chapter.
 
 ### Layouts
 
@@ -72,7 +72,7 @@ Controller-level layouts can also be set automatically by creating a file called
 
 When a controller-level layout is present, it overrides the default layout stored in the root `app/views` folder.
 
-For information on overriding the layout file to be loaded by an action, see the chapter on [Layouts](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/layouts) and documentation for the [renderView](https://api.wheels.dev/controller.renderview.html) function.
+For information on overriding the layout file to be loaded by an action, see the chapter on [Layouts](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/layouts) and documentation for the [renderView](https://wheels.dev/api/v3.0.0/controller.renderview.html) function.
 
 ### Naming Conventions for Models and Databases
 
@@ -92,7 +92,7 @@ For example, a `user` model represents a record from the `users` database table.
 
 Like controller files, models are also CFCs and are named in `PascalCase`. They are stored in the `app/models` folder. So the user model would be stored at `app/models/User.cfc`.
 
-For instructions on overriding database naming conventions, refer to documentation for the [table()](https://api.wheels.dev/model.table.html) function and the chapter on [Object Relational Mapping](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-relational-mapping).
+For instructions on overriding database naming conventions, refer to documentation for the [table()](https://wheels.dev/api/v3.0.0/model.table.html) function and the chapter on [Object Relational Mapping](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-relational-mapping).
 
 ### Everything in the Database is Lowercase
 
@@ -102,7 +102,7 @@ Because of CFML's case-insensitive nature, we recommend that you refer to model 
 
 In the `customersegments` example above, you could refer to the properties in your CFML as `title`, `regionId`, and `incomeLevel` to stick to CFML's Java-style roots. (Built-in CFML functions are often written in `camelCase` and `PascalCase`, after all.)
 
-For information on overriding column and property names, refer to documentation for the [property()](https://api.wheels.dev/model.property.html) function and the [Object Relational Mapping](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-relational-mapping) chapter.
+For information on overriding column and property names, refer to documentation for the [property()](https://wheels.dev/api/v3.0.0/model.property.html) function and the [Object Relational Mapping](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-relational-mapping) chapter.
 
 ### Configuration and Defaults
 

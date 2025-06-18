@@ -6,9 +6,9 @@ description: >-
 
 # Linking Pages
 
-Wheels's built-in [linkTo()](https://api.wheels.dev/controller.linkto.html) function does all of the heavy lifting involved with linking the different pages of your application together. You'll generally be using [linkTo()](https://api.wheels.dev/controller.linkto.html) within your view code.
+Wheels's built-in [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function does all of the heavy lifting involved with linking the different pages of your application together. You'll generally be using [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) within your view code.
 
-As you'll soon realize, the [linkTo()](https://api.wheels.dev/controller.linkto.html) function accepts a whole bunch of arguments. We won't go over all of them here, so don't forget to have a look at the [documentation](https://api.wheels.dev/controller.linkto.html) for the complete details.
+As you'll soon realize, the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function accepts a whole bunch of arguments. We won't go over all of them here, so don't forget to have a look at the [documentation](https://wheels.dev/api/v3.0.0/controller.linkto.html) for the complete details.
 
 ### Default Wildcard Linking
 
@@ -23,7 +23,7 @@ mapper()
 ```
 {% endcode %}
 
-The call to [wildcard()](https://api.wheels.dev/mapper.wildcard.html) allows a simple linking structure where we can use the [linkTo()](https://api.wheels.dev/controller.linkto.html) helper to link to a combination of controller and action.
+The call to [wildcard()](https://wheels.dev/api/v3.0.0/mapper.wildcard.html) allows a simple linking structure where we can use the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) helper to link to a combination of controller and action.
 
 For example, if we had a `widgets` controller with a `new` action, we could link to it like this:
 
@@ -41,7 +41,7 @@ That would generally produce this HTML markup:
 
 If you're developing a non-trivial Wheels application, you'll quickly grow out of the wildcard-based routing. You'll likely need to link to URLs containing primary keys, URL-friendly slugged titles, and nested subfolders. Now would be a good time to take a deep dive into the [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter and learn the concepts.
 
-When you're using [linkTo()](https://api.wheels.dev/controller.linkto.html) to create links to routes, you need to pay attention to 2 pieces of information: the route _name_ and any _parameters_ that the route requires.
+When you're using [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) to create links to routes, you need to pay attention to 2 pieces of information: the route _name_ and any _parameters_ that the route requires.
 
 Let's work with a set of sample routes to practice creating links:
 
@@ -282,17 +282,17 @@ To link to a delete request's required `DELETE` method, we need to code the link
 )#
 ```
 
-The [buttonTo()](https://api.wheels.dev/controller.buttonto.html) helper generates a form with submit button. As you can see from the example, you can style the submit button itself by prepending any arguments with `input` (e.g., `inputClass`).
+The [buttonTo()](https://wheels.dev/api/v3.0.0/controller.buttonto.html) helper generates a form with submit button. As you can see from the example, you can style the submit button itself by prepending any arguments with `input` (e.g., `inputClass`).
 
 Then it is up to you to style the form and submit button to look like a link or button using CSS (using whatever `class`es that you prefer in your markup, of course).
 
-If you need even more control, you can code up your own [startFormTag()](https://api.wheels.dev/controller.startformtag.html) with whatever markup that you like. Just be sure to pass `method="delete"` to the call to `startFormTag`.
+If you need even more control, you can code up your own [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html) with whatever markup that you like. Just be sure to pass `method="delete"` to the call to `startFormTag`.
 
 By the way, this will work with any request method that you please: `post`, `patch`, and `put` as well as `delete`.
 
 ### Extreme Example
 
-If we were to use all of the parameters for [linkTo()](https://api.wheels.dev/controller.linkto.html), our code may look something like this:
+If we were to use all of the parameters for [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html), our code may look something like this:
 
 ```html
 #linkTo(
@@ -316,7 +316,7 @@ Which would generate this HTML (or something like it):
 
 ### Images and Other Embedded HTML in Link Texts
 
-If you'd like to use an image as a link to another page, pass the output of [imageTag()](https://api.wheels.dev/controller.imagetag.html) to the `text` argument of [linkTo()](https://api.wheels.dev/controller.linkto.html)and use the `encode` argument to instruct `linkTo` to only encode `attributes`:
+If you'd like to use an image as a link to another page, pass the output of [imageTag()](https://wheels.dev/api/v3.0.0/controller.imagetag.html) to the `text` argument of [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html)and use the `encode` argument to instruct `linkTo` to only encode `attributes`:
 
 ```html
 #linkTo(
@@ -345,9 +345,9 @@ If you decide to opt out of encoding, be careful. Any dynamic data passed in to 
 
 ### Adding Additional Attributes Like class, rel, and id
 
-Like many of the other Wheels view helpers, any additional arguments that you pass to [linkTo()](https://api.wheels.dev/controller.linkto.html) will be added to the generated `<a>` tag as attributes.
+Like many of the other Wheels view helpers, any additional arguments that you pass to [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) will be added to the generated `<a>` tag as attributes.
 
-For example, if you'd like to add a `class` attribute value of button to your link, here's what the call to [linkTo()](https://api.wheels.dev/controller.linkto.html) would look like:
+For example, if you'd like to add a `class` attribute value of button to your link, here's what the call to [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) would look like:
 
 ```
 #linkTo(text="Check Out", route="checkout", class="button")#
@@ -357,7 +357,7 @@ The same goes for any other argument that you pass, including but not limited to
 
 ### What If I Don't Have URL Rewriting Enabled?
 
-Wheels will handle linking to pages without URL rewriting for you automatically. Let's pretend that you still have Wheels installed in your site root, but you do not have URL rewriting on. How you write your [linkTo()](https://api.wheels.dev/controller.linkto.html) call will not change:
+Wheels will handle linking to pages without URL rewriting for you automatically. Let's pretend that you still have Wheels installed in your site root, but you do not have URL rewriting on. How you write your [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) call will not change:
 
 ```
 #linkTo(
@@ -375,7 +375,7 @@ Wheels will still correctly build the link markup:
 
 ### Linking in a Subfolder Deployment of Wheels
 
-The same would be true if you had Wheels installed in a subfolder, thus perhaps eliminating your ability to use [URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) (depending on what web server you have). The same [linkTo()](https://api.wheels.dev/controller.linkto.html) code above may generate this HTML if you had Wheels installed in a subfolder called `foo`:
+The same would be true if you had Wheels installed in a subfolder, thus perhaps eliminating your ability to use [URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) (depending on what web server you have). The same [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) code above may generate this HTML if you had Wheels installed in a subfolder called `foo`:
 
 ```html
 <a
@@ -392,8 +392,8 @@ Wheels gives you a good amount of structure for your applications. With this, in
 
 What's more, Wheels is smart enough to build URLs for you. And it'll do this for you based on your situation with URL rewriting. Are you using URL rewriting in your app? Great. Wheels will build your URLs accordingly. Not fortunate enough to have URL rewriting capabilities in your development or production environments? That's fine too because Wheels will handle that automatically. Are you using Wheels in a subfolder on your site, thus eliminating your ability to use URL rewriting? Wheels handles that for you too.
 
-If you see the pattern, this gives your application a good deal of portability. For example, you could later enable URL rewriting or move your application to a different subfolder. As long as you're using [linkTo()](https://api.wheels.dev/controller.linkto.html) to build your links, you won't need to change anything extra to your code in order to accommodate this change.
+If you see the pattern, this gives your application a good deal of portability. For example, you could later enable URL rewriting or move your application to a different subfolder. As long as you're using [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) to build your links, you won't need to change anything extra to your code in order to accommodate this change.
 
-Lastly, if you later install a [plugin](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/plugins/installing-and-using-plugins) that needs to modify link markup, that plugin's hook is the [linkTo()](https://api.wheels.dev/controller.linkto.html) helper.
+Lastly, if you later install a [plugin](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/plugins/installing-and-using-plugins) that needs to modify link markup, that plugin's hook is the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) helper.
 
 Oh, and another reason is that it's just plain cool too. ;)

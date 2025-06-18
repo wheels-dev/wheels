@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Format code: `box run-script format` (uses cfformat)
 - Check formatting: `box run-script format:check`
 - Reload application: `wheels reload [development|testing|maintenance|production]`
+- Run all tests with Docker: `docker compose up` (runs on multiple CFML engines)
+- Run specific engine tests: `docker compose --profile lucee up -d`
 
 ## Code Style Guidelines
 
@@ -27,25 +29,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## CLI Commands
 
-- Don't mix positional and named attribute when calling CLI commands
+- Don't mix positional and named attributes when calling CLI commands
 - Named attributes should use attribute=value syntax
 - Boolean attributes can use --attribute as a shortcut instead of attribute=true
 - Parameter syntax - CommandBox requires named attributes (name=value) instead of mixing positional and named parameters
 
-## Testing the framework and the CLI go hand in hand
+## Testing the Framework and CLI
 
 - The CLI is written in CFML and is packaged as a module for CommandBox
-- If CLI commands have syntax errors in them, CommandBox will display errors when it is initially launched
 - Launch CommandBox with `box` shell command
-- Use the `workspace` directory as a sandbox to test wheels cli commands.
-- To run the CLI commands we need to launch CommandBox.
-- In Commandbox, use the `wheels` commands to run a particular CLI command.
-- First create a app with the `wheels g app` command.
-- Then start the web server with `server start` commandbox command.
-- Then you can run various CLI commands and using poppeteer check to see if the desire results are achieved in the app without throwing any errors.
-- In particular we want to test every attribute of every cli command.
-- Diagnose and fix errors as they are discovered.
-- To restart the webserver use `server restart` or `server stop` followed by `server start`.
-- If changes are made to the CLI commands then reload Commandbox with `box reload` or `exit` followed by `box`.
-- This way changes to the CLI commands can be validated and iteratively test every command.
-- keep in mind that commandbox doesn't like to mix named attributes and positional attributes.
+- Use the `workspace` directory as a sandbox to test wheels cli commands
+- First create an app with `wheels g app` command
+- Then start the web server with `server start` commandbox command
+- To restart the webserver use `server restart` or `server stop` followed by `server start`
+- If changes are made to the CLI commands then reload Commandbox with `box reload` or `exit` followed by `box`
+
+## High-Level Architecture
+
+### Core Components
+- **Controller.cfc**: Base controller providing MVC functionality, rendering, filters, and provides() for content negotiation
+- **Model.cfc**: ActiveRecord-style ORM with associations, validations, callbacks, and database adapters
+- **Dispatch.cfc**: Request routing and parameter handling
+- **Global.cfc**: Framework-wide helper functions and utilities
+- **Mapper.cfc**: RESTful routing configuration with resource mapping
+
+### Directory Structure
+- `/vendor/wheels/`: Core framework files (do not modify directly)
+- `/app/`: Application code (controllers, models, views)
+- `/config/`: Environment-specific configuration
+- `/cli/`: CommandBox CLI module for code generation and tasks
+- `/tests/`: Framework test suite
+- `/docker/`: Docker configurations for multi-engine testing
+
+### Key Patterns
+- **Controller Initialization**: Use `config()` method, NOT `init()` for controller setup
+- **Private Methods**: Prefix with `$` (e.g., `$callAction()`, `$performedRender()`)
+- **Content Negotiation**: Use `provides()` or `onlyProvides()` in controller config()
+- **View Rendering**: Automatic for HTML, skipped for JSON/XML when using renderText/renderWith
+
+### Database Testing
+- Create `wheelstestdb` database and datasource
+- Supports H2, MySQL, PostgreSQL, SQL Server, Oracle
+- Docker compose provides all database servers for testing
+- Use `db={{database}}` URL parameter to switch datasources
+
+### Development Workflow
+1. Make changes to framework files in `/vendor/wheels/`
+2. Test using workspace sandbox or Docker containers
+3. Run tests: `wheels test app` or use Docker TestUI at localhost:3000
+4. Ensure all CFML engines pass (Lucee 5/6/7, Adobe 2018/2021/2023/2025)
+
+## Important Notes
+
+- Framework uses `config()` method for controller initialization, not `init()`
+- Always check `$performedRenderOrRedirect()` before automatic view rendering
+- Use `$requestContentType()` and `$acceptableFormats()` for content negotiation
+- Test on multiple CFML engines before submitting PRs
+- Follow existing patterns when adding new functionality

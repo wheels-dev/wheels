@@ -1,6 +1,6 @@
 # docs generate
 
-Generates documentation for your CFWheels application from code comments and annotations.
+Generates documentation for your Wheels application from code comments and annotations.
 
 ## Usage
 
@@ -19,7 +19,7 @@ wheels docs generate [--output=<dir>] [--format=<format>] [--template=<template>
 
 ## Description
 
-The `docs generate` command automatically creates comprehensive documentation from your CFWheels application by parsing:
+The `docs generate` command automatically creates comprehensive documentation from your Wheels application by parsing:
 
 - JavaDoc-style comments in CFCs
 - Model relationships and validations

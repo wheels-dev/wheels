@@ -1,6 +1,6 @@
-# SQL Server for CFWheels Testing
+# SQL Server for Wheels Testing
 
-This directory contains the Docker configuration for running Microsoft SQL Server in the CFWheels test environment, optimized for Apple Silicon Macs.
+This directory contains the Docker configuration for running Microsoft SQL Server in the Wheels test environment, optimized for Apple Silicon Macs.
 
 ## Configuration Overview
 

@@ -4,7 +4,7 @@
 # Set to exit on error
 set -e
 
-echo "Building CFWheels TestUI Docker image..."
+echo "Building Wheels TestUI Docker image..."
 cd "$(dirname "$0")"
 
 # Check if this is development or production

@@ -77,7 +77,7 @@ format.
 </cfhttp>
 ```
 
-Here is a list of values that you can grab from [mimeTypes()](https://api.wheels.dev/controller.mimeTypes.html) with Wheels out\
+Here is a list of values that you can grab from [mimeTypes()](https://wheels.dev/api/v3.0.0/controller.mimeTypes.html) with Wheels out\
 of the box.
 
 * `html`
@@ -87,7 +87,7 @@ of the box.
 * `pdf`
 * `xls`
 
-You can use [addFormat()](https://api.wheels.dev/controller.addformat.html) to set more types to the appropriate MIME type for reference. For example, we could set a Microsoft Word MIME type in\
+You can use [addFormat()](https://wheels.dev/api/v3.0.0/controller.addformat.html) to set more types to the appropriate MIME type for reference. For example, we could set a Microsoft Word MIME type in\
 `app/config/settings.cfm` like so:
 
 ```javascript
@@ -97,7 +97,7 @@ addFormat(extension="doc", mimeType="application/msword");
 ### Responding to Different Formats in the Controller
 
 The fastest way to get going with creating your new API and formats is to call\
-[provides()](https://api.wheels.dev/controller.provides.html) from within your controller's `config()` method.
+[provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) from within your controller's `config()` method.
 
 Take a look at this example:
 
@@ -115,31 +115,31 @@ component extends="Controller" {
 }
 ```
 
-By calling the [provides()](https://api.wheels.dev/controller.provides.html) function in `config()`, you are instructing the Wheels controller to be ready to provide content in a number of formats.\
+By calling the [provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) function in `config()`, you are instructing the Wheels controller to be ready to provide content in a number of formats.\
 Possible choices to add to the list are `html` (which runs by default), `xml`,\
 `json`, `csv`, `pdf`, and `xls`.
 
-This is coupled with a call to [renderwith()](https://api.wheels.dev/controller.renderwith.html) in the following actions. In the example above, we are setting a query result of products and passing it\
-to [renderwith()](https://api.wheels.dev/controller.renderwith.html). By passing our data to this function, Wheels gives us the ability to respond to requests for different formats, and it even gives us the option to just let Wheels handle the generation of certain formats automatically.
+This is coupled with a call to [renderwith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html) in the following actions. In the example above, we are setting a query result of products and passing it\
+to [renderwith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html). By passing our data to this function, Wheels gives us the ability to respond to requests for different formats, and it even gives us the option to just let Wheels handle the generation of certain formats automatically.
 
-You can also use the [onlyProvides()](https://api.wheels.dev/controller.onlyProvides.html) call in an individual controller action to define which formats the action will respond with. This can be used to define behavior in individual actions or to override the controller's `config()`.
+You can also use the [onlyProvides()](https://wheels.dev/api/v3.0.0/controller.onlyProvides.html) call in an individual controller action to define which formats the action will respond with. This can be used to define behavior in individual actions or to override the controller's `config()`.
 
 When Wheels handles this response, it will set the appropriate MIME type in the\
 `Content-Type` HTTP header as well.
 
 ### Providing the HTML Format
 
-Responding to requests for the HTML version is the same as you're already used to with [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content). [renderwith()](https://api.wheels.dev/controller.renderwith.html) will accept the same arguments as [renderView()](https://api.wheels.dev/controller.renderview.html), and you create just a view template in the `views` folder like normal.
+Responding to requests for the HTML version is the same as you're already used to with [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content). [renderwith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html) will accept the same arguments as [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html), and you create just a view template in the `views` folder like normal.
 
 ### Automatic Generation of XML and JSON Formats
 
-If the requested format is `xml` or `json`, the [renderwith()](https://api.wheels.dev/controller.renderwith.html) function will automatically transform the data that you provide it. If you're fine with what the function produces, then you're done!
+If the requested format is `xml` or `json`, the [renderwith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html) function will automatically transform the data that you provide it. If you're fine with what the function produces, then you're done!
 
 **Best Practices for Providing JSON**
 
 Unfortunately there have been a lot of JSON related issues in CFML over the years. To avoid as many of these problems as possible we thought we'd outline some best practices for you to follow.
 
-First of all, always return data as an array of structs. This is done by using the `returnAs` argument (on [findAll()](https://api.wheels.dev/model.findall.html) for example), like this:
+First of all, always return data as an array of structs. This is done by using the `returnAs` argument (on [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) for example), like this:
 
 ```javascript
 authors = model("author").findAll(returnAs="structs");
@@ -147,7 +147,7 @@ authors = model("author").findAll(returnAs="structs");
 
 The reason for doing it this way is that it will preserve the case for the struct / JSON keys.
 
-Secondly, make use of Wheels ability to return the JSON values in a specified type. This is done in the [renderWith()](https://api.wheels.dev/controller.renderwith.html)function, like this:
+Secondly, make use of Wheels ability to return the JSON values in a specified type. This is done in the [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html)function, like this:
 
 ```javascript
 renderWith(data=authors, firstName="string", booksForSale="integer");

@@ -51,17 +51,17 @@ If any of these validations fail, Wheels will not commit the create or update to
 
 ### Listing of Validation Functions
 
-* [validatesConfirmationOf()](https://api.wheels.dev/model.validatesconfirmationof.html)
-* [validatesExclusionOf()](https://api.wheels.dev/model.validatesexclusionof.html)
-* [validatesFormatOf()](https://api.wheels.dev/model.validatesformatof.html)
-* [validatesInclusionOf()](https://api.wheels.dev/model.validatesinclusionof.html)
-* [validatesLengthOf()](https://api.wheels.dev/model.validateslengthof.html)
-* [validatesNumericalityOf()](https://api.wheels.dev/model.validatesnumericalityof.html)
-* [validatesPresenceOf()](https://api.wheels.dev/model.validatespresenceof.html)
-* [validatesUniquenessOf()](https://api.wheels.dev/model.validatesuniquenessof.html)
-* [validate()](https://api.wheels.dev/model.validate.html)
-* [validateOnCreate()](https://api.wheels.dev/model.validateoncreate.html)
-* [validateOnUpdate()](https://api.wheels.dev/model.validateonupdate.html)
+* [validatesConfirmationOf()](https://wheels.dev/api/v3.0.0/model.validatesconfirmationof.html)
+* [validatesExclusionOf()](https://wheels.dev/api/v3.0.0/model.validatesexclusionof.html)
+* [validatesFormatOf()](https://wheels.dev/api/v3.0.0/model.validatesformatof.html)
+* [validatesInclusionOf()](https://wheels.dev/api/v3.0.0/model.validatesinclusionof.html)
+* [validatesLengthOf()](https://wheels.dev/api/v3.0.0/model.validateslengthof.html)
+* [validatesNumericalityOf()](https://wheels.dev/api/v3.0.0/model.validatesnumericalityof.html)
+* [validatesPresenceOf()](https://wheels.dev/api/v3.0.0/model.validatespresenceof.html)
+* [validatesUniquenessOf()](https://wheels.dev/api/v3.0.0/model.validatesuniquenessof.html)
+* [validate()](https://wheels.dev/api/v3.0.0/model.validate.html)
+* [validateOnCreate()](https://wheels.dev/api/v3.0.0/model.validateoncreate.html)
+* [validateOnUpdate()](https://wheels.dev/api/v3.0.0/model.validateonupdate.html)
 
 ### Automatic Validations
 
@@ -69,16 +69,16 @@ Now that you have a good understanding of how validations work in the model, her
 
 By default, these validations will run without your needing to set up anything in the model:
 
-* Fields set to `NOT NULL` will automatically trigger [validatesPresenceOf()](https://api.wheels.dev/model.validatespresenceof.html).
-* Numeric fields will automatically trigger [validatesNumericalityOf()](https://api.wheels.dev/model.validatesnumericalityof.html).
+* Fields set to `NOT NULL` will automatically trigger [validatesPresenceOf()](https://wheels.dev/api/v3.0.0/model.validatespresenceof.html).
+* Numeric fields will automatically trigger [validatesNumericalityOf()](https://wheels.dev/api/v3.0.0/model.validatesnumericalityof.html).
 * Date or time fields will be checked for the appropriate format.
-* Fields that have a maximum length will automatically trigger [validatesLengthOf()](https://api.wheels.dev/model.validateslengthof.html).
+* Fields that have a maximum length will automatically trigger [validatesLengthOf()](https://wheels.dev/api/v3.0.0/model.validateslengthof.html).
 
 Note these extra behaviors as well:
 
 * Automatic validations will not run for [Automatic Time Stamps](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/automatic-time-stamps).
 * If you've already set a validation on a particular property in your model, the automatic validations will be overridden by your settings.
-* If your database column provides a default value for a given field, Wheels will not enforce a [validatesPresenceOf()](https://api.wheels.dev/model.validatespresenceof.html)rule on that property.
+* If your database column provides a default value for a given field, Wheels will not enforce a [validatesPresenceOf()](https://wheels.dev/api/v3.0.0/model.validatespresenceof.html)rule on that property.
 
 To disable automatic validations in your Wheels application, change this setting in `app/config/settings.cfm:`
 
@@ -86,7 +86,7 @@ To disable automatic validations in your Wheels application, change this setting
 set(automaticValidations=false);
 ```
 
-You can also turn on or off the automatic validations on a per model basis by calling the [automaticValidations()](https://api.wheels.dev/v2.2/model.automaticValidations.html) method from a model's `config()` method.
+You can also turn on or off the automatic validations on a per model basis by calling the [automaticValidations()](https://wheels.dev/api/v3.0.0/v2.2/model.automaticValidations.html) method from a model's `config()` method.
 
 See the chapter on [Configuration and Defaults](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults) for more information on available Wheels ORM settings.
 
@@ -126,13 +126,13 @@ validate(
 
 ### Custom Validations
 
-At the end of the listing above are 3 custom validation functions: [validate()](https://api.wheels.dev/model.validate.html), [validateOnCreate()](https://api.wheels.dev/model.validateoncreate.html), and [validateOnUpdate()](https://api.wheels.dev/model.validateonupdate.html). These functions allow you to create your own validation rules that aren't covered by Wheels's out-of-the-box functions.
+At the end of the listing above are 3 custom validation functions: [validate()](https://wheels.dev/api/v3.0.0/model.validate.html), [validateOnCreate()](https://wheels.dev/api/v3.0.0/model.validateoncreate.html), and [validateOnUpdate()](https://wheels.dev/api/v3.0.0/model.validateonupdate.html). These functions allow you to create your own validation rules that aren't covered by Wheels's out-of-the-box functions.
 
 There is only one difference between how the different functions work:
 
-* [validate()](https://api.wheels.dev/model.validate.html) runs on the save event, which happens on both create and update.
-* [validateOnCreate()](https://api.wheels.dev/model.validateoncreate.html) runs on create.
-* [validateOnUpdate()](https://api.wheels.dev/model.validateonupdate.html) runs on update.
+* [validate()](https://wheels.dev/api/v3.0.0/model.validate.html) runs on the save event, which happens on both create and update.
+* [validateOnCreate()](https://wheels.dev/api/v3.0.0/model.validateoncreate.html) runs on create.
+* [validateOnUpdate()](https://wheels.dev/api/v3.0.0/model.validateonupdate.html) runs on update.
 
 To use a custom validation, we pass one of these functions a method or set of methods to run:
 
@@ -140,7 +140,7 @@ To use a custom validation, we pass one of these functions a method or set of me
 validate(method="validateEmailFormat");
 ```
 
-We then should create a method called `validateEmailFormat`, which in this case would verify that the value set for `this.email` is in the proper format. If not, then the method sets an error message for that field using the [addError()](https://api.wheels.dev/model.adderror.html)function.
+We then should create a method called `validateEmailFormat`, which in this case would verify that the value set for `this.email` is in the proper format. If not, then the method sets an error message for that field using the [addError()](https://wheels.dev/api/v3.0.0/model.adderror.html)function.
 
 ```javascript
 private function validateEmailFormat() {
@@ -156,7 +156,7 @@ This is a simple rule, but you can surmise that this functionality can be used t
 
 ### Adding Errors to the Model Object as a Whole
 
-We've mainly focused on adding error messages at a property level, which admittedly is what you'll be doing 80% of the time. But we can also add messages at the model object level with the [addErrorToBase()](https://api.wheels.dev/model.adderrortobase.html) function.
+We've mainly focused on adding error messages at a property level, which admittedly is what you'll be doing 80% of the time. But we can also add messages at the model object level with the [addErrorToBase()](https://wheels.dev/api/v3.0.0/model.adderrortobase.html) function.
 
 As an example, here's a custom validation method that doesn't allow the user to sign up for an account between the hours of 3:00 and 4:00 am in the server's time zone:
 
@@ -199,9 +199,9 @@ component extends="Controller" {
 
 The first line of the action creates a `newUser` based on the `user` model and the form inputs (via the `params` struct).
 
-Now, to persist the object to the database, the model's [save()](https://api.wheels.dev/model.save.html) call can be placed within a `<cfif>` test. If the save succeeds, the [save()](https://api.wheels.dev/model.save.html) method will return `true`, and the contents of the `<cfif>` will be executed. But if any of the validations set up in the model fail, the [save()](https://api.wheels.dev/model.save.html) method returns `false`, and the `<cfelse>` will execute.
+Now, to persist the object to the database, the model's [save()](https://wheels.dev/api/v3.0.0/model.save.html) call can be placed within a `<cfif>` test. If the save succeeds, the [save()](https://wheels.dev/api/v3.0.0/model.save.html) method will return `true`, and the contents of the `<cfif>` will be executed. But if any of the validations set up in the model fail, the [save()](https://wheels.dev/api/v3.0.0/model.save.html) method returns `false`, and the `<cfelse>` will execute.
 
-The important step here is to recognize that the `<cfelse>` renders the original form input page using the [renderView()](https://api.wheels.dev/controller.renderWith.html) function. When this happens, the view will use the `newUser` object defined in our [save()](https://api.wheels.dev/model.save.html) method. If a [redirectTo()](https://api.wheels.dev/controller.redirectto.html) were used instead, the validation information loaded in our [save()](https://api.wheels.dev/model.save.html) method would be lost.
+The important step here is to recognize that the `<cfelse>` renders the original form input page using the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderWith.html) function. When this happens, the view will use the `newUser` object defined in our [save()](https://wheels.dev/api/v3.0.0/model.save.html) method. If a [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) were used instead, the validation information loaded in our [save()](https://wheels.dev/api/v3.0.0/model.save.html) method would be lost.
 
 ### The View
 
@@ -228,7 +228,7 @@ Wheels factors out much of the error display code that you'll ever need. As you 
 </cfoutput>
 ```
 
-The biggest thing to note in this example is that a field called `passwordConfirmation` was provided so that the [validatesConfirmationOf()](https://api.wheels.dev/model.validatesConfirmationOf.html) validation in the model can be properly tested.
+The biggest thing to note in this example is that a field called `passwordConfirmation` was provided so that the [validatesConfirmationOf()](https://wheels.dev/api/v3.0.0/model.validatesConfirmationOf.html) validation in the model can be properly tested.
 
 For more information on how this code behaves when there is an error, refer to the [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) chapter.
 

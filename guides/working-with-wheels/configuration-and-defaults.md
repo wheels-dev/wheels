@@ -16,11 +16,11 @@ You can also set values based on what environment you have set. For example, you
 
 ### How to Set Configurations
 
-To change a Wheels application default, you generally use the [set()](https://api.wheels.dev/controller.set.html) function. With it, you can perform all sorts of tweaks to the framework's default behaviors.
+To change a Wheels application default, you generally use the [set()](https://wheels.dev/api/v3.0.0/controller.set.html) function. With it, you can perform all sorts of tweaks to the framework's default behaviors.
 
 ### How to Access Configuration Values
 
-Use the [get()](https://api.wheels.dev/controller.get.html) function to access the value of a Wheels application setting. Just pass it the name of the setting.
+Use the [get()](https://wheels.dev/api/v3.0.0/controller.get.html) function to access the value of a Wheels application setting. Just pass it the name of the setting.
 
 
 
@@ -135,7 +135,7 @@ set(functionName="findAll", perPage=20);
 ```
 {% endcode %}
 
-That little line of code will make all calls to the [findAll()](https://api.wheels.dev/model.findall.html) method in Wheels return a maximum number of 20 record per page (if pagination is enabled for that [findAll()](https://api.wheels.dev/model.findall.html) call). How great is that? You don't need to set the `perPage` value for every single call to [findAll()](https://api.wheels.dev/model.findall.html) if you have a different requirement than the Wheels default of 10 records.
+That little line of code will make all calls to the [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) method in Wheels return a maximum number of 20 record per page (if pagination is enabled for that [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) call). How great is that? You don't need to set the `perPage` value for every single call to [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) if you have a different requirement than the Wheels default of 10 records.
 
 ### Debugging and Error Settings
 
@@ -250,7 +250,7 @@ See the chapter on [Installing and Using Plugins](https://guides.wheels.dev/2.5.
 
 ### Media Settings
 
-Configure how Wheels handles linking to assets through view helpers like [imageTag()](https://api.wheels.dev/controller.imagetag.html), [styleSheetLinkTag()](https://api.wheels.dev/controller.stylesheetlinktag.html), and [javaScriptIncludeTag()](https://api.wheels.dev/controller.javascriptincludetag.html).
+Configure how Wheels handles linking to assets through view helpers like [imageTag()](https://wheels.dev/api/v3.0.0/controller.imagetag.html), [styleSheetLinkTag()](https://wheels.dev/api/v3.0.0/controller.stylesheetlinktag.html), and [javaScriptIncludeTag()](https://wheels.dev/api/v3.0.0/controller.javascriptincludetag.html).
 
 See the chapter about [Date, Media, and Text Helpers](../displaying-views-to-users/date-media-and-text-helpers.md) for more information.
 

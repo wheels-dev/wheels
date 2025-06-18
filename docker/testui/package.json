@@ -11,7 +11,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "CFWheels TestUI - Modern test runner interface",
+  "description": "Wheels TestUI - Modern test runner interface",
   "dependencies": {
     "@types/node": "^22.15.18",
     "@vitejs/plugin-vue": "^5.2.4",

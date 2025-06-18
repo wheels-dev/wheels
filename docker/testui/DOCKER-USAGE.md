@@ -1,6 +1,6 @@
-# CFWheels TestUI Docker Usage
+# Wheels TestUI Docker Usage
 
-The CFWheels TestUI is now integrated into the main Docker Compose setup. This document provides instructions on how to use the Docker container for the new TestUI.
+The Wheels TestUI is now integrated into the main Docker Compose setup. This document provides instructions on how to use the Docker container for the new TestUI.
 
 ## Starting the TestUI
 

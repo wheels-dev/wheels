@@ -1,6 +1,6 @@
-# CFWheels CLI Commands Testing Log
+# Wheels CLI Commands Testing Log
 
-This document tracks the systematic testing of all CFWheels CLI commands. Each command will be tested with various parameters and the results will be documented here.
+This document tracks the systematic testing of all Wheels CLI commands. Each command will be tested with various parameters and the results will be documented here.
 
 ## Testing Status Legend
 - ✅ Fully Tested - All parameters tested successfully
@@ -508,9 +508,9 @@ This document tracks the systematic testing of all CFWheels CLI commands. Each c
 ### wheels plugins install
 - **Status**: ⏳ Not Tested
 - **Parameters to test**:
-  - From ForgeBox: `wheels plugins install name=CFWheelsAuth`
+  - From ForgeBox: `wheels plugins install name=WheelsAuth`
   - From URL: `wheels plugins install url=https://example.com/plugin.zip`
-  - Specific version: `wheels plugins install name=CFWheelsAuth version=2.0.0`
+  - Specific version: `wheels plugins install name=WheelsAuth version=2.0.0`
 - **Test Results**:
   - _Pending_
 
@@ -526,8 +526,8 @@ This document tracks the systematic testing of all CFWheels CLI commands. Each c
 ### wheels plugins remove
 - **Status**: ⏳ Not Tested
 - **Parameters to test**:
-  - By name: `wheels plugins remove name=CFWheelsAuth`
-  - Force remove: `wheels plugins remove name=CFWheelsAuth --force`
+  - By name: `wheels plugins remove name=WheelsAuth`
+  - Force remove: `wheels plugins remove name=WheelsAuth --force`
 - **Test Results**:
   - _Pending_
 

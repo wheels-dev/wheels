@@ -358,7 +358,7 @@ class DockerService {
         ports: {},
         created: new Date().toISOString(),
         labels: { 'com.github.cfwheels.type': 'database', 'com.github.cfwheels.name': 'h2' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'database',
         cfwheelsName: 'h2'
       };
@@ -611,7 +611,7 @@ class DockerService {
         created: now,
         uptime: '2 hours',
         labels: { 'com.github.cfwheels.type': 'engine', 'com.github.cfwheels.name': 'lucee5' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'engine',
         cfwheelsName: 'lucee5',
         cfwheelsVersion: 'v1.0.2'
@@ -627,7 +627,7 @@ class DockerService {
         created: now,
         uptime: '2 hours',
         labels: { 'com.github.cfwheels.type': 'engine', 'com.github.cfwheels.name': 'lucee6' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'engine',
         cfwheelsName: 'lucee6',
         cfwheelsVersion: 'v1.0.2'
@@ -641,7 +641,7 @@ class DockerService {
         ports: { '62018': '62018' },
         created: now,
         labels: { 'com.github.cfwheels.type': 'engine', 'com.github.cfwheels.name': 'adobe2018' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'engine',
         cfwheelsName: 'adobe2018',
         cfwheelsVersion: 'v1.0.2'
@@ -655,7 +655,7 @@ class DockerService {
         ports: { '62021': '62021' },
         created: now,
         labels: { 'com.github.cfwheels.type': 'engine', 'com.github.cfwheels.name': 'adobe2021' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'engine',
         cfwheelsName: 'adobe2021',
         cfwheelsVersion: 'v1.0.2'
@@ -671,7 +671,7 @@ class DockerService {
         created: now,
         uptime: '2 hours',
         labels: { 'com.github.cfwheels.type': 'engine', 'com.github.cfwheels.name': 'adobe2023' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'engine',
         cfwheelsName: 'adobe2023',
         cfwheelsVersion: 'v1.0.1'
@@ -689,7 +689,7 @@ class DockerService {
         created: now,
         uptime: '2 hours',
         labels: { 'com.github.cfwheels.type': 'database', 'com.github.cfwheels.name': 'mysql' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'database',
         cfwheelsName: 'mysql',
         cfwheelsVersion: '8.0'
@@ -705,7 +705,7 @@ class DockerService {
         created: now,
         uptime: '2 hours',
         labels: { 'com.github.cfwheels.type': 'database', 'com.github.cfwheels.name': 'postgres' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'database',
         cfwheelsName: 'postgres',
         cfwheelsVersion: '14'
@@ -719,7 +719,7 @@ class DockerService {
         ports: { '1433': '1434' },
         created: now,
         labels: { 'com.github.cfwheels.type': 'database', 'com.github.cfwheels.name': 'sqlserver' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'database',
         cfwheelsName: 'sqlserver',
         cfwheelsVersion: 'v1.0.2'
@@ -734,7 +734,7 @@ class DockerService {
         ports: {},
         created: now,
         labels: { 'com.github.cfwheels.type': 'database', 'com.github.cfwheels.name': 'h2' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'database',
         cfwheelsName: 'h2'
       },
@@ -747,7 +747,7 @@ class DockerService {
         ports: { '1521': '1522' },
         created: now,
         labels: { 'com.github.cfwheels.type': 'database', 'com.github.cfwheels.name': 'oracle' },
-        isCFWheelsContainer: true,
+        isWheelsContainer: true,
         cfwheelsType: 'database',
         cfwheelsName: 'oracle',
         cfwheelsVersion: '19.3.0'

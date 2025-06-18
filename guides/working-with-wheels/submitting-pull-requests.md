@@ -145,7 +145,7 @@ git push origin feature/issue-123
 
 ### 7. Create a Pull Request
 
-Create a pull request from your branch to the CFWheels develop branch:
+Create a pull request from your branch to the Wheels develop branch:
 
 1. Go to your fork on GitHub
 2. Click the "Compare & Pull Request" button for your branch
@@ -241,7 +241,7 @@ Once your PR is merged:
    git push origin develop
    ```
 
-3. Celebrate your contribution to CFWheels! 🎉
+3. Celebrate your contribution to Wheels! 🎉
 
 ## Special Considerations
 

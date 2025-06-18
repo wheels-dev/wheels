@@ -12,7 +12,7 @@ Alias: `wheels db create table`
 
 ## Description
 
-The `dbmigrate create table` command generates a migration file that creates a new database table. The generated migration includes the table structure following CFWheels conventions.
+The `dbmigrate create table` command generates a migration file that creates a new database table. The generated migration includes the table structure following Wheels conventions.
 
 ## Parameters
 
@@ -106,7 +106,7 @@ wheels dbmigrate create table name=legacy_customer primary-key=customer_code
 ## Best Practices
 
 ### 1. Use Singular Table Names
-CFWheels conventions expect singular table names:
+Wheels conventions expect singular table names:
 ```bash
 # Good
 wheels dbmigrate create table name=user

@@ -111,7 +111,7 @@ wheels dbmigrate create blank --name=refactor_order_system
 ```
 
 ### Database-Specific Features
-For database-specific features not abstracted by CFWheels:
+For database-specific features not abstracted by Wheels:
 ```bash
 # Create migration for PostgreSQL-specific features
 wheels dbmigrate create blank --name=add_json_columns

@@ -111,7 +111,7 @@ I know what you are thinking. 9 lines of code can't replace all that work, right
 
 ### Linking up the Form's Action with startFormTag
 
-The first helper you'll notice in the Wheels-ified version of the form is [startFormTag()](https://api.wheels.dev/controller.startFormTag.html). This helper allows you to easily link up the form to the action that it's posting to in a secure way.
+The first helper you'll notice in the Wheels-ified version of the form is [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startFormTag.html). This helper allows you to easily link up the form to the action that it's posting to in a secure way.
 
 You'll need to configure the `route` and `method` arguments, depending on the route that you're sending the form to. Also, if the route expects any parameters, you must pass those in as arguments to startFormTag as well. If you haven't already, read up about routes in the [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter.
 
@@ -148,7 +148,7 @@ If you click the **Routes** link in the debug footer, you'll be most interested 
 
 Once you get to this list of routes, it really doesn't matter how you authored them in your `app/config/routes.cfm`. What matters is that you know the names, methods, and parameters that the routes expect. (With some practice, you'll probably be able to look at `app/config/routes.cfm` and know exactly what the names, methods, and parameters are though.)
 
-If you are creating a record, your route is likely setup to accept a `POST` method. That happens to be the default for [startFormTag()](https://api.wheels.dev/controller.startFormTag.html), so you don't even need to include the `method` argument. You can then pass the `users` route name to the `route` argument:
+If you are creating a record, your route is likely setup to accept a `POST` method. That happens to be the default for [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startFormTag.html), so you don't even need to include the `method` argument. You can then pass the `users` route name to the `route` argument:
 
 {% code title="app/views/users/new.cfm" %}
 ```html
@@ -219,7 +219,7 @@ Browsers (even the modern ones) tend to only work well with `GET` and `POST` req
 
 To keep things secure, Wheels will still use `method="post"` on the form to send `PATCH` and `DELETE` requests. But the Wheels router will recognize a `PATCH` or `DELETE` request if a form variable called `_method` is also sent, specifying the `PATCH` or `DELETE` method.
 
-Under the hood, [startFormTag()](https://api.wheels.dev/controller.startFormTag.html) will also generate a hidden field called `_method` that passes the request method along with the form `POST`.
+Under the hood, [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startFormTag.html) will also generate a hidden field called `_method` that passes the request method along with the form `POST`.
 
 So the `<form>` tag generated along with a `method` of `patch` will look something like this:
 
@@ -230,9 +230,9 @@ So the `<form>` tag generated along with a `method` of `patch` will look somethi
 </form>
 ```
 
-You'll notice that [startFormTag()](https://api.wheels.dev/controller.startFormTag.html) will also add another hidden field along with `POST`ed requests called `authenticityToken`, which helps prevent against [Cross-Site Request Forgery (CSRF) attacks](https://owasp.org/www-community/attacks/csrf).
+You'll notice that [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startFormTag.html) will also add another hidden field along with `POST`ed requests called `authenticityToken`, which helps prevent against [Cross-Site Request Forgery (CSRF) attacks](https://owasp.org/www-community/attacks/csrf).
 
-The moral of the story: [startFormTag()](https://api.wheels.dev/controller.startFormTag.html) takes care of all of this for you. If you for some reason decide to wire up your own custom `<form>` tag that must `POST` data, be sure to add your own hidden fields for `_method` and use the [authenticityTokenField()](https://api.wheels.dev/controller.authenticityTokenField.html) helper to generate the hidden field for the `authenticityToken` that Wheels will require on the `POST`.
+The moral of the story: [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startFormTag.html) takes care of all of this for you. If you for some reason decide to wire up your own custom `<form>` tag that must `POST` data, be sure to add your own hidden fields for `_method` and use the [authenticityTokenField()](https://wheels.dev/api/v3.0.0/controller.authenticityTokenField.html) helper to generate the hidden field for the `authenticityToken` that Wheels will require on the `POST`.
 
 ### Refactoring Common Settings with Global Defaults
 
@@ -286,11 +286,11 @@ And here's how our example code can be simplified as a result:
 
 All that the controller needs to provide at this point is a model object instance named `profile` that contains `firstName`, `lastName`, and `departmentId` properties and a query object named `departments` that contains identifier and text values. Note that the instance variable is named `profile`, though the model itself doesn't necessarily need to be named `profile`.
 
-If you pass the form an empty instance named `profile` (for example, created by [new()](https://api.wheels.dev/model.new.html), the form will display blank values for all the fields. If you pass it an object created by a finder like [findOne()](https://api.wheels.dev/model.findone.html) or [findByKey()](https://api.wheels.dev/model.findbykey.html), then the form will display the values provided through the object. This allows for us to potentially use the same view file for both create and update scenarios in our application.
+If you pass the form an empty instance named `profile` (for example, created by [new()](https://wheels.dev/api/v3.0.0/model.new.html), the form will display blank values for all the fields. If you pass it an object created by a finder like [findOne()](https://wheels.dev/api/v3.0.0/model.findone.html) or [findByKey()](https://wheels.dev/api/v3.0.0/model.findbykey.html), then the form will display the values provided through the object. This allows for us to potentially use the same view file for both create and update scenarios in our application.
 
 ### Refactoring Label Names
 
-If you look at the previous examples, there is one other bit of configuration that we can clean up: the `label` arguments passed to [textField()](https://api.wheels.dev/controller.textField.html) and [select()](https://api.wheels.dev/controller.select.html).
+If you look at the previous examples, there is one other bit of configuration that we can clean up: the `label` arguments passed to [textField()](https://wheels.dev/api/v3.0.0/controller.textField.html) and [select()](https://wheels.dev/api/v3.0.0/controller.select.html).
 
 Because we've named `firstName`, `lastName`, and `departmentId` in conventional ways (camel case), Wheels will generate the labels for us automatically:
 
@@ -319,7 +319,7 @@ Because we've named `firstName`, `lastName`, and `departmentId` in conventional 
 
 You'll notice that Wheels is even smart enough to translate the `departmentId` property to `Department`.
 
-If you ever need to override a label, you can do so in the model's initializer using the `label` argument of the [property()](https://api.wheels.dev/model.property.html)method:
+If you ever need to override a label, you can do so in the model's initializer using the `label` argument of the [property()](https://wheels.dev/api/v3.0.0/model.property.html)method:
 
 {% code title="app/models/User.cfc" %}
 ```javascript
@@ -341,7 +341,7 @@ Securing the integrity of your web forms in Wheels on the server side is very ea
 
 Wheels provides you with a tool set of Helper Functions just for displaying error messages as well.
 
-In the controller, let's say that this just happened. Your model includes validations that require the presence of both `firstName` and `lastName`. The user didn't enter either. So in the controller's `update` action, it loads the model object, sets the values that the user submitted, sees that there was a validation error after calling [update()](https://api.wheels.dev/model.update.html), and displays the form view again.
+In the controller, let's say that this just happened. Your model includes validations that require the presence of both `firstName` and `lastName`. The user didn't enter either. So in the controller's `update` action, it loads the model object, sets the values that the user submitted, sees that there was a validation error after calling [update()](https://wheels.dev/api/v3.0.0/model.update.html), and displays the form view again.
 
 The `update` action may look something like this:
 
@@ -366,7 +366,7 @@ function update() {
 ```
 {% endcode %}
 
-Notice that the view for the `edit` action is rendered if the `profile` object's [update()](https://api.wheels.dev/model.update.html) returns `false`.
+Notice that the view for the `edit` action is rendered if the `profile` object's [update()](https://wheels.dev/api/v3.0.0/model.update.html) returns `false`.
 
 Let's take the previous form example and add some visual indication to the user about what he did wrong and where, by simply adding the following code on your form page.
 
@@ -436,7 +436,7 @@ Let's add some error message handlers for the `firstName`, `lastName`, and `depa
 ```
 {% endcode %}
 
-Notice the call to the [errorMessageOn()](https://api.wheels.dev/controller.errormessageon.html) function below the `firstName`, `lastName`, and `departmentId` fields. That's all it takes to display the corresponding error messages of each form control on your form.
+Notice the call to the [errorMessageOn()](https://wheels.dev/api/v3.0.0/controller.errormessageon.html) function below the `firstName`, `lastName`, and `departmentId` fields. That's all it takes to display the corresponding error messages of each form control on your form.
 
 And the error messages won't even display if there aren't any. That way you can yet again use the same form code for error and non-error scenarios alike.
 
@@ -475,7 +475,7 @@ May yield the equivalent to this HTML (if we assume the global defaults defined 
 
 ### Hidden Fields
 
-Hidden fields are powered by the [hiddenField()](https://api.wheels.dev/controller.hiddenfield.html) form helper, and it also works similarly to [textField()](https://api.wheels.dev/controller.textfield.html) and [passwordField()](https://api.wheels.dev/controller.passwordfield.html).
+Hidden fields are powered by the [hiddenField()](https://wheels.dev/api/v3.0.0/controller.hiddenfield.html) form helper, and it also works similarly to [textField()](https://wheels.dev/api/v3.0.0/controller.textfield.html) and [passwordField()](https://wheels.dev/api/v3.0.0/controller.passwordfield.html).
 
 ```html
 #hiddenField(objectName="user", property="referralSourceId")#
@@ -489,7 +489,7 @@ Would yield this type of markup:
 
 ### Select Fields
 
-As hinted in our first example of form helpers, the [select()](https://api.wheels.dev/controller.select.html) function builds a `<select>` list with options. What's really cool about this helper is that it can populate the `<option>`s with values from a query, struct, or array.
+As hinted in our first example of form helpers, the [select()](https://wheels.dev/api/v3.0.0/controller.select.html) function builds a `<select>` list with options. What's really cool about this helper is that it can populate the `<option>`s with values from a query, struct, or array.
 
 Take a look at this line:
 
@@ -553,9 +553,26 @@ Here's a full usage with this new knowledge:
 )#
 ```
 
+#### Multiple Select Fields
+
+The [select()](https://wheels.dev/api/v3.0.0/controller.select.html) function also supports multiple selections by passing `multiple=true`. This creates a multi-select box that allows users to select more than one option:
+
+```html
+#select(
+    objectName="user",
+    property="roleIds",
+    options=roles,
+    valueField="id",
+    textField="roleName",
+    multiple=true
+)#
+```
+
+When using `multiple=true`, the property should be able to handle multiple values (typically an array or a list). The rendered HTML will include the `multiple="multiple"` attribute on the `<select>` element, allowing users to select multiple options by holding down Ctrl (Windows/Linux) or Cmd (Mac) while clicking.
+
 ### Radio Buttons
 
-Radio buttons via [radioButton()](https://api.wheels.dev/controller.radiobutton.html) also take `objectName` and `property` values, and they accept an argument called `tagValue` that determines what value should be passed based on what the user selects.
+Radio buttons via [radioButton()](https://wheels.dev/api/v3.0.0/controller.radiobutton.html) also take `objectName` and `property` values, and they accept an argument called `tagValue` that determines what value should be passed based on what the user selects.
 
 Here is an example using a query object called `eyeColor` to power the possible values:
 
@@ -575,7 +592,7 @@ Here is an example using a query object called `eyeColor` to power the possible 
 </fieldset>
 ```
 
-If the `profile` object already has a value set for `eyeColorId`, then [radioButton()](https://api.wheels.dev/controller.radiobutton.html) will make sure that that value is checked on page load.
+If the `profile` object already has a value set for `eyeColorId`, then [radioButton()](https://wheels.dev/api/v3.0.0/controller.radiobutton.html) will make sure that that value is checked on page load.
 
 If `profile.eyeColorId`'s value were already set to `1`, the rendered HTML would appear similar to this:
 
@@ -610,11 +627,11 @@ If `profile.eyeColorId`'s value were already set to `1`, the rendered HTML would
 </fieldset>
 ```
 
-Note that if you don't specify `labelPlacement="after"` in your calls to [radioButton()](https://api.wheels.dev/controller.radiobutton.html), Wheels will place the labels before the form controls.
+Note that if you don't specify `labelPlacement="after"` in your calls to [radioButton()](https://wheels.dev/api/v3.0.0/controller.radiobutton.html), Wheels will place the labels before the form controls.
 
 ### Check Boxes
 
-Check boxes work similarly to radio buttons, except [checkBox()](https://api.wheels.dev/controller.checkbox.html) takes parameters called `checkedValue` and `uncheckedValue` to determine whether or not the check box should be checked on load.
+Check boxes work similarly to radio buttons, except [checkBox()](https://wheels.dev/api/v3.0.0/controller.checkbox.html) takes parameters called `checkedValue` and `uncheckedValue` to determine whether or not the check box should be checked on load.
 
 Note that binding check boxes to model objects is best suited for properties in your object that have a `yes/no` or `true/false` type value.
 
@@ -627,17 +644,17 @@ Note that binding check boxes to model objects is best suited for properties in 
 )#
 ```
 
-Because the concept of check boxes don't tie too well to models (you can select several for the same "property"), we recommend using [checkBoxTag()](https://api.wheels.dev/controller.checkboxtag.html) instead if you want to use check boxes for more values than just true/false. See the _Helpers That Aren't Bound to Model Objects_ section below.
+Because the concept of check boxes don't tie too well to models (you can select several for the same "property"), we recommend using [checkBoxTag()](https://wheels.dev/api/v3.0.0/controller.checkboxtag.html) instead if you want to use check boxes for more values than just true/false. See the _Helpers That Aren't Bound to Model Objects_ section below.
 
 ### File Fields
 
-The [fileField()](https://api.wheels.dev/controller.filefield.html) helper builds a file field form control based on the supplied `objectName` and `property`.
+The [fileField()](https://wheels.dev/api/v3.0.0/controller.filefield.html) helper builds a file field form control based on the supplied `objectName` and `property`.
 
 ```html
 #fileField(label="Photo", objectName="profile", property="photo")#
 ```
 
-In order for your form to pass the correct `enctype`, you can pass `multipart=true` to [startFormTag()](https://api.wheels.dev/controller.startformtag.html):
+In order for your form to pass the correct `enctype`, you can pass `multipart=true` to [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html):
 
 ```html
 #startFormTag(route="attachments", multipart=true)#
@@ -685,7 +702,7 @@ Now the initial state of the form will reflect the default values setup on the o
 
 Sometimes you'll want to output a form element that isn't bound to a model object.
 
-A search form that passes the user's query as a variable in the URL called `q` is a good example. In this example case, you would use the [textFieldTag()](https://api.wheels.dev/controller.textfieldtag.html) function to produce the `<input>` tag needed.
+A search form that passes the user's query as a variable in the URL called `q` is a good example. In this example case, you would use the [textFieldTag()](https://wheels.dev/api/v3.0.0/controller.textfieldtag.html) function to produce the `<input>` tag needed.
 
 ```html
 #textFieldTag(label="Search", name="q", value=params.q)#
@@ -695,19 +712,19 @@ There are "tag" versions of all of the form helpers that we've listed in this ch
 
 Here is a list of the "tag" helpers for your reference:
 
-* [checkBoxTag()](https://api.wheels.dev/controller.checkboxtag.html)
-* [hiddenFieldTag()](https://api.wheels.dev/controller.hiddenfieldtag.html)
-* [passwordFieldTag()](https://api.wheels.dev/controller.passwordfieldtag.html)
-* [radioButtonTag()](https://api.wheels.dev/controller.radiobuttontag.html)
-* [selectTag()](https://api.wheels.dev/controller.selecttag.html)
-* [textAreaTag()](https://api.wheels.dev/controller.textareatag.html)
-* [textFieldTag()](https://api.wheels.dev/controller.textfieldtag.html)
+* [checkBoxTag()](https://wheels.dev/api/v3.0.0/controller.checkboxtag.html)
+* [hiddenFieldTag()](https://wheels.dev/api/v3.0.0/controller.hiddenfieldtag.html)
+* [passwordFieldTag()](https://wheels.dev/api/v3.0.0/controller.passwordfieldtag.html)
+* [radioButtonTag()](https://wheels.dev/api/v3.0.0/controller.radiobuttontag.html)
+* [selectTag()](https://wheels.dev/api/v3.0.0/controller.selecttag.html)
+* [textAreaTag()](https://wheels.dev/api/v3.0.0/controller.textareatag.html)
+* [textFieldTag()](https://wheels.dev/api/v3.0.0/controller.textfieldtag.html)
 
 ### Passing Extra Arguments for HTML Attributes
 
-Much like Wheels's [linkTo()](https://api.wheels.dev/controller.linkto.html) function, any extra arguments that you pass to form helpers will be passed to the corresponding HTML tag as attributes.
+Much like Wheels's [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function, any extra arguments that you pass to form helpers will be passed to the corresponding HTML tag as attributes.
 
-For example, if we wanted to define a `class` on our starting form tag, we just pass that as an extra argument to [startFormTag()](https://api.wheels.dev/controller.startformtag.html):
+For example, if we wanted to define a `class` on our starting form tag, we just pass that as an extra argument to [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html):
 
 ```html
 #startFormTag(route="posts", class="login-form")#
@@ -760,15 +777,15 @@ Wheels provides a few extra form helpers that make it easier for you to generate
 
 We won't go over these in detail, but here is a list of the date and time form helpers available:
 
-* [dateSelect()](https://api.wheels.dev/controller.dateselect.html)
-* [dateSelectTags()](https://api.wheels.dev/controller.dateselecttags.html)
-* [timeSelect()](https://api.wheels.dev/controller.timeselect.html)
-* [timeSelectTags()](https://api.wheels.dev/controller.timeselecttags.html)
-* [dateTimeSelect()](https://api.wheels.dev/controller.datetimeselect.html)
-* [dateTimeSelectTags()](https://api.wheels.dev/controller.datetimeselecttags.html)
-* [yearSelectTag()](https://api.wheels.dev/controller.yearselecttag.html)
-* [monthSelectTag()](https://api.wheels.dev/controller.monthselecttag.html)
-* [daySelectTag()](https://api.wheels.dev/controller.dayselecttag.html)
-* [hourSelectTag()](https://api.wheels.dev/controller.hourselecttag.html)
-* [minuteSelectTag()](https://api.wheels.dev/controller.minuteselecttag.html)
-* [secondSelectTag()](https://api.wheels.dev/controller.secondselecttag.html)
+* [dateSelect()](https://wheels.dev/api/v3.0.0/controller.dateselect.html)
+* [dateSelectTags()](https://wheels.dev/api/v3.0.0/controller.dateselecttags.html)
+* [timeSelect()](https://wheels.dev/api/v3.0.0/controller.timeselect.html)
+* [timeSelectTags()](https://wheels.dev/api/v3.0.0/controller.timeselecttags.html)
+* [dateTimeSelect()](https://wheels.dev/api/v3.0.0/controller.datetimeselect.html)
+* [dateTimeSelectTags()](https://wheels.dev/api/v3.0.0/controller.datetimeselecttags.html)
+* [yearSelectTag()](https://wheels.dev/api/v3.0.0/controller.yearselecttag.html)
+* [monthSelectTag()](https://wheels.dev/api/v3.0.0/controller.monthselecttag.html)
+* [daySelectTag()](https://wheels.dev/api/v3.0.0/controller.dayselecttag.html)
+* [hourSelectTag()](https://wheels.dev/api/v3.0.0/controller.hourselecttag.html)
+* [minuteSelectTag()](https://wheels.dev/api/v3.0.0/controller.minuteselecttag.html)
+* [secondSelectTag()](https://wheels.dev/api/v3.0.0/controller.secondselecttag.html)

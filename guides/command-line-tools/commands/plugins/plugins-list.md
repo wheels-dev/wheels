@@ -16,11 +16,11 @@ wheels plugins list [--global] [--format=<format>] [--available]
 
 ## Description
 
-The `plugins list` command displays information about all plugins installed in your CFWheels application, including:
+The `plugins list` command displays information about all plugins installed in your Wheels application, including:
 
 - Plugin name and version
 - Installation status (active/inactive)
-- Compatibility with current CFWheels version
+- Compatibility with current Wheels version
 - Description and author information
 - Dependencies on other plugins
 

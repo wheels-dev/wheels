@@ -239,7 +239,7 @@ below:
 ```
 {% endcode %}
 
-The [linkTo()](https://api.wheels.dev/controller.linkto.html) function is a built-in Wheels function. In this case, we are passing 2 named parameters to it. The first parameter, `text`, is the text\
+The [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function is a built-in Wheels function. In this case, we are passing 2 named parameters to it. The first parameter, `text`, is the text\
 that will be displayed in the hyperlink. The second parameter, `action`, defines the action to point the link to. By using this built-in function, your application's main URL may change, and even controllers and actions may get shifted around, but you won't suffer from the dreaded dead link. Wheels will\
 always create a valid link for you as long as you configure it correctly when you make infrastructure changes to your application.
 

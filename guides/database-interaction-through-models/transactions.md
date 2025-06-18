@@ -72,7 +72,7 @@ set(transactionMode="rollback");
 
 ### Nesting Transactions with invokeWithTransaction
 
-One issue with ColdFusion is that you cannot nest `<cftransaction>` tags. In this case, Wheels provides a workaround. If you wish to run a method within a transaction, use [invokeWithTransaction()](https://api.wheels.dev/model.invokeWithTransaction.html), as below.
+One issue with ColdFusion is that you cannot nest `<cftransaction>` tags. In this case, Wheels provides a workaround. If you wish to run a method within a transaction, use [invokeWithTransaction()](https://wheels.dev/api/v3.0.0/model.invokeWithTransaction.html), as below.
 
 ```javascript
 invokeWithTransaction(

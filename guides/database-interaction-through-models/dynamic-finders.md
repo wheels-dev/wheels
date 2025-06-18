@@ -36,11 +36,11 @@ When you are passing in two values, make special note of the fact that they shou
 
 ### Works with findAll() too
 
-In the examples above, we've used the [findOne()](https://api.wheels.dev/model.findone.html) method, but you can use the same approach on a [findAll()](https://api.wheels.dev/model.findall.html) method as well.
+In the examples above, we've used the [findOne()](https://wheels.dev/api/v3.0.0/model.findone.html) method, but you can use the same approach on a [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) method as well.
 
 ### Passing in Other Finder Parameters
 
-In the background, these dynamically-named methods just pass along execution to [findOne()](https://api.wheels.dev/model.findone.html) or [findAll()](https://api.wheels.dev/model.findall.html). This means that you can also pass in any arguments that are accepted by those two methods.
+In the background, these dynamically-named methods just pass along execution to [findOne()](https://wheels.dev/api/v3.0.0/model.findone.html) or [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html). This means that you can also pass in any arguments that are accepted by those two methods.
 
 The below code, for example, is perfectly valid:
 

@@ -40,7 +40,7 @@ Here's the process that we'd like for you to follow. This process is in place ma
 
 ## Developing with Docker
 
-CFWheels now includes a comprehensive Docker-based test environment that makes it easy to test your changes against multiple CFML engines and database platforms. For detailed instructions on using this environment, see:
+Wheels now includes a comprehensive Docker-based test environment that makes it easy to test your changes against multiple CFML engines and database platforms. For detailed instructions on using this environment, see:
 
 - [Using the Test Environment](using-the-test-environment.md) - Complete guide to the Docker test environment
 - [Submitting Pull Requests](submitting-pull-requests.md) - Step-by-step guide to creating and submitting PRs

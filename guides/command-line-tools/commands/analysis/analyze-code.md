@@ -1,6 +1,6 @@
 # analyze code
 
-Analyzes code quality in your CFWheels application, checking for best practices, potential issues, and code standards compliance.
+Analyzes code quality in your Wheels application, checking for best practices, potential issues, and code standards compliance.
 
 ## Usage
 
@@ -18,10 +18,10 @@ wheels analyze code [path] [--fix] [--format=<format>] [--severity=<severity>] [
 
 ## Description
 
-The `analyze code` command performs comprehensive code quality analysis on your CFWheels application. It checks for:
+The `analyze code` command performs comprehensive code quality analysis on your Wheels application. It checks for:
 
 - Code complexity and maintainability
-- Adherence to CFWheels coding standards
+- Adherence to Wheels coding standards
 - Potential bugs and code smells
 - Duplicate code detection
 - Function length and complexity metrics
@@ -70,7 +70,7 @@ wheels analyze code app/models --fix --report
 The command provides detailed feedback including:
 
 - **Complexity Score**: Cyclomatic complexity for functions
-- **Code Standards**: Violations of CFWheels conventions
+- **Code Standards**: Violations of Wheels conventions
 - **Duplicate Code**: Similar code blocks that could be refactored
 - **Suggestions**: Recommendations for improvement
 - **Metrics Summary**: Overall code health indicators

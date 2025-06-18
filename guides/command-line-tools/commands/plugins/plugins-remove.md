@@ -16,7 +16,7 @@ wheels plugins remove <name> [--global] [--force]
 
 ## Description
 
-The `plugins remove` command safely uninstalls a plugin from your CFWheels application. It:
+The `plugins remove` command safely uninstalls a plugin from your Wheels application. It:
 
 - Checks for dependent plugins
 - Creates a backup (by default)

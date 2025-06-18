@@ -7,7 +7,7 @@
 	*/
 
 	/*
-		If you leave these settings commented out, CFWheels will set the data source name to the same name as the folder the application resides in.
+		If you leave these settings commented out, Wheels will set the data source name to the same name as the folder the application resides in.
 	*/
 	set(coreTestDataSourceName="wheelstestdb_h2");
 	set(dataSourceName="wheelstestdb_h2");
@@ -15,7 +15,7 @@
 	// set(dataSourcePassword="");
 
 	/*
-		If you comment out the following line, CFWheels will try to determine the URL rewrite capabilities automatically.
+		If you comment out the following line, Wheels will try to determine the URL rewrite capabilities automatically.
 		The "URLRewriting" setting can bet set to "on", "partial" or "off".
 		To run with "partial" rewriting, the "cgi.path_info" variable needs to be supported by the web server.
 		To run with rewriting set to "on", you need to apply the necessary rewrite rules on the web server first.

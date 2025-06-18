@@ -1,8 +1,8 @@
-# CFWheels TestUI Implementation Notes
+# Wheels TestUI Implementation Notes
 
 ## Overview
 
-This document describes the implementation of the modernized CFWheels TestUI, following the specifications created in the project plan.
+This document describes the implementation of the modernized Wheels TestUI, following the specifications created in the project plan.
 
 ## What's Been Implemented
 

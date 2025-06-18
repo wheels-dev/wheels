@@ -6,11 +6,11 @@ description: >-
 
 # Verification
 
-Verification, through the [verifies()](https://api.wheels.dev/controller.verifies.html) function, is just a special type of filter that runs before actions. With verifications defined in your controller, you can eliminate the need for wrapping your entire actions in `<cfif>` blocks checking for the existence and types of variables. You also can limit your actions' scopes to specific request types like `post, get`, and AJAX requests.
+Verification, through the [verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) function, is just a special type of filter that runs before actions. With verifications defined in your controller, you can eliminate the need for wrapping your entire actions in `<cfif>` blocks checking for the existence and types of variables. You also can limit your actions' scopes to specific request types like `post, get`, and AJAX requests.
 
 ### Using verifies() to Enforce Request Types
 
-Let's say that you want to make sure that all requests coming to a page that handles form submissions are `post`requests. While you can do this with a filter and the [isPost()](https://api.wheels.dev/controller.ispost.html) function, it is more convenient and DRY to do it with the [verifies()](https://api.wheels.dev/controller.verifies.html) function.
+Let's say that you want to make sure that all requests coming to a page that handles form submissions are `post`requests. While you can do this with a filter and the [isPost()](https://wheels.dev/api/v3.0.0/controller.ispost.html) function, it is more convenient and DRY to do it with the [verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) function.
 
 All that you need to do is add this line to your controller's `config()` function:
 
@@ -45,11 +45,11 @@ function incorrectRequestType(){
 }
 ```
 
-Note that you have to either do a [redirectTo()](https://api.wheels.dev/controller.redirectto.html) call or abort the request completely after you've done what you wanted to do inside your handler function. If you don't do anything at all and just let the function exit on its own, Wheels will redirect the user back to the page they came from. In other words, you cannot render any content from inside this function but you can let another function handle that part by redirecting to it.
+Note that you have to either do a [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) call or abort the request completely after you've done what you wanted to do inside your handler function. If you don't do anything at all and just let the function exit on its own, Wheels will redirect the user back to the page they came from. In other words, you cannot render any content from inside this function but you can let another function handle that part by redirecting to it.
 
 ### Enforcing the Existence and Type of Variables
 
-A very convenient and common use of [verifies()](https://api.wheels.dev/controller.verifies.html) is when you want to make sure that a variables exists and is of a certain type; otherwise, you would like for your controller to redirect the user to a different page.
+A very convenient and common use of [verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) is when you want to make sure that a variables exists and is of a certain type; otherwise, you would like for your controller to redirect the user to a different page.
 
 Step back in time for a moment and remember how you used to code websites before Wheels. (Yes I know those were dark days, but stay with me.)
 
@@ -63,7 +63,7 @@ On your `edit.cfm` page, what you probably did was write some code at the top of
 
 With this snippet of code, you could ensure that any request to the `edit.cfm` had to have the `userId` in the form scope and that `userId` had to be of type `guid`. If these conditions weren't met, the request was redirected to the `index.cfm` page. This was a very tedious but necessary task.
 
-Now let's see how using the [verifies()](https://api.wheels.dev/controller.verifies.html) function within Wheels improves this:
+Now let's see how using the [verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) function within Wheels improves this:
 
 ```javascript
 // In the controller 
@@ -94,7 +94,7 @@ The only thing you need to make sure of is that the number of variables in the `
 
 ### Controller Verification vs. Model Object Validation
 
-[verifies()](https://api.wheels.dev/controller.verifies.html) exists solely to validate _controller_ and _environment level_ variables and is not a substitute for [Object Validation](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-validation)in your model.
+[verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) exists solely to validate _controller_ and _environment level_ variables and is not a substitute for [Object Validation](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-validation)in your model.
 
 A basic example of this is to validate params passed through to your controller from routes. Suppose we have the following route in our application:
 
@@ -115,4 +115,4 @@ verifies(
 )>
 ```
 
-However, [verifies()](https://api.wheels.dev/controller.verifies.html) should not be used to make sure that values within the address struct themselves are valid (such as making sure that `address.zipCode` is correct). Because the `address` struct will be passed in to the model, the validation will be performed there.
+However, [verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) should not be used to make sure that values within the address struct themselves are valid (such as making sure that `address.zipCode` is correct). Because the `address` struct will be passed in to the model, the validation will be performed there.

@@ -18,9 +18,9 @@ In Wheels, we create an object like this:
 model("author");
 ```
 
-The built-in Wheels [model()](https://api.wheels.dev/controller.model.html) function will return a reference to an `author` object in the `application` scope (unless it's the first time you call this function, in which case it will also create and store it in the `application` scope).
+The built-in Wheels [model()](https://wheels.dev/api/v3.0.0/controller.model.html) function will return a reference to an `author` object in the `application` scope (unless it's the first time you call this function, in which case it will also create and store it in the `application` scope).
 
-Once you have the `author` object, you can start calling class methods on it, like [findByKey()](https://api.wheels.dev/model.findbykey.html), for example. [findByKey()](https://api.wheels.dev/model.findbykey.html) returns an instance of the object with data from the database record defined by the key value that you pass.
+Once you have the `author` object, you can start calling class methods on it, like [findByKey()](https://wheels.dev/api/v3.0.0/model.findbykey.html), for example. [findByKey()](https://wheels.dev/api/v3.0.0/model.findbykey.html) returns an instance of the object with data from the database record defined by the key value that you pass.
 
 Obviously, `author` is just an example here, and you'll use the names of the `.cfc` files you have created in the `app/models` folder.
 
@@ -35,7 +35,7 @@ For readability, this is usually combined into the following:
 authorObject = model("author").findByKey(1);
 ```
 
-Now `authorObject` is an instance of the `Author` class, and you can call object level methods on it, like [update()](https://api.wheels.dev/model.update.html) and [save()](https://api.wheels.dev/model.save.html).
+Now `authorObject` is an instance of the `Author` class, and you can call object level methods on it, like [update()](https://wheels.dev/api/v3.0.0/model.update.html) and [save()](https://wheels.dev/api/v3.0.0/model.save.html).
 
 ```javascript
 authorObject.update(firstName="Joe");
@@ -74,13 +74,13 @@ auth.firstName = "Joe";
 auth.save();
 ```
 
-This code makes use of the class method [findByKey()](https://api.wheels.dev/model.findbykey.html), updates the object property in memory, and then saves it back to the database using the object method [save()](https://api.wheels.dev/model.save.html). We'll get back to all these methods and more later.
+This code makes use of the class method [findByKey()](https://wheels.dev/api/v3.0.0/model.findbykey.html), updates the object property in memory, and then saves it back to the database using the object method [save()](https://wheels.dev/api/v3.0.0/model.save.html). We'll get back to all these methods and more later.
 
 ### Table and CFC Naming
 
 By default, a table name should be the plural version of the class name. So if you have an `Author.cfc` class, the table name should be `authors`.
 
-To change this behavior you can use the [table()](https://api.wheels.dev/model.table.html) method. This method call should be placed in the `config()` method of your class file, which is where all configuration of your model is done.
+To change this behavior you can use the [table()](https://wheels.dev/api/v3.0.0/model.table.html) method. This method call should be placed in the `config()` method of your class file, which is where all configuration of your model is done.
 
 So, for example, if you wanted for your `author` model to map to a table in your database named `tbl_authors`, you would add the following code to the `config()` method:
 
@@ -102,9 +102,9 @@ function config() {
 }
 ```
 
-With that in place, you have the foundation for a model that never touches the database. When you call methods like [save()](https://api.wheels.dev/model.save.html), [create()](https://api.wheels.dev/model.create.html), [update()](https://api.wheels.dev/model.update.html), and [delete()](https://api.wheels.dev/model.delete.html) on a tableless model, the entire model lifecycle will still run, including object validation and object callbacks.
+With that in place, you have the foundation for a model that never touches the database. When you call methods like [save()](https://wheels.dev/api/v3.0.0/model.save.html), [create()](https://wheels.dev/api/v3.0.0/model.create.html), [update()](https://wheels.dev/api/v3.0.0/model.update.html), and [delete()](https://wheels.dev/api/v3.0.0/model.delete.html) on a tableless model, the entire model lifecycle will still run, including object validation and object callbacks.
 
-Typically, you will want to configure properties and validations manually for tableless models and then override [save()](https://api.wheels.dev/model.save.html) and other persistence methods needed by your application to persist with the data elsewhere (maybe in the `session` scope, an external NoSQL database, or as an email sent from a contact form).
+Typically, you will want to configure properties and validations manually for tableless models and then override [save()](https://wheels.dev/api/v3.0.0/model.save.html) and other persistence methods needed by your application to persist with the data elsewhere (maybe in the `session` scope, an external NoSQL database, or as an email sent from a contact form).
 
 Features supported:
 
@@ -126,7 +126,7 @@ In order for Wheels to successfully read all schema data from your database be s
 
 To keep things as simple as possible, there are no getters or setters in Wheels. Instead, all the properties are made available in the `this` scope.
 
-If you want to map a specific property to a column with a different name, you can override the Wheels mapping by using the [property()](https://api.wheels.dev/model.property.html) method like this:
+If you want to map a specific property to a column with a different name, you can override the Wheels mapping by using the [property()](https://wheels.dev/api/v3.0.0/model.property.html) method like this:
 
 ```javascript
 component extends="Model" {
