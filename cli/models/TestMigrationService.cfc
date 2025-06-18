@@ -25,12 +25,29 @@ component singleton {
 		boolean backup = true,
 		boolean dryRun = false
 	) {
-		if (!fileExists(arguments.filePath)) {
-			throw(type="TestMigration.FileNotFound", message="Test file not found: #arguments.filePath#");
-		}
-		
-		var content = fileRead(arguments.filePath);
-		var originalContent = content;
+		try {
+			// Validate file existence
+			if (!fileExists(arguments.filePath)) {
+				return {
+					success = false,
+					filePath = arguments.filePath,
+					error = "File not found: #arguments.filePath#",
+					errorType = "FileNotFound"
+				};
+			}
+			
+			// Check if it's a CFC file
+			if (!listLast(arguments.filePath, ".") == "cfc") {
+				return {
+					success = false,
+					skipped = true,
+					filePath = arguments.filePath,
+					reason = "Not a CFC file"
+				};
+			}
+			
+			var content = fileRead(arguments.filePath);
+			var originalContent = content;
 		
 		// Create backup if requested
 		if (arguments.backup && !arguments.dryRun) {
@@ -63,21 +80,37 @@ component singleton {
 		// Clean up and format
 		result = cleanupAndFormat(result);
 		
-		// Save if not dry run
-		if (!arguments.dryRun) {
-			fileWrite(arguments.filePath, result.content);
+			// Save if not dry run
+			if (!arguments.dryRun) {
+				fileWrite(arguments.filePath, result.content);
+			}
+			
+			// Update statistics
+			updateStatistics(result);
+			
+			return {
+				success = true,
+				filePath = arguments.filePath,
+				changes = result.changes,
+				warnings = result.warnings,
+				dryRun = arguments.dryRun,
+				preview = arguments.dryRun ? result.content : ""
+			};
+		} catch (any e) {
+			// Extract line number if available
+			var lineNumber = "";
+			if (structKeyExists(e, "tagContext") && arrayLen(e.tagContext)) {
+				lineNumber = " at line " & e.tagContext[1].line;
+			}
+			
+			return {
+				success = false,
+				filePath = arguments.filePath,
+				error = "Migration failed: #e.message##lineNumber#",
+				errorType = e.type,
+				detail = structKeyExists(e, "detail") ? e.detail : ""
+			};
 		}
-		
-		// Update statistics
-		updateStatistics(result);
-		
-		return {
-			success = true,
-			filePath = arguments.filePath,
-			changes = result.changes,
-			warnings = result.warnings,
-			dryRun = arguments.dryRun
-		};
 	}
 	
 	/**
@@ -110,18 +143,19 @@ component singleton {
 		var results = [];
 		
 		for (var file in files) {
-			// Skip already migrated files
-			if (fileRead(file) contains 'extends="tests.BaseSpec"' || fileRead(file) contains "extends='tests.BaseSpec'") {
-				arrayAppend(results, {
-					success = true,
-					filePath = file,
-					skipped = true,
-					reason = "Already migrated to TestBox"
-				});
-				continue;
-			}
-			
 			try {
+				// Skip already migrated files
+				var fileContent = fileRead(file);
+				if (findNoCase('extends="tests.BaseSpec"', fileContent) || findNoCase("extends='tests.BaseSpec'", fileContent)) {
+					arrayAppend(results, {
+						success = true,
+						filePath = file,
+						skipped = true,
+						reason = "Already migrated to TestBox"
+					});
+					continue;
+				}
+				
 				var result = migrateTestFile(
 					filePath = file,
 					backup = arguments.backup,
@@ -278,7 +312,7 @@ component singleton {
 					var replacement = conversion.replace;
 					
 					// Handle captured groups
-					if (structKeyExists(conversion, "groups") && arrayLen(match.pos) > 1) {
+					if (arrayLen(match.pos) > 1) {
 						for (var g = 2; g <= arrayLen(match.pos); g++) {
 							if (match.len[g] > 0) {
 								var groupValue = mid(arguments.result.content, match.pos[g], match.len[g]);
@@ -324,8 +358,12 @@ component singleton {
 		];
 		
 		for (var pattern in complexPatterns) {
-			if (reFindNoCase(pattern.pattern, arguments.result.content)) {
-				arrayAppend(arguments.result.warnings, pattern.warning);
+			var matches = reFindAllNoCase(pattern.pattern, arguments.result.content);
+			if (arrayLen(matches) > 0) {
+				for (var match in matches) {
+					var lineNumber = getLineNumber(arguments.result.content, match.pos[1]);
+					arrayAppend(arguments.result.warnings, pattern.warning & " (line #lineNumber#)");
+				}
 			}
 		}
 	}
@@ -401,6 +439,23 @@ component singleton {
 	}
 	
 	/**
+	 * Get line number from position in content
+	 */
+	private function getLineNumber(required string content, required numeric position) {
+		var lines = listToArray(arguments.content, chr(10));
+		var currentPos = 0;
+		
+		for (var i = 1; i <= arrayLen(lines); i++) {
+			currentPos += len(lines[i]) + 1; // +1 for newline
+			if (currentPos >= arguments.position) {
+				return i;
+			}
+		}
+		
+		return arrayLen(lines); // Default to last line
+	}
+	
+	/**
 	 * Get conversion patterns
 	 */
 	private function getConversionPatterns() {
@@ -471,8 +526,8 @@ component singleton {
 				},
 				// Structure key exists
 				{
-					pattern: 'assert\s*\(\s*"structKeyExists\s*\(\s*([^,]+),\s*["\']([^"\']+)["\']\s*\)"\s*\)',
-					replace: 'expect($1).toHaveKey("$2")'
+					pattern = 'assert\s*\(\s*"structKeyExists\s*\(\s*([^,]+),\s*["\']([^"\']+)["\']\s*\)"\s*\)',
+					replace = 'expect($1).toHaveKey("$2")'
 				},
 				// Length checks
 				{

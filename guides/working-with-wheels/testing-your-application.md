@@ -904,8 +904,19 @@ Caveat: The test suite request must complete without uncaught exceptions. If an 
 
 The Wheels core uses TestBox for its unit test suite and contains a wealth of useful examples. They can all be found in the [`tests` folder](https://github.com/wheels-dev/wheels/tree/develop/tests) of the Wheels git repo.
 
+### Video Tutorials
+
+> 📹 **Coming Soon**: Video tutorials for visual learners
+> - Getting Started with TestBox in Wheels
+> - Migrating from RocketUnit to TestBox
+> - Writing Effective Tests with TDD
+> - Advanced Testing Techniques
+>
+> *Check the [complete testing guide](/docs/testing-with-testbox.md#video-tutorials) for updates*
+
 ### Additional Resources
 
 - [Complete TestBox Testing Guide](/docs/testing-with-testbox.md) - Comprehensive guide with advanced topics
 - [TestBox Documentation](https://testbox.ortusbooks.com/) - Official TestBox docs
 - [Test Quick Start](/tests/README.md) - Quick reference for common patterns
+- [Migration Cheat Sheet](/docs/testbox-migration-cheatsheet.md) - Quick reference for RocketUnit to TestBox

@@ -12,6 +12,7 @@ Wheels 3.0 has transitioned from RocketUnit to TestBox as its testing framework,
 6. [Migrating from RocketUnit](#migrating-from-rocketunit)
 7. [Best Practices](#best-practices)
 8. [Advanced Features](#advanced-features)
+9. [Video Tutorials](#video-tutorials)
 
 ## Getting Started
 
@@ -365,6 +366,82 @@ Options:
 - `?coverage=true` - Enable code coverage
 - `?parallel=false` - Disable parallel execution
 
+### Parallel Execution and Performance
+
+#### Thread Count Recommendations
+
+TestBox supports parallel test execution to speed up test runs. The optimal thread count depends on:
+
+1. **System Resources**
+   - CPU cores: Use 1-2 threads per core
+   - RAM: Each thread uses ~50-100MB
+   - Example: 4-core CPU = 4-8 threads
+
+2. **Test Suite Characteristics**
+   - I/O heavy tests: More threads (2x CPU cores)
+   - CPU heavy tests: Fewer threads (1x CPU cores)
+   - Database tests: Limited by connection pool
+
+3. **Database Connection Pool**
+   - Set threads ≤ max database connections
+   - Leave headroom for application requests
+   - Example: 20 connections = 10-15 test threads
+
+#### Configuration Examples
+
+```cfc
+// tests/runner.cfm
+testbox = new testbox.system.TestBox(
+	options = {
+		parallel = true,
+		maxThreads = determineOptimalThreads()
+	}
+);
+
+function determineOptimalThreads() {
+	var cpuCount = createObject("java", "java.lang.Runtime").getRuntime().availableProcessors();
+	var maxConnections = 20; // Your DB pool size
+	var recommendedThreads = min(cpuCount * 2, maxConnections - 5);
+	return max(2, recommendedThreads); // At least 2 threads
+}
+```
+
+#### Performance Tuning
+
+```bash
+# Small test suite (< 100 tests)
+box testbox run --parallel=false  # Single thread may be faster
+
+# Medium test suite (100-500 tests)
+box testbox run --maxThreads=4
+
+# Large test suite (> 500 tests)
+box testbox run --maxThreads=8
+
+# CI/CD environments (limited resources)
+box testbox run --maxThreads=2
+```
+
+#### Monitoring Performance
+
+```cfc
+// Add to your test runner
+beforeAll(() => {
+	variables.startTime = getTickCount();
+	variables.startMemory = getJVMMemoryUsage();
+});
+
+afterAll(() => {
+	var duration = getTickCount() - variables.startTime;
+	var memoryUsed = getJVMMemoryUsage() - variables.startMemory;
+	
+	writeOutput("Test Suite Performance:");
+	writeOutput("- Duration: #numberFormat(duration/1000, '9.99')# seconds");
+	writeOutput("- Memory: #numberFormat(memoryUsed/1024/1024, '9.99')# MB");
+	writeOutput("- Avg per test: #numberFormat(duration/getTestCount(), '9.99')# ms");
+});
+```
+
 ### CI/CD Integration
 
 Example GitHub Actions workflow:
@@ -657,6 +734,154 @@ describe("Price Calculation", () => {
         }).toThrow("InvalidPriceException");
     });
     
+    it("should handle very large numbers", () => {
+        var item = build("orderItem", {quantity: 999999, price: 999999.99});
+        expect(() => {
+            var total = item.getTotal();
+            expect(total).toBeNumeric();
+            expect(total).toBeGT(0);
+        }).notToThrow();
+    });
+    
+    it("should handle decimal precision", () => {
+        var item = build("orderItem", {quantity: 3, price: 10.01});
+        expect(item.getTotal()).toBe(30.03);
+    });
+});
+```
+
+#### Testing Error Conditions
+
+```cfc
+describe("User Registration", () => {
+    
+    it("should handle database connection failure", () => {
+        // Mock database failure
+        var mockDB = createMock("wheels.Connection");
+        mockDB.$("execute").throws("Database.ConnectionError", "Connection refused");
+        
+        model("User").setConnection(mockDB);
+        
+        expect(() => {
+            create("user");
+        }).toThrow("Database.ConnectionError");
+    });
+    
+    it("should handle concurrent registration attempts", () => {
+        var email = "concurrent@test.com";
+        
+        // Simulate race condition
+        transaction {
+            var user1 = model("User").new(email: email);
+            var user2 = model("User").new(email: email);
+            
+            expect(user1.save()).toBeTrue();
+            expect(user2.save()).toBeFalse();
+            expect(user2.errors()).toHaveKey("email");
+            
+            transaction action="rollback";
+        }
+    });
+});
+```
+
+#### Testing Boundary Conditions
+
+```cfc
+describe("String Processing", () => {
+    
+    it("should handle empty strings", () => {
+        var processor = new StringProcessor();
+        expect(processor.process("")).toBe("");
+        expect(processor.process(" ")).toBe("");
+    });
+    
+    it("should handle null values", () => {
+        var processor = new StringProcessor();
+        expect(processor.process(javaCast("null", ""))).toBe("");
+    });
+    
+    it("should handle very long strings", () => {
+        var longString = repeatString("a", 10000);
+        var processor = new StringProcessor();
+        
+        expect(() => {
+            processor.process(longString);
+        }).notToThrow();
+    });
+    
+    it("should handle special characters", () => {
+        var specialChars = "!@##$%^&*()_+-=[]{}|;':"",./<>?";
+        var processor = new StringProcessor();
+        
+        var result = processor.sanitize(specialChars);
+        expect(result).notToInclude("<");
+        expect(result).notToInclude(">");
+    });
+});
+```
+
+#### Testing Timeouts and Async Operations
+
+```cfc
+describe("Async Operations", () => {
+    
+    it("should timeout long-running operations", () => {
+        var service = new SlowService();
+        service.setTimeout(1000); // 1 second timeout
+        
+        expect(() => {
+            service.performLongOperation(); // Takes 5 seconds
+        }).toThrow("TimeoutException");
+    });
+    
+    it("should handle async callbacks", () => {
+        var completed = false;
+        var service = new AsyncService();
+        
+        service.processAsync(
+            data = {id: 1},
+            onSuccess = () => { completed = true; },
+            onError = () => { completed = false; }
+        );
+        
+        // Wait for async operation
+        sleep(100);
+        
+        expect(completed).toBeTrue();
+    });
+});
+```
+
+#### Testing Security Edge Cases
+
+```cfc
+describe("Security", () => {
+    
+    it("should prevent SQL injection", () => {
+        var maliciousInput = "'; DROP TABLE users; --";
+        var user = model("User").findOne(where="email='#maliciousInput#'");
+        
+        expect(user).toBeFalse(); // No user found, query safely escaped
+        expect(model("User").count()).toBeGT(0); // Table still exists
+    });
+    
+    it("should sanitize XSS attempts", () => {
+        var xssPayload = "<script>alert('XSS')</script>";
+        var comment = create("comment", {body: xssPayload});
+        
+        expect(comment.getDisplayBody()).notToInclude("<script>");
+        expect(comment.getDisplayBody()).toInclude("&lt;script&gt;");
+    });
+    
+    it("should handle path traversal attempts", () => {
+        var maliciousPath = "../../../../../../etc/passwd";
+        var fileService = new FileService();
+        
+        expect(() => {
+            fileService.readFile(maliciousPath);
+        }).toThrow("Security.InvalidPath");
+    });
 });
 ```
 
@@ -781,11 +1006,50 @@ writeDump(var=result, abort=true);
 expect(getCurrentContext()).toBe("tests.specs.unit.UserSpec");
 ```
 
+## Video Tutorials
+
+### Getting Started with TestBox in Wheels
+
+> 📹 **Coming Soon**: Introduction to TestBox testing in Wheels 3.0
+> - Setting up your first test
+> - Understanding BaseSpec helpers
+> - Running tests with CLI and web runner
+> - *Duration: ~15 minutes*
+
+### Migrating from RocketUnit to TestBox
+
+> 📹 **Coming Soon**: Step-by-step migration guide
+> - Using the automated migration tool
+> - Handling complex assertions
+> - Updating test structure and organization
+> - *Duration: ~20 minutes*
+
+### Writing Effective Tests
+
+> 📹 **Coming Soon**: Best practices for test-driven development
+> - Testing models with factories
+> - Controller and integration testing
+> - Mocking and stubbing dependencies
+> - Testing edge cases and error conditions
+> - *Duration: ~25 minutes*
+
+### Advanced Testing Techniques
+
+> 📹 **Coming Soon**: Advanced TestBox features
+> - Custom matchers and assertions
+> - Data providers for parameterized tests
+> - Performance and load testing
+> - Continuous integration setup
+> - *Duration: ~30 minutes*
+
+*Note: Video tutorials are in development. Check back soon or contribute your own tutorials to the Wheels community!*
+
 ## Additional Resources
 
 - [TestBox Documentation](https://testbox.ortusbooks.com/)
 - [Wheels Testing Guide](https://guides.cfwheels.org/docs/testing)
 - [Example Test Suite](https://github.com/cfwheels/cfwheels/tree/develop/tests)
+- [TestBox Migration Cheat Sheet](testbox-migration-cheatsheet.md)
 
 ## Contributing
 
