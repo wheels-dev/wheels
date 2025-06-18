@@ -2,6 +2,57 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Start
+
+### New to Wheels?
+1. **Install Wheels**: `box install cfwheels`
+2. **Generate an app**: `wheels g app myapp`
+3. **Start developing**: `server start`
+
+### Common Tasks
+- **Create a model**: `wheels g model User name:string,email:string,active:boolean`
+- **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
+- **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,inStock:boolean`
+- **Run migrations**: `wheels db migrate`
+- **Run tests**: `wheels test app`
+
+### AI-Specific Documentation
+- **Patterns**: See AI-PATTERNS.md for common code patterns
+- **Testing**: See AI-TESTING.md for TestBox patterns
+- **Errors**: See AI-ERRORS.md for troubleshooting
+- **CLI**: See AI-CLI.md for complete command reference
+- **Examples**: See `/examples/` directory for working applications
+
+## Framework Philosophy
+
+Wheels is inspired by Ruby on Rails and follows these principles:
+
+### Convention over Configuration
+- Models are singular (User.cfc), tables are plural (users)
+- Controllers are plural (Users.cfc)
+- URLs follow RESTful patterns (/users, /users/1, /users/new)
+- Database columns automatically map to model properties
+
+### Don't Repeat Yourself (DRY)
+- Reusable partials for views (`_form.cfm`)
+- Model associations reduce code duplication
+- Helpers and plugins for common functionality
+
+### MVC Architecture
+- **Models**: Business logic and data persistence
+- **Views**: Presentation layer (HTML, JSON, XML)
+- **Controllers**: Request handling and coordination
+
+### ActiveRecord Pattern
+- Models represent database tables
+- Instance methods for CRUD operations
+- Built-in validations and callbacks
+
+### RESTful by Default
+- Standard CRUD actions (index, show, new, create, edit, update, delete)
+- HTTP verbs map to controller actions
+- Resource-based routing
+
 ## Build/Test Commands
 
 ### Testing

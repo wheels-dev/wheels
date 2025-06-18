@@ -45,7 +45,9 @@
       "WebFetch(domain:docs.wheels.dev)",
       "WebFetch(domain:guides.wheels.dev)",
       "WebFetch(domain:www.forgebox.io)",
-      "Bash(./fix-subdomains.sh:*)"
+      "Bash(./fix-subdomains.sh:*)",
+      "Bash(git pull:*)",
+      "Bash(gh pr checkout:*)"
     ],
     "deny": []
   }
