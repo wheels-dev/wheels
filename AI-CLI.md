@@ -182,16 +182,16 @@ wheels g test helper Format
 
 ```bash
 # Run all pending migrations
-wheels db migrate
+wheels dbmigrate latest
+
+# Run next migration
+wheels dbmigrate up
 
 # Run specific migration version
-wheels db migrate version=001
-
-# Run migrations up to version
-wheels db migrate to=005
+wheels dbmigrate exec 001
 
 # Show migration status
-wheels db info
+wheels dbmigrate info
 
 # Create database
 wheels db create
@@ -201,16 +201,10 @@ wheels db create
 
 ```bash
 # Rollback last migration
-wheels db rollback
+wheels dbmigrate down
 
-# Rollback specific number of migrations
-wheels db rollback step=3
-
-# Rollback to specific version
-wheels db rollback to=002
-
-# Rollback all migrations
-wheels db rollback version=0
+# Reset all migrations (rollback all)
+wheels dbmigrate reset
 ```
 
 ### Database Utilities
@@ -219,8 +213,8 @@ wheels db rollback version=0
 # Drop database
 wheels db drop
 
-# Reset database (drop, create, migrate)
-wheels db reset
+# Reset database migrations
+wheels dbmigrate reset
 
 # Seed database
 wheels db seed

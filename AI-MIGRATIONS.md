@@ -41,19 +41,19 @@ wheels g migration MigratePostData
 
 ```bash
 # Run all pending migrations
-wheels db migrate
+wheels dbmigrate latest
 
 # Run migrations up to specific version
-wheels db migrate to=005
+wheels dbmigrate latest version=005
 
 # Rollback last migration
-wheels db rollback
+wheels dbmigrate down
 
 # Rollback multiple migrations
-wheels db rollback step=3
+wheels dbmigrate down version=3
 
 # Check migration status
-wheels db info
+wheels dbmigrate info
 ```
 
 ## Full Migration Patterns
@@ -376,17 +376,17 @@ wheels g migration Changes
 ### Migration Won't Run
 ```bash
 # Check migration status
-wheels db info
+wheels dbmigrate info
 
 # Force re-run if needed
-wheels db migrate version=0
-wheels db migrate
+wheels dbmigrate latest version=0
+wheels dbmigrate latest
 ```
 
 ### Rollback Issues
 ```bash
 # Rollback to specific version
-wheels db rollback to=20231215103045
+wheels dbmigrate down version=20231215103045
 
 # If rollback fails, check the down() method
 ```

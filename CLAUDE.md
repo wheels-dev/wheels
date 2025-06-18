@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Create a model**: `wheels g model User name:string,email:string,active:boolean`
 - **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
 - **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,inStock:boolean`
-- **Run migrations**: `wheels db migrate`
+- **Run migrations**: `wheels dbmigrate latest`
 - **Run tests**: `wheels test app`
 
 ### AI-Specific Documentation

@@ -37,7 +37,7 @@ set(dataSourceName: "blog");
 4. Create database and run migrations:
 ```bash
 wheels db create
-wheels db migrate
+wheels dbmigrate latest
 wheels db seed  # Optional: loads sample data
 ```
 
@@ -171,7 +171,7 @@ wheels test app PostTest
 ```bash
 wheels g migration AddPublishedAtToPosts
 # Edit migration to add column
-wheels db migrate
+wheels dbmigrate latest
 # Update model and forms
 ```
 
@@ -189,4 +189,4 @@ user = model("User").create(
 
 - **Images not uploading**: Check file permissions on `/images/posts/`
 - **Routes not working**: Run `wheels routes` to see all routes
-- **Database errors**: Ensure migrations ran with `wheels db info`
+- **Database errors**: Ensure migrations ran with `wheels dbmigrate info`

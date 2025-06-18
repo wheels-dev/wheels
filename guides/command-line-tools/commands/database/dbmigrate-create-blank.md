@@ -192,7 +192,7 @@ Within your blank migration, you can use these helper methods:
 
 ## Notes
 
-- Migration files are created in `/db/migrate/` or your configured migration path
+- Migration files are created in `/app/migrator/migrations/` or your configured migration path
 - The timestamp ensures migrations run in the correct order
 - Always test migrations in development before production
 - Keep migrations focused on a single purpose

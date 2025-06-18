@@ -199,7 +199,7 @@ component extends="Model" {
 When `--migrate=true` (default), generates migration:
 
 ### Migration File
-`db/migrate/[timestamp]_add_properties_to_[model].cfc`:
+`app/migrator/migrations/[timestamp]_add_properties_to_[model].cfc`:
 
 ```cfc
 component extends="wheels.migrator.Migration" hint="Add properties to product" {
@@ -461,7 +461,7 @@ wheels generate property model "createdBy:integer:belongsTo=user updatedBy:integ
 After adding properties:
 ```bash
 # Run migration
-wheels dbmigrate up
+wheels dbmigrate latest
 
 # Generate property tests
 wheels generate test model user

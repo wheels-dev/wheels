@@ -121,7 +121,7 @@ Note: If you had previously installed the [CSRF Protection plugin](https://githu
 
 If you have previously been using the dbmigrate plugin, you can now use the inbuilt version within the Wheels 2 core.&#x20;
 
-Database Migration files in `/db/migrate/` should now be moved to `/migrator/migrations` and extend `wheels.migrator.Migration`, not `plugins.dbmigrate.Migration` which can be changed with a simple find and replace. Note: Oracle is not currently supported for Migrator.
+Database Migration files in `/db/migrate/` should now be moved to `/app/migrator/migrations/` and extend `wheels.migrator.Migration`, not `plugins.dbmigrate.Migration` which can be changed with a simple find and replace. Note: Oracle is not currently supported for Migrator.
 
 ### Upgrading to 1.4.x
 

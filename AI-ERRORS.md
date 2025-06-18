@@ -93,7 +93,7 @@ ls vendor/wheels/
 **Solutions:**
 1. Run migrations:
 ```bash
-wheels db migrate
+wheels dbmigrate latest
 ```
 
 2. Check table naming convention:
@@ -626,13 +626,13 @@ Migration '001_create_users' has already been run
 **Solution:**
 ```bash
 # Check migration status
-wheels db info
+wheels dbmigrate info
 
 # Rollback if needed
-wheels db rollback
+wheels dbmigrate down
 
 # Then run again
-wheels db migrate
+wheels dbmigrate latest
 ```
 
 ### Error: "Column already exists"
