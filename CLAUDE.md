@@ -4,85 +4,151 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build/Test Commands
 
+### Testing
 - Run a single test: `wheels test app TestName`
 - Run a test package: `wheels test app testBundles=controllers`
 - Run a specific test spec: `wheels test app testBundles=controllers&testSpecs=testCaseOne`
+- Run all tests: `box testbox run`
+- Run specific directory: `box testbox run --directory=tests/specs/unit`
+- Run tests with coverage: `box testbox run --coverage --coverageReporter=html`
+- Watch mode for TDD: `box testbox watch`
+- Run tests for specific engine with Docker: `docker compose --profile lucee up -d`
+- Available Docker profiles: `lucee`, `lucee6`, `lucee7`, `adobe2018`, `adobe2021`, `adobe2023`, `adobe2025`
+
+### Code Quality
 - Format code: `box run-script format` (uses cfformat)
 - Check formatting: `box run-script format:check`
+- Watch mode formatting: `box run-script format:watch`
+
+### Development
+- Install dependencies: `box install`
 - Reload application: `wheels reload [development|testing|maintenance|production]`
-- Run all tests with Docker: `docker compose up` (runs on multiple CFML engines)
-- Run specific engine tests: `docker compose --profile lucee up -d`
+- Start server in workspace: `cd workspace && server start`
+- Restart server: `server restart`
+- Reload CommandBox after CLI changes: `box reload`
 
 ## Code Style Guidelines
 
-- Use camelCase for variable/function names and CapitalizedCamelCase for CFC names
+### Naming Conventions
+- camelCase for variable/function names
+- CapitalizedCamelCase for CFC names
+- Scoped variables use lowercase.camelCase (e.g., `application.myVar`)
+- Pascal case for built-in CF functions (e.g., `IsNumeric()`, `Trim()`)
+- Prefix "private" framework methods with `$` (e.g., `$query()`)
+
+### Formatting (cfformat rules)
 - Indent with tabs, 2 spaces per tab
 - Max line length: 120 characters
-- Function parameters use camelCase
-- Scoped variables use lowercase.camelCase (e.g., application.myVar)
-- Pascal case for built-in CF functions (e.g., IsNumeric(), Trim())
+- Array spacing: `[1, 2, 3]` not `[ 1,2,3 ]`
+- Struct spacing: `{key: value}` not `{ key : value }`
+- Binary operators spaced: `1 + 2` not `1+2`
+- Function declaration spacing: no space before parentheses
+
+### Testing Patterns
+- Use TestBox BDD syntax with describe/it blocks
 - Use `local` scope for function variables (not var-scoped)
-- Prefix "private" methods with `$` (e.g., `$query()`) for internal use
 - Follow Wheels validation/callback patterns in models
-- Use transactions for database tests
-- Use TestBox for writing tests with describe/it syntax
+- Use transactions for database tests (automatic with BaseSpec)
+- Use factories for test data generation
+
+### Model Patterns
+- Use associations (hasMany, belongsTo, hasOne)
+- Use callbacks (beforeValidation, afterCreate, etc.)
+- Use calculated properties for derived data
+- Follow ActiveRecord pattern conventions
 
 ## CLI Commands
 
-- Don't mix positional and named attributes when calling CLI commands
-- Named attributes should use attribute=value syntax
-- Boolean attributes can use --attribute as a shortcut instead of attribute=true
-- Parameter syntax - CommandBox requires named attributes (name=value) instead of mixing positional and named parameters
+### Parameter Syntax
+- CommandBox requires named attributes (name=value) not positional parameters
+- Boolean attributes can use `--attribute` as shortcut for `attribute=true`
+- Don't mix positional and named attributes
+- Note: Some CLI commands have parameter naming inconsistencies (camelCase vs kebab-case)
 
-## Testing the Framework and CLI
-
-- The CLI is written in CFML and is packaged as a module for CommandBox
-- Launch CommandBox with `box` shell command
-- Use the `workspace` directory as a sandbox to test wheels cli commands
-- First create an app with `wheels g app` command
-- Then start the web server with `server start` commandbox command
-- To restart the webserver use `server restart` or `server stop` followed by `server start`
-- If changes are made to the CLI commands then reload Commandbox with `box reload` or `exit` followed by `box`
+### Testing CLI Commands
+1. Navigate to workspace: `cd workspace`
+2. Create test app: `wheels g app myapp`
+3. Start server: `server start`
+4. Test your CLI changes
+5. If modifying CLI code, reload CommandBox: `box reload`
 
 ## High-Level Architecture
 
 ### Core Components
+- **Application.cfc**: Framework initialization and request lifecycle
 - **Controller.cfc**: Base controller providing MVC functionality, rendering, filters, and provides() for content negotiation
 - **Model.cfc**: ActiveRecord-style ORM with associations, validations, callbacks, and database adapters
 - **Dispatch.cfc**: Request routing and parameter handling
 - **Global.cfc**: Framework-wide helper functions and utilities
 - **Mapper.cfc**: RESTful routing configuration with resource mapping
+- **Migrator.cfc**: Database migration management
+- **Wirebox.cfc**: Dependency injection container
 
 ### Directory Structure
 - `/vendor/wheels/`: Core framework files (do not modify directly)
+  - `/controller/`: Controller functionality (filters, rendering, caching)
+  - `/model/`: Model functionality (CRUD, associations, validations)
+  - `/view/`: View helpers and form builders
+  - `/global/`: Global helper functions
+  - `/public/`: Request lifecycle and bootstrapping
+  - `/migrator/`: Database migration system
+  - `/events/`: Event handling system
+  - `/plugins/`: Plugin architecture
 - `/app/`: Application code (controllers, models, views)
 - `/config/`: Environment-specific configuration
 - `/cli/`: CommandBox CLI module for code generation and tasks
-- `/tests/`: Framework test suite
+- `/tests/`: Framework and application test suites
 - `/docker/`: Docker configurations for multi-engine testing
+- `/workspace/`: Sandbox for testing CLI commands
 
 ### Key Patterns
-- **Controller Initialization**: Use `config()` method, NOT `init()` for controller setup
-- **Private Methods**: Prefix with `$` (e.g., `$callAction()`, `$performedRender()`)
+- **Initialization**: Both Controllers and Models use `config()` method for initialization, NOT `init()`
+- **Private Methods**: Prefix with `$` indicates framework internals (e.g., `$callAction()`, `$performedRenderOrRedirect()`)
 - **Content Negotiation**: Use `provides()` or `onlyProvides()` in controller config()
 - **View Rendering**: Automatic for HTML, skipped for JSON/XML when using renderText/renderWith
+- **Component Integration**: Framework uses `$integrateComponents()` to mix functionality into base classes
+- **Request Flow**: Application.cfc → Dispatch.cfc → Controller → Model → View
 
 ### Database Testing
 - Create `wheelstestdb` database and datasource
-- Supports H2, MySQL, PostgreSQL, SQL Server, Oracle
+- Supports H2 (recommended for speed), MySQL, PostgreSQL, SQL Server, Oracle
 - Docker compose provides all database servers for testing
 - Use `db={{database}}` URL parameter to switch datasources
+- Tests run in transactions that automatically roll back
 
 ### Development Workflow
 1. Make changes to framework files in `/vendor/wheels/`
-2. Test using workspace sandbox or Docker containers
-3. Run tests: `wheels test app` or use Docker TestUI at localhost:3000
-4. Ensure all CFML engines pass (Lucee 5/6/7, Adobe 2018/2021/2023/2025)
+2. Test using workspace sandbox: `cd workspace && wheels g app testapp && server start`
+3. Run tests: `wheels test app` or `box testbox run`
+4. Use Docker TestUI at localhost:3000 for multi-engine testing
+5. Ensure all CFML engines pass (Lucee 5/6/7, Adobe 2018/2021/2023/2025)
+
+## Creating Pull Requests
+Use the gh command via the Bash tool for ALL GitHub-related tasks including working with issues, pull requests, checks, and releases.
 
 ## Important Notes
 
-- Framework uses `config()` method for controller initialization, not `init()`
+### Framework Specifics
+- Framework uses `config()` method for initialization in BOTH controllers and models
 - Always check `$performedRenderOrRedirect()` before automatic view rendering
 - Use `$requestContentType()` and `$acceptableFormats()` for content negotiation
+- The `$` prefix indicates framework internal methods - do not call these directly from application code
+- View files use `.cfm` extension, not `.cfc`
+
+### Testing Requirements
 - Test on multiple CFML engines before submitting PRs
+- Use BaseSpec.cfc for all tests to get Wheels integration helpers
+- Tests automatically run in transactions for isolation
+- Use factories for consistent test data generation
+- Run formatting check before committing: `box run-script format:check`
+
+### Development Best Practices
 - Follow existing patterns when adding new functionality
+- Don't modify files in `/vendor/wheels/` unless contributing to framework
+- Use the `/workspace/` directory for testing CLI commands
+- Check for existing helpers before creating new ones
+- Use TestBox BDD syntax for all new tests
+
+### Known Issues
+- Some CLI commands have inconsistent parameter naming (camelCase vs kebab-case)
+- Direct CFM file access may not work due to Wheels routing (use defined routes instead)

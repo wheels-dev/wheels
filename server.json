@@ -10,5 +10,6 @@
     },
     "app":{
         "cfengine":"lucee"
-    }
+    },
+    "rewritesEnable=true":true
 }

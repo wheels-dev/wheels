@@ -1,6 +1,12 @@
 /**
 * Run Wheels Framework Tests
 *
+* This command is deprecated. Please use the newer TestBox-based commands:
+* - wheels test run - Run tests with modern TestBox runner
+* - wheels test coverage - Generate coverage reports
+* - wheels test migrate - Migrate RocketUnit tests to TestBox
+*
+* Legacy usage:
 * {code:bash}
 * wheels test [type] [servername] [reload] [debug]
 * {code}
@@ -24,9 +30,22 @@ component extends="base" {
 		string format="json",
 		string adapter=""
 	) {
+		// Show deprecation notice
+		print.yellowLine("⚠️  DEPRECATION WARNING: 'wheels test' is deprecated.");
+		print.yellowLine("   Please use 'wheels test run' for the modern TestBox runner.");
+		print.line();
+		
+		// For backward compatibility, continue with old behavior
 	 	var suite=$buildTestSuite(argumentCollection=arguments);
-				  $outputSuiteVariables(suite);
-				  $runTestSuite(suite);
+		$outputSuiteVariables(suite);
+		$runTestSuite(suite);
+		
+		print.line();
+		print.boldLine("Tip: For better test experience, try:");
+		print.line("  wheels test run                    # Run all tests");
+		print.line("  wheels test run --watch            # Watch mode");
+		print.line("  wheels test run --coverage         # With coverage");
+		print.line("  wheels test migrate tests          # Migrate to TestBox");
 	}
 
 

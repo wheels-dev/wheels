@@ -13,45 +13,63 @@ At some point, your code is going to break. Upgrades, feature enhancements, and 
 
 The problem is that today's fix could be tomorrow's bug. What if there were an automated way of checking if that change you're making is going to break something? That's where writing tests for your application can be invaluable.
 
-For testing your application in Wheels, we have added a third party tool [TestBox](https://github.com/Ortus-Solutions/TestBox) in the framework which doesn't come preinstalled but you can install it by running `box install` in the Commandbox from inside your application.
+For testing your application in Wheels 3.0, we use [TestBox](https://github.com/Ortus-Solutions/TestBox) as the testing framework. TestBox comes bundled with Wheels and provides a modern BDD (Behavior Driven Development) testing experience.
 
 ### The Test Framework
 
-Testbox is a simple yet powerful tool for testing your application. It contains not only a testing framework, runner, assertions and expectations library but also ships with MockBox, A Mocking & Stubbing Framework. It also supports xUnit style of testing and MXUnit compatibilities.
+TestBox is a powerful testing framework that provides:
+- BDD and xUnit style testing syntax
+- Built-in assertions and expectations library
+- MockBox for mocking and stubbing
+- Code coverage reporting
+- Parallel test execution
+- Multiple output formats (HTML, JSON, JUnit, TAP)
+
+Wheels extends TestBox with framework-specific features through the `BaseSpec.cfc` class, providing helpers for testing models, controllers, and views.
 
 ### Conventions
 
-In order to run tests against your application, all tests must reside in the `tests/Testbox` directory off the root of your Wheels application, or within a subdirectory thereof.
-
-When you run the tests for your application, Testbox recursively scans your application's `tests/Testbox/specs` directory for valid tests. Whilst you have freedom to organize your subdirectories, tests and supporting files any way you see fit, we would recommend using the directory structure below as a guide:
+In Wheels 3.0, tests reside in the `tests/` directory off the root of your application. The recommended directory structure is:
 
 ```
 tests/
-  Testbox/
-    specs/
-    ├── functions/
-    ├── requests/
+├── BaseSpec.cfc          # Base test class with Wheels helpers
+├── runner.cfm            # Web-based test runner
+├── specs/                # Test specifications
+│   ├── unit/            # Isolated unit tests
+│   ├── integration/     # Integration tests
+│   └── functional/      # End-to-end tests
+├── fixtures/            # Test data and fixtures
+└── support/             # Test utilities
+    └── factories/       # Test data factories
 ```
 
 {% hint style="info" %}
-#### What are these directories for?
+#### Directory Organization
 
-The "functions" directory might contain test packages that cover model methods, global or view helper functions.
-
-The "requests" directory might contain test packages that cover controller actions and the output that they generate (views).
+- **unit/**: Tests for individual components in isolation (models, helpers)
+- **integration/**: Tests that verify multiple components work together
+- **functional/**: End-to-end tests that simulate user interactions
+- **fixtures/**: Static test data files
+- **support/factories/**: Dynamic test data generators
 {% endhint %}
 
-Any components that will contain tests must extend the `testbox.system.BaseSpec` component:
+All test components should extend the `tests.BaseSpec` component (which extends TestBox's BaseSpec):
 
 ```java
-component extends="testbox.system.BaseSpec" {
+component extends="tests.BaseSpec" {
     // your tests here
 }
 ```
 
-If the testing framework sees that a component does not extend `testbox.system.BaseSpec`, that component will give error.
+The Wheels BaseSpec provides additional helpers for testing:
+- **Transaction rollback**: All tests run in transactions that automatically roll back
+- **Model helpers**: `model()`, `create()`, `build()`, `createList()`
+- **Controller helpers**: `controller()`, `processRequest()`, `apiRequest()`
+- **Authentication helpers**: `loginAs()`, `logout()`, `isLoggedIn()`
+- **Assertion helpers**: `assertHasErrors()`, `assertFieldValueEquals()`
 
-you can write a test method with the following syntax:
+You can write a test method with the following syntax:
 
 ```java
 it("Result is True", () => {
@@ -257,6 +275,10 @@ beforeEach(() => {
       password="foobar",
       passwordConfirmation="foobar"
   }
+  
+  // Alternative: Use factories for test data
+  // user = build("user")  // Creates but doesn't save
+  // user = create("user") // Creates and saves
 })
 ```
 
@@ -690,119 +712,82 @@ component extends="testbox.system.BaseSpec" {
 
 If your plugin is uses `mixin="model"`, you will need to create and instantiate a dummy model component.
 
-### Testing Plugins with RocketUnit (Deprecated)
-
-Testing plugins requires slightly different approaches depending on the `mixin` attribute defined in the plugin's main component.
-
-Below is a simple plugin called `timeAgo` that extends Wheels' `timeAgoInWords` view helper by appending "ago" to the function's return value. Take note of the `mixin="controller"` argument as this will play a part in how we test the plugin.
-
-```java
-component mixin="controller" {
-
-    public any function init() {
-        this.version = "2.0";
-        return this;
-    }
-
-    /*
-     * Append the term "ago" to the timeAgoInWords core function
-     */
-    public string function timeAgo() {
-        return core.timeAgoInWords(argumentCollection=arguments) & " " & __timeAgoValueToAppend();
-    }
-
-    /*
-     * Define the term to append to the main function
-     */
-    private string function __timeAgoValueToAppend() {
-        return "ago";
-    }
-}
-```
-
-In order to test our plugin, we'll need to do a little setup. Our plugin's tests will reside in a directory within our plugin package named `tests`. We'll also need a directory to keep test assets, in this case a dummy controller that we will need to instantiate in our test's `setup()` function.
-
-```
-plugins/
-├─ timeago/
-    └─ TimeAgo.cfc
-    └─ index.cfm
-    └─ tests/
-        └─ TestTimeAgo.cfc
-        └─ assets/
-            └─ controllers/
-                └─ Dummy.cfc
-```
-
-The `/plugins/timeago/tests/assets/controllers/Dummy.cfc` controller contains the bare minimum for a controller.
-
-```java
-component extends="wheels.Controller" {
-}
-```
-
-Firstly, in our `/plugins/timeago/tests/TestTimeAgo.cfc` we'll need to copy the application scope so that we can change some of Wheels' internal paths. Fear not, we'll reinstate any changes after the tests have finished executing using the `teardown` function. so that if you're running your tests on your local development machine, your application will continue to function as expected after you're done testing.
-
-Once the setup is done, we simply execute the plugin functions and assert that the return values are what we expect.&#x20;
-
-```java
-component extends="wheels.Test" {
-
-    function setup() {
-        // save the original environment
-        applicationScope = Duplicate(application);
-        // a relative path to our plugin's assets folder where we will store any plugin specific components and files
-        assetsPath = "plugins/timeAgo/tests/assets/";
-        // override wheels' path with our plugin's assets directory
-        application.wheels.controllerPath = assetsPath & "controllers";
-        // clear any plugin default values that may have been set
-        StructDelete(application.wheels.functions, "timeAgo";
-        // we're always going to need a controller for these tests so we'll just create a dummy
-        _params = {controller="foo", action="bar"};
-        dummyController = controller("Dummy", _params);
-    }
-
-    function teardown() {
-        // reinstate the original application environment
-        application = applicationScope;
-    }
-
-    // testing main public function
-    function testTimeAgoReturnsExpectedValue() {
-        actual = dummyController.timeAgo(fromTime=Now(), toTime=DateAdd("h", -1, Now()));
-        expected = "About 1 hour ago";
-        assert("actual eq expected");
-    }
-
-    // testing the 'private' function
-    function testTimeAgoValueToAppendReturnsExpectedValue() {
-        actual = dummyController.__timeAgoValueToAppend();
-        expected = "ago";
-        assert("actual eq expected");
-    }
-}
-```
-
-If your plugin is uses `mixin="model"`, you will need to create and instantiate a dummy model component.
-
 ### Running Your Tests
 
-You can run your tests by clicking on the `Testbox` button in your navbar. It will open a dropdown menu which will have two options. `App Tests` and `Core Tests`. You can run either the framework's tests by clicking on the `Core Tests` or you can run your own tests that you have written for your application by clicking on `App Tests`. Clicking on either of them will open another dropdown menu which will have 4 options: `HTML`, `JSON`, `TXT` and `JUnit`. These are the formats in which you can get the result of your tests. After choosing your desired output format, click on that option. A new tab will open and you will get your test results after they have run.
+Wheels provides multiple ways to run your tests:
 
-The test URL will look something like this:\
-`/testbox`
+#### Command Line (Recommended)
 
-Running an individual package:\
-`/testbox?testBundles=controllers`
+```bash
+# Run all tests
+wheels test run
 
-Running a single test:\
-`/testbox?testBundles=controllers&testSpecs=testCaseOne`
+# Run specific directory
+wheels test run --directory=tests/specs/unit
 
-These URLs are useful should you want an external system to run your tests.
+# Watch mode for TDD
+wheels test run --watch
 
-**Test Results Format**
+# Run with coverage
+wheels test run --coverage
 
-Wheels can return your test results in either HTML, JSON, TXT or JUnit formats, simply by using the `format` url parameter. Eg: `format=junit`
+# Run specific test bundles
+wheels test run --testBundles=models
+
+# Generate coverage report
+wheels test coverage
+```
+
+#### Using TestBox CLI directly
+
+```bash
+# Run all tests
+box testbox run
+
+# Run specific directory
+box testbox run --directory=tests/specs/unit
+
+# Watch mode
+box testbox watch
+
+# With coverage
+box testbox run --coverage --coverageReporter=html
+```
+
+#### Web Runner
+
+You can also run tests through the web interface:
+
+- Visit `/tests/runner.cfm` for an interactive HTML interface
+- The test runner supports various URL parameters:
+  - `testBundles=controllers` - Run specific test bundles
+  - `testSpecs=testCaseOne` - Run specific test specs
+  - `reporter=json` - Change output format (html, json, junit, tap, simple, text)
+  - `coverage=true` - Enable code coverage
+
+#### Legacy Method
+
+The legacy test runner is still available through the navbar menu for backward compatibility:
+- Click on the `Testbox` button in your navbar
+- Choose between `App Tests` and `Core Tests`
+- Select your desired output format (HTML, JSON, TXT, JUnit)
+
+**Note**: We recommend using the newer CLI commands for better performance and features.
+
+#### Migrating from RocketUnit
+
+If you have existing RocketUnit tests, use the migration tool:
+
+```bash
+# Migrate a single file
+wheels test migrate path/to/test.cfc
+
+# Migrate all tests
+wheels test migrate tests --recursive
+
+# Preview changes without modifying files
+wheels test migrate tests --dry-run
+```
 
 ### Running Tests with Docker
 
@@ -917,4 +902,10 @@ Caveat: The test suite request must complete without uncaught exceptions. If an 
 
 ### Learn By Example: Wheels Core
 
-The Wheels core uses this test framework for its unit test suite and contains a wealth of useful examples. They can all be found in the [`tests_testbox` folder](https://github.com/wheels-dev/wheels/tree/develop/vendor/wheels/tests_testbox) of the Wheels git repo.
+The Wheels core uses TestBox for its unit test suite and contains a wealth of useful examples. They can all be found in the [`tests` folder](https://github.com/wheels-dev/wheels/tree/develop/tests) of the Wheels git repo.
+
+### Additional Resources
+
+- [Complete TestBox Testing Guide](/docs/testing-with-testbox.md) - Comprehensive guide with advanced topics
+- [TestBox Documentation](https://testbox.ortusbooks.com/) - Official TestBox docs
+- [Test Quick Start](/tests/README.md) - Quick reference for common patterns
