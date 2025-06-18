@@ -2,7 +2,7 @@ component extends="wheels.tests.Test" {
 
 	function setup() {
 		_controller = controller(name = "dummy");
-		user = model("users");
+		user = model("_c_o_r_e_users");
 	}
 
 	function test_x_pagination_valid() {

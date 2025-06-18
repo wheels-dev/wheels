@@ -2,7 +2,7 @@ component extends="wheels.tests.Test" {
 
 	function test_tablename_and_tablenameprefix() {
 		user = model("user2");
-		assert('user.tableName() eq "tblusers"');
+		assert('user.tableName() eq "_c_o_r_e_tblusers"');
 	}
 
 	function test_tablename_and_tablenameprefix_in_finders_fixes_issue_667() {

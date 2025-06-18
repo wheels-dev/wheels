@@ -19,7 +19,7 @@ component extends="wheels.tests.Test" {
 
 	function test_max_works_with_group_functionality() {
 		r = model("post").findAll(
-			select = "id, authorid, title, MAX(posts.views) AS maxView",
+			select = "id, authorid, title, MAX(_c_o_r_e_posts.views) AS maxView",
 			group = "id, authorid, title"
 		);
 		assert('r.recordcount eq 5');
@@ -27,7 +27,7 @@ component extends="wheels.tests.Test" {
 
 	function test_group_functionality_works_with_pagination() {
 		r = model("post").findAll(
-			select = "id, authorid, title, MAX(posts.views) AS maxView",
+			select = "id, authorid, title, MAX(_c_o_r_e_posts.views) AS maxView",
 			group = "id, authorid, title",
 			page = 1,
 			perPage = 2

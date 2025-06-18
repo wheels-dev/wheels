@@ -12,8 +12,8 @@ component extends="Model" {
 				"all"
 			)
 		);
-		property(name = "firstLetter", sql = "SUBSTRING(tblusers.username, 1, 1)");
-		property(name = "groupCount", sql = "COUNT(tblusers.id)");
+		property(name = "firstLetter", sql = "SUBSTRING(_c_o_r_e_tblusers.username, 1, 1)");
+		property(name = "groupCount", sql = "COUNT(_c_o_r_e_tblusers.id)");
 	}
 
 }

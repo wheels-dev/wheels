@@ -26,12 +26,12 @@ component extends="wheels.tests.Test" {
 	}
 
 	function test_$objectName_hasMany_associations_nested() {
-		objectName = _controller.$objectName(objectName = "author", association = "posts,comments", position = "1,2");
-		assert('objectName eq "author[''posts''][1][''comments''][2]"');
+		objectName = _controller.$objectName(objectName = "author", association = "posts,_c_o_r_e_comments", position = "1,2");
+		assert('objectName eq "author[''posts''][1][''_c_o_r_e_comments''][2]"');
 	}
 
 	function test_$objectName_raises_error_without_correct_positions() {
-		e = raised('_controller.$objectName(objectName="author", association="posts,comments", position="1")');
+		e = raised('_controller.$objectName(objectName="author", association="posts,_c_o_r_e_comments", position="1")');
 		assert('e eq "Wheels.InvalidArgument"');
 	}
 

@@ -1635,7 +1635,7 @@ component extends="testbox.system.BaseSpec" {
 				expect(columnList).toBe("_c_o_r_e_authors.firstname,_c_o_r_e_authors.id,_c_o_r_e_authors.id AS Authorid,_c_o_r_e_authors.lastname,_c_o_r_e_posts.averagerating AS postaveragerating,_c_o_r_e_posts.body AS postbody,_c_o_r_e_posts.createdat AS postcreatedat,_c_o_r_e_posts.deletedat AS postdeletedat,_c_o_r_e_posts.id AS postid,_c_o_r_e_posts.title AS posttitle,_c_o_r_e_posts.updatedat AS postupdatedat,_c_o_r_e_posts.views AS postviews")
 			})
 
-			it("works with association with expanded aliases enabled", () => {
+			it("works with association with expanded aliases disabled", () => {
 				columnList = ListSort(
 					g.model("Author").$createSQLFieldList(
 						clause = "select",

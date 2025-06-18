@@ -10,14 +10,14 @@ component extends="wheels.tests.Test" {
 		);
 		for (
 			local.table in [
-				"bunyips",
-				"dropbears",
-				"hoopsnakes",
-				"migratorversions"
+				"_c_o_r_e_bunyips",
+				"_c_o_r_e_dropbears",
+				"_c_o_r_e_hoopsnakes"
 			]
 		) {
 			migration.dropTable(local.table);
 		};
+		deleteMigratorVersions(2);
 	}
 
 	function teardown() {

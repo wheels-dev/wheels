@@ -9,7 +9,7 @@ component extends="Model" {
 		beforeSave("callbackThatReturnsTrue");
 		beforeDelete("callbackThatReturnsTrue");
 		property(name = "firstName", label = "First name(s)", defaultValue = "Dave");
-		property(name = "numberofitems", sql = "SELECT COUNT(id) FROM posts WHERE authorid = authors.id", select = false);
+		property(name = "numberofitems", sql = "SELECT COUNT(id) FROM _c_o_r_e_posts WHERE authorid = _c_o_r_e_authors.id", select = false);
 		property(name = "lastName", label = "Last name", defaultValue = "");
 		nestedProperties(associations = "profile", allowDelete = true);
 		validatesPresenceOf("firstName");
