@@ -41,11 +41,8 @@ cp AI-*.md "${BUILD_DIR}/"
 # Copy VS Code snippets
 echo "Copying VS Code snippets..."
 mkdir -p "${BUILD_DIR}/.vscode"
-if ls .vscode/wheels*.code-snippets 1> /dev/null 2>&1; then
-    cp .vscode/wheels*.code-snippets "${BUILD_DIR}/.vscode/"
-else
-    echo "Warning: No VS Code snippets found matching .vscode/wheels*.code-snippets"
-fi
+cp .vscode/wheels.code-snippets "${BUILD_DIR}/.vscode/"
+cp .vscode/wheels-test.code-snippets "${BUILD_DIR}/.vscode/"
 
 # Copy vendor directory from build/base if it exists
 if [ -d "build/base/vendor" ]; then
