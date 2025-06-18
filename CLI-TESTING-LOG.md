@@ -86,13 +86,57 @@ This document tracks the systematic testing of all Wheels CLI commands. Each com
     - Test file deletion paths shown but test files not created by generate resource
 
 ### wheels deps
-- **Status**: ⏳ Not Tested
+- **Status**: ⚠️ Partially Tested
 - **Parameters to test**:
-  - List: `wheels deps`
-  - Install: `wheels deps --install`
-  - Update: `wheels deps --update`
+  - List: `wheels deps list`
+  - Install: `wheels deps install dependencyName [version] [--dev]`
+  - Update: `wheels deps update dependencyName`
+  - Remove: `wheels deps remove dependencyName`
+  - Report: `wheels deps report`
 - **Test Results**:
-  - _Pending_
+  - **List Dependencies**: ✅ Success
+    - Shows all dependencies from box.json
+    - Separates regular and dev dependencies
+    - Shows version and installation status
+    - Handles missing box.json gracefully
+    - Output is clear and correct
+  - **Install Dependency**: ⏳ Pending
+    - Basic install: `wheels deps install my-package`
+    - With version: `wheels deps install my-package@1.0.0`
+    - As dev dependency: `wheels deps install my-package --dev`
+    - Should update box.json automatically
+    - Should show installation status
+  - **Update Dependency**: ⏳ Pending
+    - Basic update: `wheels deps update my-package`
+    - Should check both regular and dev dependencies
+    - Should show version changes
+    - Should maintain dependency type
+  - **Remove Dependency**: ⏳ Pending
+    - Basic remove: `wheels deps remove my-package`
+    - Should prompt for confirmation
+    - Should update box.json automatically
+    - Should handle both regular and dev dependencies
+  - **Generate Report**: ✅ Success
+    - Basic report: `wheels deps report`
+    - Includes:
+      - Project information
+      - Wheels version
+      - CFML engine details
+      - All dependencies and versions
+      - Installed modules
+      - Outdated packages
+    - Exports report to JSON file
+    - Output is clear and correct
+  - **Error Handling**: ⏳ Pending
+    - Invalid action parameter
+    - Missing name parameter for install/update/remove
+    - Non-existent dependencies
+    - File system errors
+    - CommandBox integration errors
+  - **Note**: Command integrates with CommandBox for package management
+    - Uses box.json for dependency tracking
+    - Supports both regular and dev dependencies
+    - Provides detailed feedback and reportings
 
 ### wheels reload
 - **Status**: ⏳ Not Tested

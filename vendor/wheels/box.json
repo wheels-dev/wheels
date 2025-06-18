@@ -1,4 +1,6 @@
 {
+    "name":"Wheels.dev",
+    "version":"3.0.0-SNAPSHOT",
     "devDependencies":{
         "testbox":"^4.2.1+400"
     },

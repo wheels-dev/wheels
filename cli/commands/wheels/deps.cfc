@@ -353,14 +353,17 @@ component extends="base" {
                 }
             }
             
-            // Get Wheels version
-            try {
-                local.versionInfo = $sendToCliCommand(urlstring="&command=info");
-                if (structKeyExists(local.versionInfo, "wheelsVersion")) {
-                    local.report.wheelsVersion = local.versionInfo.wheelsVersion;
+            // Try to get Wheels version from vendor/wheels/box.json
+            local.wheelsBoxPath = fileSystemUtil.resolvePath("vendor/wheels/box.json");
+            if (fileExists(local.wheelsBoxPath)) {
+                try {
+                    local.wheelsBox = deserializeJSON(fileRead(local.wheelsBoxPath));
+                    if (structKeyExists(local.wheelsBox, "version")) {
+                        local.report.wheelsVersion = local.wheelsBox.version;
+                    }
+                } catch (any e) {
+                    // Ignore errors
                 }
-            } catch (any e) {
-                // Ignore
             }
             
             // Check installed modules
@@ -487,12 +490,12 @@ component extends="base" {
      * Check if a module is installed
      */
     private boolean function checkIfInstalled(required string packageName) {
-        // Check modules directory
-        local.modulesPath = fileSystemUtil.resolvePath("modules");
-        if (directoryExists(local.modulesPath)) {
+        // Check vendor directory
+        local.vendorBasePath = fileSystemUtil.resolvePath("vendor");
+        if (directoryExists(local.vendorBasePath)) {
             // Simple name check
             local.simpleName = listLast(arguments.packageName, ":");
-            local.modulePath = local.modulesPath & "/" & local.simpleName;
+            local.modulePath = local.vendorBasePath & "/" & local.simpleName;
             if (directoryExists(local.modulePath)) {
                 return true;
             }
@@ -505,7 +508,7 @@ component extends="base" {
             ];
             
             for (local.variation in local.variations) {
-                local.modulePath = local.modulesPath & "/" & local.variation;
+                local.modulePath = local.vendorBasePath & "/" & local.variation;
                 if (directoryExists(local.modulePath)) {
                     return true;
                 }
