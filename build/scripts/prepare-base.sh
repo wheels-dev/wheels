@@ -29,6 +29,17 @@ cp -r app "${BUILD_DIR}/"
 cp -r public "${BUILD_DIR}/"
 cp -r tests "${BUILD_DIR}/"
 
+# Copy AI documentation files
+echo "Copying AI documentation..."
+cp CLAUDE.md "${BUILD_DIR}/"
+cp .ai-config.json "${BUILD_DIR}/"
+cp AI-*.md "${BUILD_DIR}/"
+
+# Copy VS Code snippets
+echo "Copying VS Code snippets..."
+mkdir -p "${BUILD_DIR}/.vscode"
+cp .vscode/wheels*.code-snippets "${BUILD_DIR}/.vscode/"
+
 # Copy vendor directory from build/base if it exists
 if [ -d "build/base/vendor" ]; then
     cp -r build/base/vendor "${BUILD_DIR}/"
