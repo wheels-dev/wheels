@@ -1,70 +1,158 @@
 /**
  * Generate code coverage reports for tests
  * 
- * {code:bash}
+ * This is a wrapper for TestBox CLI with coverage enabled.
+ * Install TestBox CLI first: box install commandbox-testbox-cli
+ * 
+ * Examples:
  * wheels test:coverage
- * wheels test:coverage app
- * wheels test:coverage core
- * wheels test:coverage plugin
- * {code}
+ * wheels test:coverage --reporter=html
+ * wheels test:coverage --directory=tests/unit --threshold=80
  */
-component extends="../base" {
+component aliases='wheels test:coverage' extends="../base" {
+    
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
-     * @type Type of tests to run (app, core, or plugin)
-     * @servername Name of server to reload (defaults to current)
-     * @reload Force a reload of wheels
-     * @debug Show debug info
-     * @outputDir Directory to output the coverage report (defaults to tests/coverageReport/)
+     * @directory.hint Test directory to run (default: tests)
+     * @reporter.hint Coverage reporter format (html, json, xml, simple)
+     * @reporter.options html,json,xml,simple
+     * @outputDir.hint Directory to output the coverage report (default: tests/results/coverage)
+     * @threshold.hint Coverage percentage threshold (0-100)
+     * @pathsToCapture.hint Paths to capture for coverage (comma-separated)
+     * @whitelist.hint Whitelist paths for coverage (comma-separated)
+     * @blacklist.hint Blacklist paths from coverage (comma-separated)
+     * @bundles.hint Comma-delimited list of test bundles to run
+     * @labels.hint Comma-delimited list of test labels to run
+     * @excludes.hint Comma-delimited list of test bundles to exclude
+     * @filter.hint Test filter pattern
+     * @verbose.hint Verbose output
      */
     function run(
-        string type="app", 
-        string servername="", 
-        boolean reload=false, 
-        boolean debug=false,
-        string outputDir="tests/coverageReport"
+        string directory = "tests",
+        string reporter = "html",
+        string outputDir = "tests/results/coverage",
+        numeric threshold = 0,
+        string pathsToCapture = "",
+        string whitelist = "",
+        string blacklist = "",
+        string bundles = "",
+        string labels = "",
+        string excludes = "",
+        string filter = "",
+        boolean verbose = false
     ) {
-        // Welcome message
-        print.line();
-        print.boldMagentaLine("Wheels Test Coverage");
-        print.line();
+        detailOutput.header("📊", "Running tests with code coverage");
         
-        // Set target directory for report
-        local.outputPath = fileSystemUtil.resolvePath(arguments.outputDir);
+        // Check if TestBox CLI is installed
+        if (!isTestBoxCLIInstalled()) {
+            error("TestBox CLI is not installed. Please run: box install commandbox-testbox-cli");
+            return;
+        }
         
         // Ensure output directory exists
-        if (!directoryExists(local.outputPath)) {
-            directoryCreate(local.outputPath);
+        var outputPath = fileSystemUtil.resolvePath(arguments.outputDir);
+        if (!directoryExists(outputPath)) {
+            directoryCreate(outputPath, true);
         }
         
-        // Create URL parameters
-        local.urlParams = "&type=#arguments.type#&coverage=true&coverageOutputDir=#urlEncodedFormat(local.outputPath)#";
+        // Build TestBox command with coverage enabled
+        var testboxCommand = "testbox run";
         
-        if (arguments.debug) {
-            local.urlParams &= "&debug=true";
+        // Add directory
+        testboxCommand &= " directory=#arguments.directory#";
+        
+        // Enable coverage
+        testboxCommand &= " coverage=true";
+        
+        // Add coverage reporter
+        testboxCommand &= " coverageReporter=#arguments.reporter#";
+        
+        // Add output directory
+        testboxCommand &= " coverageOutputDir=#arguments.outputDir#";
+        
+        // Add optional coverage parameters
+        if (arguments.threshold > 0) {
+            testboxCommand &= " coverageThreshold=#arguments.threshold#";
         }
         
-        if (arguments.reload) {
-            local.urlParams &= "&reload=true";
+        if (len(arguments.pathsToCapture)) {
+            testboxCommand &= " coveragePathToCapture=#arguments.pathsToCapture#";
         }
         
-        // Send command to TestBox
-        print.line("Running #arguments.type# tests with coverage reporting...");
+        if (len(arguments.whitelist)) {
+            testboxCommand &= " coverageWhitelist=#arguments.whitelist#";
+        }
+        
+        if (len(arguments.blacklist)) {
+            testboxCommand &= " coverageBlacklist=#arguments.blacklist#";
+        }
+        
+        // Add test filtering parameters
+        if (len(arguments.bundles)) {
+            testboxCommand &= " bundles=#arguments.bundles#";
+        }
+        
+        if (len(arguments.labels)) {
+            testboxCommand &= " labels=#arguments.labels#";
+        }
+        
+        if (len(arguments.excludes)) {
+            testboxCommand &= " excludes=#arguments.excludes#";
+        }
+        
+        if (len(arguments.filter)) {
+            testboxCommand &= " filter=#arguments.filter#";
+        }
+        
+        if (arguments.verbose) {
+            testboxCommand &= " verbose=true";
+        }
+        
+        // Show coverage details
+        print.line("Coverage reporter: #arguments.reporter#");
+        print.line("Output directory: #arguments.outputDir#");
+        
+        if (arguments.threshold > 0) {
+            print.line("Coverage threshold: #arguments.threshold#%");
+        }
+        
+        print.line();
+        print.line("Executing: #testboxCommand#");
         print.line();
         
-        // Call the test command with coverage parameters
-        local.result = $sendToCliCommand(urlstring="&command=test#local.urlParams#");
+        // Execute TestBox command
+        command(testboxCommand).run();
         
-        // Output results
-        if (structKeyExists(local.result, "coverage")) {
-            print.boldGreenLine("Coverage Results:");
-            print.yellowLine("Total Coverage: #local.result.coverage.totalCoverage#%");
-            print.yellowLine("Files Analyzed: #local.result.coverage.totalFiles#");
-            print.yellowLine("Coverage Report: #local.outputPath#");
+        // Show where to find the coverage report
+        print.line();
+        print.greenLine("Coverage report generated!");
+        
+        if (arguments.reporter == "html") {
+            var reportPath = outputPath & "/index.html";
+            print.line("View the HTML report at: #reportPath#");
+            
+            // Try to open in browser
+            if (fileExists(reportPath)) {
+                print.line();
+                print.yellowLine("Opening coverage report in browser...");
+                command("open #reportPath#").run();
+            }
         } else {
-            print.boldRedLine("Coverage results not available. Make sure TestBox is properly configured for coverage reporting.");
+            print.line("Coverage report saved to: #outputPath#");
         }
-        
-        print.line();
+    }
+    
+    /**
+     * Check if TestBox CLI is installed
+     */
+    private boolean function isTestBoxCLIInstalled() {
+        try {
+            // Try to run testbox help command
+            var result = command("testbox help").run(returnOutput=true);
+            return true;
+        } catch (any e) {
+            return false;
+        }
     }
 }

@@ -535,6 +535,85 @@ wheels test run --watch
 wheels test run --failFast
 ```
 
+### Advanced Testing (TestBox CLI Wrappers)
+
+These commands require TestBox CLI to be installed: `box install commandbox-testbox-cli`
+
+#### Run All Tests
+```bash
+# Run all tests with TestBox CLI
+wheels test:all
+
+# With specific reporter
+wheels test:all --reporter=spec
+
+# With coverage
+wheels test:all --coverage --coverageReporter=html
+
+# With filters
+wheels test:all --filter=UserTest --verbose
+```
+
+#### Run Unit Tests
+```bash
+# Run only unit tests
+wheels test:unit
+
+# With specific reporter
+wheels test:unit --reporter=spec
+
+# Filter specific tests
+wheels test:unit --filter=UserModelTest
+```
+
+#### Run Integration Tests
+```bash
+# Run only integration tests  
+wheels test:integration
+
+# With verbose output
+wheels test:integration --verbose
+
+# Filter specific tests
+wheels test:integration --filter=UserWorkflowTest
+```
+
+#### Watch Mode
+```bash
+# Watch for changes and rerun tests
+wheels test:watch
+
+# Watch specific directory
+wheels test:watch --directory=tests/unit
+
+# With custom delay
+wheels test:watch --delay=500
+
+# Watch additional paths
+wheels test:watch --watchPaths=models,controllers
+```
+
+#### Code Coverage
+```bash
+# Run tests with code coverage
+wheels test:coverage
+
+# With HTML reporter (default)
+wheels test:coverage --reporter=html
+
+# With JSON reporter
+wheels test:coverage --reporter=json
+
+# Set coverage threshold
+wheels test:coverage --threshold=80
+
+# Coverage for specific directory
+wheels test:coverage --directory=tests/unit
+
+# Specify paths to capture
+wheels test:coverage --pathsToCapture=models,controllers
+```
+
 ### TestBox Integration
 
 ```bash
