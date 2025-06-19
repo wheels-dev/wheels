@@ -18,40 +18,33 @@ The `wheels generate app` command creates a new Wheels application with a comple
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `name` | Application name | Required |
-| `template` | Template to use | `Base` |
+| `name` | Application name | `MyApp` |
+| `template` | Template to use | `wheels-base-template@BE` |
 | `directory` | Target directory | `./{name}` |
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `reload-password` | Set reload password | `wheels` |
-| `datasource-name` | Database datasource name | App name |
-| `cfml-engine` | CFML engine (lucee/adobe) | `lucee` |
-| `--use-bootstrap` | Include Bootstrap CSS | `false` |
-| `--setup-h2` | Setup H2 embedded database | `false` |
-| `--init` | Initialize as CLI-enabled app | `true` |
+| `reloadPassword` | Set reload password | `''` (empty) |
+| `datasourceName` | Database datasource name | App name |
+| `cfmlEngine` | CFML engine (lucee/adobe) | `lucee` |
+| `--useBootstrap` | Include Bootstrap CSS | `false` |
+| `--setupH2` | Setup H2 embedded database | `true` |
+| `--init` | Initialize as CommandBox package | `false` |
 | `--force` | Overwrite existing directory | `false` |
 | `--help` | Show help information | |
 
 ## Available Templates
 
-### Base (Default)
+### wheels-base-template@BE (Default)
 ```bash
 wheels generate app myapp
 ```
-- Minimal Wheels application
-- Basic directory structure
-- Essential configuration files
-
-### Base@BE (Backend Edition)
-```bash
-wheels generate app myapp Base@BE
-```
-- Backend-focused template
-- No view files
-- API-ready configuration
+- Backend Edition template
+- Complete MVC structure
+- Sample code and configuration
+- H2 database setup by default
 
 ### HelloWorld
 ```bash
@@ -91,27 +84,27 @@ wheels generate app api Base@BE
 
 ### Create in specific directory
 ```bash
-wheels generate app myapp Base ./projects/
+wheels generate app name=myapp directory=./projects/
 ```
 
 ### Create with Bootstrap
 ```bash
-wheels generate app portfolio --use-bootstrap
+wheels generate app portfolio --useBootstrap
 ```
 
-### Create with H2 database
+### Create with H2 database (default is true)
 ```bash
-wheels generate app demo --setup-h2
+wheels generate app demo --setupH2
 ```
 
 ### Create with all options
 ```bash
-wheels generate app enterprise HelloDynamic ./apps/ \
-  reload-password=secret \
-  datasource-name=enterprise_db \
-  cfml-engine=adobe \
-  --use-bootstrap \
-  --setup-h2
+wheels generate app name=enterprise template=HelloDynamic directory=./apps/ \
+  reloadPassword=secret \
+  datasourceName=enterprise_db \
+  cfmlEngine=adobe \
+  --useBootstrap \
+  --setupH2
 ```
 
 ## Generated Structure
@@ -182,16 +175,18 @@ myapp/
 
 ### With H2 (Embedded)
 ```bash
-wheels generate app myapp --setup-h2
+wheels generate app myapp
 ```
+- H2 is setup by default (--setupH2=true)
 - No external database needed
 - Perfect for development
 - Auto-configured datasource
+- To disable: `--setupH2=false`
 
 ### With External Database
 1. Create application:
    ```bash
-   wheels generate app myapp datasource-name=myapp_db
+   wheels generate app myapp datasourceName=myapp_db --setupH2=false
    ```
 
 2. Configure in CommandBox:

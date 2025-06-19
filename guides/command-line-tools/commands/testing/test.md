@@ -1,5 +1,7 @@
 # wheels test
 
+**⚠️ DEPRECATED**: This command is deprecated. Use `wheels test run` instead.
+
 Run Wheels framework tests (core, app, or plugin tests).
 
 ## Synopsis
@@ -17,16 +19,16 @@ The `wheels test` command runs the built-in Wheels framework test suite. This is
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `type` | Test type: `core`, `app`, or `plugin` | `app` |
-| `servername` | CommandBox server name | Current server |
+| `serverName` | CommandBox server name | Current server |
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--reload` | Reload before running tests | `true` |
-| `--debug` | Show debug output | `false` |
-| `--format` | Output format | `simple` |
-| `--adapter` | Test adapter | `testbox` |
+| `reload` | Reload before running tests | `true` |
+| `debug` | Show debug output | `false` |
+| `format` | Output format | `json` |
+| `adapter` | Test adapter | `""` (empty) |
 | `--help` | Show help information | |
 
 ## Test Types
@@ -69,17 +71,25 @@ wheels test core
 
 ### Run tests on specific server
 ```bash
-wheels test app myserver
+wheels test type=app serverName=myserver
 ```
 
 ### Run with debug output
 ```bash
-wheels test --debug
+wheels test debug=true
 ```
 
 ### Skip reload
 ```bash
-wheels test --reload=false
+wheels test reload=false
+```
+
+## Deprecation Notice
+
+```
+⚠️  WARNING: The 'wheels test' command is deprecated.
+   Please use 'wheels test run' instead.
+   See: wheels help test run
 ```
 
 ## Output Example
@@ -178,7 +188,7 @@ CREATE DATABASE myapp_test;
 
 ### Enable debug mode
 ```bash
-wheels test --debug
+wheels test debug=true
 ```
 
 ### Check specific test file
@@ -271,7 +281,7 @@ curl http://localhost:3000/wheels/tests
 wheels reload
 
 # Then run tests
-wheels test --reload=false
+wheels test reload=false
 ```
 
 ### Memory issues
@@ -289,14 +299,31 @@ box server restart
 4. Use CI/CD integration
 5. Keep test database clean
 
+## Migration to New Command
+
+### Old Command (Deprecated)
+```bash
+wheels test app
+wheels test core myserver
+wheels test debug=true
+```
+
+### New Command
+```bash
+wheels test run
+wheels test run --group=core
+wheels test run --verbose
+```
+
 ## Difference from TestBox Tests
 
-| Feature | `wheels test` | `wheels test run` |
-|---------|--------------|-------------------|
+| Feature | `wheels test` (deprecated) | `wheels test run` |
+|---------|---------------------------|-------------------|
 | Purpose | Framework tests | Application tests |
 | Framework | Wheels Test | TestBox |
 | Location | `/wheels/tests/` | `/tests/` |
 | Use Case | Framework integrity | App functionality |
+| Status | **Deprecated** | Current |
 
 ## See Also
 
