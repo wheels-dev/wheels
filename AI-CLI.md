@@ -10,6 +10,7 @@ This guide provides AI assistants with comprehensive CLI command reference for t
 - [Testing Commands](#testing-commands)
 - [Environment Commands](#environment-commands)
 - [Development Commands](#development-commands)
+- [Analysis and Optimization Commands](#analysis-and-optimization-commands)
 - [Common Command Sequences](#common-command-sequences)
 - [Parameter Inconsistencies](#parameter-inconsistencies)
 - [Troubleshooting](#troubleshooting)
@@ -32,6 +33,9 @@ box install
 # Start CommandBox shell
 box
 
+# Check to see if Commandbox is installed
+box version
+
 # Exit CommandBox shell
 exit
 ```
@@ -45,9 +49,18 @@ exit
 
 ## Wheels CLI Commands
 
+### Running Wheels CLI commands
+The Wheels CLI commands need to be run in the bash/command shell. They can be run from the main OS shell by
+prefixing the commands with the box command i.e. box wheels version from the os shell or you can launch
+commandbox by entering box and then entering the Wheels CLI command in the box shell i.e. box followed by
+wheels version.
+
 ### Installation
 
 ```bash
+# Check to see if Wheels CLI module is installed
+box wheels version
+
 # Install Wheels CLI module (usually automatic with box install)
 box install cfwheels-cli
 
@@ -68,14 +81,44 @@ wheels help [command]
 wheels g app myapp
 
 # With template
-wheels g app myapp template=default
+wheels g app myapp template=wheels-base-template@BE
 
 # In specific directory
 wheels g app name=myapp directory=./projects/
 
 # With datasource
-wheels g app myapp datasource=mydb
+wheels g app myapp datasourceName=mydb
+
+# With Bootstrap and H2 database
+wheels g app myapp --useBootstrap --setupH2
+
+# With custom CFML engine
+wheels g app myapp cfmlEngine=adobe@2023
 ```
+
+### Generate Application Wizard
+
+```bash
+# Interactive wizard for creating new app (recommended for beginners)
+wheels new
+
+# Alternative commands (all call the same wizard)
+wheels g app-wizard
+wheels generate app-wizard
+
+# Force installation in non-empty directory
+wheels new --force
+```
+
+The wizard will interactively ask for:
+- Application name
+- Template to use
+- Reload password
+- Datasource name
+- CFML engine preference
+- H2 database setup (Lucee only)
+- Bootstrap setup
+- Package initialization
 
 ### Generate Controller
 
@@ -89,8 +132,11 @@ wheels g controller Users index,show,new,create,edit,update,delete
 # Namespaced controller
 wheels g controller name=Admin/Users actions=index,show
 
-# With custom format
-wheels g controller name=Api/Users format=json
+# RESTful controller with CRUD actions
+wheels g controller Users --rest
+
+# API controller (no view actions)
+wheels g controller Api/Users --api
 ```
 
 ### Generate Model
@@ -106,10 +152,16 @@ wheels g model User name:string,email:string,password:string
 wheels g model Post title:string,content:text,userId:integer
 
 # Skip migration
-wheels g model User --skip-migration
+wheels g model User --migration=false
 
 # Force overwrite
 wheels g model User --force
+
+# With relationships
+wheels g model Post --belongsTo=User --hasMany=Comments
+
+# With custom table name
+wheels g model User --tableName=app_users
 ```
 
 ### Generate Scaffold
@@ -121,8 +173,14 @@ wheels g scaffold Product name:string,price:decimal,description:text
 # With namespace
 wheels g scaffold name=Admin/Product properties=name:string,price:decimal
 
-# API scaffold
-wheels g scaffold name=Api/Product properties=name:string format=json
+# API scaffold (no views)
+wheels g scaffold Product --properties="name:string,price:decimal" --api
+
+# With relationships
+wheels g scaffold Post --properties="title:string,content:text" --belongsTo=User --hasMany=Comments
+
+# With migration auto-run
+wheels g scaffold Product --properties="name:string,price:decimal" --migrate
 ```
 
 ### Generate View
@@ -145,19 +203,16 @@ wheels g view users _form
 
 ```bash
 # Create table migration
-wheels g migration CreateUsers
+wheels dbmigrate create table name=users
 
 # Add column migration
-wheels g migration AddEmailToUsers
+wheels dbmigrate create column name=AddEmailToUsers
 
-# Remove column migration
-wheels g migration RemovePasswordFromUsers
+# Create blank migration
+wheels dbmigrate create blank name=UpdateUserData
 
-# Index migration
-wheels g migration AddIndexToUsersEmail
-
-# Custom migration
-wheels g migration UpdateUserData
+# Remove table migration
+wheels dbmigrate remove table name=old_users
 ```
 
 ### Generate Test
@@ -176,6 +231,18 @@ wheels g test integration UserRegistration
 wheels g test helper Format
 ```
 
+### Generate Snippets
+
+```bash
+# Copy template snippets to app/snippets/ directory
+wheels g snippets
+
+# Alternative command
+wheels generate snippets
+```
+
+This command copies template snippets to your application that can be used as templates for generating code. The snippets are placed in the `app/snippets/` directory.
+
 ## Database Commands
 
 ### Migration Management
@@ -193,8 +260,8 @@ wheels dbmigrate exec 001
 # Show migration status
 wheels dbmigrate info
 
-# Create database
-wheels db create
+# Show migration status
+wheels dbmigrate info
 ```
 
 ### Rollback Migrations
@@ -210,17 +277,14 @@ wheels dbmigrate reset
 ### Database Utilities
 
 ```bash
-# Drop database
-wheels db drop
-
-# Reset database migrations
+# Reset all migrations (rollback all)
 wheels dbmigrate reset
+
+# Export database schema
+wheels db schema
 
 # Seed database
 wheels db seed
-
-# Open database console
-wheels db console
 ```
 
 ## Testing Commands
@@ -228,23 +292,31 @@ wheels db console
 ### Running Tests
 
 ```bash
-# Run all tests
+# DEPRECATED: The 'wheels test' command is deprecated. Use 'wheels test run' instead.
+
+# Run all tests (new command)
+wheels test run
+
+# Run all tests (deprecated)
 wheels test app
 
 # Run specific test file
-wheels test app UserTest
+wheels test run --filter=UserTest
 
-# Run test bundle
-wheels test app testBundles=models
+# Run test group
+wheels test run --group=models
 
-# Run specific test spec
-wheels test app testBundles=models&testSpecs=shouldValidateEmail
+# Run with coverage
+wheels test run --coverage
 
-# Run with reporter
-wheels test app reporter=simple
+# Run with different reporter
+wheels test run --reporter=junit
 
-# Run tests in directory
-wheels test app directory=tests/specs/unit
+# Watch mode
+wheels test run --watch
+
+# Stop on first failure
+wheels test run --failFast
 ```
 
 ### TestBox Integration
@@ -276,6 +348,7 @@ box testbox run --excludeLabels=slow
 
 ### Environment Management
 
+#### Legacy Commands (for backward compatibility)
 ```bash
 # Show current environment
 wheels get environment
@@ -284,11 +357,124 @@ wheels get environment
 wheels set environment development
 wheels set environment testing
 wheels set environment production
+```
+
+#### New Environment Command (Recommended)
+
+The enhanced `wheels environment` command provides better environment management:
+
+```bash
+# Show current environment with detailed info
+wheels environment
+
+# Set environment (with automatic reload)
+wheels environment set development
+wheels environment set testing
+wheels environment set production
+wheels environment set maintenance
+
+# Set environment without reload
+wheels environment set production --reload=false
+
+# List all available environments
+wheels environment list
+
+# Quick environment switching
+wheels environment development    # Shortcut for set development
+wheels environment production     # Shortcut for set production
 
 # Reload application
 wheels reload
 wheels reload development
 wheels reload force=true
+```
+
+### Interactive Console (REPL)
+
+The `wheels console` command starts an interactive REPL with full Wheels application context:
+
+```bash
+# Start interactive console
+wheels console
+
+# Start console in specific environment
+wheels console environment=testing
+
+# Execute single command
+wheels console execute="model('User').count()"
+
+# Start in tag mode (default is script mode)
+wheels console script=false
+```
+
+**Console Features:**
+- Access to all Wheels models via `model()` function
+- Direct database queries via `query()` function
+- All Wheels helper functions available
+- Persistent variable state between commands
+- Command history
+- Script and tag mode support
+
+**Example Console Session:**
+```cfscript
+wheels:script> user = model("User").findByKey(1)
+wheels:script> user.name = "Updated Name"
+wheels:script> user.save()
+wheels:script> users = model("User").findAll(where="active=1", order="createdAt DESC")
+wheels:script> pluralize("person")
+people
+wheels:script> query("SELECT COUNT(*) as total FROM users").total
+42
+```
+
+### Script Runner
+
+The `wheels runner` command executes script files in the Wheels application context:
+
+```bash
+# Run a script file
+wheels runner scripts/data-migration.cfm
+
+# Run with specific environment
+wheels runner scripts/cleanup.cfm environment=production
+
+# Run with parameters
+wheels runner scripts/import.cfm params='{"source":"data.csv","dryRun":true}'
+
+# Run with verbose output
+wheels runner scripts/process.cfm --verbose
+```
+
+**Script Features:**
+- Full access to Wheels application context
+- Pass parameters via JSON
+- Scripts can access `request.scriptParams`
+- Model and query functions available
+- Execution time reporting
+
+**Example Script:**
+```cfm
+<!--- scripts/cleanup-users.cfm --->
+<cfscript>
+// Access passed parameters
+var dryRun = structKeyExists(request.scriptParams, "dryRun") ? request.scriptParams.dryRun : false;
+
+// Use Wheels models
+var inactiveUsers = request.model("User").findAll(
+    where="lastLoginAt < '#dateAdd('m', -6, now())#'"
+);
+
+writeOutput("Found #inactiveUsers.recordCount# inactive users<br>");
+
+if (!dryRun) {
+    for (var user in inactiveUsers) {
+        request.model("User").deleteByKey(user.id);
+        writeOutput("Deleted user: #user.email#<br>");
+    }
+} else {
+    writeOutput("Dry run - no users deleted");
+}
+</cfscript>
 ```
 
 ### Configuration
@@ -314,6 +500,8 @@ wheels routes name=users
 
 ### Server Management
 
+#### CommandBox Native Server Commands
+
 ```bash
 # Start server
 server start
@@ -336,6 +524,85 @@ server status
 # Open browser
 server open
 ```
+
+#### Wheels Server Commands (Enhanced Wrappers)
+
+The Wheels CLI provides enhanced server management commands that wrap CommandBox's native functionality with Wheels-specific checks and enhancements.
+
+```bash
+# Start Wheels development server
+wheels server start
+
+# Start with specific port
+wheels server start port=8080
+
+# Start with URL rewriting enabled
+wheels server start --rewritesEnable
+
+# Start without opening browser
+wheels server start openbrowser=false
+
+# Start with specific host
+wheels server start host=0.0.0.0
+
+# Force start even if already running
+wheels server start --force
+
+# Stop the server
+wheels server stop
+
+# Stop specific named server
+wheels server stop name=myapp
+
+# Force stop all servers
+wheels server stop --force
+
+# Restart the server (also reloads Wheels app)
+wheels server restart
+
+# Force restart
+wheels server restart --force
+
+# Show server status with Wheels info
+wheels server status
+
+# Show status in JSON format
+wheels server status --json
+
+# Show verbose status
+wheels server status --verbose
+
+# Tail server logs
+wheels server log
+
+# Show last 100 lines of logs
+wheels server log lines=100
+
+# Follow logs (default behavior)
+wheels server log --follow
+
+# Show debug-level logs
+wheels server log --debug
+
+# Open application in browser
+wheels server open
+
+# Open specific path
+wheels server open /admin
+
+# Open in specific browser
+wheels server open --browser=firefox
+
+# Display server help
+wheels server
+```
+
+**Key Differences from CommandBox Native Commands:**
+- Checks if current directory is a Wheels application
+- Shows Wheels-specific information (version, paths)
+- Automatically reloads Wheels application on restart
+- Provides helpful error messages and suggestions
+- Integrates with Wheels application context
 
 ### Code Formatting
 
@@ -378,6 +645,99 @@ box update
 box list
 ```
 
+## Analysis and Optimization Commands
+
+### Application Analysis
+
+```bash
+# Analyze all aspects (performance, code quality, security)
+wheels analyze
+
+# Analyze specific aspect
+wheels analyze performance
+wheels analyze code
+wheels analyze security
+
+# With options
+wheels analyze --type=all --report --format=html
+wheels analyze --path=app/models --format=json
+wheels analyze performance --report --format=console
+```
+
+The analyze command provides comprehensive analysis of your application:
+- **Performance**: Identifies slow queries, N+1 problems, caching opportunities
+- **Code Quality**: Detects code smells, complexity issues, best practice violations
+- **Security**: Scans for common vulnerabilities like SQL injection, XSS
+
+### Performance Optimization
+
+```bash
+# Show optimization help and available commands
+wheels optimize
+
+# Run performance optimization analysis
+wheels optimize performance
+wheels optimize performance --analysis
+wheels optimize performance --cache --apply
+```
+
+**Note**: This feature is currently under development. It will provide:
+- Cache configuration optimization
+- Asset optimization (minification, bundling)
+- Database query optimization
+- Index recommendations
+
+### Security Scanning
+
+```bash
+# Show security help and available commands
+wheels security
+
+# Run security scan
+wheels security scan
+wheels security scan --fix
+wheels security scan --path=models --severity=high
+wheels security scan --report=html --output=security-report.html
+```
+
+**Note**: This feature is currently under development. It will detect:
+- SQL Injection vulnerabilities
+- Cross-Site Scripting (XSS)
+- Hardcoded credentials
+- File upload vulnerabilities
+- Directory traversal issues
+
+### File Watching
+
+```bash
+# Basic file watching with auto-reload
+wheels watch
+
+# Watch with specific options
+wheels watch --reload --tests
+wheels watch --includeDirs=controllers,models --excludeFiles=*.txt,*.log
+wheels watch --interval=2 --command="wheels test run"
+
+# Watch and run tests on changes
+wheels watch --tests
+
+# Watch and run migrations on schema changes
+wheels watch --migrations
+
+# Custom command on file changes
+wheels watch --command="box run-script build"
+```
+
+Options:
+- `--includeDirs`: Directories to watch (default: controllers,models,views,config,migrator/migrations)
+- `--excludeFiles`: File patterns to ignore
+- `--interval`: Check interval in seconds (default: 1)
+- `--reload`: Reload framework on changes (default: true)
+- `--tests`: Run tests on changes
+- `--migrations`: Run migrations on schema changes
+- `--command`: Custom command to run on changes
+- `--debounce`: Debounce delay in milliseconds (default: 500)
+
 ## Common Command Sequences
 
 ### New Project Setup
@@ -392,11 +752,11 @@ wheels g app myproject
 # 3. Install dependencies
 box install
 
-# 4. Create database
-wheels db create
+# 4. Setup database (H2 is setup by default)
+# For other databases, configure datasource in Admin or .cfconfig.json
 
 # 5. Run migrations
-wheels db migrate
+wheels dbmigrate latest
 
 # 6. Start server
 server start
@@ -409,7 +769,7 @@ server start
 wheels g model Article title:string,content:text,authorId:integer
 
 # 2. Run migration
-wheels db migrate
+wheels dbmigrate latest
 
 # 3. Generate controller with views
 wheels g controller Articles index,show,new,create,edit,update,delete
@@ -467,7 +827,7 @@ open http://localhost:3000
    ```bash
    # Some commands use camelCase
    wheels g model userId:integer
-   
+
    # Others use kebab-case
    wheels g migration add-index-to-users
    ```
@@ -475,8 +835,8 @@ open http://localhost:3000
 2. **Boolean Parameters**
    ```bash
    # Some accept --flag
-   wheels g model User --skip-migration
-   
+   wheels g model User --migration=false
+
    # Others require explicit
    wheels reload force=true
    ```
@@ -486,9 +846,9 @@ open http://localhost:3000
    # 'name' vs direct argument
    wheels g controller Users  # Works
    wheels g controller name=Users  # Also works
-   
-   # But migrations require name
-   wheels g migration name=CreateUsers  # Required
+
+   # But dbmigrate commands require name
+   wheels dbmigrate create blank name=CreateUsers  # Required
    ```
 
 ### Best Practices
@@ -500,7 +860,7 @@ open http://localhost:3000
 
 2. **Use --flag for boolean true**
    ```bash
-   wheels g scaffold Product --force --skip-tests
+   wheels g scaffold Product --force --tests=false
    ```
 
 3. **Quote complex values**

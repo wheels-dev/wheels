@@ -12,6 +12,8 @@ Complete reference for all Wheels CLI commands organized by category.
 | `wheels scaffold [name]` | Generate complete CRUD |
 | `wheels dbmigrate latest` | Run database migrations |
 | `wheels test run` | Run application tests |
+| `wheels server start` | Start development server |
+| `wheels server status` | Check server status |
 | `wheels watch` | Watch files for changes |
 | `wheels reload` | Reload application |
 
@@ -27,6 +29,26 @@ Essential commands for managing your Wheels application.
 | `wheels deps` | Manage dependencies | [Details](core/deps.md) |
 | `wheels destroy [type] [name]` | Remove generated code | [Details](core/destroy.md) |
 | `wheels watch` | Watch for file changes | [Details](core/watch.md) |
+
+## Server Management
+
+Enhanced server commands that wrap CommandBox's native functionality with Wheels-specific features.
+
+| Command | Description | Documentation |
+|---------|-------------|---------------|
+| `wheels server` | Display server commands help | [Details](server/server.md) |
+| `wheels server start` | Start development server | [Details](server/server-start.md) |
+| `wheels server stop` | Stop development server | [Details](server/server-stop.md) |
+| `wheels server restart` | Restart server and reload app | [Details](server/server-restart.md) |
+| `wheels server status` | Show server status with Wheels info | [Details](server/server-status.md) |
+| `wheels server log` | Tail server logs | [Details](server/server-log.md) |
+| `wheels server open` | Open application in browser | [Details](server/server-open.md) |
+
+### Server Command Features
+- Validates Wheels application directory
+- Shows framework-specific information
+- Integrates with application reload
+- Provides helpful error messages
 
 ## Code Generation
 
@@ -115,11 +137,20 @@ Commands for managing application configuration.
 
 ## Environment Management
 
-Commands for managing development environments.
+Commands for managing development environments and application context.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `wheels env` | Environment management base command | [Details](environment/env.md) |
+| `wheels environment` | Display/switch environment | [Details](environment/environment.md) |
+| `wheels environment set [env]` | Set environment with reload | [Details](environment/environment.md) |
+| `wheels environment list` | List available environments | [Details](environment/environment.md) |
+| `wheels console` | Interactive REPL console | [Details](environment/console.md) |
+| `wheels runner [script]` | Execute scripts with context | [Details](environment/runner.md) |
+
+### Legacy Environment Commands
+| Command | Description | Documentation |
+|---------|-------------|---------------|
+| `wheels env` | Environment base command | [Details](environment/env.md) |
 | `wheels env setup [name]` | Setup environment | [Details](environment/env-setup.md) |
 | `wheels env list` | List environments | [Details](environment/env-list.md) |
 | `wheels env switch [name]` | Switch environment | [Details](environment/env-switch.md) |
@@ -267,9 +298,10 @@ wheels test run
 
 **Starting development:**
 ```bash
-wheels watch              # Terminal 1
-box server start         # Terminal 2
-wheels test run --watch  # Terminal 3
+wheels server start      # Start the server
+wheels watch            # Terminal 1: Watch for file changes
+wheels server log       # Terminal 2: Monitor logs
+wheels test run --watch # Terminal 3: Run tests in watch mode
 ```
 
 **Deployment preparation:**
@@ -278,6 +310,21 @@ wheels test run
 wheels security scan
 wheels optimize performance
 wheels dbmigrate info
+wheels environment production
+```
+
+**Interactive debugging:**
+```bash
+wheels console                    # Start REPL
+wheels console environment=testing # Test in specific env
+wheels console execute="model('User').count()"  # Quick check
+```
+
+**Running maintenance scripts:**
+```bash
+wheels runner scripts/cleanup.cfm
+wheels runner scripts/migrate.cfm environment=production
+wheels runner scripts/report.cfm params='{"month":12}'
 ```
 
 ## Environment Variables
