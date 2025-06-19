@@ -5,8 +5,9 @@ I want to test the next untested group of Wheels CLI commands from PR #1591
 1. **Identify Next Group to Test**
    - Fetch PR #1591 comments using `gh pr view 1591 --comments`
    - Parse the testing checklist comments to find groups with unchecked items
+   - Skip groups that have "✅ GROUP COMPLETED" marker at the bottom of the comment
    - Select the first group that has unchecked boxes (following the priority order)
-   - Extract all commands and test cases for that group
+   - Extract all commands that are unchecked and test cases for those commands
 
 2. **Prepare Testing Environment**
    - Use the `workspace` directory as sandbox
@@ -56,7 +57,10 @@ I want to test the next untested group of Wheels CLI commands from PR #1591
    - Clean up test files created by the command
 
 6. **Group Completion**
-   - Once all commands in a group are tested, add a summary comment
+   - Once all commands in a group are processed, add "✅ GROUP COMPLETED" at the end of the group section
+   - Add a summary comment with any notes or issues found
+   - After adding the new comment remove the original comment for the group
+   - This marker prevents the group from being retested in future sessions
    - Move to the next group if time permits
 
 ## Special Considerations

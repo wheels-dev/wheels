@@ -148,7 +148,7 @@ component aliases="wheels g app" extends="../base" {
 
     // Setting cfml Engine Name
     command( 'tokenReplace' )
-      .params( path = 'server.json', token = '|cfmlEngine|', replacement = arguments.cfmlEngine )
+      .params( path = 'server.json', token = '|setEngine|', replacement = arguments.cfmlEngine )
       .run();
     details.update("server.json (CFML engine)", true);
 

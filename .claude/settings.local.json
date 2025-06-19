@@ -76,7 +76,8 @@
       "Bash(gh workflow:*)",
       "Bash(git stash:*)",
       "Bash(wheels test:*)",
-      "Bash(gh pr comment:*)"
+      "Bash(gh pr comment:*)",
+      "Bash(wheels g:*)"
     ],
     "deny": []
   }
