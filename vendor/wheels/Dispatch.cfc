@@ -200,7 +200,7 @@ component output="false" extends="wheels.Global"{
 				abort();
 			} else {
 				// Call the action method directly on the component to preserve context
-				application.wheels.public[local.params.action]();
+				invoke(application.wheels.public, local.params.action);
 			}
 		} else {
 			// Create the requested controller and call the action on it.
