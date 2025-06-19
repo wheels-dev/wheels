@@ -57,6 +57,13 @@ Or use H2 embedded database:
 wheels new blog --setupH2
 ```
 
+Create the database:
+
+```bash
+# If using external database (MySQL, PostgreSQL, etc.)
+wheels db create
+```
+
 ### 3. Start Server
 
 ```bash
@@ -282,10 +289,28 @@ box server show
 **Migration failed:**
 ```bash
 # Check status
-wheels dbmigrate info
+wheels db status
 
 # Run specific migration
 wheels dbmigrate exec 20240120000000
+
+# Or rollback and try again
+wheels db rollback
+```
+
+**Need to reset database:**
+```bash
+# Complete reset (careful - destroys all data!)
+wheels db reset --force
+```
+
+**Access database directly:**
+```bash
+# CLI shell
+wheels db shell
+
+# Web console (H2 only)
+wheels db shell --web
 ```
 
 ## Next Steps
@@ -329,11 +354,11 @@ wheels generate property author posts --has-many
 echo '<cfset resources("posts")>' >> config/routes.cfm
 echo '<cfset resources("authors")>' >> config/routes.cfm
 
-# Run migrations
-wheels dbmigrate latest
+# Setup and seed database
+wheels db setup --seed-count=10
 
 # Start development
-box server start
+wheels server start
 wheels watch
 
 # Visit http://localhost:3000/posts

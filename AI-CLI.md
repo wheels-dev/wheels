@@ -245,6 +245,113 @@ This command copies template snippets to your application that can be used as te
 
 ## Database Commands
 
+### Database Management
+
+```bash
+# Create database
+wheels db create
+wheels db create --datasource=myapp_dev
+wheels db create --environment=production
+
+# Drop database (with confirmation)
+wheels db drop
+wheels db drop --datasource=myapp_dev
+wheels db drop --force  # Skip confirmation
+
+# Setup database (create + migrate + seed)
+wheels db setup
+wheels db setup --skip-seed
+wheels db setup --seed-count=10
+
+# Reset database (drop + create + migrate + seed)
+wheels db reset
+wheels db reset --force  # Skip confirmation
+wheels db reset --skip-seed
+wheels db reset --environment=production
+
+# Seed database with test data
+wheels db seed
+wheels db seed --count=10  # Records per model
+wheels db seed --models=user,post  # Specific models
+wheels db seed --dataFile=seeds.json  # From file
+
+# Show migration status
+wheels db status
+wheels db status --format=json
+wheels db status --pending  # Only pending migrations
+
+# Show current database version
+wheels db version
+wheels db version --detailed
+
+# Rollback migrations
+wheels db rollback  # Rollback one migration
+wheels db rollback --steps=3  # Rollback 3 migrations
+wheels db rollback --target=20231201120000  # To specific version
+
+# Export database
+wheels db dump
+wheels db dump --output=backup.sql
+wheels db dump --schema-only  # Structure only
+wheels db dump --data-only  # Data only
+wheels db dump --tables=users,posts  # Specific tables
+wheels db dump --compress  # Gzip compression
+
+# Restore database
+wheels db restore backup.sql
+wheels db restore backup.sql.gz --compressed
+wheels db restore backup.sql --clean  # Drop existing objects
+wheels db restore backup.sql --force  # Skip confirmation
+
+# Launch interactive database shell
+wheels db shell  # CLI shell
+wheels db shell --web  # Web console (H2 only)
+wheels db shell --datasource=myapp_dev
+wheels db shell --command="SELECT COUNT(*) FROM users"  # Execute single command
+```
+
+### Database Shell Details
+
+The `wheels db shell` command provides direct database access:
+
+**H2 Database (Lucee default):**
+```bash
+# CLI shell - uses java -cp org.lucee.h2-*.jar org.h2.tools.Shell
+wheels db shell
+
+# Web console - launches browser interface
+wheels db shell --web
+
+# The H2 JAR is typically found in Lucee bundles as org.lucee.h2-*.jar
+```
+
+**MySQL/MariaDB:**
+```bash
+# Launches mysql client
+wheels db shell
+# Equivalent to: mysql -h host -P port -u user -p database
+```
+
+**PostgreSQL:**
+```bash
+# Launches psql client  
+wheels db shell
+# Equivalent to: psql -h host -p port -U user -d database
+```
+
+**SQL Server:**
+```bash
+# Launches sqlcmd client
+wheels db shell  
+# Equivalent to: sqlcmd -S server -d database -U user
+```
+
+**Requirements:**
+- H2: No additional installation (included with Lucee)
+- MySQL: Requires `mysql` client installed
+- PostgreSQL: Requires `psql` client installed
+- SQL Server: Requires `sqlcmd` client installed
+
 ### Migration Management
 
 ```bash
@@ -256,9 +363,6 @@ wheels dbmigrate up
 
 # Run specific migration version
 wheels dbmigrate exec 001
-
-# Show migration status
-wheels dbmigrate info
 
 # Show migration status
 wheels dbmigrate info
@@ -274,17 +378,11 @@ wheels dbmigrate down
 wheels dbmigrate reset
 ```
 
-### Database Utilities
+### Database Schema Utilities
 
 ```bash
-# Reset all migrations (rollback all)
-wheels dbmigrate reset
-
 # Export database schema
 wheels db schema
-
-# Seed database
-wheels db seed
 ```
 
 ## Testing Commands
