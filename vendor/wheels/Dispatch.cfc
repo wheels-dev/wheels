@@ -197,7 +197,7 @@ component output="false" extends="wheels.Global"{
 		if (ListFirst(local.params.controller, '.') EQ "wheels") {
 			if (!application.wheels.enablePublicComponent) {
 				// Hard abort if GUI turned off
-				abort;
+				abort();
 			} else {
 				// Call the action method directly on the component to preserve context
 				application.wheels.public[local.params.action]();
