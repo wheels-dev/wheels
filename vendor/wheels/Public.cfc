@@ -4,6 +4,8 @@ component output="false" displayName="Internal GUI" {
 	 * Internal function.
 	 */
 	public struct function $init() {
+		// Make urlFor available for views
+		variables.urlFor = application.wo.urlFor;
 		return this;
 	}
 
