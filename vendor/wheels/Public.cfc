@@ -4,9 +4,27 @@ component output="false" displayName="Internal GUI" {
 	 * Internal function.
 	 */
 	public struct function $init() {
-		// Make urlFor available for views
-		variables.urlFor = application.wo.urlFor;
 		return this;
+	}
+	
+	/**
+	 * Helper function for views - provides urlFor functionality
+	 */
+	private function urlFor() {
+		if (structKeyExists(application, "wo")) {
+			return application.wo.urlFor(argumentCollection=arguments);
+		}
+		return "";
+	}
+	
+	/**
+	 * Helper function for views - provides $args functionality
+	 */
+	private function $args() {
+		if (structKeyExists(application, "wo") && structKeyExists(application.wo, "$args")) {
+			return application.wo.$args(argumentCollection=arguments);
+		}
+		return arguments;
 	}
 
 	/*
