@@ -58,6 +58,23 @@ component excludeFromHelp=true {
 		}
 	}
 
+	// Check if current directory is a Wheels application
+	boolean function isWheelsApp(string path = getCWD()) {
+		// Check for vendor/wheels folder
+		if (!directoryExists(arguments.path & "/vendor/wheels")) {
+			return false;
+		}
+		// Check for config folder
+		if (!directoryExists(arguments.path & "/config")) {
+			return false;
+		}
+		// Check for app folder
+		if (!directoryExists(arguments.path & "/app")) {
+			return false;
+		}
+		return true;
+	}
+
 	// Compare against current wheels version
 	// scope can be one of major/minor/patch
 	boolean function $isWheelsVersion(required any version, string scope="major"){

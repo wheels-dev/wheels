@@ -348,6 +348,7 @@ box testbox run --excludeLabels=slow
 
 ### Environment Management
 
+#### Legacy Commands (for backward compatibility)
 ```bash
 # Show current environment
 wheels get environment
@@ -356,11 +357,124 @@ wheels get environment
 wheels set environment development
 wheels set environment testing
 wheels set environment production
+```
+
+#### New Environment Command (Recommended)
+
+The enhanced `wheels environment` command provides better environment management:
+
+```bash
+# Show current environment with detailed info
+wheels environment
+
+# Set environment (with automatic reload)
+wheels environment set development
+wheels environment set testing
+wheels environment set production
+wheels environment set maintenance
+
+# Set environment without reload
+wheels environment set production --reload=false
+
+# List all available environments
+wheels environment list
+
+# Quick environment switching
+wheels environment development    # Shortcut for set development
+wheels environment production     # Shortcut for set production
 
 # Reload application
 wheels reload
 wheels reload development
 wheels reload force=true
+```
+
+### Interactive Console (REPL)
+
+The `wheels console` command starts an interactive REPL with full Wheels application context:
+
+```bash
+# Start interactive console
+wheels console
+
+# Start console in specific environment
+wheels console environment=testing
+
+# Execute single command
+wheels console execute="model('User').count()"
+
+# Start in tag mode (default is script mode)
+wheels console script=false
+```
+
+**Console Features:**
+- Access to all Wheels models via `model()` function
+- Direct database queries via `query()` function
+- All Wheels helper functions available
+- Persistent variable state between commands
+- Command history
+- Script and tag mode support
+
+**Example Console Session:**
+```cfscript
+wheels:script> user = model("User").findByKey(1)
+wheels:script> user.name = "Updated Name"
+wheels:script> user.save()
+wheels:script> users = model("User").findAll(where="active=1", order="createdAt DESC")
+wheels:script> pluralize("person")
+people
+wheels:script> query("SELECT COUNT(*) as total FROM users").total
+42
+```
+
+### Script Runner
+
+The `wheels runner` command executes script files in the Wheels application context:
+
+```bash
+# Run a script file
+wheels runner scripts/data-migration.cfm
+
+# Run with specific environment
+wheels runner scripts/cleanup.cfm environment=production
+
+# Run with parameters
+wheels runner scripts/import.cfm params='{"source":"data.csv","dryRun":true}'
+
+# Run with verbose output
+wheels runner scripts/process.cfm --verbose
+```
+
+**Script Features:**
+- Full access to Wheels application context
+- Pass parameters via JSON
+- Scripts can access `request.scriptParams`
+- Model and query functions available
+- Execution time reporting
+
+**Example Script:**
+```cfm
+<!--- scripts/cleanup-users.cfm --->
+<cfscript>
+// Access passed parameters
+var dryRun = structKeyExists(request.scriptParams, "dryRun") ? request.scriptParams.dryRun : false;
+
+// Use Wheels models
+var inactiveUsers = request.model("User").findAll(
+    where="lastLoginAt < '#dateAdd('m', -6, now())#'"
+);
+
+writeOutput("Found #inactiveUsers.recordCount# inactive users<br>");
+
+if (!dryRun) {
+    for (var user in inactiveUsers) {
+        request.model("User").deleteByKey(user.id);
+        writeOutput("Deleted user: #user.email#<br>");
+    }
+} else {
+    writeOutput("Dry run - no users deleted");
+}
+</cfscript>
 ```
 
 ### Configuration
@@ -386,6 +500,8 @@ wheels routes name=users
 
 ### Server Management
 
+#### CommandBox Native Server Commands
+
 ```bash
 # Start server
 server start
@@ -408,6 +524,85 @@ server status
 # Open browser
 server open
 ```
+
+#### Wheels Server Commands (Enhanced Wrappers)
+
+The Wheels CLI provides enhanced server management commands that wrap CommandBox's native functionality with Wheels-specific checks and enhancements.
+
+```bash
+# Start Wheels development server
+wheels server start
+
+# Start with specific port
+wheels server start port=8080
+
+# Start with URL rewriting enabled
+wheels server start --rewritesEnable
+
+# Start without opening browser
+wheels server start openbrowser=false
+
+# Start with specific host
+wheels server start host=0.0.0.0
+
+# Force start even if already running
+wheels server start --force
+
+# Stop the server
+wheels server stop
+
+# Stop specific named server
+wheels server stop name=myapp
+
+# Force stop all servers
+wheels server stop --force
+
+# Restart the server (also reloads Wheels app)
+wheels server restart
+
+# Force restart
+wheels server restart --force
+
+# Show server status with Wheels info
+wheels server status
+
+# Show status in JSON format
+wheels server status --json
+
+# Show verbose status
+wheels server status --verbose
+
+# Tail server logs
+wheels server log
+
+# Show last 100 lines of logs
+wheels server log lines=100
+
+# Follow logs (default behavior)
+wheels server log --follow
+
+# Show debug-level logs
+wheels server log --debug
+
+# Open application in browser
+wheels server open
+
+# Open specific path
+wheels server open /admin
+
+# Open in specific browser
+wheels server open --browser=firefox
+
+# Display server help
+wheels server
+```
+
+**Key Differences from CommandBox Native Commands:**
+- Checks if current directory is a Wheels application
+- Shows Wheels-specific information (version, paths)
+- Automatically reloads Wheels application on restart
+- Provides helpful error messages and suggestions
+- Integrates with Wheels application context
 
 ### Code Formatting
 

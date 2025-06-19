@@ -58,7 +58,11 @@
       "Bash(else)",
       "Bash(echo:*)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "mcp__puppeteer__puppeteer_fill",
+      "Bash(curl:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }
