@@ -16,6 +16,9 @@ This guide provides AI assistants with comprehensive CLI command reference for t
   - [Development Workflow](#development-workflow)
 - [Asset and Cache Management Commands](#asset-and-cache-management-commands)
 - [Plugin Management](#plugin-management)
+- [Maintenance Commands](#maintenance-commands)
+  - [Maintenance Mode](#maintenance-mode)
+  - [Cleanup Commands](#cleanup-commands)
 - [Analysis and Optimization Commands](#analysis-and-optimization-commands)
 - [Application Utilities](#application-utilities)
 - [Common Command Sequences](#common-command-sequences)
@@ -1565,6 +1568,200 @@ box package publish
 3. **Documentation**: Include comprehensive README.md
 4. **Testing**: Include test suite in `/tests/`
 5. **Versioning**: Follow semantic versioning (major.minor.patch)
+
+## Maintenance Commands
+
+### Maintenance Mode
+
+Control application availability during deployments or maintenance:
+
+#### Enable Maintenance Mode
+```bash
+# Basic maintenance mode
+wheels maintenance:on
+
+# With custom message
+wheels maintenance:on message="We'll be back shortly after upgrading our systems."
+
+# Allow specific IPs to bypass
+wheels maintenance:on allowedIPs="192.168.1.100,10.0.0.5"
+
+# With redirect URL
+wheels maintenance:on redirectURL="/maintenance.html"
+
+# Skip confirmation
+wheels maintenance:on --force
+
+# Combined options
+wheels maintenance:on \
+  message="Scheduled maintenance in progress" \
+  allowedIPs="192.168.1.100" \
+  --force
+```
+
+Features:
+- Creates `.maintenance` file in config directory
+- Automatically updates Application.cfc with maintenance check
+- Supports IP whitelisting for admin access
+- Custom messages and redirect URLs
+- Tracks who enabled maintenance and when
+
+#### Disable Maintenance Mode
+```bash
+# Basic disable
+wheels maintenance:off
+
+# Skip confirmation
+wheels maintenance:off --force
+
+# Remove maintenance check from Application.cfc
+wheels maintenance:off --cleanup
+```
+
+Shows:
+- Current maintenance configuration
+- Duration of maintenance window
+- Who enabled maintenance mode
+
+### Cleanup Commands
+
+Remove old files to free disk space and improve performance:
+
+#### Clean Log Files
+```bash
+# Remove logs older than 7 days (default)
+wheels cleanup:logs
+
+# Keep last 30 days of logs
+wheels cleanup:logs days=30
+
+# Clean specific directory
+wheels cleanup:logs directory="logs/custom"
+
+# Use custom pattern
+wheels cleanup:logs pattern="*.log,*.txt"
+
+# Preview without deleting
+wheels cleanup:logs --dryRun
+
+# Skip confirmation
+wheels cleanup:logs --force
+
+# Clean all logs immediately
+wheels cleanup:logs days=0 --force
+```
+
+Features:
+- Scans recursively for log files
+- Shows file age and size statistics
+- Removes empty directories after cleanup
+- Detailed reporting of freed space
+
+#### Clean Temporary Files
+```bash
+# Remove temp files older than 1 day (default)
+wheels cleanup:tmp
+
+# Keep last 3 days
+wheels cleanup:tmp days=3
+
+# Clean specific directories
+wheels cleanup:tmp directories="tmp,temp,cache,uploads/temp"
+
+# Custom file patterns
+wheels cleanup:tmp patterns="*.tmp,*.cache,~*"
+
+# Exclude patterns
+wheels cleanup:tmp excludePatterns=".gitkeep,important.tmp"
+
+# Preview cleanup
+wheels cleanup:tmp --dryRun
+
+# Force cleanup
+wheels cleanup:tmp --force
+```
+
+Features:
+- Cleans multiple temp directories
+- Flexible pattern matching
+- Preserves important files (.gitkeep, .gitignore)
+- Groups files by directory in output
+
+#### Clean Session Files
+```bash
+# Clean file-based sessions
+wheels cleanup:sessions
+
+# Clean database sessions
+wheels cleanup:sessions storage=database datasource=mydb
+
+# Custom session directory
+wheels cleanup:sessions directory="sessions/custom"
+
+# Database with custom table
+wheels cleanup:sessions \
+  storage=database \
+  datasource=mydb \
+  table=user_sessions
+
+# Delete all sessions (not just expired)
+wheels cleanup:sessions expiredOnly=false --force
+
+# Preview session cleanup
+wheels cleanup:sessions --dryRun
+```
+
+Features:
+- Supports both file and database session storage
+- Auto-detects common session directories
+- Shows active vs expired session counts
+- Configurable expiration detection
+
+### Cleanup Best Practices
+
+1. **Schedule Regular Cleanups**
+   ```bash
+   # Add to cron/scheduled task
+   0 2 * * * cd /path/to/app && wheels cleanup:logs days=7 --force
+   0 3 * * * cd /path/to/app && wheels cleanup:tmp days=1 --force
+   0 4 * * * cd /path/to/app && wheels cleanup:sessions --force
+   ```
+
+2. **Test with Dry Run First**
+   ```bash
+   wheels cleanup:logs --dryRun
+   wheels cleanup:tmp --dryRun
+   wheels cleanup:sessions --dryRun
+   ```
+
+3. **Monitor Disk Usage**
+   ```bash
+   # Check before cleanup
+   df -h
+   
+   # Run cleanup
+   wheels cleanup:logs days=30 --force
+   wheels cleanup:tmp --force
+   
+   # Check after cleanup
+   df -h
+   ```
+
+4. **Maintenance Mode Workflow**
+   ```bash
+   # Enable maintenance
+   wheels maintenance:on message="Upgrading to v2.0"
+   
+   # Perform deployment/updates
+   git pull
+   wheels dbmigrate latest
+   
+   # Clear caches
+   wheels cache:clear
+   
+   # Disable maintenance
+   wheels maintenance:off
+   ```
 
 ## Analysis and Optimization Commands
 
