@@ -65,7 +65,9 @@
       "Bash(touch:*)",
       "Bash(gh pr checks:*)",
       "Bash(gh run list:*)",
-      "Bash(gh run view:*)"
+      "Bash(gh run view:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker exec:*)"
     ],
     "deny": []
   }

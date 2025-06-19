@@ -224,3 +224,50 @@ Use the gh command via the Bash tool for ALL GitHub-related tasks including work
 - H2 web console: `wheels db shell --web`
 - Database shells require native clients: mysql, psql, sqlcmd
 - Shell commands auto-detect database type from datasource configuration
+
+## Adobe ColdFusion Compatibility
+
+### Key Differences from Lucee
+- **Function calls require parentheses**: Use `abort()` not `abort`
+- **Dynamic method invocation**: Use `invoke(object=component, methodname=method)` instead of `component[method]()`
+- **Variable scoping**: Be explicit with scopes in includes and view contexts
+- **Built-in functions**: Some functions like `cfheader()` don't exist as script functions in Adobe CF
+
+### Common Adobe CF Fixes
+1. Replace `abort;` with `abort();`
+2. Replace `component[method]()` with `invoke(object=component, methodname=method)`
+3. For Adobe CF 2018/2021: Use `object` and `methodname` parameters for invoke()
+4. Ensure all included files exist (Adobe CF validates includes during compilation)
+5. Use proper CF tag syntax (`<cfheader>`) instead of script functions where needed
+
+### Testing with Adobe CF
+- Local Docker testing: `docker compose --profile adobe2021 up -d`
+- Access Adobe CF instances: http://localhost:62018, http://localhost:62021, http://localhost:62023
+- All Adobe versions must pass tests before PR submission
+- Check compilation errors first, then runtime errors
+
+## Server & Environment Management
+
+### CLI Console (REPL)
+- Start interactive console: `wheels console`
+- Execute single command: `wheels console execute="model('User').count()"`
+- Access models via `model()` function
+- Direct database queries via `query()` function
+- Switch environments: `wheels console environment=testing`
+
+### Script Runner
+- Execute scripts in app context: `wheels runner script.cfm`
+- Pass parameters: `wheels runner script.cfm --params='{"userId":123}'`
+- Useful for maintenance tasks and data migrations
+
+### Environment Management
+- Show current environment: `wheels environment`
+- Switch environment: `wheels environment set production`
+- List available environments: `wheels environment list`
+- Automatic reload after environment change
+
+### Server Management
+- Enhanced server commands: `wheels server start/stop/restart/status/log/open`
+- All commands validate Wheels application directory
+- Show Wheels-specific information (version, paths)
+- Integrated with CommandBox server functionality
