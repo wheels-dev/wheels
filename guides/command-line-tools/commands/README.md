@@ -221,6 +221,23 @@ Commands for generating and serving documentation.
 - `--output` - Output directory
 - `--port` - Server port
 
+## Maintenance Commands
+
+Commands for managing application maintenance mode and cleanup tasks.
+
+| Command | Description | Documentation |
+|---------|-------------|---------------|
+| `wheels maintenance:on` | Enable maintenance mode | [Details](maintenance/maintenance-mode.md#wheels-maintenanceon) |
+| `wheels maintenance:off` | Disable maintenance mode | [Details](maintenance/maintenance-mode.md#wheels-maintenanceoff) |
+| `wheels cleanup:logs` | Remove old log files | [Details](maintenance/cleanup-commands.md#wheels-cleanuplogs) |
+| `wheels cleanup:tmp` | Remove temporary files | [Details](maintenance/cleanup-commands.md#wheels-cleanuptmp) |
+| `wheels cleanup:sessions` | Remove expired sessions | [Details](maintenance/cleanup-commands.md#wheels-cleanupsessions) |
+
+### Maintenance Options
+
+- `--force` - Skip confirmation prompts
+- `--dryRun` - Preview changes without executing
+
 ## CI/CD Commands
 
 Commands for continuous integration and deployment workflows.

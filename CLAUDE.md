@@ -397,3 +397,33 @@ Use the gh command via the Bash tool for ALL GitHub-related tasks including work
 - Run `wheels config check production` before deployment
 - Mask sensitive values in logs and output
 - Use environment-specific secrets
+
+## Development Workflow Commands
+
+### Initialize Existing Project
+- `wheels init` - Bootstrap existing Wheels app for CLI
+- `wheels init name=myapp` - With custom name
+- `wheels init --force` - Overwrite existing configs
+
+### Framework Upgrades
+- `wheels upgrade` - Interactive upgrade wizard
+- `wheels upgrade --check` - Check for available updates
+- `wheels upgrade --to=3.0.0` - Upgrade to specific version
+
+### Performance Testing
+- `wheels benchmark /path` - Simple load testing
+- `wheels benchmark --config=scenarios.json` - Batch benchmarking
+- `wheels profile /path` - Request profiling
+- `wheels profile --interactive` - Compare multiple endpoints
+
+### Documentation
+- `wheels docs` - Open framework documentation
+- `wheels docs:generate` - Generate API docs for your app
+- `wheels docs:generate --format=markdown` - Export as Markdown
+
+## Commit Message Guidelines
+- Use conventional commit format: `type: description`
+- Types: feat, fix, docs, style, refactor, test, chore
+- Keep subject line under 50 characters
+- Don't add Claude signature to commits
+- Don't add Claude signature to PR descriptions
