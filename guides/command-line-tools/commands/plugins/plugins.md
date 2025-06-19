@@ -17,8 +17,14 @@ The `wheels plugins` command provides comprehensive plugin management for Wheels
 | Command | Description |
 |---------|-------------|
 | `list` | List installed plugins |
+| `search` | Search for plugins on ForgeBox |
+| `info` | Show detailed plugin information |
 | `install` | Install a plugin |
+| `update` | Update a specific plugin |
+| `update:all` | Update all installed plugins |
+| `outdated` | List plugins with available updates |
 | `remove` | Remove a plugin |
+| `init` | Initialize a new plugin project |
 
 ## Options
 
@@ -351,7 +357,13 @@ wheels plugins cache rebuild
 
 ## See Also
 
-- [wheels plugins list](plugins-list.md) - List plugins
-- [wheels plugins install](plugins-install.md) - Install plugins
-- [wheels plugins remove](plugins-remove.md) - Remove plugins
+- [wheels plugin list](plugins-list.md) - List plugins
+- [wheels plugin search](plugins-search.md) - Search for plugins
+- [wheels plugin info](plugins-info.md) - Show plugin details
+- [wheels plugin install](plugins-install.md) - Install plugins
+- [wheels plugin update](plugins-update.md) - Update plugins
+- [wheels plugin update:all](plugins-update-all.md) - Update all plugins
+- [wheels plugin outdated](plugins-outdated.md) - Check for updates
+- [wheels plugin remove](plugins-remove.md) - Remove plugins
+- [wheels plugin init](plugins-init.md) - Create new plugin
 - [Plugin Development Guide](../../plugin-development.md)
