@@ -58,21 +58,13 @@ try {
 					
 					// Include all global helper functions
 					$includeHelpers: function() {
-						// Include view helpers
-						include "/wheels/global/helpers.cfm";
-						include "/wheels/view/helpers.cfm";
-						include "/wheels/controller/helpers.cfm";
-						include "/wheels/model/helpers.cfm";
+						// Helper functions are already loaded in the application context
+						// No need to include additional files
 					}
 				};
 				
 				// Make application scope available
 				context.application = application;
-				
-				// Include Wheels helpers into context
-				savecontent variable="helperOutput" {
-					context.$includeHelpers();
-				}
 				
 				// Execute the code
 				if (isScript) {
