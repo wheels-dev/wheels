@@ -243,6 +243,124 @@ wheels generate snippets
 
 This command copies template snippets to your application that can be used as templates for generating code. The snippets are placed in the `app/snippets/` directory.
 
+### Generate Migration (Enhanced)
+
+```bash
+# Create table migration
+wheels g migration CreateUsersTable
+wheels g migration CreateUsersTable --create=users
+wheels g migration CreateProductsTable --attributes="name:string,price:decimal,inStock:boolean"
+
+# Add column migration
+wheels g migration AddEmailToUsers
+wheels g migration AddEmailToUsers --table=users --attributes="email:string:index,verified:boolean"
+
+# Remove column migration
+wheels g migration RemoveAgeFromUsers
+wheels g migration RemoveAgeFromUsers --table=users
+
+# Change column migration
+wheels g migration ChangeNameInUsers --table=users
+
+# Add index migration
+wheels g migration CreateIndexOnUsersEmail --table=users
+
+# Custom migration
+wheels g migration CustomDataMigration --up="/* custom up code */" --down="/* custom down code */"
+```
+
+### Generate Mailer
+
+```bash
+# Basic mailer
+wheels g mailer Welcome
+
+# With multiple methods
+wheels g mailer UserNotifications --methods="accountCreated,passwordReset,orderConfirmation"
+
+# With configuration
+wheels g mailer OrderMailer --from="orders@example.com" --layout="email"
+
+# Skip view creation
+wheels g mailer NotificationMailer --createViews=false
+```
+
+### Generate Service
+
+```bash
+# Basic service object
+wheels g service Payment
+
+# With methods
+wheels g service UserAuthentication --methods="login,logout,register,verify"
+
+# With dependencies
+wheels g service OrderProcessing --dependencies="PaymentService,EmailService"
+
+# As singleton
+wheels g service CacheManager --type=singleton
+
+# With description
+wheels g service DataExport --description="Handles CSV and Excel exports"
+```
+
+### Generate Helper
+
+```bash
+# Basic helper
+wheels g helper Format
+
+# With specific functions
+wheels g helper StringUtils --functions="truncate,highlight,slugify"
+
+# Global helper
+wheels g helper DateHelpers --global=true
+
+# View-specific helper
+wheels g helper ViewHelpers --type=view
+
+# Controller-specific helper
+wheels g helper AuthHelpers --type=controller
+```
+
+### Generate Job
+
+```bash
+# Basic background job
+wheels g job ProcessOrders
+
+# With queue configuration
+wheels g job SendNewsletters --queue=emails --priority=high
+
+# Scheduled job (cron expression)
+wheels g job CleanupOldRecords --schedule="0 0 * * *"
+
+# With delay
+wheels g job DataSync --delay=3600
+
+# With retries and timeout
+wheels g job ImportData --retries=5 --timeout=600
+```
+
+### Generate Plugin
+
+```bash
+# Basic plugin scaffold
+wheels g plugin Authentication
+
+# With version and author
+wheels g plugin ImageProcessor --version="1.0.0" --author="John Doe"
+
+# With methods
+wheels g plugin CacheManager --methods="init,configure,process"
+
+# With dependencies
+wheels g plugin APIConnector --dependencies="wheels-http-client"
+
+# With mixin types
+wheels g plugin FormValidation --mixin="controller,model"
+```
+
 ## Database Commands
 
 ### Database Management
