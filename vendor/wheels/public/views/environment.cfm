@@ -42,17 +42,17 @@ try {
 		case "set":
 			// Setting environment requires application restart
 			if (structKeyExists(request.wheels.params, "value")) {
-				var newEnvironment = request.wheels.params.value;
-				var validEnvironments = "development,testing,production,maintenance";
+				local.newEnvironment = request.wheels.params.value;
+				local.validEnvironments = "development,testing,production,maintenance";
 				
-				if (listFindNoCase(validEnvironments, newEnvironment)) {
+				if (listFindNoCase(local.validEnvironments, local.newEnvironment)) {
 					// Note: Actually changing the environment would require application restart
 					// This is just acknowledging the request
-					data.message = "Environment change to '#newEnvironment#' acknowledged. Restart required.";
-					data.newEnvironment = newEnvironment;
+					data.message = "Environment change to '#local.newEnvironment#' acknowledged. Restart required.";
+					data.newEnvironment = local.newEnvironment;
 				} else {
 					data.success = false;
-					data.message = "Invalid environment: #newEnvironment#";
+					data.message = "Invalid environment: #local.newEnvironment#";
 				}
 			} else {
 				data.success = false;

@@ -31,11 +31,11 @@ try {
 		case "execute":
 			// Execute code
 			if (structKeyExists(request.wheels.params, "code") && len(request.wheels.params.code)) {
-				var code = request.wheels.params.code;
-				var isScript = structKeyExists(request.wheels.params, "script") && request.wheels.params.script;
+				local.code = request.wheels.params.code;
+				local.isScript = structKeyExists(request.wheels.params, "script") && request.wheels.params.script;
 				
 				// Create execution context with Wheels helpers
-				var context = {
+				local.context = {
 					// Model access
 					model: function(name) {
 						return application.wheels.models[arguments.name];
@@ -60,27 +60,27 @@ try {
 				};
 				
 				// Make application scope available
-				context.application = application;
+				local.context.application = application;
 				
 				// Include Wheels helpers into context
 				savecontent variable="helperOutput" {
-					context.$includeHelpers();
+				local.context.$includeHelpers();
 				}
 				
 				// Execute the code
-				if (isScript) {
+				if (local.isScript) {
 					// CFScript execution
 					savecontent variable="output" {
 						evaluate("
 							// Import context variables
-							for (var key in context) {
-								if (key != '$includeHelpers') {
-									variables[key] = context[key];
+							for (local.key in local.context) {
+								if (local.key != '$includeHelpers') {
+									variables[local.key] = local.context[local.key];
 								}
 							}
 							
 							// Execute user code
-							#code#
+							#local.code#
 						");
 					}
 					data.output = trim(output);
@@ -88,37 +88,37 @@ try {
 					// Tag-based execution
 					savecontent variable="output" {
 						// Make context available
-						for (var key in context) {
-							if (key != "$includeHelpers") {
-								variables[key] = context[key];
+						for (local.key in local.context) {
+							if (local.key != "$includeHelpers") {
+								variables[local.key] = local.context[local.key];
 							}
 						}
 						
 						// Execute the tag-based code
-						writeOutput(evaluate(code));
+						writeOutput(evaluate(local.code));
 					}
 					data.output = trim(output);
 				}
 				
 				// If the last expression returned a value, show it
 				try {
-					var result = evaluate(code);
-					if (!isNull(result) && !isSimpleValue(result)) {
-						if (isQuery(result)) {
-							data.output &= chr(10) & chr(10) & "Query returned #result.recordCount# record(s)";
-							if (result.recordCount > 0) {
-								data.output &= chr(10) & "Columns: #result.columnList#";
+					local.result = evaluate(local.code);
+					if (!isNull(local.result) && !isSimpleValue(local.result)) {
+						if (isQuery(local.result)) {
+							data.output &= chr(10) & chr(10) & "Query returned #local.result.recordCount# record(s)";
+							if (local.result.recordCount > 0) {
+								data.output &= chr(10) & "Columns: #local.result.columnList#";
 							}
-						} else if (isStruct(result)) {
-							data.output &= chr(10) & chr(10) & "Struct with keys: #structKeyList(result)#";
-						} else if (isArray(result)) {
-							data.output &= chr(10) & chr(10) & "Array with #arrayLen(result)# element(s)";
-						} else if (isObject(result)) {
-							var metadata = getMetadata(result);
-							data.output &= chr(10) & chr(10) & "Object of type: #metadata.name#";
+						} else if (isStruct(local.result)) {
+							data.output &= chr(10) & chr(10) & "Struct with keys: #structKeyList(local.result)#";
+						} else if (isArray(local.result)) {
+							data.output &= chr(10) & chr(10) & "Array with #arrayLen(local.result)# element(s)";
+						} else if (isObject(local.result)) {
+							local.metadata = getMetadata(local.result);
+							data.output &= chr(10) & chr(10) & "Object of type: #local.metadata.name#";
 						}
-					} else if (!isNull(result) && len(data.output) == 0) {
-						data.output = result;
+					} else if (!isNull(local.result) && len(data.output) == 0) {
+						data.output = local.result;
 					}
 				} catch (any e) {
 					// Ignore - some expressions don't return values
