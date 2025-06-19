@@ -36,6 +36,14 @@ component output="false" displayName="Internal GUI" {
 		include "/wheels/public/views/docs.cfm";
 		return "";
 	}
+	function console() {
+		include "/wheels/public/views/console.cfm";
+		return "";
+	}
+	function environment() {
+		include "/wheels/public/views/environment.cfm";
+		return "";
+	}
 	function runner(){
 		include "/wheels/public/views/runner.cfm";
 		return "";
@@ -118,6 +126,9 @@ component output="false" displayName="Internal GUI" {
 			case "cli":
 			case "tests":
 			case "testbox":
+			case "console":
+			case "environment":
+			case "runner":
 				include "/wheels/public/views/#local.view#.cfm";
 				break;
 			case "packages":
