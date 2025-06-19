@@ -142,7 +142,7 @@ component {
 						arguments.value = TimeFormat(local.value, 'tt');
 					}
 				} else {
-					arguments.value = resolveDateTime(local.item, local.value);
+					arguments.value = $resolveDateTime(local.item, local.value);
 				}
 			}
 			if (local.firstDone) {
@@ -201,7 +201,7 @@ component {
 			if (arguments.twelveHour && arguments.$type IS "hour") {
 				arguments.value = TimeFormat(arguments.$now, 'h');
 			} else {
-				arguments.value = resolveDateTime(arguments.$type, arguments.$now);
+				arguments.value = $resolveDateTime(arguments.$type, arguments.$now);
 			}
 		}
 
@@ -328,7 +328,7 @@ component {
 		);
 	}
 
-	public numeric function resolveDateTime(required string dateTimeString, required date dateTimeValue){
+	public numeric function $resolveDateTime(required string dateTimeString, required date dateTimeValue){
 		switch(arguments.dateTimeString) {
 			case "year":
 				return Year(arguments.dateTimeValue);

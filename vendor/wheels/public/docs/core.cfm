@@ -16,8 +16,8 @@ if (StructKeyExists(application.wheels, "docs")) {
 		}
 	}
 
-	ArrayAppend(documentScope, {"name" = "controller", "scope" = CreateObject("component", "app.controllers.Controller")});
-	ArrayAppend(documentScope, {"name" = "model", "scope" = CreateObject("component", "app.models.Model")});
+	ArrayAppend(documentScope, {"name" = "controller", "scope" = CreateObject("component", "app.controllers.Controller").init()});
+	ArrayAppend(documentScope, {"name" = "model", "scope" = CreateObject("component", "app.models.Model").init()});
 	
 	/* 
 		To fix the issue below:
