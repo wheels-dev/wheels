@@ -21,7 +21,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Testing**: See AI-TESTING.md for TestBox patterns
 - **Errors**: See AI-ERRORS.md for troubleshooting
 - **CLI**: See AI-CLI.md for complete command reference
-- **Examples**: See `/examples/` directory for working applications
+- **Migrations**: See AI-MIGRATIONS.md for database migration patterns
+- **Examples**: See AI-EXAMPLES.md and `/examples/` directory for working applications
+- **Context**: See AI-CONTEXT.md for framework concepts
+- **Troubleshooting**: See AI-TROUBLESHOOTING.md for common issues
 
 ## Framework Philosophy
 
@@ -98,6 +101,15 @@ Wheels is inspired by Ruby on Rails and follows these principles:
 - Restore database: `wheels db restore backup.sql`
 - Check migration status: `wheels db status`
 - Rollback migrations: `wheels db rollback --steps=3`
+
+### Migration Commands
+- **ALWAYS use CLI to generate migrations**: `wheels g migration MigrationName`
+- Create table: `wheels g migration CreateUsers`
+- Add column: `wheels g migration AddEmailToUsers`
+- Remove column: `wheels g migration RemovePasswordFromUsers`
+- Add index: `wheels g migration AddIndexToUsersEmail`
+- Run migrations: `wheels dbmigrate latest`
+- Rollback: `wheels dbmigrate down`
 
 ### Enhanced Generators
 - Migration: `wheels g migration CreateUsersTable --attributes="name:string,email:string:index"`
@@ -333,3 +345,32 @@ Use the gh command via the Bash tool for ALL GitHub-related tasks including work
 - `test:unit`: Run unit tests only
 - `test:integration`: Run integration tests
 - `test:coverage`: Generate coverage report
+
+## Wheels-Specific Gotchas
+
+### Router Priority
+- Routes are matched in order of definition
+- More specific routes should be defined before generic ones
+- Resource routes generate multiple route patterns
+
+### Model Initialization
+- Use `config()` not `init()` for model initialization
+- Properties defined in `config()` are available throughout the model
+- Associations must be defined in `config()`
+
+### View Context
+- Views have access to all controller variables
+- Use `includePartial()` for reusable view components
+- Partials start with underscore (e.g., `_form.cfm`)
+
+### Migration Best Practices
+- **NEVER create migration files manually** - always use CLI
+- Migration files are timestamped and run in order
+- Use descriptive names that explain the change
+- Test migrations on all supported databases
+
+### Testing Database Setup
+- The `wheelstestdb` datasource must be configured
+- Tests create and destroy data - never run on production
+- Use factories for consistent test data
+- Each test runs in a transaction that rolls back

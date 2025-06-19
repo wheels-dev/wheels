@@ -13,6 +13,7 @@ This guide provides AI assistants with comprehensive CLI command reference for t
 - [Asset and Cache Management Commands](#asset-and-cache-management-commands)
 - [Plugin Management](#plugin-management)
 - [Analysis and Optimization Commands](#analysis-and-optimization-commands)
+- [Application Utilities](#application-utilities)
 - [Common Command Sequences](#common-command-sequences)
 - [Parameter Inconsistencies](#parameter-inconsistencies)
 - [Troubleshooting](#troubleshooting)
@@ -1341,6 +1342,191 @@ Options:
 - `--migrations`: Run migrations on schema changes
 - `--command`: Custom command to run on changes
 - `--debounce`: Debounce delay in milliseconds (default: 500)
+
+## Application Utilities
+
+### Route Management
+
+#### Display Routes
+```bash
+# Show all routes
+wheels routes
+
+# Filter routes by name or pattern
+wheels routes name=users
+wheels routes name=admin
+
+# Output in JSON format
+wheels routes format=json
+wheels routes name=users format=json
+```
+
+#### Match Route
+```bash
+# Find which route matches a URL
+wheels routes:match /users
+wheels routes:match /users/123
+wheels routes:match /users/123/edit
+
+# Match with specific HTTP method
+wheels routes:match /products method=POST
+wheels routes:match /api/users method=DELETE
+```
+
+The routes:match command shows:
+- Matching route name and pattern
+- Controller and action that will handle the request
+- Extracted parameters (e.g., key, id)
+- Other possible matches
+
+### Application Information
+
+#### About Command
+```bash
+# Display comprehensive application information
+wheels about
+```
+
+Shows:
+- Wheels framework version
+- CLI version and location
+- Application name and environment
+- Database configuration status
+- Server environment (CFML engine, Java, OS)
+- CommandBox version
+- Application statistics (controllers, models, views, tests, migrations)
+- Helpful resource links
+
+#### Version Command
+```bash
+# Show version information
+wheels version
+```
+
+Displays:
+- Wheels CLI version
+- Wheels framework version
+- CFML engine and version
+- CommandBox version
+
+### Code Analysis
+
+#### Code Statistics
+```bash
+# Display code statistics
+wheels stats
+
+# Show detailed statistics with largest files
+wheels stats verbose=true
+```
+
+Shows statistics for:
+- Controllers, Models, Views
+- Helpers, Tests, Migrations
+- Configuration files
+- JavaScript and CSS files
+- Lines of code (LOC), comments, blank lines
+- Code-to-test ratio
+- Average file sizes
+- Comment percentage
+
+#### Extract Annotations
+```bash
+# Extract TODO, FIXME, OPTIMIZE annotations
+wheels notes
+
+# Search for specific annotations
+wheels notes TODO
+wheels notes TODO,FIXME
+
+# Add custom annotations
+wheels notes custom=HACK,REVIEW
+
+# Show with file paths and line numbers
+wheels notes verbose=true
+```
+
+Searches for annotations in:
+- Application code (controllers, models, views)
+- Configuration files
+- Tests
+- Migrations
+
+### Health Checks
+
+#### Doctor Command
+```bash
+# Run health checks
+wheels doctor
+
+# Show detailed diagnostic information
+wheels doctor verbose=true
+```
+
+Checks for:
+- Required directories and files
+- Application configuration
+- Database configuration and migrations
+- Write permissions
+- Dependencies and modules
+- Test suite presence
+- Security files (.gitignore)
+
+Provides:
+- Critical issues that need immediate attention
+- Warnings for recommended improvements
+- Passed checks (shown with verbose flag)
+- Specific recommendations for fixing issues
+
+### Dependency Management
+
+#### Show Dependency Tree
+```bash
+# Display dependency tree
+wheels deptree
+
+# Limit depth of tree
+wheels deptree depth=2
+
+# Show only production dependencies
+wheels deptree production=true
+
+# Display as flat list instead of tree
+wheels deptree format=list
+```
+
+Shows:
+- Hierarchical dependency tree
+- Installation status for each package
+- Sub-dependencies (up to specified depth)
+- Production vs development dependencies
+- Missing packages highlighted in red
+
+#### Manage Wheels Dependencies
+```bash
+# List dependencies
+wheels deps list
+
+# Install a dependency
+wheels deps install PluginName
+wheels deps install PluginName version=1.2.0
+wheels deps install TestPlugin --dev
+
+# Update a dependency
+wheels deps update PluginName
+
+# Remove a dependency
+wheels deps remove PluginName
+
+# Generate dependency report
+wheels deps report
+```
+
+The deps command manages Wheels-specific dependencies and provides detailed reporting including:
+- Current dependencies and versions
+- Installation status
+- Outdated packages
+- Full dependency report with export to JSON
 
 ## Common Command Sequences
 
