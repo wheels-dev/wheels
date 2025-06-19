@@ -81,6 +81,16 @@ Wheels is inspired by Ruby on Rails and follows these principles:
 - Restart server: `server restart`
 - Reload CommandBox after CLI changes: `box reload`
 
+### Database Management
+- Create database: `wheels db create`
+- Setup database (create + migrate + seed): `wheels db setup`
+- Reset database: `wheels db reset --force`
+- Database shell: `wheels db shell` (CLI) or `wheels db shell --web` (H2 web console)
+- Backup database: `wheels db dump --output=backup.sql`
+- Restore database: `wheels db restore backup.sql`
+- Check migration status: `wheels db status`
+- Rollback migrations: `wheels db rollback --steps=3`
+
 ## Code Style Guidelines
 
 ### Naming Conventions
@@ -208,3 +218,9 @@ Use the gh command via the Bash tool for ALL GitHub-related tasks including work
 ### Known Issues
 - Some CLI commands have inconsistent parameter naming (camelCase vs kebab-case)
 - Direct CFM file access may not work due to Wheels routing (use defined routes instead)
+
+### Database Shell Specifics
+- H2 databases use Lucee's bundled JAR: `org.lucee.h2-*.jar`
+- H2 web console: `wheels db shell --web`
+- Database shells require native clients: mysql, psql, sqlcmd
+- Shell commands auto-detect database type from datasource configuration
