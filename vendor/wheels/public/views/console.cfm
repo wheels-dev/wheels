@@ -2,6 +2,14 @@
 <cfscript>
 setting showDebugOutput="no";
 
+// Check if this is a valid console request
+if (!structKeyExists(request, "wheels") || !structKeyExists(request.wheels, "params")) {
+	// Return empty response if not a proper request
+	cfcontent(reset="true", type="application/json");
+	writeOutput('{"success":false,"error":"Invalid request"}');
+	cfabort();
+}
+
 // Initialize response
 data = {
 	"success": true,
@@ -71,17 +79,16 @@ try {
 				if (isScript) {
 					// CFScript execution
 					savecontent variable="output" {
-						evaluate("
-							// Import context variables
-							for (var key in context) {
-								if (key != '$includeHelpers') {
-									variables[key] = context[key];
-								}
+						// Import context variables
+						for (var key in context) {
+							if (key != '$includeHelpers') {
+								variables[key] = context[key];
 							}
-							
-							// Execute user code
-							#code#
-						");
+						}
+						
+						// Execute user code
+						var userCode = code;
+						evaluate(userCode);
 					}
 					data.output = trim(output);
 				} else {

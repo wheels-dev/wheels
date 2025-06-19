@@ -2,6 +2,14 @@
 <cfscript>
 setting showDebugOutput="no";
 
+// Check if this is a valid environment request
+if (!structKeyExists(request, "wheels") || !structKeyExists(request.wheels, "params")) {
+	// Return empty response if not a proper request
+	cfcontent(reset="true", type="application/json");
+	writeOutput('{"success":false,"error":"Invalid request"}');
+	cfabort();
+}
+
 // Initialize response
 data = {
 	"success": true,

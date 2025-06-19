@@ -3,6 +3,14 @@
 setting showDebugOutput="no";
 setting requestTimeout="300";
 
+// Check if this is a valid runner request (requires POST with form data)
+if (!structKeyExists(form, "scriptContent")) {
+	// Return empty response if not a proper request
+	cfcontent(reset="true", type="application/json");
+	writeOutput('{"success":false,"error":"No script content provided"}');
+	cfabort();
+}
+
 // Initialize response
 data = {
 	"success": true,

@@ -143,5 +143,10 @@ component output="false" displayName="Internal GUI" {
 		}
 		return "";
 	}
+	
+	function legacy() {
+		// Handle legacy ?controller=wheels&action=wheels&view=xxx URLs
+		return wheels();
+	}
 
 }
