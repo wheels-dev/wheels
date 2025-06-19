@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
 - **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,inStock:boolean`
 - **Run migrations**: `wheels dbmigrate latest`
-- **Run tests**: `wheels test app` or `box testbox run`
+- **Run tests**: `wheels test run` or `box testbox run`
 
 ### AI-Specific Documentation
 - **Patterns**: See AI-PATTERNS.md for common code patterns
@@ -29,11 +29,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build/Test Commands
 
 ### Testing
-- Run a single test: `wheels test app TestName`
-- Run a test package: `wheels test app testBundles=controllers`
-- Run a specific test spec: `wheels test app testBundles=controllers&testSpecs=testCaseOne`
-- Run all tests: `box testbox run` or `box run-script test`
-- Run specific directory: `box testbox run --directory=tests/specs/unit`
+- Run a single test: `box testbox run --testBundles=path.to.TestFile`
+- Run tests by directory: `box testbox run --directory=tests/specs/unit`
 - Run tests with coverage: `box testbox run --coverage --coverageReporter=html`
 - Watch mode for TDD: `box testbox watch`
 - Run unit tests only: `box run-script test:unit`
@@ -186,6 +183,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Access Adobe CF instances: http://localhost:62018, http://localhost:62021, http://localhost:62023
 - All Adobe versions must pass tests before PR submission
 - Check compilation errors first, then runtime errors
+
+## Repository Structure
+
+### Key Directories
+- `/vendor/wheels/` - Core framework code (do not modify directly)
+- `/app/` - Application code (controllers, models, views, config)
+- `/cli/` - CommandBox CLI module for Wheels commands
+- `/tests/` - Framework test suite
+- `/guides/` - Framework documentation
+- `/examples/` - Example applications
+- `/docker/` - Docker configurations for different CFML engines
+- `/workspace/` - Sandbox for testing CLI commands
+
+### Working with the CLI Module
+- CLI commands are in `/cli/commands/wheels/`
+- After modifying CLI code, reload CommandBox: `box reload`
+- Test CLI commands in the `/workspace/` directory
+- Use `.claude/commands/cli/test-next-group.md` for systematic CLI testing
 
 ## Commit Message Guidelines
 - Use conventional commit format: `type: description`
