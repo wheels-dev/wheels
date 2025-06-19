@@ -4,27 +4,22 @@ component output="false" displayName="Internal GUI" {
 	 * Internal function.
 	 */
 	public struct function $init() {
-		return this;
-	}
-	
-	/**
-	 * Helper function for views - provides urlFor functionality
-	 */
-	private function urlFor() {
+		// Copy all helper functions from application.wo to make them available in views
 		if (structKeyExists(application, "wo")) {
-			return application.wo.urlFor(argumentCollection=arguments);
+			local.publicAPI = getMetaData(application.wo);
+			if (structKeyExists(local.publicAPI, "functions")) {
+				for (local.func in local.publicAPI.functions) {
+					if (local.func.access == "public" && !structKeyExists(variables, local.func.name) && !structKeyExists(this, local.func.name)) {
+						try {
+							variables[local.func.name] = application.wo[local.func.name];
+						} catch (any e) {
+							// Skip if we can't copy the function
+						}
+					}
+				}
+			}
 		}
-		return "";
-	}
-	
-	/**
-	 * Helper function for views - provides $args functionality
-	 */
-	private function $args() {
-		if (structKeyExists(application, "wo") && structKeyExists(application.wo, "$args")) {
-			return application.wo.$args(argumentCollection=arguments);
-		}
-		return arguments;
+		return this;
 	}
 
 	/*
