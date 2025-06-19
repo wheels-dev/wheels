@@ -7,7 +7,7 @@ setting requestTimeout="300";
 if (!structKeyExists(form, "scriptContent")) {
 	// Return empty response if not a proper request
 	writeOutput('{"success":false,"error":"No script content provided"}');
-	abort;
+	abort();
 }
 
 // Initialize response
