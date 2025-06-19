@@ -26,36 +26,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Context**: See AI-CONTEXT.md for framework concepts
 - **Troubleshooting**: See AI-TROUBLESHOOTING.md for common issues
 
-## Framework Philosophy
-
-Wheels is inspired by Ruby on Rails and follows these principles:
-
-### Convention over Configuration
-- Models are singular (User.cfc), tables are plural (users)
-- Controllers are plural (Users.cfc)
-- URLs follow RESTful patterns (/users, /users/1, /users/new)
-- Database columns automatically map to model properties
-
-### Don't Repeat Yourself (DRY)
-- Reusable partials for views (`_form.cfm`)
-- Model associations reduce code duplication
-- Helpers and plugins for common functionality
-
-### MVC Architecture
-- **Models**: Business logic and data persistence
-- **Views**: Presentation layer (HTML, JSON, XML)
-- **Controllers**: Request handling and coordination
-
-### ActiveRecord Pattern
-- Models represent database tables
-- Instance methods for CRUD operations
-- Built-in validations and callbacks
-
-### RESTful by Default
-- Standard CRUD actions (index, show, new, create, edit, update, delete)
-- HTTP verbs map to controller actions
-- Resource-based routing
-
 ## Build/Test Commands
 
 ### Testing
@@ -119,61 +89,15 @@ Wheels is inspired by Ruby on Rails and follows these principles:
 - Job: `wheels g job ProcessOrders --queue=high --schedule="0 0 * * *"`
 - Plugin: `wheels g plugin Authentication --version="1.0.0"`
 
-## Code Style Guidelines
-
-### Naming Conventions
-- camelCase for variable/function names
-- CapitalizedCamelCase for CFC names
-- Scoped variables use lowercase.camelCase (e.g., `application.myVar`)
-- Pascal case for built-in CF functions (e.g., `IsNumeric()`, `Trim()`)
-- Prefix "private" framework methods with `$` (e.g., `$query()`)
-
-### Formatting (cfformat rules)
-- Indent with tabs, 2 spaces per tab
-- Max line length: 120 characters
-- Array spacing: `[1, 2, 3]` not `[ 1,2,3 ]`
-- Struct spacing: `{key: value}` not `{ key : value }`
-- Binary operators spaced: `1 + 2` not `1+2`
-- Function declaration spacing: no space before parentheses
-- Built-in functions use PascalCase: `ArrayLen()`, `StructKeyExists()`
-- User-defined functions use camelCase: `myFunction()`, `getUserById()`
-
-### Testing Patterns
-- Use TestBox BDD syntax with describe/it blocks
-- Use `local` scope for function variables (not var-scoped)
-- Follow Wheels validation/callback patterns in models
-- Use transactions for database tests (automatic with BaseSpec)
-- Use factories for test data generation
-
-### Model Patterns
-- Use associations (hasMany, belongsTo, hasOne)
-- Use callbacks (beforeValidation, afterCreate, etc.)
-- Use calculated properties for derived data
-- Follow ActiveRecord pattern conventions
-
-## CLI Commands
-
-### Parameter Syntax
-- CommandBox requires named attributes (name=value) not positional parameters
-- Boolean attributes can use `--attribute` as shortcut for `attribute=true`
-- Don't mix positional and named attributes
-- Note: Some CLI commands have parameter naming inconsistencies (camelCase vs kebab-case)
-
-### Testing CLI Commands
-1. Navigate to workspace: `cd workspace`
-2. Create test app: `wheels g app myapp`
-3. Start server: `server start`
-4. Test your CLI changes
-5. If modifying CLI code, reload CommandBox: `box reload`
-
-### CLI Module Architecture
-- Commands in `/cli/commands/wheels/` directory
-- Base command class: `/cli/commands/wheels/base.cfc`
-- Service architecture in `/cli/services/`
-- Templates in `/cli/templates/`
-- Tests in `/cli/tests/`
-
 ## High-Level Architecture
+
+### Request Lifecycle
+1. **Application.cfc** initializes framework containers and loads configuration
+2. **Dispatch.cfc** receives request, finds matching route, creates params struct
+3. **Controller** instantiated and `processAction()` called
+4. **Model** interactions through ActiveRecord pattern
+5. **View** rendering (automatic or explicit)
+6. Response sent with proper content type
 
 ### Core Components
 - **Application.cfc**: Framework initialization and request lifecycle
@@ -185,80 +109,62 @@ Wheels is inspired by Ruby on Rails and follows these principles:
 - **Migrator.cfc**: Database migration management
 - **Wirebox.cfc**: Dependency injection container
 
-### Directory Structure
-- `/vendor/wheels/`: Core framework files (do not modify directly)
-  - `/controller/`: Controller functionality (filters, rendering, caching)
-  - `/model/`: Model functionality (CRUD, associations, validations)
-  - `/view/`: View helpers and form builders
-  - `/global/`: Global helper functions
-  - `/public/`: Request lifecycle and bootstrapping
-  - `/migrator/`: Database migration system
-  - `/events/`: Event handling system
-  - `/plugins/`: Plugin architecture
-- `/app/`: Application code (controllers, models, views)
-- `/config/`: Environment-specific configuration
-- `/cli/`: CommandBox CLI module for code generation and tasks
-- `/tests/`: Framework and application test suites
-- `/docker/`: Docker configurations for multi-engine testing
-- `/workspace/`: Sandbox for testing CLI commands
+### CLI Module Architecture
+- **Commands**: Hierarchical structure under `/cli/commands/wheels/`, all extend `base.cfc`
+- **Services**: Business logic in `/cli/models/` using WireBox dependency injection
+- **Templates**: Sophisticated template system with `{{variable}}` syntax, checks `app/snippets/` first
+- **SharedParameters.cfc**: Centralizes parameter definitions for consistency
 
-### Key Patterns
-- **Initialization**: Both Controllers and Models use `config()` method for initialization, NOT `init()`
-- **Private Methods**: Prefix with `$` indicates framework internals (e.g., `$callAction()`, `$performedRenderOrRedirect()`)
-- **Content Negotiation**: Use `provides()` or `onlyProvides()` in controller config()
-- **View Rendering**: Automatic for HTML, skipped for JSON/XML when using renderText/renderWith
-- **Component Integration**: Framework uses `$integrateComponents()` to mix functionality into base classes
-- **Request Flow**: Application.cfc → Dispatch.cfc → Controller → Model → View
+### Key Framework Patterns
 
-### Database Testing
-- Create `wheelstestdb` database and datasource
-- Supports H2 (recommended for speed), MySQL, PostgreSQL, SQL Server, Oracle
-- Docker compose provides all database servers for testing
-- Use `db={{database}}` URL parameter to switch datasources
+#### The $ Prefix Convention
+- All internal framework methods prefixed with `$` (e.g., `$callAction()`, `$performedRenderOrRedirect()`)
+- Clear boundary between framework and application code
+- Never call $ methods directly from application code
+
+#### Initialization Pattern
+- **CRITICAL**: Both Controllers and Models use `config()` method for initialization, NOT `init()`
+- The `config()` method is where associations, validations, filters are defined
+- Framework uses `$init()` internally, application code uses `config()`
+
+#### Component Integration
+- Framework uses `$integrateComponents()` to mix functionality into base classes
+- Avoids deep inheritance in favor of composition
+- Allows modular architecture with clear separation of concerns
+
+#### Content Negotiation
+- Use `provides()` or `onlyProvides()` in controller config()
+- Automatic format detection from URL or Accept headers
+- Format-specific views (e.g., `show.json.cfm`)
+- View rendering automatic for HTML, skipped for JSON/XML when using renderText/renderWith
+
+#### Database Adapter System
+- Base adapter provides common functionality
+- Database-specific adapters (H2, MySQL, PostgreSQL, SQLServer) handle:
+  - Type mapping and identity/auto-increment handling
+  - Database-specific SQL generation
+  - Migration SQL differences
+
+#### Plugin System
+- Plugins extracted from `/app/plugins/` directory
+- Can extend any framework component via mixins
+- Environment-specific plugin support
+- Version compatibility checking
+
+### Testing Architecture
+- **BaseSpec.cfc** provides Wheels-aware test helpers
 - Tests run in transactions that automatically roll back
+- Create `wheelstestdb` database and datasource for testing
+- Use factories for consistent test data generation
+- Docker compose provides multi-engine testing environments
 
-### Development Workflow
-1. Make changes to framework files in `/vendor/wheels/`
-2. Test using workspace sandbox: `cd workspace && wheels g app testapp && server start`
-3. Run tests: `wheels test app` or `box testbox run`
-4. Use Docker TestUI at localhost:3000 for multi-engine testing
-5. Ensure all CFML engines pass (Lucee 5/6/7, Adobe 2018/2021/2023/2025)
-
-## Creating Pull Requests
-Use the gh command via the Bash tool for ALL GitHub-related tasks including working with issues, pull requests, checks, and releases.
-
-## Important Notes
-
-### Framework Specifics
-- Framework uses `config()` method for initialization in BOTH controllers and models
+### Important Framework Specifics
 - Always check `$performedRenderOrRedirect()` before automatic view rendering
 - Use `$requestContentType()` and `$acceptableFormats()` for content negotiation
-- The `$` prefix indicates framework internal methods - do not call these directly from application code
 - View files use `.cfm` extension, not `.cfc`
-
-### Testing Requirements
-- Test on multiple CFML engines before submitting PRs
-- Use BaseSpec.cfc for all tests to get Wheels integration helpers
-- Tests automatically run in transactions for isolation
-- Use factories for consistent test data generation
-- Run formatting check before committing: `box run-script format:check`
-
-### Development Best Practices
-- Follow existing patterns when adding new functionality
-- Don't modify files in `/vendor/wheels/` unless contributing to framework
-- Use the `/workspace/` directory for testing CLI commands
-- Check for existing helpers before creating new ones
-- Use TestBox BDD syntax for all new tests
-
-### Known Issues
-- Some CLI commands have inconsistent parameter naming (camelCase vs kebab-case)
-- Direct CFM file access may not work due to Wheels routing (use defined routes instead)
-
-### Database Shell Specifics
-- H2 databases use Lucee's bundled JAR: `org.lucee.h2-*.jar`
-- H2 web console: `wheels db shell --web`
-- Database shells require native clients: mysql, psql, sqlcmd
-- Shell commands auto-detect database type from datasource configuration
+- Partials start with underscore (e.g., `_form.cfm`)
+- Routes are matched in order of definition
+- Models derive structure from database schema (database-first approach)
 
 ## Adobe ColdFusion Compatibility
 
@@ -280,146 +186,6 @@ Use the gh command via the Bash tool for ALL GitHub-related tasks including work
 - Access Adobe CF instances: http://localhost:62018, http://localhost:62021, http://localhost:62023
 - All Adobe versions must pass tests before PR submission
 - Check compilation errors first, then runtime errors
-
-## Server & Environment Management
-
-### CLI Console (REPL)
-- Start interactive console: `wheels console`
-- Execute single command: `wheels console execute="model('User').count()"`
-- Access models via `model()` function
-- Direct database queries via `query()` function
-- Switch environments: `wheels console environment=testing`
-
-### Script Runner
-- Execute scripts in app context: `wheels runner script.cfm`
-- Pass parameters: `wheels runner script.cfm --params='{"userId":123}'`
-- Useful for maintenance tasks and data migrations
-
-### Environment Management
-- Show current environment: `wheels environment`
-- Switch environment: `wheels environment set production`
-- List available environments: `wheels environment list`
-- Automatic reload after environment change
-
-### Server Management
-- Enhanced server commands: `wheels server start/stop/restart/status/log/open`
-- All commands validate Wheels application directory
-- Show Wheels-specific information (version, paths)
-- Integrated with CommandBox server functionality
-
-## Repository Structure
-
-### Framework Core
-- Main Wheels framework repository
-- Located in `/vendor/wheels/` when installed
-- Core MVC functionality and database ORM
-- Plugin system and event architecture
-
-### CLI Module
-- Separate module in `/cli/` directory
-- CommandBox integration for code generation
-- Service-based architecture with DI
-- Extensive template system for scaffolding
-
-### Testing Infrastructure
-- Framework tests in `/vendor/wheels/tests_testbox/`
-- CLI tests in `/cli/tests/`
-- Application tests in `/tests/`
-- Docker configurations for multi-engine testing
-
-## Package Management
-
-### Dependencies (box.json)
-- **wirebox**: ^7 - Dependency injection
-- **testbox**: ^5 - Testing framework
-
-### Dev Dependencies
-- **commandbox-dotenv**: Environment variables
-- **commandbox-cfconfig**: CF engine configuration
-- **commandbox-cfformat**: Code formatting
-
-### Scripts
-- `format`: Run code formatter
-- `format:check`: Check code formatting
-- `test`: Run all tests
-- `test:unit`: Run unit tests only
-- `test:integration`: Run integration tests
-- `test:coverage`: Generate coverage report
-
-## Wheels-Specific Gotchas
-
-### Router Priority
-- Routes are matched in order of definition
-- More specific routes should be defined before generic ones
-- Resource routes generate multiple route patterns
-
-### Model Initialization
-- Use `config()` not `init()` for model initialization
-- Properties defined in `config()` are available throughout the model
-- Associations must be defined in `config()`
-
-### View Context
-- Views have access to all controller variables
-- Use `includePartial()` for reusable view components
-- Partials start with underscore (e.g., `_form.cfm`)
-
-### Migration Best Practices
-- **NEVER create migration files manually** - always use CLI
-- Migration files are timestamped and run in order
-- Use descriptive names that explain the change
-- Test migrations on all supported databases
-
-### Testing Database Setup
-- The `wheelstestdb` datasource must be configured
-- Tests create and destroy data - never run on production
-- Use factories for consistent test data
-- Each test runs in a transaction that rolls back
-
-## Configuration & Security
-
-### Environment Variables (.env files)
-- Framework automatically loads `.env` files on startup
-- Supports environment-specific files: `.env.{environment}`
-- Variable interpolation: `${VAR}` syntax
-- Type casting for booleans and numbers
-- Access via `application.env['KEY_NAME']`
-
-### Configuration Management Commands
-- `wheels config dump` - Export settings (JSON, env, CFML formats)
-- `wheels config check` - Validate security and best practices
-- `wheels config diff` - Compare environments
-- `wheels secret` - Generate secure secrets
-- `wheels env set/validate/merge` - Manage .env files
-
-### Security Best Practices
-- Never commit .env files to version control
-- Use `wheels secret` for generating secure keys
-- Run `wheels config check production` before deployment
-- Mask sensitive values in logs and output
-- Use environment-specific secrets
-
-## Development Workflow Commands
-
-### Initialize Existing Project
-- `wheels init` - Bootstrap existing Wheels app for CLI
-- `wheels init name=myapp` - With custom name
-- `wheels init --force` - Overwrite existing configs
-
-### Framework Upgrades
-- `wheels upgrade` - Interactive upgrade wizard
-- `wheels upgrade --check` - Check for available updates
-- `wheels upgrade --to=3.0.0` - Upgrade to specific version
-
-### Performance Testing
-- `wheels benchmark /path` - Simple load testing
-- `wheels benchmark --config=scenarios.json` - Batch benchmarking
-- `wheels profile /path` - Request profiling
-- `wheels profile --interactive` - Compare multiple endpoints
-
-### Documentation
-- `wheels docs` - Open framework documentation
-- `wheels docs:generate` - Generate API docs for your app
-- `wheels docs:generate --format=markdown` - Export as Markdown
 
 ## Commit Message Guidelines
 - Use conventional commit format: `type: description`

@@ -14,16 +14,30 @@ This guide provides AI assistants with comprehensive CLI command reference for t
   - [Server Management](#server-management)
   - [Code Formatting](#code-formatting)
   - [Development Workflow](#development-workflow)
-- [Asset and Cache Management Commands](#asset-and-cache-management-commands)
 - [Plugin Management](#plugin-management)
 - [Maintenance Commands](#maintenance-commands)
   - [Maintenance Mode](#maintenance-mode)
   - [Cleanup Commands](#cleanup-commands)
 - [Analysis and Optimization Commands](#analysis-and-optimization-commands)
 - [Application Utilities](#application-utilities)
+- [Asset and Cache Management Commands](#asset-and-cache-management-commands)
+  - [Asset Management](#asset-management)
+  - [Cache Management](#cache-management)
+  - [Log Management](#log-management)
+  - [Temporary Files](#temporary-files)
+- [Docker Commands](#docker-commands)
+- [Deployment Commands](#deployment-commands)
+- [Security Commands](#security-commands)
+- [Documentation Commands](#documentation-commands)
+- [Continuous Integration Commands](#continuous-integration-commands)
+- [Interactive Console and Runner](#interactive-console-and-runner)
+- [Destroy Commands](#destroy-commands)
+- [Additional Generators](#additional-generators)
+- [Reload Command](#reload-command)
 - [Common Command Sequences](#common-command-sequences)
 - [Parameter Inconsistencies](#parameter-inconsistencies)
 - [Troubleshooting](#troubleshooting)
+- [Advanced Usage](#advanced-usage)
 
 ## CommandBox Basics
 
@@ -2040,6 +2054,790 @@ The deps command manages Wheels-specific dependencies and provides detailed repo
 - Installation status
 - Outdated packages
 - Full dependency report with export to JSON
+
+## Asset and Cache Management Commands
+
+### Asset Management
+
+#### Precompile Assets
+```bash
+# Precompile all assets for production
+wheels assets:precompile
+
+# Precompile with specific environment
+wheels assets:precompile environment=production
+
+# Force precompilation (ignore cache)
+wheels assets:precompile --force
+
+# Show verbose output
+wheels assets:precompile --verbose
+```
+
+The precompile command:
+- Minifies JavaScript and CSS files
+- Combines files based on configuration
+- Generates asset fingerprints for cache busting
+- Creates compressed versions (gzip)
+- Updates asset manifest
+
+#### Clean Assets
+```bash
+# Remove old compiled assets (keeps latest 3 versions)
+wheels assets:clean
+
+# Keep specific number of versions
+wheels assets:clean keep=5
+
+# Preview what will be removed
+wheels assets:clean --dryRun
+
+# Force cleanup without confirmation
+wheels assets:clean --force
+```
+
+#### Remove All Assets
+```bash
+# Remove all compiled assets
+wheels assets:clobber
+
+# Force removal without confirmation
+wheels assets:clobber --force
+```
+
+### Cache Management
+
+#### Clear Cache
+```bash
+# Clear all caches
+wheels cache:clear
+
+# Clear specific cache type
+wheels cache:clear type=template
+wheels cache:clear type=query
+wheels cache:clear type=object
+wheels cache:clear type=page
+
+# Clear cache by name pattern
+wheels cache:clear name=user*
+wheels cache:clear name=*_cache
+
+# Force clear without confirmation
+wheels cache:clear --force
+
+# Show what would be cleared
+wheels cache:clear --dryRun
+```
+
+Cache types:
+- `template`: Compiled view templates
+- `query`: Database query results
+- `object`: Object caching
+- `page`: Full page caching
+- `all`: All cache types (default)
+
+### Log Management
+
+#### Tail Logs
+```bash
+# Tail application logs (follows by default)
+wheels log:tail
+
+# Show specific number of lines
+wheels log:tail lines=50
+
+# Tail specific log file
+wheels log:tail file=error.log
+wheels log:tail file=access.log
+
+# Filter log entries
+wheels log:tail filter=ERROR
+wheels log:tail filter="user authentication"
+
+# Don't follow (just show last lines)
+wheels log:tail --noFollow
+```
+
+#### Clear Logs
+```bash
+# Clear all log files
+wheels log:clear
+
+# Clear logs older than 7 days
+wheels log:clear days=7
+
+# Clear specific log files
+wheels log:clear files=error.log,debug.log
+
+# Preview what will be cleared
+wheels log:clear --dryRun
+
+# Force clear without confirmation
+wheels log:clear --force
+```
+
+### Temporary Files
+
+#### Clear Temporary Files
+```bash
+# Clear all temporary files
+wheels tmp:clear
+
+# Clear files older than 1 day
+wheels tmp:clear days=1
+
+# Clear specific directories
+wheels tmp:clear dirs=uploads/temp,cache/temp
+
+# Preview cleanup
+wheels tmp:clear --dryRun
+
+# Force cleanup
+wheels tmp:clear --force
+```
+
+## Docker Commands
+
+### Docker Integration
+
+#### Initialize Docker Configuration
+```bash
+# Create Docker configuration files
+wheels docker:init
+
+# Initialize with specific CFML engine
+wheels docker:init engine=lucee
+wheels docker:init engine=adobe2023
+
+# Include development tools
+wheels docker:init --withDevTools
+
+# Custom port mapping
+wheels docker:init port=8080
+```
+
+Creates:
+- `Dockerfile` - Application container configuration
+- `docker-compose.yml` - Multi-container orchestration
+- `.dockerignore` - Files to exclude from build
+
+#### Deploy with Docker
+```bash
+# Build and deploy containers
+wheels docker:deploy
+
+# Deploy to specific environment
+wheels docker:deploy environment=production
+
+# Use specific tag
+wheels docker:deploy tag=v1.0.0
+
+# Deploy with docker-compose
+wheels docker:deploy --compose
+
+# Push to registry
+wheels docker:deploy registry=myregistry.com push=true
+```
+
+## Deployment Commands
+
+### Deploy Application
+
+#### Basic Deployment
+```bash
+# Deploy to default target
+wheels deploy
+
+# Deploy to specific target
+wheels deploy target=production
+wheels deploy target=staging
+
+# Deploy specific branch/tag
+wheels deploy branch=main
+wheels deploy tag=v1.0.0
+
+# Dry run (show what would happen)
+wheels deploy --dryRun
+```
+
+#### Initialize Deployment
+```bash
+# Set up deployment configuration
+wheels deploy:init
+
+# Initialize for specific provider
+wheels deploy:init provider=aws
+wheels deploy:init provider=heroku
+wheels deploy:init provider=digitalocean
+
+# With custom configuration
+wheels deploy:init target=production host=myserver.com
+```
+
+#### Deployment Setup
+```bash
+# Set up deployment target
+wheels deploy:setup
+
+# Setup specific target
+wheels deploy:setup target=production
+
+# Verify setup
+wheels deploy:setup --verify
+```
+
+#### Push Deployment
+```bash
+# Push current code to deployment target
+wheels deploy:push
+
+# Push to specific target
+wheels deploy:push target=staging
+
+# Force push (overwrites remote)
+wheels deploy:push --force
+
+# Include migrations
+wheels deploy:push --migrate
+```
+
+#### Rollback Deployment
+```bash
+# Rollback to previous version
+wheels deploy:rollback
+
+# Rollback specific number of versions
+wheels deploy:rollback steps=2
+
+# Rollback to specific version
+wheels deploy:rollback version=v1.2.3
+
+# Preview rollback
+wheels deploy:rollback --dryRun
+```
+
+#### Deployment Status
+```bash
+# Check deployment status
+wheels deploy:status
+
+# Status for specific target
+wheels deploy:status target=production
+
+# Detailed status
+wheels deploy:status --verbose
+
+# JSON output
+wheels deploy:status format=json
+```
+
+#### Deployment Logs
+```bash
+# View deployment logs
+wheels deploy:logs
+
+# Tail logs
+wheels deploy:logs --follow
+
+# Specific number of lines
+wheels deploy:logs lines=100
+
+# Filter by date
+wheels deploy:logs since="2 hours ago"
+```
+
+#### Deployment Audit
+```bash
+# Show deployment history
+wheels deploy:audit
+
+# Audit specific target
+wheels deploy:audit target=production
+
+# Show last N deployments
+wheels deploy:audit limit=10
+
+# Export audit log
+wheels deploy:audit format=csv output=audit.csv
+```
+
+#### Execute Remote Commands
+```bash
+# Execute command on deployment target
+wheels deploy:exec "wheels dbmigrate latest"
+
+# Execute on specific target
+wheels deploy:exec target=staging command="wheels cache:clear"
+
+# Interactive mode
+wheels deploy:exec --interactive
+```
+
+#### Deployment Hooks
+```bash
+# List deployment hooks
+wheels deploy:hooks
+
+# Add deployment hook
+wheels deploy:hooks add name=post-deploy command="wheels cache:clear"
+
+# Remove hook
+wheels deploy:hooks remove name=post-deploy
+
+# Test hooks
+wheels deploy:hooks test
+```
+
+#### Deployment Lock
+```bash
+# Lock deployments (prevent concurrent deploys)
+wheels deploy:lock
+
+# Lock with reason
+wheels deploy:lock reason="Database maintenance"
+
+# Unlock deployments
+wheels deploy:lock --unlock
+
+# Check lock status
+wheels deploy:lock --status
+```
+
+#### Deployment Proxy
+```bash
+# Manage deployment proxy/load balancer
+wheels deploy:proxy
+
+# Add server to pool
+wheels deploy:proxy add server=192.168.1.10
+
+# Remove server from pool
+wheels deploy:proxy remove server=192.168.1.10
+
+# Show proxy status
+wheels deploy:proxy status
+```
+
+#### Deployment Secrets
+```bash
+# Manage deployment secrets/environment variables
+wheels deploy:secrets
+
+# Set secret
+wheels deploy:secrets set API_KEY=abc123
+
+# Remove secret
+wheels deploy:secrets remove API_KEY
+
+# List secrets (values hidden)
+wheels deploy:secrets list
+
+# Export secrets
+wheels deploy:secrets export --output=secrets.env
+```
+
+#### Stop Deployment
+```bash
+# Stop running deployment
+wheels deploy:stop
+
+# Stop specific deployment
+wheels deploy:stop id=abc123
+
+# Force stop
+wheels deploy:stop --force
+```
+
+## Security Commands
+
+### Security Scanning
+
+#### Security Overview
+```bash
+# Show security overview and available commands
+wheels security
+
+# Run quick security check
+wheels security --check
+```
+
+#### Run Security Scan
+```bash
+# Scan entire application
+wheels security:scan
+
+# Scan specific paths
+wheels security:scan path=models,controllers
+
+# Scan with specific severity threshold
+wheels security:scan severity=high
+
+# Auto-fix issues where possible
+wheels security:scan --fix
+
+# Generate report
+wheels security:scan report=html output=security-report.html
+wheels security:scan report=json output=security.json
+
+# Scan specific vulnerability types
+wheels security:scan types=sql,xss,csrf
+```
+
+Security scan checks for:
+- SQL Injection vulnerabilities
+- Cross-Site Scripting (XSS)
+- Cross-Site Request Forgery (CSRF)
+- Insecure Direct Object References
+- Security Misconfiguration
+- Sensitive Data Exposure
+- XML External Entity (XXE)
+- Broken Access Control
+- File Upload vulnerabilities
+- Hardcoded credentials
+- Insecure Cryptography
+- Directory Traversal
+
+## Documentation Commands
+
+### Documentation Management
+
+#### Documentation Overview
+```bash
+# Show documentation commands
+wheels docs
+```
+
+#### Generate Documentation
+```bash
+# Generate API documentation
+wheels docs:generate
+
+# Generate with specific format
+wheels docs:generate format=html
+wheels docs:generate format=markdown
+wheels docs:generate format=json
+
+# Include source code
+wheels docs:generate --includeSource
+
+# Custom output directory
+wheels docs:generate output=docs/api
+
+# Generate for specific components
+wheels docs:generate components=models,controllers
+```
+
+#### Serve Documentation
+```bash
+# Start documentation server
+wheels docs:serve
+
+# Serve on specific port
+wheels docs:serve port=4000
+
+# Open in browser automatically
+wheels docs:serve --open
+
+# Watch for changes and regenerate
+wheels docs:serve --watch
+```
+
+Documentation features:
+- Auto-generates from code comments
+- Supports JavaDoc-style annotations
+- Includes method signatures and parameters
+- Shows relationships between components
+- Generates navigation and search
+
+## Continuous Integration Commands
+
+### CI/CD Integration
+
+#### Initialize CI Configuration
+```bash
+# Create CI configuration files
+wheels ci:init
+
+# Initialize for specific provider
+wheels ci:init provider=github     # Creates .github/workflows/ci.yml
+wheels ci:init provider=gitlab     # Creates .gitlab-ci.yml
+wheels ci:init provider=jenkins    # Creates Jenkinsfile
+wheels ci:init provider=circle     # Creates .circleci/config.yml
+wheels ci:init provider=travis     # Creates .travis.yml
+
+# Include additional workflows
+wheels ci:init --withDeployment
+wheels ci:init --withCoverage
+wheels ci:init --withDocker
+```
+
+CI configuration includes:
+- Dependency installation
+- Database setup
+- Migration running
+- Test execution
+- Code quality checks
+- Build artifacts
+- Deployment steps (optional)
+
+## Interactive Console and Runner
+
+### Interactive Console (REPL)
+```bash
+# Start interactive console with application context
+wheels console
+
+# Start in specific environment
+wheels console environment=testing
+
+# Preload specific components
+wheels console preload=models,services
+
+# With command history
+wheels console --history
+
+# Execute command and exit
+wheels console --execute="user = model('User').findByKey(1); writeDump(user);"
+```
+
+Console features:
+- Full application context loaded
+- Access to all models, services, and helpers
+- Command history and tab completion
+- Multi-line command support
+- Result pretty-printing
+
+### Script Runner
+```bash
+# Run arbitrary CFML script in application context
+wheels runner myScript.cfm
+
+# Run with arguments
+wheels runner dataImport.cfm inputFile=data.csv
+
+# Run code directly
+wheels runner --code="users = model('User').findAll(); writeDump(users.recordCount);"
+
+# Run in specific environment
+wheels runner script.cfm environment=production
+```
+
+## Destroy Commands
+
+### Remove Generated Code
+
+The destroy commands are the inverse of generate commands, removing files that were created:
+
+#### Destroy Model
+```bash
+# Remove model and associated files
+wheels destroy model User
+
+# Force removal without confirmation
+wheels destroy model User --force
+
+# Also remove migration
+wheels destroy model User --removeMigration
+```
+
+Removes:
+- Model file
+- Model test file
+- Optionally: associated migration
+
+#### Destroy Controller
+```bash
+# Remove controller and views
+wheels destroy controller Users
+
+# Force removal
+wheels destroy controller Users --force
+
+# Keep views
+wheels destroy controller Users --keepViews
+```
+
+Removes:
+- Controller file
+- Controller test file
+- View directory and all views (unless --keepViews)
+
+#### Destroy Scaffold
+```bash
+# Remove entire scaffold
+wheels destroy scaffold Product
+
+# Force removal
+wheels destroy scaffold Product --force
+```
+
+Removes:
+- Model and model test
+- Controller and controller test
+- All views
+- Does NOT remove migrations (safety measure)
+
+#### Destroy View
+```bash
+# Remove specific view
+wheels destroy view users show
+
+# Remove multiple views
+wheels destroy view users index,show,edit
+
+# Force removal
+wheels destroy view users index --force
+```
+
+#### Destroy Migration
+```bash
+# Remove migration file
+wheels destroy migration CreateUsersTable
+
+# Force removal
+wheels destroy migration CreateUsersTable --force
+```
+
+**Warning**: Only removes the migration file, does not rollback database changes
+
+#### Destroy Test
+```bash
+# Remove test file
+wheels destroy test model User
+wheels destroy test controller Users
+
+# Force removal
+wheels destroy test model User --force
+```
+
+#### Destroy Mailer
+```bash
+# Remove mailer
+wheels destroy mailer UserNotifications
+
+# Force removal
+wheels destroy mailer UserNotifications --force
+```
+
+Removes:
+- Mailer file
+- Mailer test file
+- View templates
+
+#### Destroy Service
+```bash
+# Remove service
+wheels destroy service PaymentProcessor
+
+# Force removal
+wheels destroy service PaymentProcessor --force
+```
+
+#### Destroy Helper
+```bash
+# Remove helper
+wheels destroy helper StringUtils
+
+# Force removal
+wheels destroy helper StringUtils --force
+```
+
+#### Destroy Job
+```bash
+# Remove job
+wheels destroy job ProcessOrders
+
+# Force removal
+wheels destroy job ProcessOrders --force
+```
+
+#### Destroy Plugin
+```bash
+# Remove plugin
+wheels destroy plugin Authentication
+
+# Force removal
+wheels destroy plugin Authentication --force
+
+# Also remove from dependencies
+wheels destroy plugin Authentication --removeDependency
+```
+
+### Destroy Best Practices
+
+1. **Always Review First**: Use `git status` before destroying
+2. **Backup Important Code**: Destroy commands are irreversible
+3. **Check Dependencies**: Ensure other code doesn't depend on what you're removing
+4. **Use Force Sparingly**: Confirmations exist for safety
+5. **Migrations**: Manually rollback database changes before destroying migrations
+
+## Additional Generators
+
+### Generate Frontend Components
+```bash
+# Generate frontend scaffold with JavaScript framework
+wheels g frontend component=UserList framework=vue
+
+# Supported frameworks
+wheels g frontend component=ProductGrid framework=react
+wheels g frontend component=Dashboard framework=alpine
+wheels g frontend component=DataTable framework=htmx
+
+# With TypeScript
+wheels g frontend component=UserForm framework=vue --typescript
+
+# Include tests
+wheels g frontend component=CartWidget framework=react --withTests
+
+# Custom output directory
+wheels g frontend component=NavBar framework=alpine output=assets/components
+```
+
+### Generate Property
+```bash
+# Add property to existing model
+wheels g property model=User name=email type=string
+
+# With validation
+wheels g property model=User name=age type=integer required=true
+
+# With default value
+wheels g property model=Product name=inStock type=boolean default=true
+
+# Multiple properties
+wheels g property model=User properties=phone:string,address:text
+```
+
+### Generate Route
+```bash
+# Add route to config/routes.cfm
+wheels g route name=userProfile pattern="/users/[key]/profile" controller=users action=profile
+
+# RESTful resource route
+wheels g route resource=products
+
+# Nested resource
+wheels g route resource=users nestedResource=posts
+
+# API namespace
+wheels g route namespace=api resource=users
+```
+
+## Reload Command
+```bash
+# Reload application
+wheels reload
+
+# Reload with specific environment
+wheels reload environment=development
+wheels reload environment=production
+
+# Force reload
+wheels reload --force
+
+# Reload and clear cache
+wheels reload --clearCache
+```
 
 ## Common Command Sequences
 
