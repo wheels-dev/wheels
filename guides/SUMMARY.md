@@ -131,6 +131,7 @@
     * [wheels deploy status](command-line-tools/commands/deploy/deploy-status.md)
     * [wheels deploy stop](command-line-tools/commands/deploy/deploy-stop.md)
 * CLI Development Guides
+  * [Configuration Management](command-line-tools/configuration.md)
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
   * [Service Architecture](command-line-tools/cli-guides/service-architecture.md)
   * [Migrations Guide](command-line-tools/cli-guides/migrations.md)

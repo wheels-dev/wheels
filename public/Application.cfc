@@ -53,25 +53,40 @@ component output="false" {
 	// Put environment vars into env struct
 	if ( !structKeyExists(this,"env") ) {
 		this.env = {};
+		
+		// Load base .env file
 		envFilePath = this.appDir & "../.env";
 		if (fileExists(envFilePath)) {
-			envStruct = {};
-
-			envFile = fileRead(envFilePath);
-			if (isJSON(envFile)) {
-				envStruct = deserializeJSON(envFile);
-			}
-			else { // assume it is a .properties file
-				properties = createObject('java', 'java.util.Properties').init();
-				properties.load(CreateObject('java', 'java.io.FileInputStream').init(envFilePath));
-				envStruct = properties;
-			}
-
-			// Append to env struct
-			for (key in envStruct) {
-				this.env["#key#"] = envStruct[key];
+			loadEnvFile(envFilePath, this.env);
+		}
+		
+		// Determine current environment
+		currentEnv = "";
+		if (structKeyExists(this.env, "WHEELS_ENV")) {
+			currentEnv = this.env["WHEELS_ENV"];
+		} else {
+			// Try system environment variable
+			try {
+				javaSystem = createObject("java", "java.lang.System");
+				systemEnv = javaSystem.getenv("WHEELS_ENV");
+				if (!isNull(systemEnv) && len(systemEnv)) {
+					currentEnv = systemEnv;
+				}
+			} catch (any e) {
+				// Ignore errors accessing system environment
 			}
 		}
+		
+		// Load environment-specific .env file if it exists
+		if (len(currentEnv)) {
+			envSpecificPath = this.appDir & "../.env." & currentEnv;
+			if (fileExists(envSpecificPath)) {
+				loadEnvFile(envSpecificPath, this.env);
+			}
+		}
+		
+		// Perform variable interpolation
+		performVariableInterpolation(this.env);
 	}
 
 	function onServerStart() {}
@@ -282,6 +297,105 @@ component output="false" {
 		);
 
 		return true;
+	}
+
+	/**
+	 * Load environment variables from a file into the provided struct
+	 */
+	private void function loadEnvFile(required string filePath, required struct envStruct) {
+		local.envFile = fileRead(arguments.filePath);
+		local.tempStruct = {};
+		
+		if (isJSON(local.envFile)) {
+			local.tempStruct = deserializeJSON(local.envFile);
+		} else {
+			// Parse as properties file with enhanced features
+			local.lines = listToArray(local.envFile, chr(10));
+			
+			for (local.line in local.lines) {
+				local.trimmedLine = trim(local.line);
+				
+				// Skip empty lines and comments
+				if (!len(local.trimmedLine) || left(local.trimmedLine, 1) == "##") {
+					continue;
+				}
+				
+				// Parse key=value pairs
+				if (find("=", local.trimmedLine)) {
+					local.key = trim(listFirst(local.trimmedLine, "="));
+					local.value = trim(listRest(local.trimmedLine, "="));
+					
+					// Remove surrounding quotes if present
+					if ((left(local.value, 1) == '"' && right(local.value, 1) == '"') ||
+						(left(local.value, 1) == "'" && right(local.value, 1) == "'")) {
+						local.value = mid(local.value, 2, len(local.value) - 2);
+					}
+					
+					// Type casting for boolean and numeric values
+					if (local.value == "true" || local.value == "false") {
+						local.value = (local.value == "true");
+					} else if (isNumeric(local.value) && !find(".", local.value)) {
+						// Only convert integers, leave decimals as strings
+						local.value = val(local.value);
+					}
+					
+					local.tempStruct[local.key] = local.value;
+				}
+			}
+		}
+		
+		// Merge into the main env struct
+		for (local.key in local.tempStruct) {
+			arguments.envStruct[local.key] = local.tempStruct[local.key];
+		}
+	}
+	
+	/**
+	 * Perform variable interpolation on env values using ${VAR} syntax
+	 */
+	private void function performVariableInterpolation(required struct envStruct) {
+		local.maxIterations = 10; // Prevent infinite loops
+		local.iteration = 0;
+		local.hasChanges = true;
+		
+		while (local.hasChanges && local.iteration < local.maxIterations) {
+			local.hasChanges = false;
+			local.iteration++;
+			
+			for (local.key in arguments.envStruct) {
+				local.value = arguments.envStruct[local.key];
+				
+				if (isSimpleValue(local.value) && isString(local.value)) {
+					local.newValue = local.value;
+					
+					// Find all ${VAR} patterns
+					local.matches = reMatchNoCase("\$\{([^}]+)\}", local.value);
+					
+					for (local.match in local.matches) {
+						// Extract variable name
+						local.varName = reReplaceNoCase(local.match, "\$\{([^}]+)\}", "\1");
+						
+						// Replace with actual value if it exists
+						if (structKeyExists(arguments.envStruct, local.varName)) {
+							local.replacement = arguments.envStruct[local.varName];
+							if (isSimpleValue(local.replacement)) {
+								local.newValue = replace(local.newValue, local.match, local.replacement, "all");
+								local.hasChanges = true;
+							}
+						}
+					}
+					
+					arguments.envStruct[local.key] = local.newValue;
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Helper to check if a value is a string (not boolean or numeric after parsing)
+	 */
+	private boolean function isString(required any value) {
+		return isSimpleValue(arguments.value) && !isBoolean(arguments.value) && !isNumeric(arguments.value);
 	}
 
 }
