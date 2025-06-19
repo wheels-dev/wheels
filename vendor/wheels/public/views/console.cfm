@@ -6,7 +6,7 @@ setting showDebugOutput="no";
 if (!structKeyExists(request, "wheels") || !structKeyExists(request.wheels, "params")) {
 	// Return empty response if not a proper request
 	writeOutput('{"success":false,"error":"Invalid request"}');
-	cfabort;
+	abort;
 }
 
 // Initialize response
