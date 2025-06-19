@@ -200,7 +200,8 @@ component output="false" extends="wheels.Global"{
 				abort();
 			} else {
 				// Call the action method directly on the component to preserve context
-				invoke(component=application.wheels.public, method=local.params.action);
+				// Use 'object' and 'methodname' for older Adobe CF versions compatibility
+				invoke(object=application.wheels.public, methodname=local.params.action);
 			}
 		} else {
 			// Create the requested controller and call the action on it.
