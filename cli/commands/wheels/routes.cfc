@@ -4,15 +4,18 @@
  * {code:bash}
  * wheels routes
  * wheels routes name=users
+ * wheels routes format=json
+ * wheels routes name=users format=json
  * {code}
  */
 component extends="base" {
 
 	/**
 	 * @name Filter routes by name
+	 * @format Output format (table or json)
 	 * @help Display all defined routes in the application
 	 */
-	public void function run(string name = "") {
+	public void function run(string name = "", string format = "table") {
 		local.appPath = getCWD();
 		
 		if (!isWheelsApp(local.appPath)) {
@@ -46,49 +49,54 @@ component extends="base" {
 				return;
 			}
 			
-			// Display routes in a table
-			print.line();
-			print.boldLine("Application Routes:");
-			print.line();
-			
-			// Calculate column widths
-			local.nameWidth = 20;
-			local.methodWidth = 10;
-			local.patternWidth = 30;
-			local.controllerWidth = 20;
-			local.actionWidth = 15;
-			
-			// Header
-			print.text(PadRight("Name", local.nameWidth));
-			print.text(PadRight("Method", local.methodWidth));
-			print.text(PadRight("Pattern", local.patternWidth));
-			print.text(PadRight("Controller", local.controllerWidth));
-			print.line(PadRight("Action", local.actionWidth));
-			
-			print.line(RepeatString("-", local.nameWidth + local.methodWidth + local.patternWidth + local.controllerWidth + local.actionWidth));
-			
-			// Routes
-			for (local.route in local.routes) {
-				local.name = local.route.name ?: "";
-				local.methods = local.route.methods ?: "GET";
-				local.pattern = local.route.pattern ?: "";
-				local.controller = local.route.controller ?: "";
-				local.action = local.route.action ?: "";
+			// Output based on format
+			if (arguments.format == "json") {
+				print.line(SerializeJSON(local.routes));
+			} else {
+				// Display routes in a table
+				print.line();
+				print.boldLine("Application Routes:");
+				print.line();
 				
-				// Handle multiple methods
-				if (IsArray(local.methods)) {
-					local.methods = ArrayToList(local.methods, ",");
+				// Calculate column widths
+				local.nameWidth = 20;
+				local.methodWidth = 10;
+				local.patternWidth = 30;
+				local.controllerWidth = 20;
+				local.actionWidth = 15;
+				
+				// Header
+				print.text(PadRight("Name", local.nameWidth));
+				print.text(PadRight("Method", local.methodWidth));
+				print.text(PadRight("Pattern", local.patternWidth));
+				print.text(PadRight("Controller", local.controllerWidth));
+				print.line(PadRight("Action", local.actionWidth));
+				
+				print.line(RepeatString("-", local.nameWidth + local.methodWidth + local.patternWidth + local.controllerWidth + local.actionWidth));
+				
+				// Routes
+				for (local.route in local.routes) {
+					local.name = local.route.name ?: "";
+					local.methods = local.route.methods ?: "GET";
+					local.pattern = local.route.pattern ?: "";
+					local.controller = local.route.controller ?: "";
+					local.action = local.route.action ?: "";
+					
+					// Handle multiple methods
+					if (IsArray(local.methods)) {
+						local.methods = ArrayToList(local.methods, ",");
+					}
+					
+					print.text(PadRight(Left(local.name, local.nameWidth - 1), local.nameWidth));
+					print.text(PadRight(Left(local.methods, local.methodWidth - 1), local.methodWidth));
+					print.text(PadRight(Left(local.pattern, local.patternWidth - 1), local.patternWidth));
+					print.text(PadRight(Left(local.controller, local.controllerWidth - 1), local.controllerWidth));
+					print.line(PadRight(Left(local.action, local.actionWidth - 1), local.actionWidth));
 				}
 				
-				print.text(PadRight(Left(local.name, local.nameWidth - 1), local.nameWidth));
-				print.text(PadRight(Left(local.methods, local.methodWidth - 1), local.methodWidth));
-				print.text(PadRight(Left(local.pattern, local.patternWidth - 1), local.patternWidth));
-				print.text(PadRight(Left(local.controller, local.controllerWidth - 1), local.controllerWidth));
-				print.line(PadRight(Left(local.action, local.actionWidth - 1), local.actionWidth));
+				print.line();
+				print.greenLine("Total routes: " & ArrayLen(local.routes));
 			}
-			
-			print.line();
-			print.greenLine("Total routes: " & ArrayLen(local.routes));
 			
 		} catch (any e) {
 			error("Error reading routes: " & e.message);
