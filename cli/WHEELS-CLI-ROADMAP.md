@@ -130,15 +130,17 @@ wheels dependencies                      # Show dependency tree
 wheels version                           # Show Wheels version
 ```
 
-### 8. Configuration & Security
+### 8. Configuration & Security ✅
 
 **Strategy**: Use `commandbox-dotenv` for environment management.
+
+**Status**: IMPLEMENTED
 
 ```bash
 # First, install dotenv module
 box install commandbox-dotenv
 
-# Custom Wheels commands
+# Custom Wheels commands (IMPLEMENTED)
 wheels config:dump [env]                 # Export configuration
 wheels config:check                      # Validate configuration
 wheels config:diff <env1> <env2>         # Compare environments
@@ -147,6 +149,12 @@ wheels secret                            # Generate secret key
 # Environment management via dotenv
 # .env files are automatically loaded by CommandBox
 ```
+
+**Implementation Details**:
+- `config:dump` - Exports configuration with format options (json, env, cfml) and sensitive value masking
+- `config:check` - Validates configuration files, checks security settings, and can attempt fixes
+- `config:diff` - Compares configurations between environments with table or JSON output
+- `secret` - Generates cryptographically secure keys with multiple format options
 
 ### 9. Development Workflow
 

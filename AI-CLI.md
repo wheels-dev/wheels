@@ -9,6 +9,7 @@ This guide provides AI assistants with comprehensive CLI command reference for t
 - [Database Commands](#database-commands)
 - [Testing Commands](#testing-commands)
 - [Environment Commands](#environment-commands)
+- [Configuration Commands](#configuration-commands)
 - [Development Commands](#development-commands)
 - [Asset and Cache Management Commands](#asset-and-cache-management-commands)
 - [Plugin Management](#plugin-management)
@@ -792,6 +793,179 @@ wheels routes
 
 # Show route details
 wheels routes name=users
+```
+
+## Configuration Commands
+
+The Wheels CLI provides comprehensive configuration management commands for working with application settings and environment variables.
+
+### Config Commands
+
+#### Dump Configuration
+Export configuration settings for any environment:
+
+```bash
+# Dump current environment config
+wheels config dump
+
+# Dump specific environment
+wheels config dump production
+
+# Export as JSON
+wheels config dump --format=json
+
+# Export as .env format
+wheels config dump --format=env
+
+# Export as CFML
+wheels config dump --format=cfml
+
+# Save to file
+wheels config dump --output=config.json
+
+# Show unmasked sensitive values (careful!)
+wheels config dump --no-mask
+```
+
+#### Check Configuration
+Validate configuration for security and best practices:
+
+```bash
+# Check current environment
+wheels config check
+
+# Check specific environment
+wheels config check production
+
+# Show detailed fix suggestions
+wheels config check --verbose
+
+# Auto-fix issues where possible
+wheels config check --fix
+```
+
+#### Compare Configurations
+Compare settings between environments:
+
+```bash
+# Compare two environments
+wheels config diff development production
+
+# Show only differences
+wheels config diff development production --changes-only
+
+# Output as JSON
+wheels config diff testing production --format=json
+```
+
+### Secret Generation
+
+Generate cryptographically secure secrets:
+
+```bash
+# Generate hex secret (default)
+wheels secret
+
+# Generate with specific type and length
+wheels secret --type=hex --length=64
+wheels secret --type=base64 --length=48
+wheels secret --type=alphanumeric --length=32
+wheels secret --type=uuid
+
+# Save directly to .env file
+wheels secret --save-to-env=SECRET_KEY
+wheels secret --type=base64 --save-to-env=API_SECRET
+```
+
+### Enhanced Environment Variable Commands
+
+#### Show Environment Variables
+Display environment variables with enhanced formatting:
+
+```bash
+# Show all env vars (with masking)
+wheels env show
+
+# Show specific variable
+wheels env show --key=DB_HOST
+
+# Output as JSON
+wheels env show --format=json
+
+# Read from specific file
+wheels env show --file=.env.production
+```
+
+#### Set Environment Variables
+Update .env files programmatically:
+
+```bash
+# Set single variable
+wheels env set DB_HOST=localhost
+
+# Set multiple variables
+wheels env set DB_HOST=localhost DB_PORT=3306 DB_NAME=myapp
+
+# Update specific file
+wheels env set --file=.env.production API_URL=https://api.example.com
+```
+
+#### Validate Environment Files
+Check .env file format and content:
+
+```bash
+# Validate default .env
+wheels env validate
+
+# Validate specific file
+wheels env validate --file=.env.production
+
+# Check for required variables
+wheels env validate --required=DB_HOST,DB_USER,DB_PASSWORD
+
+# Show detailed information
+wheels env validate --verbose
+```
+
+#### Merge Environment Files
+Combine multiple .env files with precedence:
+
+```bash
+# Merge files (later files override earlier)
+wheels env merge .env.defaults .env.local --output=.env
+
+# Merge with dry run to preview
+wheels env merge base.env override.env --dry-run
+
+# Merge multiple files
+wheels env merge .env .env.local .env.production --output=.env.merged
+```
+
+### Environment File Features
+
+The framework now supports enhanced .env file handling:
+
+1. **Environment-specific files**: Automatically loads `.env.{environment}` files
+2. **Variable interpolation**: Use `${VAR}` syntax to reference other variables
+3. **Type casting**: Boolean and numeric values are automatically converted
+4. **Comments**: Lines starting with `#` are treated as comments
+
+Example .env file with new features:
+```bash
+# Base configuration
+APP_NAME=MyWheelsApp
+APP_ENV=development
+
+# Database with interpolation
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=${APP_NAME}_${APP_ENV}
+DB_URL=mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+
+# Type casting examples
+DEBUG_MODE=true        # Boolean
+MAX_CONNECTIONS=100    # Numeric
+CACHE_TTL=3600        # Numeric
 ```
 
 ## Development Commands
