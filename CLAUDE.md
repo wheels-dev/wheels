@@ -374,3 +374,26 @@ Use the gh command via the Bash tool for ALL GitHub-related tasks including work
 - Tests create and destroy data - never run on production
 - Use factories for consistent test data
 - Each test runs in a transaction that rolls back
+
+## Configuration & Security
+
+### Environment Variables (.env files)
+- Framework automatically loads `.env` files on startup
+- Supports environment-specific files: `.env.{environment}`
+- Variable interpolation: `${VAR}` syntax
+- Type casting for booleans and numbers
+- Access via `application.env['KEY_NAME']`
+
+### Configuration Management Commands
+- `wheels config dump` - Export settings (JSON, env, CFML formats)
+- `wheels config check` - Validate security and best practices
+- `wheels config diff` - Compare environments
+- `wheels secret` - Generate secure secrets
+- `wheels env set/validate/merge` - Manage .env files
+
+### Security Best Practices
+- Never commit .env files to version control
+- Use `wheels secret` for generating secure keys
+- Run `wheels config check production` before deployment
+- Mask sensitive values in logs and output
+- Use environment-specific secrets

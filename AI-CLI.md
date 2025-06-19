@@ -11,6 +11,9 @@ This guide provides AI assistants with comprehensive CLI command reference for t
 - [Environment Commands](#environment-commands)
 - [Configuration Commands](#configuration-commands)
 - [Development Commands](#development-commands)
+  - [Server Management](#server-management)
+  - [Code Formatting](#code-formatting)
+  - [Development Workflow](#development-workflow)
 - [Asset and Cache Management Commands](#asset-and-cache-management-commands)
 - [Plugin Management](#plugin-management)
 - [Analysis and Optimization Commands](#analysis-and-optimization-commands)
@@ -1094,6 +1097,145 @@ box cfformat path/to/file.cfc
 # Format directory
 box cfformat app/**/*.cfc
 ```
+
+### Development Workflow
+
+#### Initialize Wheels in Existing Project
+
+The `wheels init` command bootstraps an existing Wheels application to work with the CLI:
+
+```bash
+# Initialize current directory
+wheels init
+
+# Initialize with custom name
+wheels init name=myapp
+
+# Skip server.json creation
+wheels init createServerJSON=false
+
+# Force overwrite existing files
+wheels init --force
+```
+
+This command creates:
+- `vendor/wheels/box.json` - Tracks Wheels framework version
+- `server.json` - CommandBox server configuration
+- `box.json` - Application package configuration
+
+#### Upgrade Framework
+
+The `wheels upgrade` command provides an interactive wizard for upgrading your Wheels framework:
+
+```bash
+# Start upgrade wizard
+wheels upgrade
+
+# Upgrade to specific version
+wheels upgrade --to=3.0.0
+
+# Check for available upgrades
+wheels upgrade --check
+
+# Skip confirmation prompts
+wheels upgrade --force
+
+# Upgrade without backup
+wheels upgrade --backup=false
+```
+
+Features:
+- Shows available versions from ForgeBox
+- Detects breaking changes between versions
+- Creates backup before upgrading
+- Updates dependencies automatically
+- Provides post-upgrade recommendations
+
+#### Benchmark Application
+
+The `wheels benchmark` command performs simple benchmarking of your application endpoints:
+
+```bash
+# Benchmark homepage
+wheels benchmark /
+
+# Benchmark with custom settings
+wheels benchmark /products --requests=1000 --concurrent=10
+
+# Benchmark POST request
+wheels benchmark /api/users --method=POST --data='{"name":"test"}'
+
+# Use config file for multiple scenarios
+wheels benchmark --config=benchmark.json
+
+# Output formats
+wheels benchmark /users --output=json --save=results.json
+wheels benchmark /api --output=csv --save=results.csv
+```
+
+Options:
+- `--requests`: Number of requests to make (default: 100)
+- `--concurrent`: Number of concurrent requests (default: 1)
+- `--method`: HTTP method (GET, POST, PUT, DELETE)
+- `--headers`: Comma-separated headers
+- `--timeout`: Request timeout in seconds
+- `--output`: Output format (text, json, csv)
+
+#### Profile Requests
+
+The `wheels profile` command helps identify performance bottlenecks:
+
+```bash
+# Profile single endpoint
+wheels profile /products
+
+# Profile with multiple iterations
+wheels profile /api/users --iterations=10
+
+# Interactive profiling mode
+wheels profile --interactive
+
+# Save profile results
+wheels profile /admin --output=html --save=profile.html
+
+# Profile with custom settings
+wheels profile /search --method=POST --data='{"q":"wheels"}'
+```
+
+Features:
+- Detailed timing breakdown
+- Memory usage analysis
+- Query performance metrics
+- HTML reports with charts
+- Interactive mode for comparing endpoints
+- Recommendations for optimization
+
+#### Documentation Management
+
+The `wheels docs` command manages documentation:
+
+```bash
+# Open Wheels documentation
+wheels docs
+
+# Generate API documentation
+wheels docs:generate
+
+# Generate with specific format
+wheels docs:generate --format=markdown
+wheels docs:generate --format=html --template=bootstrap
+
+# Generate for specific components
+wheels docs:generate --type=models,controllers
+
+# Serve documentation locally
+wheels docs:generate --serve --port=8080
+```
+
+Supported formats:
+- HTML with syntax highlighting
+- Markdown for GitHub/GitLab
+- JSON for custom processing
 
 ## Asset and Cache Management Commands
 
