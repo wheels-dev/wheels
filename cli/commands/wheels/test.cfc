@@ -34,18 +34,18 @@ component extends="base" {
 		print.yellowLine("⚠️  DEPRECATION WARNING: 'wheels test' is deprecated.");
 		print.yellowLine("   Please use 'wheels test run' for the modern TestBox runner.");
 		print.line();
-		
+
 		// For backward compatibility, continue with old behavior
 	 	var suite=$buildTestSuite(argumentCollection=arguments);
 		$outputSuiteVariables(suite);
 		$runTestSuite(suite);
-		
+
 		print.line();
 		print.boldLine("Tip: For better test experience, try:");
-		print.line("  wheels test run                    # Run all tests");
-		print.line("  wheels test run --watch            # Watch mode");
-		print.line("  wheels test run --coverage         # With coverage");
-		print.line("  wheels test migrate tests          # Migrate to TestBox");
+		print.line("  wheels test run                    ## Run all tests");
+		print.line("  wheels test run --watch            ## Watch mode");
+		print.line("  wheels test run --coverage         ## With coverage");
+		print.line("  wheels test migrate tests          ## Migrate to TestBox");
 	}
 
 
