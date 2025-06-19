@@ -199,8 +199,8 @@ component output="false" extends="wheels.Global"{
 				// Hard abort if GUI turned off
 				abort;
 			} else {
-				local.action = application.wheels.public[params.action];
-				local.action();
+				// Call the action method directly on the component to preserve context
+				application.wheels.public[local.params.action]();
 			}
 		} else {
 			// Create the requested controller and call the action on it.
