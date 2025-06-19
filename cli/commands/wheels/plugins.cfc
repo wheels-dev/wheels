@@ -65,6 +65,7 @@ component extends="base" {
              .line("  wheels plugin update wheels-auth --version=2.0.0")
              .line("  wheels plugin update:all --dry-run")
              .line("  wheels plugin outdated")
-             .line("  wheels plugin init my-awesome-plugin --author=\"John Doe\"");
+             .line("  wheels plugin init my-awesome-plugin --author='John Doe'")
+            .toConsole();
     }
 }
