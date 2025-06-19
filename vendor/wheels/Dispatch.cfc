@@ -197,7 +197,7 @@ component output="false" extends="wheels.Global"{
 		if (ListFirst(local.params.controller, '.') EQ "wheels") {
 			if (!application.wheels.enablePublicComponent) {
 				// Hard abort if GUI turned off
-				abort();
+				cfabort;
 			} else {
 				// Call the action method directly on the component to preserve context
 				// Use 'object' and 'methodname' for older Adobe CF versions compatibility
