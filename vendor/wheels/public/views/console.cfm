@@ -2,6 +2,13 @@
 <cfscript>
 setting showDebugOutput="no";
 
+// Check if this is a valid console request
+if (!structKeyExists(request, "wheels") || !structKeyExists(request.wheels, "params")) {
+	// Return empty response if not a proper request
+	writeOutput('{"success":false,"error":"Invalid request"}');
+	abort;
+}
+
 // Initialize response
 data = {
 	"success": true,
@@ -43,45 +50,36 @@ try {
 					
 					// Direct query access
 					query: function(sql) {
-						var q = new Query();
-						q.setDatasource(application.wheels.dataSourceName);
-						q.setSQL(arguments.sql);
-						return q.execute().getResult();
+						local.q = new Query();
+						local.q.setDatasource(application.wheels.dataSourceName);
+						local.q.setSQL(arguments.sql);
+						return local.q.execute().getResult();
 					},
 					
 					// Include all global helper functions
 					$includeHelpers: function() {
-						// Include view helpers
-						include "/wheels/global/helpers.cfm";
-						include "/wheels/view/helpers.cfm";
-						include "/wheels/controller/helpers.cfm";
-						include "/wheels/model/helpers.cfm";
+						// Helper functions are already loaded in the application context
+						// No need to include additional files
 					}
 				};
 				
 				// Make application scope available
 				local.context.application = application;
 				
-				// Include Wheels helpers into context
-				savecontent variable="helperOutput" {
-				local.context.$includeHelpers();
-				}
-				
 				// Execute the code
 				if (local.isScript) {
 					// CFScript execution
 					savecontent variable="output" {
-						evaluate("
-							// Import context variables
-							for (local.key in local.context) {
-								if (local.key != '$includeHelpers') {
-									variables[local.key] = local.context[local.key];
-								}
+						// Import context variables
+						for (local.key in local.context) {
+							if (local.key != '$includeHelpers') {
+								variables[local.key] = local.context[local.key];
 							}
-							
-							// Execute user code
-							#local.code#
-						");
+						}
+						
+						// Execute user code
+						local.userCode = local.code;
+						evaluate(local.userCode);
 					}
 					data.output = trim(output);
 				} else {
@@ -143,6 +141,9 @@ try {
 		data.template = e.tagContext[1].template;
 	}
 }
+
+// Output JSON response
 </cfscript>
-<cfcontent reset="true" type="application/json"><cfoutput>#serializeJSON(data)#</cfoutput>
+<cfheader name="Content-Type" value="application/json">
+<cfoutput>#serializeJSON(data)#</cfoutput>
 <cfabort>

@@ -62,7 +62,20 @@
       "mcp__puppeteer__puppeteer_fill",
       "Bash(curl:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker exec:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run download:*)",
+      "Bash(git remote get-url:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh search commits:*)",
+      "Bash(gh workflow:*)",
+      "Bash(git stash:*)",
+      "Bash(wheels test:*)"
     ],
     "deny": []
   }

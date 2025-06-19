@@ -197,10 +197,11 @@ component output="false" extends="wheels.Global"{
 		if (ListFirst(local.params.controller, '.') EQ "wheels") {
 			if (!application.wheels.enablePublicComponent) {
 				// Hard abort if GUI turned off
-				abort;
+				cfabort;
 			} else {
-				local.action = application.wheels.public[params.action];
-				local.action();
+				// Call the action method directly on the component to preserve context
+				// Use 'object' and 'methodname' for older Adobe CF versions compatibility
+				invoke(object=application.wheels.public, methodname=local.params.action);
 			}
 		} else {
 			// Create the requested controller and call the action on it.

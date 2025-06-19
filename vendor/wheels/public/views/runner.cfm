@@ -3,6 +3,13 @@
 setting showDebugOutput="no";
 setting requestTimeout="300";
 
+// Check if this is a valid runner request (requires POST with form data)
+if (!structKeyExists(form, "scriptContent")) {
+	// Return empty response if not a proper request
+	writeOutput('{"success":false,"error":"No script content provided"}');
+	abort;
+}
+
 // Initialize response
 data = {
 	"success": true,
@@ -88,6 +95,9 @@ try {
 		data.template = listLast(e.tagContext[1].template, "/\");
 	}
 }
+
+// Output JSON response
 </cfscript>
-<cfcontent reset="true" type="application/json"><cfoutput>#serializeJSON(data)#</cfoutput>
+<cfheader name="Content-Type" value="application/json">
+<cfoutput>#serializeJSON(data)#</cfoutput>
 <cfabort>
