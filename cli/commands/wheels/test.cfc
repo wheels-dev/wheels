@@ -1,6 +1,12 @@
 /**
 * Run Wheels Framework Tests
 *
+* This command is deprecated. Please use the newer TestBox-based commands:
+* - wheels test run - Run tests with modern TestBox runner
+* - wheels test coverage - Generate coverage reports
+* - wheels test migrate - Migrate RocketUnit tests to TestBox
+*
+* Legacy usage:
 * {code:bash}
 * wheels test [type] [servername] [reload] [debug]
 * {code}
@@ -24,9 +30,22 @@ component extends="base" {
 		string format="json",
 		string adapter=""
 	) {
+		// Show deprecation notice
+		print.yellowLine("⚠️  DEPRECATION WARNING: 'wheels test' is deprecated.");
+		print.yellowLine("   Please use 'wheels test run' for the modern TestBox runner.");
+		print.line();
+
+		// For backward compatibility, continue with old behavior
 	 	var suite=$buildTestSuite(argumentCollection=arguments);
-				  $outputSuiteVariables(suite);
-				  $runTestSuite(suite);
+		$outputSuiteVariables(suite);
+		$runTestSuite(suite);
+
+		print.line();
+		print.boldLine("Tip: For better test experience, try:");
+		print.line("  wheels test run                    ## Run all tests");
+		print.line("  wheels test run --watch            ## Watch mode");
+		print.line("  wheels test run --coverage         ## With coverage");
+		print.line("  wheels test migrate tests          ## Migrate to TestBox");
 	}
 
 
@@ -39,7 +58,7 @@ component extends="base" {
 		We then need to know the target server IP, port, and the location/query string of the tests
 		We're always going to want to return JSON.
 
-	  		wheels test [type]	[server-name] [reload] [debug] [format]
+	  		wheels test [type]	[serverName] [reload] [debug] [format]
 	*/
 	  function $buildTestSuite(
 	  	required string type,
@@ -49,16 +68,17 @@ component extends="base" {
 	  	string format="json",
 		string adapter=""
 	  ){
-	  		// Get Server Details from CB
-	  		var serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments["server-name"] } );
+	  		// Get Server Details
+	  		var serverInfo = $getServerInfo();
+	  		var serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments.serverName } );
 	  		// Massage into something more managable
 	  		var loc ={
 	  			type              = arguments.type,
-	  			servername        = arguments["server-name"],
+	  			servername        = arguments.serverName,
 	  			serverdefaultName = serverDetails.defaultName,
 	  			configFile        = serverDetails.defaultServerConfigFile,
-	  			host              = serverDetails.serverInfo.host,
-	  			port              = serverDetails.serverInfo.port,
+	  			host              = serverInfo.host,
+	  			port              = serverInfo.port,
 	  			format 			  = arguments.format,
 	  			debug             = arguments.debug,
 	  			reload            = arguments.reload,

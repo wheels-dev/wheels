@@ -301,7 +301,7 @@ wheels dbmigrate exec 20240120000000
    - `wheels dbmigrate --help`
 
 3. **Join the Community:**
-   - [Wheels Documentation](https://docs.wheels.dev)
+   - [Wheels Documentation](https://wheels.dev/docs)
    - [GitHub Discussions](https://github.com/wheels-dev/wheels/discussions)
    - [CFML Slack](https://cfml.slack.com) #wheels channel
 

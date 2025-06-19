@@ -182,13 +182,13 @@ Next, add these lines of code to the new file:
 
 What we've done here is use form helpers to generate all of the form fields necessary for creating a new user in our database. It may feel a little strange using functions to generate form elements, but it will soon become clear why we're doing this. Trust us on this one… you'll love it!
 
-To generate the form tag's `action` attribute, the [startFormTag()](https://api.wheels.dev/controller.startformtag.html) function takes parameters similar to the [linkTo()](https://api.wheels.dev/controller.linkto.html)function that we introduced in the Beginner Tutorial: Hello World tutorial. We can pass in `controller, action, key`, and other route- and parameter-defined URLs just like we do with [linkTo()](https://api.wheels.dev/controller.linkto.html).
+To generate the form tag's `action` attribute, the [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html) function takes parameters similar to the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html)function that we introduced in the Beginner Tutorial: Hello World tutorial. We can pass in `controller, action, key`, and other route- and parameter-defined URLs just like we do with [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html).
 
-To end the form, we use the [endFormTag()](https://api.wheels.dev/controller.endformtag.html) function. Easy enough.
+To end the form, we use the [endFormTag()](https://wheels.dev/api/v3.0.0/controller.endformtag.html) function. Easy enough.
 
-The [textField()](https://api.wheels.dev/controller.textfield.html) and [passwordField()](https://api.wheels.dev/controller.passwordfield.html) helpers are similar. As you probably guessed, they create `<input>` elements with `type="text"` and `type="password"`, respectively. And the [submitTag()](https://api.wheels.dev/controller.submittag.html) function creates an `<input type="submit" />` element.
+The [textField()](https://wheels.dev/api/v3.0.0/controller.textfield.html) and [passwordField()](https://wheels.dev/api/v3.0.0/controller.passwordfield.html) helpers are similar. As you probably guessed, they create `<input>` elements with `type="text"` and `type="password"`, respectively. And the [submitTag()](https://wheels.dev/api/v3.0.0/controller.submittag.html) function creates an `<input type="submit" />` element.
 
-One thing you'll notice is the [textField()](https://api.wheels.dev/controller.textfield.html) and [passwordField()](https://api.wheels.dev/controller.startformtag.html) functions accept arguments called `objectName` and `property`. As it turns out, this particular view code will throw an error because these functions are expecting an object named `user`. Let's fix that.
+One thing you'll notice is the [textField()](https://wheels.dev/api/v3.0.0/controller.textfield.html) and [passwordField()](https://wheels.dev/api/v3.0.0/controller.startformtag.html) functions accept arguments called `objectName` and `property`. As it turns out, this particular view code will throw an error because these functions are expecting an object named `user`. Let's fix that.
 
 #### Supplying the Form with Data
 
@@ -196,9 +196,9 @@ All of the form helper calls in our view specify an `objectName` argument with a
 
 Create a new ColdFusion component at `app/controllers/Users.cfc`.
 
-As it turns out, our controller needs to provide the view with a blank `user` object (whose instance variable will also be called `user` in this case). In our new action, we will use the [model()](https://api.wheels.dev/controller.model.html) function to generate a new instance of the user model.
+As it turns out, our controller needs to provide the view with a blank `user` object (whose instance variable will also be called `user` in this case). In our new action, we will use the [model()](https://wheels.dev/api/v3.0.0/controller.model.html) function to generate a new instance of the user model.
 
-To get a blank set of properties in the model, we'll also call the generated model's [new()](https://api.wheels.dev/model.new.html) method.
+To get a blank set of properties in the model, we'll also call the generated model's [new()](https://wheels.dev/api/v3.0.0/model.new.html) method.
 
 {% code title="app/controllers/Users.cfc" %}
 ```javascript
@@ -259,7 +259,7 @@ So far we have a fairly well-formed, accessible form, without writing a bunch of
 
 Next, we'll code the `create` action in the controller to handle the form submission and save the new user to the database.
 
-A basic way of doing this is using the model object's [create()](https://api.wheels.dev/model.create.html) method:
+A basic way of doing this is using the model object's [create()](https://wheels.dev/api/v3.0.0/model.create.html) method:
 
 {% code title="app/controllers/Users.cfc" %}
 ```javascript
@@ -280,7 +280,7 @@ There are more things that we can do in the `create` action to handle validation
 
 ### Listing Users
 
-Notice that our `create` action above redirects the user to the `users` index route using the [redirectTo()](https://api.wheels.dev/controller.redirectto.html) function. We'll use this action to list all users in the system with "Edit" links. We'll also provide a link to the "New User" form that we just coded.
+Notice that our `create` action above redirects the user to the `users` index route using the [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) function. We'll use this action to list all users in the system with "Edit" links. We'll also provide a link to the "New User" form that we just coded.
 
 First, let's get the data that the listing needs. Create an action named `index` in the `users` controller like so:
 
@@ -292,7 +292,7 @@ function index() {
 ```
 {% endcode %}
 
-This call to the model's [findAll()](https://api.wheels.dev/model.findall.html) method will return a query object of all users in the system. By using the method's `order` argument, we're also telling the database to order the records by `username`.
+This call to the model's [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) method will return a query object of all users in the system. By using the method's `order` argument, we're also telling the database to order the records by `username`.
 
 In the view at `app/views/users/index.cfm`, it's as simple as looping through the query and outputting the data
 
@@ -487,7 +487,7 @@ function update() {
 ```
 {% endcode %}
 
-To update the `user`, simply call its [update()](https://api.wheels.dev/model.update.html) method with the `user` struct passed from the form via `params`. It's that simple.
+To update the `user`, simply call its [update()](https://wheels.dev/api/v3.0.0/model.update.html) method with the `user` struct passed from the form via `params`. It's that simple.
 
 After the update, we'll add a success message [using the Flash](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/using-the-flash) and send the end user back to the edit form in case they want to make more changes.
 
@@ -509,7 +509,7 @@ function delete() {
 ```
 {% endcode %}
 
-We simply load the user using the model's [findByKey()](https://api.wheels.dev/model.findbykey.html) method and then call the object's [delete()](https://api.wheels.dev/model.delete.html) method. That's all there is to it.
+We simply load the user using the model's [findByKey()](https://wheels.dev/api/v3.0.0/model.findbykey.html) method and then call the object's [delete()](https://wheels.dev/api/v3.0.0/model.delete.html) method. That's all there is to it.
 
 ### Database Says Hello
 

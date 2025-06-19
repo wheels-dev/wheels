@@ -1,6 +1,6 @@
 # This workflow is used to release master releases and also by the snapshot workflow
 # to release snapshots.
-name: CFWheels Release
+name: Wheels Release
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
         required: true
 
 env:
-  CFWHEELS_PRERELEASE: false
+  WHEELS_PRERELEASE: false
 
 jobs:
   #############################################
@@ -28,15 +28,16 @@ jobs:
     steps:
       - name: Checkout Repository
         id: Checkout-Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
         run: |
+          pwd
           cat box.json
-          echo "CFWHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
+          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
           # main or snapshot
           echo "BRANCH=main" >> $GITHUB_ENV
           if [ $GITHUB_REF == 'refs/heads/develop' ]
@@ -44,92 +45,90 @@ jobs:
             echo "BRANCH=develop" >> $GITHUB_ENV
           fi
 
-      - name: Build CFWheels Variants for ${{ env.BRANCH }} v${{ env.CFWHEELS_VERSION }}
-        id: Build-CFWheels-Variants
+      - name: Make build scripts executable
         run: |
-          ant -DisPreRelease=${{ env.CFWHEELS_PRERELEASE }} -Dcfwheels.version=${{ env.CFWHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
+          chmod +x build/scripts/*.sh
+          # List scripts for verification
+          ls -la build/scripts/
 
-      - name: Upload CFWheels Core Artifact
-        id: Upload-CFWheels-Core
-        if: success()
+      #############################################
+      # Prepare and Publish to ForgeBox
+      #############################################
+      
+      - name: Prepare Wheels Base Template for ForgeBox
+        run: |
+          ./build/scripts/prepare-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Prepare Wheels Core for ForgeBox
+        run: |
+          ./build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Prepare Wheels CLI for ForgeBox
+        run: |
+          ./build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Install CommandBox
+        run: |
+          curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
+          echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
+          sudo apt-get update && sudo apt-get install -y commandbox
+
+      - name: Publish All Packages to ForgeBox
+        run: |
+          ./build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true"
+
+      #############################################
+      # Build Artifacts for GitHub
+      #############################################
+
+      - name: Build All Wheels Artifacts
+        run: |
+          ./build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-core
+          name: build-artifacts-base-template
           path: |
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.zip
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.md5
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-*.sha512
-            artifacts/cfwheels/cfwheels-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/wheels/wheels-base-template-be.zip
 
-      - name: Upload CFWheels Base Template Artifact
-        id: Upload-CFWheels-Base
-        if: success()
+      - name: Upload Wheels Core Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-base-template
+          name: build-artifacts-core
           path: |
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.zip
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.md5
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/cfwheels-base-template-*.sha512
-            artifacts/cfwheels/cfwheels-base-template-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+            artifacts/wheels/wheels-core-be.zip
 
       - name: Upload Wheels CLI Artifact
-        id: Upload-Wheels-CLI
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-cli
+          name: build-artifacts-cli
           path: |
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/cfwheels/${{ env.CFWHEELS_VERSION }}/wheels-cli-*.sha512
-            artifacts/cfwheels/wheels-cli-be.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/wheels/wheels-cli-be.zip
 
-      - name: Upload All CFWheels Artifacts (Combined)
-        id: Upload-All-Artifacts
-        if: success()
+      - name: Upload All Wheels Artifacts (Combined)
         uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-all-variants
+          name: build-artifacts-all
           path: |
             artifacts/**/*
 
-      # publish core package
-      - uses: pixl8/github-action-box-publish@v4
-        id: Publish-Core-Package
+      - name: Upload Workflow Logs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-cfwheels-core/cfwheels
-
-      # publish base package
-      - uses: pixl8/github-action-box-publish@v4
-        id: Publish-Base-Template
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-cfwheels-base/cfwheels
-
-      # publish CLI package
-      - uses: pixl8/github-action-box-publish@v4
-        id: Publish-CLI-Package
-        with:
-          forgebox_user: wheels-dev
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-cfwheels-cli/wheels-cli
-
-#      - name: Post Slack Message
-#        id: Post-Slack-Message
-#        uses: act10ns/slack@v2
-#        with:
-#          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-#          status: ${{ job.status }}
-#          steps: ${{ toJson(steps) }}
-#          channel: '#wheels-dev'
-#        if: always()
+          name: logs-release
+          path: |
+            ${{ runner.temp }}/_runner_diag/
+            ${{ runner.temp }}/_github_workflow/

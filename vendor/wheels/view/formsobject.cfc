@@ -447,6 +447,7 @@ component {
 	 * @includeBlank Whether to include a blank option in the select form control. Pass true to include a blank line or a string that should represent what display text should appear for the empty value (for example, "- Select One -").
 	 * @valueField The column or property to use for the value of each list element. Used only when a query or array of objects has been supplied in the options argument.  Required when specifying `textField`
 	 * @textField The column or property to use for the value of each list element that the end user will see. Used only when a query or array of objects has been supplied in the options argument. Required when specifying `valueField`
+	 * @multiple Whether to allow multiple options to be selected. Pass true to create a multi-select box.
 	 * @label [see:textField].
 	 * @labelPlacement [see:textField].
 	 * @prepend [see:textField].

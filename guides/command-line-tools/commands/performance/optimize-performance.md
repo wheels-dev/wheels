@@ -1,6 +1,6 @@
 # optimize performance
 
-Automatically applies performance optimizations to your CFWheels application based on analysis results.
+Automatically applies performance optimizations to your Wheels application based on analysis results.
 
 ## Usage
 

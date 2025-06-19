@@ -1,13 +1,13 @@
-# CFWheels TestUI Docker Integration
+# Wheels TestUI Docker Integration
 
-This document provides an overview of the Docker integration for the CFWheels TestUI application.
+This document provides an overview of the Docker integration for the Wheels TestUI application.
 
 ## Architecture
 
 The TestUI application is containerized for easy deployment and consistent behavior across environments. The primary components are:
 
 1. **TestUI Container**: A Vue.js application served by NGINX, providing the user interface for test management.
-2. **CFML Engine Containers**: Lucee and Adobe ColdFusion containers that execute the CFWheels test suite.
+2. **CFML Engine Containers**: Lucee and Adobe ColdFusion containers that execute the Wheels test suite.
 3. **Database Containers**: Various database containers (MySQL, PostgreSQL, SQL Server) for testing database interactions.
 
 ## Container Structure

@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/mssql/server:2022-latest
 
-LABEL maintainer "CFWheels Core Team"
+LABEL maintainer "Wheels Core Team"
 
 # Switch to root for setup operations
 USER root

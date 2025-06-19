@@ -19,7 +19,7 @@ component excludeFromHelp=true {
 	string function $getWheelsVersion(){
 		// First, look for a wheels folder..
 		if(!directoryExists( fileSystemUtil.resolvePath("vendor/wheels") ) ){
-			error("We're currently looking in #getCWD()#, but can't find a /wheels/ folder?");
+			error("We're currently looking in #getCWD()#, but can't find the /vendor/wheels/ folder. Are you sure you are in the root?");
 		}
 		// Check vendor/wheels/box.json first for wheels-core version
 		if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/box.json"))){
@@ -38,7 +38,7 @@ component excludeFromHelp=true {
 				return local.wheelsDep;
 			}
 			return local.boxJSON.version;
-		} else if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/events/onapplicationstart.cfm"))) { 
+		} else if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/events/onapplicationstart.cfm"))) {
 			var output = command( 'cd vendor\wheels' ).run( returnOutput=true );
 			local.target=fileSystemUtil.resolvePath("app/events/onapplicationstart.cfm");
 			local.content=fileRead(local.target);
@@ -255,31 +255,31 @@ component excludeFromHelp=true {
 		if (fileExists(serverJSON)) {
 			try {
 				var serverConfig = deserializeJSON(fileRead(serverJSON));
-				
+
 				// Check for port in web.port
 				if (structKeyExists(serverConfig, "web") && structKeyExists(serverConfig.web, "port") && serverConfig.web.port > 0) {
 					local.port = serverConfig.web.port;
 					local.host = structKeyExists(serverConfig.web, "host") ? serverConfig.web.host : "localhost";
-					
+
 					// If host is "localhost", convert to 127.0.0.1 for consistency
 					if (local.host == "localhost") {
 						local.host = "127.0.0.1";
 					}
-					
+
 					local.serverURL = "http://" & local.host & ":" & local.port;
 					return local;
 				}
-				
+
 				// Also check for port directly in server config root
 				if (structKeyExists(serverConfig, "port") && serverConfig.port > 0) {
 					local.port = serverConfig.port;
 					local.host = structKeyExists(serverConfig, "host") ? serverConfig.host : "localhost";
-					
+
 					// If host is "localhost", convert to 127.0.0.1 for consistency
 					if (local.host == "localhost") {
 						local.host = "127.0.0.1";
 					}
-					
+
 					local.serverURL = "http://" & local.host & ":" & local.port;
 					return local;
 				}
@@ -287,10 +287,40 @@ component excludeFromHelp=true {
 				// Continue to fallback
 			}
 		}
-		
+
+		// Try to get server status using box server status command
+		try {
+			var serverStatusResult = command("server status").params(getCWD()).run(returnOutput=true);
+
+			// Parse the output to find the port
+			// Looking for pattern like "http://127.0.0.1:63155" or "(running)  http://127.0.0.1:63155"
+			var portMatch = reFindNoCase("https?://[^:]+:(\d+)", serverStatusResult, 1, true);
+			if (arrayLen(portMatch.pos) >= 2 && portMatch.pos[2] > 0) {
+				local.port = mid(serverStatusResult, portMatch.pos[2], portMatch.len[2]);
+
+				// Extract host from the same match
+				var hostMatch = reFindNoCase("https?://([^:]+):", serverStatusResult, 1, true);
+				if (arrayLen(hostMatch.pos) >= 2 && hostMatch.pos[2] > 0) {
+					local.host = mid(serverStatusResult, hostMatch.pos[2], hostMatch.len[2]);
+				} else {
+					local.host = "127.0.0.1";
+				}
+
+				local.serverURL = "http://" & local.host & ":" & local.port;
+				return local;
+			}
+
+			// Check if server is not running
+			if (findNoCase("stopped", serverStatusResult) || findNoCase("not running", serverStatusResult)) {
+				error("Server is not running. Please start the server using 'box server start' before running database migrations.");
+			}
+		} catch (any e) {
+			// Continue to next fallback
+		}
+
 		// Fall back to original method
 		var serverDetails = serverService.resolveServerDetails( serverProps={ webroot=getCWD() } );
-		
+
 		// Check if we got a valid port from serverService
 		if (structKeyExists(serverDetails, "serverInfo") && structKeyExists(serverDetails.serverInfo, "port") && serverDetails.serverInfo.port > 0) {
 			local.host = serverDetails.serverInfo.host;
@@ -298,7 +328,7 @@ component excludeFromHelp=true {
 			local.serverURL = "http://" & local.host & ":" & local.port;
 			return local;
 		}
-		
+
 		// If we still don't have a valid port, throw an error
 		error("Unable to determine server port. Please ensure your server is running or that server.json contains a valid port configuration.");
 	}
@@ -307,17 +337,17 @@ component excludeFromHelp=true {
 	string function $getBridgeURL() {
 		var serverInfo=$getServerInfo();
 		var geturl=serverInfo.serverUrl;
-		
+
 		// Don't add /public if server is already using public as webroot
 		// This is determined by checking server.json configuration
 		var serverJSON = fileSystemUtil.resolvePath("server.json");
 		var addPublic = false;
-		
+
 		if (fileExists(serverJSON)) {
 			try {
 				var serverConfig = deserializeJSON(fileRead(serverJSON));
 				// Check if webroot is set to public
-				if (!structKeyExists(serverConfig, "web") || !structKeyExists(serverConfig.web, "webroot") || 
+				if (!structKeyExists(serverConfig, "web") || !structKeyExists(serverConfig.web, "webroot") ||
 					!findNoCase("public", serverConfig.web.webroot)) {
 					// Webroot is NOT public, so we might need to add /public
 					if (fileExists(fileSystemUtil.resolvePath("public/index.cfm"))) {
@@ -331,11 +361,11 @@ component excludeFromHelp=true {
 				}
 			}
 		}
-		
+
 		if (addPublic) {
 			getURL &= "/public";
 		}
-		
+
 		getURL &= "/?controller=wheels&action=wheels&view=cli";
   		return geturl;
 	}
@@ -348,7 +378,7 @@ component excludeFromHelp=true {
 
 		loc = new Http( url=targetURL ).send().getPrefix();
 		print.line("Sending: " & targetURL);
-		
+
 		if(isJson(loc.filecontent)){
   			loc.result=deserializeJSON(loc.filecontent);
   			if(structKeyexists(loc.result, "success") && loc.result.success){
@@ -438,23 +468,23 @@ component excludeFromHelp=true {
 		if (!directoryExists(current.webRoot & "app/")) {
 			return;
 		}
-	
+
 		// Create target directory if it doesn't exist
 		if (!directoryExists(current.targetDir)) {
 			directoryCreate(current.targetDir);
 		}
-	
+
 		// List of root-level files and folders to exclude
 		var excludedRootFiles = [];
 		var excludedFolders = [];
-	
+
 		// Get all entries in the templates directory
 		var entries = directoryList(current.moduleRoot, false, "query");
-	
+
 		for (var entry in entries) {
 			var entryPath = current.moduleRoot & entry.name;
 			var targetPath = current.targetDir & entry.name;
-	
+
 			if (entry.type == "File") {
 				// Copy only non-excluded files that are missing
 				if (!arrayContainsNoCase(excludedRootFiles, entry.name)) {
@@ -475,17 +505,17 @@ component excludeFromHelp=true {
 			}
 		}
 	}
-	
+
 	/**
 	 * Recursively copies missing files and folders from source to target.
 	 */
 	private void function copyMissingFolderContents(required string source, required string target) {
 		var items = directoryList(arguments.source, false, "query");
-	
+
 		for (var item in items) {
 			var sourcePath = arguments.source & "/" & item.name;
 			var targetPath = arguments.target & "/" & item.name;
-	
+
 			if (item.type == "File") {
 				if (!fileExists(targetPath)) {
 					fileCopy(sourcePath, targetPath);
@@ -499,5 +529,5 @@ component excludeFromHelp=true {
 			}
 		}
 	}
-	
+
 }

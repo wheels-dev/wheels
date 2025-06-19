@@ -98,6 +98,54 @@ component extends="testbox.system.BaseSpec" {
 				expect(r2).toBe("/example/my-action")
 				expect(r3).toBe("/example/my-action/123")
 			})
+
+			it("encodes URL parameters with special characters when encode=true", () => {
+				mapper = $mapper()
+				mapper
+					.$draw()
+					.wildcard(mapKey = true)
+					.end()
+				g.$setNamedRoutePositions()
+				
+				// Test with special characters in parameters
+				htmlParam = "<strong>bold</strong>"
+				ampParam = "first&second"
+				quotesParam = 'quotes"in"param'
+				
+				// Test with encode=true
+				r1 = g.urlFor(controller = "example", action = "show", key = htmlParam, encode = true)
+				r2 = g.urlFor(controller = "example", action = "show", key = ampParam, encode = true)
+				r3 = g.urlFor(controller = "example", action = "show", key = quotesParam, encode = true)
+				
+				// Expected encoded results
+				expect(r1).toBe("/example/show/%3Cstrong%3Ebold%3C%2Fstrong%3E")
+				expect(r2).toBe("/example/show/first%26second")
+				expect(r3).toBe("/example/show/quotes%22in%22param")
+			})
+			
+			it("does not encode URL parameters with special characters when encode=false", () => {
+				mapper = $mapper()
+				mapper
+					.$draw()
+					.wildcard(mapKey = true)
+					.end()
+				g.$setNamedRoutePositions()
+				
+				// Test with special characters in parameters
+				htmlParam = "<strong>bold</strong>"
+				ampParam = "first&second"
+				quotesParam = 'quotes"in"param'
+				
+				// Test with encode=false
+				r1 = g.urlFor(controller = "example", action = "show", key = htmlParam, encode = false)
+				r2 = g.urlFor(controller = "example", action = "show", key = ampParam, encode = false)
+				r3 = g.urlFor(controller = "example", action = "show", key = quotesParam, encode = false)
+				
+				// Expected unencoded results
+				expect(r1).toBe("/example/show/<strong>bold</strong>")
+				expect(r2).toBe("/example/show/first&second")
+				expect(r3).toBe('/example/show/quotes"in"param')
+			})
 		})
 	}
 

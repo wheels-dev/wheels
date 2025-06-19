@@ -44,7 +44,7 @@ Generates:
 - Controller: `/controllers/Products.cfc`
 - Views: `/views/products/` (index, show, new, edit, _form)
 - Route: `resources("products")` in `/config/routes.cfm`
-- Migration: `/db/migrate/[timestamp]_create_products.cfc`
+- Migration: `/app/migrator/migrations/[timestamp]_create_products.cfc`
 - Tests: `/tests/models/ProductTest.cfc`, `/tests/controllers/ProductsTest.cfc`
 
 ### API Resource
@@ -56,7 +56,7 @@ Generates:
 - Model: `/models/Product.cfc`
 - Controller: `/controllers/api/Products.cfc` (JSON responses only)
 - Route: `resources(name="products", except="new,edit")` in API namespace
-- Migration: `/db/migrate/[timestamp]_create_products.cfc`
+- Migration: `/app/migrator/migrations/[timestamp]_create_products.cfc`
 - Tests: API-focused test files
 
 ### Resource with Associations
@@ -231,7 +231,7 @@ component extends="Controller" {
 ```
 
 ### Migration
-`/db/migrate/[timestamp]_create_products.cfc`:
+`/app/migrator/migrations/[timestamp]_create_products.cfc`:
 ```cfc
 component extends="wheels.migrator.Migration" hint="Create products table" {
     

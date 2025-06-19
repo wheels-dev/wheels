@@ -11,6 +11,8 @@ component extends="Abstract" {
 	variables.sqlTypes['integer'] = {name = 'INT'};
 	variables.sqlTypes['string'] = {name = 'VARCHAR', limit = 255};
 	variables.sqlTypes['text'] = {name = 'TEXT'};
+	variables.sqlTypes['mediumtext'] = {name = 'MEDIUMTEXT'};
+	variables.sqlTypes['longtext'] = {name = 'LONGTEXT'};
 	variables.sqlTypes['time'] = {name = 'TIME'};
 	variables.sqlTypes['timestamp'] = {name = 'TIMESTAMP'};
 	variables.sqlTypes['uuid'] = {name = 'VARBINARY', limit = 16};
@@ -68,7 +70,7 @@ component extends="Abstract" {
 	 * MySQL text fields can't have default
 	 */
 	public boolean function optionsIncludeDefault(string type, string default = "", boolean null = true) {
-		if (ListFindNoCase("text,float", arguments.type)) {
+		if (ListFindNoCase("text,mediumtext,longtext,float", arguments.type)) {
 			return false;
 		} else {
 			return true;

@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/azure-sql-edge
 
-LABEL maintainer "CFWheels Core Team"
+LABEL maintainer "Wheels Core Team"
 
 # add sqlcmd from https://github.com/microsoft/go-sqlcmd
 # we add this to /opt/mssql-tools/bin which completely overrides the

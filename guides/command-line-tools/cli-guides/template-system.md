@@ -1,6 +1,6 @@
 # Template System
 
-The CFWheels CLI uses a powerful template system for code generation that allows you to customize the output to match your project's coding standards and conventions.
+The Wheels CLI uses a powerful template system for code generation that allows you to customize the output to match your project's coding standards and conventions.
 
 ## Overview
 

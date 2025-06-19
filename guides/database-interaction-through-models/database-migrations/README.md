@@ -173,6 +173,8 @@ For instance, here's the mySQL variants:
 * integer = INT&#x20;
 * string = VARCHAR',limit=255&#x20;
 * text = TEXT&#x20;
+* text (size="mediumtext") = MEDIUMTEXT (16MB)&#x20;
+* text (size="longtext") = LONGTEXT (4GB)&#x20;
 * time = TIME&#x20;
 * timestamp = TIMESTAMP&#x20;
 * uuid = VARBINARY', limit=16

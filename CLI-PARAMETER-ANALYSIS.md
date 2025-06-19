@@ -1,7 +1,7 @@
 # CLI Parameter Structure Analysis
 
 ## Overview
-This document provides a comprehensive analysis of parameter naming conventions used across all CFWheels CLI commands.
+This document provides a comprehensive analysis of parameter naming conventions used across all Wheels CLI commands.
 
 ## Parameter Naming Patterns
 
@@ -117,7 +117,7 @@ However, the `wheels generate model` command uses camelCase for the same concept
 ### Recommendation
 For consistency across the CLI, all parameters should follow the same naming convention. The predominant pattern is camelCase, which aligns with:
 - ColdFusion/CFML conventions
-- The rest of the CFWheels codebase
+- The rest of the Wheels codebase
 - 98% of existing CLI parameters
 
 The kebab-case parameters in `generate resource` and `scaffold` commands should be changed to camelCase for consistency.

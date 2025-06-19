@@ -4,7 +4,7 @@ description: Use the standard CFML application events through the framework.
 
 # Event Handlers
 
-Because the `Application.cfc` file is in the `public` folder of your Wheels site and it has the necessary framework initialization like `onApplicationStart`, `onRequestStart`, It uses [Wirebox](https://www.ortussolutions.com/products/wirebox) to initiailize the `vendor/wheels/Global.cfc`, which contains the initialization for controller and global functions like [model()](https://api.wheels.dev/controller.model.html), you may wonder what the best way is to use CFML's onApplicationStart, onRequestStart, etc. functions.
+Because the `Application.cfc` file is in the `public` folder of your Wheels site and it has the necessary framework initialization like `onApplicationStart`, `onRequestStart`, It uses [Wirebox](https://www.ortussolutions.com/products/wirebox) to initiailize the `vendor/wheels/Global.cfc`, which contains the initialization for controller and global functions like [model()](https://wheels.dev/api/v3.0.0/controller.model.html), you may wonder what the best way is to use CFML's onApplicationStart, onRequestStart, etc. functions.
 
 While it's perfectly possible to add your code directly to the `public/Application.cfc` or `vendor/wheels/Global.cfc` file, we certainly don't recommend it. If you add code in there, you both increase the risk of accidentally modifying how the framework functions, and you also make it a lot harder to upgrade to future versions of Wheels.
 

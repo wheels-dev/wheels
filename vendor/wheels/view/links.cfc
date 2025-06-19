@@ -429,7 +429,7 @@ component {
 	 * @relative Should we auto-link relative urls.
 	 * @encode [see:styleSheetLinkTag].
 	 */
-	public string function autoLink(required string text, string link, boolean relative = true, boolean encode) {
+	public string function autoLink(required string text, string link, boolean relative = true, any encode) {
 		$args(name = "autoLink", args = arguments);
 		local.rv = arguments.text;
 

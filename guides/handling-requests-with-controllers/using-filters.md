@@ -88,7 +88,7 @@ component extends="Controller" {
 }
 ```
 
-Much better! But Wheels can take this process of avoiding repetition one step further. By placing a [filters()](https://api.wheels.dev/controller.filters.html) call in the `config()` function of the controller, you can tell Wheels what function to run before any desired action(s).
+Much better! But Wheels can take this process of avoiding repetition one step further. By placing a [filters()](https://wheels.dev/api/v3.0.0/controller.filters.html) call in the `config()` function of the controller, you can tell Wheels what function to run before any desired action(s).
 
 ```javascript
 component extends="Controller" {
@@ -127,19 +127,19 @@ All of these advantages will become much more obvious as your applications grow 
 
 So far, we've only been dealing with one controller. Unless you're building a very simple website, you'll end up with a lot more.
 
-The question then becomes, "Where do I place the `restrictAccess()` function so I can call it from any one of my controllers?" The answer is that because all controllers extend `Controller.cfc`, you should probably put it there. The `config()` function itself with the call to [filters()](https://api.wheels.dev/controller.filters.html) should remain inside your individual controllers though.
+The question then becomes, "Where do I place the `restrictAccess()` function so I can call it from any one of my controllers?" The answer is that because all controllers extend `Controller.cfc`, you should probably put it there. The `config()` function itself with the call to [filters()](https://wheels.dev/api/v3.0.0/controller.filters.html) should remain inside your individual controllers though.
 
 If you actually want to set the same filters to be run for all controllers, you can go ahead and move it to the `Controller.cfc` file's `config()` function as well. Keep in mind that if you want to run the `config()` function in the individual controller and in `Controller.cfc`, you will need to call `super.config()` from the `config()` function of your individual controller.
 
 ### Two Types of Filters
 
-You specify if you want to run the filter function before or after the controller action with the `type` argument to the [filters()](https://api.wheels.dev/controller.filters.html) function. It defaults to running it before the action.
+You specify if you want to run the filter function before or after the controller action with the `type` argument to the [filters()](https://wheels.dev/api/v3.0.0/controller.filters.html) function. It defaults to running it before the action.
 
 The previous example with authentication showed a "before filter" in action. The other type of filter you can run is an "after filter." As you can tell from the name, an after filter executes code after the action has been completed.
 
 This can be used to make some last minute modifications to the HTML before it is sent to the browser (think translation, compression, etc.), for example.
 
-If you want to get a copy of the content that will be rendered to the browser from an after filter, you can use the [response()](https://api.wheels.dev/controller.response.html) function. To set your changes to the response afterward, use the [setResponse()](https://api.wheels.dev/controller.setresponse.html) function.
+If you want to get a copy of the content that will be rendered to the browser from an after filter, you can use the [response()](https://wheels.dev/api/v3.0.0/controller.response.html) function. To set your changes to the response afterward, use the [setResponse()](https://wheels.dev/api/v3.0.0/controller.setresponse.html) function.
 
 As an example, let's say that you want to translate the content to Gibberish before sending it to your visitor. You can do something like this:
 
@@ -209,4 +209,4 @@ You probably don't want anyone to be able to run your filters directly (by modif
 
 ### Low Level Access
 
-If you need to access your filters on a lower level, you can do so by using the [filterChain()](https://api.wheels.dev/controller.filterchain.html) and [setFilterChain()](https://api.wheels.dev/controller.setfilterchain.html)functions. Typically, you'll want to call  [filterChain()](https://api.wheels.dev/controller.filterchain.html) to return an array of all the filters set on the current controller, make your desired changes, and save it back using the [setFilterChain()](https://api.wheels.dev/controller.setfilterchain.html) function.
+If you need to access your filters on a lower level, you can do so by using the [filterChain()](https://wheels.dev/api/v3.0.0/controller.filterchain.html) and [setFilterChain()](https://wheels.dev/api/v3.0.0/controller.setfilterchain.html)functions. Typically, you'll want to call  [filterChain()](https://wheels.dev/api/v3.0.0/controller.filterchain.html) to return an array of all the filters set on the current controller, make your desired changes, and save it back using the [setFilterChain()](https://wheels.dev/api/v3.0.0/controller.setfilterchain.html) function.

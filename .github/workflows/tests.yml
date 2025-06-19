@@ -57,6 +57,8 @@ jobs:
           #   dbengine: sqlserver
           # - cfengine: lucee@5
           #   dbengine: h2
+          # - cfengine: lucee@5
+          #   dbengine: oracle
           # - cfengine: lucee@6
           #   dbengine: mysql
           # - cfengine: lucee@6
@@ -65,6 +67,18 @@ jobs:
           #   dbengine: sqlserver
           # - cfengine: lucee@6
           #   dbengine: h2
+          # - cfengine: lucee@6
+          #   dbengine: oracle
+          # - cfengine: lucee@7
+          #   dbengine: mysql
+          # - cfengine: lucee@7
+          #   dbengine: postgres
+          # - cfengine: lucee@7
+          #   dbengine: sqlserver
+          # - cfengine: lucee@7
+          #   dbengine: h2
+          # - cfengine: lucee@7
+          #   dbengine: oracle
           # - cfengine: adobe@2018
           #   dbengine: mysql
           # - cfengine: adobe@2018
@@ -147,9 +161,26 @@ jobs:
         run: |
           docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
 
+      - name: Upload Test Results Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          path: |
+            /tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt
+
       - name: Failure Debugging Info
         if: ${{ failure() }}
         run: |
           box version
           box server info serverConfigFile="server.json" --json
           box server log serverConfigFile="server.json"
+
+      - name: Upload Workflow Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          path: |
+            ${{ runner.temp }}/_runner_diag/
+            ${{ runner.temp }}/_github_workflow/

@@ -154,9 +154,9 @@ redirectTo(action="showArticle", key=params.key);
 ```
 {% endcode %}
 
-Note that by default, any filters set for the action are being run as normal. This means that if you do authentication in the filter (which is a common technique for sites with content where you have to login first to see it), you can still cache those pages safely using the [caches()](https://api.wheels.dev/controller.caches.html) function.
+Note that by default, any filters set for the action are being run as normal. This means that if you do authentication in the filter (which is a common technique for sites with content where you have to login first to see it), you can still cache those pages safely using the [caches()](https://wheels.dev/api/v3.0.0/controller.caches.html) function.
 
-However, to achieve the fastest possible cache, you can override this default and tell Wheels to cache the HTML and serve that exactly as it is to all subsequent requests without running any filters. To do this, set the `static` argument on [caches()](https://api.wheels.dev/controller.caches.html) to `true`. This will cache your content using the `cfcache` tag behind the scenes. This means that the Wheels framework won't even get involved with the subsequent requests until they expire from the cache again (please note that application events like `onSessionStart`, `onRequestStart`, etc. will run though).
+However, to achieve the fastest possible cache, you can override this default and tell Wheels to cache the HTML and serve that exactly as it is to all subsequent requests without running any filters. To do this, set the `static` argument on [caches()](https://wheels.dev/api/v3.0.0/controller.caches.html) to `true`. This will cache your content using the `cfcache` tag behind the scenes. This means that the Wheels framework won't even get involved with the subsequent requests until they expire from the cache again (please note that application events like `onSessionStart`, `onRequestStart`, etc. will run though).
 
 ### Page Caching
 
@@ -182,7 +182,7 @@ The difference between action caching and page caching is that page caching will
 
 When your site contains personalized information (maybe some text specifying who you are logged in as, a list of items in your shopping cart, etc.), then action caching is not an option, and you need to cache at a lower level. This is where being able to cache only specific parts of pages comes in handy.
 
-In Wheels, this is done by using the `cache` argument in a call to [includePartial()](https://api.wheels.dev/controller.includepartial.html) or [renderPartial()](https://api.wheels.dev/controller.renderpartial.html). You can pass in `cache=true` or `cache=x` where `x` is the number of minutes you want to cache the partial for.
+In Wheels, this is done by using the `cache` argument in a call to [includePartial()](https://wheels.dev/api/v3.0.0/controller.includepartial.html) or [renderPartial()](https://wheels.dev/api/v3.0.0/controller.renderpartial.html). You can pass in `cache=true` or `cache=x` where `x` is the number of minutes you want to cache the partial for.
 
 If you just pass in `true`, the default cache expiration time will be used.
 
@@ -218,6 +218,6 @@ When working with objects in Wheels, you'll likely find yourself using all of th
 
 For example, if you have set up a `belongsTo` association from `article` to `author`, then you will likely write a lot of `article.author().name()` calls. In this case, Wheels is smart enough to only call the database once per request if the queries are identical. So don't worry about adding performance hits when making multiple calls like that in your code.
 
-You can turn off this functionality either by using the `reload` argument to [findAll()](https://api.wheels.dev/model.findall.html) (or any of the dynamic methods that end up calling [findAll()](https://api.wheels.dev/model.findall.html) behind the scenes) or globally by adding `set(cacheQueriesDuringRequest=false)` to your configuration files.
+You can turn off this functionality either by using the `reload` argument to [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) (or any of the dynamic methods that end up calling [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) behind the scenes) or globally by adding `set(cacheQueriesDuringRequest=false)` to your configuration files.
 
 The caching of these queries are stored on a per-model basis and Wheels will conveniently clear the cache for a model whenever anything changes in the database for a model (e.g. you call something that creates, updates or deletes records).

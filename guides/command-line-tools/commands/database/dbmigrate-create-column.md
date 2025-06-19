@@ -198,7 +198,7 @@ wheels dbmigrate create blank name=add_user_preferences_json
 wheels dbmigrate create column name=user data-type=string column-name=required_field --null=false
 
 # Do this instead
-wheels dbmigrate create column name=user data-type=string column-name=required_field default="TBD"
+wheels dbmigrate create column name=user data-type=string column-name=required_field default="pending"
 ```
 
 ### 2. Changing Column Types

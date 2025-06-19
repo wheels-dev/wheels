@@ -1,33 +1,24 @@
 {
-    "name":"Wheels CLI Commands",
-    "version":"@build.version@",
-    "author":"Tom King, Peter Amiri",
-    "location":"forgeboxStorage",
-    "directory":"",
-    "createPackageDirectory":true,
-    "packageDirectory":"wheels-cli",
-    "homepage":"https://wheels.dev/",
-    "documentation":"https://guides.cfwheels.org/docs/command-line-tools/cli-commands",
-    "repository":{
-        "type":"GIT",
-        "URL":"https://github.com/cfwheels/wheels-cli"
-    },
-    "bugs":"https://github.com/cfwheels/wheels-cli/issues",
-    "slug":"wheels-cli",
-    "shortDescription":"Wheels.dev CLI Commands",
-    "description":"Command Line Interface for CFWheels framework providing code generation, database migrations, testing, and development tools",
-    "instructions":"Install via CommandBox by typing 'install wheels-cli'",
-    "changelog":"",
-    "type":"commandbox-modules",
-    "keywords":"wheels.dev,wheels,cli,commands",
-    "private":false,
-        "scripts":{
-        "postVersion":"package set location='cfwheels/wheels-cli#v`package version`'",
-        "postPublish":"!git push --follow-tags",
-        "patch-release":"bump --patch && publish",
-        "minor-release":"bump --minor && publish",
-        "major-release":"bump --major && publish",
-        "test":"testbox run",
-        "test:watch":"testbox run --watch"
-    }
+	"name":"Wheels CLI Commands",
+	"version":"@build.version@",
+	"author":"Tom King, Peter Amiri",
+	"location":"forgeboxStorage",
+	"directory":"",
+	"createPackageDirectory":true,
+	"packageDirectory":"wheels-cli",
+	"homepage":"https://wheels.dev/",
+	"documentation":"https://guides.wheels.org/docs/command-line-tools/cli-commands",
+	"repository":{
+			"type":"GIT",
+			"URL":"https://github.com/wheels-dev/wheels"
+	},
+	"bugs":"https://github.com/wheels-dev/wheels/issues",
+	"slug":"wheels-cli",
+	"shortDescription":"Wheels.dev CLI Commands",
+	"description":"Command Line Interface for Wheels framework providing code generation, database migrations, testing, and development tools",
+	"instructions":"Install via CommandBox by typing 'box install wheels-cli'",
+	"changelog":"",
+	"type":"commandbox-modules",
+	"keywords":"wheels.dev,wheels,cli,commands",
+	"private":false
 }

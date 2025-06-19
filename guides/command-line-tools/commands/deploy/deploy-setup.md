@@ -1,6 +1,6 @@
 # deploy setup
 
-Setup and configure deployment environment for your CFWheels application.
+Setup and configure deployment environment for your Wheels application.
 
 ## Synopsis
 
@@ -10,7 +10,7 @@ wheels deploy setup [environment] [options]
 
 ## Description
 
-The `wheels deploy setup` command initializes and configures deployment environments for your CFWheels application. It sets up necessary infrastructure, configurations, and dependencies required for successful deployments.
+The `wheels deploy setup` command initializes and configures deployment environments for your Wheels application. It sets up necessary infrastructure, configurations, and dependencies required for successful deployments.
 
 ## Options
 
@@ -202,7 +202,7 @@ After setup completes, you should:
 
 3. **Configure secrets**
    ```bash
-   wheels deploy secrets set DATABASE_PASSWORD=xxx
+   wheels deploy secrets set DATABASE_PASSWORD=your-secure-password
    ```
 
 4. **Run initial deployment**

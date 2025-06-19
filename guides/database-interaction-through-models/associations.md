@@ -16,7 +16,7 @@ The association methods should always be called in the `config()` method of a mo
 
 ### The belongsTo Association
 
-If your database table contains a field that is a foreign key to another table, then this is where to use the [belongsTo()](https://api.wheels.dev/model.belongsto.html)function.
+If your database table contains a field that is a foreign key to another table, then this is where to use the [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html)function.
 
 If we had a comments table that contains a foreign key to the posts table called `postid`, then we would have this `config()` method within our comment model:
 
@@ -60,7 +60,7 @@ And don't worry about those pesky words in the English language that aren't plur
 
 ### An Example of hasOne
 
-The [hasOne()](https://api.wheels.dev/model.hasone.html) association is not used as often as the [hasMany()](https://api.wheels.dev/model.hasmany.html) association, but it has its use cases. The most common use case is when you have a large table that you have broken down into two or more smaller tables (a.k.a. denormalization) for performance reasons or otherwise.
+The [hasOne()](https://wheels.dev/api/v3.0.0/model.hasone.html) association is not used as often as the [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) association, but it has its use cases. The most common use case is when you have a large table that you have broken down into two or more smaller tables (a.k.a. denormalization) for performance reasons or otherwise.
 
 Let's consider an association between `user` and `profile`. A lot of websites allow you to enter required info such as name and email but also allow you to add optional information such as age, salary, and so on. These can of course be stored in the same table. But given the fact that so much information is optional, it would make sense to have the required info in a `users` table and the optional info in a `profiles` table. This gives us a `hasOne()` relationship between these two models: "A user _has one_ profile."
 
@@ -96,7 +96,7 @@ As you can see, you do not pluralize "profile" in this case because there is onl
 
 By the way, as you can see above, the association goes both ways, i.e. a `user hasOne() profile`, and a `profile belongsTo()` a `user`. Generally speaking, all associations should be set up this way. This will give you the fullest API to work with in terms of the methods and arguments that Wheels makes available for you.
 
-However, this is not a definite requirement. Wheels associations are completely independent of one another, so it's perfectly OK to setup a [hasMany()](https://api.wheels.dev/model.hasmany.html) association without specifying the related [belongsTo()](https://api.wheels.dev/model.belongsto.html) association.
+However, this is not a definite requirement. Wheels associations are completely independent of one another, so it's perfectly OK to setup a [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) association without specifying the related [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html) association.
 
 ### Dependencies
 
@@ -200,7 +200,7 @@ There are a couple ways to join data via associations, which we'll go over now.
 
 ### Using the include Argument in findAll()
 
-To join data from related tables in our [findAll()](https://api.wheels.dev/model.findall.html) calls, we simply need to use the include argument. Let's say that we wanted to include data about the author in our  [findAll()](https://api.wheels.dev/model.findall.html) call for `posts`.
+To join data from related tables in our [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) calls, we simply need to use the include argument. Let's say that we wanted to include data about the author in our  [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) call for `posts`.
 
 Here's what that call would look like:
 
@@ -303,9 +303,9 @@ As usual, this will make more sense when put into the context of an example. So 
 
 ### Example: Dynamic Shortcut Methods for Posts and Comments
 
-Let's say that you tell Wheels through a [hasMany()](https://api.wheels.dev/model.hasmany.html) call that a `post` _has many_ `comments`. What happens then is that Wheels will enrich the post model by adding a bunch of useful methods related to this association.
+Let's say that you tell Wheels through a [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) call that a `post` _has many_ `comments`. What happens then is that Wheels will enrich the post model by adding a bunch of useful methods related to this association.
 
-If you wanted to get all `comments` that have been submitted for a `post`, you can now call `post.comments()`. In the background, Wheels will delegate this to a [findAll()](https://api.wheels.dev/model.findall.html) call with the `where` argument set to `postid=#post.id#`.
+If you wanted to get all `comments` that have been submitted for a `post`, you can now call `post.comments()`. In the background, Wheels will delegate this to a [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) call with the `where` argument set to `postid=#post.id#`.
 
 ### Listing of Dynamic Shortcut Methods
 
@@ -313,50 +313,50 @@ Here are all the methods that are added for the three possible association types
 
 **Methods Added by hasMany**
 
-Given that you have told Wheels that a `post` _has many_ `comments` through a [hasMany()](https://api.wheels.dev/model.hasmany.html) call, here are the methods that will be made available to you on the `post` model.
+Given that you have told Wheels that a `post` _has many_ `comments` through a [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) call, here are the methods that will be made available to you on the `post` model.
 
-Replace `XXX` below with the name of the associated model (i.e. `comments` in the case of the example that we're using here).
+Replace `[associationName]` below with the name of the associated model (i.e. `comments` in the case of the example that we're using here).
 
 | Method         | Example                     | Description                                                                                                                                                                           |
 | -------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| XXX()          | post.comments()             | Returns all comments where the foreign key matches the post's primary key value. Similar to calling `model("comment").findAll(where="postid=#post.id#")`.                             |
-| addXXX()       | post.addComment(comment)    | Adds a comment to the post association by setting its foreign key to the post's primary key value. Similar to calling `model("comment").updateByKey(key=comment.id, postid=post.id)`. |
-| removeXXX()    | post.removeComment(comment) | Removes a comment from the post association by setting its foreign key value to `NULL`. Similar to calling `model("comment").updateByKey(key=comment.id, postid="")`.                 |
-| deleteXXX()    | post.deleteComment(comment) | Deletes the associated comment from the database table. Similar to calling `model("comment").deleteByKey(key=comment.id)`.                                                            |
-| removeAllXXX() | post.removeAllComments()    | Removes all comments from the post association by setting their foreign key values to `NULL`. Similar to calling `model("comment").updateAll(postid="", where="postid=#post.id#")`.   |
-| deleteAllXXX() | post.deleteAllComments()    | Deletes the associated comments from the database table. Similar to calling `model("comment").deleteAll(where="postid=#post.id#")`.                                                   |
-| XXXCount()     | post.commentCount()         | Returns the number of associated comments. Similar to calling `model("comment").count(where="postid=#post.id#")`.                                                                     |
-| newXXX()       | post.newComment()           | Creates a new comment object. Similar to calling `model("comment").new(postid=post.id)`.                                                                                              |
-| createXXX()    | post.createComment()        | Creates a new comment object and saves it to the database. Similar to calling `model("comment").create(postid=post.id)`.                                                              |
-| hasXXX()       | post.hasComments()          | Returns true if the post has any comments associated with it. Similar to calling `model("comment").exists(where="postid=#post.id#")`.                                                 |
-| findOneXXX()   | post.findOneComment()       | Returns one of the associated comments. Similar to calling `model("comment").findOne(where="postid=#post.id#")`.                                                                      |
+| [associationName]()          | post.comments()             | Returns all comments where the foreign key matches the post's primary key value. Similar to calling `model("comment").findAll(where="postid=#post.id#")`.                             |
+| add[AssociationName]()       | post.addComment(comment)    | Adds a comment to the post association by setting its foreign key to the post's primary key value. Similar to calling `model("comment").updateByKey(key=comment.id, postid=post.id)`. |
+| remove[AssociationName]()    | post.removeComment(comment) | Removes a comment from the post association by setting its foreign key value to `NULL`. Similar to calling `model("comment").updateByKey(key=comment.id, postid="")`.                 |
+| delete[AssociationName]()    | post.deleteComment(comment) | Deletes the associated comment from the database table. Similar to calling `model("comment").deleteByKey(key=comment.id)`.                                                            |
+| removeAll[AssociationName]() | post.removeAllComments()    | Removes all comments from the post association by setting their foreign key values to `NULL`. Similar to calling `model("comment").updateAll(postid="", where="postid=#post.id#")`.   |
+| deleteAll[AssociationName]() | post.deleteAllComments()    | Deletes the associated comments from the database table. Similar to calling `model("comment").deleteAll(where="postid=#post.id#")`.                                                   |
+| [associationName]Count()     | post.commentCount()         | Returns the number of associated comments. Similar to calling `model("comment").count(where="postid=#post.id#")`.                                                                     |
+| new[AssociationName]()       | post.newComment()           | Creates a new comment object. Similar to calling `model("comment").new(postid=post.id)`.                                                                                              |
+| create[AssociationName]()    | post.createComment()        | Creates a new comment object and saves it to the database. Similar to calling `model("comment").create(postid=post.id)`.                                                              |
+| has[AssociationName]()       | post.hasComments()          | Returns true if the post has any comments associated with it. Similar to calling `model("comment").exists(where="postid=#post.id#")`.                                                 |
+| findOne[AssociationName]()   | post.findOneComment()       | Returns one of the associated comments. Similar to calling `model("comment").findOne(where="postid=#post.id#")`.                                                                      |
 
 **Methods Added by hasOne**
 
-The [hasOne()](https://api.wheels.dev/model.hasone.html) association adds a few methods as well. Most of them are very similar to the ones added by [hasMany()](https://api.wheels.dev/model.hasmany.html).
+The [hasOne()](https://wheels.dev/api/v3.0.0/model.hasone.html) association adds a few methods as well. Most of them are very similar to the ones added by [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html).
 
-Given that you have told Wheels that an `author` _has one_ `profile` through a [hasOne()](https://api.wheels.dev/model.hasone.html) call, here are the methods that will be made available to you on the `author` model.
+Given that you have told Wheels that an `author` _has one_ `profile` through a [hasOne()](https://wheels.dev/api/v3.0.0/model.hasone.html) call, here are the methods that will be made available to you on the `author` model.
 
 | Method      | Example                    | Description                                                                                                                                                                                                                                                                                               |
 | ----------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| XXX()       | author.profile()           | Returns the profile where the foreign key matches the author's primary key value. Similar to calling model("profile").findOne(where="authorid=#author.id#").                                                                                                                                              |
-| setXXX()    | author.setProfile(profile) | Sets the profile to be associated with the author by setting its foreign key to the author's primary key value. You can pass in either a profile object or the primary key value of a profile object to this method. Similar to calling model("profile").updateByKey(key=profile.id, authorid=author.id). |
-| removeXXX() | author.removeProfile()     | Removes the profile from the author association by setting its foreign key to NULL. Similar to calling model("profile").updateOne(where="authorid=#author.id#", authorid="").                                                                                                                             |
-| deleteXXX() | author.deleteProfile()     | Deletes the associated profile from the database table. Similar to calling model("profile").deleteOne(where="authorid=#author.id#")                                                                                                                                                                       |
-| newXXX()    | author.newProfile()        | Creates a new profile object. Similar to calling model("profile").new(authorid=author.id).                                                                                                                                                                                                                |
-| createXXX() | author.createProfile()     | Creates a new profile object and saves it to the database. Similar to calling model("profile").create(authorid=author.id).                                                                                                                                                                                |
-| hasXXX()    | author.hasProfile()        | Returns true if the author has an associated profile. Similar to calling model("profile").exists(where="authorid=#author.id#").                                                                                                                                                                           |
+| [associationName]()       | author.profile()           | Returns the profile where the foreign key matches the author's primary key value. Similar to calling model("profile").findOne(where="authorid=#author.id#").                                                                                                                                              |
+| set[AssociationName]()    | author.setProfile(profile) | Sets the profile to be associated with the author by setting its foreign key to the author's primary key value. You can pass in either a profile object or the primary key value of a profile object to this method. Similar to calling model("profile").updateByKey(key=profile.id, authorid=author.id). |
+| remove[AssociationName]() | author.removeProfile()     | Removes the profile from the author association by setting its foreign key to NULL. Similar to calling model("profile").updateOne(where="authorid=#author.id#", authorid="").                                                                                                                             |
+| delete[AssociationName]() | author.deleteProfile()     | Deletes the associated profile from the database table. Similar to calling model("profile").deleteOne(where="authorid=#author.id#")                                                                                                                                                                       |
+| new[AssociationName]()    | author.newProfile()        | Creates a new profile object. Similar to calling model("profile").new(authorid=author.id).                                                                                                                                                                                                                |
+| create[AssociationName]() | author.createProfile()     | Creates a new profile object and saves it to the database. Similar to calling model("profile").create(authorid=author.id).                                                                                                                                                                                |
+| has[AssociationName]()    | author.hasProfile()        | Returns true if the author has an associated profile. Similar to calling model("profile").exists(where="authorid=#author.id#").                                                                                                                                                                           |
 
 **Methods Added by belongsTo**
 
-The [belongsTo()](https://api.wheels.dev/model.belongsto.html) association adds a couple of methods to your model as well.
+The [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html) association adds a couple of methods to your model as well.
 
-Given that you have told Wheels that a `comment` belongs to a `post` through a [belongsTo()](https://api.wheels.dev/model.belongsto.html) call, here are the methods that will be made available to you on the `comment` model.
+Given that you have told Wheels that a `comment` belongs to a `post` through a [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html) call, here are the methods that will be made available to you on the `comment` model.
 
 | Method   | Example           | Description                                                                                                                                 |
 | -------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| XXX()    | comment.post()    | Returns the post where the primary key matches the comment's foreign key value. Similar to calling model("post").findByKey(comment.postid). |
-| hasXXX() | comment.hasPost() | Returns true if the comment has a post associated with it. Similar to calling model("post").exists(comment.postid).                         |
+| [associationName]()    | comment.post()    | Returns the post where the primary key matches the comment's foreign key value. Similar to calling model("post").findByKey(comment.postid). |
+| has[AssociationName]() | comment.hasPost() | Returns true if the comment has a post associated with it. Similar to calling model("post").exists(comment.postid).                         |
 
 One general rule for all of the methods above is that you can always supply any argument that is accepted by the method that the processing is delegated to. This means that you can, for example, call `post.comments(order="createdAt DESC")`, and the `order` argument will be passed along to `findAll()`.
 
@@ -370,7 +370,7 @@ If it makes you feel any better, all calls in your Wheels request that generate 
 
 ### Passing Arguments to Dynamic Shortcut Methods
 
-You can also pass arguments to dynamic shortcut methods where applicable. For example, with the `XXX()` method, perhaps we'd want to limit a `post`'s comment listing to just ones created today. We can pass a `where` argument similar to what is passed to the `findAll()` function that powers `XXX()` behind the scenes.
+You can also pass arguments to dynamic shortcut methods where applicable. For example, with the `[associationName]()` method, perhaps we'd want to limit a `post`'s comment listing to just ones created today. We can pass a `where` argument similar to what is passed to the `findAll()` function that powers `[associationName]()` behind the scenes.
 
 ```javascript
 today = DateFormat(Now(), "yyyy-mm-dd");
@@ -446,9 +446,9 @@ component extends="Controller" {
 
 ### Creating a Shortcut for a Many-to-Many Relationship
 
-With the `shortcut` argument to [hasMany()](https://api.wheels.dev/model.hasmany.html), you can have Wheels create a dynamic method that lets you bypass the join model and instead reference the model on the other end of the many-to-many relationship directly.
+With the `shortcut` argument to [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html), you can have Wheels create a dynamic method that lets you bypass the join model and instead reference the model on the other end of the many-to-many relationship directly.
 
-For our example above, you can alter the [hasMany()](https://api.wheels.dev/model.hasmany.html) call on the `customer` model to look like this instead:
+For our example above, you can alter the [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) call on the `customer` model to look like this instead:
 
 {% code title="app/models/customer.cfc" %}
 ```javascript
@@ -476,11 +476,11 @@ component extends="Controller" {
 ```
 {% endcode %}
 
-This functionality relies on having set up all the appropriate [hasMany()](https://api.wheels.dev/model.hasmany.html) and [belongsTo()](https://api.wheels.dev/model.belongsto.html) associations in all 3 models (like we have in our example in this chapter).
+This functionality relies on having set up all the appropriate [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) and [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html) associations in all 3 models (like we have in our example in this chapter).
 
 It also relies on the association names being consistent, but if you have customized your association names, you can specify exactly which associations the shortcut method should use with the `through` argument.
 
-The `through` argument accepts a list of 2 association names. The first argument is the name of the [belongsTo()](https://api.wheels.dev/model.belongsto.html)association (set in the `subscription` model in this case), and the second argument is the [hasMany()](https://api.wheels.dev/model.hasmany.html) association going back the other way (set in the `publication` model).
+The `through` argument accepts a list of 2 association names. The first argument is the name of the [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html)association (set in the `subscription` model in this case), and the second argument is the [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) association going back the other way (set in the `publication` model).
 
 Sound complicated? That's another reason to stick to the conventions whenever possible: it keeps things simple.
 

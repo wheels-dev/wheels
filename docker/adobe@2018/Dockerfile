@@ -1,6 +1,6 @@
 FROM ortussolutions/commandbox:latest
 
-LABEL maintainer "CFWheels Core Team"
+LABEL maintainer "Wheels Core Team"
 
 ENV PORT 62018
 ENV APP_DIR                 "/cfwheels-test-suite"

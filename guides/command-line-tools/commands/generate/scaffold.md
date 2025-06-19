@@ -79,7 +79,7 @@ wheels scaffold name=category properties=name:string migrate=true
    - `edit.cfm` - Edit record form
    - `_form.cfm` - Shared form partial
 
-4. **Migration** (`/db/migrate/[timestamp]_create_products.cfc`)
+4. **Migration** (`/app/migrator/migrations/[timestamp]_create_products.cfc`)
    - Create table
    - Add indexes
    - Define columns
@@ -232,7 +232,7 @@ component extends="Controller" {
 #textField(objectName="product", property="stock", label="Stock Quantity")#
 ```
 
-### Migration: `/db/migrate/[timestamp]_create_products.cfc`
+### Migration: `/app/migrator/migrations/[timestamp]_create_products.cfc`
 ```cfc
 component extends="wheels.migrator.Migration" {
 

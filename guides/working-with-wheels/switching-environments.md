@@ -100,7 +100,7 @@ This is just an additional check to ensure that your production mode acts in the
 
 By default, Wheels only enables the debug GUI (wheels interface) and debug information in the development environment. However, there may be situations where you need access to these debugging tools in other environments like testing, production, or maintenance - but only for specific IP addresses.
 
-CFWheels provides IP-based access control for the debug GUI and debug information through two configuration settings:
+Wheels provides IP-based access control for the debug GUI and debug information through two configuration settings:
 
 ### Configuration Settings
 

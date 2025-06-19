@@ -261,7 +261,7 @@ component extends="testbox.system.BaseSpec" {
 				g.set(functionName = "javaScriptIncludeTag", encode = true)
 			})
 
-			it("should handle extensions, nonextensions and multiple extensionsn", () => {
+			it("should handle extensions, nonextensions and multiple extensions", () => {
 				args.source = "test,test.js,jquery.dataTables.min,jquery.dataTables.min.js"
 				e = _controller.javaScriptIncludeTag(argumentcollection = args)
 				r = '<script src="#application.wheels.webpath#javascripts/test.js" type="text/javascript"></script>#Chr(10)#<script src="#application.wheels.webpath#javascripts/test.js" type="text/javascript"></script>#Chr(10)#<script src="#application.wheels.webpath#javascripts/jquery.dataTables.min.js" type="text/javascript"></script>#Chr(10)#<script src="#application.wheels.webpath#javascripts/jquery.dataTables.min.js" type="text/javascript"></script>#Chr(10)#'

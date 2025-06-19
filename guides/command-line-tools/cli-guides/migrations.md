@@ -22,7 +22,7 @@ A migration is a CFC file that describes a database change. Each migration has:
 
 ### Migration Files
 
-Migrations are stored in `/db/migrate/` with this naming convention:
+Migrations are stored in `/app/migrator/migrations/` with this naming convention:
 ```
 [YYYYMMDDHHmmss]_[description].cfc
 ```
@@ -85,6 +85,8 @@ function up() {
         // Column types
         t.string("name", limit=100);
         t.text("description");
+        t.text("content", size="mediumtext"); // MySQL only: mediumtext (16MB)
+        t.text("longDescription", size="longtext"); // MySQL only: longtext (4GB)
         t.integer("quantity");
         t.bigInteger("views");
         t.float("weight");
@@ -465,7 +467,7 @@ wheels dbmigrate reset
 
 2. **Edit migration file**
    ```cfc
-   // Edit /db/migrate/[timestamp]_create_orders_table.cfc
+   // Edit /app/migrator/migrations/[timestamp]_create_orders_table.cfc
    ```
 
 3. **Test migration**

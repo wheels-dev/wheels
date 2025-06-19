@@ -1,0 +1,321 @@
+{
+	// TestBox BDD Specs
+	"TestBox Spec": {
+		"prefix": "tbspec",
+		"body": [
+			"component extends=\"tests.BaseSpec\" {",
+			"\t",
+			"\tfunction run() {",
+			"\t\t",
+			"\t\tdescribe(\"${1:Feature}\", () => {",
+			"\t\t\t",
+			"\t\t\tbeforeEach(() => {",
+			"\t\t\t\t${2:// Setup}",
+			"\t\t\t});",
+			"\t\t\t",
+			"\t\t\tit(\"${3:should do something}\", () => {",
+			"\t\t\t\t${4:// Test implementation}",
+			"\t\t\t\texpect(${5:actual}).toBe(${6:expected});",
+			"\t\t\t});",
+			"\t\t});",
+			"\t}",
+			"}"
+		],
+		"description": "Create a TestBox spec with basic structure"
+	},
+	
+	// Model Test
+	"Model Test": {
+		"prefix": "tbmodel",
+		"body": [
+			"component extends=\"tests.BaseSpec\" {",
+			"\t",
+			"\tfunction run() {",
+			"\t\t",
+			"\t\tdescribe(\"${1:Model} Model\", () => {",
+			"\t\t\t",
+			"\t\t\tbeforeEach(() => {",
+			"\t\t\t\tvariables.${2:model} = model(\"${1}\").new();",
+			"\t\t\t});",
+			"\t\t\t",
+			"\t\t\tdescribe(\"Validations\", () => {",
+			"\t\t\t\tit(\"validates required fields\", () => {",
+			"\t\t\t\t\texpect(${2:model}.valid()).toBeFalse();",
+			"\t\t\t\t\tassertHasErrors(${2:model}, \"${3:fieldName}\");",
+			"\t\t\t\t});",
+			"\t\t\t});",
+			"\t\t\t",
+			"\t\t\tdescribe(\"Associations\", () => {",
+			"\t\t\t\tit(\"has expected associations\", () => {",
+			"\t\t\t\t\t// Test associations",
+			"\t\t\t\t});",
+			"\t\t\t});",
+			"\t\t});",
+			"\t}",
+			"}"
+		],
+		"description": "Create a model test with validation and association tests"
+	},
+	
+	// Controller Test
+	"Controller Test": {
+		"prefix": "tbcontroller",
+		"body": [
+			"component extends=\"tests.BaseSpec\" {",
+			"\t",
+			"\tfunction run() {",
+			"\t\t",
+			"\t\tdescribe(\"${1:Controller} Controller\", () => {",
+			"\t\t\t",
+			"\t\t\tbeforeEach(() => {",
+			"\t\t\t\tvariables.controller = controller(\"${1}\");",
+			"\t\t\t\t${2:// Setup test data}",
+			"\t\t\t});",
+			"\t\t\t",
+			"\t\t\tdescribe(\"${3:action} action\", () => {",
+			"\t\t\t\tit(\"${4:should respond successfully}\", () => {",
+			"\t\t\t\t\tvar result = processRequest(",
+			"\t\t\t\t\t\troute = \"${5:route}\",",
+			"\t\t\t\t\t\tmethod = \"${6:GET}\",",
+			"\t\t\t\t\t\tparams = {}",
+			"\t\t\t\t\t);",
+			"\t\t\t\t\texpect(result.status).toBe(200);",
+			"\t\t\t\t});",
+			"\t\t\t});",
+			"\t\t});",
+			"\t}",
+			"}"
+		],
+		"description": "Create a controller test"
+	},
+	
+	// API Test
+	"API Test": {
+		"prefix": "tbapi",
+		"body": [
+			"component extends=\"tests.BaseSpec\" {",
+			"\t",
+			"\tfunction run() {",
+			"\t\t",
+			"\t\tdescribe(\"${1:Resource} API\", () => {",
+			"\t\t\t",
+			"\t\t\tbeforeEach(() => {",
+			"\t\t\t\tvariables.apiKey = create(\"apiKey\");",
+			"\t\t\t\tvariables.headers = {",
+			"\t\t\t\t\t\"Authorization\": \"Bearer #apiKey.token#\",",
+			"\t\t\t\t\t\"Content-Type\": \"application/json\"",
+			"\t\t\t\t};",
+			"\t\t\t});",
+			"\t\t\t",
+			"\t\t\tdescribe(\"GET /api/${2:resources}\", () => {",
+			"\t\t\t\tit(\"returns paginated results\", () => {",
+			"\t\t\t\t\tvar result = apiRequest(",
+			"\t\t\t\t\t\troute = \"api/${2:resources}\",",
+			"\t\t\t\t\t\tmethod = \"GET\",",
+			"\t\t\t\t\t\theaders = variables.headers",
+			"\t\t\t\t\t);",
+			"\t\t\t\t\texpect(result.status).toBe(200);",
+			"\t\t\t\t\texpect(result.json.data).toBeArray();",
+			"\t\t\t\t});",
+			"\t\t\t});",
+			"\t\t});",
+			"\t}",
+			"}"
+		],
+		"description": "Create an API test"
+	},
+	
+	// Integration Test
+	"Integration Test": {
+		"prefix": "tbintegration",
+		"body": [
+			"component extends=\"tests.BaseSpec\" {",
+			"\t",
+			"\tfunction run() {",
+			"\t\t",
+			"\t\tdescribe(\"${1:Feature} Integration\", () => {",
+			"\t\t\t",
+			"\t\t\tbeforeEach(() => {",
+			"\t\t\t\tvariables.user = create(\"user\");",
+			"\t\t\t\tloginAs(user.id);",
+			"\t\t\t});",
+			"\t\t\t",
+			"\t\t\tafterEach(() => {",
+			"\t\t\t\tlogout();",
+			"\t\t\t});",
+			"\t\t\t",
+			"\t\t\tit(\"completes the full workflow\", () => {",
+			"\t\t\t\t${2:// Test workflow steps}",
+			"\t\t\t});",
+			"\t\t});",
+			"\t}",
+			"}"
+		],
+		"description": "Create an integration test"
+	},
+	
+	// Describe Block
+	"Describe Block": {
+		"prefix": "describe",
+		"body": [
+			"describe(\"${1:Feature}\", () => {",
+			"\t${2:// Tests}",
+			"});"
+		],
+		"description": "Create a describe block"
+	},
+	
+	// It Block
+	"It Block": {
+		"prefix": "it",
+		"body": [
+			"it(\"${1:should do something}\", () => {",
+			"\t${2:// Test implementation}",
+			"});"
+		],
+		"description": "Create an it block"
+	},
+	
+	// BeforeEach
+	"BeforeEach": {
+		"prefix": "beforeEach",
+		"body": [
+			"beforeEach(() => {",
+			"\t${1:// Setup before each test}",
+			"});"
+		],
+		"description": "Create a beforeEach block"
+	},
+	
+	// AfterEach
+	"AfterEach": {
+		"prefix": "afterEach",
+		"body": [
+			"afterEach(() => {",
+			"\t${1:// Cleanup after each test}",
+			"});"
+		],
+		"description": "Create an afterEach block"
+	},
+	
+	// Expectations
+	"Expect ToBe": {
+		"prefix": "extobe",
+		"body": "expect(${1:actual}).toBe(${2:expected});",
+		"description": "Expect to be equal"
+	},
+	
+	"Expect ToBeTrue": {
+		"prefix": "extrue",
+		"body": "expect(${1:value}).toBeTrue();",
+		"description": "Expect to be true"
+	},
+	
+	"Expect ToBeFalse": {
+		"prefix": "exfalse",
+		"body": "expect(${1:value}).toBeFalse();",
+		"description": "Expect to be false"
+	},
+	
+	"Expect ToHaveKey": {
+		"prefix": "exkey",
+		"body": "expect(${1:struct}).toHaveKey(\"${2:key}\");",
+		"description": "Expect struct to have key"
+	},
+	
+	"Expect ToBeArray": {
+		"prefix": "exarray",
+		"body": "expect(${1:value}).toBeArray();",
+		"description": "Expect to be an array"
+	},
+	
+	"Expect ToInclude": {
+		"prefix": "exinclude",
+		"body": "expect(${1:string}).toInclude(\"${2:substring}\");",
+		"description": "Expect to include substring"
+	},
+	
+	"Expect ToThrow": {
+		"prefix": "exthrow",
+		"body": [
+			"expect(() => {",
+			"\t${1:// Code that should throw}",
+			"}).toThrow(${2:type});",
+		],
+		"description": "Expect to throw an exception"
+	},
+	
+	// Wheels Test Helpers
+	"Create Test Model": {
+		"prefix": "create",
+		"body": "var ${1:model} = create(\"${2:modelName}\", ${3:{}});",
+		"description": "Create a test model instance"
+	},
+	
+	"Build Test Model": {
+		"prefix": "build",
+		"body": "var ${1:model} = build(\"${2:modelName}\", ${3:{}});",
+		"description": "Build a test model without saving"
+	},
+	
+	"Process Request": {
+		"prefix": "processrequest",
+		"body": [
+			"var result = processRequest(",
+			"\troute = \"${1:route}\",",
+			"\tmethod = \"${2:GET}\",",
+			"\tparams = {${3:}}",
+			");"
+		],
+		"description": "Process a test request"
+	},
+	
+	"API Request": {
+		"prefix": "apirequest",
+		"body": [
+			"var result = apiRequest(",
+			"\troute = \"${1:api/resource}\",",
+			"\tmethod = \"${2:GET}\",",
+			"\tdata = {${3:}},",
+			"\theaders = variables.headers",
+			");"
+		],
+		"description": "Make an API request"
+	},
+	
+	"Login As User": {
+		"prefix": "loginas",
+		"body": "loginAs(${1:userId});",
+		"description": "Login as a specific user"
+	},
+	
+	"Assert Has Errors": {
+		"prefix": "asserterrors",
+		"body": "assertHasErrors(${1:model}, \"${2:property}\");",
+		"description": "Assert model has errors"
+	},
+	
+	"Assert Redirected": {
+		"prefix": "assertredirect",
+		"body": "assertRedirected(${1:controller}, \"${2:route}\");",
+		"description": "Assert controller redirected"
+	},
+	
+	// Factory Examples
+	"Factory with Attributes": {
+		"prefix": "factory",
+		"body": [
+			"var ${1:model} = create(\"${2:modelName}\", {",
+			"\t${3:name}: \"${4:Test Name}\",",
+			"\t${5:// other attributes}",
+			"});"
+		],
+		"description": "Create model with factory and attributes"
+	},
+	
+	"Create List": {
+		"prefix": "createlist",
+		"body": "var ${1:models} = createList(\"${2:modelName}\", ${3:5});",
+		"description": "Create multiple model instances"
+	}
+}

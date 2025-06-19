@@ -4,7 +4,7 @@ description: How to create new objects and save them to the database.
 
 # Creating Records
 
-In Wheels, one way to create objects that represent records in our table is by calling the [new()](https://api.wheels.dev/model.new.html) class-level method.
+In Wheels, one way to create objects that represent records in our table is by calling the [new()](https://wheels.dev/api/v3.0.0/model.new.html) class-level method.
 
 ```javascript
 newAuthor = model("author").new();
@@ -17,7 +17,7 @@ newAuthor.firstName = "John";
 newAuthor.lastName = "Doe";
 ```
 
-At this point, the `newAuthor` object only exists in memory. We save it to the database by calling its [save()](https://api.wheels.dev/model.save.html) method.
+At this point, the `newAuthor` object only exists in memory. We save it to the database by calling its [save()](https://wheels.dev/api/v3.0.0/model.save.html) method.
 
 ```javascript
 newAuthor.save();
@@ -25,7 +25,7 @@ newAuthor.save();
 
 ### Creating Based on a Struct
 
-If you want to create a new object based on parameters sent in from a form request, the [new()](https://api.wheels.dev/model.new.html) method conveniently accepts a struct as well. As we'll see later, when you use the Wheels form helpers, they automatically turn your form variables into a struct that you can pass into [new()](https://api.wheels.dev/model.new.html) and other methods.
+If you want to create a new object based on parameters sent in from a form request, the [new()](https://wheels.dev/api/v3.0.0/model.new.html) method conveniently accepts a struct as well. As we'll see later, when you use the Wheels form helpers, they automatically turn your form variables into a struct that you can pass into [new()](https://wheels.dev/api/v3.0.0/model.new.html) and other methods.
 
 Given that `params.newAuthor` is a struct containing the `firstName` and `lastName` variables, the code below does the same as the code above (without saving it though).
 
@@ -35,7 +35,7 @@ newAuthor = model("author").new(params.newAuthor);
 
 ### Saving Straight to the Database
 
-If you want to save a new author to the database right away, you can use the [create()](https://api.wheels.dev/model.create.html) method instead.
+If you want to save a new author to the database right away, you can use the [create()](https://wheels.dev/api/v3.0.0/model.create.html) method instead.
 
 {% code title="" %}
 ```javascript
@@ -69,7 +69,7 @@ The best way of handling model defaults is usually by setting a default constrai
 
 However, unlike the primary key, Wheels will not automatically load database defaults after saving as it requires an additional database call and in most cases is not required. (After saving, the most common action is to redirect, in which case you would reload the newly saved model in the next request anyway.)
 
-Of course, if you do need to access the database default immediately after saving, Wheels allows this. Simply add `reload=true` to the [create()](https://api.wheels.dev/model.create.html), [update()](https://api.wheels.dev/model.update.html), or [save()](https://api.wheels.dev/model.save.html) methods:
+Of course, if you do need to access the database default immediately after saving, Wheels allows this. Simply add `reload=true` to the [create()](https://wheels.dev/api/v3.0.0/model.create.html), [update()](https://wheels.dev/api/v3.0.0/model.update.html), or [save()](https://wheels.dev/api/v3.0.0/model.save.html) methods:
 
 ```javascript
 newAuthor = model("author").new();
@@ -80,7 +80,7 @@ newAuthor.save(reload=true);
 
 ### Using Model Defaults
 
-Sometimes a database default isn't the most appropriate solution because the value is only set after the model has been inserted. If you want to set a default value when it is first created with [new()](https://api.wheels.dev/model.new.html) or [create()](https://api.wheels.dev/model.create.html), then you can pass the `defaultValue` argument of the [property()](https://api.wheels.dev/model.property.html) method used in your model's `config()` block.
+Sometimes a database default isn't the most appropriate solution because the value is only set after the model has been inserted. If you want to set a default value when it is first created with [new()](https://wheels.dev/api/v3.0.0/model.new.html) or [create()](https://wheels.dev/api/v3.0.0/model.create.html), then you can pass the `defaultValue` argument of the [property()](https://wheels.dev/api/v3.0.0/model.property.html) method used in your model's `config()` block.
 
 ```javascript
 property(name="welcomeText", defaultValue="Hello world!");

@@ -1,6 +1,6 @@
 # security scan
 
-Scans your CFWheels application for security vulnerabilities and provides remediation recommendations.
+Scans your Wheels application for security vulnerabilities and provides remediation recommendations.
 
 ## Usage
 
@@ -18,7 +18,7 @@ wheels security scan [path] [--fix] [--report=<format>] [--severity=<level>] [--
 
 ## Description
 
-The `security scan` command performs comprehensive security analysis of your CFWheels application, checking for:
+The `security scan` command performs comprehensive security analysis of your Wheels application, checking for:
 
 - SQL injection vulnerabilities
 - Cross-site scripting (XSS) risks

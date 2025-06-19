@@ -62,15 +62,15 @@ same name in the controller file.
 
 Mapping an incoming URL to code is only one side of the equation. You will also\
 need a way to create these URLs. This is done through a variety of different\
-functions like [linkTo()](https://api.wheels.dev/controller.linkto.html) (for creating links), [startFormTag()](https://api.wheels.dev/controller.startformtag.html) (for\
-creating forms), and [redirectTo()](https://api.wheels.dev/controller.redirectto.html) (for redirecting users), to name a few.
+functions like [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) (for creating links), [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html) (for\
+creating forms), and [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) (for redirecting users), to name a few.
 
 Internally, all of these functions use the same code to create the URL, namely\
-the [URLFor()](https://api.wheels.dev/controller.urlfor.html) function. The [URLFor()](https://api.wheels.dev/controller.urlfor.html) function accepts a controller and\
+the [URLFor()](https://wheels.dev/api/v3.0.0/controller.urlfor.html) function. The [URLFor()](https://wheels.dev/api/v3.0.0/controller.urlfor.html) function accepts a controller and\
 an action argument, which are what you will use most of the time. It has a lot\
 of other arguments and does some neat stuff (like defaulting to the current\
 controller when you don't specifically pass one in). So check out the\
-documentation for the [URLFor()](https://api.wheels.dev/controller.urlfor.html) function for all the details.
+documentation for the [URLFor()](https://wheels.dev/api/v3.0.0/controller.urlfor.html) function for all the details.
 
 By the way, by using URL rewriting in Apache or IIS, you can completely get rid\
 of the `index.cfm` part of the URL so that\
@@ -105,15 +105,15 @@ component extends="Controller" {
 {% endcode %}
 
 The only thing this does is specify the view page to render using the\
-[renderView()](https://api.wheels.dev/controller.renderview.html) function.
+[renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function.
 
-The [renderView()](https://api.wheels.dev/controller.renderview.html) function is available to you because the `shop` controller extends the main Wheels `Controller`component. Don't forget to include that `extends` attribute in your `cfcomponent` call as you build your controllers!
+The [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function is available to you because the `shop` controller extends the main Wheels `Controller`component. Don't forget to include that `extends` attribute in your `cfcomponent` call as you build your controllers!
 
-So, how does [renderView()](https://api.wheels.dev/controller.renderview.html) work? Well, it accepts the arguments `controller` and `action` (among others, such as `route`), and, based on these, it will try to include a view file. In our case, the view file is stored at `app/views/shop/products.cfm`.
+So, how does [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) work? Well, it accepts the arguments `controller` and `action` (among others, such as `route`), and, based on these, it will try to include a view file. In our case, the view file is stored at `app/views/shop/products.cfm`.
 
-You can read the chapter about [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) for more information about the [renderView()](https://api.wheels.dev/controller.renderview.html) function.
+You can read the chapter about [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) for more information about the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function.
 
-It's important to note that the [renderView()](https://api.wheels.dev/controller.renderview.html) function does not cause any controller actions or functions to be executed. It just specifies what view\
+It's important to note that the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function does not cause any controller actions or functions to be executed. It just specifies what view\
 files to get content from. Keep this in mind going forward because it's a common assumption that it does. (Especially when you want to include the view page for another action, it's easy to jump to the incorrect conclusion that the code for that action would also get executed.)
 
 ### Wheels Conventions
@@ -123,7 +123,7 @@ code in the example above, and it will still work because Wheels will just guess
 what your intention is. Let's have a quick look at exactly what code can be\
 removed and why.
 
-The first thing Wheels assumes is that if you call [renderView()](https://api.wheels.dev/controller.renderview.html) without\
+The first thing Wheels assumes is that if you call [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) without\
 arguments, you want to include the view page for the **current** controller and\
 action.
 
@@ -144,7 +144,7 @@ component extends="Controller" {
 … and it will still work just fine.
 
 Does Wheels assume anything else? Sure it does. You can actually remove the\
-entire [renderView()](https://api.wheels.dev/controller.renderview.html) call because Wheels will assume that you always want to call a view page when the processing in the controller is done. Wheels will call\
+entire [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) call because Wheels will assume that you always want to call a view page when the processing in the controller is done. Wheels will call\
 it for you behind the scenes.
 
 That leaves you with this code:

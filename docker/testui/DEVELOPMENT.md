@@ -1,6 +1,6 @@
-# CFWheels TestUI Development Guide
+# Wheels TestUI Development Guide
 
-This document provides guidance for developers working on the CFWheels TestUI.
+This document provides guidance for developers working on the Wheels TestUI.
 
 ## Architecture
 

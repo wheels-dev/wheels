@@ -1,0 +1,481 @@
+{
+	// Controller Snippets
+	"Wheels Controller": {
+		"prefix": "wcontroller",
+		"body": [
+			"component extends=\"Controller\" {",
+			"\t",
+			"\tfunction config() {",
+			"\t\t${1:// Configuration}",
+			"\t}",
+			"\t",
+			"\tfunction index() {",
+			"\t\t${2:modelName} = model(\"${3:Model}\").findAll();",
+			"\t}",
+			"\t",
+			"\tfunction show() {",
+			"\t\t${2:modelName} = model(\"${3:Model}\").findByKey(params.key);",
+			"\t\tif (!isObject(${2:modelName})) {",
+			"\t\t\tflashInsert(error: \"${3:Model} not found\");",
+			"\t\t\tredirectTo(route: \"${4:route}\");",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction new() {",
+			"\t\t${2:modelName} = model(\"${3:Model}\").new();",
+			"\t}",
+			"\t",
+			"\tfunction create() {",
+			"\t\t${2:modelName} = model(\"${3:Model}\").new(params.${2:modelName});",
+			"\t\tif (${2:modelName}.save()) {",
+			"\t\t\tflashInsert(success: \"${3:Model} created successfully\");",
+			"\t\t\tredirectTo(route: \"${4:route}\", key: ${2:modelName}.key());",
+			"\t\t} else {",
+			"\t\t\trenderView(\"new\");",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction edit() {",
+			"\t\t${2:modelName} = model(\"${3:Model}\").findByKey(params.key);",
+			"\t\tif (!isObject(${2:modelName})) {",
+			"\t\t\tflashInsert(error: \"${3:Model} not found\");",
+			"\t\t\tredirectTo(route: \"${4:route}\");",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction update() {",
+			"\t\t${2:modelName} = model(\"${3:Model}\").findByKey(params.key);",
+			"\t\tif (isObject(${2:modelName}) && ${2:modelName}.update(params.${2:modelName})) {",
+			"\t\t\tflashInsert(success: \"${3:Model} updated successfully\");",
+			"\t\t\tredirectTo(route: \"${4:route}\", key: ${2:modelName}.key());",
+			"\t\t} else {",
+			"\t\t\trenderView(\"edit\");",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction delete() {",
+			"\t\t${2:modelName} = model(\"${3:Model}\").findByKey(params.key);",
+			"\t\tif (isObject(${2:modelName}) && ${2:modelName}.delete()) {",
+			"\t\t\tflashInsert(success: \"${3:Model} deleted successfully\");",
+			"\t\t} else {",
+			"\t\t\tflashInsert(error: \"Could not delete ${3:Model}\");",
+			"\t\t}",
+			"\t\tredirectTo(route: \"${4:route}\");",
+			"\t}",
+			"}"
+		],
+		"description": "Create a Wheels controller with CRUD actions"
+	},
+
+	"API Controller": {
+		"prefix": "wapicontroller",
+		"body": [
+			"component extends=\"Controller\" {",
+			"\t",
+			"\tfunction config() {",
+			"\t\tprovides(\"json\");",
+			"\t\t${1:filters(\"authenticate\");}",
+			"\t}",
+			"\t",
+			"\tfunction index() {",
+			"\t\tlocal.${2:models} = model(\"${3:Model}\").findAll(",
+			"\t\t\tpage: params.page ?: 1,",
+			"\t\t\tperPage: params.perPage ?: 25,",
+			"\t\t\torder: params.order ?: \"createdAt DESC\"",
+			"\t\t);",
+			"\t\trenderWith(local.${2:models});",
+			"\t}",
+			"\t",
+			"\tfunction show() {",
+			"\t\tlocal.${4:model} = model(\"${3:Model}\").findByKey(params.key);",
+			"\t\tif (!isObject(local.${4:model})) {",
+			"\t\t\trenderWith({error: \"Not found\"}, status: 404);",
+			"\t\t} else {",
+			"\t\t\trenderWith(local.${4:model});",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction create() {",
+			"\t\tlocal.${4:model} = model(\"${3:Model}\").new(params.${4:model});",
+			"\t\tif (local.${4:model}.save()) {",
+			"\t\t\trenderWith(local.${4:model}, status: 201);",
+			"\t\t} else {",
+			"\t\t\trenderWith({errors: local.${4:model}.allErrors()}, status: 422);",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction update() {",
+			"\t\tlocal.${4:model} = model(\"${3:Model}\").findByKey(params.key);",
+			"\t\tif (isObject(local.${4:model}) && local.${4:model}.update(params.${4:model})) {",
+			"\t\t\trenderWith(local.${4:model});",
+			"\t\t} else {",
+			"\t\t\trenderWith({errors: local.${4:model}.allErrors()}, status: 422);",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction delete() {",
+			"\t\tlocal.${4:model} = model(\"${3:Model}\").findByKey(params.key);",
+			"\t\tif (isObject(local.${4:model}) && local.${4:model}.delete()) {",
+			"\t\t\trenderWith({message: \"Deleted successfully\"});",
+			"\t\t} else {",
+			"\t\t\trenderWith({error: \"Could not delete\"}, status: 422);",
+			"\t\t}",
+			"\t}",
+			"}"
+		],
+		"description": "Create an API controller with JSON responses"
+	},
+
+	"Controller Config": {
+		"prefix": "wconfig",
+		"body": [
+			"function config() {",
+			"\t${1:// Filters}",
+			"\tfilters(\"${2:authenticate}\");",
+			"\t",
+			"\t${3:// Content negotiation}",
+			"\tprovides(\"html,json,xml\");",
+			"\t",
+			"\t${4:// Caching}",
+			"\tcaches(actions: \"index,show\", time: 60);",
+			"}"
+		],
+		"description": "Controller config method"
+	},
+
+	"Before Filter": {
+		"prefix": "wbeforefilter",
+		"body": [
+			"filters(\"${1:filterName}\");",
+			"",
+			"private function ${1:filterName}() {",
+			"\t${2:// Filter logic}",
+			"\tif (${3:condition}) {",
+			"\t\tredirectTo(route: \"${4:route}\");",
+			"\t}",
+			"}"
+		],
+		"description": "Add a before filter to controller"
+	},
+
+	// Model Snippets
+	"Wheels Model": {
+		"prefix": "wmodel",
+		"body": [
+			"component extends=\"Model\" {",
+			"\t",
+			"\tfunction config() {",
+			"\t\t// Table",
+			"\t\ttable(\"${1:tableName}\");",
+			"\t\t",
+			"\t\t// Associations",
+			"\t\t${2:belongsTo(\"user\");}",
+			"\t\t${3:hasMany(\"comments\");}",
+			"\t\t",
+			"\t\t// Validations",
+			"\t\tvalidatesPresenceOf(\"${4:title}\");",
+			"\t\tvalidatesUniquenessOf(\"${5:email}\");",
+			"\t\t",
+			"\t\t// Callbacks",
+			"\t\tbeforeCreate(\"${6:setDefaults}\");",
+			"\t}",
+			"\t",
+			"\t// Callback methods",
+			"\tprivate function ${6:setDefaults}() {",
+			"\t\tif (!len(this.${7:slug})) {",
+			"\t\t\tthis.${7:slug} = createSlug(this.${4:title});",
+			"\t\t}",
+			"\t}",
+			"}"
+		],
+		"description": "Create a Wheels model with associations and validations"
+	},
+
+	"Model Associations": {
+		"prefix": "wassociations",
+		"body": [
+			"// Associations",
+			"belongsTo(name: \"${1:user}\", foreignKey: \"${2:userId}\");",
+			"hasMany(name: \"${3:comments}\", foreignKey: \"${4:postId}\", dependent: \"delete\");",
+			"hasOne(name: \"${5:profile}\", foreignKey: \"${6:userId}\");"
+		],
+		"description": "Add model associations"
+	},
+
+	"Model Validations": {
+		"prefix": "wvalidations",
+		"body": [
+			"// Validations",
+			"validatesPresenceOf(properties: \"${1:title,content}\");",
+			"validatesUniquenessOf(property: \"${2:email}\", message: \"That email is already taken\");",
+			"validatesFormatOf(property: \"${2:email}\", regex: \"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$\");",
+			"validatesLengthOf(property: \"${3:password}\", minimum: 8, message: \"Password must be at least 8 characters\");",
+			"validatesConfirmationOf(property: \"${3:password}\");",
+			"validate(method: \"${4:customValidation}\");"
+		],
+		"description": "Add model validations"
+	},
+
+	"Model Callbacks": {
+		"prefix": "wcallbacks",
+		"body": [
+			"// Callbacks",
+			"beforeValidation(\"${1:trimFields}\");",
+			"afterValidation(\"${2:logValidation}\");",
+			"beforeSave(\"${3:updateTimestamps}\");",
+			"afterSave(\"${4:clearCache}\");",
+			"beforeCreate(\"${5:setDefaults}\");",
+			"afterCreate(\"${6:sendWelcomeEmail}\");",
+			"beforeUpdate(\"${7:trackChanges}\");",
+			"afterUpdate(\"${8:notifyUpdate}\");",
+			"beforeDelete(\"${9:checkDependencies}\");",
+			"afterDelete(\"${10:cleanup}\");"
+		],
+		"description": "Add model callbacks"
+	},
+
+	"Model Scopes": {
+		"prefix": "wscopes",
+		"body": [
+			"// Scopes",
+			"function scopePublished() {",
+			"\treturn where(\"publishedAt <= ?\", now());",
+			"}",
+			"",
+			"function scopeByAuthor(required numeric authorId) {",
+			"\treturn where(\"authorId = ?\", arguments.authorId);",
+			"}",
+			"",
+			"function scopeRecent(numeric days = 7) {",
+			"\treturn where(\"createdAt >= ?\", dateAdd(\"d\", -arguments.days, now()));",
+			"}"
+		],
+		"description": "Add model scopes"
+	},
+
+	// Route Snippets
+	"Route Resources": {
+		"prefix": "wresources",
+		"body": [
+			"mapper()",
+			"\t.resources(name: \"${1:posts}\", nested: true)",
+			"\t\t.resources(name: \"${2:comments}\")",
+			"\t.end()",
+			".end();"
+		],
+		"description": "Add RESTful resources to routes"
+	},
+
+	"Route Namespace": {
+		"prefix": "wnamespace",
+		"body": [
+			"mapper()",
+			"\t.namespace(\"${1:admin}\")",
+			"\t\t.resources(\"${2:users}\")",
+			"\t\t.resources(\"${3:posts}\")",
+			"\t.end()",
+			".end();"
+		],
+		"description": "Add namespaced routes"
+	},
+
+	"Custom Routes": {
+		"prefix": "wroutes",
+		"body": [
+			"mapper()",
+			"\t.get(name: \"${1:home}\", pattern: \"/\", to: \"${2:main##index}\")",
+			"\t.post(name: \"${3:login}\", pattern: \"/login\", to: \"${4:sessions##create}\")",
+			"\t.delete(name: \"${5:logout}\", pattern: \"/logout\", to: \"${4:sessions##delete}\")",
+			"\t.root(to: \"${2:main##index}\")",
+			".end();"
+		],
+		"description": "Add custom routes"
+	},
+
+	// View Snippets
+	"Form Tag": {
+		"prefix": "wform",
+		"body": [
+			"#startFormTag(route: \"${1:route}\", method: \"${2:post}\")#",
+			"\t${3:<!-- Form fields -->}",
+			"\t#textField(objectName: \"${4:model}\", property: \"${5:property}\", label: \"${6:Label}\")#",
+			"\t#submitTag(value: \"${7:Submit}\")#",
+			"#endFormTag()#"
+		],
+		"description": "Create a form tag"
+	},
+
+	"Model Form": {
+		"prefix": "wmodelform",
+		"body": [
+			"#startFormTag(route: \"${1:route}\", key: ${2:model}.key())#",
+			"\t#textField(objectName: \"${2:model}\", property: \"${3:title}\")#",
+			"\t#textArea(objectName: \"${2:model}\", property: \"${4:content}\")#",
+			"\t#select(objectName: \"${2:model}\", property: \"${5:categoryId}\", options: categories, includeBlank: true)#",
+			"\t#checkBox(objectName: \"${2:model}\", property: \"${6:published}\")#",
+			"\t#submitTag(value: \"Save\")#",
+			"#endFormTag()#"
+		],
+		"description": "Create a model-bound form"
+	},
+
+	"Link To": {
+		"prefix": "wlink",
+		"body": "#linkTo(text: \"${1:Link Text}\", route: \"${2:route}\", key: ${3:model.key()})#",
+		"description": "Create a link"
+	},
+
+	"Image Tag": {
+		"prefix": "wimage",
+		"body": "#imageTag(source: \"${1:image.png}\", alt: \"${2:Alt text}\", class: \"${3:css-class}\")#",
+		"description": "Create an image tag"
+	},
+
+	"Flash Messages": {
+		"prefix": "wflash",
+		"body": [
+			"<cfif flashKeyExists(\"success\")>",
+			"\t<div class=\"alert alert-success\">#flash(\"success\")#</div>",
+			"</cfif>",
+			"<cfif flashKeyExists(\"error\")>",
+			"\t<div class=\"alert alert-danger\">#flash(\"error\")#</div>",
+			"</cfif>"
+		],
+		"description": "Display flash messages"
+	},
+
+	// Migration Snippets
+	"Migration": {
+		"prefix": "wmigration",
+		"body": [
+			"component extends=\"Migration\" {",
+			"\t",
+			"\tfunction up() {",
+			"\t\ttransaction {",
+			"\t\t\t${1:// Migration code}",
+			"\t\t\tcreateTable(name: \"${2:tableName}\", force: true, primaryKey: \"id\") {",
+			"\t\t\t\tt.string(columnName: \"${3:name}\", null: false);",
+			"\t\t\t\tt.text(columnName: \"${4:description}\");",
+			"\t\t\t\tt.integer(columnName: \"${5:userId}\", null: false);",
+			"\t\t\t\tt.boolean(columnName: \"${6:active}\", null: false, default: true);",
+			"\t\t\t\tt.timestamps();",
+			"\t\t\t};",
+			"\t\t\taddIndex(table: \"${2:tableName}\", columnNames: \"${5:userId}\");",
+			"\t\t}",
+			"\t}",
+			"\t",
+			"\tfunction down() {",
+			"\t\ttransaction {",
+			"\t\t\tdropTable(\"${2:tableName}\");",
+			"\t\t}",
+			"\t}",
+			"}"
+		],
+		"description": "Create a migration"
+	},
+
+	"Add Column": {
+		"prefix": "waddcolumn",
+		"body": "addColumn(table: \"${1:tableName}\", columnName: \"${2:columnName}\", columnType: \"${3:string}\", null: ${4:true}, default: ${5:null});",
+		"description": "Add column to table"
+	},
+
+	"Create Index": {
+		"prefix": "windex",
+		"body": "addIndex(table: \"${1:tableName}\", columnNames: \"${2:column1,column2}\", unique: ${3:false}, indexName: \"${4:idx_name}\");",
+		"description": "Create database index"
+	},
+
+	// Helper Snippets
+	"Private Function": {
+		"prefix": "wprivate",
+		"body": [
+			"private ${1:any} function ${2:functionName}(${3:required type name}) {",
+			"\t${4:// Implementation}",
+			"\treturn ${5:result};",
+			"}"
+		],
+		"description": "Create a private function"
+	},
+
+	"Public Function": {
+		"prefix": "wpublic",
+		"body": [
+			"public ${1:any} function ${2:functionName}(${3:required type name}) {",
+			"\t${4:// Implementation}",
+			"\treturn ${5:result};",
+			"}"
+		],
+		"description": "Create a public function"
+	},
+
+	// Common Patterns
+	"Authentication Check": {
+		"prefix": "wauth",
+		"body": [
+			"if (!structKeyExists(session, \"userId\")) {",
+			"\tflashInsert(error: \"Please login to continue\");",
+			"\tredirectTo(route: \"login\");",
+			"}"
+		],
+		"description": "Check if user is authenticated"
+	},
+
+	"Try Catch": {
+		"prefix": "wtry",
+		"body": [
+			"try {",
+			"\t${1:// Code that might throw}",
+			"} catch (any e) {",
+			"\tflashInsert(error: \"An error occurred: #e.message#\");",
+			"\twriteLog(text: e.message, file: \"error\");",
+			"\t${2:// Handle error}",
+			"}"
+		],
+		"description": "Try-catch block"
+	},
+
+	"Transaction": {
+		"prefix": "wtransaction",
+		"body": [
+			"transaction {",
+			"\ttry {",
+			"\t\t${1:// Database operations}",
+			"\t\ttransaction action=\"commit\";",
+			"\t} catch (any e) {",
+			"\t\ttransaction action=\"rollback\";",
+			"\t\tthrow(e);",
+			"\t}",
+			"}"
+		],
+		"description": "Database transaction"
+	},
+
+	// Query Snippets
+	"Find All": {
+		"prefix": "wfindall",
+		"body": "model(\"${1:Model}\").findAll(order: \"${2:createdAt DESC}\", include: \"${3:association}\");",
+		"description": "Find all records"
+	},
+
+	"Find One": {
+		"prefix": "wfindone",
+		"body": "model(\"${1:Model}\").findOne(where: \"${2:email = ?}\", values: [${3:value}]);",
+		"description": "Find one record"
+	},
+
+	"Custom Query": {
+		"prefix": "wquery",
+		"body": [
+			"local.result = model(\"${1:Model}\").findBySQL(",
+			"\tsql: \"",
+			"\t\tSELECT ${2:*}",
+			"\t\tFROM ${3:table}",
+			"\t\tWHERE ${4:condition} = ?",
+			"\t\",",
+			"\tvalues: [${5:value}]",
+			");"
+		],
+		"description": "Custom SQL query"
+	}
+}

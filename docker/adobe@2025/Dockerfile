@@ -1,6 +1,6 @@
 FROM ortussolutions/commandbox:jdk17
 
-LABEL maintainer "CFWheels Core Team"
+LABEL maintainer "Wheels Core Team"
 
 ENV PORT 62025
 ENV APP_DIR                 "/cfwheels-test-suite"

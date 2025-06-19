@@ -35,7 +35,7 @@ If you want to run a Wheels-powered application from a subfolder in an existing 
 
 Create a new database in MySQL, PostgreSQL, Microsoft SQL Server, or H2 and add a new data source for it in the ColdFusion/Lucee Administrator, just as you'd normally do. Now open up `app/config/settings.cfm` and call `set(dataSourceName="")` with the name you chose for the data source.
 
-If you don't want to be bothered by opening up a Wheels configuration file at all, there is a nice convention you can follow for the naming. Just name your data source with the same name as the folder you are running your website from (`mysite` in the example above), and Wheels will use that when you haven't set the `dataSourceName` setting using the [Set()](https://api.wheels.dev/v3.0.0-SNAPSHOT/set.html) function.
+If you don't want to be bothered by opening up a Wheels configuration file at all, there is a nice convention you can follow for the naming. Just name your data source with the same name as the folder you are running your website from (`mysite` in the example above), and Wheels will use that when you haven't set the `dataSourceName` setting using the [Set()](https://wheels.dev/api/v3.0.0/v3.0.0-SNAPSHOT/set.html) function.
 
 ### 4. Test It
 

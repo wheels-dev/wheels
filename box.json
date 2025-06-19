@@ -56,6 +56,14 @@
         "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver",
         "format":"cfformat run --overwrite",
         "format:watch":"cfformat watch ./.cfformat.json",
-        "format:check":"cfformat check"
+        "format:check":"cfformat check",
+        "test":"testbox run",
+        "test:watch":"testbox watch",
+        "test:unit":"testbox run --directory=tests/specs/unit",
+        "test:integration":"testbox run --directory=tests/specs/integration",
+        "test:coverage":"testbox run --coverage --coverageReporter=html",
+        "test:migrate":"wheels test migrate tests --backup",
+        "test:app":"wheels test app",
+        "test:core":"wheels test core"
     }
 }

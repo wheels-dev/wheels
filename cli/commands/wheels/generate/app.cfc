@@ -255,7 +255,16 @@ component aliases="wheels g app" extends="../base" {
       arrayAppend(nextSteps, "Start server and install H2 extension: start && install && restart");
       details.line();
       details.getPrint().yellowLine("🛠️ Installing H2 database extension...");
-      command( 'start && install && restart' ).run();
+      
+      // Start the server
+      command( 'server start' ).params( name = arguments.name, openBrowser = false, debug = false ).flags( '!saveSettings' ).run();
+      
+      // Auto-install any necessary extensions for Lucee
+      if ( arguments.cfmlEngine == 'lucee' ) {
+        // Give server time to start up
+        sleep(5000);
+        command( 'server restart' ).params( name = arguments.name ).run();
+      }
     } else {
       arrayAppend(nextSteps, "Configure your datasource in Lucee/ACF admin");
       arrayAppend(nextSteps, "Start the server: server start");

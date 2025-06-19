@@ -157,7 +157,7 @@ wheels security scan
 
 ## Community & Support
 
-- **Documentation**: [https://docs.wheels.dev](https://docs.wheels.dev)
+- **Documentation**: [https://wheels.dev/docs](https://wheels.dev/docs)
 - **GitHub**: [https://github.com/wheels-dev/wheels](https://github.com/wheels-dev/wheels)
 - **Slack**: [CFML Slack](https://cfml.slack.com) - #wheels channel
 - **Forums**: [https://groups.google.com/forum/#!forum/wheels](https://groups.google.com/forum/#!forum/wheels)

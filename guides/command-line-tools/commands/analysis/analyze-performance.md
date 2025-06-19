@@ -1,6 +1,6 @@
 # analyze performance
 
-Analyzes application performance, identifying bottlenecks and optimization opportunities in your CFWheels application.
+Analyzes application performance, identifying bottlenecks and optimization opportunities in your Wheels application.
 
 ## Usage
 
@@ -18,7 +18,7 @@ wheels analyze performance [--target=<target>] [--duration=<seconds>] [--report]
 
 ## Description
 
-The `analyze performance` command profiles your CFWheels application to identify performance bottlenecks and provide optimization recommendations. It monitors:
+The `analyze performance` command profiles your Wheels application to identify performance bottlenecks and provide optimization recommendations. It monitors:
 
 - Request execution times
 - Database query performance
