@@ -10,6 +10,7 @@ This guide provides AI assistants with comprehensive CLI command reference for t
 - [Testing Commands](#testing-commands)
 - [Environment Commands](#environment-commands)
 - [Development Commands](#development-commands)
+- [Asset and Cache Management Commands](#asset-and-cache-management-commands)
 - [Analysis and Optimization Commands](#analysis-and-optimization-commands)
 - [Common Command Sequences](#common-command-sequences)
 - [Parameter Inconsistencies](#parameter-inconsistencies)
@@ -917,6 +918,112 @@ box cfformat path/to/file.cfc
 # Format directory
 box cfformat app/**/*.cfc
 ```
+
+## Asset and Cache Management Commands
+
+### Asset Management
+
+```bash
+# Precompile assets for production
+wheels assets:precompile
+wheels assets:precompile --force              # Force recompilation
+wheels assets:precompile --environment=staging # Target specific environment
+
+# Clean old compiled assets
+wheels assets:clean
+wheels assets:clean --keep=5                  # Keep 5 versions of each asset
+wheels assets:clean --dryRun                  # Preview what would be deleted
+
+# Remove all compiled assets
+wheels assets:clobber
+wheels assets:clobber --force                 # Skip confirmation
+```
+
+### Cache Management
+
+```bash
+# Clear all caches
+wheels cache:clear
+wheels cache:clear --force                    # Skip confirmation
+
+# Clear specific cache
+wheels cache:clear query                      # Clear query cache
+wheels cache:clear page                       # Clear page cache
+wheels cache:clear partial                    # Clear partial/fragment cache
+wheels cache:clear action                     # Clear action cache
+wheels cache:clear sql                        # Clear SQL file cache
+
+# Clear multiple caches
+wheels cache:clear all                        # Clear all caches (default)
+```
+
+### Log Management
+
+```bash
+# Clear log files
+wheels log:clear
+wheels log:clear --environment=production     # Clear specific environment logs
+wheels log:clear --days=30                    # Clear logs older than 30 days
+wheels log:clear --force                      # Skip confirmation
+
+# Tail log files
+wheels log:tail
+wheels log:tail --environment=production      # Tail specific environment log
+wheels log:tail --lines=50                    # Show last 50 lines
+wheels log:tail --follow                      # Follow log in real-time (default)
+wheels log:tail --file=custom.log            # Tail specific log file
+```
+
+### Temporary Files Management
+
+```bash
+# Clear all temporary files
+wheels tmp:clear
+wheels tmp:clear --force                      # Skip confirmation
+
+# Clear specific temp file types
+wheels tmp:clear cache                        # Clear cache files only
+wheels tmp:clear sessions                     # Clear session files only
+wheels tmp:clear uploads                      # Clear upload files only
+
+# Clear old temporary files
+wheels tmp:clear --days=7                     # Clear files older than 7 days
+wheels tmp:clear --type=cache --days=30      # Clear cache files older than 30 days
+```
+
+### Asset Precompilation Details
+
+The `wheels assets:precompile` command:
+- Minifies JavaScript and CSS files
+- Generates cache-busted filenames with MD5 hashes
+- Creates a manifest.json for asset mapping
+- Optimizes images (copies with cache-busted names)
+- Stores compiled assets in `/public/assets/compiled/`
+
+**Example manifest.json:**
+```json
+{
+  "application.js": "application-a1b2c3d4.min.js",
+  "styles.css": "styles-e5f6g7h8.min.css",
+  "logo.png": "logo-i9j0k1l2.png"
+}
+```
+
+### Cache Types Explained
+
+- **Query Cache**: Stores database query results
+- **Page Cache**: Stores complete rendered pages
+- **Partial Cache**: Stores rendered view fragments
+- **Action Cache**: Stores controller action results
+- **SQL Cache**: Stores parsed SQL files
+
+### Log File Color Coding
+
+The `wheels log:tail` command color-codes log entries:
+- **Red**: ERROR level messages
+- **Yellow**: WARN/WARNING level messages
+- **Cyan**: INFO level messages
+- **Grey**: DEBUG level messages
 
 ### Package Management
 

@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
 - **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,inStock:boolean`
 - **Run migrations**: `wheels dbmigrate latest`
-- **Run tests**: `wheels test app`
+- **Run tests**: `wheels test app` or `box testbox run`
 
 ### AI-Specific Documentation
 - **Patterns**: See AI-PATTERNS.md for common code patterns
@@ -68,6 +68,14 @@ Wheels is inspired by Ruby on Rails and follows these principles:
 - Run tests for specific engine with Docker: `docker compose --profile lucee up -d`
 - Available Docker profiles: `lucee`, `lucee6`, `lucee7`, `adobe2018`, `adobe2021`, `adobe2023`, `adobe2025`
 
+### Advanced Testing (TestBox CLI)
+- Install TestBox CLI: `box install commandbox-testbox-cli`
+- Run all tests: `wheels test:all`
+- Run unit tests: `wheels test:unit`
+- Run integration tests: `wheels test:integration`
+- Watch mode: `wheels test:watch`
+- Coverage: `wheels test:coverage`
+
 ### Code Quality
 - Format code: `box run-script format` (uses cfformat)
 - Check formatting: `box run-script format:check`
@@ -90,6 +98,14 @@ Wheels is inspired by Ruby on Rails and follows these principles:
 - Restore database: `wheels db restore backup.sql`
 - Check migration status: `wheels db status`
 - Rollback migrations: `wheels db rollback --steps=3`
+
+### Enhanced Generators
+- Migration: `wheels g migration CreateUsersTable --attributes="name:string,email:string:index"`
+- Mailer: `wheels g mailer UserNotifications --methods="welcome,passwordReset"`
+- Service: `wheels g service PaymentProcessor --type=singleton`
+- Helper: `wheels g helper StringUtils --functions="truncate,slugify"`
+- Job: `wheels g job ProcessOrders --queue=high --schedule="0 0 * * *"`
+- Plugin: `wheels g plugin Authentication --version="1.0.0"`
 
 ## Code Style Guidelines
 
@@ -137,6 +153,13 @@ Wheels is inspired by Ruby on Rails and follows these principles:
 3. Start server: `server start`
 4. Test your CLI changes
 5. If modifying CLI code, reload CommandBox: `box reload`
+
+### CLI Module Architecture
+- Commands in `/cli/commands/wheels/` directory
+- Base command class: `/cli/commands/wheels/base.cfc`
+- Service architecture in `/cli/services/`
+- Templates in `/cli/templates/`
+- Tests in `/cli/tests/`
 
 ## High-Level Architecture
 
@@ -271,3 +294,42 @@ Use the gh command via the Bash tool for ALL GitHub-related tasks including work
 - All commands validate Wheels application directory
 - Show Wheels-specific information (version, paths)
 - Integrated with CommandBox server functionality
+
+## Repository Structure
+
+### Framework Core
+- Main Wheels framework repository
+- Located in `/vendor/wheels/` when installed
+- Core MVC functionality and database ORM
+- Plugin system and event architecture
+
+### CLI Module
+- Separate module in `/cli/` directory
+- CommandBox integration for code generation
+- Service-based architecture with DI
+- Extensive template system for scaffolding
+
+### Testing Infrastructure
+- Framework tests in `/vendor/wheels/tests_testbox/`
+- CLI tests in `/cli/tests/`
+- Application tests in `/tests/`
+- Docker configurations for multi-engine testing
+
+## Package Management
+
+### Dependencies (box.json)
+- **wirebox**: ^7 - Dependency injection
+- **testbox**: ^5 - Testing framework
+
+### Dev Dependencies
+- **commandbox-dotenv**: Environment variables
+- **commandbox-cfconfig**: CF engine configuration
+- **commandbox-cfformat**: Code formatting
+
+### Scripts
+- `format`: Run code formatter
+- `format:check`: Check code formatting
+- `test`: Run all tests
+- `test:unit`: Run unit tests only
+- `test:integration`: Run integration tests
+- `test:coverage`: Generate coverage report
