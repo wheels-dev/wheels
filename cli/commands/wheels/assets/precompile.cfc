@@ -1,9 +1,25 @@
 /**
  * Compile assets for production
+ * 
+ * This command processes JavaScript, CSS, and image assets for production deployment.
+ * It minifies files, generates cache-busted filenames, and creates a manifest for asset mapping.
+ * 
+ * {code:bash}
+ * wheels assets:precompile
+ * wheels assets:precompile --force
+ * wheels assets:precompile --environment=staging
+ * {code}
  **/
 component extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
+	
+	// CommandBox metadata
+	this.aliases = [ "precompile" ];
+	this.parameters = [
+		{ name="force", type="boolean", required=false, default=false, hint="Force recompilation of all assets" },
+		{ name="environment", type="string", required=false, default="production", hint="Target environment for compilation" }
+	];
 	
 	/**
 	 * Compile and optimize assets for production deployment

@@ -1,9 +1,30 @@
 /**
  * Clear temporary files
+ * 
+ * This command removes temporary files from the tmp directory including cache files,
+ * session data, and uploads. You can clear specific types or filter by age.
+ * 
+ * {code:bash}
+ * wheels tmp:clear
+ * wheels tmp:clear --force
+ * wheels tmp:clear cache
+ * wheels tmp:clear sessions
+ * wheels tmp:clear uploads
+ * wheels tmp:clear --days=7
+ * wheels tmp:clear --type=cache --days=30
+ * {code}
  **/
 component extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
+	
+	// CommandBox metadata
+	this.aliases = [ "clear", "clean" ];
+	this.parameters = [
+		{ name="type", type="string", required=false, default="all", hint="Type of temp files to clear (cache|sessions|uploads|all)" },
+		{ name="days", type="numeric", required=false, default=0, hint="Only clear files older than specified days" },
+		{ name="force", type="boolean", required=false, default=false, hint="Skip confirmation prompt" }
+	];
 	
 	/**
 	 * Clear temporary files and directories

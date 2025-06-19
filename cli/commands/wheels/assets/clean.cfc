@@ -1,9 +1,25 @@
 /**
  * Remove old compiled assets
+ * 
+ * This command cleans up old asset files from previous compilations while keeping
+ * the most recent versions. Useful for freeing disk space after multiple deployments.
+ * 
+ * {code:bash}
+ * wheels assets:clean
+ * wheels assets:clean --keep=5
+ * wheels assets:clean --dryRun
+ * {code}
  **/
 component extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
+	
+	// CommandBox metadata
+	this.aliases = [ "clean" ];
+	this.parameters = [
+		{ name="keep", type="numeric", required=false, default=3, hint="Number of versions to keep for each asset" },
+		{ name="dryRun", type="boolean", required=false, default=false, hint="Show what would be deleted without actually deleting" }
+	];
 	
 	/**
 	 * Remove old compiled assets while keeping the most recent versions

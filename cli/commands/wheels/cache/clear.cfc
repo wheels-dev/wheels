@@ -1,9 +1,29 @@
 /**
  * Clear application caches
+ * 
+ * This command clears various types of caches used by Wheels including query, page,
+ * partial, action, and SQL caches. Clear specific caches or all at once.
+ * 
+ * {code:bash}
+ * wheels cache:clear
+ * wheels cache:clear all --force
+ * wheels cache:clear query
+ * wheels cache:clear page
+ * wheels cache:clear partial
+ * wheels cache:clear action
+ * wheels cache:clear sql
+ * {code}
  **/
 component extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
+	
+	// CommandBox metadata
+	this.aliases = [ "clear", "flush" ];
+	this.parameters = [
+		{ name="name", type="string", required=false, default="all", hint="Cache name to clear (query|page|partial|action|sql|all)" },
+		{ name="force", type="boolean", required=false, default=false, hint="Skip confirmation for clearing all caches" }
+	];
 	
 	/**
 	 * Clear specific or all application caches

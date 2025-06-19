@@ -1,9 +1,27 @@
 /**
  * Clear log files
+ * 
+ * This command removes log files from the logs directory. You can filter by
+ * environment, age, or clear all logs. Useful for managing disk space.
+ * 
+ * {code:bash}
+ * wheels log:clear
+ * wheels log:clear --environment=production
+ * wheels log:clear --days=30
+ * wheels log:clear --environment=production --days=7 --force
+ * {code}
  **/
 component extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
+	
+	// CommandBox metadata
+	this.aliases = [ "clear", "clean" ];
+	this.parameters = [
+		{ name="environment", type="string", required=false, default="all", hint="Environment logs to clear (development|testing|production|all)" },
+		{ name="days", type="numeric", required=false, default=0, hint="Only clear logs older than specified days" },
+		{ name="force", type="boolean", required=false, default=false, hint="Skip confirmation prompt" }
+	];
 	
 	/**
 	 * Clear application log files

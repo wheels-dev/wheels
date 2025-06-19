@@ -1,9 +1,23 @@
 /**
  * Remove all compiled assets
+ * 
+ * This command completely removes all compiled assets and the manifest file.
+ * Use with caution as this will require full asset recompilation.
+ * 
+ * {code:bash}
+ * wheels assets:clobber
+ * wheels assets:clobber --force
+ * {code}
  **/
 component extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
+	
+	// CommandBox metadata
+	this.aliases = [ "clobber" ];
+	this.parameters = [
+		{ name="force", type="boolean", required=false, default=false, hint="Skip confirmation prompt" }
+	];
 	
 	/**
 	 * Remove all compiled assets and reset the asset pipeline

@@ -1,9 +1,34 @@
 /**
  * Tail log files
+ * 
+ * This command displays the last lines of a log file and optionally follows it
+ * for new content. Log entries are color-coded by level for easy reading.
+ * 
+ * {code:bash}
+ * wheels log:tail
+ * wheels log:tail --environment=production
+ * wheels log:tail --lines=50
+ * wheels log:tail --follow --file=custom.log
+ * {code}
+ * 
+ * Color coding:
+ * - Red: ERROR level messages
+ * - Yellow: WARN/WARNING level messages  
+ * - Cyan: INFO level messages
+ * - Grey: DEBUG level messages
  **/
 component extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
+	
+	// CommandBox metadata
+	this.aliases = [ "tail", "follow" ];
+	this.parameters = [
+		{ name="environment", type="string", required=false, default="development", hint="Environment log to tail (development|testing|production)" },
+		{ name="lines", type="numeric", required=false, default=10, hint="Number of lines to display" },
+		{ name="follow", type="boolean", required=false, default=false, hint="Follow the log file for new content" },
+		{ name="file", type="string", required=false, default="", hint="Specific log file name to tail" }
+	];
 	
 	/**
 	 * Tail application log files in real-time
