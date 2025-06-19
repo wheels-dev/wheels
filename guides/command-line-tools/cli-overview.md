@@ -20,7 +20,7 @@ Wheels CLI is a CommandBox module that provides a comprehensive set of tools for
 Complete reference for all CLI commands organized by category:
 - [Core Commands](commands/core/init.md) - Essential commands like init, reload, watch
 - [Code Generation](commands/generate/app.md) - Generate applications, models, controllers, views
-- [Database Commands](commands/database/dbmigrate-info.md) - Migrations and database management
+- [Database Commands](commands/database/database-management.md) - Complete database management and migrations
 - [Testing Commands](commands/testing/test.md) - Run tests and generate coverage
 - [Configuration](commands/config/config-list.md) - Manage application settings
 - [And more...](commands/README.md)
@@ -70,19 +70,24 @@ wheels generate controller users --rest
 wheels generate view users index
 ```
 
-### 🗄️ Database Migrations
+### 🗄️ Database Management
 
-Manage database schema changes:
+Complete database lifecycle management:
 
 ```bash
-# Create migration
+# Database operations
+wheels db create              # Create database
+wheels db setup              # Create + migrate + seed
+wheels db reset              # Drop + recreate + migrate + seed
+wheels db shell              # Interactive database shell
+wheels db dump               # Backup database
+wheels db restore backup.sql # Restore from backup
+
+# Migrations
 wheels dbmigrate create table posts
-
-# Run migrations
 wheels dbmigrate latest
-
-# Check status
-wheels dbmigrate info
+wheels db status            # Check migration status
+wheels db rollback          # Rollback migrations
 ```
 
 ### 🧪 Testing
