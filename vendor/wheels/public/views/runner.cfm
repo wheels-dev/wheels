@@ -7,7 +7,7 @@ setting requestTimeout="300";
 if (!structKeyExists(form, "scriptContent")) {
 	// Return empty response if not a proper request
 	writeOutput('{"success":false,"error":"No script content provided"}');
-	abort();
+	cfabort;
 }
 
 // Initialize response
@@ -22,29 +22,29 @@ data = {
 };
 
 try {
-	var startTime = getTickCount();
+	local.startTime = getTickCount();
 	
 	// Get script content from POST
 	if (!structKeyExists(form, "scriptContent") || !len(form.scriptContent)) {
 		throw(message="No script content provided");
 	}
 	
-	var scriptContent = form.scriptContent;
-	var params = {};
-	var verbose = false;
+	local.scriptContent = form.scriptContent;
+	local.params = {};
+	local.verbose = false;
 	
 	// Parse parameters
 	if (structKeyExists(form, "params") && len(form.params)) {
-		params = deserializeJSON(form.params);
+		local.params = deserializeJSON(form.params);
 	}
 	
 	if (structKeyExists(form, "verbose")) {
-		verbose = form.verbose;
+		local.verbose = form.verbose;
 	}
 	
 	// Create execution context with Wheels helpers and passed parameters
-	request.scriptParams = params;
-	request.scriptVerbose = verbose;
+	request.scriptParams = local.params;
+	request.scriptVerbose = local.verbose;
 	
 	// Make Wheels components available
 	request.model = function(name) {
@@ -61,25 +61,25 @@ try {
 	// Execute the script
 	savecontent variable="output" {
 		// Create a temporary file to execute
-		var tempFile = getTempDirectory() & "wheels_runner_" & createUUID() & ".cfm";
-		fileWrite(tempFile, scriptContent);
+		local.tempFile = getTempDirectory() & "wheels_runner_" & createUUID() & ".cfm";
+		fileWrite(local.tempFile, local.scriptContent);
 		
 		try {
 			// Include and execute the script
-			include tempFile;
+			include local.tempFile;
 		} finally {
 			// Clean up temp file
-			if (fileExists(tempFile)) {
-				fileDelete(tempFile);
+			if (fileExists(local.tempFile)) {
+				fileDelete(local.tempFile);
 			}
 		}
 	}
 	
 	data.output = trim(output);
-	data.executionTime = getTickCount() - startTime;
+	data.executionTime = getTickCount() - local.startTime;
 	
 	// Add execution time if verbose
-	if (verbose) {
+	if (local.verbose) {
 		if (len(data.output)) {
 			data.output &= chr(10) & chr(10);
 		}

@@ -67,7 +67,10 @@
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
       "Bash(docker restart:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(gh api:*)",
+      "Bash(gh run download:*)",
+      "Bash(git remote get-url:*)"
     ],
     "deny": []
   }
