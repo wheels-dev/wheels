@@ -151,7 +151,7 @@ try {
 }
 
 // Output JSON response
-cfheader(name="Content-Type", value="application/json");
-writeOutput(serializeJSON(data));
-abort;
 </cfscript>
+<cfheader name="Content-Type" value="application/json">
+<cfoutput>#serializeJSON(data)#</cfoutput>
+<cfabort>
