@@ -11,6 +11,7 @@ This guide provides AI assistants with comprehensive CLI command reference for t
 - [Environment Commands](#environment-commands)
 - [Development Commands](#development-commands)
 - [Asset and Cache Management Commands](#asset-and-cache-management-commands)
+- [Plugin Management](#plugin-management)
 - [Analysis and Optimization Commands](#analysis-and-optimization-commands)
 - [Common Command Sequences](#common-command-sequences)
 - [Parameter Inconsistencies](#parameter-inconsistencies)
@@ -1046,6 +1047,207 @@ box update
 # List installed packages
 box list
 ```
+
+## Plugin Management
+
+### Plugin Commands Overview
+
+Wheels provides comprehensive plugin management through the CLI:
+
+```bash
+# Search for plugins on ForgeBox
+wheels plugin search
+wheels plugin search auth
+wheels plugin search --format=json --orderBy=downloads
+
+# Get detailed plugin information
+wheels plugin info wheels-auth
+wheels plugin info wheels-api-builder
+
+# List installed plugins
+wheels plugin list
+wheels plugin list --global
+wheels plugin list --format=json
+wheels plugin list --available    # Show all ForgeBox plugins
+
+# Install plugins
+wheels plugin install wheels-auth
+wheels plugin install wheels-vue-cli --dev
+wheels plugin install https://github.com/user/wheels-plugin
+wheels plugin install wheels-api@2.0.0 --global
+
+# Update plugins
+wheels plugin update wheels-auth
+wheels plugin update wheels-api --version=2.1.0 --force
+wheels plugin update:all
+wheels plugin update:all --dry-run
+
+# Check for outdated plugins
+wheels plugin outdated
+wheels plugin outdated --format=json
+
+# Remove plugins
+wheels plugin remove wheels-auth
+wheels plugin remove wheels-docker --global --force
+
+# Create new plugin
+wheels plugin init my-awesome-plugin
+wheels plugin init wheels-payment-gateway --author="John Doe" --license=MIT
+```
+
+### Plugin Search
+
+Search ForgeBox for available Wheels plugins:
+
+```bash
+# Search all plugins
+wheels plugin search
+
+# Search with query
+wheels plugin search authentication
+wheels plugin search "api builder"
+
+# Sort results
+wheels plugin search --orderBy=downloads    # Most popular first (default)
+wheels plugin search --orderBy=updated      # Recently updated first
+wheels plugin search --orderBy=name         # Alphabetical
+
+# JSON output for scripting
+wheels plugin search auth --format=json
+```
+
+### Plugin Information
+
+Get detailed information about a plugin:
+
+```bash
+# Show plugin details
+wheels plugin info wheels-auth
+
+# Information includes:
+# - Installation status
+# - Latest version
+# - Description and author
+# - Download statistics
+# - Dependencies
+# - Available versions
+# - Repository and homepage URLs
+```
+
+### Plugin Installation
+
+Install plugins from ForgeBox or GitHub:
+
+```bash
+# Install from ForgeBox
+wheels plugin install wheels-auth
+wheels plugin install wheels-api-builder
+
+# Install specific version
+wheels plugin install wheels-auth@2.0.0
+
+# Install as development dependency
+wheels plugin install wheels-test-helpers --dev
+
+# Install globally (available to all projects)
+wheels plugin install wheels-docker --global
+
+# Install from GitHub
+wheels plugin install https://github.com/username/wheels-custom-plugin
+```
+
+### Plugin Updates
+
+Keep plugins up to date:
+
+```bash
+# Update single plugin
+wheels plugin update wheels-auth
+wheels plugin update wheels-api --version=2.1.0
+
+# Force update (reinstall even if up to date)
+wheels plugin update wheels-auth --force
+
+# Update all plugins
+wheels plugin update:all
+
+# Preview updates without installing
+wheels plugin update:all --dry-run
+
+# Force update all
+wheels plugin update:all --force
+```
+
+### Outdated Plugins
+
+Check which plugins have available updates:
+
+```bash
+# List outdated plugins
+wheels plugin outdated
+
+# JSON format for automation
+wheels plugin outdated --format=json
+
+# Output includes:
+# - Current version
+# - Latest available version
+# - Last update date
+# - Plugin type (dev/prod)
+```
+
+### Plugin Development
+
+Create new Wheels plugins:
+
+```bash
+# Basic plugin initialization
+wheels plugin init my-plugin
+
+# With metadata
+wheels plugin init payment-gateway \
+  --author="Jane Smith" \
+  --description="Payment processing for Wheels" \
+  --version="0.1.0" \
+  --license=MIT
+
+# Generated structure:
+# my-plugin/
+# ├── box.json          # Package configuration
+# ├── ModuleConfig.cfc  # Module configuration
+# ├── README.md         # Documentation
+# ├── commands/         # CLI commands
+# ├── models/           # Service components
+# ├── templates/        # File templates
+# └── tests/            # Test suite
+```
+
+### Plugin Publishing
+
+Publish plugins to ForgeBox:
+
+```bash
+# Login to ForgeBox
+box login
+
+# From plugin directory
+cd my-plugin
+
+# Publish to ForgeBox
+box package publish
+
+# Update version and publish
+box bump --major
+box package publish
+```
+
+### Plugin Best Practices
+
+1. **Naming Convention**: Prefix with `wheels-` (e.g., `wheels-auth`)
+2. **Type Declaration**: Set type as `commandbox-modules,cfwheels-plugins`
+3. **Documentation**: Include comprehensive README.md
+4. **Testing**: Include test suite in `/tests/`
+5. **Versioning**: Follow semantic versioning (major.minor.patch)
 
 ## Analysis and Optimization Commands
 
