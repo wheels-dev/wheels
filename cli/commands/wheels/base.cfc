@@ -64,8 +64,8 @@ component excludeFromHelp=true {
 		if (!directoryExists(arguments.path & "/vendor/wheels")) {
 			return false;
 		}
-		// Check for config folder
-		if (!directoryExists(arguments.path & "/config")) {
+		// Check for app/config folder
+		if (!directoryExists(arguments.path & "/app/config")) {
 			return false;
 		}
 		// Check for app folder

@@ -74,7 +74,6 @@ component extends="base" {
 		// CommandBox Info
 		print.boldGreenLine("CommandBox");
 		print.greenLine("  Version: " & shell.getVersion());
-		print.greenLine("  Home: " & fileSystem.getHomeDirectory());
 		print.line();
 		
 		// File Statistics (if in Wheels app)
