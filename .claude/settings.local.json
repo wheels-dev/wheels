@@ -70,7 +70,12 @@
       "Bash(docker exec:*)",
       "Bash(gh api:*)",
       "Bash(gh run download:*)",
-      "Bash(git remote get-url:*)"
+      "Bash(git remote get-url:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh search commits:*)",
+      "Bash(gh workflow:*)",
+      "Bash(git stash:*)",
+      "Bash(wheels test:*)"
     ],
     "deny": []
   }
