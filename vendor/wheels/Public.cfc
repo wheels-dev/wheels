@@ -4,22 +4,6 @@ component output="false" displayName="Internal GUI" {
 	 * Internal function.
 	 */
 	public struct function $init() {
-		// Copy all helper functions from application.wo to make them available in views
-		if (structKeyExists(application, "wo")) {
-			local.publicAPI = getMetaData(application.wo);
-			if (structKeyExists(local.publicAPI, "functions")) {
-				for (local.func in local.publicAPI.functions) {
-					// Check if access property exists and is public
-					if (structKeyExists(local.func, "access") && local.func.access == "public" && structKeyExists(local.func, "name") && !structKeyExists(variables, local.func.name) && !structKeyExists(this, local.func.name)) {
-						try {
-							variables[local.func.name] = application.wo[local.func.name];
-						} catch (any e) {
-							// Skip if we can't copy the function
-						}
-					}
-				}
-			}
-		}
 		return this;
 	}
 
