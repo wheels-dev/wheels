@@ -9,7 +9,8 @@ component output="false" displayName="Internal GUI" {
 			local.publicAPI = getMetaData(application.wo);
 			if (structKeyExists(local.publicAPI, "functions")) {
 				for (local.func in local.publicAPI.functions) {
-					if (local.func.access == "public" && !structKeyExists(variables, local.func.name) && !structKeyExists(this, local.func.name)) {
+					// Check if access property exists and is public
+					if (structKeyExists(local.func, "access") && local.func.access == "public" && structKeyExists(local.func, "name") && !structKeyExists(variables, local.func.name) && !structKeyExists(this, local.func.name)) {
 						try {
 							variables[local.func.name] = application.wo[local.func.name];
 						} catch (any e) {
