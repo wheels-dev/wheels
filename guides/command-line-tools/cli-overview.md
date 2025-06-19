@@ -98,11 +98,12 @@ Comprehensive testing support:
 # Run all tests
 wheels test run
 
-# Watch mode
-wheels test run --watch
-
-# Generate coverage
-wheels test coverage
+# Advanced testing with TestBox CLI
+wheels test:all              # Run all tests
+wheels test:unit             # Run unit tests only
+wheels test:integration      # Run integration tests only
+wheels test:watch            # Watch mode
+wheels test:coverage         # Generate coverage reports
 ```
 
 ### 👀 Development Tools

@@ -1,6 +1,6 @@
 # wheels test
 
-**⚠️ DEPRECATED**: This command is deprecated. Use `wheels test run` instead.
+**⚠️ DEPRECATED**: This command is deprecated. Use `wheels test run` or the advanced testing commands (`wheels test:all`, `wheels test:unit`, etc.) instead.
 
 Run Wheels framework tests (core, app, or plugin tests).
 
