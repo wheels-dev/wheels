@@ -111,6 +111,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Services**: Business logic in `/cli/models/` using WireBox dependency injection
 - **Templates**: Sophisticated template system with `{{variable}}` syntax, checks `app/snippets/` first
 - **SharedParameters.cfc**: Centralizes parameter definitions for consistency
+- **Important**: After modifying CLI code, reload CommandBox: `box reload`
 
 ### Key Framework Patterns
 
@@ -201,6 +202,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - After modifying CLI code, reload CommandBox: `box reload`
 - Test CLI commands in the `/workspace/` directory
 - Use `.claude/commands/cli/test-next-group.md` for systematic CLI testing
+
+## Recent CLI Fixes (2025-06-20)
+
+The following critical issues were addressed in the CLI:
+- Database and server command namespaces now properly route to subcommands
+- Test commands now detect actual server port instead of hardcoded 8080
+- Scaffold generator supports non-interactive mode
+- Plugin and console commands have proper dependency injection
+- Get/set commands now route to their subcommands correctly
 
 ## Commit Message Guidelines
 - Use conventional commit format: `type: description`
