@@ -37,16 +37,62 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
   }
 
   /**
+   * @name           The name of the app you want to create
+   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug)
+   * @directory      The directory to create the app in
+   * @reloadPassword The reload password to set for the app
+   * @datasourceName The datasource name to set for the app
+   * @cfmlEngine     The CFML engine to use for the app
+   * @useBootstrap   Add Bootstrap to the app
+   * @setupH2        Setup the H2 database for development
+   * @init           "init" the directory as a package if it isn't already
    * @force          Force installation into an none empty directory
+   * @nonInteractive Run without prompts, using provided options or defaults
    **/
   function run(
-    boolean force   = false
+    string name = '',
+    string template = '',
+    string directory = '',
+    string reloadPassword = '',
+    string datasourceName = '',
+    string cfmlEngine = '',
+    boolean useBootstrap = false,
+    boolean setupH2 = true,
+    boolean init = false,
+    boolean force = false,
+    boolean nonInteractive = false
    ) {
     // Initialize detail service
     var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
     
     var appContent      = fileRead( getTemplate( '/ConfigAppContent.txt' ) );
     var routesContent   = fileRead( getTemplate( '/ConfigRoutes.txt' ) );
+    
+    // If non-interactive mode, use defaults for missing values
+    if (arguments.nonInteractive) {
+      if (!len(arguments.name)) arguments.name = 'MyWheelsApp';
+      if (!len(arguments.template)) arguments.template = 'wheels-base-template@BE';
+      if (!len(arguments.reloadPassword)) arguments.reloadPassword = 'changeMe';
+      if (!len(arguments.datasourceName)) arguments.datasourceName = arguments.name;
+      if (!len(arguments.cfmlEngine)) arguments.cfmlEngine = 'lucee';
+      if (!len(arguments.directory)) arguments.directory = getCWD() & arguments.name;
+      
+      // Skip all prompts and proceed directly
+      command( 'wheels g app' ).params(
+        name            = arguments.name,
+        template        = arguments.template,
+        directory       = arguments.directory,
+        reloadPassword  = arguments.reloadPassword,
+        datasourceName  = arguments.datasourceName,
+        cfmlEngine      = arguments.cfmlEngine,
+        useBootstrap    = arguments.useBootstrap,
+        setupH2         = arguments.setupH2,
+        init            = arguments.init,
+        force           = arguments.force,
+        initWizard      = true
+      ).run();
+      return;
+    }
 
     // ---------------- Welcome
     details.header("🧿", "Wheels Application Wizard");
@@ -56,15 +102,39 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
       .line();
 
     // ---------------- Set an app Name
-    // TODO: Add conditions on what can in an application name
     print.yellowBoldLine( "📝 Step 1: Application Name" )
       .line()
       .text( "Enter a name for your application. " )
       .line( "A new directory will be created with this name." )
+      .line()
+      .cyanLine( "Note: Names can only contain letters, numbers, underscores, and hyphens." )
       .line();
 
-    var appName = ask( message = 'Please enter a name for your application: ', defaultResponse = 'MyWheelsApp' );
-    appName     = helpers.stripSpecialChars( appName );
+    var validAppName = false;
+    var appName = "";
+    
+    while (!validAppName) {
+      appName = ask( message = 'Please enter a name for your application: ', defaultResponse = 'MyWheelsApp' );
+      appName = helpers.stripSpecialChars( appName );
+      
+      // Validate app name
+      if (len(trim(appName)) == 0) {
+        print.redLine("Application name cannot be empty. Please try again.");
+      } else if (!reFindNoCase("^[a-zA-Z][a-zA-Z0-9_-]*$", appName)) {
+        print.redLine("Application name must start with a letter and contain only letters, numbers, underscores, and hyphens.");
+      } else if (len(appName) > 50) {
+        print.redLine("Application name is too long. Please use 50 characters or less.");
+      } else {
+        // Check for reserved names
+        var reservedNames = ["con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "lpt1", "lpt2", "lpt3", "wheels", "commandbox", "cfml"];
+        if (arrayFindNoCase(reservedNames, appName)) {
+          print.redLine("'#appName#' is a reserved name. Please choose a different name.");
+        } else {
+          validAppName = true;
+        }
+      }
+    }
+    
     print.line().toConsole();
 
     // ---------------- Template

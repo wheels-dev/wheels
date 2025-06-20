@@ -26,7 +26,24 @@ component extends="../base" {
 		var logCommand = "server log";
 		
 		if (!isNull(arguments.name)) {
-			logCommand &= " --name=#arguments.name#";
+			logCommand &= " #arguments.name#";
+		} else {
+			// Try to get server name from server.json
+			var serverJSON = fileSystemUtil.resolvePath("server.json");
+			if (fileExists(serverJSON)) {
+				try {
+					var serverConfig = deserializeJSON(fileRead(serverJSON));
+					if (structKeyExists(serverConfig, "name")) {
+						logCommand &= " #serverConfig.name#";
+					}
+				} catch (any e) {
+					// Fall back to directory method
+					logCommand &= " --directory=#getCWD()#";
+				}
+			} else {
+				// Use current directory
+				logCommand &= " --directory=#getCWD()#";
+			}
 		}
 		
 		if (arguments.follow) {

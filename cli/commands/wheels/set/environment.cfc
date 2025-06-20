@@ -64,7 +64,22 @@ component extends="../base" {
 				
 				local.serverJson.env.WHEELS_ENV = arguments.environment;
 				
-				FileWrite(local.serverJsonPath, SerializeJSON(local.serverJson, "pretty"));
+				// Write JSON - try pretty format first
+				try {
+					// Try with pretty parameter (newer CF versions)
+					local.jsonString = SerializeJSON(local.serverJson, "struct", false);
+					// If we get here, try adding pretty formatting
+					try {
+						// Some versions support this syntax
+						local.jsonString = SerializeJSON(local.serverJson, false, false);
+					} catch (any e2) {
+						// Ignore and use regular JSON
+					}
+					FileWrite(local.serverJsonPath, local.jsonString);
+				} catch (any e) {
+					// Fall back to most basic JSON serialization
+					FileWrite(local.serverJsonPath, SerializeJSON(local.serverJson));
+				}
 				local.updated = true;
 				print.greenLine("Updated server.json");
 			}

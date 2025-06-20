@@ -21,7 +21,24 @@ component extends="../base" {
 		var restartCommand = "server restart";
 		
 		if (!isNull(arguments.name)) {
-			restartCommand &= " --name=#arguments.name#";
+			restartCommand &= " #arguments.name#";
+		} else {
+			// Try to get server name from server.json
+			var serverJSON = fileSystemUtil.resolvePath("server.json");
+			if (fileExists(serverJSON)) {
+				try {
+					var serverConfig = deserializeJSON(fileRead(serverJSON));
+					if (structKeyExists(serverConfig, "name")) {
+						restartCommand &= " #serverConfig.name#";
+					}
+				} catch (any e) {
+					// Fall back to directory method
+					restartCommand &= " --directory=#getCWD()#";
+				}
+			} else {
+				// Use current directory
+				restartCommand &= " --directory=#getCWD()#";
+			}
 		}
 		
 		if (arguments.force) {

@@ -61,6 +61,7 @@ component aliases="wheels g controller" extends="../base" {
             name = arguments.name,
             description = arguments.description,
             rest = arguments.rest,
+            api = arguments.api,
             force = arguments.force,
             actions = actionList,
             baseDirectory = getCWD()

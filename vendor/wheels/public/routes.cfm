@@ -28,6 +28,8 @@ mapper()
 		.get(name = "legacy", pattern = "wheels/[view]", to = "public##legacy")
 		.root(method = "get", to = "public##index", mapFormat = false)
 	.end()
+	// Add route for tests controller outside the wheels namespace
+	.get(name = "testsController", pattern = "tests", to = "tests##index")
 	.get(name = "testbox", pattern = "testbox", to = "tests##Testbox##runner")
 .end();
 </cfscript>

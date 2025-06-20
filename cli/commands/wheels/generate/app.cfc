@@ -244,6 +244,16 @@ component aliases="wheels g app" extends="../base" {
       }
 
     }
+    
+    // Generate Tests controller for CLI test support
+    details.line();
+    details.getPrint().yellowLine("🧪 Creating Tests controller for CLI support...");
+    
+    // Create the tests controller from template
+    var testsControllerContent = fileRead(getTemplate('/tests/TestsController.txt'));
+    var testsControllerPath = fileSystemUtil.resolvePath("app/controllers/Tests.cfc");
+    file action='write' file='#testsControllerPath#' mode='777' output='#trim(testsControllerContent)#';
+    details.create("app/controllers/Tests.cfc", true);
 
     details.success("Application created successfully!");
 

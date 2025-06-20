@@ -21,11 +21,15 @@ component aliases='wheels g view' extends="../base"  {
 	 * @name.hint Name of the file(s) to create, i.e, edit or index,show,edit,new
 	 * @template.hint optional template (used in Scaffolding)
 	 * @template.options crud/_form,crud/edit,crud/index,crud/new,crud/show
+	 * @layout.hint Layout file to use for this view (without .cfm extension)
+	 * @force.hint Overwrite existing files without prompting
 	 **/
 	function run(
 		required string objectName,
 		required string name,
-		string template=""
+		string template="",
+		string layout="",
+		boolean force=false
 	){
 		var obj = helpers.getNameVariants(listLast( arguments.objectName, '/\' ));
 		var viewdirectory     = fileSystemUtil.resolvePath( "app/views" );
@@ -74,11 +78,23 @@ component aliases='wheels g view' extends="../base"  {
 			}
 			// Replace Object tokens
 			viewContent=$replaceDefaultObjectNames(viewContent, obj);
+			
+			// Add layout specification if provided
+			if (len(arguments.layout)) {
+				// Check if the view already has a cfset for layout
+				if (!findNoCase("<" & "cfset layout", viewContent)) {
+					// Add layout setting at the beginning of the file
+					viewContent = '<' & 'cfset layout="##arguments.layout##">' & chr(10) & viewContent;
+				} else {
+					// Replace existing layout setting
+					viewContent = reReplaceNoCase(viewContent, '<' & 'cfset\s+layout\s*=\s*["''][^"'']+["'']\s*>', '<' & 'cfset layout="##arguments.layout##">');
+				}
+			}
 			var viewName = lcase(viewNameItem) & ".cfm";
 			var viewPath = directory & "/" & viewName;
 
 			if(fileExists(viewPath)){
-				if( confirm( '#viewName# already exists in target directory. Do you want to overwrite? [y/n]' ) ) {
+				if(arguments.force || confirm( '#viewName# already exists in target directory. Do you want to overwrite? [y/n]' ) ) {
 				    detailOutput.update("app/views/" & obj.objectNamePlural & "/" & viewName);
 				} else {
 				    detailOutput.skip("app/views/" & obj.objectNamePlural & "/" & viewName);
@@ -104,6 +120,11 @@ component aliases='wheels g view' extends="../base"  {
 			
 			if (len(arguments.template)) {
 				arrayAppend(nextSteps, "The views were generated using the '" & arguments.template & "' template");
+			}
+			
+			if (len(arguments.layout)) {
+				arrayAppend(nextSteps, "Views are configured to use the '" & arguments.layout & "' layout");
+				arrayAppend(nextSteps, "Make sure the layout file exists at app/views/" & arguments.layout & ".cfm");
 			}
 			
 			detailOutput.nextSteps(nextSteps);

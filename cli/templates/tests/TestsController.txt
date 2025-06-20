@@ -1,0 +1,38 @@
+component extends="Controller" {
+
+	/**
+	 * Initialize the controller
+	 */
+	public void function config() {
+		// This controller provides JSON responses for test running
+		provides("json");
+	}
+
+	/**
+	 * Run tests via CLI
+	 */
+	public void function index() {
+		// This is a simple proxy to the Wheels test runner
+		// In production, you would want to add authentication
+		
+		local.result = {
+			success = false,
+			message = "Test running via CLI is not enabled in this environment"
+		};
+		
+		// Only allow in development/testing environments
+		if (listFindNoCase("development,testing", get("environment"))) {
+			// Redirect to the Wheels test runner
+			try {
+				// Include the test runner
+				include "/wheels/public/views/tests.cfm";
+				abort;
+			} catch (any e) {
+				local.result.message = "Error running tests: #e.message#";
+			}
+		}
+		
+		renderWith(local.result);
+	}
+
+}

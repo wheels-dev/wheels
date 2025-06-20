@@ -1,9 +1,10 @@
 component extends="wheels.Controller" {
-    
+
     function init() {
         provides("json");
+				filters(through="setJsonResponse);
     }
-    
+
     /**
      * GET /#objectNamePlural#
      * Returns a list of all #objectNamePlural#
@@ -12,45 +13,45 @@ component extends="wheels.Controller" {
         local.#objectNamePlural# = model("|ObjectNameSingular|").findAll();
         renderWith(data={ #objectNamePlural#=local.#objectNamePlural# });
     }
-    
+
     /**
      * GET /#objectNamePlural#/:key
      * Returns a specific #objectNameSingular# by ID
      */
     function show() {
         local.#objectNameSingular# = model("|ObjectNameSingular|").findByKey(params.key);
-        
+
         if (IsObject(local.#objectNameSingular#)) {
             renderWith(data={ #objectNameSingular#=local.#objectNameSingular# });
         } else {
             renderWith(data={ error="Record not found" }, status=404);
         }
     }
-    
+
     /**
      * POST /#objectNamePlural#
      * Creates a new #objectNameSingular#
      */
     function create() {
         local.#objectNameSingular# = model("|ObjectNameSingular|").new(params.#objectNameSingular#);
-        
+
         if (local.#objectNameSingular#.save()) {
             renderWith(data={ #objectNameSingular#=local.#objectNameSingular# }, status=201);
         } else {
             renderWith(data={ error="Validation failed", errors=local.#objectNameSingular#.allErrors() }, status=422);
         }
     }
-    
+
     /**
      * PUT /#objectNamePlural#/:key
      * Updates an existing #objectNameSingular#
      */
     function update() {
         local.#objectNameSingular# = model("|ObjectNameSingular|").findByKey(params.key);
-        
+
         if (IsObject(local.#objectNameSingular#)) {
             local.#objectNameSingular#.update(params.#objectNameSingular#);
-            
+
             if (local.#objectNameSingular#.hasErrors()) {
                 renderWith(data={ error="Validation failed", errors=local.#objectNameSingular#.allErrors() }, status=422);
             } else {
@@ -60,14 +61,14 @@ component extends="wheels.Controller" {
             renderWith(data={ error="Record not found" }, status=404);
         }
     }
-    
+
     /**
      * DELETE /#objectNamePlural#/:key
      * Deletes a #objectNameSingular#
      */
     function delete() {
         local.#objectNameSingular# = model("|ObjectNameSingular|").findByKey(params.key);
-        
+
         if (IsObject(local.#objectNameSingular#)) {
             local.#objectNameSingular#.delete();
             renderWith(data={}, status=204);
@@ -75,4 +76,12 @@ component extends="wheels.Controller" {
             renderWith(data={ error="Record not found" }, status=404);
         }
     }
+
+		/**
+		* Set Response to JSON
+		*/
+		private function setJsonResponse() {
+			params.format = "json";
+		}
+
 }

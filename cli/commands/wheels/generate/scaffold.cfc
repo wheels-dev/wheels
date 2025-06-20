@@ -71,11 +71,15 @@ component aliases="wheels g scaffold" extends="../base" {
         if (arguments.migrate) {
             detailOutput.invoke("dbmigrate");
             command('wheels dbmigrate up').run();
-        } else if (!arguments.api && !isBoolean(shell.getNonInteractiveFlag())) {
+        } else if (!arguments.api) {
             // Only ask to migrate in interactive mode
-            if (confirm("Would you like to run migrations now? [y/n]")) {
-                detailOutput.invoke("dbmigrate");
-                command('wheels dbmigrate up').run();
+            try {
+                if (confirm("Would you like to run migrations now? [y/n]")) {
+                    detailOutput.invoke("dbmigrate");
+                    command('wheels dbmigrate up').run();
+                }
+            } catch (any e) {
+                // Skip if non-interactive
             }
         }
         

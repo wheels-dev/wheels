@@ -86,6 +86,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Job: `wheels g job ProcessOrders --queue=high --schedule="0 0 * * *"`
 - Plugin: `wheels g plugin Authentication --version="1.0.0"`
 
+### Deployment Commands (New)
+- Initialize deployment: `wheels deploy:init --provider=digitalocean --domain=myapp.com`
+- Setup servers: `wheels deploy:setup`
+- Deploy application: `wheels deploy:push`
+- Check status: `wheels deploy:status`
+- View logs: `wheels deploy:logs --follow`
+- Rollback: `wheels deploy:rollback`
+- Manage secrets: `wheels deploy:secrets push`
+
+### Security & Analysis (New)
+- Security scan: `wheels security scan --fix`
+- Performance optimization: `wheels optimize performance --analysis`
+- Code analysis: `wheels analyze code --metrics`
+- Dependency analysis: `wheels deps --tree`
+
+### Environment Management (New)
+- List environments: `wheels env list`
+- Switch environment: `wheels env switch production`
+- Setup environment: `wheels env setup --name=staging`
+- Environment diff: `wheels config diff production staging`
+
 ## High-Level Architecture
 
 ### Request Lifecycle
@@ -203,14 +224,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Test CLI commands in the `/workspace/` directory
 - Use `.claude/commands/cli/test-next-group.md` for systematic CLI testing
 
-## Recent CLI Fixes (2025-06-20)
+## Recent CLI Enhancements (2025-06-20)
 
-The following critical issues were addressed in the CLI:
+### Fixed Issues
 - Database and server command namespaces now properly route to subcommands
 - Test commands now detect actual server port instead of hardcoded 8080
 - Scaffold generator supports non-interactive mode
 - Plugin and console commands have proper dependency injection
 - Get/set commands now route to their subcommands correctly
+- Model generator now creates foreign key columns for relationships
+- View generator now respects layout parameter
+- App wizard includes application name validation
+
+### New Features
+- **Deploy System**: Full production deployment with zero-downtime support
+- **Security Scanner**: Vulnerability detection and automated fixes
+- **Performance Optimizer**: Caching, asset optimization, query analysis
+- **Environment Management**: Multi-environment configuration and switching
+- **Advanced Generators**: API resources, frontend scaffolding, job scheduling
 
 ## Commit Message Guidelines
 - Use conventional commit format: `type: description`

@@ -1,9 +1,20 @@
 component {
     
-    property name="packageService" inject="PackageService@commandbox-core";
-    property name="configService" inject="ConfigService@commandbox-core";
-    property name="forgebox" inject="ForgeBox@commandbox-core";
-    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
+    // Note: These services are not available in the module context
+    // property name="packageService" inject="PackageService@commandbox-core";
+    // property name="forgebox" inject="ForgeBox@commandbox-core";
+    // property name="fileSystemUtil" inject="FileSystem@commandbox-core";
+    
+    /**
+     * List installed plugins
+     */
+    function list(boolean global = false) {
+        return {
+            success: true,
+            message: "Plugin functionality is currently being refactored. Please use CommandBox package management directly.",
+            plugins: []
+        };
+    }
     
     /**
      * Install a Wheels CLI plugin
@@ -15,7 +26,7 @@ component {
         string version = ""
     ) {
         try {
-            var boxJsonPath = fileSystemUtil.resolvePath("box.json");
+            var boxJsonPath = expandPath("box.json");
             var boxJson = {};
             
             // Read existing box.json
