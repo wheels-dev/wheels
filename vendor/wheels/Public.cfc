@@ -1,4 +1,4 @@
-component output="false" displayName="Internal GUI" {
+component output="false" displayName="Internal GUI" extends="wheels.Global" {
 
 	/**
 	 * Internal function.
