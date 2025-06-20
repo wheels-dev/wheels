@@ -16,14 +16,14 @@ component extends="base" {
 	public void function run() {
 		local.appPath = getCWD();
 		
-		// Header
+		// Header - Updated to just "Wheels"
 		print.line();
-		print.boldRedLine("  _____ _______          ___               _     ");
-		print.boldRedLine(" / ____|  ____\ \        / / |             | |    ");
-		print.boldRedLine("| |    | |__   \ \  /\  / /| |__   ___  ___| |___ ");
-		print.boldRedLine("| |    |  __|   \ \/  \/ / | '_ \ / _ \/ _ \ / __|");
-		print.boldRedLine("| |____| |       \  /\  /  | | | |  __/  __/ \__ \");
-		print.boldRedLine(" \_____|_|        \/  \/   |_| |_|\___|\___|_|___/");
+		print.boldRedLine(" __          ___               _     ");
+		print.boldRedLine(" \ \        / / |             | |    ");
+		print.boldRedLine("  \ \  /\  / /| |__   ___  ___| |___ ");
+		print.boldRedLine("   \ \/  \/ / | '_ \ / _ \/ _ \ / __|");
+		print.boldRedLine("    \  /\  /  | | | |  __/  __/ \__ \");
+		print.boldRedLine("     \/  \/   |_| |_|\___|\___|_|___/");
 		print.line();
 		
 		// Wheels Version
@@ -90,10 +90,10 @@ component extends="base" {
 		
 		// Helpful Links
 		print.boldGreenLine("Resources");
-		print.cyanLine("  Documentation: https://guides.cfwheels.org");
-		print.cyanLine("  API Reference: https://api.cfwheels.org");
+		print.cyanLine("  Documentation: https://guides.wheels.dev");
+		print.cyanLine("  API Reference: https://api.wheels.dev");
 		print.cyanLine("  GitHub: https://github.com/cfwheels/cfwheels");
-		print.cyanLine("  Community: https://community.cfwheels.org");
+		print.cyanLine("  Community: https://community.wheels.dev");
 		print.line();
 	}
 

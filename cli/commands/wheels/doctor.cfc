@@ -309,12 +309,12 @@ component extends="base" {
 			try {
 				local.boxJson = DeserializeJSON(FileRead(local.boxJsonPath));
 				
-				// Check for cfwheels dependency
+				// Check for wheels dependency
 				if (StructKeyExists(local.boxJson, "dependencies")) {
-					if (StructKeyExists(local.boxJson.dependencies, "cfwheels")) {
-						ArrayAppend(arguments.passed, "CFWheels dependency declared");
+					if (StructKeyExists(local.boxJson.dependencies, "wheels-core") || StructKeyExists(local.boxJson.dependencies, "cfwheels")) {
+						ArrayAppend(arguments.passed, "Wheels dependency declared");
 					} else {
-						ArrayAppend(arguments.warnings, "CFWheels not listed in dependencies");
+						ArrayAppend(arguments.warnings, "Wheels not listed in dependencies");
 					}
 				}
 				
