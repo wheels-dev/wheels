@@ -7,7 +7,7 @@
  * wheels scaffold Product --properties="name:string,price:decimal" --api
  * wheels scaffold Comment --belongs-to=Post,User
  */
-component extends="base" {
+component aliases="wheels g scaffold" extends="../base" {
     
     property name="scaffoldService" inject="ScaffoldService@wheels-cli";
     property name="detailOutput" inject="DetailOutputService@wheels-cli";

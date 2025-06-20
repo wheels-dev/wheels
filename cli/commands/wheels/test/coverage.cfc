@@ -56,57 +56,50 @@ component aliases='wheels test:coverage' extends="../base" {
             directoryCreate(outputPath, true);
         }
         
-        // Build TestBox command with coverage enabled
-        var testboxCommand = "testbox run";
-        
-        // Add directory
-        testboxCommand &= " directory=#arguments.directory#";
-        
-        // Enable coverage
-        testboxCommand &= " coverage=true";
-        
-        // Add coverage reporter
-        testboxCommand &= " coverageReporter=#arguments.reporter#";
-        
-        // Add output directory
-        testboxCommand &= " coverageOutputDir=#arguments.outputDir#";
+        // Build TestBox command parameters
+        var params = {
+            directory = arguments.directory,
+            coverage = true,
+            coverageReporter = arguments.reporter,
+            coverageOutputDir = arguments.outputDir
+        };
         
         // Add optional coverage parameters
         if (arguments.threshold > 0) {
-            testboxCommand &= " coverageThreshold=#arguments.threshold#";
+            params.coverageThreshold = arguments.threshold;
         }
         
         if (len(arguments.pathsToCapture)) {
-            testboxCommand &= " coveragePathToCapture=#arguments.pathsToCapture#";
+            params.coveragePathToCapture = arguments.pathsToCapture;
         }
         
         if (len(arguments.whitelist)) {
-            testboxCommand &= " coverageWhitelist=#arguments.whitelist#";
+            params.coverageWhitelist = arguments.whitelist;
         }
         
         if (len(arguments.blacklist)) {
-            testboxCommand &= " coverageBlacklist=#arguments.blacklist#";
+            params.coverageBlacklist = arguments.blacklist;
         }
         
         // Add test filtering parameters
         if (len(arguments.bundles)) {
-            testboxCommand &= " bundles=#arguments.bundles#";
+            params.bundles = arguments.bundles;
         }
         
         if (len(arguments.labels)) {
-            testboxCommand &= " labels=#arguments.labels#";
+            params.labels = arguments.labels;
         }
         
         if (len(arguments.excludes)) {
-            testboxCommand &= " excludes=#arguments.excludes#";
+            params.excludes = arguments.excludes;
         }
         
         if (len(arguments.filter)) {
-            testboxCommand &= " filter=#arguments.filter#";
+            params.filter = arguments.filter;
         }
         
         if (arguments.verbose) {
-            testboxCommand &= " verbose=true";
+            params.verbose = true;
         }
         
         // Show coverage details
@@ -118,11 +111,11 @@ component aliases='wheels test:coverage' extends="../base" {
         }
         
         print.line();
-        print.line("Executing: #testboxCommand#");
+        print.line("Executing: testbox run with coverage enabled");
         print.line();
         
         // Execute TestBox command
-        command(testboxCommand).run();
+        command('testbox run').params(argumentCollection=params).run();
         
         // Show where to find the coverage report
         print.line();

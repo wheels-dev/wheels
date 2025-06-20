@@ -184,13 +184,17 @@ component {
     /**
      * Search for available plugins
      */
-    function search(string query = "") {
+    function search(string query = "", string type = "cfwheels-plugins") {
         try {
-            // Search ForgeBox for wheels-cli-plugin type packages
-            var searchResults = packageService.search(
-                searchTerm = arguments.query,
-                type = "wheels-cli-plugin"
-            );
+            // Search ForgeBox for wheels plugins
+            var searchParams = {};
+            if (len(arguments.query)) {
+                searchParams.searchTerm = arguments.query;
+            }
+            searchParams.type = arguments.type;
+            searchParams.max = 50;
+            
+            var searchResults = packageService.search(argumentCollection=searchParams);
             
             var plugins = [];
             for (var result in searchResults) {

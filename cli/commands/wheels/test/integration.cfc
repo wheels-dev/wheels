@@ -53,48 +53,43 @@ component aliases='wheels test:integration' extends="../base" {
             createSampleIntegrationTest(integrationTestPath);
         }
         
-        // Build TestBox command
-        var testboxCommand = "testbox run";
-        
-        // Set directory to integration tests
-        testboxCommand &= " directory=#arguments.directory#";
-        
-        // Add reporter
-        testboxCommand &= " reporter=#arguments.reporter#";
-        
-        // Always recurse for integration tests
-        testboxCommand &= " recurse=true";
+        // Build TestBox command parameters
+        var params = {
+            directory = arguments.directory,
+            reporter = arguments.reporter,
+            recurse = true
+        };
         
         // Add optional parameters
         if (len(arguments.bundles)) {
-            testboxCommand &= " bundles=#arguments.bundles#";
+            params.bundles = arguments.bundles;
         }
         
         if (len(arguments.labels)) {
-            testboxCommand &= " labels=#arguments.labels#";
+            params.labels = arguments.labels;
         }
         
         if (len(arguments.excludes)) {
-            testboxCommand &= " excludes=#arguments.excludes#";
+            params.excludes = arguments.excludes;
         }
         
         if (len(arguments.filter)) {
-            testboxCommand &= " filter=#arguments.filter#";
+            params.filter = arguments.filter;
         }
         
         if (arguments.verbose) {
-            testboxCommand &= " verbose=true";
+            params.verbose = true;
         }
         
         if (arguments.failFast) {
-            testboxCommand &= " failfast=true";
+            params.failfast = true;
         }
         
         // Execute TestBox command
-        print.line("Executing: #testboxCommand#");
+        print.line("Executing: testbox run for integration tests");
         print.line();
         
-        command(testboxCommand).run();
+        command('testbox run').params(argumentCollection=params).run();
     }
     
     /**

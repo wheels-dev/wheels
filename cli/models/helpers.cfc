@@ -48,6 +48,20 @@ component accessors="true" singleton {
         return appPath;
     }
     
+    // Get the path to the tests directory
+    public string function getTestPath() {
+        var cwd = shell.pwd();
+        var testPath = cwd & "/tests";
+        
+        // Check if tests directory exists
+        if (!directoryExists(testPath)) {
+            // Create it if it doesn't exist
+            directoryCreate(testPath);
+        }
+        
+        return testPath;
+    }
+    
     // Generate a timestamp for migrations (format: YYYYMMDDHHMMSS)
     public string function generateMigrationTimestamp() {
         var now = now();

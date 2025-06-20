@@ -71,6 +71,51 @@ exit
 3. **Working Directory**: Commands run in current directory
 4. **Reload Requirement**: After modifying CLI code, run `box reload`
 
+## Server Requirements
+
+### Commands That Require a Running Server
+
+Many Wheels CLI commands interact with the application runtime and therefore require a running CommandBox server. These commands will fail with errors like "Unable to determine server port" if no server is running.
+
+**Commands requiring a server:**
+- `wheels dbmigrate` (all subcommands) - Database migrations need active database connection
+- `wheels test` (all subcommands) - Tests run in application context
+- `wheels routes` - Reads runtime route configuration
+- `wheels reload` - Reloads the running application
+- `wheels runner` - Executes code in application context
+- `wheels console` - Interactive REPL needs application context
+
+**Commands that work without a server:**
+- All generator commands (`wheels g ...`)
+- `wheels version`, `wheels info`, `wheels about`
+- `wheels environment` (read/set)
+- `wheels doctor` - Checks file system only
+- `wheels stats`, `wheels notes` - Static code analysis
+- `wheels cache clear` - Clears file-based caches
+- `wheels secret` - Generates random secrets
+
+### Starting a Server
+
+```bash
+# Start server in current directory
+server start
+
+# Start with specific name
+server start name=myapp
+
+# Start on specific port
+server start port=8080
+
+# Start without opening browser
+server start openBrowser=false
+
+# Check server status
+server status
+
+# Stop server
+server stop
+```
+
 ## Wheels CLI Commands
 
 ### Running Wheels CLI commands
@@ -2920,53 +2965,100 @@ wheels test app
 open http://localhost:3000
 ```
 
-## Parameter Inconsistencies
+## Parameter Syntax Requirements
 
-### Known Inconsistencies
+### CommandBox Parameter Rules
 
-1. **Case Sensitivity**
+CommandBox has strict parameter requirements that must be followed:
+
+1. **DO NOT mix positional and named parameters**
    ```bash
-   # Some commands use camelCase
-   wheels g model userId:integer
-
-   # Others use kebab-case
-   wheels g migration add-index-to-users
+   # ❌ WRONG - This will error
+   wheels g app myapp template=base --force
+   
+   # ✅ CORRECT - Use all named parameters
+   wheels g app name=myapp template=base force=true
+   
+   # ✅ CORRECT - Or all positional (if command supports it)
+   wheels g app myapp
    ```
 
-2. **Boolean Parameters**
+2. **Named parameters use equals sign**
    ```bash
-   # Some accept --flag
-   wheels g model User --migration=false
-
-   # Others require explicit
-   wheels reload force=true
+   # ❌ WRONG
+   wheels g model name User properties title:string
+   
+   # ✅ CORRECT
+   wheels g model name=User properties="title:string"
    ```
 
-3. **Parameter Names**
+3. **Boolean flags**
    ```bash
-   # 'name' vs direct argument
-   wheels g controller Users  # Works
-   wheels g controller name=Users  # Also works
+   # Two ways to specify boolean true:
+   wheels g scaffold Product --force      # Flag style (means force=true)
+   wheels g scaffold Product force=true   # Explicit style
+   
+   # For false, must use explicit style:
+   wheels g model User migration=false
+   ```
 
-   # But dbmigrate commands require name
-   wheels dbmigrate create blank name=CreateUsers  # Required
+4. **Quote complex values**
+   ```bash
+   # ❌ WRONG - Space breaks parsing
+   wheels g controller name=Users actions=index,show,new
+   
+   # ✅ CORRECT - Quote values with spaces or special characters
+   wheels g controller name=Users actions="index,show,new,create"
+   wheels g model name=Article properties="title:string,content:text,userId:integer"
+   ```
+
+### Common Parameter Patterns
+
+1. **Generators typically support positional name**
+   ```bash
+   # These are equivalent:
+   wheels g model User
+   wheels g model name=User
+   ```
+
+2. **Database commands require named parameters**
+   ```bash
+   # ❌ WRONG
+   wheels dbmigrate create CreateUsers
+   
+   # ✅ CORRECT
+   wheels dbmigrate create name=CreateUsers
+   ```
+
+3. **Multiple values use comma separation**
+   ```bash
+   # Controller actions
+   wheels g controller name=Posts actions="index,show,new,create,edit,update,delete"
+   
+   # Model properties
+   wheels g model name=User properties="name:string,email:string,active:boolean"
+   
+   # View names
+   wheels g view name=posts views="index,show,edit,new"
    ```
 
 ### Best Practices
 
-1. **Always use named parameters for consistency**
+1. **When in doubt, use all named parameters**
    ```bash
-   wheels g model name=User properties=name:string,email:string
+   wheels g app name=myapp template=base datasourceName=mydb setupH2=true
    ```
 
-2. **Use --flag for boolean true**
+2. **Check command help for parameter names**
    ```bash
-   wheels g scaffold Product --force --tests=false
+   wheels help g model
+   wheels help dbmigrate create
    ```
 
-3. **Quote complex values**
+3. **Use quotes for safety**
    ```bash
-   wheels g controller name=Users actions="index,show,new,create"
+   wheels g migration name="AddIndexToUsersEmail"
+   wheels g controller name="Admin/Users" actions="index,show"
    ```
 
 ## Troubleshooting

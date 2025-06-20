@@ -18,7 +18,7 @@ component  aliases='wheels db latest,wheels db migrate'  extends="../base"  {
 			} else {
 				// Migrate to specific version
 				print.line("Migrating database to version #arguments.version#...");
-				command('wheels dbmigrate exec version=#arguments.version#').run();
+				command('wheels dbmigrate exec').params(version=arguments.version).run();
 			}
 		} else {
 			// Default behavior - migrate to latest
@@ -32,7 +32,7 @@ component  aliases='wheels db latest,wheels db migrate'  extends="../base"  {
 				
 				print.line("Updating Database Schema to Latest Version")
 					.line("Latest Version is #DBMigrateInfo.result.lastVersion#");
-				command('wheels dbmigrate exec version=#DBMigrateInfo.result.lastVersion#').run();
+				command('wheels dbmigrate exec').params(version=DBMigrateInfo.result.lastVersion).run();
 			} catch (any e) {
 				error("Failed to get migration information: #e.message#");
 			}

@@ -79,7 +79,8 @@
       "Bash(gh pr comment:*)",
       "Bash(wheels g:*)",
       "mcp__puppeteer__puppeteer_select",
-      "Bash(wheels:*)"
+      "Bash(wheels:*)",
+      "Bash(time:*)"
     ],
     "deny": []
   }

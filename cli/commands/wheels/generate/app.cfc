@@ -256,8 +256,45 @@ component aliases="wheels g app" extends="../base" {
       details.line();
       details.getPrint().yellowLine("🛠️ Installing H2 database extension...");
       
+      // Check if server with this name already exists
+      var serverInfo = command( 'server list' ).params( name = arguments.name, JSON = true ).run( returnOutput = true );
+      if ( len(trim(serverInfo)) ) {
+        // Server exists, check if it's pointing to a different directory
+        try {
+          var serverData = deserializeJSON( serverInfo );
+          if ( structKeyExists(serverData, arguments.name) && serverData[arguments.name].webroot != arguments.directory ) {
+            details.line();
+            details.getPrint().orangeLine("⚠️  Warning: A server named '#arguments.name#' already exists pointing to a different directory.");
+            details.getPrint().orangeLine("   Existing: #serverData[arguments.name].webroot#");
+            details.getPrint().orangeLine("   New: #arguments.directory#");
+            details.line();
+            
+            // Ask user what to do
+            if ( confirm("Would you like to forget the existing server and create a new one? [y/n]") ) {
+              command( 'server forget' ).params( name = arguments.name, force = true ).run();
+              details.getPrint().greenLine("✓ Existing server forgotten.");
+            } else {
+              details.getPrint().yellowLine("⚠️  Skipping server start. You'll need to handle the server configuration manually.");
+              arrayAppend(nextSteps, "Resolve server name conflict and start manually: server start");
+              return;
+            }
+          }
+        } catch (any e) {
+          // If we can't parse the JSON, just continue
+        }
+      }
+      
       // Start the server
-      command( 'server start' ).params( name = arguments.name, openBrowser = false, debug = false ).flags( '!saveSettings' ).run();
+      try {
+        command( 'server start' ).params( name = arguments.name, openBrowser = false, debug = false ).flags( '!saveSettings' ).run();
+      } catch (any e) {
+        details.line();
+        details.getPrint().redLine("❌ Error starting server: #e.message#");
+        if (findNoCase("already exists", e.message)) {
+          details.getPrint().yellowLine("💡 Try using a different app name or manually forget the existing server.");
+        }
+        arrayAppend(nextSteps, "Manually start the server after resolving conflicts: server start");
+      }
       
       // Auto-install any necessary extensions for Lucee
       if ( arguments.cfmlEngine == 'lucee' ) {

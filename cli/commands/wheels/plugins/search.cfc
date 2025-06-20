@@ -8,7 +8,6 @@
 component aliases="wheels plugin search" extends="../base" {
     
     property name="pluginService" inject="PluginService@wheels-cli";
-    property name="forgebox" inject="ForgeBox@commandbox-core";
     
     /**
      * @query.hint Search term to filter plugins
@@ -26,18 +25,8 @@ component aliases="wheels plugin search" extends="../base" {
              .line();
         
         try {
-            // Search ForgeBox for wheels plugins
-            var searchParams = {
-                type: "cfwheels-plugins",
-                max: 50
-            };
-            
-            if (len(arguments.query)) {
-                searchParams.searchTerm = arguments.query;
-            }
-            
-            // Get results from ForgeBox API
-            var results = forgebox.search(argumentCollection=searchParams);
+            // Search for plugins using PluginService
+            var results = pluginService.search(arguments.query);
             
             if (!arrayLen(results)) {
                 print.yellowLine("No plugins found matching '#arguments.query#'");

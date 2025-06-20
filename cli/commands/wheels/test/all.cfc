@@ -51,56 +51,53 @@ component aliases='wheels test:all' extends="../base" {
             return;
         }
         
-        // Build TestBox command
-        var testboxCommand = "testbox run";
-        
-        // Add directory
-        testboxCommand &= " directory=#arguments.directory#";
-        
-        // Add reporter
-        testboxCommand &= " reporter=#arguments.reporter#";
+        // Build TestBox command parameters
+        var params = {
+            directory = arguments.directory,
+            reporter = arguments.reporter
+        };
         
         // Add optional parameters
         if (arguments.recurse) {
-            testboxCommand &= " recurse=true";
+            params.recurse = true;
         }
         
         if (len(arguments.bundles)) {
-            testboxCommand &= " bundles=#arguments.bundles#";
+            params.bundles = arguments.bundles;
         }
         
         if (len(arguments.labels)) {
-            testboxCommand &= " labels=#arguments.labels#";
+            params.labels = arguments.labels;
         }
         
         if (len(arguments.excludes)) {
-            testboxCommand &= " excludes=#arguments.excludes#";
+            params.excludes = arguments.excludes;
         }
         
         if (len(arguments.filter)) {
-            testboxCommand &= " filter=#arguments.filter#";
+            params.filter = arguments.filter;
         }
         
         if (arguments.verbose) {
-            testboxCommand &= " verbose=true";
+            params.verbose = true;
         }
         
         if (arguments.failFast) {
-            testboxCommand &= " failfast=true";
+            params.failfast = true;
         }
         
         // Add coverage options
         if (arguments.coverage) {
-            testboxCommand &= " coverage=true";
-            testboxCommand &= " coverageReporter=#arguments.coverageReporter#";
-            testboxCommand &= " coverageOutputDir=#arguments.coverageOutputDir#";
+            params.coverage = true;
+            params.coverageReporter = arguments.coverageReporter;
+            params.coverageOutputDir = arguments.coverageOutputDir;
         }
         
         // Execute TestBox command
-        print.line("Executing: #testboxCommand#");
+        print.line("Executing: testbox run");
         print.line();
         
-        command(testboxCommand).run();
+        command('testbox run').params(argumentCollection=params).run();
     }
     
     /**
