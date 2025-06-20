@@ -2660,7 +2660,7 @@ component output="false" {
 	 *
 	 * @path The key path to normalize.
 	 */
-	public string function normalizePath(required string path) {
+	public string function $normalizePath(required string path) {
 		local.norm = arguments.path;
 		local.norm = reReplace(local.norm, "\[(.*?)\]", ".\1", "all");
 		local.norm = reReplace(local.norm, "^\.", "", "one");

@@ -16,8 +16,8 @@ if (StructKeyExists(application.wheels, "docs")) {
 		}
 	}
 
-	ArrayAppend(documentScope, {"name" = "controller", "scope" = CreateObject("component", "app.controllers.Controller")});
-	ArrayAppend(documentScope, {"name" = "model", "scope" = CreateObject("component", "app.models.Model")});
+	ArrayAppend(documentScope, {"name" = "controller", "scope" = CreateObject("component", "app.controllers.Controller").init()});
+	ArrayAppend(documentScope, {"name" = "model", "scope" = CreateObject("component", "app.models.Model").init()});
 	
 	/* 
 		To fix the issue below:
@@ -48,7 +48,21 @@ if (StructKeyExists(application.wheels, "docs")) {
 		);
 	}
 	// Array of functions to ignore
-	ignore = ["config", "init"];
+	ignore = [
+		"config",
+		"init",
+		"onDIcomplete",
+		"exposeMixin",
+		"getPropertyMixin",
+		"getVariablesMixin",
+		"includeitMixin",
+		"injectMixin",
+		"injectPropertyMixin",
+		"invokerMixin",
+		"methodProxy",
+		"removeMixin",
+		"removePropertyMixin"
+	];
 
 	// Populate the main documentation
 	docs = $returnInternalDocumentation(documentScope, ignore);

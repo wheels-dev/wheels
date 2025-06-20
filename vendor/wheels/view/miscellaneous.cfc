@@ -638,7 +638,7 @@ component {
 				} else if(arguments.objectName.startsWith("variables.")){
 					local.rv = variableScope[replaceNoCase(arguments.objectName, "variables.", "", "one")];
 				} else{
-					local.rv = getValueByDynamicPath(arguments.objectName, variableScope);
+					local.rv = $getValueByDynamicPath(arguments.objectName, variableScope);
 				}
 			} else {
 				local.rv = variableScope[arguments.objectName];
@@ -680,7 +680,7 @@ component {
 	 * @path The path to resolve the values from.
 	 * @variableScope The scope from which to resolve the path from.
 	 */
-	public any function getValueByDynamicPath(required string path, required struct variableScope) {
+	public any function $getValueByDynamicPath(required string path, required struct variableScope) {
 		// Extract keys and indexes using a regular expression
 		local.pattern = "[a-zA-Z0-9_]+|\\['[^\\]]+'\\]";
 		local.matches = REMatchNoCase(local.pattern, arguments.path);

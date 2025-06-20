@@ -115,7 +115,7 @@
 
 							<cfloop list="#local.skip#" index="local.j">
 								<!--- Normalize the key path --->
-								<cfset local.normalizedPath = normalizePath(local.j)>
+								<cfset local.normalizedPath = $normalizePath(local.j)>
 								<cfif local.normalizedPath CONTAINS "." AND ListFirst(local.normalizedPath, ".") EQ local.scopeName>
 									<!--- Get nested path relative to the scope --->
 									<cfset local.relativePath = ListRest(local.normalizedPath, ".")>

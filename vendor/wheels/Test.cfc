@@ -204,7 +204,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 	 * @display  Whether to display the debug call. False returns without outputting anything into the buffer. Good when you want to leave the debug command in the test for later purposes, but don't want it to display
 		*/
 	public any function debug(required string expression, boolean display = true) {
-		local.attributeArgs = {"var" = evaluateExpression(arguments.expression), "label" = arguments.expression};
+		local.attributeArgs = {"var" = $evaluateExpression(arguments.expression), "label" = arguments.expression};
 		local.dump = "";
 
 		// this string will be added to the request key regardless of display argument
@@ -728,7 +728,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 		return (Left(local.path, 7) == "wheels/" || ListFindNoCase("index.cfm", local.path));
 	}
 
-	public any function evaluateExpression(required string expression) {
+	public any function $evaluateExpression(required string expression) {
 		local.parts = $splitOutsideFunctions(arguments.expression, ".");
 
 		try {

@@ -551,7 +551,7 @@ component {
 			if (StructKeyExists(arguments, local.item) && Len(arguments[local.item])) {
 				local.key = local.item & "Evaluated";
 				try {
-        	local[local.key] = EvaluateConditionString(arguments[local.item]);
+        	local[local.key] = $evaluateConditionString(arguments[local.item]);
 				} catch (any e) {
 					return false;
 				}
@@ -785,7 +785,7 @@ component {
 	 * Function to evaluate a condition string without using Evaluate()
 	 * @condition The condition to resolve
 	 */
-	public any function EvaluateConditionString(required string condition) {
+	public any function $evaluateConditionString(required string condition) {
 		// Replace CFScript operators with CFScript equivalents
 		local.operatorList = "eq,neq,lt,lte,gt,gte";
 		local.normalizedCondition = ReplaceList(condition, "==,!=,<,<=,>,>=", local.operatorList);
@@ -870,7 +870,7 @@ component {
 			local.leftOperand = isNumeric(local.leftOperand) ? JavaCast("double", local.leftOperand) : local.leftOperand;
 			local.rightOperand = isNumeric(local.rightOperand) ? JavaCast("double", local.rightOperand) : local.rightOperand;
 			// Evaluate the logical expression
-			return resolveOperator(local.leftOperand, local.rightOperand, local.operator);
+			return $resolveOperator(local.leftOperand, local.rightOperand, local.operator);
 		}
 
 		if(structKeyExists(local, 'after') && structKeyExists(local, 'middle')){
@@ -883,7 +883,7 @@ component {
     	  local.after = Replace(local.after, '"', "", "all");
     	}
 
-			return resolveOperator(local.rv, local.after, local.middle);
+			return $resolveOperator(local.rv, local.after, local.middle);
 		}
 
 		return structKeyExists(local, rv)? local.rv : false;
@@ -892,7 +892,7 @@ component {
 	/**
  	 * Evaluate a logical expression based on the operator.
  	 */
-	public boolean function resolveOperator(required any firstOperator, required any secondOperator, required any operator){
+	public boolean function $resolveOperator(required any firstOperator, required any secondOperator, required any operator){
 		switch (arguments.operator) {
 			case "eq":
 				return (arguments.firstOperator == arguments.secondOperator);
