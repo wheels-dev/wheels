@@ -80,7 +80,9 @@
       "Bash(wheels g:*)",
       "mcp__puppeteer__puppeteer_select",
       "Bash(wheels:*)",
-      "Bash(time:*)"
+      "Bash(time:*)",
+      "Bash(server start openBrowser=false)",
+      "Bash(server status)"
     ],
     "deny": []
   }

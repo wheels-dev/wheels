@@ -1,7 +1,9 @@
 component {
     
-    property name="packageService" inject="PackageService";
-    property name="ConfigService" inject="ConfigService";
+    property name="packageService" inject="PackageService@commandbox-core";
+    property name="configService" inject="ConfigService@commandbox-core";
+    property name="forgebox" inject="ForgeBox@commandbox-core";
+    property name="fileSystemUtil" inject="FileSystem@commandbox-core";
     
     /**
      * Install a Wheels CLI plugin
@@ -13,7 +15,7 @@ component {
         string version = ""
     ) {
         try {
-            var boxJsonPath = resolvePath("box.json");
+            var boxJsonPath = fileSystemUtil.resolvePath("box.json");
             var boxJson = {};
             
             // Read existing box.json

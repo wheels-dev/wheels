@@ -71,8 +71,8 @@ component aliases="wheels g scaffold" extends="../base" {
         if (arguments.migrate) {
             detailOutput.invoke("dbmigrate");
             command('wheels dbmigrate up').run();
-        } else {
-            // Ask to migrate
+        } else if (!arguments.api && !isBoolean(shell.getNonInteractiveFlag())) {
+            // Only ask to migrate in interactive mode
             if (confirm("Would you like to run migrations now? [y/n]")) {
                 detailOutput.invoke("dbmigrate");
                 command('wheels dbmigrate up').run();
@@ -86,7 +86,7 @@ component aliases="wheels g scaffold" extends="../base" {
             "Visit the resource at: /#lCase(helpers.pluralize(arguments.name))#"
         ];
         
-        if (!arguments.migrate && !confirm("Would you like to run migrations now? [y/n]")) {
+        if (!arguments.migrate) {
             arrayPrepend(nextSteps, "Run migrations: wheels dbmigrate up");
         }
         
