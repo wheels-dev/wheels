@@ -82,7 +82,9 @@
       "Bash(wheels:*)",
       "Bash(time:*)",
       "Bash(server start openBrowser=false)",
-      "Bash(server status)"
+      "Bash(server status)",
+      "Bash(./test-db-commands.sh:*)",
+      "Bash(git reset:*)"
     ],
     "deny": []
   }
