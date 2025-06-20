@@ -3,9 +3,11 @@
  *
  * {code:bash}
  * wheels version
+ * wheels -v
+ * wheels --version
  * {code}
  */
-component extends="base" {
+component aliases="-v,--version" extends="base" {
 
 	/**
 	 * @help Show version information

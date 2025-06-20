@@ -1,7 +1,7 @@
 component {
     
-    property name="packageService" inject="PackageService@commandbox-core";
-    property name="configService" inject="ConfigService@commandbox-core";
+    property name="packageService" inject="PackageService";
+    property name="ConfigService" inject="ConfigService";
     
     /**
      * Install a Wheels CLI plugin
@@ -141,7 +141,7 @@ component {
         
         if (arguments.global) {
             // Get global CommandBox modules
-            var globalModules = configService.getSetting("modules", {});
+            var globalModules = ConfigService.getSetting("modules", {});
             for (var moduleName in globalModules) {
                 if (isWheelsPlugin(moduleName)) {
                     arrayAppend(plugins, {

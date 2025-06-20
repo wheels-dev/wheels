@@ -77,7 +77,9 @@
       "Bash(git stash:*)",
       "Bash(wheels test:*)",
       "Bash(gh pr comment:*)",
-      "Bash(wheels g:*)"
+      "Bash(wheels g:*)",
+      "mcp__puppeteer__puppeteer_select",
+      "Bash(wheels:*)"
     ],
     "deny": []
   }

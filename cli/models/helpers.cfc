@@ -1,5 +1,6 @@
 component accessors="true" singleton {
     property name="serverService" inject="ServerService";
+    property name="shell" inject="shell";
 
     // Return commonly used model name variants
     public struct function getNameVariants(required string name){
@@ -14,6 +15,50 @@ component accessors="true" singleton {
 
     public string function stripSpecialChars(required string str) {
         return trim(reReplace(str,"[{}()^$&%##!@=<>:;,~`'*?/+|\[\]\-\\]",'','all'));
+    }
+
+    // Get the path to the migrations directory
+    public string function getMigrationPath() {
+        var appPath = getAppPath();
+        var migrationPath = appPath & "/migrator/migrations";
+        return migrationPath;
+    }
+
+    // Get the path to the app directory
+    public string function getAppPath() {
+        // Try to find app directory in current working directory
+        var cwd = shell.pwd();
+        var appPath = cwd & "/app";
+        
+        // Check if app directory exists
+        if (!directoryExists(appPath)) {
+            // If not, check if we're already in the app directory
+            if (right(cwd, 4) == "/app") {
+                appPath = cwd;
+            } else {
+                // Last resort - look for vendor/wheels to confirm we're in project root
+                if (directoryExists(cwd & "/vendor/wheels")) {
+                    appPath = cwd & "/app";
+                } else {
+                    throw(message="Cannot determine app directory path", detail="Make sure you're running this command from the project root directory");
+                }
+            }
+        }
+        
+        return appPath;
+    }
+    
+    // Generate a timestamp for migrations (format: YYYYMMDDHHMMSS)
+    public string function generateMigrationTimestamp() {
+        var now = now();
+        var year = year(now);
+        var month = numberFormat(month(now), "00");
+        var day = numberFormat(day(now), "00");
+        var hour = numberFormat(hour(now), "00");
+        var minute = numberFormat(minute(now), "00");
+        var second = numberFormat(second(now), "00");
+        
+        return year & month & day & hour & minute & second;
     }
 
 //=====================================================================

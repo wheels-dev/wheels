@@ -22,10 +22,20 @@ component  aliases='wheels db latest,wheels db migrate'  extends="../base"  {
 			}
 		} else {
 			// Default behavior - migrate to latest
-			var DBMigrateInfo=$sendToCliCommand();
-			print.line("Updating Database Schema to Latest Version")
-				.line("Latest Version is #DBMigrateInfo.lastVersion#");
-			command('wheels dbmigrate exec version=#DBMigrateInfo.lastVersion#').run();
+			try {
+				var DBMigrateInfo = $sendToCliCommand("&command=info");
+				
+				// Check if we got a valid response
+				if (!isStruct(DBMigrateInfo) || !structKeyExists(DBMigrateInfo, "result") || !structKeyExists(DBMigrateInfo.result, "lastVersion")) {
+					error("Unable to retrieve migration information from the application. Please ensure your server is running and the application is properly configured.");
+				}
+				
+				print.line("Updating Database Schema to Latest Version")
+					.line("Latest Version is #DBMigrateInfo.result.lastVersion#");
+				command('wheels dbmigrate exec version=#DBMigrateInfo.result.lastVersion#').run();
+			} catch (any e) {
+				error("Failed to get migration information: #e.message#");
+			}
 		}
 		
 		command('wheels dbmigrate info').run();
