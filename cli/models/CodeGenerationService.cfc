@@ -122,6 +122,7 @@ component {
         string extends = "",
         string description = "",
         boolean rest = false,
+        boolean api = false,
         boolean force = false,
         array actions = [],
         string baseDirectory = ""
@@ -156,12 +157,19 @@ component {
             description: arguments.description,
             actions: arguments.actions,
             rest: arguments.rest,
+            api: arguments.api,
             timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
         };
         
         // Generate from template
         try {
-            var template = arguments.rest ? "CRUDContent.txt" : "ControllerContent.txt";
+            var template = "ControllerContent.txt";
+            if (arguments.api) {
+                template = "ApiControllerContent.txt";
+            } else if (arguments.rest) {
+                template = "CRUDContent.txt";
+            }
+            
             var generatedPath = templateService.generateFromTemplate(
                 template = template,
                 destination = "controllers/#fileName#",

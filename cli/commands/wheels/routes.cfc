@@ -23,9 +23,29 @@ component extends="base" {
 			return;
 		}
 
-		// Get the routes from the application
+		// Get the routes from the application via CLI bridge
 		try {
-			local.routes = getRoutes(local.appPath);
+			// Check if server is running
+			$preConnectionCheck();
+			
+			// Get routes via CLI bridge
+			local.result = $sendToCliCommand("&command=routes");
+			
+			if (!structKeyExists(local.result, "routes") || !isArray(local.result.routes)) {
+				// Fall back to static parsing if bridge doesn't return routes
+				print.yellowLine("Unable to retrieve routes from running application.");
+				print.yellowLine("Attempting to parse routes from config file...");
+				print.line();
+				
+				local.routes = getRoutes(local.appPath);
+				
+				if (ArrayLen(local.routes) == 0) {
+					print.redLine("No routes found in the application");
+					return;
+				}
+			} else {
+				local.routes = local.result.routes;
+			}
 			
 			if (ArrayLen(local.routes) == 0) {
 				print.yellowLine("No routes found in the application");

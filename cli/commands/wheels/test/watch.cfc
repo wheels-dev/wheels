@@ -50,46 +50,41 @@ component aliases='wheels test:watch' extends="../base" {
         print.line("Press Ctrl+C to stop watching");
         print.line();
         
-        // Build TestBox watch command
-        var testboxCommand = "testbox watch";
-        
-        // Add directory
-        testboxCommand &= " directory=#arguments.directory#";
-        
-        // Add reporter
-        testboxCommand &= " reporter=#arguments.reporter#";
-        
-        // Add delay
-        testboxCommand &= " delay=#arguments.delay#";
+        // Build TestBox watch command parameters
+        var params = {
+            directory = arguments.directory,
+            reporter = arguments.reporter,
+            delay = arguments.delay
+        };
         
         // Add optional parameters
         if (arguments.verbose) {
-            testboxCommand &= " verbose=true";
+            params.verbose = true;
         }
         
         if (len(arguments.watchPaths)) {
             // Add additional paths to watch
-            testboxCommand &= " paths=#arguments.watchPaths#";
+            params.paths = arguments.watchPaths;
         }
         
         if (len(arguments.excludePaths)) {
-            testboxCommand &= " excludePaths=#arguments.excludePaths#";
+            params.excludePaths = arguments.excludePaths;
         }
         
         if (len(arguments.bundles)) {
-            testboxCommand &= " bundles=#arguments.bundles#";
+            params.bundles = arguments.bundles;
         }
         
         if (len(arguments.labels)) {
-            testboxCommand &= " labels=#arguments.labels#";
+            params.labels = arguments.labels;
         }
         
         if (len(arguments.excludes)) {
-            testboxCommand &= " excludes=#arguments.excludes#";
+            params.excludes = arguments.excludes;
         }
         
         if (len(arguments.filter)) {
-            testboxCommand &= " filter=#arguments.filter#";
+            params.filter = arguments.filter;
         }
         
         // Show watching details
@@ -106,11 +101,11 @@ component aliases='wheels test:watch' extends="../base" {
         }
         
         print.line();
-        print.line("Executing: #testboxCommand#");
+        print.line("Executing: testbox watch");
         print.line();
         
         // Execute TestBox watch command
-        command(testboxCommand).run();
+        command('testbox watch').params(argumentCollection=params).run();
     }
     
     /**

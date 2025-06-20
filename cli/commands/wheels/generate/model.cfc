@@ -9,6 +9,13 @@
  */
 component aliases='wheels g model' extends="../base" {
     
+    /**
+     * Constructor
+     */
+    function init() {
+        return this;
+    }
+    
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
     property name="migrationService" inject="MigrationService@wheels-cli";
     property name="scaffoldService" inject="ScaffoldService@wheels-cli";
@@ -39,6 +46,10 @@ component aliases='wheels g model' extends="../base" {
         string description = "",
         boolean force = false
     ) {
+        // Support positional parameter for name
+        if (structKeyExists(arguments, "1") && !structKeyExists(arguments, "name")) {
+            arguments.name = arguments["1"];
+        }
         // Validate model name
         var validation = codeGenerationService.validateName(arguments.name, "model");
         if (!validation.valid) {
@@ -158,10 +169,33 @@ component aliases='wheels g model' extends="../base" {
         required string hasMany,
         required string hasOne
     ) {
-        // Add belongsTo relationships
+        // Add belongsTo relationships and their foreign key columns
         if (len(arguments.belongsTo)) {
             var parents = listToArray(arguments.belongsTo);
             for (var parent in parents) {
+                // Add the foreign key column for the migration
+                var foreignKeyName = lCase(parent) & "Id";
+                var hasFK = false;
+                
+                // Check if FK already exists in properties
+                for (var prop in arguments.properties) {
+                    if (prop.name == foreignKeyName) {
+                        hasFK = true;
+                        break;
+                    }
+                }
+                
+                // Add FK column if not already present
+                if (!hasFK) {
+                    arrayAppend(arguments.properties, {
+                        name: foreignKeyName,
+                        type: "integer",
+                        required: false,
+                        unique: false
+                    });
+                }
+                
+                // Add the association info (for model generation, not migration)
                 arrayAppend(arguments.properties, {
                     name: lCase(parent),
                     association: "belongsTo",

@@ -61,6 +61,7 @@ component aliases="wheels g controller" extends="../base" {
             name = arguments.name,
             description = arguments.description,
             rest = arguments.rest,
+            api = arguments.api,
             force = arguments.force,
             actions = actionList,
             baseDirectory = getCWD()
@@ -69,12 +70,14 @@ component aliases="wheels g controller" extends="../base" {
         if (result.success) {
             detailOutput.create(result.path);
             
+            // Initialize viewsCreated outside the conditional block
+            var viewsCreated = 0;
+            
             // Generate views for non-API controllers
             if (!arguments.api && arguments.rest) {
                 detailOutput.invoke("views");
                 
                 var viewActions = ["index", "show", "new", "edit"];
-                var viewsCreated = 0;
                 
                 for (var action in viewActions) {
                     if (arrayFindNoCase(actionList, action)) {
@@ -91,8 +94,6 @@ component aliases="wheels g controller" extends="../base" {
                         }
                     }
                 }
-                
-                // Remove this block since we're showing each file individually
             }
             
             // Show next steps

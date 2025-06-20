@@ -50,7 +50,7 @@ component excludeFromHelp=true {
 			print.line("We're currently looking in #getCWD()#");
 			if(confirm("Would you like to try and create one? [y/n]")){
 				local.version=ask("Which Version is it? Please enter your response in semVar format, i.e '1.4.5'");
-				command('init').params(name="CFWHEELS", version=local.version, slugname="wheels").run();
+				command('init').params(name="WHEELS", version=local.version, slugname="wheels").run();
 				return local.version;
 			} else {
 				error("Ok, aborting");
@@ -64,8 +64,8 @@ component excludeFromHelp=true {
 		if (!directoryExists(arguments.path & "/vendor/wheels")) {
 			return false;
 		}
-		// Check for config folder
-		if (!directoryExists(arguments.path & "/config")) {
+		// Check for app/config folder
+		if (!directoryExists(arguments.path & "/app/config")) {
 			return false;
 		}
 		// Check for app folder
@@ -97,6 +97,27 @@ component excludeFromHelp=true {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Prompt user for confirmation
+	 * @message The message to display
+	 * @defaultResponse Default response if non-interactive
+	 */
+	boolean function confirm(required string message, boolean defaultResponse = false) {
+		// Check if we're in non-interactive mode
+		if (structKeyExists(shell, "getNonInteractiveFlag") && shell.getNonInteractiveFlag()) {
+			return arguments.defaultResponse;
+		}
+		
+		// Try to use shell's ask method
+		try {
+			var response = shell.ask(arguments.message);
+			return (lCase(left(trim(response), 1)) == "y");
+		} catch (any e) {
+			// If we can't interact, return default
+			return arguments.defaultResponse;
+		}
 	}
 
 	// Replace default objectNames
@@ -273,7 +294,21 @@ component excludeFromHelp=true {
 			try {
 				var serverConfig = deserializeJSON(fileRead(serverJSON));
 
-				// Check for port in web.port
+				// Check for port in web.http.port (new format)
+				if (structKeyExists(serverConfig, "web") && structKeyExists(serverConfig.web, "http") && structKeyExists(serverConfig.web.http, "port") && serverConfig.web.http.port > 0) {
+					local.port = serverConfig.web.http.port;
+					local.host = structKeyExists(serverConfig.web, "host") ? serverConfig.web.host : "localhost";
+
+					// If host is "localhost", convert to 127.0.0.1 for consistency
+					if (local.host == "localhost") {
+						local.host = "127.0.0.1";
+					}
+
+					local.serverURL = "http://" & local.host & ":" & local.port;
+					return local;
+				}
+
+				// Check for port in web.port (legacy format)
 				if (structKeyExists(serverConfig, "web") && structKeyExists(serverConfig.web, "port") && serverConfig.web.port > 0) {
 					local.port = serverConfig.web.port;
 					local.host = structKeyExists(serverConfig.web, "host") ? serverConfig.web.host : "localhost";
@@ -438,6 +473,8 @@ component excludeFromHelp=true {
 			var filePath=directory & "/" & fileName;
 			file action='write' file='#filePath#' mode ='777' output='#trim( content )#';
 			print.line( 'Created #fileName#' );
+			// Return the relative path
+			return "app/migrator/migrations/" & fileName;
 	}
 
 	//=====================================================================

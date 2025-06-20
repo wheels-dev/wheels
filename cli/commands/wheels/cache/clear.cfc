@@ -61,8 +61,7 @@ component extends="../base" {
 		// Warn if clearing all caches
 		if (arguments.name == "all" && !arguments.force) {
 			print.yellowLine("WARNING: This will clear all application caches.");
-			var confirmed = ask("Are you sure you want to continue? [y/N]: ");
-			if (lCase(trim(confirmed)) != "y") {
+			if (!confirm("Are you sure you want to continue?")) {
 				print.line("Operation cancelled.");
 				return;
 			}

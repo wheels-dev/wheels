@@ -186,4 +186,33 @@ component {
 		return variables.print;
 	}
 
+	/**
+	 * Output a generic message
+	 * @message The message to output
+	 * @indent Whether to indent this message
+	 */
+	function output(required string message, boolean indent = false) {
+		var indentText = arguments.indent ? repeatString(" ", variables.indentSize) : "";
+		print.line(indentText & arguments.message).toConsole();
+		return this;
+	}
+
+	/**
+	 * Output a separator line
+	 */
+	function separator() {
+		print.line().toConsole();
+		return this;
+	}
+
+	/**
+	 * Output a code block
+	 * @code The code to display
+	 * @language The language for syntax highlighting (optional)
+	 */
+	function code(required string code, string language = "") {
+		print.line().line(arguments.code).line().toConsole();
+		return this;
+	}
+
 }

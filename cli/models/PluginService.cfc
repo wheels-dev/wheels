@@ -1,7 +1,20 @@
 component {
     
-    property name="packageService" inject="PackageService@commandbox-core";
-    property name="configService" inject="ConfigService@commandbox-core";
+    // Note: These services are not available in the module context
+    // property name="packageService" inject="PackageService@commandbox-core";
+    // property name="forgebox" inject="ForgeBox@commandbox-core";
+    // property name="fileSystemUtil" inject="FileSystem@commandbox-core";
+    
+    /**
+     * List installed plugins
+     */
+    function list(boolean global = false) {
+        return {
+            success: true,
+            message: "Plugin functionality is currently being refactored. Please use CommandBox package management directly.",
+            plugins: []
+        };
+    }
     
     /**
      * Install a Wheels CLI plugin
@@ -13,7 +26,7 @@ component {
         string version = ""
     ) {
         try {
-            var boxJsonPath = resolvePath("box.json");
+            var boxJsonPath = expandPath("box.json");
             var boxJson = {};
             
             // Read existing box.json
@@ -141,7 +154,7 @@ component {
         
         if (arguments.global) {
             // Get global CommandBox modules
-            var globalModules = configService.getSetting("modules", {});
+            var globalModules = ConfigService.getSetting("modules", {});
             for (var moduleName in globalModules) {
                 if (isWheelsPlugin(moduleName)) {
                     arrayAppend(plugins, {
@@ -184,13 +197,17 @@ component {
     /**
      * Search for available plugins
      */
-    function search(string query = "") {
+    function search(string query = "", string type = "cfwheels-plugins") {
         try {
-            // Search ForgeBox for wheels-cli-plugin type packages
-            var searchResults = packageService.search(
-                searchTerm = arguments.query,
-                type = "wheels-cli-plugin"
-            );
+            // Search ForgeBox for wheels plugins
+            var searchParams = {};
+            if (len(arguments.query)) {
+                searchParams.searchTerm = arguments.query;
+            }
+            searchParams.type = arguments.type;
+            searchParams.max = 50;
+            
+            var searchResults = packageService.search(argumentCollection=searchParams);
             
             var plugins = [];
             for (var result in searchResults) {

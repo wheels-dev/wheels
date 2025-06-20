@@ -7,7 +7,7 @@
  * wheels scaffold Product --properties="name:string,price:decimal" --api
  * wheels scaffold Comment --belongs-to=Post,User
  */
-component extends="base" {
+component aliases="wheels g scaffold" extends="../base" {
     
     property name="scaffoldService" inject="ScaffoldService@wheels-cli";
     property name="detailOutput" inject="DetailOutputService@wheels-cli";
@@ -71,11 +71,15 @@ component extends="base" {
         if (arguments.migrate) {
             detailOutput.invoke("dbmigrate");
             command('wheels dbmigrate up').run();
-        } else {
-            // Ask to migrate
-            if (confirm("Would you like to run migrations now? [y/n]")) {
-                detailOutput.invoke("dbmigrate");
-                command('wheels dbmigrate up').run();
+        } else if (!arguments.api) {
+            // Only ask to migrate in interactive mode
+            try {
+                if (confirm("Would you like to run migrations now? [y/n]")) {
+                    detailOutput.invoke("dbmigrate");
+                    command('wheels dbmigrate up').run();
+                }
+            } catch (any e) {
+                // Skip if non-interactive
             }
         }
         
@@ -86,7 +90,7 @@ component extends="base" {
             "Visit the resource at: /#lCase(helpers.pluralize(arguments.name))#"
         ];
         
-        if (!arguments.migrate && !confirm("Would you like to run migrations now? [y/n]")) {
+        if (!arguments.migrate) {
             arrayPrepend(nextSteps, "Run migrations: wheels dbmigrate up");
         }
         

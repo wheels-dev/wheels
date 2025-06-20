@@ -11,5 +11,6 @@
     "app":{
         "cfengine":"lucee"
     },
-    "rewritesEnable=true":true
+    "rewritesEnable=true":true,
+    "openbrowser":"false"
 }

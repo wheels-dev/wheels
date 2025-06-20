@@ -108,6 +108,20 @@ component {
             processed = reReplace(processed, "\{\{hasManyRelationships\}\}", "", "all");
         }
         
+        var hasOneValue = "";
+        if (structKeyExists(arguments.context, "hasOne")) {
+            hasOneValue = arguments.context.hasOne;
+        } else if (structKeyExists(arguments.context, "HASONE")) {
+            hasOneValue = arguments.context.HASONE;
+        }
+        
+        if (len(hasOneValue)) {
+            var hasOneCode = generateHasOneCode(hasOneValue);
+            processed = reReplace(processed, "\{\{hasOneRelationships\}\}", hasOneCode, "all");
+        } else {
+            processed = reReplace(processed, "\{\{hasOneRelationships\}\}", "", "all");
+        }
+        
         // Process attributes
         if (structKeyExists(arguments.context, "attributes") && len(arguments.context.attributes)) {
             var attributesStruct = parseAttributes(arguments.context.attributes);
@@ -158,10 +172,12 @@ component {
         // Generate object name variations from model or controller name
         if (structKeyExists(arguments.context, "modelName")) {
             var modelName = arguments.context.modelName;
-            processed = replace(processed, "|ObjectNameSingular|", lCase(modelName), "all");
-            processed = replace(processed, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(modelName)), "all");
-            processed = replace(processed, "|ObjectNameSingularC|", modelName, "all");
-            processed = replace(processed, "|ObjectNamePluralC|", variables.helpers.pluralize(modelName), "all");
+            // Extract just the model name without namespace path for variable names
+            var baseModelName = listLast(modelName, "/");
+            processed = replace(processed, "|ObjectNameSingular|", lCase(baseModelName), "all");
+            processed = replace(processed, "|ObjectNamePlural|", lCase(variables.helpers.pluralize(baseModelName)), "all");
+            processed = replace(processed, "|ObjectNameSingularC|", baseModelName, "all");
+            processed = replace(processed, "|ObjectNamePluralC|", variables.helpers.pluralize(baseModelName), "all");
         }
         
         return processed;
@@ -190,6 +206,20 @@ component {
         
         for (var rel in relationships) {
             arrayAppend(code, "		hasMany('#trim(rel)#');");
+        }
+        
+        return arrayToList(code, chr(10));
+    }
+    
+    /**
+     * Generate hasOne relationship code
+     */
+    private function generateHasOneCode(required string hasOne) {
+        var relationships = listToArray(arguments.hasOne);
+        var code = [];
+        
+        for (var rel in relationships) {
+            arrayAppend(code, "		hasOne('#trim(rel)#');");
         }
         
         return arrayToList(code, chr(10));

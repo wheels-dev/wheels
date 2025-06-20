@@ -79,7 +79,7 @@ component aliases='wheels g migration' extends="../base" {
             detailOutput.code(migrationContent, "cfscript");
         }
         
-        detailOutput.output("Run 'wheels dbmigrate latest' to apply this migration");
+        print.line("Run 'wheels dbmigrate latest' to apply this migration");
     }
     
     /**

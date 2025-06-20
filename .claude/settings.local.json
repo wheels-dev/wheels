@@ -75,7 +75,16 @@
       "Bash(gh search commits:*)",
       "Bash(gh workflow:*)",
       "Bash(git stash:*)",
-      "Bash(wheels test:*)"
+      "Bash(wheels test:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(wheels g:*)",
+      "mcp__puppeteer__puppeteer_select",
+      "Bash(wheels:*)",
+      "Bash(time:*)",
+      "Bash(server start openBrowser=false)",
+      "Bash(server status)",
+      "Bash(./test-db-commands.sh:*)",
+      "Bash(git reset:*)"
     ],
     "deny": []
   }

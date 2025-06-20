@@ -5,7 +5,7 @@
  * wheels test run --filter=UserTest --coverage
  * wheels test run --group=integration --reporter=junit
  */
-component extends="wheels-cli.models.BaseCommand" {
+component extends="../base" {
     
     /**
      * @filter.hint Filter tests by name pattern
@@ -64,7 +64,7 @@ component extends="wheels-cli.models.BaseCommand" {
         }
         
         // Build test URL
-        var serverInfo = getServerInfo();
+        var serverInfo = $getServerInfo();
         var testURL = serverInfo.serverURL & "/tests/runner.cfm?";
         
         // Add parameters

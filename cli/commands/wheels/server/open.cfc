@@ -20,55 +20,49 @@ component extends="../base" {
 		string browser,
 		string name
 	) {
-		// First check if server is running
+		// Get server info to determine URL
 		try {
 			var serverInfo = $getServerInfo();
-			if (!structKeyExists(serverInfo, "port") || serverInfo.port == 0) {
-				print.redLine("Server doesn't appear to be running.");
-				print.line("Start it with: wheels server start");
-				return;
-			}
-			
-			// Build the URL
-			var url = serverInfo.serverURL;
+			var serverURL = serverInfo.serverURL;
 			
 			// Add path if provided
 			if (len(arguments.path)) {
-				if (!left(arguments.path, 1) == "/") {
-					url &= "/";
+				// Ensure path starts with /
+				if (left(arguments.path, 1) != "/") {
+					arguments.path = "/" & arguments.path;
 				}
-				url &= arguments.path;
+				serverURL &= arguments.path;
 			}
 			
-			// Build the open command
+			print.greenLine("Opening Wheels application in browser...");
+			print.cyanLine("URL: " & serverURL);
+			print.line();
+			
+			// Use CommandBox's browse command which handles cross-platform opening
+			if (!isNull(arguments.browser)) {
+				command("browse").params(serverURL, "--browser=" & arguments.browser).run();
+			} else {
+				command("browse").params(serverURL).run();
+			}
+		} catch (any e) {
+			// Fall back to standard server open command if we can't get server info
+			print.yellowLine("Unable to determine server URL. Attempting to use server open command...");
+			
 			var openCommand = "server open";
 			
 			if (!isNull(arguments.name)) {
-				openCommand &= " --name=#arguments.name#";
+				openCommand &= " name=#arguments.name#";
+			}
+			
+			if (len(arguments.path)) {
+				openCommand &= " --path=#arguments.path#";
 			}
 			
 			if (!isNull(arguments.browser)) {
 				openCommand &= " --browser=#arguments.browser#";
 			}
 			
-			// If path was provided, we need to use browse command instead
-			if (len(arguments.path)) {
-				openCommand = "browse #url#";
-				if (!isNull(arguments.browser)) {
-					openCommand &= " --browser=#arguments.browser#";
-				}
-			}
-			
-			print.greenLine("Opening Wheels application in browser...");
-			print.line("URL: #url#");
-			print.line();
-			
-			// Execute the command
 			command(openCommand).run();
-			
-		} catch (any e) {
-			print.redLine("Unable to determine server URL.");
-			print.line("Is the server running? Check with: wheels server status");
 		}
 	}
 

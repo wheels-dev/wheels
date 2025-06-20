@@ -261,7 +261,16 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		} else {
 			// Check .env file permissions
 			local.fileInfo = GetFileInfo(local.envFile);
-			if (fileInfo.canRead && fileInfo.canWrite && fileInfo.canExecute) {
+			// Check file permissions - note that canExecute may not exist on all platforms
+			local.hasPermissionIssue = false;
+			if (structKeyExists(fileInfo, "canRead") && structKeyExists(fileInfo, "canWrite")) {
+				// On systems that support execute permission
+				if (structKeyExists(fileInfo, "canExecute") && fileInfo.canExecute) {
+					local.hasPermissionIssue = true;
+				}
+			}
+			
+			if (local.hasPermissionIssue) {
 				ArrayAppend(arguments.warnings, {
 					type: "warning",
 					message: ".env file has overly permissive permissions",

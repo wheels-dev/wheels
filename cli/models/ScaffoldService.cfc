@@ -50,9 +50,39 @@ component {
             
             // 2. Generate Migration
             try {
+                // Parse properties and add foreign keys for relationships
+                var parsedProperties = parseProperties(arguments.properties);
+                
+                // Add foreign key columns for belongsTo relationships
+                if (len(arguments.belongsTo)) {
+                    var parents = listToArray(arguments.belongsTo);
+                    for (var parent in parents) {
+                        var foreignKeyName = lCase(parent) & "Id";
+                        var hasFK = false;
+                        
+                        // Check if FK already exists
+                        for (var prop in parsedProperties) {
+                            if (prop.name == foreignKeyName) {
+                                hasFK = true;
+                                break;
+                            }
+                        }
+                        
+                        // Add FK if not present
+                        if (!hasFK) {
+                            arrayAppend(parsedProperties, {
+                                name: foreignKeyName,
+                                type: "integer",
+                                required: false,
+                                unique: false
+                            });
+                        }
+                    }
+                }
+                
                 var migrationPath = createMigrationWithProperties(
                     name = arguments.name,
-                    properties = parseProperties(arguments.properties),
+                    properties = parsedProperties,
                     baseDirectory = arguments.baseDirectory
                 );
                 
@@ -69,6 +99,7 @@ component {
             var controllerResult = codeGenerationService.generateController(
                 name = variables.helpers.pluralize(arguments.name),
                 rest = true,
+                api = arguments.api,
                 force = arguments.force,
                 baseDirectory = arguments.baseDirectory
             );
@@ -485,9 +516,9 @@ component {
             arrayAppend(errors, "Resource name is required");
         }
         
-        // Check for valid name format
-        if (!reFindNoCase("^[a-zA-Z][a-zA-Z0-9_]*$", arguments.name)) {
-            arrayAppend(errors, "Resource name must start with a letter and contain only letters, numbers, and underscores");
+        // Check for valid name format (allow namespaces with slashes)
+        if (!reFindNoCase("^[a-zA-Z][a-zA-Z0-9_/]*$", arguments.name)) {
+            arrayAppend(errors, "Resource name must start with a letter and contain only letters, numbers, underscores, and forward slashes for namespaces");
         }
         
         // Check if already exists

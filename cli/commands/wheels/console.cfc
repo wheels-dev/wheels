@@ -10,10 +10,9 @@
  **/
 component extends="base" {
 
-	property name="fileSystem" inject="fileSystem";
+	property name="fileSystem" inject="fileSystem@commandbox-core";
 	property name="shell" inject="shell";
 	property name="print" inject="print";
-	property name="CR" inject="CR";
 
 	/**
 	 * @environment Environment to load (development, testing, production)

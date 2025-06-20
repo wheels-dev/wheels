@@ -3,9 +3,11 @@
  *
  * {code:bash}
  * wheels version
+ * wheels -v
+ * wheels --version
  * {code}
  */
-component extends="base" {
+component aliases="-v,--version" extends="base" {
 
 	/**
 	 * @help Show version information
@@ -14,9 +16,9 @@ component extends="base" {
 		// Get server information
 		local.serverInfo = getServerInfo();
 		
-		print.boldGreenLine("CFWheels CLI Module " & getWheelsCliVersion());
+		print.boldGreenLine("Wheels CLI Module " & getWheelsCliVersion());
 		print.line("");
-		print.greenLine("CFWheels Version: " & $getWheelsVersion());
+		print.greenLine("Wheels Version: " & $getWheelsVersion());
 		print.greenLine("CFML Engine: " & local.serverInfo.name & " " & local.serverInfo.version);
 		print.greenLine("CommandBox Version: " & shell.getVersion());
 	}
