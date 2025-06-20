@@ -333,7 +333,7 @@ component output="false" extends="wheels.Global"{
 			password = application.wheels.dataSourcePassword
 		);
 		if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)){
-			local.sql = "SELECT TOP 1 * FROM _c_o_r_e_levels"
+			local.sql = "SELECT TOP 1 * FROM _c_o_r_e_levels";
 		} else{
 			local.sql = "SELECT * FROM _c_o_r_e_levels LIMIT 1";
 		}
@@ -377,7 +377,7 @@ component output="false" extends="wheels.Global"{
 						sql = "SELECT version FROM migratorversions"
 					);
 					if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)) {
-						local.sql = "EXEC sp_rename 'migratorversions', '#application[local.appKey].migratorTableName#'"
+						local.sql = "EXEC sp_rename 'migratorversions', '#application[local.appKey].migratorTableName#'";
 					} else {
 						local.sql = "ALTER TABLE migratorversions RENAME TO #application[local.appKey].migratorTableName#";
 					}
@@ -387,12 +387,20 @@ component output="false" extends="wheels.Global"{
 					);
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD core_level INT NOT NULL DEFAULT 1;"
+						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD core_level INT NOT NULL DEFAULT 1"
+					);
+					$query(
+						datasource = application[local.appKey].dataSourceName,
+						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES _c_o_r_e_levels(id)"
 					);
 				} catch ( any e ) {
 					$query(
 						datasource = application[local.appKey].dataSourceName,
 						sql = "CREATE TABLE #application[local.appKey].migratorTableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)"
+					);
+					$query(
+						datasource = application[local.appKey].dataSourceName,
+						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES _c_o_r_e_levels(id)"
 					);
 				}
 			}
