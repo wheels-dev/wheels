@@ -27,7 +27,7 @@ export enum TestStatus {
 }
 
 // CFML Engine types
-export type CfmlEngineType = 'lucee5' | 'lucee6' | 'adobe2018' | 'adobe2021' | 'adobe2023';
+export type CfmlEngineType = 'lucee5' | 'lucee6' | 'lucee7' | 'adobe2018' | 'adobe2021' | 'adobe2023';
 
 // CFML Engine
 export interface CfmlEngine {

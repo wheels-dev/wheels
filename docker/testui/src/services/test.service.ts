@@ -701,6 +701,7 @@ class TestService {
     if (engine.name === 'Lucee') {
       if (engine.version === '5') return 60005;
       if (engine.version === '6') return 60006;
+      if (engine.version === '7') return 60007;
     } else if (engine.name === 'Adobe') {
       if (engine.version === '2018') return 62018;
       if (engine.version === '2021') return 62021;
@@ -716,6 +717,7 @@ class TestService {
     if (engine.name === 'Lucee') {
       if (engine.version === '5') return 'lucee5';
       if (engine.version === '6') return 'lucee6';
+      if (engine.version === '7') return 'lucee7';
     } else if (engine.name === 'Adobe') {
       if (engine.version === '2018') return 'adobe2018';
       if (engine.version === '2021') return 'adobe2021';

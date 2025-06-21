@@ -589,6 +589,9 @@ const fetchEnginesAndDatabases = async () => {
         } else if (c.name.includes('lucee6')) {
           name = 'Lucee'
           version = '6'
+        } else if (c.name.includes('lucee7')) {
+          name = 'Lucee'
+          version = '7'
         } else if (c.name.includes('adobe2018')) {
           name = 'Adobe'
           version = '2018'
@@ -716,6 +719,7 @@ const addToQueue = () => {
       type: `${engineName.toLowerCase()}${engineVersion}` as any,
       port: engineName === 'Lucee' && engineVersion === '5' ? 60005 :
             engineName === 'Lucee' && engineVersion === '6' ? 60006 :
+            engineName === 'Lucee' && engineVersion === '7' ? 60007 :
             engineName === 'Adobe' && engineVersion === '2018' ? 62018 :
             engineName === 'Adobe' && engineVersion === '2021' ? 62021 :
             engineName === 'Adobe' && engineVersion === '2023' ? 62023 : 8080
