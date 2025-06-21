@@ -81,6 +81,7 @@ export interface TestResult {
   bundle?: TestBundle;
   spec?: TestSpec;
   runId?: string; // Unique identifier for each test run
+  testUrl?: string; // URL used to run this test
   error?: {
     message: string;
     detail?: string;
@@ -106,6 +107,7 @@ export interface TestRun {
     errors: number;
     skipped: number;
   };
+  testUrl?: string;
 }
 
 // Test Queue Item
