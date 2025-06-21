@@ -127,9 +127,9 @@ As we said, when linking a form to a route, there are 3 pieces of information th
 Wheels's default wildcard `controller/action`-based URLs will not accept form posts for security reasons. This is due to an attack known as [Cross Site Request Forgery (CSRF)](https://owasp.org/www-community/attacks/csrf). We strongly recommend configuring [routes](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) to post your forms to.
 {% endhint %}
 
-Most of the time, you'll probably be working with a resource. Your `app/config/routes.cfm` may look something like this:
+Most of the time, you'll probably be working with a resource. Your `/config/routes.cfm` may look something like this:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .resources("users")
@@ -146,7 +146,7 @@ If you click the **Routes** link in the debug footer, you'll be most interested 
 | user  | PATCH  | /users/\[key] | users      | update |
 | user  | DELETE | /users/\[key] | users      | delete |
 
-Once you get to this list of routes, it really doesn't matter how you authored them in your `app/config/routes.cfm`. What matters is that you know the names, methods, and parameters that the routes expect. (With some practice, you'll probably be able to look at `app/config/routes.cfm` and know exactly what the names, methods, and parameters are though.)
+Once you get to this list of routes, it really doesn't matter how you authored them in your `/config/routes.cfm`. What matters is that you know the names, methods, and parameters that the routes expect. (With some practice, you'll probably be able to look at `/config/routes.cfm` and know exactly what the names, methods, and parameters are though.)
 
 If you are creating a record, your route is likely setup to accept a `POST` method. That happens to be the default for [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startFormTag.html), so you don't even need to include the `method` argument. You can then pass the `users` route name to the `route` argument:
 
@@ -238,9 +238,9 @@ The moral of the story: [startFormTag()](https://wheels.dev/api/v3.0.0/controlle
 
 By setting up global defaults (as explained in the [Configuration and Defaults](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults)) for the `prependToLabel`, `append`, and `labelPlacement` arguments, you can make the form code ever simpler across your whole application.
 
-Here are the settings that you would apply in `app/config/settings.cfm`:
+Here are the settings that you would apply in `/config/settings.cfm`:
 
-{% code title="app/config/settings.cfm" %}
+{% code title="/config/settings.cfm" %}
 ```javascript
 set(
     functionName="textField",

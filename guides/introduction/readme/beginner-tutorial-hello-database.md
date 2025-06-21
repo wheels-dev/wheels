@@ -20,14 +20,14 @@ You can download all the source code for this sample application from [https://g
 
 ### Setting up the Data Source
 
-By default, Wheels will connect to a data source `wheels.dev`. To change this default behavior, open the file at `app/config/settings.cfm`. In a fresh install of Wheels, you'll see the follwing code:
+By default, Wheels will connect to a data source `wheels.dev`. To change this default behavior, open the file at `/config/settings.cfm`. In a fresh install of Wheels, you'll see the follwing code:
 
-{% code title="app/config/settings.cfm" %}
+{% code title="/config/settings.cfm" %}
 ```html
 <cfscript>
 	/*
 		Use this file to configure your application.
-		You can also use the environment specific files (e.g. app/config/production/settings.cfm) to override settings set here.
+		You can also use the environment specific files (e.g. /config/production/settings.cfm) to override settings set here.
 		Don't forget to issue a reload request (e.g. reload=true) after making changes.
 		See https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults for more info.
 	*/
@@ -60,7 +60,7 @@ By default, Wheels will connect to a data source `wheels.dev`. To change this de
 
 These lines provide Wheels with the necessary information about the data source, URL rewriting, and reload password for your application, and include the appropriate values. This may include values for `dataSourceName`, `dataSourceUserName`, and `dataSourcePassword`. More on URL rewriting and reload password later.
 
-{% code title="app/config/settings.cfm" %}
+{% code title="/config/settings.cfm" %}
 ```warpscript
 set(dataSourceName="back2thefuture");
 // set(dataSourceUserName="marty");
@@ -92,9 +92,9 @@ Fortunately, there are ways of going outside of these conventions when you reall
 
 ### Creating Routes for the users Resource
 
-Next, open the file at `app/config/routes.cfm`. You will see contents similar to this:
+Next, open the file at `/config/routes.cfm`. You will see contents similar to this:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .wildcard()
@@ -107,7 +107,7 @@ We are going to create a section of our application for listing, creating, updat
 
 Because a `users` resource is more specific than the "generic" routes provided by Wheels, we'll list it first in the chain of mapper method calls:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .resources("users")

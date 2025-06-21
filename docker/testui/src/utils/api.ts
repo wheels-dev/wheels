@@ -261,7 +261,7 @@ export const api = {
   // Special method for handling CFML engine API requests
   async cfml<T>(engine: string, path: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     // Validate engine parameter
-    const validEngines = ['lucee5', 'lucee6', 'adobe2018', 'adobe2021', 'adobe2023'];
+    const validEngines = ['lucee5', 'lucee6', 'lucee7', 'adobe2018', 'adobe2021', 'adobe2023'];
     if (!validEngines.includes(engine)) {
       console.error(`Invalid engine: ${engine}. Must be one of: ${validEngines.join(', ')}`);
       return {

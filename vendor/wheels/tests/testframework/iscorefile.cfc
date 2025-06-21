@@ -21,7 +21,7 @@ component extends="wheels.tests.Test" {
 	}
 
 	function _test_$isCoreFile_config_settings_cfm_is_false() {
-		path = ExpandPath('app/config/settings.cfm');
+		path = ExpandPath('/config/settings.cfm');
 		debug("path", false);
 		assert("!$isCoreFile(path)", "path");
 	}

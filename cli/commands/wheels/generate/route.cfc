@@ -46,7 +46,7 @@ component  aliases='wheels g route' extends="../base"  {
 			error("Please provide either an objectname for a resources route or specify a route type (--get, --post, etc.)");
 		}
 
-		var target = fileSystemUtil.resolvePath("app/config/routes.cfm");
+		var target = fileSystemUtil.resolvePath("config/routes.cfm");
 		var content = fileRead(target);
 		var inject = "";
 		var routeType = "";

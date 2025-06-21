@@ -88,7 +88,7 @@ of the box.
 * `xls`
 
 You can use [addFormat()](https://wheels.dev/api/v3.0.0/controller.addformat.html) to set more types to the appropriate MIME type for reference. For example, we could set a Microsoft Word MIME type in\
-`app/config/settings.cfm` like so:
+`/config/settings.cfm` like so:
 
 ```javascript
 addFormat(extension="doc", mimeType="application/msword");

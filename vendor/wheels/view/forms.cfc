@@ -39,7 +39,7 @@ component {
 	 *
 	 * @method The type of `method` to use in the `form` tag (`delete`, `get`, `patch`, `post`, and `put` are the options).
 	 * @multipart Set to `true` if the form should be able to upload files.
-	 * @route Name of a route that you have configured in `app/config/routes.cfm`.
+	 * @route Name of a route that you have configured in `config/routes.cfm`.
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.
@@ -111,7 +111,7 @@ component {
 				$throwErrorOrShow404Page(
 					type = "Wheels.RouteNotFound",
 					message = "Could not find the `#arguments.route#` route.",
-					extendedInfo = "Make sure there is a route configured in your `app/config/routes.cfm` file named `#arguments.route#`."
+					extendedInfo = "Make sure there is a route configured in your `config/routes.cfm` file named `#arguments.route#`."
 				);
 			}
 

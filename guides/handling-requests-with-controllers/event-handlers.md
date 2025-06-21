@@ -40,4 +40,4 @@ Sometimes it's useful to add functions right in the `Application.cfc` file to ma
 
 ### Application Settings
 
-Again, because there is no `Application.cfc` file for you to work with in Wheels, you have to find a suitable place to set application settings such as `SessionManagement`, `SessionTimeout, ScriptProtect, SetClientCookies`, and so on. These are usually set in the constructor area of an `Application.cfc` file. We recommend that you set them in the `app/config/app.cfm` file instead.
+Again, because there is no `Application.cfc` file for you to work with in Wheels, you have to find a suitable place to set application settings such as `SessionManagement`, `SessionTimeout, ScriptProtect, SetClientCookies`, and so on. These are usually set in the constructor area of an `Application.cfc` file. We recommend that you set them in the `/config/app.cfm` file instead.

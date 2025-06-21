@@ -1,6 +1,7 @@
 import type { TestBundle, TestSpec, TestRun, TestResult, CfmlEngine, Database } from '@/types';
 import { TestStatus } from '@/types';
-import { api } from '@/utils/api';
+// Lazy load api to avoid potential circular dependencies
+const getApi = () => import('@/utils/api').then(m => m.api);
 
 class TestService {
   private apiBase: string = '/api/tests';
@@ -112,6 +113,9 @@ class TestService {
     const testRunnerUrl = `${oldFormatHost}/wheels/testbox?`;
     const params = oldFormatParams;
     
+    // Store the full test URL for later assignment
+    const fullTestUrl = testRunnerUrl + params.toString();
+    
     // ===== NEW FORMAT URL (FOR REFERENCE ONLY) =====
     const newFormatUrl = `http://${engine.name.toLowerCase()}${engine.version}:${enginePort}/tests/runner.cfm?`;
     const newFormatParams = new URLSearchParams();
@@ -171,7 +175,8 @@ class TestService {
         failed: 0,
         errors: 0,
         skipped: 0
-      }
+      },
+      testUrl: fullTestUrl
     };
     
     try {
@@ -193,11 +198,18 @@ class TestService {
       console.log(`Full API URL will be: /api/${engineApiName}/${requestPath}`);
       
       // Make the API request through the NGINX proxy
-      const response = await api.cfml<any>(engineApiName, requestPath, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
+      let response;
+      try {
+        const api = await getApi();
+        response = await api.cfml<any>(engineApiName, requestPath, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+      } catch (apiError) {
+        console.error('API call failed:', apiError);
+        throw new Error(`API call failed: ${apiError.message || 'Unknown error'}`);
+      }
       
       if (response.error || !response.data) {
         throw new Error(`Test request failed: ${response.error || 'No data returned'}`);
@@ -689,6 +701,7 @@ class TestService {
     if (engine.name === 'Lucee') {
       if (engine.version === '5') return 60005;
       if (engine.version === '6') return 60006;
+      if (engine.version === '7') return 60007;
     } else if (engine.name === 'Adobe') {
       if (engine.version === '2018') return 62018;
       if (engine.version === '2021') return 62021;
@@ -704,6 +717,7 @@ class TestService {
     if (engine.name === 'Lucee') {
       if (engine.version === '5') return 'lucee5';
       if (engine.version === '6') return 'lucee6';
+      if (engine.version === '7') return 'lucee7';
     } else if (engine.name === 'Adobe') {
       if (engine.version === '2018') return 'adobe2018';
       if (engine.version === '2021') return 'adobe2021';

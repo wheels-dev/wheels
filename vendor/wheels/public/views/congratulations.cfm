@@ -42,7 +42,7 @@
 	</p>
 	<ol>
 		<li>
-			Open the routes configuration file at <code>app/config/routes.cfm</code>.
+			Open the routes configuration file at <code>/config/routes.cfm</code>.
 		</li>
 		<li>
 			You will see a line similar to this for a route named <code>root</code>:

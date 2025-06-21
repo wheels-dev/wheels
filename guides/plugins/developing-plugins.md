@@ -89,7 +89,7 @@ This is convenient when you're deploying plugins but can be annoying when you're
 
 To force Wheels to skip the unzipping process, set the `overwritePlugins` setting to `false` in the development\` environment.
 
-{% code title="app/config/development/settings.cfm" %}
+{% code title="/config/development/settings.cfm" %}
 ```javascript
 set(overwritePlugins=false);
 ```
@@ -101,7 +101,7 @@ With this setting, you'll be able to reload your application without worrying ab
 
 To force Wheels to skip the folder deletion process, set the `deletePluginDirectories` setting to `false` for your `development` environment.
 
-{% code title="app/config/development/settings.cfm" %}
+{% code title="/config/development/settings.cfm" %}
 ```javascript
 set(deletePluginDirectories=false);
 ```

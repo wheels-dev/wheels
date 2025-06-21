@@ -8,7 +8,7 @@ This file provides complete working examples for common Wheels framework tasks t
 
 #### Routes Configuration
 ```cfml
-// /app/config/routes.cfm
+// /config/routes.cfm
 mapper()
   // Public routes
   .get(name="home", pattern="", to="pages##home")

@@ -28,7 +28,7 @@ server.json
 
 #### Quick Summary
 
-Your configuration settings will be done in the _**app/config**_ directory.
+Your configuration settings will be done in the _**/config**_ directory.
 
 Your application code will end up in four of the folders, namely _**app/controllers**_, _**app/events**_, _**app/models**_, and _**app/views**_.
 
@@ -62,7 +62,7 @@ This is where you prepare the views for your users. As you work on your website,
 
 If you want code executed when ColdFusion triggers an event, you can place it here (rather than directly in `Application.cfc`).
 
-#### app/config
+#### /config
 
 Make all your configuration changes here. You can set the environment, routes, and other settings here. You can also override settings by making changes in the individual settings files that you see in the subdirectories.
 

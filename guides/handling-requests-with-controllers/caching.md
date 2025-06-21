@@ -16,7 +16,7 @@ All this takes time and resources on your web and database servers. Let's assume
 
 Wheels will configure all caching parameters behind the scenes for you based on what environment mode you are currently in. If you leave everything to Wheels, caching will be optimized for the different environment modes (and set to have reasonable settings for cache size and culling). This means that all caching is off when working in Development mode but on when in Production mode, for example.
 
-Here are the global caching parameters you can set, their default values, and a description of what they do. Because these are not meant to be set differently based on the environment mode, you would usually set these in the `app/config/settings.cfm` file:
+Here are the global caching parameters you can set, their default values, and a description of what they do. Because these are not meant to be set differently based on the environment mode, you would usually set these in the `/config/settings.cfm` file:
 
 ```
 set(maximumItemsToCache=5000);

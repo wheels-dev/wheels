@@ -169,7 +169,7 @@ wheels deploy:exec "env | grep WHEELS"
 wheels deploy:exec "tar -czf /tmp/backup.tar.gz /app/uploads"
 
 # Check file permissions
-wheels deploy:exec "ls -la /app/config"
+wheels deploy:exec "ls -la /config"
 
 # Remove old logs
 wheels deploy:exec "find /app/logs -name '*.log' -mtime +30 -delete"

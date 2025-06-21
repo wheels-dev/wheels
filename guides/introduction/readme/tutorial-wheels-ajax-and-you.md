@@ -20,7 +20,7 @@ In this example, we'll wire up some simple JavaScript code that calls a Wheels a
 First, let's make sure we've got an appropriate route setup. It might be you're still using the default `wildcard()` route which will create some default `GET` routes for the `controller/action` pattern, but we'll add a new route here just for practice. We are going to create a route named `sayHello` and direct it to the `hello` action of the `say` controller. There are two ways you could write this code a long hand method specifying the controller and action separately as well as a short hand method that combines the two into a single parameter.
 
 The longhand way would look like:
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
   .get(name="sayHello", controller="say", action="hello")
@@ -29,7 +29,7 @@ mapper()
 {% endcode %}
 
 The shorthand method would look like:
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
   .get(name="sayHello", to="say##hello")
