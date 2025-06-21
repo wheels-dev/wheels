@@ -48,7 +48,7 @@ services:
         target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/lucee@5/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/config/settings.cfm
     ports:
       - "60005:60005"
     networks:
@@ -66,7 +66,7 @@ services:
         target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/lucee@6/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/config/settings.cfm
     ports:
       - "60006:60006"
     networks:
@@ -84,7 +84,7 @@ services:
         target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/lucee@7/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/config/settings.cfm
     ports:
       - "60007:60007"
     networks:
@@ -102,7 +102,7 @@ services:
         target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2018/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/config/settings.cfm
     ports:
       - "62018:62018"
     networks:
@@ -120,7 +120,7 @@ services:
         target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2021/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/config/settings.cfm
     ports:
       - "62021:62021"
     networks:
@@ -138,7 +138,7 @@ services:
         target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2023/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/config/settings.cfm
     ports:
       - "62023:62023"
     networks:
@@ -156,7 +156,7 @@ services:
         target: /cfwheels-test-suite/server.json
       - type: bind
         source: ./docker/adobe@2025/settings.cfm
-        target: /cfwheels-test-suite/app/config/settings.cfm
+        target: /cfwheels-test-suite/config/settings.cfm
     ports:
       - "62025:62025"
     networks:
