@@ -288,7 +288,7 @@ component aliases='wheels t migrate' extends="../base" {
 		var nextSteps = [];
 		if (status.unmigrated > 0) {
 			arrayAppend(nextSteps, "Run 'wheels test migrate #arguments.path#' to migrate remaining files");
-			arrayAppend(nextSteps, "Use --dry-run to preview changes first");
+			arrayAppend(nextSteps, "Use dryRun=true to preview changes first");
 		}
 		if (status.mixed > 0) {
 			arrayAppend(nextSteps, "Review partially migrated files for manual fixes");

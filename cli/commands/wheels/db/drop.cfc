@@ -39,7 +39,7 @@ component extends="../base" {
 			}
 			
 			if (!Len(arguments.datasource)) {
-				error("No datasource configured. Use --datasource parameter or set dataSourceName in settings.");
+				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
 				return;
 			}
 			

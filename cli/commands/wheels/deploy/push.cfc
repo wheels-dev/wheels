@@ -3,8 +3,8 @@
  * 
  * {code:bash}
  * wheels deploy:push
- * wheels deploy:push --tag=v1.0.0
- * wheels deploy:push --no-build --rolling
+ * wheels deploy:push tag=v1.0.0
+ * wheels deploy:push build=false rolling=true
  * {code}
  */
 component extends="./base" {

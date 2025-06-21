@@ -60,7 +60,7 @@ component aliases='wheels g service' extends="../base" {
         
         // Check if file exists
         if (fileExists(servicePath) && !arguments.force) {
-            error("Service already exists: #arguments.name#.cfc. Use --force to overwrite.");
+            error("Service already exists: #arguments.name#.cfc. Use force=true to overwrite.");
             return;
         }
         

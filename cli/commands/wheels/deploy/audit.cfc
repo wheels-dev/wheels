@@ -128,7 +128,7 @@ component extends="./base" {
                 }
                 
                 if (arrayLen(entries) < arrayLen(auditLines)) {
-                    print.line("Use --lines=N to see more entries");
+                    print.line("Use lines=N to see more entries");
                 }
             }
         }

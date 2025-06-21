@@ -3,9 +3,9 @@
  * 
  * Examples:
  * wheels scaffold User
- * wheels scaffold Post --properties="title:string,content:text,published:boolean"
- * wheels scaffold Product --properties="name:string,price:decimal" --api
- * wheels scaffold Comment --belongs-to=Post,User
+ * wheels scaffold Post properties="title:string,content:text,published:boolean"
+ * wheels scaffold Product properties="name:string,price:decimal" api=true
+ * wheels scaffold Comment belongsTo=Post,User
  */
 component aliases="wheels g scaffold" extends="../base" {
     

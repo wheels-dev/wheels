@@ -3,8 +3,8 @@
  *
  * {code:bash}
  * wheels db restore backup.sql
- * wheels db restore backup.sql.gz --compressed
- * wheels db restore backup.sql --clean
+ * wheels db restore backup.sql.gz compressed=true
+ * wheels db restore backup.sql clean=true
  * {code}
  */
 component extends="../base" {
@@ -56,7 +56,7 @@ component extends="../base" {
 			}
 			
 			if (!Len(arguments.datasource)) {
-				error("No datasource configured. Use --datasource parameter or set dataSourceName in settings.");
+				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
 				return;
 			}
 			

@@ -3,8 +3,8 @@
  * 
  * {code:bash}
  * wheels deploy:rollback
- * wheels deploy:rollback --tag=v1.0.0
- * wheels deploy:rollback --servers=192.168.1.100
+ * wheels deploy:rollback tag=v1.0.0
+ * wheels deploy:rollback servers=192.168.1.100
  * {code}
  */
 component extends="./base" {

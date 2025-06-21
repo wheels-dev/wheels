@@ -3,8 +3,8 @@
  * 
  * {code:bash}
  * wheels deploy:logs
- * wheels deploy:logs --tail=50 --follow
- * wheels deploy:logs --servers=192.168.1.100 --service=db
+ * wheels deploy:logs tail=50 follow=true
+ * wheels deploy:logs servers=192.168.1.100 service=db
  * {code}
  */
 component extends="./base" {
@@ -105,9 +105,9 @@ component extends="./base" {
         
         if (!arguments.follow) {
             print.line();
-            print.line("Tip: Use --follow to stream logs in real-time");
-            print.line("     Use --tail=N to show last N lines");
-            print.line("     Use --since=1h to show logs from last hour");
+            print.line("Tip: Use follow=true to stream logs in real-time");
+            print.line("     Use tail=N to show last N lines");
+            print.line("     Use since=1h to show logs from last hour");
         }
     }
     

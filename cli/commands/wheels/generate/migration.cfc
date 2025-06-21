@@ -5,9 +5,9 @@
  * wheels generate migration CreateUsersTable
  * wheels generate migration AddEmailToUsers
  * wheels generate migration RemoveAgeFromUsers
- * wheels generate migration CreateUsersTable --create=users
- * wheels generate migration AddEmailToUsers --table=users --attributes="email:string:index,verified:boolean"
- * wheels generate migration CreateProductsTable --attributes="name:string,price:decimal,inStock:boolean"
+ * wheels generate migration CreateUsersTable create=users
+ * wheels generate migration AddEmailToUsers table=users attributes="email:string:index,verified:boolean"
+ * wheels generate migration CreateProductsTable attributes="name:string,price:decimal,inStock:boolean"
  */
 component aliases='wheels g migration' extends="../base" {
     
@@ -62,7 +62,7 @@ component aliases='wheels g migration' extends="../base" {
         
         // Check if file exists
         if (fileExists(filePath) && !arguments.force) {
-            error("Migration file already exists: #fileName#. Use --force to overwrite.");
+            error("Migration file already exists: #fileName#. Use force=true to overwrite.");
             return;
         }
         

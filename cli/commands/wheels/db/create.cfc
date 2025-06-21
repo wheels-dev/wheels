@@ -3,7 +3,7 @@
  *
  * {code:bash}
  * wheels db create
- * wheels db create --datasource=myapp_dev
+ * wheels db create datasource=myapp_dev
  * {code}
  */
 component extends="../base" {
@@ -36,7 +36,7 @@ component extends="../base" {
 			}
 			
 			if (!Len(arguments.datasource)) {
-				error("No datasource configured. Use --datasource parameter or set dataSourceName in settings.");
+				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
 				return;
 			}
 			

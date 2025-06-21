@@ -6,8 +6,8 @@
  *
  * {code:bash}
  * wheels upgrade
- * wheels upgrade --to=3.0.0
- * wheels upgrade --check
+ * wheels upgrade to=3.0.0
+ * wheels upgrade check=true
  * {code}
  **/
 component extends="base" {

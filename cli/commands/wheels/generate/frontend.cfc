@@ -2,9 +2,9 @@
  * Scaffold and integrate modern frontend frameworks with Wheels
  *
  * {code:bash}
- * wheels generate frontend --framework=react
- * wheels generate frontend --framework=vue
- * wheels generate frontend --framework=alpine
+ * wheels generate frontend framework=react
+ * wheels generate frontend framework=vue
+ * wheels generate frontend framework=alpine
  * {code}
  */
 component extends="../base" {

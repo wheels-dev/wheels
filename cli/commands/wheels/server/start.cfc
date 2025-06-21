@@ -6,7 +6,7 @@
  * {code:bash}
  * wheels server start
  * wheels server start port=8080
- * wheels server start --rewritesEnable
+ * wheels server start rewritesEnable=true
  * {code}
  **/
 component extends="../base" {

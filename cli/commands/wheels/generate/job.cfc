@@ -3,9 +3,9 @@
  * 
  * Examples:
  * wheels generate job ProcessOrders
- * wheels generate job SendNewsletters --queue=emails --priority=high
- * wheels generate job DataExport --schedule="0 0 * * *"
- * wheels generate job CleanupOldRecords --delay=3600
+ * wheels generate job SendNewsletters queue=emails priority=high
+ * wheels generate job DataExport schedule="0 0 * * *"
+ * wheels generate job CleanupOldRecords delay=3600
  */
 component aliases='wheels g job' extends="../base" {
     
@@ -66,7 +66,7 @@ component aliases='wheels g job' extends="../base" {
         
         // Check if file exists
         if (fileExists(jobPath) && !arguments.force) {
-            error("Job already exists: #arguments.name#.cfc. Use --force to overwrite.");
+            error("Job already exists: #arguments.name#.cfc. Use force=true to overwrite.");
             return;
         }
         

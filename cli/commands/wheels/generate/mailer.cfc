@@ -53,7 +53,7 @@ component aliases='wheels g mailer' extends="../base" {
         
         // Check if file exists
         if (fileExists(mailerPath) && !arguments.force) {
-            error("Mailer already exists: #arguments.name#.cfc. Use --force to overwrite.");
+            error("Mailer already exists: #arguments.name#.cfc. Use force=true to overwrite.");
             return;
         }
         

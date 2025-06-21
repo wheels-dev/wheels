@@ -98,7 +98,7 @@ component aliases="wheels g app" extends="../base" {
       details.create(arguments.directory);
     } else {
       if ( arrayLen( directoryList( arguments.directory, false ) ) && !force) {
-        details.error( 'The target directory is not empty. Use --force to force the installation into a none empty directory.' );
+        details.error( 'The target directory is not empty. Use force=true to force the installation into a none empty directory.' );
         return;
       }
       details.identical(arguments.directory);

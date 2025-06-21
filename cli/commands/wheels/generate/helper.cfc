@@ -71,7 +71,7 @@ component aliases='wheels g helper' extends="../base" {
         
         // Check if file exists
         if (fileExists(helperPath) && !arguments.force) {
-            error("Helper already exists: #arguments.name#.cfc. Use --force to overwrite.");
+            error("Helper already exists: #arguments.name#.cfc. Use force=true to overwrite.");
             return;
         }
         

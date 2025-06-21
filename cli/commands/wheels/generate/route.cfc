@@ -1,8 +1,8 @@
 /**
  * Adds a route to the routes.cfm file
- * 
+ *
  * Examples:
- * wheels generate route products (creates resources route)
+ * wheels generate route products
  * wheels generate route --get products/sale,products#sale
  * wheels generate route --post api/users,api.users#create
  * wheels generate route --resources products
@@ -38,19 +38,19 @@ component  aliases='wheels g route' extends="../base"  {
 	) {
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
-		
+
 		// Validate that at least one route option is provided
-		if (!len(arguments.objectname) && !len(arguments.get) && !len(arguments.post) && 
-			!len(arguments.put) && !len(arguments.patch) && !len(arguments.delete) && 
+		if (!len(arguments.objectname) && !len(arguments.get) && !len(arguments.post) &&
+			!len(arguments.put) && !len(arguments.patch) && !len(arguments.delete) &&
 			!len(arguments.root) && !arguments.resources) {
 			error("Please provide either an objectname for a resources route or specify a route type (--get, --post, etc.)");
 		}
-		
+
 		var target = fileSystemUtil.resolvePath("app/config/routes.cfm");
 		var content = fileRead(target);
 		var inject = "";
 		var routeType = "";
-		
+
 		// Determine route type and format
 		if (len(arguments.get)) {
 			var parts = listToArray(arguments.get, ",");
@@ -98,17 +98,17 @@ component  aliases='wheels g route' extends="../base"  {
 		} else {
 			// Default to resources route
 			var obj = helpers.getNameVariants(listLast(arguments.objectname, '/\'));
-			
+
 			// Check if route already exists
 			if (findNoCase('.resources("' & obj.objectNamePlural & '")', content)) {
 				details.skip("config/routes.cfm (resources route for #obj.objectNamePlural# already exists)");
 				return;
 			}
-			
+
 			inject = '.resources("' & obj.objectNamePlural & '")';
 			routeType = "resources";
 		}
-		
+
 		// Find the correct indentation level
 		var baseIndent = chr(9) & chr(9) & chr(9);
 		var markerPattern = baseIndent & '// CLI-Appends-Here';
@@ -124,15 +124,15 @@ component  aliases='wheels g route' extends="../base"  {
 			baseIndent = '';
 			markerPattern = '// CLI-Appends-Here';
 		}
-		
+
 		// Add proper indentation to inject
 		inject = baseIndent & inject;
-		
+
 		// Replace the marker with the new route followed by the marker on a new line
 		content = replace(content, markerPattern, inject & cr & markerPattern, 'all');
-		
+
 		file action='write' file='#target#' mode='777' output='#trim(content)#';
-		
+
 		// Output detail message
 		details.header("🛤️", "Route Generation");
 		details.route(inject);

@@ -43,8 +43,8 @@ component extends="base" {
 		print.line();
 		print.boldLine("Tip: For better test experience, try:");
 		print.line("  wheels test run                    ## Run all tests");
-		print.line("  wheels test run --watch            ## Watch mode");
-		print.line("  wheels test run --coverage         ## With coverage");
+		print.line("  wheels test run watch=true         ## Watch mode");
+		print.line("  wheels test run coverage=true      ## With coverage");
 		print.line("  wheels test migrate tests          ## Migrate to TestBox");
 	}
 

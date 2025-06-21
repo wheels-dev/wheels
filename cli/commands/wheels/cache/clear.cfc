@@ -6,7 +6,7 @@
  * 
  * {code:bash}
  * wheels cache:clear
- * wheels cache:clear all --force
+ * wheels cache:clear all force=true
  * wheels cache:clear query
  * wheels cache:clear page
  * wheels cache:clear partial
