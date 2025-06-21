@@ -25,6 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Examples**: See AI-EXAMPLES.md and `/examples/` directory for working applications
 - **Context**: See AI-CONTEXT.md for framework concepts
 - **Troubleshooting**: See AI-TROUBLESHOOTING.md for common issues
+- **Upgrading**: See `/guides/upgrading/3.0.0-config-migration.md` for config directory migration
 
 ## Build/Test Commands
 
@@ -212,7 +213,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Key Directories
 - `/vendor/wheels/` - Core framework code (do not modify directly)
 - `/app/` - Application code (controllers, models, views)
-- `/config/` - Configuration files (routes, settings, environments) - **NOTE: Recently moved from /app/config**
+- `/config/` - Configuration files (routes, settings, environments) - **NOTE: Moved from /app/config in 3.0.0**
 - `/cli/` - CommandBox CLI module for Wheels commands
 - `/tests/` - Framework test suite
 - `/guides/` - Framework documentation

@@ -10,7 +10,7 @@ We all love the "Convention over Configuration" motto of Wheels, but what about 
 
 ### Where Configurations Happen
 
-You will find configuration files in the `config` folder of your Wheels application. In general, most of your settings will go in `config/settings.cfm`.
+You will find configuration files in the `config` folder at the root of your Wheels application. In general, most of your settings will go in `config/settings.cfm`.
 
 You can also set values based on what environment you have set. For example, you can have different values for your settings depending on whether you're in `development` mode or `production` mode. See the chapter on [Switching Environments](switching-environments.md) for more details.
 
