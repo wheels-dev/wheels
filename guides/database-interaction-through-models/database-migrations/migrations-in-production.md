@@ -24,7 +24,7 @@ In this scenario, you could use the built-in `autoMigrateDatabase` setting: this
 
 This would fire for each node on a cluster and would fire on each application restart - however, the overhead would be minimal (one additional database call).&#x20;
 
-To activate this feature, just use `set(autoMigrateDatabase=true)` in your `app/config/production/settings.cfm` settings, to ensure it only fires in production mode.
+To activate this feature, just use `set(autoMigrateDatabase=true)` in your `/config/production/settings.cfm` settings, to ensure it only fires in production mode.
 
 ### Programmatic Migrations
 

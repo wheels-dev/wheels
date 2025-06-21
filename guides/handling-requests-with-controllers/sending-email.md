@@ -33,7 +33,7 @@ But you are not limited to setting only these 3 variables. In fact, you can set 
 
 Alternatively, most modern CFML engines allow setting SMTP information directly within the application configuration. So you can actually add this in `/config/app.cfm`: here's an example configuration:
 
-{% code title="config/app.cfm" %}
+{% code title="/config/app.cfm" %}
 ```javascript
 // Lucee:
 this.tag.mail.server="smtp.mydomain.com";

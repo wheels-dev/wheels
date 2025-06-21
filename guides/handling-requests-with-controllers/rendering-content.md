@@ -80,7 +80,7 @@ it in the internal Wheels variable.
 
 Two of the functions listed above are capable of caching the content for you;\
 [renderView()](https://wheels.dev/api/v3.0.0/controller.renderView.html) and [renderPartial()](https://wheels.dev/api/v3.0.0/controller.renderpartial.html). Just pass in `cache=true` (to use\
-the default cache time set in `app/config/settings.cfm`) or `cache=x` where `x` is\
+the default cache time set in `/config/settings.cfm`) or `cache=x` where `x` is\
 the number of minutes you want to cache the content for. Keep in mind that this\
 caching respects the global setting set for it in your configuration files so\
 normally no pages will be cached when in Design or Development mode.

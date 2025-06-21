@@ -12,9 +12,9 @@ As you'll soon realize, the [linkTo()](https://wheels.dev/api/v3.0.0/controller.
 
 ### Default Wildcard Linking
 
-When installing Wheels, if you open the file at `app/config/routes.cfm`, you'll see something like this:
+When installing Wheels, if you open the file at `/config/routes.cfm`, you'll see something like this:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .wildcard()
@@ -45,7 +45,7 @@ When you're using [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.htm
 
 Let's work with a set of sample routes to practice creating links:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .get(name="newWidget", pattern="widgets/new", to="widgets##new")
@@ -96,7 +96,7 @@ If you have a route with multiple parameters, you must pass all of the placehold
 
 {% code title="Example" %}
 ```html
-<!--- app/config/routes.cfm --->
+<!--- /config/routes.cfm --->
 <cfscript>
 mapper()
     .get(
@@ -127,11 +127,11 @@ mapper()
 
 Resources are the encouraged routing pattern in Wheels, and you will likely find yourself using this type of route most often.
 
-Once you setup a resource in `app/config/routes.cfm`, the key is to inspect the routes generated and get a feel for the names and parameters that are expected.
+Once you setup a resource in `/config/routes.cfm`, the key is to inspect the routes generated and get a feel for the names and parameters that are expected.
 
 Consider this sample `posts` resource:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .resources("posts")

@@ -182,7 +182,7 @@ set(flashStorage="session");
 
 Note: Before you set Wheels to use the `session` scope, you need to make sure\
 that session management is enabled. To enable it, all you need to do is add\
-`this.SessionManagement = true` to the `config/app.cfm` file.
+`this.SessionManagement = true` to the `/config/app.cfm` file.
 
 #### Changing Flash Storage Dynamically During a Request
 

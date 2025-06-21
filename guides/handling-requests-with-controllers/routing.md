@@ -24,7 +24,7 @@ The routing system may match the request to a route like this, which tells Wheel
 
 ### Configuring Routes
 
-To configure routes, open the file at `config/routes.cfm`.
+To configure routes, open the file at `/config/routes.cfm`.
 
 The Wheels router begins with a call to [mapper()](https://wheels.dev/api/v3.0.0/controller.mapper.html), various methods chained from that, and lastly ends with a call to `end()`.
 
@@ -176,7 +176,7 @@ We strongly recommend that you not allow any `GET` requests to modify resources 
 
 Consider a few examples:
 
-{% code title="config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .patch(name="heartbeat", to="sessions##update")
@@ -201,7 +201,7 @@ Notice that you can use the `to="controller##action"` or use separate `controlle
 
 In fact, you could mock a `users` resource using these methods like so (though obviously there is little practical reason for doing so):
 
-{% code title="config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     // The following is roughly equivalent to .resources("users")
@@ -219,7 +219,7 @@ mapper()
 
 If you need to limit the actions that are exposed by [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) and [resource()](https://wheels.dev/api/v3.0.0/mapper.resource.html), you can also pass in `only` or `except`arguments:
 
-{% code title="config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     // Only offer endpoints for cart show, update, and delete:
