@@ -705,7 +705,7 @@ component output="false" {
 			$throwErrorOrShow404Page(
 				type = "Wheels.RouteNotFound",
 				message = "Could not find the `#arguments.route#` route.",
-				extendedInfo = "Make sure there is a route configured in your `app/config/routes.cfm` file named `#arguments.route#`."
+				extendedInfo = "Make sure there is a route configured in your `config/routes.cfm` file named `#arguments.route#`."
 			);
 		}
 		local.routePos = application.wheels.namedRoutePositions[arguments.route];
@@ -1931,7 +1931,7 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the mapper object used to configure your application's routes. Usually you will use this method in `app/config/routes.cfm` to start chaining route mapping methods like `resources`, `namespace`, etc.
+	 * Returns the mapper object used to configure your application's routes. Usually you will use this method in `config/routes.cfm` to start chaining route mapping methods like `resources`, `namespace`, etc.
 	 *
 	 * [section: Configuration]
 	 * [category: Routing]
@@ -2270,7 +2270,7 @@ component output="false" {
 	 * [section: Global Helpers]
 	 * [category: Miscellaneous Functions]
 	 *
-	 * @route Name of a route that you have configured in `app/config/routes.cfm`.
+	 * @route Name of a route that you have configured in `config/routes.cfm`.
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.

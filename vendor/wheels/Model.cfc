@@ -356,7 +356,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 				Throw(
 					type = "Wheels.DataSourceNotFound",
 					message = "The data source could not be reached.",
-					extendedInfo = "Make sure your database is reachable and that your data source settings are correct. You either need to setup a data source with the name `#variables.wheels.class.dataSource#` in the Administrator or tell CFWheels to use a different data source in `app/config/settings.cfm`."
+					extendedInfo = "Make sure your database is reachable and that your data source settings are correct. You either need to setup a data source with the name `#variables.wheels.class.dataSource#` in the Administrator or tell CFWheels to use a different data source in `config/settings.cfm`."
 				);
 			}
 		} else {
