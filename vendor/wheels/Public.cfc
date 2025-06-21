@@ -36,17 +36,34 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/views/docs.cfm";
 		return "";
 	}
-	function console() {
-		include "/wheels/public/views/console.cfm";
-		return "";
-	}
-	function environment() {
-		include "/wheels/public/views/environment.cfm";
-		return "";
-	}
 	function runner(){
 		include "/wheels/public/views/runner.cfm";
 		return "";
+	}
+	
+	public function tests_testbox(){
+		// Set proper HTTP status first
+		cfheader(statuscode="200", statustext="OK");
+		
+		// Simple test to ensure the endpoint works
+		if (structKeyExists(url, "test") && url.test == "simple") {
+			cfcontent(type="application/json");
+			writeOutput('{"success":true,"message":"TestBox endpoint is working"}');
+			abort;
+		}
+		
+		// Set content type based on format
+		if (structKeyExists(url, "format") && url.format == "json") {
+			cfcontent(type="application/json");
+		} else if (structKeyExists(url, "format") && url.format == "txt") {
+			cfcontent(type="text/plain");
+		}
+		
+		// Include the TestBox runner directly without buffering
+		include "/wheels/tests_testbox/runner.cfm";
+		
+		// Ensure we abort to prevent any further processing
+		abort;
 	}
 	function packages() {
 		include "/wheels/public/views/packages.cfm";
@@ -120,17 +137,18 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		local.action = StructKeyExists(request.wheels.params, "action") ? request.wheels.params.action : "";
 		local.view = StructKeyExists(request.wheels.params, "view") ? request.wheels.params.view : "";
 		local.type = StructKeyExists(request.wheels.params, "type") ? request.wheels.params.type : "";
+		
 		switch (local.view) {
 			case "routes":
 			case "docs":
 			case "cli":
 			case "tests":
-			case "testbox":
-			case "console":
-			case "environment":
 			case "runner":
 				include "/wheels/public/views/#local.view#.cfm";
 				break;
+			case "testbox":
+				// Handle testbox specifically
+				return tests_testbox();
 			case "packages":
 				include "/wheels/public/views/packages.cfm";
 				break;
