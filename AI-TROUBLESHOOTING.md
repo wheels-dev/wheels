@@ -21,7 +21,7 @@ Error: Could not find the controller "Posts"
    - Fix: Must extend "Controller" not "wheels.Controller"
 
 3. **Routing issue**
-   - Check: Routes in `/app/config/routes.cfm`
+   - Check: Routes in `/config/routes.cfm`
    - Fix: Add proper route: `mapper().resources("posts").end()`
 
 #### Issue: "View not found" error
@@ -58,7 +58,7 @@ Error: Table "users" doesn't exist in database
 **Solutions:**
 1. Run migrations: `wheels dbmigrate latest`
 2. Check table name: `table("custom_table_name")` in model config()
-3. Verify datasource configuration in `/app/config/app.cfm`
+3. Verify datasource configuration in `/config/app.cfm`
 4. Check database connection settings
 
 #### Issue: Validations not working
@@ -94,7 +94,7 @@ Error: Could not find a route that matches this request
 ```
 
 **Solutions:**
-1. Check route definition in `/app/config/routes.cfm`
+1. Check route definition in `/config/routes.cfm`
 2. Verify HTTP method matches route (GET, POST, etc.)
 3. Use `wheels routes` command to list all routes
 4. Check route parameter patterns match request
@@ -231,9 +231,9 @@ Error after running: wheels g resource posts
 
 #### Issue: Wrong environment loading
 **Solutions:**
-1. Check `/app/config/environment.cfm`
+1. Check `/config/environment.cfm`
 2. Set URL variable: `?reload=true&environment=development`
-3. Verify environment-specific settings in `/app/config/[env]/settings.cfm`
+3. Verify environment-specific settings in `/config/[env]/settings.cfm`
 4. Check server configuration
 
 #### Issue: Configuration not updating
@@ -267,7 +267,7 @@ Error after running: wheels g resource posts
 
 ### 1. Enable Debug Output
 ```cfml
-// In /app/config/development/settings.cfm
+// In /config/development/settings.cfm
 set(showDebugInformation=true);
 ```
 

@@ -24,6 +24,7 @@ component output="false" {
 	this.mappings["/wirebox"] = this.wireboxDir;
 	this.mappings["/testbox"] = this.testboxDir;
 	this.mappings["/tests"] = expandPath("../tests");
+	this.mappings["/config"] = expandPath("../config");
 
 	// We turn on "sessionManagement" by default since the Flash uses it.
 	this.sessionManagement = true;
@@ -91,7 +92,7 @@ component output="false" {
 
 	function onServerStart() {}
 
-	include "../app/config/app.cfm";
+	include "../config/app.cfm";
 
 	function onApplicationStart() {
 		wirebox = new wirebox.system.ioc.Injector("wheels.Wirebox");

@@ -176,13 +176,13 @@ You can override this setting in the same way that you override other Wheels\
 settings by running the [set()](https://wheels.dev/api/v3.0.0/controller.set.html) function like this:
 
 ```javascript
-// In `app/config/settings.cfm` or another `settings.cfm` file within the `app/config` subfolders
+// In `config/settings.cfm` or another `settings.cfm` file within the `config` subfolders
 set(flashStorage="session");
 ```
 
 Note: Before you set Wheels to use the `session` scope, you need to make sure\
 that session management is enabled. To enable it, all you need to do is add\
-`this.SessionManagement = true` to the `app/config/app.cfm` file.
+`this.SessionManagement = true` to the `config/app.cfm` file.
 
 #### Changing Flash Storage Dynamically During a Request
 
@@ -236,7 +236,7 @@ considerations.
 
 ### Appending to, rather than replacing the flash
 
-From Wheels 2.1, you can now change the default flash behavior to append to an existing key, rather than directly replacing it. To turn on this behavior, add `set(flashAppend=true)` to you `/app/config/settings.cfm` file.
+From Wheels 2.1, you can now change the default flash behavior to append to an existing key, rather than directly replacing it. To turn on this behavior, add `set(flashAppend=true)` to you `/config/settings.cfm` file.
 
 An example of where this might be useful:
 

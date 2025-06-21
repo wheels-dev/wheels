@@ -10,7 +10,7 @@ We all love the "Convention over Configuration" motto of Wheels, but what about 
 
 ### Where Configurations Happen
 
-You will find configuration files in the `app/config` folder of your Wheels application. In general, most of your settings will go in `app/config/settings.cfm`.
+You will find configuration files in the `config` folder of your Wheels application. In general, most of your settings will go in `config/settings.cfm`.
 
 You can also set values based on what environment you have set. For example, you can have different values for your settings depending on whether you're in `development` mode or `production` mode. See the chapter on [Switching Environments](switching-environments.md) for more details.
 
@@ -34,11 +34,11 @@ if (get("environment") == "production") {
 
 ### Setting CFML Application Configurations
 
-In CFML's standard `Application.cfc`, you can normally set values for your application's properties in the `this`scope. Wheels still provides these options to you in the file at `app/config/app.cfm`.
+In CFML's standard `Application.cfc`, you can normally set values for your application's properties in the `this`scope. Wheels still provides these options to you in the file at `config/app.cfm`.
 
-Here is an example of what can go in `app/config/app.cfm`:
+Here is an example of what can go in `config/app.cfm`:
 
-{% code title="app/config/app.cfm" %}
+{% code title="config/app.cfm" %}
 ```javascript
 this.name = "TheNextSiteToBeatTwitter";
 this.sessionManagement = false;
@@ -145,7 +145,7 @@ For example, let's say that we want to enable debugging information in our "deve
 
 {% code title="CFScript" %}
 ```javascript
-// /app/config/development/settings.cfm
+// /config/development/settings.cfm
 set(showDebugInformation=false);
 ```
 {% endcode %}

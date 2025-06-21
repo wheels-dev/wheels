@@ -86,7 +86,9 @@
       "Bash(./test-db-commands.sh:*)",
       "Bash(git reset:*)",
       "Bash(jq:*)",
-      "Bash(server restart)"
+      "Bash(server restart)",
+      "Bash(docker compose:*)",
+      "Bash(docker logs:*)"
     ],
     "deny": []
   }

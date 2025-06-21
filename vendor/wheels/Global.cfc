@@ -1155,7 +1155,7 @@ component output="false" {
 		// TODO skip this if mode != development|testing?
 		$include(template = "/wheels/public/routes.cfm");
 		// load developer routes next
-		$include(template = "/app/config/routes.cfm");
+		$include(template = "/config/routes.cfm");
 		// set lookup info for the named routes
 		$setNamedRoutePositions();
 	}

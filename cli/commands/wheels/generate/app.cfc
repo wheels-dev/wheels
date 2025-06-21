@@ -129,22 +129,22 @@ component aliases="wheels g app" extends="../base" {
     // Setting Application Name
     details.line();
     details.getPrint().yellowLine( "🔧 Configuring application..." );
-    command( 'tokenReplace' ).params( path = 'app/config/app.cfm', token = '|appName|', replacement = arguments.name ).run();
-    details.update("app/config/app.cfm", true);
+    command( 'tokenReplace' ).params( path = 'config/app.cfm', token = '|appName|', replacement = arguments.name ).run();
+    details.update("config/app.cfm", true);
     command( 'tokenReplace' ).params( path = 'server.json', token = '|appName|', replacement = arguments.name ).run();
     details.update("server.json", true);
 
     // Setting Reload Password
     command( 'tokenReplace' )
-      .params( path = 'app/config/settings.cfm', token = '|reloadPassword|', replacement = arguments.reloadPassword )
+      .params( path = 'config/settings.cfm', token = '|reloadPassword|', replacement = arguments.reloadPassword )
       .run();
-    details.update("app/config/settings.cfm (reload password)", true);
+    details.update("config/settings.cfm (reload password)", true);
 
     // Setting Datasource Name
     command( 'tokenReplace' )
-      .params( path = 'app/config/settings.cfm', token = '|datasourceName|', replacement = arguments.datasourceName )
+      .params( path = 'config/settings.cfm', token = '|datasourceName|', replacement = arguments.datasourceName )
       .run();
-    details.update("app/config/settings.cfm (datasource)", true);
+    details.update("config/settings.cfm (datasource)", true);
 
     // Setting cfml Engine Name
     command( 'tokenReplace' )
@@ -177,9 +177,9 @@ component aliases="wheels g app" extends="../base" {
         };
         // CLI-Appends-Here';
       command( 'tokenReplace' )
-        .params( path = 'app/config/app.cfm', token = '// CLI-Appends-Here', replacement = datasourceConfig )
+        .params( path = 'config/app.cfm', token = '// CLI-Appends-Here', replacement = datasourceConfig )
         .run();
-      details.update("app/config/app.cfm (H2 datasource)", true);
+      details.update("config/app.cfm (H2 datasource)", true);
 
     // Init, if not a package as a Box Package
     if ( arguments.init && !packageService.isPackage( arguments.directory ) ) {
@@ -234,9 +234,9 @@ component aliases="wheels g app" extends="../base" {
       var bsSettings=fileRead( getTemplate('/bootstrap/settings.cfm' ) );
       bsSettings = bsSettings & cr & '// CLI-Appends-Here';
       command( 'tokenReplace' )
-        .params( path = 'app/config/settings.cfm', token = '// CLI-Appends-Here', replacement = bsSettings )
+        .params( path = 'config/settings.cfm', token = '// CLI-Appends-Here', replacement = bsSettings )
         .run();
-      details.update("app/config/settings.cfm (Bootstrap settings)", true);
+      details.update("config/settings.cfm (Bootstrap settings)", true);
 
       // New Flashwrapper Plugin needed - install it via Forgebox
       command( 'install cfwheels-flashmessages-bootstrap' ).run();

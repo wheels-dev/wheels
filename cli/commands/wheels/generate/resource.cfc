@@ -460,7 +460,7 @@ component aliases='wheels g resource' extends="../base" {
     }
 
     private function addRoutes(obj, options) {
-        var routesPath = fileSystemUtil.resolvePath("app/config/routes.cfm");
+        var routesPath = fileSystemUtil.resolvePath("config/routes.cfm");
 
         if (!fileExists(routesPath)) {
             return false;

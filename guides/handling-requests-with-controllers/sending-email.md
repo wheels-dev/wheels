@@ -14,7 +14,7 @@ Getting this to work in Wheels can be broken down in 3 steps. We'll walk you thr
 
 We recommend using Wheels ability to set global defaults for [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html) so that you don't have to specify more arguments than necessary in your controller files. Because it's likely that you will use the same mail server across your application, this makes it worthwhile to set a global default for it.
 
-This setting should be done in the `app/config/settings.cfm` file and can look something like this:
+This setting should be done in the `config/settings.cfm` file and can look something like this:
 
 {% code title="Example" %}
 ```javascript
@@ -31,9 +31,9 @@ By specifying these values here, these arguments can be omitted from all [sendEm
 
 But you are not limited to setting only these 3 variables. In fact, you can set a global default for any optional argument to  [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html) and since it accepts the same arguments that `cfmail` does. That's quite a few.
 
-Alternatively, most modern CFML engines allow setting SMTP information directly within the application configuration. So you can actually add this in `/app/config/app.cfm`: here's an example configuration:
+Alternatively, most modern CFML engines allow setting SMTP information directly within the application configuration. So you can actually add this in `/config/app.cfm`: here's an example configuration:
 
-{% code title="app/config/app.cfm" %}
+{% code title="config/app.cfm" %}
 ```javascript
 // Lucee:
 this.tag.mail.server="smtp.mydomain.com";

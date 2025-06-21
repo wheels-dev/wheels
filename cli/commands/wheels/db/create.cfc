@@ -96,7 +96,7 @@ component extends="../base" {
 		try {
 			// Try to get datasource info from application.cfc
 			local.appPath = getCWD();
-			local.appCfcPath = local.appPath & "/app/config/app.cfm";
+			local.appCfcPath = local.appPath & "/config/app.cfm";
 			
 			if (fileExists(local.appCfcPath)) {
 				local.content = fileRead(local.appCfcPath);
@@ -354,14 +354,14 @@ component extends="../base" {
 
 	private string function getDataSourceName(required string appPath, required string environment) {
 		// Check environment-specific settings first
-		local.envSettingsFile = arguments.appPath & "/app/config/" & arguments.environment & "/settings.cfm";
+		local.envSettingsFile = arguments.appPath & "/config/" & arguments.environment & "/settings.cfm";
 		if (FileExists(local.envSettingsFile)) {
 			local.dsName = extractDataSourceName(FileRead(local.envSettingsFile));
 			if (Len(local.dsName)) return local.dsName;
 		}
 		
 		// Check general settings
-		local.settingsFile = arguments.appPath & "/app/config/settings.cfm";
+		local.settingsFile = arguments.appPath & "/config/settings.cfm";
 		if (FileExists(local.settingsFile)) {
 			local.dsName = extractDataSourceName(FileRead(local.settingsFile));
 			if (Len(local.dsName)) return local.dsName;

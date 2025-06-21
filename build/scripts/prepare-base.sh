@@ -50,8 +50,8 @@ fi
 cp build/base/box.json "${BUILD_DIR}/box.json"
 cp build/base/README.md "${BUILD_DIR}/README.md"
 cp build/base/server.json "${BUILD_DIR}/server.json"
-cp build/base/app/config/app.cfm "${BUILD_DIR}/app/config/app.cfm"
-cp build/base/app/config/settings.cfm "${BUILD_DIR}/app/config/settings.cfm"
+cp build/base/config/app.cfm "${BUILD_DIR}/config/app.cfm"
+cp build/base/config/settings.cfm "${BUILD_DIR}/config/settings.cfm"
 
 # Replace version placeholders
 echo "Replacing version placeholders..."

@@ -429,7 +429,7 @@ component {
         try {
             var routesPath = resolvePath("config/routes.cfm", arguments.baseDirectory);
             if (!fileExists(routesPath)) {
-                routesPath = resolvePath("app/config/routes.cfm", arguments.baseDirectory);
+                routesPath = resolvePath("config/routes.cfm", arguments.baseDirectory);
             }
             
             if (fileExists(routesPath)) {

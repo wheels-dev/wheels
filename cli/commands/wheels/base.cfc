@@ -65,7 +65,7 @@ component excludeFromHelp=true {
 			return false;
 		}
 		// Check for app/config folder
-		if (!directoryExists(arguments.path & "/app/config")) {
+		if (!directoryExists(arguments.path & "/config")) {
 			return false;
 		}
 		// Check for app folder

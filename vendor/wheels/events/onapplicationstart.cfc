@@ -128,7 +128,7 @@ component {
 		) {
 			application.$wheels.environment = URL.reload;
 		} else {
-			application.wo.$include(template = "/app/config/environment.cfm");
+			application.wo.$include(template = "/config/environment.cfm");
 		}
 
 		// If we're not allowed to switch, override and replace with the old environment
@@ -905,9 +905,9 @@ component {
 		application.$wheels.initialized = true;
 
 		// Load general developer settings first, then override with environment specific ones.
-		application.wo.$include(template = "/app/config/settings.cfm");
-		if (FileExists(ExpandPath("/app/config/#application.$wheels.environment#/settings.cfm"))) {
-			application.wo.$include(template = "/app/config/#application.$wheels.environment#/settings.cfm");
+		application.wo.$include(template = "/config/settings.cfm");
+		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
+			application.wo.$include(template = "/config/#application.$wheels.environment#/settings.cfm");
 		}
 
 		// Clear query (cfquery) and page (cfcache) caches.
