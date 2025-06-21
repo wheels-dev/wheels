@@ -92,7 +92,9 @@
       "Bash(npm run build:*)",
       "Bash(docker build:*)",
       "Bash(npm run dev:*)",
-      "Bash(VITE_PORT=3001 npm run dev)"
+      "Bash(VITE_PORT=3001 npm run dev)",
+      "Bash(diff:*)",
+      "Bash(docker:*)"
     ],
     "deny": []
   }

@@ -90,6 +90,17 @@
                     <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
                   </tr>
                   <tr 
+                    @click="handleEngineClick('lucee7', 60007)"
+                    :class="{ 'cursor-pointer': true }"
+                    :title="!engines.lucee7 ? 'Click to see how to start Lucee 7' : engines.lucee7.status === 'running' ? 'Click to open Lucee 7' : 'Click to start Lucee 7'"
+                  >
+                    <td>Lucee 7</td>
+                    <td class="text-end" v-if="engines.lucee7">
+                      <span class="badge" :class="getStatusClass(engines.lucee7)">{{ getStatusText(engines.lucee7) }}</span>
+                    </td>
+                    <td class="text-end" v-else><span class="badge bg-warning">Checking...</span></td>
+                  </tr>
+                  <tr 
                     @click="handleEngineClick('adobe2018', 62018)"
                     :class="{ 'cursor-pointer': true }"
                     :title="!engines.adobe2018 ? 'Click to see how to start Adobe 2018' : engines.adobe2018.status === 'running' ? 'Click to open Adobe 2018' : 'Click to start Adobe 2018'"
@@ -220,6 +231,7 @@ import { dockerService } from '@/services/docker.service';
 const engines = ref({
   lucee5: null,
   lucee6: null,
+  lucee7: null,
   adobe2018: null,
   adobe2021: null,
   adobe2023: null
@@ -375,6 +387,9 @@ async function fetchContainers() {
         if (container.status === 'running') hasRunningLucee = true;
       } else if (container.name.includes('lucee6')) {
         engines.value.lucee6 = container;
+        if (container.status === 'running') hasRunningLucee = true;
+      } else if (container.name.includes('lucee7')) {
+        engines.value.lucee7 = container;
         if (container.status === 'running') hasRunningLucee = true;
       } else if (container.name.includes('adobe2018')) {
         engines.value.adobe2018 = container;
