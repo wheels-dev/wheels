@@ -48,6 +48,12 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/views/runner.cfm";
 		return "";
 	}
+	
+	function tests_testbox(){
+		// Include the core TestBox runner
+		include "/wheels/tests_testbox/runner.cfm";
+		abort;
+	}
 	function packages() {
 		include "/wheels/public/views/packages.cfm";
 		return "";
