@@ -100,7 +100,7 @@ component extends="wheels.tests.Test" {
 		try {
 			$callAction(action = "renderWithStatus");
 			actual = _controller.response();
-			assert("actual eq '{"error":"Not Found"}'");
+			assert('actual eq ''{"error":"Not Found"}''');
 			assert("$statusCode() eq 404");
 		} catch (any e) {
 			fail("renderText with status should work without view. Error: #e.message#");
@@ -128,7 +128,7 @@ component extends="wheels.tests.Test" {
 		try {
 			$callAction(action = "jsonWithRenderText");
 			actual = _controller.response();
-			assert("actual eq '{"source":"renderText"}'");
+			assert('actual eq ''{"source":"renderText"}''');
 		} catch (any e) {
 			fail("Mixed format controller should handle JSON renderText. Error: #e.message#");
 		}
@@ -157,7 +157,7 @@ component extends="wheels.tests.Test" {
 		try {
 			$callAction(action = "formatAware");
 			actual = _controller.response();
-			assert("actual eq '{"format":"json"}'");
+			assert('actual eq ''{"format":"json"}''');
 		} catch (any e) {
 			fail("Format-aware action should handle JSON. Error: #e.message#");
 		}
