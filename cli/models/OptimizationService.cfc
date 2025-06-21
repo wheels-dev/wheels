@@ -12,7 +12,7 @@ component {
         };
         
         // Check for Wheels cache settings
-        var settingsPath = resolvePath("app/config/settings.cfm");
+        var settingsPath = resolvePath("config/settings.cfm");
         if (fileExists(settingsPath)) {
             var content = fileRead(settingsPath);
             
