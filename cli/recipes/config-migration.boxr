@@ -97,6 +97,43 @@ if (fileExists(appCfcPath)) {
     }
 }
 
+// Step 3b: Update config file comments
+print.line()
+    .line("Updating config file comments...");
+
+var configFiles = [
+    "config/settings.cfm",
+    "config/development/settings.cfm",
+    "config/testing/settings.cfm",
+    "config/production/settings.cfm",
+    "config/maintenance/settings.cfm"
+];
+
+var updatedFiles = 0;
+for (var configFile in configFiles) {
+    if (fileExists(configFile)) {
+        var content = fileRead(configFile);
+        var originalContent = content;
+        
+        // Update comment references
+        content = replaceNoCase(content, '"app/config/settings.cfm"', '"/config/settings.cfm"', "all");
+        content = replaceNoCase(content, '"app/config/production/settings.cfm"', '"/config/production/settings.cfm"', "all");
+        content = replaceNoCase(content, "(e.g. app/config/", "(e.g. /config/", "all");
+        
+        if (content != originalContent) {
+            fileWrite(configFile, content);
+            updatedFiles++;
+            print.line("  - Updated: #configFile#");
+        }
+    }
+}
+
+if (updatedFiles > 0) {
+    print.greenLine("Updated #updatedFiles# config file(s) with correct path references.");
+} else {
+    print.line("No config file comment updates needed.");
+}
+
 // Step 4: Check for custom code references
 print.line()
     .line("Scanning for references to app/config in your code...");

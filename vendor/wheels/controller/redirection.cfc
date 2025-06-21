@@ -9,7 +9,7 @@ component {
 	 * @back Set to `true` to redirect back to the referring page.
 	 * @addToken See documentation for your CFML engine's implementation of `cflocation`.
 	 * @statusCode See documentation for your CFML engine's implementation of `cflocation`.
-	 * @route Name of a route that you have configured in `app/config/routes.cfm`.
+	 * @route Name of a route that you have configured in `config/routes.cfm`.
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.

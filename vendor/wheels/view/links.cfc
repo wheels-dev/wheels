@@ -8,7 +8,7 @@ component {
 	 * [category: Link Functions]
 	 *
 	 * @text The text content of the link.
-	 * @route Name of a route that you have configured in app/config/routes.cfm.
+	 * @route Name of a route that you have configured in config/routes.cfm.
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.
