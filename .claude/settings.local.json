@@ -85,7 +85,8 @@
       "Bash(server status)",
       "Bash(./test-db-commands.sh:*)",
       "Bash(git reset:*)",
-      "Bash(jq:*)"
+      "Bash(jq:*)",
+      "Bash(server restart)"
     ],
     "deny": []
   }
