@@ -1,6 +1,17 @@
 ﻿<cfsetting requestTimeOut="1800">
 <cfscript>
-    testBox = new testbox.system.TestBox(directory="wheels.tests_testbox.specs")
+    try {
+        // Try to create TestBox instance with coverage disabled
+        testBox = new testbox.system.TestBox(
+            directory="wheels.tests_testbox.specs",
+            options={ coverage = { enabled = false } }
+        );
+    } catch (any e) {
+        cfheader(statuscode="500", statustext="Internal Server Error");
+        cfcontent(type="application/json");
+        writeOutput('{"success":false,"error":"Failed to create TestBox instance: ' & replace(e.message, '"', '\"', "all") & '"}');
+        abort;
+    }
 
     //Sorting the bundles Alphabetically
     local.sortedArray = testBox.getBundles()

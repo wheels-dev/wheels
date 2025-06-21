@@ -84,7 +84,8 @@
       "Bash(server start openBrowser=false)",
       "Bash(server status)",
       "Bash(./test-db-commands.sh:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(jq:*)"
     ],
     "deny": []
   }
