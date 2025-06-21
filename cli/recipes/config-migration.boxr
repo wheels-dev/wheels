@@ -1,0 +1,183 @@
+#!/usr/bin/env cfscript
+/**
+ * CFWheels 3.0.0 Config Migration Recipe
+ * 
+ * This recipe migrates your CFWheels application from the old /app/config
+ * structure to the new /config structure at the root level.
+ * 
+ * Usage: box recipe config-migration.boxr
+ */
+
+// Display welcome message
+print.greenBoldLine("CFWheels 3.0.0 Config Migration Tool")
+    .line("====================================")
+    .line()
+    .yellowLine("This recipe will migrate your config directory from /app/config to /config")
+    .line();
+
+// Check if we're in a Wheels application
+if (!fileExists("Application.cfc") || !directoryExists("app")) {
+    print.redLine("ERROR: This doesn't appear to be a CFWheels application root directory.")
+        .line("Please run this from your application root.")
+        .line();
+    return;
+}
+
+// Check current state
+var hasOldConfig = directoryExists("app/config");
+var hasNewConfig = directoryExists("config");
+
+if (!hasOldConfig && hasNewConfig) {
+    print.greenLine("Your application already appears to be migrated!")
+        .line("The /config directory exists and /app/config does not.")
+        .line();
+    return;
+}
+
+if (hasOldConfig && hasNewConfig) {
+    print.yellowLine("WARNING: Both /app/config and /config directories exist!")
+        .line("This recipe will backup the existing /config and replace it with /app/config")
+        .line();
+    
+    if (!confirm("Do you want to continue? [y/n]")) {
+        print.line("Migration cancelled.");
+        return;
+    }
+}
+
+// Step 1: Backup existing config if it exists
+if (hasNewConfig) {
+    var backupName = "config_backup_" & dateTimeFormat(now(), "yyyymmdd_HHnnss");
+    print.line("Backing up existing /config to /#backupName#...");
+    
+    command('mv')
+        .params(path = 'config', newPath = backupName)
+        .run();
+    
+    print.greenLine("Backup created: /#backupName#");
+}
+
+// Step 2: Move app/config to config
+if (hasOldConfig) {
+    print.line("Moving /app/config to /config...");
+    
+    command('mv')
+        .params(path = 'app/config', newPath = 'config')
+        .run();
+    
+    print.greenLine("Config directory moved successfully!");
+} else {
+    print.yellowLine("No /app/config directory found. Creating empty /config directory...");
+    directoryCreate("config");
+}
+
+// Step 3: Update Application.cfc
+print.line()
+    .line("Updating Application.cfc...");
+
+var appCfcPath = "Application.cfc";
+if (fileExists(appCfcPath)) {
+    var appContent = fileRead(appCfcPath);
+    var originalContent = appContent;
+    
+    // Update config path references
+    appContent = replaceNoCase(appContent, "app/config/", "config/", "all");
+    appContent = replaceNoCase(appContent, "app\config\", "config\", "all");
+    appContent = replaceNoCase(appContent, "/app/config", "/config", "all");
+    appContent = replaceNoCase(appContent, "\app\config", "\config", "all");
+    
+    if (appContent != originalContent) {
+        // Backup original
+        fileWrite("Application.cfc.bak", originalContent);
+        fileWrite(appCfcPath, appContent);
+        print.greenLine("Application.cfc updated successfully!");
+        print.line("  - Backup saved as Application.cfc.bak");
+    } else {
+        print.line("No changes needed in Application.cfc");
+    }
+}
+
+// Step 4: Check for custom code references
+print.line()
+    .line("Scanning for references to app/config in your code...");
+
+var searchPaths = ["app/controllers", "app/models", "app/views", "tests"];
+var foundReferences = [];
+
+for (var searchPath in searchPaths) {
+    if (directoryExists(searchPath)) {
+        var files = directoryList(searchPath, true, "path", "*.cf*");
+        
+        for (var file in files) {
+            var content = fileRead(file);
+            if (findNoCase("app/config", content) || findNoCase("app\config", content)) {
+                arrayAppend(foundReferences, file);
+            }
+        }
+    }
+}
+
+if (arrayLen(foundReferences)) {
+    print.yellowLine()
+        .yellowLine("Found references to app/config in the following files:");
+    
+    for (var ref in foundReferences) {
+        print.line("  - #ref#");
+    }
+    
+    print.line()
+        .yellowLine("You should update these files manually to use 'config' instead of 'app/config'");
+}
+
+// Step 5: Create migration documentation
+var migrationLog = [];
+arrayAppend(migrationLog, "CFWheels 3.0.0 Config Migration Log");
+arrayAppend(migrationLog, "===================================");
+arrayAppend(migrationLog, "Migration Date: #dateTimeFormat(now(), 'yyyy-mm-dd HH:nn:ss')#");
+arrayAppend(migrationLog, "");
+arrayAppend(migrationLog, "Actions Performed:");
+arrayAppend(migrationLog, "- Moved /app/config to /config");
+arrayAppend(migrationLog, "- Updated Application.cfc");
+
+if (hasNewConfig) {
+    arrayAppend(migrationLog, "- Backed up existing /config to /#backupName#");
+}
+
+if (arrayLen(foundReferences)) {
+    arrayAppend(migrationLog, "");
+    arrayAppend(migrationLog, "Files Requiring Manual Updates:");
+    for (var ref in foundReferences) {
+        arrayAppend(migrationLog, "- #ref#");
+    }
+}
+
+fileWrite("config_migration.log", arrayToList(migrationLog, chr(10)));
+
+// Final message
+print.line()
+    .greenBoldLine("Migration Complete!")
+    .line()
+    .line("Summary:")
+    .line("- Config directory has been moved to /config")
+    .line("- Application.cfc has been updated")
+    .line("- Migration log saved to: config_migration.log");
+
+if (arrayLen(foundReferences)) {
+    print.line()
+        .yellowBoldLine("Action Required:")
+        .yellowLine("Please review and update the files listed above that reference app/config");
+}
+
+print.line()
+    .line("Next Steps:")
+    .line("1. Review any files that need manual updates")
+    .line("2. Test your application thoroughly")
+    .line("3. If you encounter issues, check config_migration.log")
+    .line("4. Remove Application.cfc.bak after confirming everything works")
+    .line();
+
+// Helper function for confirmations
+function confirm(message) {
+    var answer = ask(message);
+    return (lCase(answer) == "y" || lCase(answer) == "yes");
+}
