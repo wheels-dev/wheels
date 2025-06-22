@@ -1,7 +1,0 @@
-
-	/**
-	* |ActionHint| Action
-	**/
-	function |Action|() {
-
-	}

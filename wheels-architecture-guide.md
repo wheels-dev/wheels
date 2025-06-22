@@ -12,8 +12,7 @@ The current Wheels repository structure has evolved organically over time, resul
 ```
 wheels/
 ├── vendor/wheels/          # Core framework (installed dependency)
-├── cli/                    # Original CLI implementation
-├── cli-new/               # New CLI implementation (CommandBox module)
+├── cli/                    # CLI implementation (CommandBox module)
 ├── app/                   # Sample application files
 ├── config/                # Application configuration
 ├── build/                 # Build scripts and templates
@@ -31,11 +30,10 @@ wheels/
 ### Current Challenges
 
 1. **Scattered Components**: Core framework in vendor directory makes it less discoverable
-2. **Duplicate CLI Implementations**: Both `/cli/` and `/cli-new/` directories create confusion
-3. **Mixed Concerns**: Application files mixed with framework development
-4. **Complex Build Process**: Build scripts separated from their components
-5. **Test Organization**: Framework tests mixed with application tests
-6. **Documentation Fragmentation**: Guides separate from component documentation
+2. **Mixed Concerns**: Application files mixed with framework development
+3. **Complex Build Process**: Build scripts separated from their components
+4. **Test Organization**: Framework tests mixed with application tests
+5. **Documentation Fragmentation**: Guides separate from component documentation
 
 ## Repository Architecture
 
@@ -111,7 +109,7 @@ wheels/
 3. **Easier Testing**: Test integration between components
 4. **Simplified Releases**: One release process for everything
 5. **Better Discoverability**: Contributors can see the whole picture
-6. **Eliminates Duplication**: Single CLI implementation, clear ownership
+6. **Clear Ownership**: Single implementation for each component
 7. **Improved Organization**: Each component has its own space with tests and docs
 8. **Cleaner Root**: Framework development separated from example applications
 
@@ -129,35 +127,24 @@ wheels/
    mv build/core/box.json core/src/
    ```
 
-2. **Consolidate CLI**
-   ```bash
-   # Use cli-new as the base for new CLI
-   mkdir -p cli/src
-   cp -r cli-new/* cli/src/
-   
-   # Archive old CLI for reference
-   mv cli cli-legacy
-   ```
-
-3. **Organize Templates**
+2. **Organize Templates**
    ```bash
    # Extract templates from CLI
    mkdir -p templates
-   mv cli/src/templates/* templates/
+   mv cli/templates/* templates/
    
    # Create template structures
    mkdir -p templates/{default,api,spa}
    ```
 
-4. **Separate Tests**
+3. **Separate Tests**
    ```bash
    # Move framework tests
    mkdir -p core/tests
    mv vendor/wheels/tests/* core/tests/
    
-   # Move CLI tests
-   mkdir -p cli/tests
-   mv cli-new/tests/* cli/tests/
+   # CLI tests already in place
+   # cli/tests/
    ```
 
 ### Phase 2: Build System Updates
@@ -254,8 +241,6 @@ wheels/
 ### Immediate Actions (Week 1-2)
 1. Create migration branch
 2. Set up new directory structure
-3. Move cli-new to cli/src
-4. Archive old CLI
 
 ### Short Term (Week 3-4)
 1. Migrate core framework
