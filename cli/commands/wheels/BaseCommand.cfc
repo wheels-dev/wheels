@@ -204,7 +204,7 @@ component extends="commandbox.system.BaseCommand" accessors="true" {
         if (len(arguments.subtitle)) {
             print.greyLine(arguments.subtitle);
         }
-        print.line("=" repeatString 60);
+        print.line(repeatString("=", 60));
     }
     
     /**
@@ -213,7 +213,7 @@ component extends="commandbox.system.BaseCommand" accessors="true" {
     function printSection(required string title) {
         print.line();
         print.yellowLine(arguments.title);
-        print.line("-" repeatString len(arguments.title));
+        print.line(repeatString("-", len(arguments.title)));
     }
     
     /**

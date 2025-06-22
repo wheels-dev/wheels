@@ -16,7 +16,7 @@ component extends="commands.wheels.BaseCommand" {
         print.line();
         print.boldBlueLine("Wheels CLI Snippets");
         print.yellowLine("Snippet System: CommandBox @VARIABLE@ placeholders");
-        print.line("=" repeatString 60);
+        print.line(repeatString("=", 60));
         print.line();
         
         var builtInPath = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../snippets";
@@ -72,7 +72,7 @@ component extends="commands.wheels.BaseCommand" {
             }
             
             if (statusColor == "green") {
-                print.indented#statusColor#Line("✓ #snippet# [#status#]");
+                print.indentedGreenLine("✓ #snippet# [#status#]");
             } else {
                 print.indentedLine("  #snippet# [#status#]");
             }

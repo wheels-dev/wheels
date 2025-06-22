@@ -3,13 +3,24 @@
 <img src="https://www.forgebox.io/api/v1/entry/wheels/badges/downloads" />
 ![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.forgebox.io%2Fapi%2Fv1%2Fentry%2Fwheels%2Fbadges%2F&query=%24.data.versions.0.version&style=flat-square&label=Bleeding%20Edge%20Release)
 
-# Wheels
+# Wheels Framework Monorepo
 
 [Wheels][1] provides fast application development, a great organization system for your code, and is
 just plain fun to use.
 
 One of our biggest goals is for you to be able to get up and running with Wheels quickly. We want for
 you to be able to learn it as rapidly as it is to write applications with it.
+
+## Repository Structure
+
+This is the Wheels framework monorepo containing:
+
+- **core/**: Core framework source code
+- **cli/**: CommandBox CLI module for Wheels commands
+- **templates/**: Project templates (default, api, spa)
+- **docs/**: Documentation and architecture guides
+- **examples/**: Example applications
+- **tools/**: Development tools and scripts
 
 ## Getting Started
 

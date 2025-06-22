@@ -1,13 +1,10 @@
 {
-    "name":"Wheels.dev",
+    "name":"Wheels Framework Monorepo",
     "version":"3.0.0-SNAPSHOT",
     "author":"Wheels Core Team and Community",
-    "shortDescription":"Wheels MVC Framework Core Directory",
+    "shortDescription":"Wheels MVC Framework - Complete Development Suite",
     "location":"ForgeboxStorage",
-    "slug":"wheels.fw",
-    "directory":"vendor/wheels",
-    "createPackageDirectory":true,
-    "packageDirectory":"vendor/wheels",
+    "slug":"wheels-monorepo",
     "homepage":"https://wheels.dev/",
     "documentation":"https://docs.wheels.dev/",
     "changelog":"https://github.com/wheels-dev/wheels/blob/master/CHANGELOG.md",
@@ -20,18 +17,16 @@
         "mvc",
         "rails",
         "wheels",
-        "core"
+        "framework",
+        "cli",
+        "monorepo"
     ],
-    "ignore":[
-        "box.json",
-        "readme.md"
+    "workspaces":[
+        "core",
+        "cli",
+        "templates/*"
     ],
-    "installPathConvention":{
-        "modules":"vendor/",
-        "wheels-plugins":"vendor/"
-    },
     "installPaths":{
-        "wheels":"vendor/wheels/",
         "wirebox":"vendor/wirebox/",
         "testbox":"vendor/testbox/"
     },
@@ -59,11 +54,13 @@
         "format:check":"cfformat check",
         "test":"testbox run",
         "test:watch":"testbox watch",
-        "test:unit":"testbox run --directory=tests/specs/unit",
-        "test:integration":"testbox run --directory=tests/specs/integration",
+        "test:all":"box run-script test:core && box run-script test:cli",
+        "test:core":"cd core && testbox run",
+        "test:cli":"cd cli && testbox run",
         "test:coverage":"testbox run --coverage --coverageReporter=html",
-        "test:migrate":"wheels test migrate tests --backup",
-        "test:app":"wheels test app",
-        "test:core":"wheels test core"
+        "build:all":"box run-script build:core && box run-script build:cli",
+        "build:core":"cd tools/scripts && ./build-core.sh",
+        "build:cli":"cd tools/scripts && ./build-cli.sh",
+        "publish:all":"cd tools/scripts && ./publish-to-forgebox.sh"
     }
 }

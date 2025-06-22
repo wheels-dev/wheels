@@ -1,0 +1,22 @@
+{
+    "name":"Wheels SPA Template",
+    "version":"1.0.0",
+    "author":"Wheels Core Team",
+    "slug":"wheels-spa-template",
+    "shortDescription":"Single Page Application template for Wheels",
+    "type":"mvc",
+    "keywords":["mvc","spa","frontend","wheels"],
+    "homepage":"https://wheels.dev/",
+    "documentation":"https://docs.wheels.dev/",
+    "repository":{
+        "type":"git",
+        "URL":"https://github.com/wheels-dev/wheels"
+    },
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
+    "dependencies":{
+        "wheels":"^3.0.0"
+    },
+    "installPaths":{
+        "wheels":"vendor/wheels/"
+    }
+}

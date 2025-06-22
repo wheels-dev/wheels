@@ -1,0 +1,22 @@
+{
+    "name":"Wheels API Template",
+    "version":"1.0.0",
+    "author":"Wheels Core Team",
+    "slug":"wheels-api-template",
+    "shortDescription":"API-only template for Wheels applications",
+    "type":"mvc",
+    "keywords":["mvc","api","rest","wheels"],
+    "homepage":"https://wheels.dev/",
+    "documentation":"https://docs.wheels.dev/",
+    "repository":{
+        "type":"git",
+        "URL":"https://github.com/wheels-dev/wheels"
+    },
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
+    "dependencies":{
+        "wheels":"^3.0.0"
+    },
+    "installPaths":{
+        "wheels":"vendor/wheels/"
+    }
+}

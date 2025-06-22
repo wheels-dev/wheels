@@ -8,15 +8,24 @@ CFIDE
 cfide
 WEB-INF
 
+# Build artifacts
 /target
 /temp/
 /manual/
 /bin/
 /migrator/sql/
+
+# Dependencies
 /vendor/testbox/
 /vendor/wirebox/
+node_modules/
+
+# CLI development
 /cli/workspace/
 /cli/simpletestapp/
+
+# Old structure (backward compatibility)
+/vendor/wheels/
 
 settings.json
 settings.xml

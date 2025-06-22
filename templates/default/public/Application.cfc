@@ -13,7 +13,8 @@ component output="false" {
 	// Set up the application paths.
 	this.appDir     = expandPath("../app/");
 	this.vendorDir  = expandPath("../vendor/");
-	this.wheelsDir  = this.vendorDir & "wheels/";
+	this.coreDir    = expandPath("../core/");
+	this.wheelsDir  = this.coreDir & "src/wheels/";
 	this.wireboxDir = this.vendorDir & "wirebox/";
 	this.testboxDir = this.vendorDir & "testbox/";
 

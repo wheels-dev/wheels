@@ -1,0 +1,15 @@
+{
+	"name":"|appName|",
+	"web":{
+			"host":"localhost",
+			"webroot": "public",
+			"rewrites":{
+					"enable":true,
+					"config":"public/urlrewrite.xml"
+			}
+	},
+	"app":{
+			"cfengine":"|cfmlEngine|",
+      "libDirs":"app/lib"
+	}
+}

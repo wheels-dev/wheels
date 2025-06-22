@@ -79,16 +79,16 @@ component extends="commands.wheels.BaseCommand" {
             print.line();
             
             print.yellowLine("Examples:");
-            print.indentedLine("# Create a new blog application");
+            print.indentedLine("## Create a new blog application");
             print.indentedLine("wheels create app blog");
             print.line();
-            print.indentedLine("# Generate a Post model with migration");
+            print.indentedLine("## Generate a Post model with migration");
             print.indentedLine("wheels create model Post title:string content:text --migration");
             print.line();
-            print.indentedLine("# Generate a RESTful controller");
+            print.indentedLine("## Generate a RESTful controller");
             print.indentedLine("wheels create controller Posts --resource");
             print.line();
-            print.indentedLine("# Run database migrations");
+            print.indentedLine("## Run database migrations");
             print.indentedLine("wheels db migrate");
             print.line();
             

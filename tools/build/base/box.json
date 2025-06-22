@@ -1,0 +1,61 @@
+{
+    "name":"Wheels Base Template",
+    "version":"@build.version@",
+    "author":"Wheels Core Team and Community",
+    "shortDescription":"Wheels Framework Base Template",
+    "location":"forgeboxStorage",
+    "slug":"wheels-base-template",
+    "createPackageDirectory":false,
+    "type":"cfwheels-templates",
+    "keywords":[
+			"mvc",
+			"rails",
+			"wheels",
+			"wheels",
+			"core"
+		],
+    "homepage":"https://wheels.dev/",
+    "documentation":"https://wheels.dev/docs",
+    "repository":{
+			"type":"git",
+			"URL":"https://github.com/wheels-dev/wheels"
+		},
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
+		"contributors":[
+			"Peter Amiri <peter@alurium.com>"
+		],
+	 "ignore":[],
+    "devDependencies":{
+        "commandbox-dotenv":"*",
+        "commandbox-cfconfig":"*",
+        "commandbox-cfformat":"*"
+    },
+		"installPathConvention":{
+			"modules":"vendor/",
+			"wheels-plugins":"vendor/"
+		},
+    "installPaths":{
+        "wheels-core":"vendor/wheels/",
+				"wirebox":"vendor/wirebox/",
+				"testbox":"vendor/testbox/"
+    },
+    "dependencies":{
+        "wheels-core":"@build.version@",
+				"wirebox":"^7",
+				"testbox":"^5"
+    },
+    "private":false,
+    "license":[
+        {
+            "type":"Apache License 2.0",
+            "URL":"https://github.com/wheels-dev/wheels/blob/master/LICENSE"
+        }
+    ],
+    "scripts":{
+        "postPublish":"!git push --follow-tags",
+        "postInstall":"pathExists .env || cp env.example .env && mv env.example .env.example",
+        "format":"cfformat run config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc --overwrite",
+        "format:check":"cfformat check config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc",
+        "format:watch":"cfformat watch path='config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc' settingsPath='.cfformat.json'"
+    }
+}

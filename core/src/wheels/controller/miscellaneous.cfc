@@ -193,10 +193,17 @@ component {
 				if (local.fullPath CONTAINS "/wheels") {
 					local.startPos = findNoCase("/wheels", local.fullPath);
 					
-					// Prefer /vendor/wheels if available
-					local.vendorWheelsPos = findNoCase("/vendor/wheels/", local.fullPath);
-					if (local.vendorWheelsPos > 0) {
-						local.startPos = local.vendorWheelsPos + len("/vendor");
+					// Prefer /core/src/wheels if available
+					local.coreWheelsPos = findNoCase("/core/src/wheels/", local.fullPath);
+					if (local.coreWheelsPos > 0) {
+						local.startPos = local.coreWheelsPos + len("/core/src");
+					}
+					// Also check for vendor/wheels for backward compatibility
+					else {
+						local.vendorWheelsPos = findNoCase("/vendor/wheels/", local.fullPath);
+						if (local.vendorWheelsPos > 0) {
+							local.startPos = local.vendorWheelsPos + len("/vendor");
+						}
 					}
 
 					if (local.startPos > 0) {
