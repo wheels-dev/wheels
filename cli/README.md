@@ -1,6 +1,6 @@
 # Wheels CLI (Next Generation)
 
-A modern, powerful CommandBox module that provides comprehensive CLI tooling for the CFWheels framework.
+A modern, powerful CommandBox module that provides comprehensive CLI tooling for the Wheels framework.
 
 ## 🚀 Features
 

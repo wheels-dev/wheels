@@ -6,7 +6,7 @@
 component extends="testbox.system.BaseSpec" {
 	
 	// Wheels application reference
-	property name="app" inject="wirebox:CFWheels";
+	property name="app" inject="wirebox:Wheels";
 	
 	/**
 	 * Run before all tests in the spec

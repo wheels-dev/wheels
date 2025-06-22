@@ -83,7 +83,7 @@ Checks Passed (15):
   ✓ Session management is configured
   ✓ Routes are configured
   ✓ Write permission OK: db/migrate
-  ✓ CFWheels dependency declared
+  ✓ Wheels dependency declared
   ✓ .gitignore file exists
 
 ======================================================================
@@ -141,7 +141,7 @@ Tests write permissions on:
 
 ### Dependencies
 Verifies package management:
-- CFWheels listed in dependencies
+- Wheels listed in dependencies
 - Modules directory exists
 - Dependencies installed
 

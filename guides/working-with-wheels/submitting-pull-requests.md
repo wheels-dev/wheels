@@ -108,10 +108,10 @@ Use the TestUI or run tests directly:
 ```bash
 # Run all tests across all engines (from TestUI)
 # or run specific tests via command line:
-docker exec -it cfwheels-test-lucee5 sh -c "cd /cfwheels-test-suite && box wheels test app"
+docker exec -it wheels-test-lucee5 sh -c "cd /wheels-test-suite && box wheels test app"
 
 # Run a specific test
-docker exec -it cfwheels-test-lucee5 sh -c "cd /cfwheels-test-suite && box wheels test app TestName"
+docker exec -it wheels-test-lucee5 sh -c "cd /wheels-test-suite && box wheels test app TestName"
 ```
 
 Make sure your changes:

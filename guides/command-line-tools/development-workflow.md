@@ -140,7 +140,7 @@ By default, upgrades create a backup in `backups/upgrade-[timestamp]/` containin
 After a successful upgrade:
 
 1. Run your test suite: `wheels test run`
-2. Check the upgrade guide at https://guides.cfwheels.org/upgrading
+2. Check the upgrade guide at https://guides.wheels.dev/upgrading
 3. Review deprecated features
 4. Update your plugins to compatible versions
 

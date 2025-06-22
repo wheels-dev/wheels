@@ -117,7 +117,7 @@ Each plugin contains `plugin.json`:
 ### Official Registry
 Default source for plugins:
 ```
-https://www.forgebox.io/type/cfwheels-plugins/
+https://www.forgebox.io/type/wheels-plugins/
 ```
 
 ### Custom Registries
@@ -125,7 +125,7 @@ Configure additional sources:
 ```json
 {
   "pluginRegistries": [
-    "https://www.forgebox.io/type/cfwheels-plugins/",
+    "https://www.forgebox.io/type/wheels-plugins/",
     "https://company.com/wheels-plugins/"
   ]
 }

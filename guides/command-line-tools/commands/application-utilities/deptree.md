@@ -45,7 +45,7 @@ Application Dependencies
 Project: myapp
 Version: 1.0.0
 
-├── cfwheels @ ^2.5.0 [installed: 2.5.0]
+├── wheels @ ^2.5.0 [installed: 2.5.0]
 │   ├── wirebox @ ^7.0.0 [installed: 7.2.0]
 │   └── testbox @ ^5.0.0 [installed: 5.2.0]
 │       └── mockdatacfc @ ^3.6.0 [installed: 3.6.0]
@@ -68,7 +68,7 @@ wheels deptree depth=1
 
 Output:
 ```
-├── cfwheels @ ^2.5.0 [installed: 2.5.0]
+├── wheels @ ^2.5.0 [installed: 2.5.0]
 ├── commandbox-dotenv @ ^1.0.0 [installed: 1.5.0]
 ├── commandbox-cfformat @ ^0.15.0 [installed: 0.15.3]
 └── qb @ ^9.0.0 [installed: 9.2.0]
@@ -97,7 +97,7 @@ Version: 1.0.0
 
 Package                  Required        Installed      Status
 ----------------------------------------------------------------------
-cfwheels                ^2.5.0          2.5.0          Installed
+wheels                  ^2.5.0          2.5.0          Installed
 commandbox-dotenv       ^1.0.0          1.5.0          Installed
 commandbox-cfformat     ^0.15.0         0.15.3         Installed
 qb                      ^9.0.0          9.2.0          Installed
@@ -182,7 +182,7 @@ The command reads from `box.json`:
   "name": "myapp",
   "version": "1.0.0",
   "dependencies": {
-    "cfwheels": "^2.5.0",
+    "wheels": "^2.5.0",
     "qb": "^9.0.0"
   },
   "devDependencies": {
@@ -209,9 +209,9 @@ The command checks if packages are installed by looking in:
 
 ### Version Mismatches
 ```
-├── cfwheels @ ^2.5.0 [installed: 2.3.0]
+├── wheels @ ^2.5.0 [installed: 2.3.0]
 ```
-**Solution**: Run `box update cfwheels`
+**Solution**: Run `box update wheels`
 
 ### Deep Dependency Conflicts
 When sub-dependencies conflict:
@@ -246,7 +246,7 @@ wheels deptree production=true format=list
 For critical applications:
 ```json
 "dependencies": {
-  "cfwheels": "2.5.0",  // Exact version
+  "wheels": "2.5.0",  // Exact version
   "qb": "9.2.0"
 }
 ```

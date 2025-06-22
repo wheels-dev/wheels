@@ -84,8 +84,8 @@ wheels-my-plugin/
   "name": "wheels-my-plugin",
   "version": "1.0.0",
   "author": "John Doe",
-  "type": "commandbox-modules,cfwheels-plugins",
-  "keywords": "cfwheels,wheels,cli,plugin",
+  "type": "commandbox-modules,wheels-plugins",
+  "keywords": "wheels,cli,plugin",
   "shortDescription": "Plugin description",
   "license": [{
     "type": "MIT",

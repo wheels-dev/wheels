@@ -19,7 +19,7 @@ component extends="commandbox.system.BaseCommand" accessors="true" {
     // Module Services
     property name="configService"     inject="ConfigService@wheelscli";
     property name="projectService"    inject="ProjectService@wheelscli";
-    property name="templateService"   inject="TemplateService@wheelscli";
+    property name="snippetService"    inject="SnippetService@wheelscli";
     property name="formatterService"  inject="FormatterService@wheelscli";
     property name="tabCompletionService" inject="TabCompletionService@wheelscli";
     
@@ -383,28 +383,28 @@ component extends="commandbox.system.BaseCommand" accessors="true" {
     }
     
     // ========================================
-    // Template Utilities
+    // Snippet Utilities
     // ========================================
     
     /**
-     * Render template with data
+     * Render snippet with data
      */
-    function renderTemplate(required string template, required struct data) {
-        return getTemplateService().render(arguments.template, arguments.data);
+    function renderSnippet(required string snippet, required struct data) {
+        return getSnippetService().render(arguments.snippet, arguments.data);
     }
     
     /**
-     * Get template content
+     * Get snippet content
      */
-    function getTemplate(required string type, string name = "default") {
-        return getTemplateService().getTemplate(arguments.type, arguments.name);
+    function getSnippet(required string type, string name = "default") {
+        return getSnippetService().getSnippet(arguments.type, arguments.name);
     }
     
     /**
-     * Check if using custom template
+     * Check if using custom snippet
      */
-    function isUsingCustomTemplate(required string path) {
-        return getTemplateService().isCustomTemplate(arguments.path);
+    function isUsingCustomSnippet(required string path) {
+        return getSnippetService().isCustomSnippet(arguments.path);
     }
     
     // ========================================
@@ -651,17 +651,17 @@ component extends="commandbox.system.BaseCommand" accessors="true" {
     }
     
     /**
-     * Complete template names
+     * Complete snippet names
      */
-    function completeTemplateNames(string paramSoFar = "", struct passedNamedParameters = {}) {
-        return getTabCompletionService().getTemplateNames(arguments.paramSoFar, arguments.passedNamedParameters);
+    function completeSnippetNames(string paramSoFar = "", struct passedNamedParameters = {}) {
+        return getTabCompletionService().getSnippetNames(arguments.paramSoFar, arguments.passedNamedParameters);
     }
     
     /**
-     * Complete template types
+     * Complete snippet types
      */
-    function completeTemplateTypes(string paramSoFar = "", struct passedNamedParameters = {}) {
-        return getTabCompletionService().getTemplateTypes(arguments.paramSoFar, arguments.passedNamedParameters);
+    function completeSnippetTypes(string paramSoFar = "", struct passedNamedParameters = {}) {
+        return getTabCompletionService().getSnippetTypes(arguments.paramSoFar, arguments.passedNamedParameters);
     }
     
     /**

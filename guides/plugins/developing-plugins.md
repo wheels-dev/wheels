@@ -194,7 +194,7 @@ install:
   # Install CLI: needed to repackage the plugin to a zip on install
   - box install wheels-cli
   # Install Master Branch; nb, installed into folder of the git repo name, i.e neokoenig/wheels-ical4j
-  - box install cfwheels/cfwheels
+  - box install wheels-dev/wheels
   # Install the Plugin: use gitHub path to get the absolute latest rather than the forgebox version
   - box install neokoenig/wheels-ical4j
 before_script:

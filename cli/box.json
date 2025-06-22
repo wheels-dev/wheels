@@ -1,20 +1,20 @@
 {
     "name": "wheels-cli-next",
     "version": "3.0.0-beta.1",
-    "author": "CFWheels Team",
-    "homepage": "https://cfwheels.org",
-    "documentation": "https://guides.cfwheels.org/cli",
+    "author": "Wheels Team",
+    "homepage": "https://wheels.dev",
+    "documentation": "https://guides.wheels.dev/cli",
     "repository": {
         "type": "git",
-        "url": "https://github.com/cfwheels/cfwheels"
+        "url": "https://github.com/wheels-dev/wheels"
     },
-    "bugs": "https://github.com/cfwheels/cfwheels/issues",
+    "bugs": "https://github.com/wheels-dev/wheels/issues",
     "slug": "wheels-cli-next",
-    "shortDescription": "Next-generation CLI for CFWheels Framework",
-    "description": "A powerful command-line interface for CFWheels that provides scaffolding, database management, and development tools",
+    "shortDescription": "Next-generation CLI for Wheels Framework",
+    "description": "A powerful command-line interface for Wheels that provides scaffolding, database management, and development tools",
     "type": "commandbox-modules",
     "keywords": [
-        "cfwheels",
+        "wheels",
         "mvc",
         "cli",
         "scaffolding",

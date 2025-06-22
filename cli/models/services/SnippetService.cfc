@@ -1,6 +1,6 @@
 /**
- * Template Service for Wheels CLI
- * Handles template loading, rendering, and management
+ * Snippet Service for Wheels CLI
+ * Handles snippet loading, rendering, and management
  * 
  * @singleton
  * @author CFWheels Team
@@ -15,31 +15,31 @@ component accessors="true" singleton {
     
     // Service Properties
     property name="settings" type="struct";
-    property name="templateCache" type="struct";
-    property name="customTemplatePaths" type="array";
+    property name="snippetCache" type="struct";
+    property name="customSnippetPaths" type="array";
     
     /**
      * Constructor
      */
     function init(struct settings = {}) {
         variables.settings = arguments.settings;
-        variables.templateCache = {};
-        variables.customTemplatePaths = [];
+        variables.snippetCache = {};
+        variables.customSnippetPaths = [];
         
         return this;
     }
     
     /**
-     * Render template with data
+     * Render snippet with data
      */
-    function render(required string template, struct data = {}) {
+    function render(required string snippet, struct data = {}) {
         var content = "";
         
-        // Load template from file or cache
-        if (fileExists(arguments.template)) {
-            content = fileRead(arguments.template);
+        // Load snippet from file or cache
+        if (fileExists(arguments.snippet)) {
+            content = fileRead(arguments.snippet);
         } else {
-            content = arguments.template;
+            content = arguments.snippet;
         }
         
         // Get placeholder settings
@@ -77,40 +77,40 @@ component accessors="true" singleton {
     }
     
     /**
-     * Get template by type and name
+     * Get snippet by type and name
      */
-    function getTemplate(required string type, string name = "default") {
+    function getSnippet(required string type, string name = "default") {
         var cacheKey = arguments.type & ":" & arguments.name;
         
         // Check cache
-        if (structKeyExists(variables.templateCache, cacheKey)) {
-            return variables.templateCache[cacheKey];
+        if (structKeyExists(variables.snippetCache, cacheKey)) {
+            return variables.snippetCache[cacheKey];
         }
         
-        // Search for template file
-        var templatePath = findTemplate(arguments.type, arguments.name);
+        // Search for snippet file
+        var snippetPath = findSnippet(arguments.type, arguments.name);
         
-        if (len(templatePath)) {
-            var content = fileRead(templatePath);
+        if (len(snippetPath)) {
+            var content = fileRead(snippetPath);
             
-            // Cache the template
-            variables.templateCache[cacheKey] = content;
+            // Cache the snippet
+            variables.snippetCache[cacheKey] = content;
             
             return content;
         }
         
-        // Return built-in template
-        return getBuiltInTemplate(arguments.type, arguments.name);
+        // Return built-in snippet
+        return getBuiltInSnippet(arguments.type, arguments.name);
     }
     
     /**
-     * Find template file in search paths
+     * Find snippet file in search paths
      */
-    private function findTemplate(required string type, required string name) {
-        var searchPaths = getTemplatePaths();
+    private function findSnippet(required string type, required string name) {
+        var searchPaths = getSnippetPaths();
         var fileName = arguments.name & ".cfc";
         
-        // Special handling for view templates
+        // Special handling for view snippets
         if (arguments.type == "view") {
             fileName = arguments.name & ".cfm";
         }
@@ -121,7 +121,7 @@ component accessors="true" singleton {
             fullPath = replace(fullPath, "//", "/", "all");
             
             if (fileExists(fullPath)) {
-                log.debug("Found template: #fullPath#");
+                log.debug("Found snippet: #fullPath#");
                 return fullPath;
             }
         }
@@ -130,13 +130,13 @@ component accessors="true" singleton {
     }
     
     /**
-     * Get all template search paths
+     * Get all snippet search paths
      */
-    function getTemplatePaths() {
+    function getSnippetPaths() {
         var paths = [];
         
-        // Add custom template paths from config
-        var configPaths = getConfigService().get("templates.searchPaths", []);
+        // Add custom snippet paths from config
+        var configPaths = getConfigService().get("snippets.searchPaths", []);
         for (var path in configPaths) {
             if (directoryExists(expandPath(path))) {
                 arrayAppend(paths, expandPath(path));
@@ -152,8 +152,8 @@ component accessors="true" singleton {
             }
         }
         
-        // Add default module template path
-        var modulePath = expandPath("/wheelscli/templates");
+        // Add default module snippet path
+        var modulePath = expandPath("/wheelscli/snippets");
         if (directoryExists(modulePath) && !arrayFind(paths, modulePath)) {
             arrayAppend(paths, modulePath);
         }
@@ -162,50 +162,50 @@ component accessors="true" singleton {
     }
     
     /**
-     * Check if template is custom (not built-in)
+     * Check if snippet is custom (not built-in)
      */
-    function isCustomTemplate(required string path) {
-        var builtInPath = expandPath("/wheelscli/templates");
+    function isCustomSnippet(required string path) {
+        var builtInPath = expandPath("/wheelscli/snippets");
         return !findNoCase(builtInPath, arguments.path);
     }
     
     /**
-     * List available templates
+     * List available snippets
      */
-    function listTemplates(string type = "") {
-        var templates = {
+    function listSnippets(string type = "") {
+        var snippets = {
             builtin = {},
             custom = {}
         };
         
-        var searchPaths = getTemplatePaths();
+        var searchPaths = getSnippetPaths();
         var types = len(arguments.type) ? [arguments.type] : ["model", "controller", "view", "migration", "test"];
         
         for (var searchPath in searchPaths) {
-            var isCustom = isCustomTemplate(searchPath);
+            var isCustom = isCustomSnippet(searchPath);
             
-            for (var templateType in types) {
-                var typePath = searchPath & "/" & templateType;
+            for (var snippetType in types) {
+                var typePath = searchPath & "/" & snippetType;
                 
                 if (directoryExists(typePath)) {
                     var files = directoryList(typePath, false, "name", "*.cf*");
                     
                     for (var file in files) {
-                        var templateName = listFirst(file, ".");
+                        var snippetName = listFirst(file, ".");
                         
                         if (isCustom) {
-                            if (!structKeyExists(templates.custom, templateType)) {
-                                templates.custom[templateType] = [];
+                            if (!structKeyExists(snippets.custom, snippetType)) {
+                                snippets.custom[snippetType] = [];
                             }
-                            if (!arrayFind(templates.custom[templateType], templateName)) {
-                                arrayAppend(templates.custom[templateType], templateName);
+                            if (!arrayFind(snippets.custom[snippetType], snippetName)) {
+                                arrayAppend(snippets.custom[snippetType], snippetName);
                             }
                         } else {
-                            if (!structKeyExists(templates.builtin, templateType)) {
-                                templates.builtin[templateType] = [];
+                            if (!structKeyExists(snippets.builtin, snippetType)) {
+                                snippets.builtin[snippetType] = [];
                             }
-                            if (!arrayFind(templates.builtin[templateType], templateName)) {
-                                arrayAppend(templates.builtin[templateType], templateName);
+                            if (!arrayFind(snippets.builtin[snippetType], snippetName)) {
+                                arrayAppend(snippets.builtin[snippetType], snippetName);
                             }
                         }
                     }
@@ -213,17 +213,17 @@ component accessors="true" singleton {
             }
         }
         
-        return templates;
+        return snippets;
     }
     
     /**
-     * Copy template to project
+     * Copy snippet to project
      */
-    function copyTemplate(required string type, required string name, required string destination) {
-        var templatePath = findTemplate(arguments.type, arguments.name);
+    function copySnippet(required string type, required string name, required string destination) {
+        var snippetPath = findSnippet(arguments.type, arguments.name);
         
-        if (!len(templatePath)) {
-            throw(type="TemplateNotFound", message="Template '#arguments.type#/#arguments.name#' not found");
+        if (!len(snippetPath)) {
+            throw(type="SnippetNotFound", message="Snippet '#arguments.type#/#arguments.name#' not found");
         }
         
         // Ensure destination directory exists
@@ -232,10 +232,10 @@ component accessors="true" singleton {
             directoryCreate(destDir, true);
         }
         
-        // Copy the template
-        fileCopy(templatePath, arguments.destination);
+        // Copy the snippet
+        fileCopy(snippetPath, arguments.destination);
         
-        log.info("Copied template '#arguments.type#/#arguments.name#' to '#arguments.destination#'");
+        log.info("Copied snippet '#arguments.type#/#arguments.name#' to '#arguments.destination#'");
         
         return true;
     }
@@ -246,12 +246,12 @@ component accessors="true" singleton {
     private function getMergedData(required struct data) {
         var merged = {};
         
-        // Add template defaults from settings
+        // Add snippet defaults from settings
         var defaults = getSetting("defaults", {});
         structAppend(merged, defaults);
         
-        // Add template defaults from config
-        var configDefaults = getConfigService().get("templates", {});
+        // Add snippet defaults from config
+        var configDefaults = getConfigService().get("snippets", {});
         structAppend(merged, configDefaults);
         
         // Add common variables
@@ -266,7 +266,7 @@ component accessors="true" singleton {
     }
     
     /**
-     * Process conditional blocks in template
+     * Process conditional blocks in snippet
      */
     private function processConditionals(required string content, required struct data) {
         var processed = arguments.content;
@@ -293,7 +293,7 @@ component accessors="true" singleton {
     }
     
     /**
-     * Process loops in template
+     * Process loops in snippet
      */
     private function processLoops(required string content, required struct data) {
         var processed = arguments.content;
@@ -383,32 +383,32 @@ component accessors="true" singleton {
     }
     
     /**
-     * Get built-in template
+     * Get built-in snippet
      */
-    private function getBuiltInTemplate(required string type, required string name) {
-        // These would be the actual built-in templates
-        // For now, returning empty templates
+    private function getBuiltInSnippet(required string type, required string name) {
+        // These would be the actual built-in snippets
+        // For now, returning empty snippets
         
         switch(arguments.type) {
             case "model":
-                return getBuiltInModelTemplate(arguments.name);
+                return getBuiltInModelSnippet(arguments.name);
             case "controller":
-                return getBuiltInControllerTemplate(arguments.name);
+                return getBuiltInControllerSnippet(arguments.name);
             case "view":
-                return getBuiltInViewTemplate(arguments.name);
+                return getBuiltInViewSnippet(arguments.name);
             case "migration":
-                return getBuiltInMigrationTemplate(arguments.name);
+                return getBuiltInMigrationSnippet(arguments.name);
             case "test":
-                return getBuiltInTestTemplate(arguments.name);
+                return getBuiltInTestSnippet(arguments.name);
             default:
                 return "";
         }
     }
     
     /**
-     * Built-in model template
+     * Built-in model snippet
      */
-    private function getBuiltInModelTemplate(required string name) {
+    private function getBuiltInModelSnippet(required string name) {
         if (arguments.name == "default") {
             return 'component extends="Model" {
     
@@ -451,9 +451,9 @@ component accessors="true" singleton {
     }
     
     /**
-     * Built-in controller template
+     * Built-in controller snippet
      */
-    private function getBuiltInControllerTemplate(required string name) {
+    private function getBuiltInControllerSnippet(required string name) {
         if (arguments.name == "default") {
             return 'component extends="Controller" {
     
@@ -491,9 +491,9 @@ component accessors="true" singleton {
     }
     
     /**
-     * Built-in view template
+     * Built-in view snippet
      */
-    private function getBuiltInViewTemplate(required string name) {
+    private function getBuiltInViewSnippet(required string name) {
         if (arguments.name == "default") {
             return '<cfoutput>
 
@@ -508,9 +508,9 @@ component accessors="true" singleton {
     }
     
     /**
-     * Built-in migration template
+     * Built-in migration snippet
      */
-    private function getBuiltInMigrationTemplate(required string name) {
+    private function getBuiltInMigrationSnippet(required string name) {
         if (arguments.name == "default") {
             return 'component extends="wheels.migrator.Migration" {
     
@@ -567,9 +567,9 @@ component accessors="true" singleton {
     }
     
     /**
-     * Built-in test template
+     * Built-in test snippet
      */
-    private function getBuiltInTestTemplate(required string name) {
+    private function getBuiltInTestSnippet(required string name) {
         if (arguments.name == "default") {
             return 'component extends="wheels.test" {
     

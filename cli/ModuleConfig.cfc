@@ -45,9 +45,9 @@ component {
                 verbose = getSystemSetting("WHEELS_VERBOSE", false)
             },
             
-            // Template settings
-            templates = {
-                searchPaths = ["config/templates", ".wheels/templates"],
+            // Snippet settings
+            snippets = {
+                searchPaths = ["config/snippets", ".wheels/snippets"],
                 placeholder = {
                     prefix = "@",
                     suffix = "@"
@@ -110,10 +110,10 @@ component {
             .to("#moduleMapping#.models.services.DatabaseService")
             .asSingleton();
             
-        binder.map("TemplateService@wheelscli")
-            .to("#moduleMapping#.models.services.TemplateService")
+        binder.map("SnippetService@wheelscli")
+            .to("#moduleMapping#.models.services.SnippetService")
             .asSingleton()
-            .initWith(settings = settings.templates);
+            .initWith(settings = settings.snippets);
             
         binder.map("MigrationService@wheelscli")
             .to("#moduleMapping#.models.services.MigrationService")
@@ -181,7 +181,7 @@ component {
                     "database": "sqlite",
                     "template": "default"
                 },
-                "templates": {
+                "snippets": {
                     "author": "",
                     "license": "MIT"
                 }

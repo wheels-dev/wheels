@@ -1,94 +1,94 @@
 /**
- * List available templates and their override status
+ * List available snippets and their override status
  */
 component extends="commands.wheels.BaseCommand" {
     
     /**
-     * List available templates and their override status
+     * List available snippets and their override status
      * 
-     * @type Template type to list (model, controller, view, migration, all)
+     * @type Snippet type to list (model, controller, view, migration, all)
      * @verbose Show template details and variables
-     * @help Display available CLI templates and customization status
+     * @help Display available CLI snippets and customization status
      */
     function run(string type = "all", boolean verbose = false) {
         ensureWheelsProject();
         
         print.line();
-        print.boldBlueLine("Wheels CLI Templates");
-        print.yellowLine("Template System: CommandBox @VARIABLE@ placeholders");
+        print.boldBlueLine("Wheels CLI Snippets");
+        print.yellowLine("Snippet System: CommandBox @VARIABLE@ placeholders");
         print.line("=" repeatString 60);
         print.line();
         
-        var builtInPath = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../templates";
-        var projectPath = getConfigPath("templates");
+        var builtInPath = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../snippets";
+        var projectPath = getConfigPath("snippets");
         
         var types = arguments.type == "all" ? ["model", "controller", "view", "migration"] : [arguments.type];
         
-        for (var templateType in types) {
-            listTemplatesForType(templateType, builtInPath, projectPath, arguments.verbose);
+        for (var snippetType in types) {
+            listSnippetsForType(snippetType, builtInPath, projectPath, arguments.verbose);
         }
         
         if (directoryExists(projectPath)) {
-            print.yellowLine("Custom templates location:");
+            print.yellowLine("Custom snippets location:");
             print.indentedLine(projectPath);
             print.line();
-            print.line("Your custom templates will be used instead of built-in templates.");
+            print.line("Your custom snippets will be used instead of built-in snippets.");
         } else {
-            print.yellowLine("No custom templates found.");
-            print.line("Run 'wheels templates copy' to customize templates for your project.");
+            print.yellowLine("No custom snippets found.");
+            print.line("Run 'wheels snippets copy' to customize snippets for your project.");
         }
         
         if (!arguments.verbose) {
             print.line();
-            print.line("Use --verbose to see template details and available variables.");
+            print.line("Use --verbose to see snippet details and available variables.");
         }
     }
     
-    private function listTemplatesForType(type, builtInPath, projectPath, verbose) {
+    private function listSnippetsForType(type, builtInPath, projectPath, verbose) {
         var builtInDir = arguments.builtInPath & "/" & arguments.type;
         
         if (!directoryExists(builtInDir)) {
             return;
         }
         
-        print.greenBoldLine(uCase(arguments.type) & " Templates:");
+        print.greenBoldLine(uCase(arguments.type) & " Snippets:");
         
-        var templates = directoryList(builtInDir, false, "name", "*.cfc|*.cfm");
+        var snippets = directoryList(builtInDir, false, "name", "*.cfc|*.cfm");
         
-        if (arrayLen(templates) == 0) {
-            print.indentedLine("No templates found");
+        if (arrayLen(snippets) == 0) {
+            print.indentedLine("No snippets found");
             print.line();
             return;
         }
         
-        for (var template in templates) {
-            var projectTemplate = arguments.projectPath & "/" & arguments.type & "/" & template;
+        for (var snippet in snippets) {
+            var projectSnippet = arguments.projectPath & "/" & arguments.type & "/" & snippet;
             var status = "Built-in";
             var statusColor = "white";
             
-            if (fileExists(projectTemplate)) {
+            if (fileExists(projectSnippet)) {
                 status = "Customized";
                 statusColor = "green";
             }
             
             if (statusColor == "green") {
-                print.indented#statusColor#Line("✓ #template# [#status#]");
+                print.indented#statusColor#Line("✓ #snippet# [#status#]");
             } else {
-                print.indentedLine("  #template# [#status#]");
+                print.indentedLine("  #snippet# [#status#]");
             }
             
             if (arguments.verbose) {
-                showTemplateDetails(arguments.type, template);
+                showSnippetDetails(arguments.type, snippet);
             }
         }
         
         print.line();
     }
     
-    private function showTemplateDetails(type, template) {
-        print.indentedLine("    └─ Description: #getTemplateDescription(arguments.type, arguments.template)#");
+    private function showSnippetDetails(type, snippet) {
+        print.indentedLine("    └─ Description: #getSnippetDescription(arguments.type, arguments.snippet)#");
         
-        var variables = getTemplateVariables(arguments.type, arguments.template);
+        var variables = getSnippetVariables(arguments.type, arguments.snippet);
         if (arrayLen(variables) > 0) {
             print.indentedLine("    └─ Variables:");
             for (var variable in variables) {
@@ -97,7 +97,7 @@ component extends="commands.wheels.BaseCommand" {
         }
     }
     
-    private function getTemplateDescription(type, template) {
+    private function getSnippetDescription(type, snippet) {
         var descriptions = {
             "model" = {
                 "Model.cfc" = "Basic model with minimal configuration",
@@ -123,14 +123,14 @@ component extends="commands.wheels.BaseCommand" {
         };
         
         if (structKeyExists(descriptions, arguments.type) && 
-            structKeyExists(descriptions[arguments.type], arguments.template)) {
-            return descriptions[arguments.type][arguments.template];
+            structKeyExists(descriptions[arguments.type], arguments.snippet)) {
+            return descriptions[arguments.type][arguments.snippet];
         }
         
-        return "Custom template";
+        return "Custom snippet";
     }
     
-    private function getTemplateVariables(type, template) {
+    private function getSnippetVariables(type, snippet) {
         var variables = [];
         
         switch(arguments.type) {

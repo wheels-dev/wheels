@@ -11,7 +11,7 @@ component extends="commands.wheels.BaseCommand" {
      * @model Model name (defaults to singular of controller)
      * @partial Generate a partial view (prefixed with _)
      * @layout Generate a layout file
-     * @template View template style (default, bootstrap5, tailwind)
+     * @template View snippet style (default, bootstrap5, tailwind)
      * @force Overwrite existing files
      * @help Generate view files for controller actions
      * 
@@ -84,7 +84,7 @@ component extends="commands.wheels.BaseCommand" {
         required string controller,
         required string action,
         required string model,
-        required string template,
+        required string snippet,
         boolean force = false
     ) {
         var viewsPath = getAppPath("views");
@@ -265,13 +265,13 @@ component extends="commands.wheels.BaseCommand" {
     }
     
     /**
-     * Generate view content based on action and template
+     * Generate view content based on action and snippet
      */
     private function generateViewContent(
         required string controller,
         required string action,
         required string model,
-        required string template
+        required string snippet
     ) {
         var content = "";
         var modelLower = lCase(arguments.model);
@@ -280,19 +280,19 @@ component extends="commands.wheels.BaseCommand" {
         // Generate content based on action
         switch(arguments.action) {
             case "index":
-                content = generateIndexView(arguments.controller, arguments.model, arguments.template);
+                content = generateIndexView(arguments.controller, arguments.model, arguments.snippet);
                 break;
                 
             case "show":
-                content = generateShowView(arguments.controller, arguments.model, arguments.template);
+                content = generateShowView(arguments.controller, arguments.model, arguments.snippet);
                 break;
                 
             case "new":
-                content = generateNewView(arguments.controller, arguments.model, arguments.template);
+                content = generateNewView(arguments.controller, arguments.model, arguments.snippet);
                 break;
                 
             case "edit":
-                content = generateEditView(arguments.controller, arguments.model, arguments.template);
+                content = generateEditView(arguments.controller, arguments.model, arguments.snippet);
                 break;
                 
             default:
@@ -305,7 +305,7 @@ component extends="commands.wheels.BaseCommand" {
     /**
      * Generate index view
      */
-    private function generateIndexView(controller, model, template) {
+    private function generateIndexView(controller, model, snippet) {
         var modelLower = lCase(model);
         var modelsLower = lCase(pluralize(model));
         
@@ -353,7 +353,7 @@ component extends="commands.wheels.BaseCommand" {
     /**
      * Generate show view
      */
-    private function generateShowView(controller, model, template) {
+    private function generateShowView(controller, model, snippet) {
         var modelLower = lCase(model);
         
         return '<cfoutput>
@@ -388,7 +388,7 @@ component extends="commands.wheels.BaseCommand" {
     /**
      * Generate new view
      */
-    private function generateNewView(controller, model, template) {
+    private function generateNewView(controller, model, snippet) {
         var modelLower = lCase(model);
         
         return '<cfoutput>
@@ -416,7 +416,7 @@ component extends="commands.wheels.BaseCommand" {
     /**
      * Generate edit view
      */
-    private function generateEditView(controller, model, template) {
+    private function generateEditView(controller, model, snippet) {
         var modelLower = lCase(model);
         
         return '<cfoutput>

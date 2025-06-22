@@ -59,10 +59,10 @@ component extends="commands.wheels.BaseCommand" {
             print.indentedLine("server restart           Restart the development server");
             print.line();
             
-            // Template Commands
-            print.greenLine("  Templates:");
-            print.indentedLine("templates copy           Copy templates for customization");
-            print.indentedLine("templates list           List available templates");
+            // Snippet Commands
+            print.greenLine("  Snippets:");
+            print.indentedLine("snippets copy            Copy snippets for customization");
+            print.indentedLine("snippets list            List available snippets");
             print.line();
             
             // Test Commands

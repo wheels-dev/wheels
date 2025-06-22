@@ -146,7 +146,7 @@ component accessors="true" singleton {
     /**
      * Get template names for tab completion
      */
-    function getTemplateNames(string paramSoFar = "", struct context = {}) {
+    function getSnippetNames(string paramSoFar = "", struct context = {}) {
         var templateType = structKeyExists(arguments.context, "type") ? arguments.context.type : "";
         var templates = [];
         
@@ -178,7 +178,7 @@ component accessors="true" singleton {
     /**
      * Get template types for tab completion
      */
-    function getTemplateTypes(string paramSoFar = "", struct context = {}) {
+    function getSnippetTypes(string paramSoFar = "", struct context = {}) {
         var types = ["model", "controller", "view", "migration", "test"];
         return filterCompletions(types, arguments.paramSoFar);
     }

@@ -245,7 +245,7 @@ component extends="commands.wheels.BaseCommand" {
         required array properties,
         string model = ""
     ) {
-        var template = getTemplate("migration", "Migration");
+        var snippet = getSnippet("migration", "Migration");
         
         var data = {
             migrationName = arguments.name,
@@ -365,8 +365,8 @@ component extends="commands.wheels.BaseCommand" {
                 downContent = '// Implement your rollback logic here';
         }
         
-        // Replace placeholders in template
-        var content = renderTemplate(template, data);
+        // Replace placeholders in snippet
+        var content = renderSnippet(snippet, data);
         content = replaceNoCase(content, "// Create table", upContent, "all");
         content = replaceNoCase(content, "// Drop table", downContent, "all");
         

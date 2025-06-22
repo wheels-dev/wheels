@@ -64,7 +64,7 @@ Total: 3 plugins
 ### Available Plugins from ForgeBox
 ```
 ================ Available Wheels Plugins From ForgeBox ======================
-[Lists all available cfwheels-plugins from ForgeBox]
+[Lists all available wheels-plugins from ForgeBox]
 =============================================================================
 ```
 

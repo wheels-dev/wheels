@@ -41,7 +41,7 @@ ForgeBox Information:
 📝 Name: Wheels Authentication Plugin
 🔗 Slug: wheels-auth
 🏷️  Latest Version: 2.1.0
-📁 Type: cfwheels-plugins
+📁 Type: wheels-plugins
 📄 Description: Complete authentication and authorization system for Wheels applications
 👤 Author: John Doe
 📊 Downloads: 15,432

@@ -1,7 +1,7 @@
-![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/cfwheels/cfwheels/snapshot.yml?style=flat-square&logo=github&label=Wheels%20Snapshots)
-<img src="https://www.forgebox.io/api/v1/entry/cfwheels/badges/version" />
-<img src="https://www.forgebox.io/api/v1/entry/cfwheels/badges/downloads" />
-![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.forgebox.io%2Fapi%2Fv1%2Fentry%2Fcfwheels%2Fbadges%2F&query=%24.data.versions.0.version&style=flat-square&label=Bleeding%20Edge%20Release)
+![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/wheels-dev/wheels/snapshot.yml?style=flat-square&logo=github&label=Wheels%20Snapshots)
+<img src="https://www.forgebox.io/api/v1/entry/wheels/badges/version" />
+<img src="https://www.forgebox.io/api/v1/entry/wheels/badges/downloads" />
+![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.forgebox.io%2Fapi%2Fv1%2Fentry%2Fwheels%2Fbadges%2F&query=%24.data.versions.0.version&style=flat-square&label=Bleeding%20Edge%20Release)
 
 # Wheels
 
@@ -45,13 +45,13 @@ version).
 
 ## Our Contributors
 
-<a href="https://github.com/cfwheels/cfwheels/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=cfwheels/cfwheels" />
+<a href="https://github.com/wheels-dev/wheels/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=wheels-dev/wheels" />
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).
 
 [1]: https://wheels.dev/
 [2]: https://guides.wheels.dev/introduction/readme/beginner-tutorial-hello-world
-[3]: https://guides.wheels.dev/working-with-cfwheels/contributing-to-cfwheels
-[4]: https://github.com/cfwheels/cfwheels/issues
+[3]: https://guides.wheels.dev/working-with-wheels/contributing-to-wheels
+[4]: https://github.com/wheels-dev/wheels/issues

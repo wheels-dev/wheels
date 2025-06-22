@@ -124,7 +124,7 @@ After finding plugins:
 
 - Search results are cached for 15 minutes
 - Results limited to 50 plugins per search
-- Only shows plugins compatible with cfwheels
+- Only shows plugins compatible with wheels
 - ForgeBox availability required
 
 ## See Also

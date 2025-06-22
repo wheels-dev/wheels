@@ -20,8 +20,8 @@ component extends="commands.wheels.BaseCommand" {
      * @tests.options true,false
      * @api.hint Create API controller instead of regular controller
      * @api.options true,false
-     * @template.hint Model template to use
-     * @template.optionsUDF completeModelTemplates
+     * @template.hint Model snippet to use
+     * @template.optionsUDF completeModelSnippets
      * @force.hint Overwrite existing files
      * @force.options true,false
      * @format.hint Output format
@@ -63,23 +63,23 @@ component extends="commands.wheels.BaseCommand" {
             // Parse properties
             var props = parseProperties(arguments.properties);
             
-            // Select appropriate template
-            var templateName = len(arguments.template) ? arguments.template : selectModelTemplate(props);
+            // Select appropriate snippet
+            var snippetName = len(arguments.template) ? arguments.template : selectModelSnippet(props);
             
-            if (!fileExists(getDirectoryFromPath(getCurrentTemplatePath()) & "../../../templates/model/#templateName#.cfc")) {
-                error("Template not found: #templateName#");
+            if (!fileExists(getDirectoryFromPath(getCurrentTemplatePath()) & "../../../snippets/model/#snippetName#.cfc")) {
+                error("Snippet not found: #snippetName#");
             }
             
-            var template = getTemplate("model", templateName);
+            var snippet = getSnippet("model", snippetName);
             
-            // Check if using custom template
-            if (isUsingCustomTemplate("model/#templateName#.cfc")) {
-                printInfo("Using custom model template: #templateName#");
+            // Check if using custom snippet
+            if (isUsingCustomSnippet("model/#snippetName#.cfc")) {
+                printInfo("Using custom model snippet: #snippetName#");
             }
             
             // Generate model file
             runWithSpinner("Generating model file", function() {
-                var modelContent = renderModelContent(arguments.name, props, template);
+                var modelContent = renderModelContent(arguments.name, props, snippet);
                 var modelsPath = getAppPath("models");
                 var modelFile = modelsPath & "/" & arguments.name & ".cfc";
                 
@@ -263,9 +263,9 @@ component extends="commands.wheels.BaseCommand" {
     }
     
     /**
-     * Select appropriate model template based on properties and configuration
+     * Select appropriate model snippet based on properties and configuration
      */
-    private string function selectModelTemplate(required array properties) {
+    private string function selectModelSnippet(required array properties) {
         var hasValidations = false;
         for (var prop in arguments.properties) {
             if (structKeyExists(prop.options, "required") || 
@@ -276,10 +276,10 @@ component extends="commands.wheels.BaseCommand" {
             }
         }
         
-        var includeAuditFields = getConfigService().get("templates.model.includeAuditFields", false);
-        var includeSoftDeletes = getConfigService().get("templates.model.includeSoftDeletes", false);
+        var includeAuditFields = getConfigService().get("snippets.model.includeAuditFields", false);
+        var includeSoftDeletes = getConfigService().get("snippets.model.includeSoftDeletes", false);
         
-        // Select template based on features needed
+        // Select snippet based on features needed
         if (includeAuditFields && includeSoftDeletes && hasValidations) {
             return "ModelComplete";
         } else if (includeAuditFields || includeSoftDeletes) {
@@ -292,12 +292,12 @@ component extends="commands.wheels.BaseCommand" {
     }
     
     /**
-     * Generate model content using template
+     * Generate model content using snippet
      */
     private string function renderModelContent(
         required string name,
         required array properties,
-        required string template
+        required string snippet
     ) {
         var data = {
             modelName = arguments.name,
@@ -340,13 +340,13 @@ component extends="commands.wheels.BaseCommand" {
         }
         data.validations = validations;
         
-        return renderTemplate(arguments.template, data);
+        return renderSnippet(arguments.snippet, data);
     }
     
     /**
-     * Tab completion for model templates
+     * Tab completion for model snippets
      */
-    function completeModelTemplates(string paramSoFar = "", struct passedNamedParameters = {}) {
+    function completeModelSnippets(string paramSoFar = "", struct passedNamedParameters = {}) {
         return getTabCompletionService().getTemplateNames(arguments.paramSoFar, {type = "model"});
     }
     

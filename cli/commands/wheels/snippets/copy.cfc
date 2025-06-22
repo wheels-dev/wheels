@@ -1,53 +1,53 @@
 /**
- * Copy CLI templates to your project for customization
+ * Copy CLI snippets to your project for customization
  */
 component extends="commands.wheels.BaseCommand" {
     
     /**
-     * Copy CLI templates to your project for customization
+     * Copy CLI snippets to your project for customization
      * 
-     * @type Template type to copy (model, controller, view, migration, all)
-     * @force Overwrite existing templates
-     * @help Copy built-in templates to your project for customization
+     * @type Snippet type to copy (model, controller, view, migration, all)
+     * @force Overwrite existing snippets
+     * @help Copy built-in snippets to your project for customization
      */
     function run(string type = "all", boolean force = false) {
         ensureWheelsProject();
         
-        var templateSource = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../templates";
-        var templateDest = getConfigPath("templates");
+        var snippetSource = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../snippets";
+        var snippetDest = getConfigPath("snippets");
         
-        // Ensure templates directory exists
-        if (!directoryExists(templateDest)) {
-            directoryCreate(templateDest, true);
+        // Ensure snippets directory exists
+        if (!directoryExists(snippetDest)) {
+            directoryCreate(snippetDest, true);
         }
         
         print.line();
-        print.boldBlueLine("Copying Wheels CLI templates for customization");
+        print.boldBlueLine("Copying Wheels CLI snippets for customization");
         print.line();
-        print.yellowLine("Templates use CommandBox's @VARIABLE@ placeholder system:");
+        print.yellowLine("Snippets use CommandBox's @VARIABLE@ placeholder system:");
         print.indentedLine("✓ CFML-safe (no hash mark conflicts)");
         print.indentedLine("✓ Works with CSS colors and HTML fragments");
         print.indentedLine("✓ Battle-tested CommandBox standard");
         print.line();
         
         if (arguments.type == "all") {
-            copyAllTemplates(templateSource, templateDest, arguments.force);
+            copyAllSnippets(snippetSource, snippetDest, arguments.force);
         } else {
-            copyTemplateType(arguments.type, templateSource, templateDest, arguments.force);
+            copySnippetType(arguments.type, snippetSource, snippetDest, arguments.force);
         }
         
         print.line();
-        print.greenBoldLine("✅ Templates copied successfully!");
+        print.greenBoldLine("✅ Snippets copied successfully!");
         print.line();
-        print.yellowLine("Template location:");
-        print.indentedLine(templateDest);
+        print.yellowLine("Snippet location:");
+        print.indentedLine(snippetDest);
         print.line();
-        print.boldLine("Available template variables:");
+        print.boldLine("Available snippet variables:");
         print.line();
         
         // Show available variables based on template type
         if (arguments.type == "all" || arguments.type == "model") {
-            print.greenLine("Model templates:");
+            print.greenLine("Model snippets:");
             print.indentedLine("@MODEL_NAME@         - Model name (e.g., User)");
             print.indentedLine("@TABLE_NAME@         - Database table name (e.g., users)");
             print.indentedLine("@PROPERTY_DEFINITIONS@ - Property definitions");
@@ -59,7 +59,7 @@ component extends="commands.wheels.BaseCommand" {
         }
         
         if (arguments.type == "all" || arguments.type == "controller") {
-            print.greenLine("Controller templates:");
+            print.greenLine("Controller snippets:");
             print.indentedLine("@CONTROLLER_NAME@    - Controller name (e.g., Users)");
             print.indentedLine("@MODEL_NAME@         - Associated model name");
             print.indentedLine("@SINGULAR_LOWER_NAME@ - Singular lowercase (e.g., user)");
@@ -69,59 +69,59 @@ component extends="commands.wheels.BaseCommand" {
         }
         
         print.yellowLine("Customization tips:");
-        print.indentedLine("• Edit templates in config/templates/ to match your coding style");
+        print.indentedLine("• Edit snippets in config/snippets/ to match your coding style");
         print.indentedLine("• Add your own variables and logic");
-        print.indentedLine("• Templates support full CFML syntax");
+        print.indentedLine("• Snippets support full CFML syntax");
         print.indentedLine("• Changes apply to all future generated files");
         print.line();
         
-        print.line("The CLI will automatically use your custom templates when generating files.");
+        print.line("The CLI will automatically use your custom snippets when generating files.");
     }
     
-    private function copyAllTemplates(source, dest, force) {
+    private function copyAllSnippets(source, dest, force) {
         var types = ["model", "controller", "view", "migration"];
         
         for (var type in types) {
             if (directoryExists(arguments.source & "/" & type)) {
-                copyTemplateType(type, arguments.source, arguments.dest, arguments.force);
+                copySnippetType(type, arguments.source, arguments.dest, arguments.force);
             }
         }
         
-        // Copy template configuration if exists
-        var configFile = arguments.source & "/templates.json";
+        // Copy snippet configuration if exists
+        var configFile = arguments.source & "/snippets.json";
         if (fileExists(configFile)) {
-            var destFile = arguments.dest & "/templates.json";
+            var destFile = arguments.dest & "/snippets.json";
             
             if (fileExists(destFile) && !arguments.force) {
-                if (confirm("Template configuration already exists. Overwrite?")) {
+                if (confirm("Snippet configuration already exists. Overwrite?")) {
                     fileCopy(configFile, destFile);
-                    print.greenLine("✓ Copied: templates.json");
+                    print.greenLine("✓ Copied: snippets.json");
                 } else {
-                    print.yellowLine("⚠️  Skipped: templates.json");
+                    print.yellowLine("⚠️  Skipped: snippets.json");
                 }
             } else {
                 fileCopy(configFile, destFile);
-                print.greenLine("✓ Copied: templates.json");
+                print.greenLine("✓ Copied: snippets.json");
             }
         }
     }
     
-    private function copyTemplateType(type, source, dest, force) {
+    private function copySnippetType(type, source, dest, force) {
         var sourceDir = arguments.source & "/" & arguments.type;
         var destDir = arguments.dest & "/" & arguments.type;
         
         if (!directoryExists(sourceDir)) {
-            error("Template type '#arguments.type#' not found. Valid types: model, controller, view, migration, all");
+            error("Snippet type '#arguments.type#' not found. Valid types: model, controller, view, migration, all");
         }
         
         if (directoryExists(destDir) && !arguments.force) {
-            if (!confirm("Templates for '#arguments.type#' already exist. Overwrite?")) {
-                print.yellowLine("Skipping #arguments.type# templates...");
+            if (!confirm("Snippets for '#arguments.type#' already exist. Overwrite?")) {
+                print.yellowLine("Skipping #arguments.type# snippets...");
                 return;
             }
         }
         
-        print.yellowLine("Copying #arguments.type# templates...");
+        print.yellowLine("Copying #arguments.type# snippets...");
         directoryCreate(destDir, true);
         
         var files = directoryList(sourceDir, false, "path", "*.cfc|*.cfm|*.txt");
@@ -147,7 +147,7 @@ component extends="commands.wheels.BaseCommand" {
         }
         
         if (copiedCount > 0) {
-            print.indentedLine("Copied #copiedCount# #arguments.type# template#copiedCount != 1 ? 's' : ''#");
+            print.indentedLine("Copied #copiedCount# #arguments.type# snippet#copiedCount != 1 ? 's' : ''#");
         }
     }
 }

@@ -12,7 +12,7 @@ component extends="commands.wheels.BaseCommand" {
      * @resource Generate RESTful resource controller with standard CRUD actions
      * @api Generate API controller without view rendering
      * @views Generate view files for each action
-     * @template Controller template to use (Controller, ResourceController, ApiController)
+     * @template Controller snippet to use (Controller, ResourceController, ApiController)
      * @force Overwrite existing files
      * @help Generate a controller file with optional views
      * 
@@ -49,7 +49,7 @@ component extends="commands.wheels.BaseCommand" {
             arguments.model = singularize(baseName);
         }
         
-        // Determine template
+        // Determine snippet
         if (!len(arguments.template)) {
             if (arguments.api) {
                 arguments.template = "ApiController";
@@ -60,17 +60,17 @@ component extends="commands.wheels.BaseCommand" {
             }
         }
         
-        // Check template exists
-        var templatePath = "controller/#arguments.template#.cfc";
-        if (!fileExists(getDirectoryFromPath(getCurrentTemplatePath()) & "../../../templates/" & templatePath)) {
-            error("Template not found: #arguments.template#");
+        // Check snippet exists
+        var snippetPath = "controller/#arguments.template#.cfc";
+        if (!fileExists(getDirectoryFromPath(getCurrentTemplatePath()) & "../../../snippets/" & snippetPath)) {
+            error("Snippet not found: #arguments.template#");
         }
         
-        var template = getTemplate("controller", arguments.template);
+        var snippet = getSnippet("controller", arguments.template);
         
-        // Check if using custom template
-        if (isUsingCustomTemplate(templatePath)) {
-            print.yellowLine("Using custom controller template: #arguments.template#");
+        // Check if using custom snippet
+        if (isUsingCustomSnippet(snippetPath)) {
+            print.yellowLine("Using custom controller snippet: #arguments.template#");
         }
         
         // Parse actions
@@ -88,7 +88,7 @@ component extends="commands.wheels.BaseCommand" {
             arguments.name,
             arguments.model,
             actionList,
-            template,
+            snippet,
             arguments.api
         );
         
@@ -167,7 +167,7 @@ component extends="commands.wheels.BaseCommand" {
         required string name,
         required string model,
         required array actions,
-        required string template,
+        required string snippet,
         boolean api = false
     ) {
         var data = {
@@ -181,6 +181,6 @@ component extends="commands.wheels.BaseCommand" {
             generatedBy = "Wheels CLI v3.0.0-beta.1"
         };
         
-        return renderTemplate(arguments.template, data);
+        return renderSnippet(arguments.snippet, data);
     }
 }
