@@ -9,7 +9,7 @@ networks:
 # YAML Anchors for common configurations
 x-cfml-base: &cfml-base
   volumes:
-    - ./:${WHEELS_TEST_DIR:-/cfwheels-test-suite}
+    - ./:${WHEELS_TEST_DIR:-/wheelsapp}
   networks:
     - cfwheels-network
   restart: unless-stopped
@@ -49,7 +49,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./:${WHEELS_TEST_DIR:-/cfwheels-test-suite}:ro
+      - ./:${WHEELS_TEST_DIR:-/wheelsapp}:ro
       - ./tools/docker/testui/logs/nginx:/var/log/nginx
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]

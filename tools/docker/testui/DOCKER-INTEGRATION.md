@@ -240,8 +240,8 @@ curl http://localhost:3000/api/compose/health
 #### Path mounting errors when starting containers
 If you see "Mounts denied" errors when the API tries to start containers:
 - This happens because Docker Compose inside the container references container paths
-- The API server uses `-f /cfwheels-test-suite/compose.yml` to specify the compose file
-- Make sure the testui-api container has the project mounted: `- ./:/cfwheels-test-suite:ro`
+- The API server uses `-f /wheelsapp/compose.yml` to specify the compose file
+- Make sure the testui-api container has the project mounted: `- ./:/wheelsapp:ro`
 - The COMPOSE_PROJECT_DIRECTORY environment variable helps Docker resolve relative paths
 
 #### NGINX proxy errors

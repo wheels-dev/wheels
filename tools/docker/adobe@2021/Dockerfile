@@ -3,7 +3,7 @@ FROM ortussolutions/commandbox:latest
 LABEL maintainer "Wheels Core Team"
 
 ENV PORT 62021
-ENV APP_DIR                 "/cfwheels-test-suite"
+ENV APP_DIR                 "/wheelsapp"
 ENV HEALTHCHECK_URI         "http://127.0.0.1:62021/"
 ENV ENV_MODE                "remote"
 ENV BOX_SERVER_CFCONFIGFILE "./docker/adobe@2021/CFConfig.json"

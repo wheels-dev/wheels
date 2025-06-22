@@ -16,15 +16,15 @@ RUN if [ "$ENGINE_TYPE" = "lucee" ]; then \
 
 # Set environment variables
 ENV PORT=${ENGINE_PORT}
-ENV APP_DIR="/cfwheels-test-suite"
+ENV APP_DIR="/wheelsapp"
 ENV HEALTHCHECK_URI="http://127.0.0.1:${ENGINE_PORT}/"
 ENV BOX_INSTALL=TRUE
 ENV BOX_SERVER_PROFILE="none"
 
 # Copy engine-specific configuration
-COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/server.json /cfwheels-test-suite/server.json
-COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/CFConfig.json /cfwheels-test-suite/CFConfig.json
-COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/settings.cfm /cfwheels-test-suite/config/settings.cfm
+COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/server.json /wheelsapp/server.json
+COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/CFConfig.json /wheelsapp/CFConfig.json
+COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/settings.cfm /wheelsapp/config/settings.cfm
 
 # Set working directory
 WORKDIR ${APP_DIR}

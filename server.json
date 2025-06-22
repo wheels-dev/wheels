@@ -1,5 +1,5 @@
 {
-  "name": "wheels-test-suite",
+  "name": "wheelsapp",
   "web": {
     "webroot": "core/tests",
     "rewrites": {
