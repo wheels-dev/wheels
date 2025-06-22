@@ -94,7 +94,10 @@
       "Bash(npm run dev:*)",
       "Bash(VITE_PORT=3001 npm run dev)",
       "Bash(diff:*)",
-      "Bash(docker:*)"
+      "Bash(docker:*)",
+      "Bash(tree:*)",
+      "WebFetch(domain:forgebox.io)",
+      "WebFetch(domain:commandbox.ortusbooks.com)"
     ],
     "deny": []
   }

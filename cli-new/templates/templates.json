@@ -1,0 +1,29 @@
+{
+    "model": {
+        "baseClass": "Model",
+        "includeAuditFields": false,
+        "includeSoftDeletes": false,
+        "defaultCallbacks": [],
+        "defaultScopes": []
+    },
+    "controller": {
+        "baseClass": "Controller",
+        "requireAuthentication": false,
+        "defaultFormat": "html",
+        "includeAuthorization": false,
+        "defaultFilters": []
+    },
+    "view": {
+        "uiFramework": "none",
+        "includeIcons": false,
+        "dateFormat": "mm/dd/yyyy",
+        "dateTimeFormat": "mm/dd/yyyy hh:mm tt",
+        "tablePlugin": "none"
+    },
+    "migration": {
+        "includeTimestamps": true,
+        "defaultEngine": "InnoDB",
+        "defaultCharset": "utf8mb4",
+        "useSoftDeletes": false
+    }
+}

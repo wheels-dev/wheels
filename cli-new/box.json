@@ -1,0 +1,64 @@
+{
+    "name": "wheels-cli-next",
+    "version": "3.0.0-beta.1",
+    "author": "CFWheels Team",
+    "homepage": "https://cfwheels.org",
+    "documentation": "https://guides.cfwheels.org/cli",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/cfwheels/cfwheels"
+    },
+    "bugs": "https://github.com/cfwheels/cfwheels/issues",
+    "slug": "wheels-cli-next",
+    "shortDescription": "Next-generation CLI for CFWheels Framework",
+    "description": "A powerful command-line interface for CFWheels that provides scaffolding, database management, and development tools",
+    "type": "commandbox-modules",
+    "keywords": [
+        "cfwheels",
+        "mvc",
+        "cli",
+        "scaffolding",
+        "commandbox",
+        "framework",
+        "rapid-development"
+    ],
+    "private": false,
+    "license": [
+        {
+            "type": "Apache-2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0"
+        }
+    ],
+    "dependencies": {
+        "commandbox-migrations": "^4.0.0",
+        "commandbox-cfformat": "^2.0.0",
+        "sqlite-jdbc": "^3.46.0"
+    },
+    "devDependencies": {
+        "testbox": "^5.0.0"
+    },
+    "installPaths": {
+        "commandbox-migrations": "modules/commandbox-migrations/",
+        "commandbox-cfformat": "modules/commandbox-cfformat/",
+        "sqlite-jdbc": "lib/",
+        "testbox": "tests/testbox/"
+    },
+    "scripts": {
+        "test": "testbox run",
+        "test:watch": "testbox watch",
+        "format": "cfformat run commands/ lib/ --overwrite",
+        "format:check": "cfformat check commands/ lib/",
+        "package": "package destination=../artifacts/wheels-cli-next-@version@.zip --force"
+    },
+    "testbox": {
+        "runner": "tests/runner.cfm",
+        "directory": "tests/specs",
+        "recurse": true,
+        "reporter": "simple",
+        "reportPath": "tests/results",
+        "coverageEnabled": false,
+        "coveragePathToCapture": "commands,lib",
+        "coverageWhitelist": "",
+        "coverageBlacklist": ""
+    }
+}

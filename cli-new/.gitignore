@@ -1,0 +1,27 @@
+# Dependencies
+modules/
+testbox/
+
+# Test results
+tests/results/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Build artifacts
+*.zip
+artifacts/
+
+# Local development
+.env
+*.local
+
+# CommandBox
+.commandbox/
+server-*.json
