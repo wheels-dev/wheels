@@ -21,7 +21,6 @@ WEB-INF
 node_modules/
 
 # CLI development
-/cli/workspace/
 /cli/simpletestapp/
 
 # Old structure (backward compatibility)
@@ -33,5 +32,4 @@ settings.xml
 .claude/settings.local.json
 cli/tests/
 test-output/
-workspace/**
-!workspace/.keep
+.env

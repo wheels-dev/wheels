@@ -1,0 +1,25 @@
+{
+  "name": "wheels-test-{{ENGINE_VERSION}}",
+  "profile": "development",
+  "force": true,
+  "web": {
+    "host": "0.0.0.0",
+    "webroot": "${WHEELS_WEBROOT:-core/tests}",
+    "http": {
+      "port": "{{ENGINE_PORT}}",
+      "enable": true
+    },
+    "rewrites": {
+      "enable": true,
+      "config": "urlrewrite.xml"
+    }
+  },
+  "app": {
+    "cfengine": "{{ENGINE_VERSION}}",
+    "serverHomeDirectory": ".engine/{{ENGINE_VERSION}}"
+  },
+  "env": {
+    "WHEELS_ENV": "testing",
+    "WHEELS_DATASOURCE": "${DEFAULT_DB:-h2}"
+  }
+}

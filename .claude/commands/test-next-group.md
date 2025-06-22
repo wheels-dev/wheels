@@ -10,8 +10,8 @@ I want to test the next untested group of Wheels CLI commands from PR #1591
    - Extract all commands that are unchecked and test cases for those commands
 
 2. **Prepare Testing Environment**
-   - Use the `workspace` directory as sandbox
-   - Clean any existing test app: `rm -rf workspace/testapp`
+   - Create a temporary directory for testing: `mkdir -p /tmp/wheels-cli-test && cd /tmp/wheels-cli-test`
+   - Clean any existing test app: `rm -rf testapp`
    - Set up fresh environment for testing
 
 3. **Test Each Command in the Group**
@@ -19,7 +19,7 @@ I want to test the next untested group of Wheels CLI commands from PR #1591
 
    a. **Setup Phase**
       - If not testing app generation, create test app: `box wheels g app testapp`
-      - Navigate to test app: `cd workspace/testapp`
+      - Navigate to test app: `cd testapp`
       - Start server if needed: `box server start`
       - Wait for server to be ready
 
@@ -87,11 +87,11 @@ I want to test the next untested group of Wheels CLI commands from PR #1591
 
 For testing "Generation Commands" group:
 ```bash
-# Clean workspace
-rm -rf workspace/testapp
+# Clean test directory
+cd /tmp/wheels-cli-test
+rm -rf testapp
 
 # Test app generation
-cd workspace
 box wheels g app testapp
 cd testapp
 
@@ -117,8 +117,8 @@ box server start
 # Clean up
 box server stop
 box server forget
-cd ../..
-rm -rf workspace/testapp
+cd ..
+rm -rf testapp
 ```
 
 ## Progress Tracking

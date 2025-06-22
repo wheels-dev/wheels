@@ -9,7 +9,7 @@ ENV PORT 60006
 ENV APP_DIR                 "/cfwheels-test-suite"
 ENV HEALTHCHECK_URI         "http://127.0.0.1:60006/"
 ENV ENV_MODE                "remote"
-ENV BOX_SERVER_CFCONFIGFILE "/cfwheels-test-suite/docker/lucee@6/CFConfig.json"
+ENV BOX_SERVER_CFCONFIGFILE "/cfwheels-test-suite/tools/docker/lucee@6/CFConfig.json"
 ENV BOX_SERVER_PROFILE      "none"
 ENV BOX_INSTALL             TRUE
 

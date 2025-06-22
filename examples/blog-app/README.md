@@ -17,10 +17,10 @@ A complete blog application built with Wheels framework demonstrating MVC patter
 
 ## Setup
 
-1. Copy this example to your workspace:
+1. Copy this example to a new directory:
 ```bash
-cp -r examples/blog-app ../workspace/my-blog
-cd ../workspace/my-blog
+cp -r examples/blog-app ../my-blog
+cd ../my-blog
 ```
 
 2. Install dependencies:

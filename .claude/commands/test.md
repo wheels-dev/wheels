@@ -1,6 +1,6 @@
 I want to test the wheels cli command: $ARGUMENTS
 
-1. Use the `workspace` directory in the root as a sandbox are to test wheels cli commands.
+1. Create a temporary test directory (e.g., `mkdir ../test-wheels-cli && cd ../test-wheels-cli`) to test wheels cli commands.
 2. To run the CLI command we need to launch CommandBox with the `box` command.
 
 If $ARGUMENTS is equal to `wheels generate app` or `wheels g app` then skip steps 3 and 4
@@ -20,4 +20,4 @@ If $ARGUMENTS is equal to `wheels generate app` or `wheels g app` then skip step
 15. Once finished:
     - stop the server with `server stop` command
 		- destroy the server with `server forget` command
-		- remove the app directory from the `workspace` directory
+		- remove the test directory created in step 1

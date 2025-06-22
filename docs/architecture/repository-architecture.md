@@ -25,8 +25,7 @@ wheels/
 ├── examples/              # Example applications
 ├── tests/                 # Mixed framework and application tests
 ├── guides/                # Documentation
-├── docker/                # Docker configurations
-└── workspace/             # Development workspace
+└── docker/                # Docker configurations
 ```
 
 ### Current Challenges

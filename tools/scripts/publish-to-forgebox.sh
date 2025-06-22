@@ -41,7 +41,7 @@ create_package_zip() {
     
     # Create the ZIP file
     cd "$PACKAGE_DIR"
-    zip -r "$ZIP_NAME" . -x "*.git*" -x "*.DS_Store" -x "node_modules/*" -x "workspace/*"
+    zip -r "$ZIP_NAME" . -x "*.git*" -x "*.DS_Store" -x "node_modules/*"
     
     # Show ZIP contents
     echo "ZIP contents:"

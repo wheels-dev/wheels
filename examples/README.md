@@ -36,7 +36,7 @@ A complete authentication system featuring:
 Each example includes its own README with specific setup instructions. Generally:
 
 1. Navigate to the example directory
-2. Copy the example to your workspace: `cp -r examples/blog-app ../workspace/`
+2. Copy the example to a new directory: `cp -r examples/blog-app ../my-app`
 3. Install dependencies: `box install`
 4. Configure your database in `config/settings.cfm`
 5. Run migrations: `wheels dbmigrate latest`

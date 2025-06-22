@@ -1,0 +1,9 @@
+{
+  "name": "wheels-test-suite",
+  "web": {
+    "webroot": "core/tests",
+    "rewrites": {
+      "enable": true
+    }
+  }
+}

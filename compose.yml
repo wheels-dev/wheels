@@ -1,33 +1,62 @@
-# Description: Docker Compose file for running the CFWheels Test Suite
+# Wheels Framework Docker Test Suite
+# Usage: docker compose --profile [profile] up -d
+# Profiles: lucee, adobe, db, quick-test, full-test
 
 networks:
   cfwheels-network:
     driver: bridge
 
+# YAML Anchors for common configurations
+x-cfml-base: &cfml-base
+  volumes:
+    - ./:${WHEELS_TEST_DIR:-/cfwheels-test-suite}
+  networks:
+    - cfwheels-network
+  restart: unless-stopped
+  depends_on:
+    - mysql
+  healthcheck:
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 60s
+
+x-lucee-base: &lucee-base
+  <<: *cfml-base
+  build:
+    context: ./
+
+x-adobe-base: &adobe-base
+  <<: *cfml-base
+  build:
+    context: ./
+
+x-db-base: &db-base
+  networks:
+    - cfwheels-network
+  restart: always
+
 services:
-  # Modern TestUI
+  # TestUI Service
   testui:
+    profiles: ["ui", "full-test"]
     build:
-      context: ./docker/testui
-    image: cfwheels-testui:v2.0.0
+      context: ./tools/docker/testui
+    image: cfwheels-testui:${TESTUI_VERSION:-v2.0.0}
     ports:
-      - "3000:80"
-    # Add extra_hosts to allow container to access host services
+      - "${TESTUI_PORT:-3000}:80"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Mount Docker socket and project directory for container management
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./:/cfwheels-test-suite:ro
-      - ./docker/testui/logs/nginx:/var/log/nginx
-    # Add healthcheck to verify container is working properly
+      - ./:${WHEELS_TEST_DIR:-/cfwheels-test-suite}:ro
+      - ./tools/docker/testui/logs/nginx:/var/log/nginx
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
-    # Add restart policy to ensure container stays up
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -36,142 +65,97 @@ services:
     networks:
       - cfwheels-network
 
+  # Lucee Engines
   lucee5:
-    build:
-      context: ./
-      dockerfile: ./docker/lucee@5/Dockerfile
-    image: cfwheels-test-lucee5:v1.0.2
-    volumes:
-      - ./:/cfwheels-test-suite
-      - type: bind
-        source: ./docker/lucee@5/server.json
-        target: /cfwheels-test-suite/server.json
-      - type: bind
-        source: ./docker/lucee@5/settings.cfm
-        target: /cfwheels-test-suite/config/settings.cfm
+    <<: *lucee-base
+    profiles: ["lucee", "full-test"]
+    dockerfile: ./tools/docker/lucee@5/Dockerfile
+    image: cfwheels-test-lucee5:${LUCEE5_VERSION:-v1.0.2}
     ports:
-      - "60005:60005"
-    networks:
-      - cfwheels-network
+      - "${LUCEE5_PORT:-60005}:60005"
+    environment:
+      - ENGINE_PORT=60005
+      - ENGINE_VERSION=lucee@5
 
   lucee6:
-    build:
-      context: ./
-      dockerfile: ./docker/lucee@6/Dockerfile
-    image: cfwheels-test-lucee6:v1.0.2
-    volumes:
-      - ./:/cfwheels-test-suite
-      - type: bind
-        source: ./docker/lucee@6/server.json
-        target: /cfwheels-test-suite/server.json
-      - type: bind
-        source: ./docker/lucee@6/settings.cfm
-        target: /cfwheels-test-suite/config/settings.cfm
+    <<: *lucee-base
+    profiles: ["lucee", "quick-test", "full-test"]
+    dockerfile: ./tools/docker/lucee@6/Dockerfile
+    image: cfwheels-test-lucee6:${LUCEE6_VERSION:-v1.0.2}
     ports:
-      - "60006:60006"
-    networks:
-      - cfwheels-network
+      - "${LUCEE6_PORT:-60006}:60006"
+    environment:
+      - ENGINE_PORT=60006
+      - ENGINE_VERSION=lucee@6
 
   lucee7:
-    build:
-      context: ./
-      dockerfile: ./docker/lucee@7/Dockerfile
-    image: cfwheels-test-lucee7:v1.0.0
-    volumes:
-      - ./:/cfwheels-test-suite
-      - type: bind
-        source: ./docker/lucee@7/server.json
-        target: /cfwheels-test-suite/server.json
-      - type: bind
-        source: ./docker/lucee@7/settings.cfm
-        target: /cfwheels-test-suite/config/settings.cfm
+    <<: *lucee-base
+    profiles: ["lucee", "full-test"]
+    dockerfile: ./tools/docker/lucee@7/Dockerfile
+    image: cfwheels-test-lucee7:${LUCEE7_VERSION:-v1.0.0}
     ports:
-      - "60007:60007"
-    networks:
-      - cfwheels-network
+      - "${LUCEE7_PORT:-60007}:60007"
+    environment:
+      - ENGINE_PORT=60007
+      - ENGINE_VERSION=lucee@7
 
+  # Adobe ColdFusion Engines
   adobe2018:
-    build:
-      context: ./
-      dockerfile: ./docker/adobe@2018/Dockerfile
-    image: cfwheels-test-adobe2018:v1.0.2
-    volumes:
-      - ./:/cfwheels-test-suite
-      - type: bind
-        source: ./docker/adobe@2018/server.json
-        target: /cfwheels-test-suite/server.json
-      - type: bind
-        source: ./docker/adobe@2018/settings.cfm
-        target: /cfwheels-test-suite/config/settings.cfm
+    <<: *adobe-base
+    profiles: ["adobe", "full-test"]
+    dockerfile: ./tools/docker/adobe@2018/Dockerfile
+    image: cfwheels-test-adobe2018:${ADOBE2018_VERSION:-v1.0.2}
     ports:
-      - "62018:62018"
-    networks:
-      - cfwheels-network
+      - "${ADOBE2018_PORT:-62018}:62018"
+    environment:
+      - ENGINE_PORT=62018
+      - ENGINE_VERSION=adobe@2018
 
   adobe2021:
-    build:
-      context: ./
-      dockerfile: ./docker/adobe@2021/Dockerfile
-    image: cfwheels-test-adobe2021:v1.0.2
-    volumes:
-      - ./:/cfwheels-test-suite
-      - type: bind
-        source: ./docker/adobe@2021/server.json
-        target: /cfwheels-test-suite/server.json
-      - type: bind
-        source: ./docker/adobe@2021/settings.cfm
-        target: /cfwheels-test-suite/config/settings.cfm
+    <<: *adobe-base
+    profiles: ["adobe", "full-test"]
+    dockerfile: ./tools/docker/adobe@2021/Dockerfile
+    image: cfwheels-test-adobe2021:${ADOBE2021_VERSION:-v1.0.2}
     ports:
-      - "62021:62021"
-    networks:
-      - cfwheels-network
+      - "${ADOBE2021_PORT:-62021}:62021"
+    environment:
+      - ENGINE_PORT=62021
+      - ENGINE_VERSION=adobe@2021
 
   adobe2023:
-    build:
-      context: ./
-      dockerfile: ./docker/adobe@2023/Dockerfile
-    image: cfwheels-test-adobe2023:v1.0.1
-    volumes:
-      - ./:/cfwheels-test-suite
-      - type: bind
-        source: ./docker/adobe@2023/server.json
-        target: /cfwheels-test-suite/server.json
-      - type: bind
-        source: ./docker/adobe@2023/settings.cfm
-        target: /cfwheels-test-suite/config/settings.cfm
+    <<: *adobe-base
+    profiles: ["adobe", "full-test"]
+    dockerfile: ./tools/docker/adobe@2023/Dockerfile
+    image: cfwheels-test-adobe2023:${ADOBE2023_VERSION:-v1.0.1}
     ports:
-      - "62023:62023"
-    networks:
-      - cfwheels-network
+      - "${ADOBE2023_PORT:-62023}:62023"
+    environment:
+      - ENGINE_PORT=62023
+      - ENGINE_VERSION=adobe@2023
 
   adobe2025:
-    build:
-      context: ./
-      dockerfile: ./docker/adobe@2025/Dockerfile
-    image: cfwheels-test-adobe2025:v1.0.0
-    volumes:
-      - ./:/cfwheels-test-suite
-      - type: bind
-        source: ./docker/adobe@2025/server.json
-        target: /cfwheels-test-suite/server.json
-      - type: bind
-        source: ./docker/adobe@2025/settings.cfm
-        target: /cfwheels-test-suite/config/settings.cfm
+    <<: *adobe-base
+    profiles: ["adobe", "full-test"]
+    dockerfile: ./tools/docker/adobe@2025/Dockerfile
+    image: cfwheels-test-adobe2025:${ADOBE2025_VERSION:-v1.0.0}
     ports:
-      - "62025:62025"
-    networks:
-      - cfwheels-network
-
-  mysql:
-    image: mysql:8.0
-    restart: always
+      - "${ADOBE2025_PORT:-62025}:62025"
     environment:
-      MYSQL_ROOT_PASSWORD: wheelstestdb
-      MYSQL_DATABASE: wheelstestdb
-      MYSQL_USER: wheelstestdb
-      MYSQL_PASSWORD: wheelstestdb
+      - ENGINE_PORT=62025
+      - ENGINE_VERSION=adobe@2025
+
+  # Database Services
+  mysql:
+    <<: *db-base
+    profiles: ["db", "quick-test", "full-test"]
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-wheelstestdb}
+      MYSQL_DATABASE: ${DB_NAME:-wheelstestdb}
+      MYSQL_USER: ${DB_USER:-wheelstestdb}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-wheelstestdb}
     ports:
-      - "3307:3306"
+      - "${MYSQL_PORT:-3307}:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
@@ -182,16 +166,18 @@ services:
       - mysql_data:/var/lib/mysql
 
   postgres:
+    <<: *db-base
+    profiles: ["db", "full-test"]
     image: postgres:14
-    restart: always
     environment:
-      POSTGRES_USER: wheelstestdb
-      POSTGRES_PASSWORD: wheelstestdb
+      POSTGRES_USER: ${DB_USER:-wheelstestdb}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wheelstestdb}
+      POSTGRES_DB: ${DB_NAME:-wheelstestdb}
       POSTGRES_INITDB_ARGS: --auth-host=md5
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wheelstestdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-wheelstestdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -200,19 +186,19 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   sqlserver:
+    <<: *db-base
+    profiles: ["db", "full-test"]
     build:
       context: ./
-      dockerfile: ./docker/sqlserver/Dockerfile_CICD
-    image: cfwheels-sqlserver:v1.0.2
-    restart: always
+      dockerfile: ./tools/docker/sqlserver/Dockerfile_CICD
+    image: cfwheels-sqlserver:${SQLSERVER_VERSION:-v1.0.2}
     environment:
-      MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-x!bsT8t60yo0cTVTPq}
       ACCEPT_EULA: Y
       MSSQL_PID: Developer
-      # Increase memory to ensure stability
-      MSSQL_MEMORY_LIMIT_MB: 4096
+      MSSQL_MEMORY_LIMIT_MB: ${MSSQL_MEMORY_LIMIT_MB:-4096}
     ports:
-      - "1434:1433"
+      - "${SQLSERVER_PORT:-1434}:1433"
     healthcheck:
       test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" -C || exit 1
       interval: 30s
@@ -229,17 +215,18 @@ services:
           memory: 2G
 
   oracle:
+    <<: *db-base
+    profiles: ["db", "full-test"]
     image: gvenzl/oracle-xe:21-slim
-    restart: always
     environment:
-      ORACLE_PASSWORD: wheelstestdb
-      ORACLE_DATABASE: wheelstestdb
-      APP_USER: wheelstestdb
-      APP_USER_PASSWORD: wheelstestdb
+      ORACLE_PASSWORD: ${DB_PASSWORD:-wheelstestdb}
+      ORACLE_DATABASE: ${DB_NAME:-wheelstestdb}
+      APP_USER: ${DB_USER:-wheelstestdb}
+      APP_USER_PASSWORD: ${DB_PASSWORD:-wheelstestdb}
     ports:
-      - "1522:1521"
+      - "${ORACLE_PORT:-1522}:1521"
     healthcheck:
-      test: ["CMD", "sqlplus", "-S", "wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb", "<<<", "SELECT 1 FROM DUAL;"]
+      test: ["CMD", "sqlplus", "-S", "${DB_USER:-wheelstestdb}/${DB_PASSWORD:-wheelstestdb}@localhost:1521/${DB_NAME:-wheelstestdb}", "<<<", "SELECT 1 FROM DUAL;"]
       interval: 30s
       timeout: 10s
       retries: 5

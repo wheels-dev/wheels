@@ -56,7 +56,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Install dependencies: `box install`
 - Install CFML modules on server: `cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver`
 - Reload application: `wheels reload [development|testing|maintenance|production]`
-- Start server in workspace: `cd workspace && server start`
 - Restart server: `server restart`
 - Reload CommandBox after CLI changes: `box reload`
 
@@ -219,12 +218,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `/guides/` - Framework documentation
 - `/examples/` - Example applications
 - `/docker/` - Docker configurations for different CFML engines
-- `/workspace/` - Sandbox for testing CLI commands
 
 ### Working with the CLI Module
 - CLI commands are in `/cli/commands/wheels/`
 - After modifying CLI code, reload CommandBox: `box reload`
-- Test CLI commands in the `/workspace/` directory
 - Use `.claude/commands/cli/test-next-group.md` for systematic CLI testing
 
 ## Recent Changes (2025-06-21)

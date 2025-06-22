@@ -1,147 +1,190 @@
-# Wheels Internal Test Suites
+# Wheels Framework Docker Test Suite
 
-## Directories
+This directory contains Docker configurations for testing the Wheels framework across multiple CFML engines and databases.
 
-- `/src/docker/` - New Docker based standalone test suite (not for CI)
-- `/src/docker/sqlserver` - SQL server specific config
-- `/src/docker/testui` - Modern Test Suite frontend with container management
+## Quick Start
 
-## Docker Compose Profiles
-
-The Docker Compose setup now uses profiles to organize the containers:
-
-- `db`: Database containers (MySQL, PostgreSQL, SQL Server)
-- `lucee`: Lucee CFML engines (5, 6)
-- `adobe`: Adobe ColdFusion engines (2018, 2021, 2023)
-- `ui`: TestUI containers (web interface and API server) for running tests and managing containers
-- `quick-test`: Minimal setup for quick testing (Lucee 5, MySQL)
-- `current`: Latest versions of Lucee and Adobe engines
-- `compatibility`: All CFML engines for compatibility testing
-- `all`: All containers
-
-## Usage with Profiles
-
-Start containers using profiles:
-
+### 1. Copy the environment file
 ```bash
-# Start just the latest Lucee engine with MySQL
-docker compose --profile quick-test up -d
-
-# Start all Adobe ColdFusion engines
-docker compose --profile adobe up -d
-
-# Start SQL Server only
-docker compose --profile sqlserver up -d
-
-# Start all containers
-docker compose --profile all up -d
+cp .env.example .env
 ```
 
-### How to run (Legacy Method)
-
-- Ensure docker is installed (beyond the scope of this document)
-- Increase Docker's default allocated 2GB memory to about 4GB
-- Ensure the following ports are free
-  - `60005`
-  - `60006`
-  - `62018`
-  - `62021`
-  - `62023`
-  - `3000`
-- Navigate to the repo root
-- Run `docker compose up`
-
-### On first run
-
-If this is the first time you've run it, docker will download a lot of stuff, namely:
-
-- **Commandbox Docker image**, which in turn will get **Lucee5 / Lucee6 / ACF2018 / ACF2021 / ACF2023** (note, the Commandbox artifacts directory will be created/aliased to `/.Commandbox` for caching, so your images won't have to get them every time your image is rebuilt)
-- **MySQL**
-- **Postgres**
-- **MSSQL 2022**
-
-Once all the images are downloaded (this may take some time), the databases will attempt to start. MySQL/Postgres are fairly simple, using the predefined images which allow for a database to be created directly from docker compose; MSSQL doesn't allow for this annoyingly, so we're actually spinning up a custom image based on the Microsoft Azure one, which allows us to script for the creation of a new database.
-
-Once the Databases are running, the Commandbox images will start. URL Rewriting is included by default. Note we're not using Commandbox's default, as we need Wheels-specific rewrites
-
-### Datasources
-Each database type is added as a datasource via `CFConfig.json` files. But there are different version of `CFConfig.json` for each flavor of engine. All engines get a copy of `wheelstestdb` which defaults to MySQL if no DB is sprecified. Additioanlly, all engines get a copy of `wheelstestdb_mysql`, `wheelstestdb_sqlserver`, and `wheelstestdb_postgres`. Lastly, the Lucee engine gets an additional datasource `wheelstestdb_h2` for testing against the built in H2 Database.
-
-- `wheelstestdb` - Defaults to mySQL
-- `wheelstestdb_mysql` MySQL
-- `wheelstestdb_sqlserver` MSSQL
-- `wheelstestdb_postgres` Postgres
-- `wheelstestdb_h2` H2 Database
-
-There's a new `db={{database}}` URL var which switches which datasource is used: the TestUI just appends this string to the test runner.
-
-Please note that there is an additional datasource defined `msdb_sqlserver` which is initially used to create the wheelstestdb if it doesn't exists.
-
-### What runs on what port
-
-Docker compose basically creates it's own internal network and exposes the various services on different ports. You shouldn't need to connect to the databases directly so those ports aren't exposed to prevent clashes with externally running services
-
-- Lucee 5 on `60005`
-- Lucee 6 on `60006`
-- ACF2018 on `62018`
-- ACF2021 on `62021`
-- ACF2023 on `62023`
-- TestUI on `3000`
-- TestUI API Server on `3001`
-
-### Network Configuration
-
-The containers use the following network configuration:
-
-- Network aliases ensure that containers can communicate with each other
-- SQL Server is accessible via the service name `sqlserver`
-- CFML engine containers connect to databases using the hostnames defined in their CFConfig.json files
-
-### How to actually run the tests
-
-Use the Provided UI at `localhost:3000` for ease. The TestUI provides:
-- Visual test runner with real-time results
-- Container management - start stopped containers by clicking on them
-- Pre-flight checks to ensure services are running
-- Test history and statistics
-- Support for all CFML engines and databases including Oracle
-
-You can also access each CF Engine directly on it's respective port, i.e, to access ACF2018, you just go to `localhost:62018`
-
-A sample task runner URL is `http://localhost:60005/wheels/testbox?format=json&sort=directory%20asc&db=mysql`. You can change the port to hit a different engine and change the db name to test a different database.
-
-### Other useful commands
-
-You can start specific services or rebuild specific services by name using profiles or direct service names:
+### 2. Run tests with different profiles
 
 ```bash
-# Using profiles
-docker compose --profile lucee up -d
+# Quick test with Lucee 6 + H2 database (minimal setup)
+docker compose -f compose.minimal.yml up -d
 
-# Using service names
-docker compose up adobe2018
-docker compose up sqlserver
+# Test with specific profiles
+docker compose --profile quick-test up -d    # Lucee 6 + MySQL
+docker compose --profile lucee up -d         # All Lucee versions
+docker compose --profile adobe up -d         # All Adobe CF versions
+docker compose --profile db up -d            # All databases
+docker compose --profile full-test up -d     # Everything
 ```
 
-Likewise if you need to rebuild any of the images, you can do it on an image by image basis if needed:
+## Available Profiles
 
-`docker compose up testui --build` *etc*
+- **`quick-test`**: Lucee 6 + MySQL - fastest way to get started
+- **`lucee`**: All Lucee engines (5, 6, 7)
+- **`adobe`**: All Adobe ColdFusion engines (2018, 2021, 2023, 2025)
+- **`db`**: All database servers (MySQL, PostgreSQL, SQL Server, Oracle)
+- **`ui`**: TestUI web interface
+- **`full-test`**: All engines and databases
 
-Which can be quicker than rebuilding everything via `docker compose up --build`
+## Port Mappings
 
-## Troubleshooting
+| Service | Port | URL |
+|---------|------|-----|
+| Lucee 5 | 60005 | http://localhost:60005 |
+| Lucee 6 | 60006 | http://localhost:60006 |
+| Lucee 7 | 60007 | http://localhost:60007 |
+| Adobe 2018 | 62018 | http://localhost:62018 |
+| Adobe 2021 | 62021 | http://localhost:62021 |
+| Adobe 2023 | 62023 | http://localhost:62023 |
+| Adobe 2025 | 62025 | http://localhost:62025 |
+| TestUI | 3000 | http://localhost:3000 |
+| MySQL | 3307 | mysql://localhost:3307 |
+| PostgreSQL | 5433 | postgresql://localhost:5433 |
+| SQL Server | 1434 | sqlserver://localhost:1434 |
+| Oracle | 1522 | oracle://localhost:1522 |
 
-If you encounter issues with a specific container:
+## Running Tests
 
-1. Check the container logs: `docker logs <container-name>`
-2. Verify network connectivity between containers
-3. For SQL Server issues, see the specific README in the sqlserver directory
-4. If using Apple Silicon (M1/M2/M3/M4), make sure to enable Rosetta for SQL Server
+### Via TestUI (Recommended)
+1. Start the UI: `docker compose --profile ui up -d`
+2. Open http://localhost:3000
+3. Select engine and database
+4. Click "Run Tests"
 
-### Known Issues
+### Direct URLs
+```bash
+# Lucee 6 with H2
+http://localhost:60006/wheels/testbox?db=h2
 
-There's an issue with CORS tests currently, which means those tests are currently commented out
+# Adobe 2021 with MySQL
+http://localhost:62021/wheels/testbox?db=mysql
 
-### Rebuilding
+# With JSON format
+http://localhost:60006/wheels/testbox?format=json&db=postgres
+```
 
-You can force a rebuild of all the images via `docker compose up --build` which is useful if you change configuration of any of the Dockerfiles etc. The two adobe engines still take ages to boot this way (just an fyi)
+## Database Connections
+
+All engines are pre-configured with these datasources:
+- `wheelstestdb` - Default datasource (uses MySQL)
+- `wheelstestdb_mysql` - MySQL specific
+- `wheelstestdb_postgres` - PostgreSQL specific
+- `wheelstestdb_sqlserver` - SQL Server specific
+- `wheelstestdb_h2` - H2 embedded (Lucee only)
+- `wheelstestdb_oracle` - Oracle specific
+
+Use the `db` URL parameter to switch databases:
+- `?db=h2` (Lucee only)
+- `?db=mysql`
+- `?db=postgres`
+- `?db=sqlserver`
+- `?db=oracle`
+
+## Development Workflow
+
+### Testing a specific engine
+```bash
+# Start just Lucee 6
+docker compose up lucee6 -d
+
+# View logs
+docker compose logs -f lucee6
+
+# Stop
+docker compose down lucee6
+```
+
+### Rebuilding after changes
+```bash
+# Rebuild specific service
+docker compose build lucee6
+docker compose up lucee6 -d --force-recreate
+
+# Rebuild all
+docker compose build
+docker compose --profile full-test up -d --force-recreate
+```
+
+### Troubleshooting
+
+1. **Container won't start**: Check logs with `docker compose logs [service]`
+2. **Port conflicts**: Change ports in `.env` file
+3. **Memory issues**: Increase Docker memory allocation (4GB+ recommended)
+4. **SQL Server on Apple Silicon**: Enable Rosetta in Docker Desktop
+
+## Advanced Configuration
+
+### Custom Environment Variables
+Edit `.env` file to customize:
+- Port numbers
+- Database credentials
+- Memory limits
+- Container versions
+
+### Adding New Engines
+1. Create directory: `tools/docker/[engine]@[version]/`
+2. Add Dockerfile, server.json, CFConfig.json, settings.cfm
+3. Update compose.yml with new service
+4. Add to appropriate profile
+
+### Maintenance Commands
+```bash
+# Clean up everything
+docker compose down -v --remove-orphans
+
+# Remove unused images
+docker image prune -a
+
+# View resource usage
+docker stats
+
+# Access container shell
+docker compose exec lucee6 bash
+```
+
+## Directory Structure
+```
+tools/docker/
+├── README.md                   # This file
+├── Dockerfile.template         # Template for unified Dockerfiles
+├── server.json.template        # Template for server configurations
+├── lucee@5/                   # Lucee 5 specific files
+├── lucee@6/                   # Lucee 6 specific files
+├── lucee@7/                   # Lucee 7 specific files
+├── adobe@2018/                # Adobe CF 2018 files
+├── adobe@2021/                # Adobe CF 2021 files
+├── adobe@2023/                # Adobe CF 2023 files
+├── adobe@2025/                # Adobe CF 2025 files
+├── sqlserver/                 # SQL Server configuration
+└── testui/                    # Test UI application
+```
+
+## Performance Tips
+
+1. Use profiles to start only what you need
+2. Use H2 database for fastest tests (Lucee only)
+3. Allocate sufficient Docker memory (4GB minimum)
+4. Use `.env` to reduce memory for unused services
+5. Consider `compose.minimal.yml` for development
+
+## Known Issues
+
+- CORS tests are currently disabled
+- Adobe engines take longer to start (be patient)
+- SQL Server requires extra memory allocation
+- Oracle container needs 2GB+ memory
+
+## Contributing
+
+When adding new engines or databases:
+1. Follow the existing naming conventions
+2. Update this README
+3. Add to appropriate profiles
+4. Test with minimal and full profiles
+5. Document any special requirements

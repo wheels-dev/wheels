@@ -1,0 +1,33 @@
+# Unified Dockerfile template for CFML engines
+# Build args: ENGINE_TYPE, ENGINE_VERSION, ENGINE_PORT
+ARG ENGINE_TYPE=lucee
+ARG ENGINE_VERSION=6
+ARG ENGINE_PORT=60006
+
+FROM ortussolutions/commandbox:latest
+
+LABEL maintainer "Wheels Core Team"
+
+# Add H2 extension for Lucee engines
+RUN if [ "$ENGINE_TYPE" = "lucee" ]; then \
+      curl -o /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.h2-1.3.172.lex \
+      https://ext.lucee.org/org.h2-1.3.172.lex; \
+    fi
+
+# Set environment variables
+ENV PORT=${ENGINE_PORT}
+ENV APP_DIR="/cfwheels-test-suite"
+ENV HEALTHCHECK_URI="http://127.0.0.1:${ENGINE_PORT}/"
+ENV BOX_INSTALL=TRUE
+ENV BOX_SERVER_PROFILE="none"
+
+# Copy engine-specific configuration
+COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/server.json /cfwheels-test-suite/server.json
+COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/CFConfig.json /cfwheels-test-suite/CFConfig.json
+COPY tools/docker/${ENGINE_TYPE}@${ENGINE_VERSION}/settings.cfm /cfwheels-test-suite/config/settings.cfm
+
+# Set working directory
+WORKDIR ${APP_DIR}
+
+# Warm up the server
+RUN ${BUILD_DIR}/util/warmup-server.sh || true
