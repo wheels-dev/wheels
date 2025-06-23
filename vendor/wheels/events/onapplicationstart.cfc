@@ -174,11 +174,12 @@ component {
 
 		// Create migrations object and set default settings.
 		application.$wheels.autoMigrateDatabase = false;
-		application.$wheels.migratorTableName = "migratorversions";
+		application.$wheels.migratorTableName = "_c_o_r_e_migrator_versions";
 		application.$wheels.createMigratorTable = true;
 		application.$wheels.writeMigratorSQLFiles = false;
 		application.$wheels.migratorObjectCase = "lower";
 		application.$wheels.allowMigrationDown = false;
+		application.$wheels.migrationLevel = 1;
 		if (application.$wheels.environment == "development") {
 			application.$wheels.allowMigrationDown = true;
 		}

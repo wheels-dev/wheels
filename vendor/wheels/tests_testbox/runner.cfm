@@ -148,6 +148,9 @@
         application.wo.set(modelPath = local.AssetPath & "models")
         application.wo.set(wheelsComponentPath = "/wheels")
 
+        /* set migration level for tests*/
+        application.wheels.migrationLevel = 2;
+        
         /* turn off default validations for testing */
         application.wheels.automaticValidations = false
         application.wheels.assetQueryString = false
@@ -196,7 +199,7 @@
         local.tables = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables")
         local.tableList = ValueList(local.tables.table_name)
         local.populate = StructKeyExists(url, "populate") ? url.populate : true
-        if (local.populate || !FindNoCase("authors", local.tableList)) {
+        if (local.populate || !FindNoCase("_c_o_r_e_authors", local.tableList)) {
             include "populate.cfm"
         }
     }

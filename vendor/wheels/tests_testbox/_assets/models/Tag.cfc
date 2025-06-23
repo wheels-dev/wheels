@@ -1,6 +1,7 @@
 component extends="Model" {
 
 	function config() {
+		table("_c_o_r_e_tags");
 		belongsTo(name = "parent", modelName = "tag", foreignKey = "parentid", joinType = "outer");
 		hasMany(name = "children", modelName = "tag", foreignKey = "parentid");
 		hasMany(name = "classifications");

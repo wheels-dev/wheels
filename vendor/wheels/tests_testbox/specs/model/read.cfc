@@ -200,7 +200,7 @@ component extends="testbox.system.BaseSpec" {
 		// ensure the authors table exists in the alt datasource
 		g.$query(
 			sql = "
-				CREATE TABLE IF NOT EXISTS authors
+				CREATE TABLE IF NOT EXISTS _c_o_r_e_authors
 				(
 					id int NOT NULL IDENTITY
 					,firstname varchar(100) NOT NULL
@@ -212,7 +212,7 @@ component extends="testbox.system.BaseSpec" {
 		)
 		firstName = "Troll"
 		g.$query(
-			sql = "INSERT INTO authors (firstName, lastName) VALUES ('#firstName#', 'Dolls');",
+			sql = "INSERT INTO _c_o_r_e_authors (firstName, lastName) VALUES ('#firstName#', 'Dolls');",
 			datasource = altDatasource
 		)
 		finderArgs = {where = "firstName = '#firstName#'", datasource = altDatasource}
