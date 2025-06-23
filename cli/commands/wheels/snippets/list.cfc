@@ -1,7 +1,7 @@
 /**
  * List available snippets and their override status
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     /**
      * List available snippets and their override status

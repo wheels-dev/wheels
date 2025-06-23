@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><cfoutput>##contentForLayout("title")##</cfoutput></title>
+    <cfoutput>##styleSheetLinkTag("app")##</cfoutput>
+    <cfoutput>##contentForLayout("head")##</cfoutput>
+</head>
+<body>
+    <header>
+        <h1>Welcome to Wheels</h1>
+    </header>
+    
+    <main>
+        <cfif flashKeyExists("success")>
+            <div class="flash-messages flash-success">
+                <cfoutput>##flash("success")##</cfoutput>
+            </div>
+        </cfif>
+        
+        <cfif flashKeyExists("error")>
+            <div class="flash-messages flash-error">
+                <cfoutput>##flash("error")##</cfoutput>
+            </div>
+        </cfif>
+        
+        <cfif flashKeyExists("notice")>
+            <div class="flash-messages flash-notice">
+                <cfoutput>##flash("notice")##</cfoutput>
+            </div>
+        </cfif>
+        
+        <cfoutput>##contentForLayout()##</cfoutput>
+    </main>
+    
+    <footer>
+        <p><small>Powered by CFWheels</small></p>
+    </footer>
+    
+    <cfoutput>##contentForLayout("scripts")##</cfoutput>
+</body>
+</html>

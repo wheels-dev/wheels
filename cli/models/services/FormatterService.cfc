@@ -9,7 +9,7 @@
 component accessors="true" singleton {
     
     // DI Properties
-    property name="print" inject="print";
+    property name="print" inject="PrintBuffer";
     property name="log" inject="logbox:logger:{this}";
     
     // Pluralization rules

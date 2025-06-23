@@ -1,0 +1,16 @@
+/**
+ * Test suite for @NAME@ views
+ * Generated: @GENERATED_DATE@
+ */
+component extends="tests.WheelsTestCase" {
+    
+    function run() {
+        describe("@NAME@ Views", function() {
+            
+            it("should render without errors", function() {
+                // Test view rendering
+            });
+            
+        });
+    }
+}

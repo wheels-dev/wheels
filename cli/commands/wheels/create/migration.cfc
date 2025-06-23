@@ -1,7 +1,7 @@
 /**
  * Create a new database migration
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     /**
      * Create a new database migration

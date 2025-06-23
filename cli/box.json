@@ -1,5 +1,5 @@
 {
-    "name": "wheels-cli-next",
+    "name": "wheels-cli",
     "version": "3.0.0-beta.1",
     "author": "Wheels Team",
     "homepage": "https://wheels.dev",
@@ -51,7 +51,7 @@
         "package": "package destination=../artifacts/wheels-cli-next-@version@.zip --force"
     },
     "testbox": {
-        "runner": "tests/runner.cfm",
+        "runner": "file://tests/runner.cfm",
         "directory": "tests/specs",
         "recurse": true,
         "reporter": "simple",

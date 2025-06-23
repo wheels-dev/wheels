@@ -1,7 +1,7 @@
 /**
  * Setup the database (create, migrate, and seed)
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     /**
      * Setup the database by running create, migrate, and seed

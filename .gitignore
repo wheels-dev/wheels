@@ -33,3 +33,7 @@ settings.xml
 cli/tests/
 test-output/
 .env
+
+# Docker generated files
+**/docker-compose.yml
+!compose*.yml

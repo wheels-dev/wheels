@@ -1,0 +1,13 @@
+component {
+    this.name = "WheelsTestSuite" & hash(getCurrentTemplatePath());
+    this.sessionManagement = false;
+    
+    // Set up test datasource
+    this.datasource = "wheelstestdatasource";
+    
+    // Mappings
+    this.mappings["/tests"] = getDirectoryFromPath(getCurrentTemplatePath());
+    this.mappings["/app"] = expandPath("../app");
+    this.mappings["/wheels"] = expandPath("../vendor/wheels");
+    this.mappings["/testbox"] = expandPath("../vendor/testbox");
+}

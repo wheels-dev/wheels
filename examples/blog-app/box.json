@@ -1,0 +1,25 @@
+{
+    "name":"Wheels Blog Example",
+    "version":"1.0.0",
+    "author":"Wheels Core Team",
+    "shortDescription":"Example blog application using Wheels Framework",
+    "type":"projects",
+    "keywords":["mvc","wheels","example","blog"],
+    "homepage":"https://wheels.dev/",
+    "private":true,
+    "installPaths":{
+        "wheels-core":"vendor/wheels/",
+        "wirebox":"vendor/wirebox/",
+        "testbox":"vendor/testbox/"
+    },
+    "dependencies":{
+        "wirebox":"^7",
+        "testbox":"^5"
+    },
+    "scripts":{
+        "dev":"task run start",
+        "stop":"task run stop",
+        "logs":"task run logs",
+        "test":"task run test"
+    }
+}

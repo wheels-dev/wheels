@@ -1,0 +1,27 @@
+<cfoutput>
+
+##contentFor(title="Welcome to Wheels")##
+
+<h2>Congratulations!</h2>
+
+<p>You have successfully created a new Wheels application.</p>
+
+<h3>What's next?</h3>
+
+<ul>
+    <li>Generate a model: <code>wheels create model Post title:string content:text --migration</code></li>
+    <li>Generate a controller: <code>wheels create controller Posts --resource</code></li>
+    <li>Run migrations: <code>wheels db migrate</code></li>
+    <li>Explore the <a href="https://guides.cfwheels.org">Wheels Guides</a></li>
+</ul>
+
+<h3>Your Application</h3>
+
+<ul>
+    <li>Framework Version: ##application.wheels.version##</li>
+    <li>Environment: ##get("environment")##</li>
+    <li>Datasource: ##get("dataSourceName")##</li>
+    <li>Database: @DATABASE@</li>
+</ul>
+
+</cfoutput>

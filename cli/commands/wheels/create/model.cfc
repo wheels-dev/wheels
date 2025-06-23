@@ -1,7 +1,7 @@
 /**
  * Create a new Wheels model
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     /**
      * Create a new Wheels model

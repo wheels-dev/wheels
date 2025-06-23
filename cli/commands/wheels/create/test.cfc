@@ -1,7 +1,9 @@
 /**
  * Create test files
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
+    
+    property name="snippetService" inject="SnippetService@wheelscli";
     
     /**
      * Create test files for models, controllers, or helpers
@@ -119,97 +121,10 @@ component extends="commands.wheels.BaseCommand" {
         var modelLower = lCase(arguments.name);
         var modelPlural = pluralize(arguments.name);
         
-        return '/**
- * Test suite for #arguments.name# model
- * Generated: #dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")#
- */
-component extends="tests.WheelsTestCase" {
-    
-    /**
-     * Setup before all tests
-     */
-    function beforeAll() {
-        super.beforeAll();
-        
-        // Setup test data
-        variables.validProperties = {
-            // Add valid properties for your model
-            // name = "Test #arguments.name#"
-        };
-        
-        variables.invalidProperties = {
-            // Add invalid properties to test validations
-        };
-    }
-    
-    /**
-     * Teardown after each test
-     */
-    function afterEach() {
-        // Clean up test data
-        model("#arguments.name#").deleteAll(reload=true);
-    }
-    
-    function run() {
-        describe("#arguments.name# Model", function() {
-            
-            describe("Initialization", function() {
-                it("should be a valid model", function() {
-                    var #modelLower# = model("#arguments.name#");
-                    expect(#modelLower#).toBeInstanceOf("models.#arguments.name#");
-                });
-                
-                it("should have the correct table name", function() {
-                    var #modelLower# = model("#arguments.name#");
-                    expect(#modelLower#.tableName()).toBe("#lCase(modelPlural)#");
-                });
-            });
-            
-            describe("Properties", function() {
-                it("should have required properties", function() {
-                    var #modelLower# = model("#arguments.name#").new();
-                    var properties = #modelLower#.properties();
-                    
-                    // Test for expected properties
-                    // expect(properties).toHaveKey("name");
-                });
-            });
-            
-            describe("Validations", function() {
-                it("should save with valid properties", function() {
-                    var #modelLower# = model("#arguments.name#").new(validProperties);
-                    var result = #modelLower#.save();
-                    
-                    expect(result).toBeTrue();
-                    expect(#modelLower#.hasErrors()).toBeFalse();
-                });
-                
-                it("should not save with invalid properties", function() {
-                    var #modelLower# = model("#arguments.name#").new(invalidProperties);
-                    var result = #modelLower#.save();
-                    
-                    expect(result).toBeFalse();
-                    expect(#modelLower#.hasErrors()).toBeTrue();
-                });
-                
-                // Add specific validation tests
-            });
-            
-            describe("Associations", function() {
-                // Test model associations
-            });
-            
-            describe("Callbacks", function() {
-                // Test model callbacks
-            });
-            
-            describe("Scopes", function() {
-                // Test model scopes
-            });';
-        
-        // Add method-specific tests
+        // Generate method tests if any
+        var methodTests = "";
         for (var method in arguments.methods) {
-            content &= '
+            methodTests &= '
             
             describe("##' & method & '()", function() {
                 it("should ' & method & ' correctly", function() {
@@ -218,13 +133,14 @@ component extends="tests.WheelsTestCase" {
             });';
         }
         
-        content &= '
-            
+        var content = snippetService.getSnippet("test", "model.cfc");
+        return snippetService.render(content, {
+            MODEL_NAME = arguments.name,
+            MODEL_LOWER = modelLower,
+            TABLE_NAME = lCase(modelPlural),
+            GENERATED_DATE = dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss"),
+            METHOD_TESTS = methodTests
         });
-    }
-}';
-        
-        return content;
     }
     
     /**
@@ -235,62 +151,30 @@ component extends="tests.WheelsTestCase" {
         var modelName = singularize(arguments.name);
         var modelLower = lCase(modelName);
         
-        return '/**
- * Test suite for #arguments.name# controller
- * Generated: #dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")#
- */
-component extends="tests.WheelsTestCase" {
-    
-    /**
-     * Setup before all tests
-     */
-    function beforeAll() {
-        super.beforeAll();
-        
-        // Create test data
-        variables.test#modelName# = model("#modelName#").create({
-            // Add test properties
-        });
-    }
-    
-    /**
-     * Teardown after all tests
-     */
-    function afterAll() {
-        // Clean up test data
-        model("#modelName#").deleteAll(reload=true);
-        
-        super.afterAll();
-    }
-    
-    function run() {
-        describe("#arguments.name# Controller", function() {';
-        
-        // Add tests for each method
+        // Generate method tests
+        var methodTests = "";
         for (var method in arguments.methods) {
-            content &= generateControllerMethodTest(arguments.name, method, modelName);
+            methodTests &= generateControllerMethodTest(arguments.name, method, modelName);
         }
         
-        content &= '
-            
+        var content = snippetService.getSnippet("test", "controller.cfc");
+        return snippetService.render(content, {
+            CONTROLLER_NAME = arguments.name,
+            MODEL_NAME = modelName,
+            GENERATED_DATE = dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss"),
+            METHOD_TESTS = methodTests
         });
-    }
-}';
-        
-        return content;
     }
     
     /**
      * Generate test for controller method
      */
     private function generateControllerMethodTest(controller, method, model) {
-        var content = '
-            
-            describe("##' & method & '() action", function() {';
+        var methodContent = "";
         
         switch(arguments.method) {
             case "index":
-                content &= '
+                methodContent = '
                 it("should return a list of ' & lCase(pluralize(model)) & '", function() {
                     var result = processRequest(controller="' & controller & '", action="' & method & '");
                     
@@ -301,7 +185,7 @@ component extends="tests.WheelsTestCase" {
                 break;
                 
             case "show":
-                content &= '
+                methodContent = '
                 it("should return a single ' & lCase(model) & '", function() {
                     var result = processRequest(
                         controller="' & controller & '", 
@@ -325,7 +209,7 @@ component extends="tests.WheelsTestCase" {
                 break;
                 
             case "new":
-                content &= '
+                methodContent = '
                 it("should display the new ' & lCase(model) & ' form", function() {
                     var result = processRequest(controller="' & controller & '", action="' & method & '");
                     
@@ -336,7 +220,7 @@ component extends="tests.WheelsTestCase" {
                 break;
                 
             case "create":
-                content &= '
+                methodContent = '
                 it("should create a new ' & lCase(model) & ' with valid data", function() {
                     var initialCount = model("' & model & '").count();
                     
@@ -375,16 +259,17 @@ component extends="tests.WheelsTestCase" {
                 break;
                 
             default:
-                content &= '
+                methodContent = '
                 it("should handle ' & method & ' action", function() {
                     // Test ' & method & ' action
                 });';
         }
         
-        content &= '
-            });';
-        
-        return content;
+        var content = snippetService.getSnippet("test", "controller-method.cfc");
+        return snippetService.render(content, {
+            METHOD = method,
+            METHOD_CONTENT = methodContent
+        });
     }
     
     /**
@@ -405,22 +290,11 @@ component extends="tests.WheelsTestCase" {
             }
         }
         
-        var testContent = '/**
- * Test suite for #arguments.name# views
- * Generated: #dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")#
- */
-component extends="tests.WheelsTestCase" {
-    
-    function run() {
-        describe("#arguments.name# Views", function() {
-            
-            it("should render without errors", function() {
-                // Test view rendering
-            });
-            
+        var testContent = snippetService.getSnippet("test", "view.cfc");
+        testContent = snippetService.render(testContent, {
+            NAME = arguments.name,
+            GENERATED_DATE = dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
         });
-    }
-}';
         
         fileWrite(testFile, testContent);
         print.greenLine("✓ Created test: tests/specs/views/#arguments.name#ViewTest.cfc");
@@ -444,22 +318,11 @@ component extends="tests.WheelsTestCase" {
             }
         }
         
-        var testContent = '/**
- * Test suite for #arguments.name# helper
- * Generated: #dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")#
- */
-component extends="tests.WheelsTestCase" {
-    
-    function run() {
-        describe("#arguments.name# Helper", function() {
-            
-            it("should be available", function() {
-                // Test helper availability
-            });
-            
+        var testContent = snippetService.getSnippet("test", "helper.cfc");
+        testContent = snippetService.render(testContent, {
+            NAME = arguments.name,
+            GENERATED_DATE = dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
         });
-    }
-}';
         
         fileWrite(testFile, testContent);
         print.greenLine("✓ Created test: tests/specs/helpers/#arguments.name#Test.cfc");
@@ -483,22 +346,11 @@ component extends="tests.WheelsTestCase" {
             }
         }
         
-        var testContent = '/**
- * Integration test for #arguments.name#
- * Generated: #dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")#
- */
-component extends="tests.WheelsTestCase" {
-    
-    function run() {
-        describe("#arguments.name# Integration", function() {
-            
-            it("should complete the full workflow", function() {
-                // Test complete user workflow
-            });
-            
+        var testContent = snippetService.getSnippet("test", "integration.cfc");
+        testContent = snippetService.render(testContent, {
+            NAME = arguments.name,
+            GENERATED_DATE = dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
         });
-    }
-}';
         
         fileWrite(testFile, testContent);
         print.greenLine("✓ Created test: tests/specs/integration/#arguments.name#Test.cfc");

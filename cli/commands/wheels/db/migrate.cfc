@@ -1,7 +1,7 @@
 /**
  * Run database migrations
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     property name="migrationService" inject="MigrationService@wheelscli";
     

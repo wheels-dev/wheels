@@ -1,7 +1,9 @@
 /**
  * Create view files
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
+    
+    property name="snippetService" inject="SnippetService@wheelscli";
     
     /**
      * Create view files for a controller action
@@ -153,18 +155,12 @@ component extends="commands.wheels.BaseCommand" {
             }
         }
         
-        var partialContent = '<cfoutput>
-<!--- Partial: #partialName# --->
-<!--- Generated: #dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")# --->
-
-<div class="partial-#replace(partialName, "_", "", "one")#">
-    <!--- Add your partial content here --->
-    <p>This is the #partialName# partial.</p>
-    
-    <!--- Access passed variables like this: --->
-    <!--- ##variables.someVariable## --->
-</div>
-</cfoutput>';
+        var partialContent = snippetService.getSnippet("view", "_partial.cfm");
+        partialContent = snippetService.render(partialContent, {
+            PARTIAL_NAME = partialName,
+            PARTIAL_CLASS = replace(partialName, "_", "", "one"),
+            GENERATED_DATE = dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
+        });
         
         fileWrite(partialFile, partialContent);
         print.greenLine("✓ Created partial: app/views/#lCase(arguments.name)#/#partialName#.cfm");
@@ -199,62 +195,10 @@ component extends="commands.wheels.BaseCommand" {
             }
         }
         
-        var layoutContent = '<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><cfoutput>##contentForLayout("title")## - ##application.applicationName##</cfoutput></title>
-    
-    <!--- CSS --->
-    <cfoutput>##styleSheetLinkTag("app")##</cfoutput>
-    
-    <!--- Additional head content --->
-    <cfoutput>##contentForLayout("head")##</cfoutput>
-</head>
-<body>
-    <header>
-        <nav>
-            <h1><cfoutput>##application.applicationName##</cfoutput></h1>
-            <!--- Add navigation here --->
-        </nav>
-    </header>
-    
-    <main>
-        <!--- Flash messages --->
-        <cfif flashKeyExists("success")>
-            <div class="alert alert-success">
-                <cfoutput>##flash("success")##</cfoutput>
-            </div>
-        </cfif>
-        
-        <cfif flashKeyExists("error")>
-            <div class="alert alert-error">
-                <cfoutput>##flash("error")##</cfoutput>
-            </div>
-        </cfif>
-        
-        <cfif flashKeyExists("notice")>
-            <div class="alert alert-notice">
-                <cfoutput>##flash("notice")##</cfoutput>
-            </div>
-        </cfif>
-        
-        <!--- Main content --->
-        <cfoutput>##contentForLayout()##</cfoutput>
-    </main>
-    
-    <footer>
-        <p>&copy; #year(now())# <cfoutput>##application.applicationName##</cfoutput></p>
-    </footer>
-    
-    <!--- JavaScript --->
-    <cfoutput>##javaScriptIncludeTag("app")##</cfoutput>
-    
-    <!--- Additional scripts --->
-    <cfoutput>##contentForLayout("scripts")##</cfoutput>
-</body>
-</html>';
+        var layoutContent = snippetService.getSnippet("layout", "custom.cfm");
+        layoutContent = snippetService.render(layoutContent, {
+            CURRENT_YEAR = year(now())
+        });
         
         fileWrite(layoutFile, layoutContent);
         print.greenLine("✓ Created layout: app/views/layout/#arguments.name#.cfm");
@@ -306,157 +250,57 @@ component extends="commands.wheels.BaseCommand" {
      * Generate index view
      */
     private function generateIndexView(controller, model, snippet) {
-        var modelLower = lCase(model);
-        var modelsLower = lCase(pluralize(model));
-        
-        return '<cfoutput>
-
-##contentFor(title="#pluralize(model)#")##
-
-<div class="page-header">
-    <h1>#pluralize(model)#</h1>
-    ##linkTo(route="new#model#", text="New #model#", class="btn btn-primary")##
-</div>
-
-<cfif #modelsLower#.recordCount>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <!--- Add more columns here based on your model --->
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <cfloop query="#modelsLower#">
-                <tr>
-                    <td>###modelsLower#.id##</td>
-                    <!--- Add more columns here --->
-                    <td>##dateFormat(#modelsLower#.createdAt, "mm/dd/yyyy")##</td>
-                    <td>
-                        ##linkTo(route="#modelLower#", key=#modelsLower#.id, text="View")##
-                        ##linkTo(route="edit#model#", key=#modelsLower#.id, text="Edit")##
-                        ##linkTo(route="#modelLower#", key=#modelsLower#.id, text="Delete", method="delete", confirm="Are you sure?")##
-                    </td>
-                </tr>
-            </cfloop>
-        </tbody>
-    </table>
-<cfelse>
-    <p>No #lCase(pluralize(model))# found.</p>
-</cfif>
-
-</cfoutput>';
+        var content = snippetService.getSnippet("view", "index.cfm");
+        return snippetService.render(content, {
+            MODEL = model,
+            MODEL_PLURAL = pluralize(model),
+            MODEL_LOWER = lCase(model),
+            MODELS_LOWER = lCase(pluralize(model))
+        });
     }
     
     /**
      * Generate show view
      */
     private function generateShowView(controller, model, snippet) {
-        var modelLower = lCase(model);
-        
-        return '<cfoutput>
-
-##contentFor(title="#model# Details")##
-
-<div class="page-header">
-    <h1>#model# Details</h1>
-</div>
-
-<dl class="dl-horizontal">
-    <dt>ID:</dt>
-    <dd>###modelLower#.id##</dd>
-    
-    <!--- Add more fields here based on your model --->
-    
-    <dt>Created:</dt>
-    <dd>##dateFormat(#modelLower#.createdAt, "mm/dd/yyyy")##</dd>
-    
-    <dt>Updated:</dt>
-    <dd>##dateFormat(#modelLower#.updatedAt, "mm/dd/yyyy")##</dd>
-</dl>
-
-<div class="form-actions">
-    ##linkTo(route="edit#model#", key=#modelLower#.id, text="Edit", class="btn btn-primary")##
-    ##linkTo(route="#lCase(pluralize(model))#", text="Back to List", class="btn")##
-</div>
-
-</cfoutput>';
+        var content = snippetService.getSnippet("view", "show.cfm");
+        return snippetService.render(content, {
+            MODEL = model,
+            MODEL_LOWER = lCase(model),
+            MODELS_LOWER = lCase(pluralize(model))
+        });
     }
     
     /**
      * Generate new view
      */
     private function generateNewView(controller, model, snippet) {
-        var modelLower = lCase(model);
-        
-        return '<cfoutput>
-
-##contentFor(title="New #model#")##
-
-<div class="page-header">
-    <h1>New #model#</h1>
-</div>
-
-##startFormTag(route="#lCase(pluralize(model))#", method="post")##
-    
-    ##includePartial("form")##
-    
-    <div class="form-actions">
-        ##submitTag("Create #model#", class="btn btn-primary")##
-        ##linkTo(route="#lCase(pluralize(model))#", text="Cancel", class="btn")##
-    </div>
-    
-##endFormTag()##
-
-</cfoutput>';
+        var content = snippetService.getSnippet("view", "new.cfm");
+        return snippetService.render(content, {
+            MODEL = model,
+            MODELS_LOWER = lCase(pluralize(model))
+        });
     }
     
     /**
      * Generate edit view
      */
     private function generateEditView(controller, model, snippet) {
-        var modelLower = lCase(model);
-        
-        return '<cfoutput>
-
-##contentFor(title="Edit #model#")##
-
-<div class="page-header">
-    <h1>Edit #model#</h1>
-</div>
-
-##startFormTag(route="#modelLower#", key=#modelLower#.id, method="patch")##
-    
-    ##includePartial("form")##
-    
-    <div class="form-actions">
-        ##submitTag("Update #model#", class="btn btn-primary")##
-        ##linkTo(route="#modelLower#", key=#modelLower#.id, text="Cancel", class="btn")##
-    </div>
-    
-##endFormTag()##
-
-</cfoutput>';
+        var content = snippetService.getSnippet("view", "edit.cfm");
+        return snippetService.render(content, {
+            MODEL = model,
+            MODEL_LOWER = lCase(model)
+        });
     }
     
     /**
      * Generate default view
      */
     private function generateDefaultView(controller, action, model) {
-        return '<cfoutput>
-
-##contentFor(title="#action#")##
-
-<div class="page-header">
-    <h1>#action#</h1>
-</div>
-
-<p>This is the #action# view for the #controller# controller.</p>
-
-<!--- Add your view content here --->
-
-</cfoutput>';
+        var content = snippetService.getSnippet("view", "default.cfm");
+        return snippetService.render(content, {
+            ACTION = action,
+            CONTROLLER = controller
+        });
     }
 }

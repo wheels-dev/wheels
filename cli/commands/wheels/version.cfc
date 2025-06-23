@@ -1,7 +1,7 @@
 /**
  * Display Wheels version and project information
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="base" {
     
     /**
      * @help Display Wheels framework and project version information
@@ -19,7 +19,7 @@ component extends="commands.wheels.BaseCommand" {
         
         print.line();
         print.boldBlueLine("CFWheels Project Information");
-        print.line("=" repeatString 40);
+        print.line(repeatString("=", 40));
         
         // Framework info
         print.yellowLine("Framework:");

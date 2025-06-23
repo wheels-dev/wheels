@@ -11,7 +11,7 @@ component accessors="true" singleton {
     // DI Properties
     property name="fileSystem" inject="FileSystem";
     property name="log" inject="logbox:logger:{this}";
-    property name="configService" inject="ConfigService@wheelscli";
+    property name="configService" inject="ConfigService@wheels-cli-next";
     
     // Service Properties
     property name="settings" type="struct";

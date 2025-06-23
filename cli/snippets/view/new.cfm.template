@@ -1,0 +1,20 @@
+<cfoutput>
+
+##contentFor(title="New @MODEL@")##
+
+<div class="page-header">
+    <h1>New @MODEL@</h1>
+</div>
+
+##startFormTag(route="@MODELS_LOWER@", method="post")##
+    
+    ##includePartial("form")##
+    
+    <div class="form-actions">
+        ##submitTag("Create @MODEL@", class="btn btn-primary")##
+        ##linkTo(route="@MODELS_LOWER@", text="Cancel", class="btn")##
+    </div>
+    
+##endFormTag()##
+
+</cfoutput>

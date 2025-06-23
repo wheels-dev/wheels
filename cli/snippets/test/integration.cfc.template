@@ -1,0 +1,16 @@
+/**
+ * Integration test for @NAME@
+ * Generated: @GENERATED_DATE@
+ */
+component extends="tests.WheelsTestCase" {
+    
+    function run() {
+        describe("@NAME@ Integration", function() {
+            
+            it("should complete the full workflow", function() {
+                // Test complete user workflow
+            });
+            
+        });
+    }
+}

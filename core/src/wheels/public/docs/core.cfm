@@ -32,7 +32,13 @@ if (StructKeyExists(application.wheels, "docs")) {
 		ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "tests.functions.Example")});
 	}
 	catch (any exception){
-		ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "tests.Test")});
+		try {
+			ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "tests.Test")});
+		}
+		catch (any testException) {
+			// Test framework not available in this context, skip test documentation
+			// This can happen in Docker containers or when tests directory is not properly mapped
+		}
 	}
 
 	ArrayAppend(documentScope, {"name" = "mapper", "scope" = application.wheels.mapper});

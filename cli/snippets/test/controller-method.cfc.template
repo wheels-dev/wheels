@@ -1,0 +1,3 @@
+            
+            describe("##@METHOD@() action", function() {@METHOD_CONTENT@
+            });

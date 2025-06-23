@@ -1,7 +1,7 @@
 /**
  * Seed the database
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     /**
      * Run database seed files

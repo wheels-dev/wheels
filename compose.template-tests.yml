@@ -1,0 +1,42 @@
+# Wheels Template Test Suite
+# Usage: docker compose -f compose.template-tests.yml up -d
+
+networks:
+  cfwheels-network:
+    driver: bridge
+
+services:
+  lucee6:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/lucee@6/Dockerfile
+    image: cfwheels-test-lucee6:v1.0.2
+    ports:
+      - "60006:60006"
+    entrypoint: ["/usr/local/bin/entrypoint-template.sh"]
+    command: ["/__cacert_entrypoint.sh"]
+    volumes:
+      # Mount entire project for access to core
+      - ./:/project
+      # Mount template as the app root
+      - ./templates/default:/wheelsapp
+      # Mount core source separately to ensure it's available
+      - ./core/src:/wheelsapp/core/src
+      # Mount dependencies from host if available
+      - ./vendor:/wheelsapp/vendor
+    networks:
+      - cfwheels-network
+    environment:
+      - ENGINE_PORT=60006
+      - ENGINE_VERSION=lucee@6
+      - DEFAULT_DB=h2
+      - WHEELS_ENV=development
+      - BOX_SERVER_WEB_WEBROOT=/wheelsapp/public
+      - BOX_SERVER_CFCONFIGFILE=/wheelsapp/tools/docker/lucee@6/CFConfig.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:60006/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

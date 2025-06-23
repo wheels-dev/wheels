@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><cfoutput>##contentForLayout("title")## - ##application.applicationName##</cfoutput></title>
+    
+    <!--- CSS --->
+    <cfoutput>##styleSheetLinkTag("app")##</cfoutput>
+    
+    <!--- Additional head content --->
+    <cfoutput>##contentForLayout("head")##</cfoutput>
+</head>
+<body>
+    <header>
+        <nav>
+            <h1><cfoutput>##application.applicationName##</cfoutput></h1>
+            <!--- Add navigation here --->
+        </nav>
+    </header>
+    
+    <main>
+        <!--- Flash messages --->
+        <cfif flashKeyExists("success")>
+            <div class="alert alert-success">
+                <cfoutput>##flash("success")##</cfoutput>
+            </div>
+        </cfif>
+        
+        <cfif flashKeyExists("error")>
+            <div class="alert alert-error">
+                <cfoutput>##flash("error")##</cfoutput>
+            </div>
+        </cfif>
+        
+        <cfif flashKeyExists("notice")>
+            <div class="alert alert-notice">
+                <cfoutput>##flash("notice")##</cfoutput>
+            </div>
+        </cfif>
+        
+        <!--- Main content --->
+        <cfoutput>##contentForLayout()##</cfoutput>
+    </main>
+    
+    <footer>
+        <p>&copy; @CURRENT_YEAR@ <cfoutput>##application.applicationName##</cfoutput></p>
+    </footer>
+    
+    <!--- JavaScript --->
+    <cfoutput>##javaScriptIncludeTag("app")##</cfoutput>
+    
+    <!--- Additional scripts --->
+    <cfoutput>##contentForLayout("scripts")##</cfoutput>
+</body>
+</html>

@@ -1,9 +1,9 @@
 /**
  * Display application routes
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="base" {
     
-    property name="wheelsService" inject="WheelsService@wheelscli";
+    property name="wheelsService" inject="WheelsService@wheels-cli-next";
     
     /**
      * Display all configured routes for the application

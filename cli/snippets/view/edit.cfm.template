@@ -1,0 +1,20 @@
+<cfoutput>
+
+##contentFor(title="Edit @MODEL@")##
+
+<div class="page-header">
+    <h1>Edit @MODEL@</h1>
+</div>
+
+##startFormTag(route="@MODEL_LOWER@", key=@MODEL_LOWER@.id, method="patch")##
+    
+    ##includePartial("form")##
+    
+    <div class="form-actions">
+        ##submitTag("Update @MODEL@", class="btn btn-primary")##
+        ##linkTo(route="@MODEL_LOWER@", key=@MODEL_LOWER@.id, text="Cancel", class="btn")##
+    </div>
+    
+##endFormTag()##
+
+</cfoutput>

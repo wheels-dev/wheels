@@ -7,6 +7,8 @@
  */
 component {
     
+    property name="systemSettings" inject="SystemSettings";
+    
     // Module Properties
     this.title         = "Wheels CLI";
     this.author        = "CFWheels Team";
@@ -16,8 +18,8 @@ component {
     
     // Module Config
     this.autoMapModels     = false;
-    this.modelNamespace    = "wheelscli";
-    this.cfmapping         = "wheelscli";
+    this.modelNamespace    = "wheels-cli-next";
+    this.cfmapping         = "wheels-cli-next";
     this.entryPoint        = "wheels";
     this.aliases           = ["cfwheels"];
     
@@ -78,66 +80,44 @@ component {
             }
         };
         
-        // Custom Interceptors
-        interceptors = [
-            {
-                class = "#moduleMapping#.interceptors.CLIInterceptor",
-                name = "WheelsCLIInterceptor"
-            }
-        ];
-        
-        // Interceptor Points
-        interceptorSettings = {
-            customInterceptionPoints = [
-                "preWheelsCommand",
-                "postWheelsCommand",
-                "onWheelsCommandError",
-                "onWheelsProjectDetection"
-            ]
-        };
+        // No interceptors needed for CommandBox modules
         
         // WireBox Mappings
-        binder.map("ConfigService@wheelscli")
+        binder.map("ConfigService@wheels-cli-next")
             .to("#moduleMapping#.models.services.ConfigService")
             .asSingleton()
             .initWith(settings = settings);
             
-        binder.map("WheelsService@wheelscli")
+        binder.map("WheelsService@wheels-cli-next")
             .to("#moduleMapping#.models.services.WheelsService")
             .asSingleton();
             
-        binder.map("DatabaseService@wheelscli")
+        binder.map("DatabaseService@wheels-cli-next")
             .to("#moduleMapping#.models.services.DatabaseService")
             .asSingleton();
             
-        binder.map("SnippetService@wheelscli")
+        binder.map("SnippetService@wheels-cli-next")
             .to("#moduleMapping#.models.services.SnippetService")
             .asSingleton()
             .initWith(settings = settings.snippets);
             
-        binder.map("MigrationService@wheelscli")
+        binder.map("MigrationService@wheels-cli-next")
             .to("#moduleMapping#.models.services.MigrationService")
             .asSingleton();
             
-        binder.map("FormatterService@wheelscli")
+        binder.map("FormatterService@wheels-cli-next")
             .to("#moduleMapping#.models.services.FormatterService")
             .asSingleton();
             
-        binder.map("ProjectService@wheelscli")
+        binder.map("ProjectService@wheels-cli-next")
             .to("#moduleMapping#.models.services.ProjectService")
             .asSingleton();
             
-        binder.map("TabCompletionService@wheelscli")
+        binder.map("TabCompletionService@wheels-cli-next")
             .to("#moduleMapping#.models.services.TabCompletionService")
             .asSingleton();
         
-        // Command Aliases
-        binder.map("command:w").to("command:wheels");
-        binder.map("command:wheels g").to("command:wheels create");
-        binder.map("command:wheels generate").to("command:wheels create");
-        binder.map("command:wheels s").to("command:wheels server");
-        binder.map("command:wheels db:migrate").to("command:wheels db migrate");
-        binder.map("command:wheels db:rollback").to("command:wheels db rollback");
+        // Command Aliases will be registered after module loads
     }
     
     /**
@@ -145,7 +125,7 @@ component {
      */
     function onLoad() {
         // Initialize configuration
-        var configService = wirebox.getInstance("ConfigService@wheelscli");
+        var configService = wirebox.getInstance("ConfigService@wheels-cli-next");
         configService.loadConfiguration();
         
         // Log activation
@@ -153,9 +133,7 @@ component {
             log.info("Wheels CLI Module v#this.version# loaded successfully");
         }
         
-        // Register custom command help
-        var commandService = wirebox.getInstance("CommandService");
-        commandService.addCommandHelp("wheels", "CFWheels framework CLI commands");
+        // Command registration happens automatically
     }
     
     /**
@@ -172,7 +150,7 @@ component {
      */
     function onInstall() {
         // Create default configuration file
-        var configPath = shell.pwd() & "/.wheelscli.json";
+        var configPath = expandPath(".") & "/.wheelscli.json";
         if (!fileExists(configPath)) {
             var defaultConfig = {
                 "name": "My Wheels App",
@@ -189,15 +167,14 @@ component {
             fileWrite(configPath, serializeJSON(defaultConfig, false, false));
         }
         
-        print.greenLine("Wheels CLI installed successfully!");
-        print.line("Run 'wheels help' to get started.");
+        // Installation complete
     }
     
     /**
      * Module update
      */
     function onUpdate(string previousVersion) {
-        print.greenLine("Wheels CLI updated from v#arguments.previousVersion# to v#this.version#");
+        // Update complete
     }
     
     /**

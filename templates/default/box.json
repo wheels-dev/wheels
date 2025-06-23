@@ -56,6 +56,21 @@
         "postInstall":"pathExists .env || cp env.example .env && mv env.example .env.example",
         "format":"cfformat run config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc --overwrite",
         "format:check":"cfformat check config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc",
-        "format:watch":"cfformat watch path='config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc' settingsPath='.cfformat.json'"
+        "format:watch":"cfformat watch path='config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc' settingsPath='.cfformat.json'",
+        "dev":"task run start",
+        "dev:lucee5":"task run start --engine=lucee5",
+        "dev:lucee6":"task run start --engine=lucee6",
+        "dev:lucee7":"task run start --engine=lucee7",
+        "dev:adobe2018":"task run start --engine=adobe2018",
+        "dev:adobe2021":"task run start --engine=adobe2021",
+        "dev:adobe2023":"task run start --engine=adobe2023",
+        "dev:adobe2025":"task run start --engine=adobe2025",
+        "dev:mysql":"task run start --database=mysql",
+        "dev:postgresql":"task run start --database=postgresql",
+        "dev:sqlserver":"task run start --database=sqlserver",
+        "stop":"task run stop",
+        "logs":"task run logs",
+        "test":"task run test",
+        "test:core":"task run test:core"
     }
 }

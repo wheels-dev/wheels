@@ -1,0 +1,22 @@
+<cfscript>
+    /**
+     * Production Environment Settings
+     */
+    
+    // Hide debugging information
+    set(showDebugInformation = false);
+    
+    // Hide error information
+    set(showErrorInformation = false);
+    
+    // Disable auto reload
+    set(autoReload = false);
+    
+    // Enable caching
+    set(cacheFileChecking = true);
+    set(cacheControllerInitialization = true);
+    set(cacheModelInitialization = true);
+    set(cachePlugins = true);
+    set(cacheRoutes = true);
+    set(cacheViewPaths = true);
+</cfscript>

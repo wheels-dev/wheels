@@ -97,7 +97,12 @@
       "Bash(docker:*)",
       "Bash(tree:*)",
       "WebFetch(domain:forgebox.io)",
-      "WebFetch(domain:commandbox.ortusbooks.com)"
+      "WebFetch(domain:commandbox.ortusbooks.com)",
+      "Bash(/Users/peter/projects/wheels/cli/fix-extends.sh:*)",
+      "Bash(/Users/peter/projects/wheels/cli/fix-subcommands.sh:*)",
+      "Bash(ln:*)",
+      "Bash(/Users/peter/projects/wheels/cli/temporary-fix.sh:*)",
+      "Bash(/usr/bin/git status)"
     ],
     "deny": []
   }

@@ -1,7 +1,7 @@
 /**
  * Display help for Wheels CLI commands
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="base" {
     
     /**
      * @command Command to get help for (optional)

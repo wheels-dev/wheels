@@ -1,0 +1,13 @@
+<cfoutput>
+
+##contentFor(title="@ACTION@")##
+
+<div class="page-header">
+    <h1>@ACTION@</h1>
+</div>
+
+<p>This is the @ACTION@ view for the @CONTROLLER@ controller.</p>
+
+<!--- Add your view content here --->
+
+</cfoutput>

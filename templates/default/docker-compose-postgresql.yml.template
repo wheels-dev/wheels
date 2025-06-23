@@ -1,0 +1,21 @@
+  # PostgreSQL Database Service
+  postgresql_db:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=wheelstestdb
+      - POSTGRES_USER=wheels
+      - POSTGRES_PASSWORD=wheels
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - wheels-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wheels"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

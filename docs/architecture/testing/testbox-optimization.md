@@ -1,8 +1,8 @@
-# TestBox Integration Optimization for CFWheels 3.0
+# TestBox Integration Optimization for Wheels 3.0
 
 ## Executive Summary
 
-CFWheels 3.0 is transitioning from RocketUnit to TestBox as its testing framework. This document analyzes the current integration state and provides actionable recommendations to optimize the testing experience for developers, making it more enjoyable, efficient, and maintainable.
+Wheels 3.0 is transitioning from RocketUnit to TestBox as its testing framework. This document analyzes the current integration state and provides actionable recommendations to optimize the testing experience for developers, making it more enjoyable, efficient, and maintainable.
 
 ## Current State Analysis
 
@@ -68,29 +68,29 @@ Create a new `BaseSpec.cfc` that bridges Wheels and TestBox:
 
 ```cfc
 component extends="testbox.system.BaseSpec" {
-    
+
     // Wheels application reference
-    property name="app" inject="wirebox:CFWheels";
-    
+    property name="app" inject="wirebox:Wheels";
+
     function beforeAll() {
         // Store original application state
         variables.originalApplication = duplicate(application);
-        
+
         // Set testing mode
         request.isTestingMode = true;
-        
+
         // Initialize test database if needed
         if (structKeyExists(url, "resetdb") && url.resetdb) {
             resetTestDatabase();
         }
     }
-    
+
     function afterAll() {
         // Restore original application state
         application = variables.originalApplication;
         request.isTestingMode = false;
     }
-    
+
     function aroundEach(spec) {
         // Start transaction
         transaction {
@@ -105,21 +105,21 @@ component extends="testbox.system.BaseSpec" {
             transaction action="rollback";
         }
     }
-    
+
     // Wheels-specific helpers
     function controller(required string name) {
         return application.wo.controller(arguments.name);
     }
-    
+
     function model(required string name) {
         return application.wo.model(arguments.name);
     }
-    
+
     function params(struct params = {}) {
         request.wheels.params = arguments.params;
         return request.wheels.params;
     }
-    
+
     // Authentication helpers
     function loginAs(required numeric userId) {
         var user = model("User").findByKey(arguments.userId);
@@ -129,11 +129,11 @@ component extends="testbox.system.BaseSpec" {
         };
         return user;
     }
-    
+
     function logout() {
         structDelete(session, "user");
     }
-    
+
     // Request helpers
     function processRequest(
         required string route,
@@ -142,27 +142,27 @@ component extends="testbox.system.BaseSpec" {
         struct headers = {}
     ) {
         var result = {};
-        
+
         // Set up request context
         cgi.request_method = arguments.method;
-        
+
         // Merge params
         structAppend(form, arguments.params);
         structAppend(url, arguments.params);
-        
+
         // Process through Wheels
         savecontent variable="result.output" {
             result.controller = application.wo.dispatch(argumentCollection=arguments);
         }
-        
+
         return result;
     }
-    
+
     // Factory helpers
     function create(required string factoryName, struct attributes = {}) {
         return application.factories.create(arguments.factoryName, arguments.attributes);
     }
-    
+
     function build(required string factoryName, struct attributes = {}) {
         return application.factories.build(arguments.factoryName, arguments.attributes);
     }
@@ -177,22 +177,22 @@ Create a migration helper to convert RocketUnit assertions to TestBox:
 ```cfc
 // MigrationHelper.cfc
 component {
-    
+
     function migrateTestFile(required string filePath) {
         var content = fileRead(arguments.filePath);
-        
+
         // Replace extends
         content = replace(content, 'extends="tests.Test"', 'extends="tests.BaseSpec"', "all");
-        
+
         // Wrap test methods in describe/it blocks
-        content = reFindReplace(content, 
+        content = reFindReplace(content,
             'function\s+(Test_[^(]+)\s*\([^)]*\)\s*{([^}]+)}',
             'describe("\1", () => {
                 it("should pass", () => {\2
                 });
             });'
         );
-        
+
         // Convert assertions
         var mappings = [
             {from: 'assert\("([^"]+)"\)', to: 'expect(\1).toBeTrue()'},
@@ -200,11 +200,11 @@ component {
             {from: 'assert\("([^"]+)\s*==\s*([^"]+)"\)', to: 'expect(\1).toBe(\2)'},
             {from: 'assert\("structKeyExists\(([^,]+),\s*''([^'']+)''\)"\)', to: 'expect(\1).toHaveKey("\2")'}
         ];
-        
+
         for (var mapping in mappings) {
             content = reReplace(content, mapping.from, mapping.to, "all");
         }
-        
+
         return content;
     }
 }
@@ -225,7 +225,7 @@ Add Wheels CLI commands for test generation:
 # Generate model test
 wheels generate test model User
 
-# Generate controller test  
+# Generate controller test
 wheels generate test controller Admin.Users
 
 # Generate integration test
@@ -236,32 +236,32 @@ Example generated test:
 
 ```cfc
 component extends="tests.BaseSpec" {
-    
+
     describe("User Model", () => {
-        
+
         beforeEach(() => {
             variables.user = model("User").new();
         });
-        
+
         describe("Validations", () => {
             it("requires email", () => {
                 user.email = "";
                 expect(user.valid()).toBeFalse();
                 expect(user.errors()).toHaveKey("email");
             });
-            
+
             it("validates email format", () => {
                 user.email = "invalid-email";
                 expect(user.valid()).toBeFalse();
             });
         });
-        
+
         describe("Associations", () => {
             it("has many roles", () => {
                 expect(user).toHaveMethod("roles");
             });
         });
-        
+
         describe("Methods", () => {
             it("generates full name", () => {
                 user.firstName = "John";
@@ -274,7 +274,7 @@ component extends="tests.BaseSpec" {
 ```
 
 #### B. VS Code Integration
-Create `.vscode/cfwheels-test.code-snippets`:
+Create `.vscode/wheels-test.code-snippets`:
 
 ```json
 {
@@ -345,22 +345,22 @@ jobs:
     strategy:
       matrix:
         cfengine: ["lucee@5", "lucee@6", "adobe@2018", "adobe@2021"]
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup CommandBox
         uses: Ortus-Solutions/setup-commandbox@v2
-        
+
       - name: Install Dependencies
         run: box install
-        
+
       - name: Start Server
         run: box server start cfengine=${{ matrix.cfengine }}
-        
+
       - name: Run Tests
         run: box testbox run --reporter=junit --outputFile=test-results.xml
-        
+
       - name: Upload Test Results
         uses: actions/upload-artifact@v3
         with:
@@ -390,22 +390,22 @@ testbox = new testbox.system.TestBox(
 #### A. Testing Controllers
 ```cfc
 describe("UsersController", () => {
-    
+
     beforeEach(() => {
         variables.controller = controller("Users");
         loginAs(1); // Admin user
     });
-    
+
     describe("index action", () => {
         it("returns list of users", () => {
             var result = processRequest(route="users", method="GET");
             expect(result.controller.users).toBeArray();
             expect(arrayLen(result.controller.users)).toBeGT(0);
         });
-        
+
         it("paginates results", () => {
             var result = processRequest(
-                route="users", 
+                route="users",
                 method="GET",
                 params={page: 2, perPage: 10}
             );
@@ -418,7 +418,7 @@ describe("UsersController", () => {
 #### B. Testing Models with Factories
 ```cfc
 describe("SalesOrder", () => {
-    
+
     it("calculates total from line items", () => {
         var order = create("salesOrder", {
             lineItems: [
@@ -426,10 +426,10 @@ describe("SalesOrder", () => {
                 build("lineItem", {quantity: 1, unitPrice: 15})
             ]
         });
-        
+
         expect(order.calculateTotal()).toBe(35);
     });
-    
+
     it("validates customer association", () => {
         var order = build("salesOrder", {customerID: ""});
         expect(order.valid()).toBeFalse();
@@ -441,14 +441,14 @@ describe("SalesOrder", () => {
 #### C. Testing API Endpoints
 ```cfc
 describe("API v1 Sales Orders", () => {
-    
+
     beforeEach(() => {
         variables.apiKey = create("apiKey");
         variables.headers = {
             "Authorization": "Bearer #apiKey.key#:#apiKey.secret#"
         };
     });
-    
+
     it("creates sales order", () => {
         var payload = {
             customer_id: create("customer").id,
@@ -458,14 +458,14 @@ describe("API v1 Sales Orders", () => {
                 unit_price: 10.99
             }]
         };
-        
+
         var result = processRequest(
             route = "api.v1.salesOrders",
             method = "POST",
             params = {body: serializeJSON(payload)},
             headers = variables.headers
         );
-        
+
         var response = deserializeJSON(result.output);
         expect(response.success).toBeTrue();
         expect(response.data).toHaveKey("id");
@@ -478,7 +478,7 @@ describe("API v1 Sales Orders", () => {
 #### A. Test Data Management
 ```cfc
 component {
-    
+
     // Shared test data loaded once
     function setupTestData() {
         if (!structKeyExists(application, "testData")) {
@@ -488,7 +488,7 @@ component {
             };
         }
     }
-    
+
     // Fast data cleanup
     function cleanupTestData() {
         queryExecute("DELETE FROM sales_orders WHERE notes LIKE '%[TEST]%'");
@@ -503,7 +503,7 @@ component {
 component {
     function getAffectedTests(changedFiles) {
         var tests = [];
-        
+
         for (var file in arguments.changedFiles) {
             if (file contains "/models/") {
                 arrayAppend(tests, "tests/specs/unit/models/#getFileFromPath(file)#");
@@ -511,7 +511,7 @@ component {
                 arrayAppend(tests, "tests/specs/integration/controllers/#getFileFromPath(file)#");
             }
         }
-        
+
         return tests;
     }
 }
@@ -545,7 +545,7 @@ component {
 
 ## Conclusion
 
-By following these recommendations, CFWheels 3.0 can provide a modern, enjoyable testing experience that:
+By following these recommendations, Wheels 3.0 can provide a modern, enjoyable testing experience that:
 - Leverages TestBox's full capabilities
 - Maintains backward compatibility during transition
 - Improves developer productivity

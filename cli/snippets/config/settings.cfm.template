@@ -1,0 +1,11 @@
+<cfscript>
+    /**
+     * Application Settings
+     */
+    
+    // Reload password for development
+    set(reloadPassword = "reload@@@DATABASE@");
+    
+    // Environment settings will override these settings
+    // based on the current environment (development, testing, production)
+</cfscript>

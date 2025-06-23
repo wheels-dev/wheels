@@ -11,7 +11,7 @@ component accessors="true" singleton {
     // DI Properties
     property name="fileSystem" inject="FileSystem";
     property name="log" inject="logbox:logger:{this}";
-    property name="configService" inject="ConfigService@wheelscli";
+    property name="configService" inject="ConfigService@wheels-cli-next";
     
     // Cache for project information
     property name="projectCache" type="struct";
@@ -350,7 +350,7 @@ component accessors="true" singleton {
      * Create .gitignore file
      */
     private function createGitIgnore(required string path) {
-        var gitignoreContent = "# Wheels files
+        var gitignoreContent = "## Wheels files
 /vendor/
 /db/*.db
 /db/sqlite/*.db
@@ -358,36 +358,36 @@ component accessors="true" singleton {
 /.env.*
 !/.env.example
 
-# IDE files
+## IDE files
 .idea/
 .vscode/
 *.sublime-*
 
-# OS files
+## OS files
 .DS_Store
 Thumbs.db
 
-# Test files
+## Test files
 /tests/results/
 /tests/reports/
 
-# Logs
+## Logs
 /logs/
 *.log
 
-# Cache
+## Cache
 /cache/
 /.cache/
 
-# Build files
+## Build files
 /dist/
 /build/
 
-# Dependencies
+## Dependencies
 /node_modules/
 /bower_components/
 
-# CommandBox
+## CommandBox
 .engine/
 server.json.bak";
         

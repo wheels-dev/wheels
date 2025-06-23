@@ -1,0 +1,26 @@
+  # SQL Server Database Service
+  sqlserver_db:
+    build:
+      context: {{ROOT_DIR}}/tools/docker/sqlserver
+      dockerfile: Dockerfile
+    image: wheels-sqlserver:latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Wheels2023!Strong
+      - MSSQL_DB=wheelstestdb
+      - MSSQL_USER=wheels
+      - MSSQL_PASSWORD=wheels
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - wheels-dev
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "Wheels2023!Strong", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sqlserver_data:

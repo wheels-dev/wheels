@@ -1,0 +1,21 @@
+<cfcomponent output="false">
+    <cfscript>
+        this.name = "@APP_NAME@";
+        this.sessionManagement = true;
+        this.sessionTimeout = createTimeSpan(0, 2, 0, 0);
+        this.applicationTimeout = createTimeSpan(1, 0, 0, 0);
+        
+        // Wheels settings
+        this.mappings["/wheels"] = getDirectoryFromPath(getCurrentTemplatePath()) & "vendor/wheels";
+        this.datasource = "wheelsdatasource";
+        
+        // Include Wheels framework
+        include "wheels/events/onapplicationstart.cfm";
+        include "wheels/events/onrequeststart.cfm"; 
+        include "wheels/events/onrequest.cfm";
+        include "wheels/events/onrequestend.cfm";
+        include "wheels/events/onerror.cfm";
+        include "wheels/events/onsessionstart.cfm";
+        include "wheels/events/onsessionend.cfm";
+    </cfscript>
+</cfcomponent>

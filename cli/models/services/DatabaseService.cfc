@@ -12,9 +12,9 @@ component accessors="true" singleton {
     property name="fileSystem" inject="FileSystem";
     property name="log" inject="logbox:logger:{this}";
     property name="print" inject="PrintBuffer";
-    property name="JSONUtil" inject="JSONUtil";
-    property name="configService" inject="ConfigService@wheelscli";
-    property name="projectService" inject="ProjectService@wheelscli";
+    // JSON handling is built into CFML, no injection needed
+    property name="configService" inject="ConfigService@wheels-cli-next";
+    property name="projectService" inject="ProjectService@wheels-cli-next";
     
     // Service Properties
     property name="databaseConfigs" type="struct";
@@ -577,18 +577,18 @@ component accessors="true" singleton {
      * Create database .gitignore
      */
     private function createDatabaseGitIgnore(required string path) {
-        var gitignoreContent = "# Database files
+        var gitignoreContent = "## Database files
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
 
-# Backup files
+## Backup files
 *.sql
 *.bak
 *.backup
 
-# Log files
+## Log files
 *.log";
         
         fileWrite(arguments.path & ".gitignore", gitignoreContent);

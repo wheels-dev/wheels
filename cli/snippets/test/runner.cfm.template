@@ -1,0 +1,15 @@
+<cfscript>
+    // TestBox Runner
+    r = new testbox.system.TestBox();
+    
+    // Run tests
+    results = r.run(
+        directory = {
+            mapping = "tests.specs",
+            recurse = true
+        }
+    );
+    
+    // Output results
+    writeOutput(results);
+</cfscript>

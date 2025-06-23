@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<urlrewrite>
+    <rule>
+        <note>Wheels catch-all route</note>
+        <from>^(.*)$</from>
+        <to>/rewrite.cfm$1</to>
+    </rule>
+</urlrewrite>

@@ -1,0 +1,39 @@
+<cfoutput>
+
+##contentFor(title="@MODEL_PLURAL@")##
+
+<div class="page-header">
+    <h1>@MODEL_PLURAL@</h1>
+    ##linkTo(route="new@MODEL@", text="New @MODEL@", class="btn btn-primary")##
+</div>
+
+<cfif @MODELS_LOWER@.recordCount>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <!--- Add more columns here based on your model --->
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <cfloop query="@MODELS_LOWER@">
+                <tr>
+                    <td>##@MODELS_LOWER@.id##</td>
+                    <!--- Add more columns here --->
+                    <td>##dateFormat(@MODELS_LOWER@.createdAt, "mm/dd/yyyy")##</td>
+                    <td>
+                        ##linkTo(route="@MODEL_LOWER@", key=@MODELS_LOWER@.id, text="View")##
+                        ##linkTo(route="edit@MODEL@", key=@MODELS_LOWER@.id, text="Edit")##
+                        ##linkTo(route="@MODEL_LOWER@", key=@MODELS_LOWER@.id, text="Delete", method="delete", confirm="Are you sure?")##
+                    </td>
+                </tr>
+            </cfloop>
+        </tbody>
+    </table>
+<cfelse>
+    <p>No @MODELS_LOWER@ found.</p>
+</cfif>
+
+</cfoutput>

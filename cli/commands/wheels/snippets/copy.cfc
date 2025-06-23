@@ -1,7 +1,7 @@
 /**
  * Copy CLI snippets to your project for customization
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     /**
      * Copy CLI snippets to your project for customization

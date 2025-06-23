@@ -1,0 +1,22 @@
+<cfscript>
+    /**
+     * Development Environment Settings
+     */
+    
+    // Show debugging information
+    set(showDebugInformation = true);
+    
+    // Show error information
+    set(showErrorInformation = true);
+    
+    // Auto reload
+    set(autoReload = true);
+    
+    // Cache settings
+    set(cacheFileChecking = false);
+    set(cacheControllerInitialization = false);
+    set(cacheModelInitialization = false);
+    set(cachePlugins = false);
+    set(cacheRoutes = false);
+    set(cacheViewPaths = false);
+</cfscript>

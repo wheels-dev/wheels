@@ -1,0 +1,18 @@
+component extends="Controller" {
+    
+    /**
+     * Controller configuration
+     */
+    function config() {
+        // Add any filters or settings here
+    }
+    
+    /**
+     * Index action - home page
+     */
+    function index() {
+        // This is your home page
+        // Add any data you want to pass to the view here
+    }
+    
+}

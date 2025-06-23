@@ -1,0 +1,16 @@
+/**
+ * Test suite for @NAME@ helper
+ * Generated: @GENERATED_DATE@
+ */
+component extends="tests.WheelsTestCase" {
+    
+    function run() {
+        describe("@NAME@ Helper", function() {
+            
+            it("should be available", function() {
+                // Test helper availability
+            });
+            
+        });
+    }
+}

@@ -1,22 +1,20 @@
 {
+	"name": "wheels-lucee6",
 	"profile": "development",
-	"force":true,
-	"web":{
-			"host":"localhost",
-			"webroot":"public",
-			"http":{
-					"port":"60006",
-					"enable":true
-			},
-			"rewrites":{
-					"enable":true,
-					"config":"public/urlrewrite.xml"
-			}
+	"force": true,
+	"web": {
+		"host": "0.0.0.0",
+		"webroot": "${BOX_SERVER_WEB_WEBROOT:core/tests}",
+		"http": {
+			"port": "60006",
+			"enable": true
+		},
+		"rewrites": {
+			"enable": true
+		}
 	},
-	"app":{
-			"cfengine":"Lucee@6",
-			"libDirs":"docker/lucee@6/lib",
-			"serverHomeDirectory":".engine/lucee@6"
-	},
-	"cfconfigFile":"CFConfig.json"
+	"app": {
+		"cfengine": "Lucee@6",
+		"serverHomeDirectory": ".engine/lucee@6"
+	}
 }

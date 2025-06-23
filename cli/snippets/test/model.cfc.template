@@ -1,0 +1,91 @@
+/**
+ * Test suite for @MODEL_NAME@ model
+ * Generated: @GENERATED_DATE@
+ */
+component extends="tests.WheelsTestCase" {
+    
+    /**
+     * Setup before all tests
+     */
+    function beforeAll() {
+        super.beforeAll();
+        
+        // Setup test data
+        variables.validProperties = {
+            // Add valid properties for your model
+            // name = "Test @MODEL_NAME@"
+        };
+        
+        variables.invalidProperties = {
+            // Add invalid properties to test validations
+        };
+    }
+    
+    /**
+     * Teardown after each test
+     */
+    function afterEach() {
+        // Clean up test data
+        model("@MODEL_NAME@").deleteAll(reload=true);
+    }
+    
+    function run() {
+        describe("@MODEL_NAME@ Model", function() {
+            
+            describe("Initialization", function() {
+                it("should be a valid model", function() {
+                    var @MODEL_LOWER@ = model("@MODEL_NAME@");
+                    expect(@MODEL_LOWER@).toBeInstanceOf("models.@MODEL_NAME@");
+                });
+                
+                it("should have the correct table name", function() {
+                    var @MODEL_LOWER@ = model("@MODEL_NAME@");
+                    expect(@MODEL_LOWER@.tableName()).toBe("@TABLE_NAME@");
+                });
+            });
+            
+            describe("Properties", function() {
+                it("should have required properties", function() {
+                    var @MODEL_LOWER@ = model("@MODEL_NAME@").new();
+                    var properties = @MODEL_LOWER@.properties();
+                    
+                    // Test for expected properties
+                    // expect(properties).toHaveKey("name");
+                });
+            });
+            
+            describe("Validations", function() {
+                it("should save with valid properties", function() {
+                    var @MODEL_LOWER@ = model("@MODEL_NAME@").new(validProperties);
+                    var result = @MODEL_LOWER@.save();
+                    
+                    expect(result).toBeTrue();
+                    expect(@MODEL_LOWER@.hasErrors()).toBeFalse();
+                });
+                
+                it("should not save with invalid properties", function() {
+                    var @MODEL_LOWER@ = model("@MODEL_NAME@").new(invalidProperties);
+                    var result = @MODEL_LOWER@.save();
+                    
+                    expect(result).toBeFalse();
+                    expect(@MODEL_LOWER@.hasErrors()).toBeTrue();
+                });
+                
+                // Add specific validation tests
+            });
+            
+            describe("Associations", function() {
+                // Test model associations
+            });
+            
+            describe("Callbacks", function() {
+                // Test model callbacks
+            });
+            
+            describe("Scopes", function() {
+                // Test model scopes
+            });@METHOD_TESTS@
+            
+        });
+    }
+}

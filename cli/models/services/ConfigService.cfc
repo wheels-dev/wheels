@@ -9,8 +9,8 @@
 component accessors="true" singleton {
     
     // DI Properties
-    property name="fileSystem" inject="FileSystem";
-    property name="JSONUtil" inject="JSONUtil";
+    // FileSystem not needed, using built-in file functions
+    // JSON handling is built into CFML, no injection needed
     property name="log" inject="logbox:logger:{this}";
     
     // Service Properties
@@ -37,7 +37,7 @@ component accessors="true" singleton {
      * Load configuration from file system
      */
     function loadConfiguration(string startPath = "") {
-        var searchPath = len(arguments.startPath) ? arguments.startPath : shell.pwd();
+        var searchPath = len(arguments.startPath) ? arguments.startPath : expandPath(".");
         
         // Find configuration file
         variables.configFilePath = findConfigFile(searchPath);
@@ -280,8 +280,9 @@ component accessors="true" singleton {
         var env = "";
         
         // Check system environment variable
-        if (len(systemSettings.getSystemSetting("WHEELS_ENV", ""))) {
-            env = systemSettings.getSystemSetting("WHEELS_ENV", "");
+        var systemEnv = createObject("java", "java.lang.System").getenv("WHEELS_ENV");
+        if (!isNull(systemEnv) && len(systemEnv)) {
+            env = systemEnv;
         }
         
         // Check configuration

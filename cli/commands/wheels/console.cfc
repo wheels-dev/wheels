@@ -1,7 +1,7 @@
 /**
  * Open an interactive Wheels console
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="base" {
     
     /**
      * Start an interactive console session with your Wheels application loaded

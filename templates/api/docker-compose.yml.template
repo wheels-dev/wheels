@@ -1,0 +1,45 @@
+# Wheels Development Docker Compose
+# Generated from template - do not edit directly
+# Engine: {{ENGINE}}
+# Database: {{DATABASE}}
+# Port: {{PORT}}
+
+version: '3.8'
+
+networks:
+  wheels-dev:
+    driver: bridge
+
+services:
+  # CFML Engine Service
+  cfml:
+    build:
+      context: {{ROOT_DIR}}
+      dockerfile: tools/docker/{{ENGINE}}/Dockerfile
+    image: wheels-dev-{{ENGINE}}:latest
+    ports:
+      - "{{PORT}}:{{PORT}}"
+    volumes:
+      # Mount the application
+      - .:/app
+      # Mount core framework from repository root
+      - {{ROOT_DIR}}/core/src/wheels:/app/vendor/wheels
+      # Mount shared dependencies
+      - {{ROOT_DIR}}/vendor/wirebox:/app/vendor/wirebox
+      - {{ROOT_DIR}}/vendor/testbox:/app/vendor/testbox
+      # Mount core tests for testing
+      - {{ROOT_DIR}}/core/tests:/app/core-tests
+    environment:
+      - PORT={{PORT}}
+      - WHEELS_ENV=development
+      - DB_TYPE={{DATABASE}}
+      - BOX_SERVER_WEB_WEBROOT=/app/public
+      - BOX_SERVER_APP_CFENGINE={{ENGINE}}
+    networks:
+      - wheels-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:{{PORT}}/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

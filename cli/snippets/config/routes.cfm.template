@@ -1,0 +1,22 @@
+<cfscript>
+    /**
+     * Routes Configuration
+     * See: https://guides.cfwheels.org/docs/routing
+     */
+    
+    // Draw your application routes below
+    
+    // Example RESTful resource
+    // resources("posts");
+    
+    // Example nested resources
+    // resources("users", function() {
+    //     resources("posts");
+    // });
+    
+    // Root route
+    root(to="main##index");
+    
+    // Generic catch-all routes
+    get(name="catchall", pattern="*", to="wheels##redirect");
+</cfscript>

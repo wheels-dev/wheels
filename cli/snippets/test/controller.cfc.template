@@ -1,0 +1,34 @@
+/**
+ * Test suite for @CONTROLLER_NAME@ controller
+ * Generated: @GENERATED_DATE@
+ */
+component extends="tests.WheelsTestCase" {
+    
+    /**
+     * Setup before all tests
+     */
+    function beforeAll() {
+        super.beforeAll();
+        
+        // Create test data
+        variables.test@MODEL_NAME@ = model("@MODEL_NAME@").create({
+            // Add test properties
+        });
+    }
+    
+    /**
+     * Teardown after all tests
+     */
+    function afterAll() {
+        // Clean up test data
+        model("@MODEL_NAME@").deleteAll(reload=true);
+        
+        super.afterAll();
+    }
+    
+    function run() {
+        describe("@CONTROLLER_NAME@ Controller", function() {@METHOD_TESTS@
+            
+        });
+    }
+}

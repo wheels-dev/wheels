@@ -1,7 +1,7 @@
 /**
  * Drop the database
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
     property name="databaseService" inject="DatabaseService@wheelscli";
     

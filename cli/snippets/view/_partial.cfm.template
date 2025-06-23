@@ -1,0 +1,12 @@
+<cfoutput>
+<!--- Partial: @PARTIAL_NAME@ --->
+<!--- Generated: @GENERATED_DATE@ --->
+
+<div class="partial-@PARTIAL_CLASS@">
+    <!--- Add your partial content here --->
+    <p>This is the @PARTIAL_NAME@ partial.</p>
+    
+    <!--- Access passed variables like this: --->
+    <!--- ##variables.someVariable## --->
+</div>
+</cfoutput>

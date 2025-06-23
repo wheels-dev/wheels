@@ -1,0 +1,27 @@
+<cfoutput>
+
+##contentFor(title="@MODEL@ Details")##
+
+<div class="page-header">
+    <h1>@MODEL@ Details</h1>
+</div>
+
+<dl class="dl-horizontal">
+    <dt>ID:</dt>
+    <dd>##@MODEL_LOWER@.id##</dd>
+    
+    <!--- Add more fields here based on your model --->
+    
+    <dt>Created:</dt>
+    <dd>##dateFormat(@MODEL_LOWER@.createdAt, "mm/dd/yyyy")##</dd>
+    
+    <dt>Updated:</dt>
+    <dd>##dateFormat(@MODEL_LOWER@.updatedAt, "mm/dd/yyyy")##</dd>
+</dl>
+
+<div class="form-actions">
+    ##linkTo(route="edit@MODEL@", key=@MODEL_LOWER@.id, text="Edit", class="btn btn-primary")##
+    ##linkTo(route="@MODELS_LOWER@", text="Back to List", class="btn")##
+</div>
+
+</cfoutput>

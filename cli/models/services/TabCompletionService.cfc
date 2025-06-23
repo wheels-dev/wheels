@@ -11,11 +11,11 @@ component accessors="true" singleton {
     // DI Properties
     property name="fileSystem" inject="FileSystem";
     property name="log" inject="logbox:logger:{this}";
-    property name="projectService" inject="ProjectService@wheelscli";
-    property name="wheelsService" inject="WheelsService@wheelscli";
-    property name="templateService" inject="TemplateService@wheelscli";
-    property name="migrationService" inject="MigrationService@wheelscli";
-    property name="configService" inject="ConfigService@wheelscli";
+    property name="projectService" inject="ProjectService@wheels-cli-next";
+    property name="wheelsService" inject="WheelsService@wheels-cli-next";
+    property name="templateService" inject="TemplateService@wheels-cli-next";
+    property name="migrationService" inject="MigrationService@wheels-cli-next";
+    property name="configService" inject="ConfigService@wheels-cli-next";
     
     /**
      * Constructor

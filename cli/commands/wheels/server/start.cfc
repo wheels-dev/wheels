@@ -1,9 +1,9 @@
 /**
  * Start the development server
  */
-component extends="commands.wheels.BaseCommand" {
+component extends="../base" {
     
-    property name="serverService" inject="ServerService";
+    property name="serverService" inject="ServerService@commandbox";
     
     /**
      * Start the Wheels development server
