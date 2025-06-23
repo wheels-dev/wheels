@@ -2,8 +2,8 @@
  * Generate API documentation
  * Examples:
  * wheels docs generate
- * wheels docs generate --output=docs/api --format=html
- * wheels docs generate --include=models,controllers --serve
+ * wheels docs generate output=docs/api format=html
+ * wheels docs generate include=models,controllers serve=true
  */
 component extends="../base" {
     

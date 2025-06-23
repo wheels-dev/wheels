@@ -65,7 +65,7 @@ component aliases="wheels plugin update" extends="../base" {
                     var packageInfo = packageService.getPackage(arguments.name);
                     if (packageInfo.keyExists("version") && currentVersion == packageInfo.version) {
                         print.yellowLine("Plugin is already at the latest version (#packageInfo.version#)");
-                        print.line("Use --force to reinstall anyway");
+                        print.line("Use force=true to reinstall anyway");
                         return;
                     }
                 } catch (any e) {

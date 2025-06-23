@@ -32,7 +32,7 @@ When you destroy a resource, the following items are deleted:
 - Model test file (`/tests/Testbox/specs/models/[Name].cfc`)
 - Controller test file (`/tests/Testbox/specs/controllers/[Names].cfc`)
 - View test directory (`/tests/Testbox/specs/views/[names]/`)
-- Resource route entry in `/app/config/routes.cfm`
+- Resource route entry in `/config/routes.cfm`
 - Database table (if confirmed)
 
 ## Examples
@@ -56,7 +56,7 @@ the following files and directories:
 /tests/Testbox/specs/models/User.cfc
 /tests/Testbox/specs/controllers/Users.cfc
 /tests/Testbox/specs/views/users/
-/app/config/routes.cfm
+/config/routes.cfm
 .resources("users")
 
 Are you sure? [y/n]
@@ -84,7 +84,7 @@ the following files and directories:
 /tests/Testbox/specs/models/User.cfc
 /tests/Testbox/specs/controllers/Users.cfc
 /tests/Testbox/specs/views/users/
-/app/config/routes.cfm
+/config/routes.cfm
 .resources("users")
 
 Are you sure? [y/n]

@@ -1,8 +1,8 @@
 component extends="wheels.tests.Test" {
 
 	function setup() {
-		StructDelete(application.wheels.models, "users", false);
-		user = model("users").new();
+		StructDelete(application.wheels.models, "_c_o_r_e_users", false);
+		user = model("_c_o_r_e_users").new();
 		user.username = "TheLongestNameInTheWorld";
 		args = {};
 		args.property = "username";

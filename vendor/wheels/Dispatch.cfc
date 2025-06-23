@@ -31,6 +31,12 @@ component output="false" extends="wheels.Global"{
 		local.rv = $ensureControllerAndAction(params = local.rv, route = arguments.route);
 		local.rv = $addRouteFormat(params = local.rv, route = arguments.route);
 		local.rv = $addRouteName(params = local.rv, route = arguments.route);
+		
+		// Debug log for testbox route
+		if (structKeyExists(arguments.route, "name") && arguments.route.name == "wheelsTestbox") {
+			writeLog(file="application", text="Route details - controller: #arguments.route.controller#, action: #arguments.route.action#");
+			writeLog(file="application", text="Final params - controller: #local.rv.controller#, action: #local.rv.action#");
+		}
 
 		return local.rv;
 	}
@@ -138,13 +144,13 @@ component output="false" extends="wheels.Global"{
 				$throwErrorOrShow404Page(
 					type = "Wheels.RouteNotFound",
 					message = "Incorrect HTTP Verb for route",
-					extendedInfo = "The `#arguments.path#` path does not allow `#EncodeForHTML(arguments.requestMethod)#` requests, only `#UCase(local.alternativeMatchingMethodsForURL)#` requests. Ensure you are using the correct HTTP Verb and that your `app/config/routes.cfm` file is configured correctly."
+					extendedInfo = "The `#arguments.path#` path does not allow `#EncodeForHTML(arguments.requestMethod)#` requests, only `#UCase(local.alternativeMatchingMethodsForURL)#` requests. Ensure you are using the correct HTTP Verb and that your `config/routes.cfm` file is configured correctly."
 				);
 			} else {
 				$throwErrorOrShow404Page(
 					type = "Wheels.RouteNotFound",
 					message = "Could not find a route that matched this request.",
-					extendedInfo = "Make sure there is a route configured in your `app/config/routes.cfm` file that matches the `#EncodeForHTML(arguments.path)#` request."
+					extendedInfo = "Make sure there is a route configured in your `config/routes.cfm` file that matches the `#EncodeForHTML(arguments.path)#` request."
 				);
 			}
 		}
@@ -199,9 +205,15 @@ component output="false" extends="wheels.Global"{
 				// Hard abort if GUI turned off
 				cfabort;
 			} else {
+				// Debug log the controller and action being called
+				writeLog(file="application", text="Wheels dispatch - controller: #local.params.controller#, action: #local.params.action#");
+				
 				// Call the action method directly on the component to preserve context
 				// Use 'object' and 'methodname' for older Adobe CF versions compatibility
 				invoke(object=application.wheels.public, methodname=local.params.action);
+				// The wheels controller methods handle their own output and abort
+				// So we need to ensure we don't continue processing
+				return "";
 			}
 		} else {
 			// Create the requested controller and call the action on it.
@@ -431,6 +443,10 @@ component output="false" extends="wheels.Global"{
 		local.rv.controller = ReReplace(local.rv.controller, "[^0-9A-Za-z-_\.]", "", "all");
 
 		// Filter out illegal characters from the controller and action arguments.
+		// Debug log before filtering
+		if (local.rv.controller == "wheels.public" && local.rv.action == "tests_testbox") {
+			writeLog(file="application", text="Before filter - action: #local.rv.action#");
+		}
 		local.rv.action = ReReplace(local.rv.action, "[^0-9A-Za-z-_\.]", "", "all");
 
 		// Convert controller to upperCamelCase.
@@ -443,6 +459,11 @@ component output="false" extends="wheels.Global"{
 
 		// Action to normal camelCase.
 		local.rv.action = ReReplace(local.rv.action, "-([a-z])", "\u\1", "all");
+		
+		// Debug log final values
+		if (local.rv.controller == "wheels.public") {
+			writeLog(file="application", text="Final dispatch params - controller: #local.rv.controller#, action: #local.rv.action#");
+		}
 
 		return local.rv;
 	}

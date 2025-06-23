@@ -7,7 +7,7 @@
  * Examples:
  * wheels test:all
  * wheels test:all --reporter=junit
- * wheels test:all --coverage --coverageReporter=html
+ * wheels test:all coverage=true coverageReporter=html
  */
 component aliases='wheels test:all' extends="../base" {
     

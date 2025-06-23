@@ -24,37 +24,8 @@
 			if(structKeyExists(item, "type"))
 				navArgs['type'] = item['type'];
 			</cfscript>
-			<cfif item.title eq 'Testbox Packages'>
-				<div class="ui dropdown item">
-					#navArgs.Text#
-					<div class="menu">
-						<div class="item">
-							<span class="text">TestBox</span>
-							<div class="menu">
-								<div class="item">
-									<span class="text">App Tests</span>
-									<div class="menu">
-										<a href="/testbox" class="#navArgs['class']#" target="_blank">HTML</a>
-										<a href="/testbox?format=json" class="#navArgs['class']#" target="_blank">JSON</a>
-										<a href="/testbox?format=txt" class="#navArgs['class']#" target="_blank">TXT</a>
-										<a href="/testbox?format=junit" class="#navArgs['class']#" target="_blank">JUnit</a>
-									</div>
-								</div>
-								<div class="item">
-									<span class="text">Core Tests</span>
-									<div class="menu">
-										<a href="#urlFor(argumentCollection = navArgs)#" class="#navArgs['class']#" target="_blank">HTML</a>
-										<a href="#urlFor(argumentCollection = navArgs)#?format=json" class="#navArgs['class']#" target="_blank">JSON</a>
-										<a href="#urlFor(argumentCollection = navArgs)#?format=txt" class="#navArgs['class']#" target="_blank">TXT</a>
-										<a href="#urlFor(argumentCollection = navArgs)#?format=junit" class="#navArgs['class']#" target="_blank">JUnit</a>
-									</div>
-								</div> 
-							</div>
-						</div>
-			
-						<a href="/wheels/packages/app" class="#navArgs['class']#">RocketUnit</a>
-					</div>
-				</div>
+			<cfif item.title eq "Tests">
+				<a href="/wheels/testbox" class="#navArgs['class']#">#navArgs.Text#</a>
 			<cfelse>
 				<a href="#urlFor(argumentCollection = navArgs)#" class="#navArgs['class']#">#navArgs.Text#</a>
 			</cfif>

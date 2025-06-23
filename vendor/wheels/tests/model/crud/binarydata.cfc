@@ -16,7 +16,7 @@ component extends="wheels.tests.Test" {
 	}
 
 	function test_insert() {
-		gallery = model("gallery").findOne(include = "user", where = "users.lastname = 'Petruzzi'", orderby = "id");
+		gallery = model("gallery").findOne(include = "user", where = "_c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id");
 		transaction action="begin" {
 			photo = model("photo").create(
 				galleryid = "#gallery.id#",

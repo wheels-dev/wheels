@@ -2,8 +2,8 @@
  * Run Wheels application tests
  * Examples:
  * wheels test run
- * wheels test run --filter=UserTest --coverage
- * wheels test run --group=integration --reporter=junit
+ * wheels test run filter=UserTest coverage=true
+ * wheels test run group=integration reporter=junit
  */
 component extends="../base" {
     

@@ -167,7 +167,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("is valid", () => {
 				_controller = g.controller(name = "dummy")
-				user = g.model("users")
+				user = g.model("_c_o_r_e_users")
 				e = user.findAll(
 					where = "firstname = 'somemoron'",
 					perpage = "2",

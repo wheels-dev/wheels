@@ -27,6 +27,9 @@ if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2", url.db)
 /* For JS Test Runner */
 $header(name="Access-Control-Allow-Origin", value="*");
 
+/* set migration level for tests*/
+application.wheels.migrationLevel = 2;
+
 /* turn off default validations for testing */
 application.wheels.automaticValidations = false;
 application.wheels.assetQueryString = false;

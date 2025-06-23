@@ -3,8 +3,8 @@
  *
  * {code:bash}
  * wheels db shell
- * wheels db shell --web
- * wheels db shell --datasource=myapp_dev
+ * wheels db shell web=true
+ * wheels db shell datasource=myapp_dev
  * {code}
  */
 component extends="../base" {
@@ -41,7 +41,7 @@ component extends="../base" {
 			}
 			
 			if (!Len(arguments.datasource)) {
-				error("No datasource configured. Use --datasource parameter or set dataSourceName in settings.");
+				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
 				return;
 			}
 			
@@ -239,7 +239,7 @@ component extends="../base" {
 					runInteractiveCommand(local.cmd);
 				} else {
 					error("H2 JAR not found. Make sure H2 database is installed.");
-					print.line("You can also try the web console with: wheels db shell --web");
+					print.line("You can also try the web console with: wheels db shell web=true");
 				}
 			}
 		}

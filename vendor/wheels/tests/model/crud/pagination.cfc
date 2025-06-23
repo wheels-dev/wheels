@@ -71,7 +71,7 @@ component extends="wheels.tests.Test" {
 	}
 
 	function test_specify_where_on_joined_table() {
-		q = gallery.findOne(include = "user", where = "users.lastname = 'Petruzzi'", orderby = "id");
+		q = gallery.findOne(include = "user", where = "_c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id");
 
 		/* 10 records, 2 perpage, 5 pages */
 		args = {
@@ -161,7 +161,7 @@ component extends="wheels.tests.Test" {
 	function test_incorrect_number_of_record_returned_when_where_clause_satisfies_records_beyond_the_first_identifier_value() {
 		q = model("author").findAll(
 			include = "posts",
-			where = "posts.views > 2",
+			where = "_c_o_r_e_posts.views > 2",
 			page = 1,
 			perpage = 5
 		);

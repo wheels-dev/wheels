@@ -3,7 +3,9 @@
  *
  * {code:bash}
  * wheels generate api-resource users
- * wheels generate api-resource posts --model=true --docs=true
+ * wheels generate api-resource posts --model --docs --auth
+ * wheels g api-resource products --model --docs
+ * wheels g api-resource orders --auth
  * {code}
  */
 component aliases='wheels g api-resource' extends="../base" {

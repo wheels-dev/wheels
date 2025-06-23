@@ -1,7 +1,7 @@
 component extends="Model" {
 
 	function config() {
-		table("tags");
+		table("_c_o_r_e_tags");
 		afterCreate("createWelcomePost");
 	}
 

@@ -201,8 +201,9 @@ component {
 
 					if (local.startPos > 0) {
 						local.fullPath = ExpandPath(mid(local.fullPath, local.startPos, len(local.fullPath) - local.startPos + 1));
-						local.file = listLast(local.fullPath, "\");
-						local.directory = reverse(listRest(reverse(local.fullPath), "\"));
+						local.fullPath = Replace(local.fullPath, "\", "/", "all");
+						local.file = ListLast(local.fullPath, "/");
+						local.directory = Reverse(ListRest(Reverse(local.fullPath), "/"));
 					}
 				} else{
 					local.fullPath = ExpandPath(local.fullPath);

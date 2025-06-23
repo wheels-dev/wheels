@@ -30,7 +30,7 @@ Regardless of your specific setup, Wheels will try to figure out how to handle\
 the URLs. If Wheels fails to do this properly (i.e. you _know_ that your web\
 server supports `cgi.path_info`, but Wheels insists on creating the URLs with\
 the query string format), you can override it by setting `URLRewriting` in\
-`app/config/settings.cfm` to either `On, Partial`, or `Off`. The line of code should\
+`/config/settings.cfm` to either `On, Partial`, or `Off`. The line of code should\
 look something like this:
 
 ```javascript

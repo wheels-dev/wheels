@@ -98,7 +98,7 @@ component aliases="wheels g app" extends="../base" {
       details.create(arguments.directory);
     } else {
       if ( arrayLen( directoryList( arguments.directory, false ) ) && !force) {
-        details.error( 'The target directory is not empty. Use --force to force the installation into a none empty directory.' );
+        details.error( 'The target directory is not empty. Use force=true to force the installation into a none empty directory.' );
         return;
       }
       details.identical(arguments.directory);
@@ -129,22 +129,22 @@ component aliases="wheels g app" extends="../base" {
     // Setting Application Name
     details.line();
     details.getPrint().yellowLine( "🔧 Configuring application..." );
-    command( 'tokenReplace' ).params( path = 'app/config/app.cfm', token = '|appName|', replacement = arguments.name ).run();
-    details.update("app/config/app.cfm", true);
+    command( 'tokenReplace' ).params( path = 'config/app.cfm', token = '|appName|', replacement = arguments.name ).run();
+    details.update("config/app.cfm", true);
     command( 'tokenReplace' ).params( path = 'server.json', token = '|appName|', replacement = arguments.name ).run();
     details.update("server.json", true);
 
     // Setting Reload Password
     command( 'tokenReplace' )
-      .params( path = 'app/config/settings.cfm', token = '|reloadPassword|', replacement = arguments.reloadPassword )
+      .params( path = 'config/settings.cfm', token = '|reloadPassword|', replacement = arguments.reloadPassword )
       .run();
-    details.update("app/config/settings.cfm (reload password)", true);
+    details.update("config/settings.cfm (reload password)", true);
 
     // Setting Datasource Name
     command( 'tokenReplace' )
-      .params( path = 'app/config/settings.cfm', token = '|datasourceName|', replacement = arguments.datasourceName )
+      .params( path = 'config/settings.cfm', token = '|datasourceName|', replacement = arguments.datasourceName )
       .run();
-    details.update("app/config/settings.cfm (datasource)", true);
+    details.update("config/settings.cfm (datasource)", true);
 
     // Setting cfml Engine Name
     command( 'tokenReplace' )
@@ -177,9 +177,9 @@ component aliases="wheels g app" extends="../base" {
         };
         // CLI-Appends-Here';
       command( 'tokenReplace' )
-        .params( path = 'app/config/app.cfm', token = '// CLI-Appends-Here', replacement = datasourceConfig )
+        .params( path = 'config/app.cfm', token = '// CLI-Appends-Here', replacement = datasourceConfig )
         .run();
-      details.update("app/config/app.cfm (H2 datasource)", true);
+      details.update("config/app.cfm (H2 datasource)", true);
 
     // Init, if not a package as a Box Package
     if ( arguments.init && !packageService.isPackage( arguments.directory ) ) {
@@ -234,9 +234,9 @@ component aliases="wheels g app" extends="../base" {
       var bsSettings=fileRead( getTemplate('/bootstrap/settings.cfm' ) );
       bsSettings = bsSettings & cr & '// CLI-Appends-Here';
       command( 'tokenReplace' )
-        .params( path = 'app/config/settings.cfm', token = '// CLI-Appends-Here', replacement = bsSettings )
+        .params( path = 'config/settings.cfm', token = '// CLI-Appends-Here', replacement = bsSettings )
         .run();
-      details.update("app/config/settings.cfm (Bootstrap settings)", true);
+      details.update("config/settings.cfm (Bootstrap settings)", true);
 
       // New Flashwrapper Plugin needed - install it via Forgebox
       command( 'install cfwheels-flashmessages-bootstrap' ).run();
@@ -244,16 +244,6 @@ component aliases="wheels g app" extends="../base" {
       }
 
     }
-    
-    // Generate Tests controller for CLI test support
-    details.line();
-    details.getPrint().yellowLine("🧪 Creating Tests controller for CLI support...");
-    
-    // Create the tests controller from template
-    var testsControllerContent = fileRead(getTemplate('/tests/TestsController.txt'));
-    var testsControllerPath = fileSystemUtil.resolvePath("app/controllers/Tests.cfc");
-    file action='write' file='#testsControllerPath#' mode='777' output='#trim(testsControllerContent)#';
-    details.create("app/controllers/Tests.cfc", true);
 
     details.success("Application created successfully!");
 
@@ -265,53 +255,7 @@ component aliases="wheels g app" extends="../base" {
       arrayAppend(nextSteps, "Start server and install H2 extension: start && install && restart");
       details.line();
       details.getPrint().yellowLine("🛠️ Installing H2 database extension...");
-      
-      // Check if server with this name already exists
-      var serverInfo = command( 'server list' ).params( name = arguments.name, JSON = true ).run( returnOutput = true );
-      if ( len(trim(serverInfo)) ) {
-        // Server exists, check if it's pointing to a different directory
-        try {
-          var serverData = deserializeJSON( serverInfo );
-          if ( structKeyExists(serverData, arguments.name) && serverData[arguments.name].webroot != arguments.directory ) {
-            details.line();
-            details.getPrint().orangeLine("⚠️  Warning: A server named '#arguments.name#' already exists pointing to a different directory.");
-            details.getPrint().orangeLine("   Existing: #serverData[arguments.name].webroot#");
-            details.getPrint().orangeLine("   New: #arguments.directory#");
-            details.line();
-            
-            // Ask user what to do
-            if ( confirm("Would you like to forget the existing server and create a new one? [y/n]") ) {
-              command( 'server forget' ).params( name = arguments.name, force = true ).run();
-              details.getPrint().greenLine("✓ Existing server forgotten.");
-            } else {
-              details.getPrint().yellowLine("⚠️  Skipping server start. You'll need to handle the server configuration manually.");
-              arrayAppend(nextSteps, "Resolve server name conflict and start manually: server start");
-              return;
-            }
-          }
-        } catch (any e) {
-          // If we can't parse the JSON, just continue
-        }
-      }
-      
-      // Start the server
-      try {
-        command( 'server start' ).params( name = arguments.name, openBrowser = false, debug = false ).flags( '!saveSettings' ).run();
-      } catch (any e) {
-        details.line();
-        details.getPrint().redLine("❌ Error starting server: #e.message#");
-        if (findNoCase("already exists", e.message)) {
-          details.getPrint().yellowLine("💡 Try using a different app name or manually forget the existing server.");
-        }
-        arrayAppend(nextSteps, "Manually start the server after resolving conflicts: server start");
-      }
-      
-      // Auto-install any necessary extensions for Lucee
-      if ( arguments.cfmlEngine == 'lucee' ) {
-        // Give server time to start up
-        sleep(5000);
-        command( 'server restart' ).params( name = arguments.name ).run();
-      }
+      command( 'start && install && restart' ).run();
     } else {
       arrayAppend(nextSteps, "Configure your datasource in Lucee/ACF admin");
       arrayAppend(nextSteps, "Start the server: server start");

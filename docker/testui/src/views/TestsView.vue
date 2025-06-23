@@ -249,6 +249,22 @@
                           <i class="bi bi-clock me-1"></i>{{ formatDuration(groupedRun.duration) }}
                         </span>
                       </div>
+                      <div v-if="groupedRun.testUrl" class="small mt-1">
+                        <a :href="getHtmlTestUrl(groupedRun.testUrl)" target="_blank" class="text-decoration-none" :title="groupedRun.testUrl">
+                          <i class="bi bi-link-45deg"></i>
+                          <span class="text-muted">Test URL: </span>
+                          <span class="text-truncate" style="max-width: 400px; display: inline-block; vertical-align: bottom;">
+                            {{ getHtmlTestUrl(groupedRun.testUrl) }}
+                          </span>
+                        </a>
+                        <button 
+                          class="btn btn-sm btn-link p-0 ms-2" 
+                          @click="copyToClipboard(getHtmlTestUrl(groupedRun.testUrl))"
+                          title="Copy URL to clipboard"
+                        >
+                          <i class="bi bi-clipboard"></i>
+                        </button>
+                      </div>
                     </div>
                     
                     <!-- Collapsible detail section (only displayed if there are failures) -->
@@ -386,7 +402,8 @@ const groupedResults = computed(() => {
         skippedCount: 0,
         failedTests: [],
         duration: 0,
-        timestamp: result.timestamp || new Date().toISOString()
+        timestamp: result.timestamp || new Date().toISOString(),
+        testUrl: result.testUrl
       })
     }
     
@@ -500,6 +517,29 @@ const formatDuration = (duration: number): string => {
   return `${minutes}m ${remainingSeconds}s`
 }
 
+// Convert JSON test URL to HTML-friendly URL
+const getHtmlTestUrl = (jsonUrl: string): string => {
+  if (!jsonUrl) return ''
+  
+  // Remove format=json and timeout parameters to get a cleaner HTML URL
+  const url = new URL(jsonUrl)
+  url.searchParams.delete('format')
+  url.searchParams.delete('timeout')
+  url.searchParams.delete('sort')
+  
+  return url.toString()
+}
+
+// Copy text to clipboard
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    // Could add a toast notification here
+  } catch (err) {
+    console.error('Failed to copy to clipboard:', err)
+  }
+}
+
 // Form values
 const selectedEngine = ref('')
 const selectedDatabase = ref('')
@@ -549,6 +589,9 @@ const fetchEnginesAndDatabases = async () => {
         } else if (c.name.includes('lucee6')) {
           name = 'Lucee'
           version = '6'
+        } else if (c.name.includes('lucee7')) {
+          name = 'Lucee'
+          version = '7'
         } else if (c.name.includes('adobe2018')) {
           name = 'Adobe'
           version = '2018'
@@ -639,11 +682,7 @@ const addToQueue = () => {
     return
   }
   
-  // Debug information with a direct check of the actual raw values
-  console.log('====== CLAUDE FIX APPLIED - VERSION 2.0 ======');
-  console.log('Selected engine (raw value):', selectedEngine.value);
-  console.log('Selected database (raw value):', selectedDatabase.value);
-  console.log('Selected bundle (raw value):', selectedBundle.value);
+  // Debug logging removed - fix has been applied
   
   // Get engine name and version directly from the raw value
   let engineName = '';
@@ -653,7 +692,6 @@ const addToQueue = () => {
     const parts = selectedEngine.value.split(' ');
     engineName = parts[0] || '';
     engineVersion = parts[1] || '';
-    console.log('Split engine parts:', engineName, engineVersion);
   }
   
   // Find engine by name + version combination
@@ -675,26 +713,34 @@ const addToQueue = () => {
   let engineObj = engine
   if (!engineObj) {
     engineObj = { 
-      id: `${engineName}-${engineVersion}`, 
+      id: `${engineName.toLowerCase()}${engineVersion}`, 
       name: engineName, 
-      version: engineVersion 
+      version: engineVersion,
+      type: `${engineName.toLowerCase()}${engineVersion}` as any,
+      port: engineName === 'Lucee' && engineVersion === '5' ? 60005 :
+            engineName === 'Lucee' && engineVersion === '6' ? 60006 :
+            engineName === 'Lucee' && engineVersion === '7' ? 60007 :
+            engineName === 'Adobe' && engineVersion === '2018' ? 62018 :
+            engineName === 'Adobe' && engineVersion === '2021' ? 62021 :
+            engineName === 'Adobe' && engineVersion === '2023' ? 62023 : 8080
     }
   }
   
   let databaseObj = database
   if (!databaseObj) {
     databaseObj = { 
-      id: selectedDatabase.toLowerCase().replace(/\s+/g, '-'), 
-      name: selectedDatabase 
+      id: selectedDatabase.value.toLowerCase().replace(/\s+/g, '-'), 
+      name: selectedDatabase.value,
+      type: selectedDatabase.value.toLowerCase().replace(/\s+/g, '') as any
     }
   }
   
   let bundleObj = bundle
   if (!bundleObj) {
     bundleObj = { 
-      id: selectedBundle, 
-      name: selectedBundle, 
-      path: `/${selectedBundle}` 
+      id: selectedBundle.value, 
+      name: selectedBundle.value, 
+      path: `/${selectedBundle.value}` 
     }
   }
   
@@ -712,10 +758,9 @@ const addToQueue = () => {
   }
   
   queue.value.push(queueItem)
-  console.log('Added to queue:', queueItem)
   
-  // Reset selections
-  selectedBundle.value = ''
+  // Reset selections (bundle stays as 'all')
+  selectedBundle.value = 'all'
 }
 
 // Remove an item from the queue
@@ -735,17 +780,18 @@ const startTests = async () => {
     return
   }
   
-  isRunning.value = true
-  results.value = []
-  activeTest.value = null
-  activeTestId.value = null
-  summary.value = {
-    total: 0,
-    passed: 0,
-    failed: 0,
-    errors: 0,
-    skipped: 0
-  }
+  try {
+    isRunning.value = true
+    results.value = []
+    activeTest.value = null
+    activeTestId.value = null
+    summary.value = {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      errors: 0,
+      skipped: 0
+    }
   
   // Reset test tracking
   currentTestIndex.value = -1
@@ -764,7 +810,45 @@ const startTests = async () => {
       currentTestIndex.value = i
       currentTestStartTime.value = new Date()
       
-      const testRun = await testService.runTests(item.engine, item.database, item.bundle)
+      // Debug: Check if testService is available
+      console.log('TestService available:', typeof testService)
+      console.log('runTests method:', typeof testService.runTests)
+      
+      let testRun
+      try {
+        testRun = await testService.runTests(item.engine, item.database, item.bundle)
+      } catch (serviceError) {
+        console.error('Error calling testService.runTests:', serviceError)
+        // Create a mock response for now
+        testRun = {
+          id: `${Date.now()}`,
+          engine: item.engine,
+          database: item.database,
+          bundle: item.bundle,
+          status: TestStatus.Error,
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+          duration: 0,
+          results: [{
+            id: 'error',
+            name: 'Test Service Error',
+            status: TestStatus.Error,
+            duration: 0,
+            timestamp: new Date().toISOString(),
+            error: {
+              message: serviceError.message || 'Unknown error',
+              detail: serviceError.stack || 'No stack trace available'
+            }
+          }],
+          summary: {
+            total: 1,
+            passed: 0,
+            failed: 0,
+            errors: 1,
+            skipped: 0
+          }
+        }
+      }
       currentRunId.value = testRun.id
       
       // Generate a unique run ID for this test suite execution
@@ -776,7 +860,8 @@ const startTests = async () => {
         engine: item.engine,
         database: item.database,
         bundle: item.bundle,
-        runId: runId
+        runId: runId,
+        testUrl: testRun.testUrl
       }))
       
       // Update results and summary
@@ -800,6 +885,11 @@ const startTests = async () => {
     currentTestIndex.value = -1
     currentTestStartTime.value = null
     stopElapsedTimer()
+  }
+  } catch (outerError) {
+    console.error('Fatal error in startTests:', outerError)
+    isRunning.value = false
+    alert('An error occurred while starting tests. Please check the console.')
   }
 }
 

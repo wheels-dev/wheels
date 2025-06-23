@@ -11,7 +11,7 @@
 	this.datasources['wheels-dev'] = {
 		class: 'org.h2.Driver'
 	, connectionString: 'jdbc:h2:file:./db/h2/wheels-dev;MODE=MySQL'
-	, username = 'sa'
+	, username: 'sa'
 	};
 
 	// CLI-Appends-Here

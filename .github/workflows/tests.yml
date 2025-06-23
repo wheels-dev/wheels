@@ -127,7 +127,7 @@ jobs:
         run: |
           cp ./docker/${{ matrix.cfengine }}/server.json ./
           cp ./docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
-          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./app/config/settings.cfm
+          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./config/settings.cfm
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}

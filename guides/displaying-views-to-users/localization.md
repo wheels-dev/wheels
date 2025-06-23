@@ -36,9 +36,9 @@ Incorrect encoding example
 
 Correct encoding
 
-Likewise, umlauts in routes would need for the `app/config/routes.cfm` file to have the correct encoding:
+Likewise, umlauts in routes would need for the `/config/routes.cfm` file to have the correct encoding:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```html
 <cfprocessingdirective pageEncoding="utf-8">
 <cfscript>

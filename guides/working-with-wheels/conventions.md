@@ -34,7 +34,7 @@ This URL pattern works up the chain and will also handle the following example U
 | [http://localhost/users/](http://localhost/users/edit/12)new     | users      | new    |     |
 | [http://localhost/users](http://localhost/users/edit/12)         | users      | index  |     |
 
-Note that the above conventions are for `GET` requests and only apply when you have a `wildcard()` call in `app/config/routes.cfm` (which is the default). See [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) for instructions on overriding this behavior and how to deal with `PUT`, `POST` etc.
+Note that the above conventions are for `GET` requests and only apply when you have a `wildcard()` call in `/config/routes.cfm` (which is the default). See [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) for instructions on overriding this behavior and how to deal with `PUT`, `POST` etc.
 
 ### Naming Conventions for Controllers, Actions, and Views
 
@@ -80,7 +80,7 @@ By default, the names of Wheels models, model properties, database tables, and d
 
 ### Data Sources
 
-By default, the datasource is set to `wheels.dev` in the `app/config/settings.cfm` file. You can change the value in the `set(dataSourceName="wheels.dev")` function to whatever you want the name of the datasource to be.
+By default, the datasource is set to `wheels.dev` in the `/config/settings.cfm` file. You can change the value in the `set(dataSourceName="wheels.dev")` function to whatever you want the name of the datasource to be.
 
 Refer to the [Configuration and Defaults](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults) chapter for instructions on overriding data source information.
 

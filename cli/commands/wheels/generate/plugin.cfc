@@ -46,7 +46,7 @@ component aliases='wheels g plugin' extends="../base" {
         var pluginDir = helpers.getAppPath() & "/plugins/" & lCase(arguments.name);
         
         if (directoryExists(pluginDir) && !arguments.force) {
-            error("Plugin directory already exists: /plugins/#lCase(arguments.name)#. Use --force to overwrite.");
+            error("Plugin directory already exists: /plugins/#lCase(arguments.name)#. Use force=true to overwrite.");
             return;
         }
         

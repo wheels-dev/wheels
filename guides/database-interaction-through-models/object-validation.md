@@ -80,7 +80,7 @@ Note these extra behaviors as well:
 * If you've already set a validation on a particular property in your model, the automatic validations will be overridden by your settings.
 * If your database column provides a default value for a given field, Wheels will not enforce a [validatesPresenceOf()](https://wheels.dev/api/v3.0.0/model.validatespresenceof.html)rule on that property.
 
-To disable automatic validations in your Wheels application, change this setting in `app/config/settings.cfm:`
+To disable automatic validations in your Wheels application, change this setting in `/config/settings.cfm:`
 
 ```javascript
 set(automaticValidations=false);
@@ -255,7 +255,7 @@ There are 2 ways to accomplish this: through global defaults in your config file
 
 ### Setting Global Defaults for Error Messages
 
-Using basic global defaults for the validation functions, you can set error messages in your config file at `app/config/settings.cfm`.
+Using basic global defaults for the validation functions, you can set error messages in your config file at `/config/settings.cfm`.
 
 ```javascript
 set(functionName="validatesPresenceOf", message="Please provide a value for [property]");

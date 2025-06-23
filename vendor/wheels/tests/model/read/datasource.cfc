@@ -16,7 +16,7 @@ component extends="wheels.tests.Test" {
 		// ensure the authors table exists in the alt datasource
 		$query(
 			sql = "
-				CREATE TABLE IF NOT EXISTS authors
+				CREATE TABLE IF NOT EXISTS _c_o_r_e_authors
 				(
 					id int NOT NULL IDENTITY
 					,firstname varchar(100) NOT NULL
@@ -28,7 +28,7 @@ component extends="wheels.tests.Test" {
 		);
 		firstName = "Troll";
 		$query(
-			sql = "INSERT INTO authors (firstName, lastName) VALUES ('#firstName#', 'Dolls');",
+			sql = "INSERT INTO _c_o_r_e_authors (firstName, lastName) VALUES ('#firstName#', 'Dolls');",
 			datasource = altDatasource
 		);
 		finderArgs = {where = "firstName = '#firstName#'", datasource = altDatasource};

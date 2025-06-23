@@ -128,7 +128,7 @@ component {
 		) {
 			application.$wheels.environment = URL.reload;
 		} else {
-			application.wo.$include(template = "/app/config/environment.cfm");
+			application.wo.$include(template = "/config/environment.cfm");
 		}
 
 		// If we're not allowed to switch, override and replace with the old environment
@@ -174,11 +174,12 @@ component {
 
 		// Create migrations object and set default settings.
 		application.$wheels.autoMigrateDatabase = false;
-		application.$wheels.migratorTableName = "migratorversions";
+		application.$wheels.migratorTableName = "_c_o_r_e_migrator_versions";
 		application.$wheels.createMigratorTable = true;
 		application.$wheels.writeMigratorSQLFiles = false;
 		application.$wheels.migratorObjectCase = "lower";
 		application.$wheels.allowMigrationDown = false;
+		application.$wheels.migrationLevel = 1;
 		if (application.$wheels.environment == "development") {
 			application.$wheels.allowMigrationDown = true;
 		}
@@ -905,9 +906,9 @@ component {
 		application.$wheels.initialized = true;
 
 		// Load general developer settings first, then override with environment specific ones.
-		application.wo.$include(template = "/app/config/settings.cfm");
-		if (FileExists(ExpandPath("/app/config/#application.$wheels.environment#/settings.cfm"))) {
-			application.wo.$include(template = "/app/config/#application.$wheels.environment#/settings.cfm");
+		application.wo.$include(template = "/config/settings.cfm");
+		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/settings.cfm"))) {
+			application.wo.$include(template = "/config/#application.$wheels.environment#/settings.cfm");
 		}
 
 		// Clear query (cfquery) and page (cfcache) caches.

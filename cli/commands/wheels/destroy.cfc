@@ -49,7 +49,7 @@ component aliases='wheels d'  extends="base"  {
 		var testmodelFile  		 = fileSystemUtil.resolvePath("tests/Testbox/specs/models/#obj.objectNameSingularC#.cfc");
 		var testcontrollerFile = fileSystemUtil.resolvePath("tests/Testbox/specs/controllers/#obj.objectNamePluralC#.cfc");
 		var testviewFolder     = fileSystemUtil.resolvePath("tests/Testbox/specs/views/#obj.objectNamePlural#/");
-		var routeFile   			 = fileSystemUtil.resolvePath("app/config/routes.cfm");
+		var routeFile   			 = fileSystemUtil.resolvePath("config/routes.cfm");
 		var resourceName			 = '.resources("' & obj.objectNamePlural & '")';
 
 		print.redBoldLine("================================================")

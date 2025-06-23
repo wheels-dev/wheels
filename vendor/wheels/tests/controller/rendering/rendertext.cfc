@@ -36,7 +36,7 @@ component extends="wheels.tests.Test" {
 		_controller = controller("dummy", params);
 		_controller.provides("json");
 		_controller.renderText('{"message":"JSON response"}');
-		assert("_controller.response() IS '{"message":"JSON response"}'");
+		assert('_controller.response() IS ''{"message":"JSON response"}''');
 	}
 
 	// Test renderText with XML format
@@ -54,7 +54,7 @@ component extends="wheels.tests.Test" {
 		_controller = controller("ApiTest", params);
 		// This should work without throwing ViewNotFound
 		_controller.renderText('{"test":true}');
-		assert("_controller.response() eq '{"test":true}'");
+		assert('_controller.response() eq ''{"test":true}''');
 	}
 
 }

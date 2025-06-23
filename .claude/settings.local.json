@@ -84,7 +84,17 @@
       "Bash(server start openBrowser=false)",
       "Bash(server status)",
       "Bash(./test-db-commands.sh:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(jq:*)",
+      "Bash(server restart)",
+      "Bash(docker compose:*)",
+      "Bash(docker logs:*)",
+      "Bash(npm run build:*)",
+      "Bash(docker build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(VITE_PORT=3001 npm run dev)",
+      "Bash(diff:*)",
+      "Bash(docker:*)"
     ],
     "deny": []
   }

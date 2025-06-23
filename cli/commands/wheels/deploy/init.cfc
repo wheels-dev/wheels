@@ -3,8 +3,8 @@
  * 
  * {code:bash}
  * wheels deploy:init
- * wheels deploy:init --provider=digitalocean
- * wheels deploy:init --servers=192.168.1.100,192.168.1.101
+ * wheels deploy:init provider=digitalocean
+ * wheels deploy:init servers=192.168.1.100,192.168.1.101
  * {code}
  */
 component extends="./base" {
@@ -38,7 +38,7 @@ component extends="./base" {
         var deployConfigPath = fileSystemUtil.resolvePath(configFileName);
         
         if (fileExists(deployConfigPath) && !arguments.force) {
-            print.redLine("#configFileName# already exists! Use --force to overwrite.");
+            print.redLine("#configFileName# already exists! Use force=true to overwrite.");
             return;
         }
         

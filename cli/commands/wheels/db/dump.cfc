@@ -3,9 +3,9 @@
  *
  * {code:bash}
  * wheels db dump
- * wheels db dump --output=backup.sql
- * wheels db dump --schema-only
- * wheels db dump --data-only
+ * wheels db dump output=backup.sql
+ * wheels db dump schemaOnly=true
+ * wheels db dump dataOnly=true
  * {code}
  */
 component extends="../base" {
@@ -38,7 +38,7 @@ component extends="../base" {
 
 		// Validate options
 		if (arguments.schemaOnly && arguments.dataOnly) {
-			error("Cannot use both --schema-only and --data-only flags");
+			error("Cannot use both schemaOnly=true and dataOnly=true flags");
 			return;
 		}
 
@@ -54,7 +54,7 @@ component extends="../base" {
 			}
 			
 			if (!Len(arguments.datasource)) {
-				error("No datasource configured. Use --datasource parameter or set dataSourceName in settings.");
+				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
 				return;
 			}
 			

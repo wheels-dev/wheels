@@ -5,25 +5,25 @@
  * Create the a string/textField property called firstname on the User model:
  *
  * {code:bash}
- * wheels generate property user --column-name=firstname
+ * wheels generate property user columnname=firstname
  * {code}
  *
  * Create a boolean/Checkbox property called isActive on the User model with a default of 0:
  *
  * {code:bash}
- * wheels generate property user --column-name=isActive --data-type=boolean
+ * wheels generate property user columname=isActive datatype=boolean
  * {code}
  *
  * Create a boolean/Checkbox property called hasActivated on the User model with a default of 1 (i.e, true):
  *
  * {code:bash}
- * wheels generate property user --column-name=isActive --data-type=boolean --default=1
+ * wheels generate property user columnname=isActive datatype=boolean default=1
  * {code}
  *
  * Create a datetime/datetimepicker property called lastloggedin on the User model:
  *
  * {code:bash}
- * wheels generate property user --column-name=lastloggedin --data-type=datetime
+ * wheels generate property user columnname=lastloggedin datatype=datetime
  * {code}
  *
  * All data-type options:
@@ -56,7 +56,7 @@ component aliases='wheels g property'  extends="../base"  {
 	){
 
     	var obj = helpers.getNameVariants(arguments.name);
-    	
+
     	detailOutput.header("🏗️", "Generating property: #arguments.columnName# for #arguments.name#");
 
     	// Quick Sanity Checks: are we actually adding a property to an existing model?
@@ -116,18 +116,18 @@ component aliases='wheels g property'  extends="../base"  {
 		}
 
 		detailOutput.success("Property generation complete!");
-		
+
 		var nextSteps = [
 			"Review the generated migration",
 			"Run migrations: wheels dbmigrate latest"
 		];
-		
+
 		if (fileExists(formPath) || fileExists(indexPath) || fileExists(showPath)) {
 			arrayAppend(nextSteps, "Review the updated view files");
 		}
-		
+
 		detailOutput.nextSteps(nextSteps);
-		
+
 		if(confirm("Would you like to migrate the database now? [y/n]")){
 			detailOutput.invoke("dbmigrate");
 			command('wheels dbmigrate latest').run();

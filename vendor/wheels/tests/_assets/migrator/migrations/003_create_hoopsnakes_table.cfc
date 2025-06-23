@@ -4,7 +4,7 @@
 		<cftransaction>
 			<cfscript>
 			try {
-				t = createTable(name = "hoopsnakes");
+				t = createTable(name = "_c_o_r_e_hoopsnakes");
 				t.string(
 					columnNames = "name",
 					default = "",
@@ -31,7 +31,7 @@
 		<cftransaction>
 			<cfscript>
 			try {
-				dropTable('hoopsnakes');
+				dropTable('_c_o_r_e_hoopsnakes');
 			} catch (any ex) {
 				hasError = true;
 				catchObject = ex;

@@ -21,12 +21,12 @@ component extends="wheels.tests.Test" {
 	}
 
 	function test_order_clause_with_include() {
-		result = model("post").findAll(include = "comments", order = "createdAt DESC,id DESC,name");
+		result = model("post").findAll(include = "_c_o_r_e_comments", order = "createdAt DESC,id DESC,name");
 		assert("result['title'][1] IS 'Title for fifth test post'");
 	}
 
 	function test_order_clause_with_include_and_identical_columns() {
-		result = model("post").findAll(include = "comments", order = "createdAt,createdAt");
+		result = model("post").findAll(include = "_c_o_r_e_comments", order = "createdAt,createdAt");
 		assert("result['title'][1] IS 'Title for first test post'");
 	}
 
@@ -49,7 +49,7 @@ component extends="wheels.tests.Test" {
 
 	function test_order_clause_with_paginated_include_and_identical_columns() {
 		if (get("adaptername") != "MySQL") {
-			result = model("post").findAll(page = 1, perPage = 3, include = "comments", order = "createdAt,createdAt");
+			result = model("post").findAll(page = 1, perPage = 3, include = "_c_o_r_e_comments", order = "createdAt,createdAt");
 			assert("result['title'][1] IS 'Title for first test post'");
 		} else {
 			// Skipping on MySQL, see issue for details:
@@ -63,8 +63,8 @@ component extends="wheels.tests.Test" {
 			result = model("post").findAll(
 				page = 1,
 				perPage = 3,
-				include = "comments",
-				order = "posts.createdAt DESC,posts.id DESC,comments.createdAt"
+				include = "_c_o_r_e_comments",
+				order = "_c_o_r_e_posts.createdAt DESC,_c_o_r_e_posts.id DESC,_c_o_r_e_comments.createdAt"
 			);
 			assert("result['title'][1] IS 'Title for fifth test post'");
 		} else {

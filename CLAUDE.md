@@ -25,6 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Examples**: See AI-EXAMPLES.md and `/examples/` directory for working applications
 - **Context**: See AI-CONTEXT.md for framework concepts
 - **Troubleshooting**: See AI-TROUBLESHOOTING.md for common issues
+- **Upgrading**: See `/guides/upgrading/3.0.0-config-migration.md` for config directory migration
 
 ## Build/Test Commands
 
@@ -184,6 +185,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Partials start with underscore (e.g., `_form.cfm`)
 - Routes are matched in order of definition
 - Models derive structure from database schema (database-first approach)
+- **Configuration location**: Config files are now in `/config` at root level (NOT `/app/config`)
 
 ## Adobe ColdFusion Compatibility
 
@@ -210,7 +212,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Key Directories
 - `/vendor/wheels/` - Core framework code (do not modify directly)
-- `/app/` - Application code (controllers, models, views, config)
+- `/app/` - Application code (controllers, models, views)
+- `/config/` - Configuration files (routes, settings, environments) - **NOTE: Moved from /app/config in 3.0.0**
 - `/cli/` - CommandBox CLI module for Wheels commands
 - `/tests/` - Framework test suite
 - `/guides/` - Framework documentation
@@ -224,9 +227,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Test CLI commands in the `/workspace/` directory
 - Use `.claude/commands/cli/test-next-group.md` for systematic CLI testing
 
-## Recent CLI Enhancements (2025-06-20)
+## Recent Changes (2025-06-21)
 
-### Fixed Issues
+### Configuration Directory Move
+- **BREAKING CHANGE**: Configuration moved from `/app/config` to `/config` at root level
+- This affects: routes.cfm, settings.cfm, environment.cfm, and all environment-specific settings
+- Mapping added to Application.cfc for compatibility
+
+### Recent CLI Enhancements (2025-06-20)
+
+#### Fixed Issues
 - Database and server command namespaces now properly route to subcommands
 - Test commands now detect actual server port instead of hardcoded 8080
 - Scaffold generator supports non-interactive mode
@@ -236,7 +246,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - View generator now respects layout parameter
 - App wizard includes application name validation
 
-### New Features
+#### New Features
 - **Deploy System**: Full production deployment with zero-downtime support
 - **Security Scanner**: Vulnerability detection and automated fixes
 - **Performance Optimizer**: Caching, asset optimization, query analysis

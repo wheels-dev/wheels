@@ -4,7 +4,7 @@ With the new routing system in Wheels 2.x, there are lots of nice features which
 
 For example, we may have a whole "Admin" section, where for each endpoint, we need to check some permissions, and possibly load some default data. Let's say we have a `Users` controller which provides standard CRUD operations.
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 .mapper()
   .namespace("admin")

@@ -6,8 +6,8 @@
  * 
  * {code:bash}
  * wheels assets:precompile
- * wheels assets:precompile --force
- * wheels assets:precompile --environment=staging
+ * wheels assets:precompile force=true
+ * wheels assets:precompile environment=staging
  * {code}
  **/
 component extends="../base" {

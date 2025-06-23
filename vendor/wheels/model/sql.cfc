@@ -769,7 +769,7 @@ component {
 	 */
 	public string function $expandProperties(required string list, required array classes) {
 		local.rv = arguments.list;
-		local.matches = ReMatch("[A-Za-z1-9]+\.\*", local.rv);
+		local.matches = ReMatch("[A-Za-z1-9_]+\.\*", local.rv);
 		local.iEnd = ArrayLen(local.matches);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.match = local.matches[local.i];

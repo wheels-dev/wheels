@@ -1,6 +1,17 @@
 ﻿<cfsetting requestTimeOut="1800">
 <cfscript>
-    testBox = new testbox.system.TestBox(directory="wheels.tests_testbox.specs")
+    try {
+        // Try to create TestBox instance with coverage disabled
+        testBox = new testbox.system.TestBox(
+            directory="wheels.tests_testbox.specs",
+            options={ coverage = { enabled = false } }
+        );
+    } catch (any e) {
+        cfheader(statuscode="500", statustext="Internal Server Error");
+        cfcontent(type="application/json");
+        writeOutput('{"success":false,"error":"Failed to create TestBox instance: ' & replace(e.message, '"', '\"', "all") & '"}');
+        abort;
+    }
 
     //Sorting the bundles Alphabetically
     local.sortedArray = testBox.getBundles()
@@ -137,6 +148,9 @@
         application.wo.set(modelPath = local.AssetPath & "models")
         application.wo.set(wheelsComponentPath = "/wheels")
 
+        /* set migration level for tests*/
+        application.wheels.migrationLevel = 2;
+        
         /* turn off default validations for testing */
         application.wheels.automaticValidations = false
         application.wheels.assetQueryString = false
@@ -185,7 +199,7 @@
         local.tables = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables")
         local.tableList = ValueList(local.tables.table_name)
         local.populate = StructKeyExists(url, "populate") ? url.populate : true
-        if (local.populate || !FindNoCase("authors", local.tableList)) {
+        if (local.populate || !FindNoCase("_c_o_r_e_authors", local.tableList)) {
             include "populate.cfm"
         }
     }

@@ -2,7 +2,7 @@ component extends="wheels.tests.Test" {
 
 	function test_table_name_with_star_translates_to_all_fields() {
 		postModel = model("post");
-		r = postModel.$createSQLFieldList(clause = "select", list = "posts.*", include = "", returnAs = "query");
+		r = postModel.$createSQLFieldList(clause = "select", list = "_c_o_r_e_posts.*", include = "", returnAs = "query");
 		props = postModel.$classData().properties;
 		assert('ListLen(r) eq StructCount(props)');
 	}
@@ -24,7 +24,7 @@ component extends="wheels.tests.Test" {
 			"text"
 		);
 		assert(
-			'columnList eq "authors.firstname,authors.id,authors.id AS authorid,authors.lastname,posts.averagerating AS postaveragerating,posts.body AS postbody,posts.createdat AS postcreatedat,posts.deletedat AS postdeletedat,posts.id AS postid,posts.title AS posttitle,posts.updatedat AS postupdatedat,posts.views AS postviews"'
+			'columnList eq "_c_o_r_e_authors.firstname,_c_o_r_e_authors.id,_c_o_r_e_authors.id AS authorid,_c_o_r_e_authors.lastname,_c_o_r_e_posts.averagerating AS postaveragerating,_c_o_r_e_posts.body AS postbody,_c_o_r_e_posts.createdat AS postcreatedat,_c_o_r_e_posts.deletedat AS postdeletedat,_c_o_r_e_posts.id AS postid,_c_o_r_e_posts.title AS posttitle,_c_o_r_e_posts.updatedat AS postupdatedat,_c_o_r_e_posts.views AS postviews"'
 		);
 	}
 
@@ -40,7 +40,7 @@ component extends="wheels.tests.Test" {
 			"text"
 		);
 		assert(
-			'columnList eq "authors.firstname,authors.id,authors.id AS authorid,authors.lastname,posts.averagerating,posts.body,posts.createdat,posts.deletedat,posts.id AS postid,posts.title,posts.updatedat,posts.views"'
+			'columnList eq "_c_o_r_e_authors.firstname,_c_o_r_e_authors.id,_c_o_r_e_authors.id AS authorid,_c_o_r_e_authors.lastname,_c_o_r_e_posts.averagerating,_c_o_r_e_posts.body,_c_o_r_e_posts.createdat,_c_o_r_e_posts.deletedat,_c_o_r_e_posts.id AS postid,_c_o_r_e_posts.title,_c_o_r_e_posts.updatedat,_c_o_r_e_posts.views"'
 		);
 	}
 

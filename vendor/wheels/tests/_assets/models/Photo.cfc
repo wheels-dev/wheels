@@ -1,6 +1,7 @@
 component extends="Model" {
 
 	function config() {
+		table("_c_o_r_e_photos");
 		property(name = "DESCRIPTION1", column = "description");
 		belongsTo(name = "gallery", modelName = "gallery", foreignKey = "id");
 		beforeValidation("beforeValidationCallbackThatSetsProperty,beforeValidationCallbackThatIncreasesVariable");

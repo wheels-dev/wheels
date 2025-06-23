@@ -10,7 +10,7 @@ We all love the "Convention over Configuration" motto of Wheels, but what about 
 
 ### Where Configurations Happen
 
-You will find configuration files in the `app/config` folder of your Wheels application. In general, most of your settings will go in `app/config/settings.cfm`.
+You will find configuration files in the `config` folder at the root of your Wheels application. In general, most of your settings will go in `config/settings.cfm`.
 
 You can also set values based on what environment you have set. For example, you can have different values for your settings depending on whether you're in `development` mode or `production` mode. See the chapter on [Switching Environments](switching-environments.md) for more details.
 
@@ -34,11 +34,11 @@ if (get("environment") == "production") {
 
 ### Setting CFML Application Configurations
 
-In CFML's standard `Application.cfc`, you can normally set values for your application's properties in the `this`scope. Wheels still provides these options to you in the file at `app/config/app.cfm`.
+In CFML's standard `Application.cfc`, you can normally set values for your application's properties in the `this`scope. Wheels still provides these options to you in the file at `/config/app.cfm`.
 
-Here is an example of what can go in `app/config/app.cfm`:
+Here is an example of what can go in `/config/app.cfm`:
 
-{% code title="app/config/app.cfm" %}
+{% code title="/config/app.cfm" %}
 ```javascript
 this.name = "TheNextSiteToBeatTwitter";
 this.sessionManagement = false;
@@ -75,9 +75,9 @@ Let's take a closer look at each of these options.
 
 Not only are the environments useful for separating your production settings from your "under development" settings, but they are also opportunities for you to override settings that will only take effect in a specified environment.
 
-The setting for the current environment can be found in `app/config/environment.cfm` and should look something like this:
+The setting for the current environment can be found in `/config/environment.cfm` and should look something like this:
 
-{% code title="app/config/environment.cfm" %}
+{% code title="/config/environment.cfm" %}
 ```javascript
 set(environment="development");
 ```
@@ -87,7 +87,7 @@ set(environment="development");
 
 | Name                         | Type    | Default                               | Description                                                                                                                                                                                                                                  |
 | ---------------------------- | ------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| environment                  | string  | development                           | Environment to load. Set this value in app/config/environment.cfm. Valid values are development, testing, maintenance, and production.                                                                                                       |
+| environment                  | string  | development                           | Environment to load. Set this value in /config/environment.cfm. Valid values are development, testing, maintenance, and production.                                                                                                       |
 | reloadPassword               | string  | \[empty string]                       | Password to require when reloading the Wheels application from the URL. Leave empty to require no password.                                                                                                                                |
 | redirectAfterReload          | boolean | Enabled in maintenance and production | Whether or not to redirect away from the current URL when it includes a reload request. This hinders accidentally exposing your application's reload URL and password in web analytics software, screenshots of the browser, etc.            |
 | ipExceptions                 | string  | \[empty string]                       | IP addresses that Wheels will ignore when the environment is set to maintenance. That way administrators can test the site while in maintenance mode, while the rest of users will see the message loaded in app/events/onmaintenance.cfm. |
@@ -145,7 +145,7 @@ For example, let's say that we want to enable debugging information in our "deve
 
 {% code title="CFScript" %}
 ```javascript
-// /app/config/development/settings.cfm
+// /config/development/settings.cfm
 set(showDebugInformation=false);
 ```
 {% endcode %}
@@ -231,7 +231,7 @@ Now your `post` model will map to the `blog_posts` table, `comment` model will m
 
 There are several settings that make plugin development more convenient. We recommend only changing these settings in `development` mode so there aren't any deployment issues in `production`, `testing`, and `maintenance`modes. (At that point, your plugin should be properly packaged in a zip file.)
 
-If you want to keep what's stored in a plugin's zip file from overwriting changes that you made in its expanded folder, set this in `app/config/development/settings.cfm`:
+If you want to keep what's stored in a plugin's zip file from overwriting changes that you made in its expanded folder, set this in `/config/development/settings.cfm`:
 
 {% code title="CFScript" %}
 ```javascript

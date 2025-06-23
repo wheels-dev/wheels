@@ -3,8 +3,8 @@
  *
  * {code:bash}
  * wheels db reset
- * wheels db reset --force
- * wheels db reset --skip-seed
+ * wheels db reset force=true
+ * wheels db reset skipSeed=true
  * {code}
  */
 component extends="../base" {
@@ -94,7 +94,7 @@ component extends="../base" {
 					.params(count=arguments.seedCount)
 					.run();
 			} else {
-				print.yellowLine("Step 4/4: Skipping database seeding (--skip-seed flag used)");
+				print.yellowLine("Step 4/4: Skipping database seeding (skipSeed=true flag used)");
 			}
 			
 			print.line();

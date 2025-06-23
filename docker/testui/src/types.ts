@@ -27,7 +27,7 @@ export enum TestStatus {
 }
 
 // CFML Engine types
-export type CfmlEngineType = 'lucee5' | 'lucee6' | 'adobe2018' | 'adobe2021' | 'adobe2023';
+export type CfmlEngineType = 'lucee5' | 'lucee6' | 'lucee7' | 'adobe2018' | 'adobe2021' | 'adobe2023';
 
 // CFML Engine
 export interface CfmlEngine {
@@ -81,6 +81,7 @@ export interface TestResult {
   bundle?: TestBundle;
   spec?: TestSpec;
   runId?: string; // Unique identifier for each test run
+  testUrl?: string; // URL used to run this test
   error?: {
     message: string;
     detail?: string;
@@ -106,6 +107,7 @@ export interface TestRun {
     errors: number;
     skipped: number;
   };
+  testUrl?: string;
 }
 
 // Test Queue Item

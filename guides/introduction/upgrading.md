@@ -91,7 +91,7 @@ The [addRoute()](https://wheels.dev/api/v3.0.0/v1.4.5/addroute.html) function ha
 
 A limited version of the "wildcard" route (`[controller]/[action]/[key]`) is available as `[controller]/[action]`) if you use the new [wildcard()](https://wheels.dev/api/v3.0.0/mapper.wildcard.html) mapper method:
 
-{% code title="app/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .wildcard()

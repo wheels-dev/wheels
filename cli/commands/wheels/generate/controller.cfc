@@ -3,9 +3,9 @@
  * 
  * Examples:
  * wheels generate controller Users
- * wheels generate controller Users --rest
- * wheels generate controller Users --actions=index,show,custom
- * wheels generate controller Api/V1/Users --api
+ * wheels generate controller Users rest=true
+ * wheels generate controller Users actions=index,show,custom
+ * wheels generate controller Api/V1/Users api=true
  */
 component aliases="wheels g controller" extends="../base" {
     
