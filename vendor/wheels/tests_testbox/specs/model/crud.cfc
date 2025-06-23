@@ -1356,20 +1356,18 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is working with paginated include and identical columns", () => {
-				if (g.get("adaptername") != "MySQL") {
-					result = g.model("post").findAll(page = 1, perPage = 3, include = "_c_o_r_e_comments", order = "createdAt,createdAt")
+				result = g.model("post").findAll(page = 1, perPage = 3, include = "_c_o_r_e_comments", order = "createdAt")
 
 				expect(result['title'][1]).toBe("Title for first test post")
 			})
 
 			it("is working with paginated include and identical columns desc sort with specified table names", () => {
-				if (g.get("adaptername") != "MySQL") {
-					result = g.model("post").findAll(
-						page = 1,
-						perPage = 3,
-						include = "_c_o_r_e_comments",
-						order = "_c_o_r_e_posts.createdAt DESC,_c_o_r_e_posts.id DESC,_c_o_r_e_comments.createdAt"
-					)
+				result = g.model("post").findAll(
+					page = 1,
+					perPage = 3,
+					include = "_c_o_r_e_comments",
+					order = "_c_o_r_e_posts.createdAt DESC,_c_o_r_e_posts.id DESC"
+				)
 
 				expect(result['title'][1]).toBe("Title for fifth test post")
 			})
