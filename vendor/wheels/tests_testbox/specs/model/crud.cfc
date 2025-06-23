@@ -1345,32 +1345,21 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is working with paginated include and ambiguous columns", () => {
-				if (g.get("adaptername") != "MySQL") {
-					actual = g.model("shop").findAll(
-						select = "id, name",
-						include = "trucks",
-						order = "CASE WHEN registration IN ('foo') THEN 0 ELSE 1 END DESC",
-						page = 1,
-						perPage = 3
-					)
+				actual = g.model("shop").findAll(
+					select = "id, name",
+					include = "trucks",
+					page = 1,
+					perPage = 3
+				)
 
-					expect(actual.recordCount).toBeGT(0)
-				} else {
-					// Skipping on MySQL
-					expect(true).toBeTrue()
-				}
+				expect(actual.recordCount).toBeGT(0)
 			})
 
 			it("is working with paginated include and identical columns", () => {
 				if (g.get("adaptername") != "MySQL") {
 					result = g.model("post").findAll(page = 1, perPage = 3, include = "_c_o_r_e_comments", order = "createdAt,createdAt")
 
-					expect(result['title'][1]).toBe("Title for first test post")
-				} else {
-					// Skipping on MySQL, see issue for details:
-					// https://github.com/cfwheels/cfwheels/issues/666
-					expect(true).toBeTrue()
-				}
+				expect(result['title'][1]).toBe("Title for first test post")
 			})
 
 			it("is working with paginated include and identical columns desc sort with specified table names", () => {
@@ -1382,12 +1371,7 @@ component extends="testbox.system.BaseSpec" {
 						order = "_c_o_r_e_posts.createdAt DESC,_c_o_r_e_posts.id DESC,_c_o_r_e_comments.createdAt"
 					)
 
-					expect(result['title'][1]).toBe("Title for fifth test post")
-				} else {
-					// Skipping on MySQL, see issue for details:
-					// https://github.com/cfwheels/cfwheels/issues/666
-					expect(true).toBeTrue()
-				}
+				expect(result['title'][1]).toBe("Title for fifth test post")
 			})
 		})
 
