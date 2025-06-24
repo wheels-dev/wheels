@@ -212,10 +212,30 @@ component {
 		local.args.include = arguments.include;
 		local.args.returnAs = arguments.returnAs;
 		local.args.clause = "groupBy";
+		local.adapterName = get("adapterName");
 		if (arguments.distinct) {
 			// if we want a distinct statement, we can do it grouping every field in the select
 			local.args.list = arguments.select;
 			local.rv = $createSQLFieldList(argumentCollection = local.args);
+
+			// Remove any [[duplicate]] markers in the GROUP BY clause
+			local.rv = ReReplaceNoCase(local.rv, "\[\[duplicate\]\]\d+", "", "all");
+			
+			// For SQL Server, we need special handling to remove subqueries
+			if (local.adapterName == "SQLServer") {
+				// Get list of items without the subqueries
+				local.groupByItems = [];
+				local.selectItems = ListToArray(local.rv);
+
+				for (local.item in local.selectItems) {
+					// Only skip subqueries (items with SELECT inside parentheses)
+					if (!Find("(", local.item) || !FindNoCase("SELECT", local.item)) {
+						ArrayAppend(local.groupByItems, local.item);
+					}
+				}
+
+				local.rv = ArrayToList(local.groupByItems);
+			}
 		} else if (Len(arguments.group)) {
 			local.args.list = arguments.group;
 			local.rv = $createSQLFieldList(argumentCollection = local.args);
