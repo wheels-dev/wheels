@@ -333,9 +333,9 @@ component output="false" extends="wheels.Global"{
 			password = application.wheels.dataSourcePassword
 		);
 		if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)){
-			local.sql = "SELECT TOP 1 * FROM _c_o_r_e_levels";
+			local.sql = "SELECT TOP 1 * FROM c_o_r_e_levels";
 		} else{
-			local.sql = "SELECT * FROM _c_o_r_e_levels LIMIT 1";
+			local.sql = "SELECT * FROM c_o_r_e_levels LIMIT 1";
 		}
 
 		try {
@@ -347,15 +347,15 @@ component output="false" extends="wheels.Global"{
 			if (application[local.appKey].createMigratorTable) {
 				$query(
 					datasource = application[local.appKey].dataSourceName,
-					sql = "CREATE TABLE _c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))"
+					sql = "CREATE TABLE c_o_r_e_levels (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, description VARCHAR(255))"
 				);
 				$query(
 					datasource = application[local.appKey].dataSourceName,
-					sql = "INSERT INTO _c_o_r_e_levels (id, name, description) VALUES (1, 'App', 'Application level migrations')"
+					sql = "INSERT INTO c_o_r_e_levels (id, name, description) VALUES (1, 'App', 'Application level migrations')"
 				);
 				$query(
 					datasource = application[local.appKey].dataSourceName,
-					sql = "INSERT INTO _c_o_r_e_levels (id, name, description) VALUES (2, 'Test', 'Test level migrations')"
+					sql = "INSERT INTO c_o_r_e_levels (id, name, description) VALUES (2, 'Test', 'Test level migrations')"
 				);
 			}
 		}
@@ -391,7 +391,7 @@ component output="false" extends="wheels.Global"{
 					);
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES _c_o_r_e_levels(id)"
+						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
 					);
 				} catch ( any e ) {
 					$query(
@@ -400,7 +400,7 @@ component output="false" extends="wheels.Global"{
 					);
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES _c_o_r_e_levels(id)"
+						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
 					);
 				}
 			}

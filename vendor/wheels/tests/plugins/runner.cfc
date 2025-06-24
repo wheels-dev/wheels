@@ -31,7 +31,7 @@ component extends="wheels.tests.Test" {
 		_originalViewPath = get("viewPath");
 		set(viewPath = "/wheels/tests/_assets/views");
 		c = controller("test", _params);
-		m = model("_c_o_r_e_authors").new();
+		m = model("c_o_r_e_authors").new();
 		d = $createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
 	}
 

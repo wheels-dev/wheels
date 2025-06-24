@@ -39,7 +39,7 @@ component extends="testbox.system.BaseSpec" {
 				}
 				PluginObj = $pluginObj(config)
 				application.wheels.mixins = PluginObj.getMixins()
-				m = g.model("_c_o_r_e_authors").new()
+				m = g.model("c_o_r_e_authors").new()
 				_params = {controller = "test", action = "index"}
 				c = g.controller("test", _params)
 				d = g.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init")
@@ -148,7 +148,7 @@ component extends="testbox.system.BaseSpec" {
 				application.wheels.mixins = PluginObj.getMixins()
 
 				c = g.controller("test", _params)
-				m = g.model("_c_o_r_e_authors").new()
+				m = g.model("c_o_r_e_authors").new()
 				d = g.$createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init")
 			})
 

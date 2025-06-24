@@ -53,6 +53,8 @@ component extends="wheels.Global"{
 		}
 		*/
 			local.adapterName = "H2";
+		} else if (local.info.driver_name Contains "Oracle") {
+			local.adapterName = "Oracle";
 		}
 		return local.adapterName;
 	}

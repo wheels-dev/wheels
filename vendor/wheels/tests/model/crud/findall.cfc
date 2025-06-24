@@ -34,7 +34,7 @@ component extends="wheels.tests.Test" {
 	function test_custom_query_and_orm_query_in_transaction() {
 		transaction {
 			actual = model("user").findAll(select = "id");
-			expected = $query(datasource = application.wheels.dataSourceName, sql = "SELECT id FROM _c_o_r_e_users");
+			expected = $query(datasource = application.wheels.dataSourceName, sql = "SELECT id FROM c_o_r_e_users");
 		}
 		assert("actual.recordCount eq expected.recordCount");
 	}
@@ -79,7 +79,7 @@ component extends="wheels.tests.Test" {
 	}
 
 	function test_uppercase_table_name_containing_or_substring() {
-		actual = model("category").findAll(where = "_c_o_r_e_CATEGORIES.ID > 0");
+		actual = model("category").findAll(where = "c_o_r_e_CATEGORIES.ID > 0");
 		assert("actual.recordCount eq 2");
 	}
 
@@ -97,20 +97,20 @@ component extends="wheels.tests.Test" {
 		// trim extra whitespace
 		actual = Trim(actual);
 
-		expected = "SELECT _c_o_r_e_authors.id FROM _c_o_r_e_authors";
+		expected = "SELECT c_o_r_e_authors.id FROM c_o_r_e_authors";
 
 		assert("actual eq expected");
 	}
 	function test_select_ambiguous_column_name_using_alias() {
-		loc.query = model("Post").findAll(select = "createdat,_c_o_r_e_commentcreatedat,_c_o_r_e_commentbody", include = "_c_o_r_e_Comments");
+		loc.query = model("Post").findAll(select = "createdat,c_o_r_e_commentcreatedat,c_o_r_e_commentbody", include = "c_o_r_e_Comments");
 		loc.columnList = ListSort(loc.query.columnList, "text");
-		assert('loc.columnList eq "createdat,_c_o_r_e_commentbody,_c_o_r_e_commentcreatedat"');
+		assert('loc.columnList eq "createdat,c_o_r_e_commentbody,c_o_r_e_commentcreatedat"');
 	}
 
 	function test_select_calculated_property_when_implicitly_selecting_fields() {
 		posts = model("Post").findAll(
-			select = "_c_o_r_e_posts.id,_c_o_r_e_posts.title,_c_o_r_e_posts.authorid,_c_o_r_e_comments.id AS commentid,_c_o_r_e_comments.name,titleAlias",
-			include = "_c_o_r_e_Comments"
+			select = "c_o_r_e_posts.id,c_o_r_e_posts.title,c_o_r_e_posts.authorid,c_o_r_e_comments.id AS commentid,c_o_r_e_comments.name,titleAlias",
+			include = "c_o_r_e_Comments"
 		);
 		assert("isDefined('posts.titleAlias')");
 	}

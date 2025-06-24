@@ -1,7 +1,7 @@
 component extends="Model" {
 
 	function config() {
-		table("_c_o_r_e_tags");
+		table("c_o_r_e_tags");
 		belongsTo(
 			name = "parent",
 			modelName = "tag",

@@ -114,7 +114,7 @@ component extends="testbox.system.BaseSpec" {
 
 			beforeEach(() => {
 				user = application.wirebox.getInstance("wheels.tests._assets.models.Model").$initModelClass(
-					name = "_c_o_r_e_Users",
+					name = "c_o_r_e_Users",
 					path = g.get("modelPath")
 				)
 				user.username = "TheLongestNameInTheWorld"
@@ -451,8 +451,8 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests standard validations", () => {
 
 			beforeEach(() => {
-				StructDelete(application.wheels.models, "_c_o_r_e_users", false)
-				user = g.model("_c_o_r_e_users").new()
+				StructDelete(application.wheels.models, "c_o_r_e_users", false)
+				user = g.model("c_o_r_e_users").new()
 			})
 
 			afterEach(() => {
@@ -950,8 +950,8 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests validation error messages", () => {
 
 			beforeEach(() => {
-				StructDelete(application.wheels.models, "_c_o_r_e_users", false)
-				user = g.model("_c_o_r_e_users").new()
+				StructDelete(application.wheels.models, "c_o_r_e_users", false)
+				user = g.model("c_o_r_e_users").new()
 				user.username = "TheLongestNameInTheWorld"
 				args = {}
 				args.property = "username"

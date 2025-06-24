@@ -1,7 +1,7 @@
 component extends="Model" {
 
 	function config() {
-		table("_c_o_r_e_CATEGORIES");
+		table("c_o_r_e_CATEGORIES");
 	}
 
 }

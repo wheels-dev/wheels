@@ -115,7 +115,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it( "CONCAT works with table alias", function(){
-				actual = g.model("user").findAll(where = "username='tonyp'", select = "CONCAT(_c_o_r_e_users.firstname,' ',_c_o_r_e_users.lastname) as fullname")
+				actual = g.model("user").findAll(where = "username='tonyp'", select = "CONCAT(c_o_r_e_users.firstname,' ',c_o_r_e_users.lastname) as fullname")
 
 				expect(	actual.fullname ).toBe("Tony Petruzzi")
 			});
