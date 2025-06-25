@@ -1,0 +1,186 @@
+# This is a reusable workflow that is called from the pr, snapshot, and release workflows
+# This workflow runs the complete Wheels Framework Test Suites
+name: Wheels Test Suites
+# We are a reusable Workflow only
+on:
+  workflow_call:
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+jobs:
+  tests:
+    name: Test Suites
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        cfengine:
+          ["lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023"]
+        dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
+        commandbox_version: ["6.2.1"]
+        jdkVersion: ["21"]
+        experimental: [false]
+        include:
+          # Lucee 7 experimental tests (non-blocking)
+          - cfengine: "lucee@7"
+            dbengine: "h2"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "mysql"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "postgres"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "sqlserver"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee@7"
+            dbengine: "oracle"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+        exclude:
+          # - cfengine: lucee@5
+          #   dbengine: mysql
+          # - cfengine: lucee@5
+          #   dbengine: postgres
+          # - cfengine: lucee@5
+          #   dbengine: sqlserver
+          # - cfengine: lucee@5
+          #   dbengine: h2
+          # - cfengine: lucee@5
+          #   dbengine: oracle
+          # - cfengine: lucee@6
+          #   dbengine: mysql
+          # - cfengine: lucee@6
+          #   dbengine: postgres
+          # - cfengine: lucee@6
+          #   dbengine: sqlserver
+          # - cfengine: lucee@6
+          #   dbengine: h2
+          # - cfengine: lucee@6
+          #   dbengine: oracle
+          # - cfengine: lucee@7
+          #   dbengine: mysql
+          # - cfengine: lucee@7
+          #   dbengine: postgres
+          # - cfengine: lucee@7
+          #   dbengine: sqlserver
+          # - cfengine: lucee@7
+          #   dbengine: h2
+          # - cfengine: lucee@7
+          #   dbengine: oracle
+          # - cfengine: adobe@2018
+          #   dbengine: mysql
+          # - cfengine: adobe@2018
+          #   dbengine: postgres
+          # - cfengine: adobe@2018
+          #   dbengine: sqlserver
+          - cfengine: adobe@2018
+            dbengine: h2
+          - cfengine: adobe@2018
+            dbengine: oracle
+          # - cfengine: adobe@2021
+          #   dbengine: mysql
+          # - cfengine: adobe@2021
+          #   dbengine: postgres
+          # - cfengine: adobe@2021
+          #   dbengine: sqlserver
+          - cfengine: adobe@2021
+            dbengine: h2
+          - cfengine: adobe@2021
+            dbengine: oracle
+          # - cfengine: adobe@2023
+          #   dbengine: mysql
+          # - cfengine: adobe@2023
+          #   dbengine: postgres
+          # - cfengine: adobe@2023
+          #   dbengine: sqlserver
+          - cfengine: adobe@2023
+            dbengine: h2
+          - cfengine: adobe@2023
+            dbengine: oracle
+          - cfengine: adobe@2025
+            dbengine: h2
+          - cfengine: adobe@2025
+            dbengine: oracle
+          - cfengine: adobe@2025
+            dbengine: mysql
+          - cfengine: adobe@2025
+            dbengine: postgres
+          - cfengine: adobe@2025
+            dbengine: sqlserver
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Copy server.json files
+        run: |
+          cp ./docker/${{ matrix.cfengine }}/server.json ./
+          cp ./docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
+          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./config/settings.cfm
+
+      - name: Start external DB if needed (${{ matrix.dbengine }}) ...
+        if: ${{ matrix.dbengine != 'h2' }}
+        run: docker compose up -d ${{ matrix.dbengine }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: ${{ matrix.jdkVersion }}
+
+      - name: Setup CommandBox CLI
+        uses: Ortus-Solutions/setup-commandbox@v2.0.1
+        with:
+          version: ${{ matrix.commandbox_version }}
+
+      - name: Install Dependencies
+        run: |
+          # Core dependencies
+          box install
+
+      - name: Start ${{ matrix.cfengine }} Server
+        run: |
+          box server start serverConfigFile="server.json" --noSaveSettings --debug
+
+      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
+        if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
+        run: box run-script onServerInstall
+
+      - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+        run: |
+          docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+
+      - name: Upload Test Results Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          path: |
+            /tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt
+
+      - name: Failure Debugging Info
+        if: ${{ failure() }}
+        run: |
+          box version
+          box server info serverConfigFile="server.json" --json
+          box server log serverConfigFile="server.json"
+
+      - name: Upload Workflow Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          path: |
+            ${{ runner.temp }}/_runner_diag/
+            ${{ runner.temp }}/_github_workflow/
