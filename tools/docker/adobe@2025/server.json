@@ -15,7 +15,7 @@
 	},
 	"app":{
 			"cfengine":"adobe@2025",
-			"libDirs":"docker/adobe@2025/lib",
+			"libDirs":"tools/docker/adobe@2025/lib",
 			"serverHomeDirectory":".engine/adobe@2025"
 	},
 	"cfconfigFile":"CFConfig.json",
