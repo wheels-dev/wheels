@@ -1,134 +1,52 @@
-# This workflow is used to release master releases and also by the snapshot workflow
-# to release snapshots.
-name: Wheels Release
+name: Release
 
 on:
   push:
-    branches:
-      - main
-  workflow_call:
-    secrets:
-      SLACK_WEBHOOK_URL:
-        required: true
-      FORGEBOX_API_TOKEN:
-        required: true
-      FORGEBOX_PASS:
-        required: true
-
-env:
-  WHEELS_PRERELEASE: false
+    tags:
+      - 'v*'
 
 jobs:
-  #############################################
-  # Build Snapshot or Final Release
-  #############################################
-  build:
-    name: Build & Publish Release
+  release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        id: Checkout-Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Environment Variables For Build Process
-        id: Calculate-Version-And-Branch
-        run: |
-          pwd
-          cat box.json
-          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
-          # main or snapshot
-          echo "BRANCH=main" >> $GITHUB_ENV
-          if [ $GITHUB_REF == 'refs/heads/develop' ]
-          then
-            echo "BRANCH=develop" >> $GITHUB_ENV
-          fi
-
-      - name: Make build scripts executable
-        run: |
-          chmod +x build/scripts/*.sh
-          # List scripts for verification
-          ls -la build/scripts/
-
-      #############################################
-      # Prepare and Publish to ForgeBox
-      #############################################
+      - uses: actions/checkout@v3
       
-      - name: Prepare Wheels Base Template for ForgeBox
+      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
+      
+      - name: Prepare Release
+        run: box task run release:prepare
+        
+      - name: Publish Core to ForgeBox
         run: |
-          ./build/scripts/prepare-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          cd core
+          box publish
+        env:
+          FORGEBOX_TOKEN: ${{ secrets.FORGEBOX_TOKEN }}
 
-      - name: Prepare Wheels Core for ForgeBox
+      - name: Publish CLI to ForgeBox
         run: |
-          ./build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          cd cli
+          box publish
+        env:
+          FORGEBOX_TOKEN: ${{ secrets.FORGEBOX_TOKEN }}
 
-      - name: Prepare Wheels CLI for ForgeBox
+      - name: Publish Base Template to ForgeBox
         run: |
-          ./build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-
-      - name: Install CommandBox
+          cd templates/base
+          box publish
+        env:
+          FORGEBOX_TOKEN: ${{ secrets.FORGEBOX_TOKEN }}
+          
+      - name: Deploy Documentation
         run: |
-          curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
-          echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
-          sudo apt-get update && sudo apt-get install -y commandbox
-
-      - name: Publish All Packages to ForgeBox
-        run: |
-          ./build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true"
-
-      #############################################
-      # Build Artifacts for GitHub
-      #############################################
-
-      - name: Build All Wheels Artifacts
-        run: |
-          ./build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-          ./build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-
-      - name: Upload Wheels Base Template Artifact
-        uses: actions/upload-artifact@v4
+          box task run docs:build
+          # Deploy to GitHub Pages or other hosting
+          
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: build-artifacts-base-template
-          path: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
-            artifacts/wheels/wheels-base-template-be.zip
-
-      - name: Upload Wheels Core Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-core
-          path: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
-            artifacts/wheels/wheels-core-be.zip
-
-      - name: Upload Wheels CLI Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-cli
-          path: |
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
-            artifacts/wheels/wheels-cli-be.zip
-
-      - name: Upload All Wheels Artifacts (Combined)
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts-all
-          path: |
-            artifacts/**/*
-
-      - name: Upload Workflow Logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: logs-release
-          path: |
-            ${{ runner.temp }}/_runner_diag/
-            ${{ runner.temp }}/_github_workflow/
+          files: |
+            core/artifacts/*.zip
+            cli/artifacts/*.zip
+            templates/base/artifacts/*.zip
+          body_path: CHANGELOG.md

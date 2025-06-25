@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
+      - run: box install commandbox-cfformat
+      - run: box task run format:check
+
+  test-core:
+    needs: format
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cfengine: ["lucee@5", "adobe@2021"]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
+      - run: box install
+      - run: box task run test:core
+        env:
+          CFENGINE: ${{ matrix.cfengine }}
+
+  test-cli:
+    needs: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
+      - run: box install
+      - run: box task run test:cli
+
+  test-templates:
+    needs: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
+      - run: box install
+      - run: box task run test:templates
+
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - run: pip install mkdocs mkdocs-material
+      - run: box task run docs:build
+      - uses: actions/upload-artifact@v3
+        with:
+          name: docs
+          path: docs/build/
+
+  integration:
+    needs: [test-core, test-cli, test-templates]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
+      - run: box install
+      - name: Integration Tests
+        run: |
+          # Test creating a new app with local framework
+          ./tools/scripts/integration-test.sh
