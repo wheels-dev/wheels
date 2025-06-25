@@ -14,8 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
-      
       - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
@@ -24,7 +22,9 @@ jobs:
         run: pip install mkdocs mkdocs-material
       
       - name: Build documentation
-        run: box task run docs:build
+        run: |
+          cd docs
+          mkdocs build
       
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
