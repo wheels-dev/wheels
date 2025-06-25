@@ -128,7 +128,7 @@ CMD ["box", "server", "start"]
 version: '3.8'
 services:
   wheels-dev:
-    build: 
+    build:
       context: .
       dockerfile: tools/docker/Dockerfile.dev
     volumes:
@@ -244,10 +244,10 @@ Create a test harness that sets up a complete Wheels environment:
 // tools/test-harness/Application.cfc
 component {
     this.name = "WheelsTestHarness";
-    
+
     // Point to local development version
     this.mappings["/wheels"] = expandPath("../../core/src/wheels");
-    
+
     // Test-specific settings
     this.datasource = "wheels_test";
 }
@@ -261,22 +261,22 @@ component {
 component {
     function run() {
         var templates = directoryList("templates", false, "path");
-        
+
         for (var template in templates) {
             print.boldLine("Testing template: #template#");
-            
+
             // Create temp directory
             var testDir = getTempDirectory() & createUUID();
-            
+
             // Copy template
             directoryCopy(template, testDir);
-            
+
             // Install dependencies
             command("install").inWorkingDirectory(testDir).run();
-            
+
             // Run template tests
             command("testbox run").inWorkingDirectory(testDir).run();
-            
+
             // Cleanup
             directoryDelete(testDir, true);
         }
@@ -298,24 +298,24 @@ jobs:
       matrix:
         cfengine: ["lucee@5", "adobe@2018", "adobe@2021", "adobe@2023"]
         db: ["sqlite", "mysql", "postgresql"]
-    
+
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup CommandBox
         uses: Ortus-Solutions/setup-commandbox@v2.0.1
-        
+
       - name: Install Dependencies
         run: box install
-        
+
       - name: Start Test Server
         run: |
           box server start \
             cfengine=${{ matrix.cfengine }} \
             name=test-${{ matrix.cfengine }}-${{ matrix.db }}
-          
+
       - name: Run Tests
         run: box task run test:all
         env:
@@ -420,34 +420,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - uses: Ortus-Solutions/setup-commandbox@v2.0.1
-      
+
       - name: Prepare Release
         run: box task run release:prepare
-        
+
       - name: Publish Core to ForgeBox
         run: |
           cd core
           box publish
         env:
           FORGEBOX_TOKEN: ${{ secrets.FORGEBOX_TOKEN }}
-          
+
       - name: Publish CLI to ForgeBox
         run: |
           cd cli
           box publish
         env:
           FORGEBOX_TOKEN: ${{ secrets.FORGEBOX_TOKEN }}
-          
+
       - name: Update Templates
         run: box task run release:update-templates
-        
+
       - name: Deploy Documentation
         run: |
           box task run docs:build
           # Deploy to GitHub Pages or other hosting
-          
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -505,11 +505,11 @@ theme:
     - navigation.sections
     - search.suggest
     - content.code.copy
-    
+
 plugins:
   - search
   - macros
-  
+
 nav:
   - Home: index.md
   - Getting Started:
@@ -531,7 +531,7 @@ Use DocBox for automatic API documentation:
 component {
     function run() {
         var docbox = new docbox.DocBox();
-        
+
         docbox.generate(
             source = expandPath("../../core/src/wheels"),
             mapping = "wheels",
@@ -558,13 +558,13 @@ component {
             "templates/api/box.json",
             "templates/spa/box.json"
         ];
-        
+
         for (var file in files) {
             var content = deserializeJSON(fileRead(file));
             content.version = arguments.version;
             fileWrite(file, serializeJSON(content, false, false));
         }
-        
+
         print.greenLine("Version bumped to #arguments.version#");
     }
 }
@@ -600,15 +600,15 @@ tests/
 ```javascript
 // tests/helpers/TestBase.cfc
 component extends="testbox.system.BaseSpec" {
-    
+
     function beforeAll() {
         // Setup test database
         setupTestDatabase();
-        
+
         // Load framework
         application.wheels = createObject("component", "wheels.core.Wheels").init();
     }
-    
+
     function setupTestDatabase() {
         // Create SQLite test database
         var dbPath = expandPath("/tests/db/test.db");
@@ -616,7 +616,7 @@ component extends="testbox.system.BaseSpec" {
             fileDelete(dbPath);
         }
     }
-    
+
     function createTestApp(struct options = {}) {
         // Helper to create test applications
         var testApp = duplicate(application.wheels);
@@ -633,9 +633,9 @@ component extends="testbox.system.BaseSpec" {
 component {
     function run() {
         print.line("Watching for changes...");
-        
+
         var watcher = createObject("java", "java.nio.file.WatchService");
-        
+
         while (true) {
             var changes = watcher.poll();
             if (!isNull(changes)) {
@@ -663,28 +663,28 @@ component {
             .inWorkingDirectory("core")
             .params(message = "Release v#getVersion()#")
             .run();
-            
+
         // Publish CLI
         command("publish")
             .inWorkingDirectory("cli")
             .params(message = "Release v#getVersion()#")
             .run();
-            
+
         // Update template dependencies
         updateTemplateDependencies();
     }
-    
+
     function updateTemplateDependencies() {
         var version = getVersion();
         var templates = directoryList("templates", false, "path");
-        
+
         for (var template in templates) {
             var boxJsonPath = template & "/box.json";
             var boxJson = deserializeJSON(fileRead(boxJsonPath));
-            
+
             // Update wheels dependency
             boxJson.dependencies.cfwheels = "^#version#";
-            
+
             fileWrite(boxJsonPath, serializeJSON(boxJson, false, false));
         }
     }
@@ -719,19 +719,19 @@ CMD ["box", "server", "start", "--console", "--production"]
 component {
     function run() {
         var suite = new BenchmarkSuite();
-        
+
         suite.add("Model Creation", function() {
             model("User").new();
         });
-        
+
         suite.add("Simple Query", function() {
             model("User").findAll(maxrows = 10);
         });
-        
+
         suite.add("View Rendering", function() {
             renderView(view = "users/index", layout = false);
         });
-        
+
         suite.run(iterations = 1000);
     }
 }
@@ -765,10 +765,10 @@ performance:
 component extends="TestBase" {
     function testSqlInjection() {
         var maliciousInput = "1'; DROP TABLE users; --";
-        
+
         // This should be safe
         var result = model("User").findAll(where = "id = :id", params = {id = maliciousInput});
-        
+
         // Verify table still exists
         expect(model("User").count()).toBeGT(0);
     }
@@ -799,3 +799,77 @@ This architecture provides:
 5. **Great Documentation**: Auto-generated API docs, comprehensive guides
 
 The monorepo approach with strong automation ensures that Wheels remains accessible to new contributors while maintaining high quality standards. The investment in tooling and automation pays dividends in reduced maintenance burden and improved developer experience.
+
+## Recommendations for 3.0
+
+While the proposed architecture is robust, the following enhancements could further improve the project's quality and maintainability for the 3.0 release.
+
+### 1. Enhance Developer Experience (DX)
+
+#### Pre-commit Hooks
+To ensure code quality and consistency *before* code is committed, integrate pre-commit hooks. Tools like **Husky** can automatically run `cfformat` and other checks on staged files. This prevents improperly formatted code from ever entering the repository.
+
+```json
+// package.json (for Husky setup)
+{
+  "husky": {
+    "hooks": {
+      "pre-commit": "box task run format:check && box task run test:core"
+    }
+  }
+}
+```
+
+#### VS Code Integration
+To provide a consistent environment for developers using Visual Studio Code, we can include recommended settings and extensions.
+
+*   **`.vscode/extensions.json`**: Recommend extensions for CFML, EditorConfig, Docker, and CFFormat.
+*   **`.vscode/settings.json`**: Configure default formatter settings to align with the project's coding standards.
+
+### 2. Strengthen CI/CD Pipeline
+
+#### CI Caching
+To significantly speed up build times, implement caching for dependencies in the GitHub Actions workflows. Cache the `.CommandBox` directory and any `node_modules` directories used for development tooling.
+
+```yaml
+# .github/workflows/ci.yml (example step)
+- name: Cache CommandBox dependencies
+  uses: actions/cache@v3
+  with:
+    path: ~/.CommandBox
+    key: ${{ runner.os }}-commandbox-${{ hashFiles('**/box.json') }}
+    restore-keys: |
+      ${{ runner.os }}-commandbox-
+```
+
+#### Enforce Conventional Commits
+While the guide suggests `commitizen`, we should enforce this standard on Pull Requests. A GitHub Action like **commitlint** can check PR titles, ensuring a clean and readable git history, which is vital for automated changelog generation.
+
+#### Draft Releases
+Instead of publishing directly, the `release.yml` workflow should first create a **Draft Release** on GitHub. This provides a crucial manual review step, allowing maintainers to verify the changelog and attached artifacts before making the release public.
+
+### 3. Improve Documentation Workflow
+
+#### Live Documentation Previews
+Enhance the CI process to automatically build and deploy documentation from pull requests to a temporary preview URL (e.g., using Netlify, Vercel, or GitHub Pages). This allows reviewers to see rendered documentation changes directly, improving the quality of feedback.
+
+### 4. Bolster Security
+
+#### Secret Scanning
+In addition to dependency scanning, add a secret scanning step to the CI pipeline. Tools like **TruffleHog** or GitHub's native secret scanning can prevent sensitive information like API keys from being accidentally committed to the repository.
+
+```yaml
+# .github/workflows/ci.yml (example job)
+security-scan:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # Required for full history scan
+    - name: TruffleHog Scan
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.pull_request.base.sha }}
+        head: ${{ github.event.pull_request.head.sha }}
+```
