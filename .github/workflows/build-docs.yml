@@ -13,27 +13,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-      
+
       - name: Install MkDocs and dependencies
         run: pip install mkdocs mkdocs-material
-      
+
       - name: Build documentation
         run: |
           cd docs
           mkdocs build
-      
+
       - name: Upload documentation artifacts
         uses: actions/upload-artifact@v4
         with:
           name: wheels-docs-${{ github.sha }}
-          path: public/docs
+          path: docs/public
           retention-days: 7
           if-no-files-found: error
-      
+
       - name: Add PR comment with artifact link
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v6
