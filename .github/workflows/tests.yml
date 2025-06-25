@@ -141,41 +141,20 @@ jobs:
               sed -i.bak 's/wheelstestdb_h2/wheelstestdb_${{ matrix.dbengine }}/g' ./config/settings.cfm
           fi
           
-          # Create public directory and copy wheels to it
-          mkdir -p ./public
-          cp -r ./core/src/wheels ./public/
+          # Copy base template structure
+          cp -r ./templates/base/src/* ./
+          
+          # Create vendor directory and copy wheels to it
+          mkdir -p ./vendor
+          cp -r ./core/src/wheels ./vendor/
           
           # Copy test app resources if they don't exist
           if [ ! -d "./app" ]; then
-              cp -r ./public/wheels/tests_testbox/resources/app ./
+              cp -r ./vendor/wheels/tests_testbox/resources/app ./
           fi
           
-          # Create Application.cfc for testing (will be overwritten if test app has one)
-          cat > ./Application.cfc << 'EOF'
-          component {
-              this.name = "WheelsTests";
-              this.sessionManagement = true;
-              this.sessionTimeout = createTimeSpan(0, 0, 30, 0);
-              
-              // Include app configuration
-              if (fileExists(expandPath("config/app.cfm"))) {
-                  include "config/app.cfm";
-              }
-              
-              include "wheels/events/onapplicationstart.cfm";
-          }
-          EOF
-          
-          # Create a box.json with necessary scripts
-          cat > ./box.json << 'EOF'
-          {
-              "name": "wheels-test-environment",
-              "version": "1.0.0",
-              "scripts": {
-                  "onServerInstall": "cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"
-              }
-          }
-          EOF
+          # Update box.json with onServerInstall script
+          jq '.scripts.onServerInstall = "cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"' box.json > box.json.tmp && mv box.json.tmp box.json
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
@@ -194,8 +173,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # Install testbox in the wheels directory
-          cd ./public/wheels
+          # Install dependencies at root level
           box install
 
       - name: Start ${{ matrix.cfengine }} Server
