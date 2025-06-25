@@ -1,0 +1,43 @@
+# Wheels Development Docker Compose
+# Generated from template - do not edit directly
+# Engine: lucee6
+# Database: h2
+# Port: 60006
+
+networks:
+  wheels-dev:
+    driver: bridge
+
+services:
+  # CFML Engine Service
+  cfml:
+    build:
+      context: /Users/peter/projects/wheels
+      dockerfile: tools/docker/lucee@6/Dockerfile
+    image: wheels-dev-lucee6:latest
+    ports:
+      - "60006:60006"
+    volumes:
+      # Mount the application
+      - .:/wheelsapp
+      # Mount core framework from repository root
+      - /Users/peter/projects/wheels/core/src/wheels:/wheelsapp/vendor/wheels
+      # Mount shared dependencies
+      - /Users/peter/projects/wheels/vendor/wirebox:/wheelsapp/vendor/wirebox
+      - /Users/peter/projects/wheels/vendor/testbox:/wheelsapp/vendor/testbox
+      # Mount core tests for testing
+      - /Users/peter/projects/wheels/core/tests:/wheelsapp/core-tests
+    environment:
+      - PORT=60006
+      - WHEELS_ENV=development
+      - DB_TYPE=h2
+      - BOX_SERVER_WEB_WEBROOT=/wheelsapp/public
+      - BOX_SERVER_APP_CFENGINE=lucee@6
+    networks:
+      - wheels-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:60006/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
