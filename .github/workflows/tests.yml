@@ -126,15 +126,15 @@ jobs:
       - name: Setup Test Environment
         run: |
           # Copy server configuration files to root (for backward compatibility)
-          cp ./docker/${{ matrix.cfengine }}/server.json ./
-          cp ./docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
+          cp ./tools/docker/${{ matrix.cfengine }}/server.json ./
+          cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
           
           # Create H2 database directory for H2 datasource
-          mkdir -p ./docker/${{ matrix.cfengine }}/H2.db/
+          mkdir -p ./tools/docker/${{ matrix.cfengine }}/H2.db/
           
           # Create config directory for settings
           mkdir -p ./config
-          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./config/
+          cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./config/
           
           # Update settings.cfm to use the correct datasource based on dbengine
           if [ "${{ matrix.dbengine }}" != "h2" ]; then
@@ -208,7 +208,7 @@ jobs:
 
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
         run: |
-          docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+          tools/docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
 
       - name: Upload Test Results Artifacts
         if: always()

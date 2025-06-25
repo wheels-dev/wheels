@@ -176,7 +176,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Tests run in transactions that automatically roll back
 - Create `wheelstestdb` database and datasource for testing
 - Use factories for consistent test data generation
-- Docker compose provides multi-engine testing environments
+- Docker compose provides multi-engine testing environments (see `/tools/docker/`)
 
 ### Important Framework Specifics
 - Always check `$performedRenderOrRedirect()` before automatic view rendering
@@ -218,7 +218,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `/tests/` - Framework test suite
 - `/guides/` - Framework documentation
 - `/examples/` - Example applications
-- `/docker/` - Docker configurations for different CFML engines
+- `/tools/docker/` - Docker configurations for different CFML engines
+- `/tools/build/` - Build artifacts and scripts
 - `/workspace/` - Sandbox for testing CLI commands
 
 ### Working with the CLI Module

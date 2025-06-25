@@ -11,7 +11,7 @@ After downloading and unzipping Wheels, here's the directory structure that you 
 app/\
 build/ \
 db/ \
-docker/ \
+tools/docker/ \
 guides/ \
 public/ \
 tests/ \
