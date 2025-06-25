@@ -245,7 +245,7 @@ component {
 				arguments.missingMethodArguments.include = local.include;
 				local.where = $keyWhereString(
 					properties = local.joinAssociation.foreignKey,
-					keys = local.componentReference.primaryKeys()
+					keys = primaryKeys()
 				);
 				if (StructKeyExists(arguments.missingMethodArguments, "where")) {
 					local.where = "(#local.where#) AND (#arguments.missingMethodArguments.where#)";
