@@ -1,0 +1,5 @@
+{% extends "./page.html" %}
+
+{% block body %}
+<div id="pdf-footer" class="pdf-footer"><span class="sub">{{ config.title }} | Published: {{ config.published }} | Updated: {{ gitbook.time|date("MM/DD/YYYY") }} | {{ config.copyright }} </span> <span class="footer-pages-count"> {{ page.num }} / {{ config.totalpages }} </span></div><script>if (({% for num in config.hidepagefooters %}{{ page.num }} == {{ num }} || {% endfor %}false)) document.getElementById('pdf-footer').style.display = 'none'</script>
+{% endblock %}

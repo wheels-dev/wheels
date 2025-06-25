@@ -97,7 +97,8 @@
       "Bash(docker:*)",
       "Bash(mkdocs:*)",
       "Bash(pip3 install:*)",
-      "Bash(/Users/peter/Library/Python/3.9/bin/mkdocs build)"
+      "Bash(/Users/peter/Library/Python/3.9/bin/mkdocs build)",
+      "Bash(/Users/peter/Library/Python/3.9/bin/mkdocs build --strict)"
     ],
     "deny": []
   }

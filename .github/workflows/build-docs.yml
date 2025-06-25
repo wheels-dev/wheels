@@ -19,7 +19,7 @@ jobs:
           python-version: '3.x'
 
       - name: Install MkDocs and dependencies
-        run: pip install mkdocs mkdocs-material
+        run: pip install mkdocs mkdocs-material mkdocs-minify-plugin pymdown-extensions
 
       - name: Build documentation
         run: |
