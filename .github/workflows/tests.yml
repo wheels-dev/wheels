@@ -129,22 +129,51 @@ jobs:
           cp ./docker/${{ matrix.cfengine }}/server.json ./
           cp ./docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
           
+          # Create H2 database directory for H2 datasource
+          mkdir -p ./docker/${{ matrix.cfengine }}/H2.db/
+          
           # Create config directory for settings
           mkdir -p ./config
           cp ./docker/${{ matrix.cfengine }}/settings.cfm ./config/
+          
+          # Update settings.cfm to use the correct datasource based on dbengine
+          if [ "${{ matrix.dbengine }}" != "h2" ]; then
+              sed -i.bak 's/wheelstestdb_h2/wheelstestdb_${{ matrix.dbengine }}/g' ./config/settings.cfm
+          fi
           
           # Create public directory and copy wheels to it
           mkdir -p ./public
           cp -r ./core/src/wheels ./public/
           
-          # Create a simple Application.cfc for testing
+          # Copy test app resources if they don't exist
+          if [ ! -d "./app" ]; then
+              cp -r ./public/wheels/tests_testbox/resources/app ./
+          fi
+          
+          # Create Application.cfc for testing (will be overwritten if test app has one)
           cat > ./Application.cfc << 'EOF'
           component {
               this.name = "WheelsTests";
               this.sessionManagement = true;
               this.sessionTimeout = createTimeSpan(0, 0, 30, 0);
               
+              // Include app configuration
+              if (fileExists(expandPath("config/app.cfm"))) {
+                  include "config/app.cfm";
+              }
+              
               include "wheels/events/onapplicationstart.cfm";
+          }
+          EOF
+          
+          # Create a box.json with necessary scripts
+          cat > ./box.json << 'EOF'
+          {
+              "name": "wheels-test-environment",
+              "version": "1.0.0",
+              "scripts": {
+                  "onServerInstall": "cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"
+              }
           }
           EOF
 
@@ -165,7 +194,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # Core dependencies
+          # Install testbox in the wheels directory
+          cd ./public/wheels
           box install
 
       - name: Start ${{ matrix.cfengine }} Server
