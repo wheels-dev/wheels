@@ -43,34 +43,34 @@ Follow these conventions:
 ```cfc
 // tests/unit/models/UserTest.cfc
 component extends="testbox.system.BaseSpec" {
-    
+
     function run() {
         describe("User Model", function() {
-            
+
             beforeEach(function() {
                 // Setup before each test
                 variables.user = model("User").new();
             });
-            
+
             afterEach(function() {
                 // Cleanup after each test
             });
-            
+
             it("validates email presence", function() {
                 variables.user.email = "";
                 expect(variables.user.valid()).toBeFalse();
                 expect(variables.user.errors).toHaveKey("email");
             });
-            
+
             it("validates email format", function() {
                 variables.user.email = "invalid-email";
                 expect(variables.user.valid()).toBeFalse();
                 expect(variables.user.errors.email).toInclude("valid email");
             });
-            
+
         });
     }
-    
+
 }
 ```
 
@@ -78,17 +78,17 @@ component extends="testbox.system.BaseSpec" {
 
 ```cfc
 component extends="testbox.system.BaseSpec" {
-    
+
     function run() {
         describe("Product Model", function() {
-            
+
             describe("Validations", function() {
                 it("requires a name", function() {
                     var product = model("Product").new();
                     expect(product.valid()).toBeFalse();
                     expect(product.errors).toHaveKey("name");
                 });
-                
+
                 it("requires price to be positive", function() {
                     var product = model("Product").new(
                         name = "Test Product",
@@ -98,7 +98,7 @@ component extends="testbox.system.BaseSpec" {
                     expect(product.errors.price).toInclude("greater than 0");
                 });
             });
-            
+
             describe("Associations", function() {
                 it("has many reviews", function() {
                     var product = model("Product").findOne();
@@ -106,22 +106,22 @@ component extends="testbox.system.BaseSpec" {
                     expect(product.reviews()).toBeQuery();
                 });
             });
-            
+
             describe("Scopes", function() {
                 it("filters active products", function() {
                     // Create test data
                     model("Product").create(name="Active", active=true);
                     model("Product").create(name="Inactive", active=false);
-                    
+
                     var activeProducts = model("Product").active().findAll();
                     expect(activeProducts.recordCount).toBe(1);
                     expect(activeProducts.name).toBe("Active");
                 });
             });
-            
+
         });
     }
-    
+
 }
 ```
 
@@ -129,15 +129,15 @@ component extends="testbox.system.BaseSpec" {
 
 ```cfc
 component extends="testbox.system.BaseSpec" {
-    
+
     function beforeAll() {
         // Setup test request context
         variables.mockController = prepareMock(createObject("component", "controllers.Products"));
     }
-    
+
     function run() {
         describe("Products Controller", function() {
-            
+
             describe("index action", function() {
                 it("returns all products", function() {
                     // Setup
@@ -145,20 +145,20 @@ component extends="testbox.system.BaseSpec" {
                         [1, "Product 1"],
                         [2, "Product 2"]
                     ]);
-                    
+
                     mockController.$("model").$args("Product").$returns(
                         mockModel.$("findAll").$returns(products)
                     );
-                    
+
                     // Execute
                     mockController.index();
-                    
+
                     // Assert
                     expect(mockController.products).toBe(products);
                     expect(mockController.products.recordCount).toBe(2);
                 });
             });
-            
+
             describe("create action", function() {
                 it("creates product with valid data", function() {
                     // Setup params
@@ -168,29 +168,29 @@ component extends="testbox.system.BaseSpec" {
                             price: 99.99
                         }
                     };
-                    
+
                     // Mock successful save
                     var mockProduct = createEmptyMock("models.Product");
                     mockProduct.$("save").$returns(true);
                     mockProduct.$("id", 123);
-                    
+
                     mockController.$("model").$args("Product").$returns(
                         createMock("models.Product").$("new").$returns(mockProduct)
                     );
-                    
+
                     // Execute
                     mockController.create();
-                    
+
                     // Assert
                     expect(mockController.flashMessages.success).toInclude("created successfully");
                     expect(mockController.redirectTo.action).toBe("show");
                     expect(mockController.redirectTo.key).toBe(123);
                 });
             });
-            
+
         });
     }
-    
+
 }
 ```
 
@@ -198,15 +198,15 @@ component extends="testbox.system.BaseSpec" {
 
 ```cfc
 component extends="testbox.system.BaseSpec" {
-    
+
     function run() {
         describe("User Registration Flow", function() {
-            
+
             it("allows new user to register", function() {
                 // Visit registration page
                 var event = execute(event="users.new", renderResults=true);
                 expect(event.getRenderedContent()).toInclude("Register");
-                
+
                 // Submit registration form
                 var event = execute(
                     event = "users.create",
@@ -218,21 +218,21 @@ component extends="testbox.system.BaseSpec" {
                         }
                     }
                 );
-                
+
                 // Verify user created
                 var user = model("User").findOne(where="email='test@example.com'");
                 expect(user).toBeObject();
-                
+
                 // Verify logged in
                 expect(session.userId).toBe(user.id);
-                
+
                 // Verify redirect
                 expect(event.getValue("relocate_URI")).toBe("/dashboard");
             });
-            
+
         });
     }
-    
+
 }
 ```
 
@@ -243,7 +243,7 @@ component extends="testbox.system.BaseSpec" {
 ```cfc
 // tests/helpers/Factories.cfc
 component {
-    
+
     function createUser(struct overrides = {}) {
         var defaults = {
             email: "user#createUUID()#@test.com",
@@ -251,22 +251,22 @@ component {
             firstName: "Test",
             lastName: "User"
         };
-        
+
         defaults.append(arguments.overrides);
         return model("User").create(defaults);
     }
-    
+
     function createProduct(struct overrides = {}) {
         var defaults = {
             name: "Product #createUUID()#",
             price: randRange(10, 100),
             stock: randRange(0, 50)
         };
-        
+
         defaults.append(arguments.overrides);
         return model("Product").create(defaults);
     }
-    
+
 }
 ```
 
@@ -275,37 +275,37 @@ component {
 ```cfc
 // tests/helpers/TestDatabase.cfc
 component {
-    
+
     function setUp() {
         // Start transaction
         transaction action="begin";
     }
-    
+
     function tearDown() {
         // Rollback transaction
         transaction action="rollback";
     }
-    
+
     function clean() {
         // Clean specific tables
         queryExecute("DELETE FROM users WHERE email LIKE '%@test.com'");
         queryExecute("DELETE FROM products WHERE name LIKE 'Test%'");
     }
-    
+
     function loadFixtures(required string name) {
         var fixtures = deserializeJSON(
             fileRead("/tests/fixtures/#arguments.name#.json")
         );
-        
+
         for (var record in fixtures) {
             queryExecute(
-                "INSERT INTO #arguments.name# (#structKeyList(record)#) 
+                "INSERT INTO #arguments.name# (#structKeyList(record)#)
                  VALUES (#structKeyList(record, ':')#)",
                 record
             );
         }
     }
-    
+
 }
 ```
 
@@ -393,16 +393,16 @@ this.coverage = {
 ```cfc
 // tests/Application.cfc
 component {
-    
+
     this.name = "WheelsTestSuite" & Hash(GetCurrentTemplatePath());
-    
+
     // Test datasource
     this.datasources["test"] = {
         url: "jdbc:h2:mem:test;MODE=MySQL",
         driver: "org.h2.Driver"
     };
     this.datasource = "test";
-    
+
     // TestBox settings
     this.testbox = {
         bundles: ["tests"],
@@ -413,7 +413,7 @@ component {
         labels: [],
         options: {}
     };
-    
+
 }
 ```
 
@@ -447,22 +447,22 @@ tests/
 
 ```cfc
 describe("User Model", function() {
-    
+
     beforeEach(function() {
         // Fresh instance for each test
         variables.user = model("User").new();
-        
+
         // Clear caches
         application.wheels.cache.queries = {};
     });
-    
+
     afterEach(function() {
         // Clean up test data
         if (isDefined("variables.user.id")) {
             variables.user.delete();
         }
     });
-    
+
 });
 ```
 
@@ -494,10 +494,10 @@ it("calculates order total with tax", function() {
     var item2 = createOrderItem(price: 50, quantity: 1);
     order.addItem(item1);
     order.addItem(item2);
-    
+
     // Act
     var total = order.calculateTotal(taxRate: 0.08);
-    
+
     // Assert
     expect(total).toBe(270); // (200 + 50) * 1.08
 });
@@ -515,30 +515,30 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v2
-    
+
     - name: Setup CommandBox
       uses: Ortus-Solutions/setup-commandbox@v2.0.0
-    
+
     - name: Install dependencies
       run: box install
-    
+
     - name: Run tests
       run: |
         box server start
         wheels test run --reporter=junit --outputFile=test-results.xml
-    
+
     - name: Upload test results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: test-results
         path: test-results.xml
-    
+
     - name: Generate coverage
       run: wheels test coverage
-    
+
     - name: Upload coverage
       uses: codecov/codecov-action@v1
 ```
@@ -573,16 +573,16 @@ fi
 ```cfc
 it("processes data correctly", function() {
     var result = processData(testData);
-    
+
     // Debug output
     debug(result);
     writeDump(var=result, abort=false);
-    
+
     // Conditional debugging
     if (request.debug ?: false) {
         writeOutput("Result: #serializeJSON(result)#");
     }
-    
+
     expect(result.status).toBe("success");
 });
 ```
@@ -606,25 +606,25 @@ wheels test run --showSQL
 
 ```cfc
 describe("Performance", function() {
-    
+
     it("handles 1000 concurrent users", function() {
         var threads = [];
-        
+
         for (var i = 1; i <= 1000; i++) {
             arrayAppend(threads, function() {
                 var result = model("Product").findAll();
                 return result.recordCount;
             });
         }
-        
+
         var start = getTickCount();
         var results = parallel(threads);
         var duration = getTickCount() - start;
-        
+
         expect(duration).toBeLT(5000); // Less than 5 seconds
         expect(arrayLen(results)).toBe(1000);
     });
-    
+
 });
 ```
 
@@ -635,10 +635,10 @@ describe("Performance", function() {
 ```cfc
 it("tests private method", function() {
     var user = model("User").new();
-    
+
     // Use makePublic() for testing
     makePublic(user, "privateMethod");
-    
+
     var result = user.privateMethod();
     expect(result).toBe("expected");
 });
@@ -651,14 +651,14 @@ it("sends email on user creation", function() {
     // Mock email service
     var mockMailer = createEmptyMock("services.Mailer");
     mockMailer.$("send").$returns(true);
-    
+
     // Inject mock
     var user = model("User").new();
     user.$property("mailer", mockMailer);
-    
+
     // Test
     user.save();
-    
+
     // Verify
     expect(mockMailer.$times("send")).toBe(1);
     expect(mockMailer.$callLog().send[1].to).toBe(user.email);

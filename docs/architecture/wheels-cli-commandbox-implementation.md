@@ -134,11 +134,11 @@ wheels-cli/
 ### Base Command Class
 ```javascript
 component extends="commandbox.system.BaseCommand" {
-    
+
     property name="fileSystemUtil" inject="FileSystem";
     property name="packageService" inject="PackageService";
     property name="consoleLogger" inject="logbox:logger:console";
-    
+
     /**
      * Common functionality for all Wheels commands
      */
@@ -146,7 +146,7 @@ component extends="commandbox.system.BaseCommand" {
         super.init();
         return this;
     }
-    
+
     /**
      * Check if we're in a Wheels project
      */
@@ -154,7 +154,7 @@ component extends="commandbox.system.BaseCommand" {
         // Modern structure: Wheels in vendor directory
         return directoryExists(getCWD() & "vendor/wheels/");
     }
-    
+
     /**
      * Check if we're in a legacy Wheels project (pre-3.0)
      */
@@ -162,7 +162,7 @@ component extends="commandbox.system.BaseCommand" {
         // Legacy structure: Wheels in root directory
         return directoryExists(getCWD() & "wheels/") && !directoryExists(getCWD() & "vendor/wheels/");
     }
-    
+
     /**
      * Detect if directory might be a Wheels project based on structure
      */
@@ -173,7 +173,7 @@ component extends="commandbox.system.BaseCommand" {
                directoryExists(getCWD() & "app/controllers/") ||
                fileExists(getCWD() & "box.json");
     }
-    
+
     /**
      * Get Wheels version from the project
      */
@@ -181,7 +181,7 @@ component extends="commandbox.system.BaseCommand" {
         var wheelsInfo = getWheelsInfo();
         return structKeyExists(wheelsInfo, "version") ? wheelsInfo.version : "Unknown";
     }
-    
+
     /**
      * Get Wheels package information from box.json
      */
@@ -192,18 +192,18 @@ component extends="commandbox.system.BaseCommand" {
             author = "",
             homepage = ""
         };
-        
+
         if (!isWheelsProject() && !isLegacyWheelsProject()) {
             return info;
         }
-        
+
         // For modern projects, read from box.json in vendor/wheels/
         if (isWheelsProject()) {
             var boxJsonPath = getCWD() & "vendor/wheels/box.json";
             if (fileExists(boxJsonPath)) {
                 try {
                     var boxJson = deserializeJSON(fileRead(boxJsonPath));
-                    
+
                     // Extract common properties
                     if (structKeyExists(boxJson, "version")) {
                         info.version = boxJson.version;
@@ -217,16 +217,16 @@ component extends="commandbox.system.BaseCommand" {
                     if (structKeyExists(boxJson, "homepage")) {
                         info.homepage = boxJson.homepage;
                     }
-                    
+
                     // Store full box.json data for potential future use
                     info.boxJson = boxJson;
-                    
+
                 } catch (any e) {
                     consoleLogger.error("Error parsing Wheels box.json: #e.message#");
                 }
             }
         }
-        
+
         // For legacy projects, check for version.txt
         if (isLegacyWheelsProject()) {
             var versionFile = getCWD() & "wheels/version.txt";
@@ -234,10 +234,10 @@ component extends="commandbox.system.BaseCommand" {
                 info.version = trim(fileRead(versionFile));
             }
         }
-        
+
         return info;
     }
-    
+
     /**
      * Ensure command is run from Wheels root
      */
@@ -252,68 +252,68 @@ component extends="commandbox.system.BaseCommand" {
             }
         }
     }
-    
+
     /**
      * Template rendering helper
      */
     function renderTemplate(required string template, required struct data) {
-        var templatePath = getDirectoryFromPath(getCurrentTemplatePath()) & 
+        var templatePath = getDirectoryFromPath(getCurrentTemplatePath()) &
                           "templates/" & arguments.template;
-        
+
         if (!fileExists(templatePath)) {
             error("Template not found: #arguments.template#");
         }
-        
+
         var content = fileRead(templatePath);
-        
+
         // Simple template replacement
         for (var key in arguments.data) {
             content = replaceNoCase(content, "{{#key#}}", arguments.data[key], "all");
         }
-        
+
         return content;
     }
-    
+
     /**
      * Get app directory paths
      */
     function getAppPath(string type = "") {
         var basePath = getCWD() & "app/";
-        
+
         if (len(arguments.type)) {
             return basePath & arguments.type & "/";
         }
-        
+
         return basePath;
     }
-    
+
     /**
      * Get config directory path
      */
     function getConfigPath(string type = "") {
         var basePath = getCWD() & "config/";
-        
+
         if (len(arguments.type)) {
             return basePath & arguments.type & "/";
         }
-        
+
         return basePath;
     }
-    
+
     /**
      * Get vendor directory path
      */
     function getVendorPath() {
         return getCWD() & "vendor/";
     }
-    
+
     /**
      * Get Wheels framework path
      */
     function getWheelsPath() {
         return getVendorPath() & "wheels/";
     }
-    
+
     /**
      * Compare version strings
      * Returns: -1 if v1 < v2, 0 if equal, 1 if v1 > v2
@@ -322,15 +322,15 @@ component extends="commandbox.system.BaseCommand" {
         var parts1 = listToArray(arguments.v1, ".");
         var parts2 = listToArray(arguments.v2, ".");
         var maxLen = max(arrayLen(parts1), arrayLen(parts2));
-        
+
         for (var i = 1; i <= maxLen; i++) {
             var num1 = i <= arrayLen(parts1) ? val(parts1[i]) : 0;
             var num2 = i <= arrayLen(parts2) ? val(parts2[i]) : 0;
-            
+
             if (num1 < num2) return -1;
             if (num1 > num2) return 1;
         }
-        
+
         return 0;
     }
 }
@@ -339,7 +339,7 @@ component extends="commandbox.system.BaseCommand" {
 ### Version Information Command
 ```javascript
 component extends="commands.wheels.BaseCommand" {
-    
+
     /**
      * Display Wheels version and project information
      */
@@ -348,17 +348,17 @@ component extends="commands.wheels.BaseCommand" {
             print.redLine("Not in a Wheels project directory!");
             return;
         }
-        
+
         var wheelsInfo = getWheelsInfo();
-        
+
         print.line();
         print.boldBlueLine("Wheels Project Information");
         print.line("=" repeatString 40);
-        
+
         // Framework info
         print.yellowLine("Framework:");
         print.indentedLine("Version: #wheelsInfo.version#");
-        
+
         if (len(wheelsInfo.name)) {
             print.indentedLine("Package: #wheelsInfo.name#");
         }
@@ -368,16 +368,16 @@ component extends="commands.wheels.BaseCommand" {
         if (len(wheelsInfo.homepage)) {
             print.indentedLine("Homepage: #wheelsInfo.homepage#");
         }
-        
+
         // Project info
         var projectBoxJson = getCWD() & "box.json";
         if (fileExists(projectBoxJson)) {
             try {
                 var projectInfo = deserializeJSON(fileRead(projectBoxJson));
-                
+
                 print.line();
                 print.yellowLine("Project:");
-                
+
                 if (structKeyExists(projectInfo, "name")) {
                     print.indentedLine("Name: #projectInfo.name#");
                 }
@@ -394,12 +394,12 @@ component extends="commands.wheels.BaseCommand" {
                 // Ignore errors reading project box.json
             }
         }
-        
+
         // Environment info
         print.line();
         print.yellowLine("Environment:");
         print.indentedLine("CommandBox: #shell.getVersion()#");
-        
+
         // Get server info if available
         try {
             var serverInfo = shell.getServerInfo();
@@ -409,15 +409,15 @@ component extends="commands.wheels.BaseCommand" {
         } catch (any e) {
             // Server might not be running
         }
-        
+
         print.indentedLine("Project Root: #getCWD()#");
-        
+
         if (isLegacyWheelsProject()) {
             print.line();
             print.redLine("⚠️  Legacy Project Structure Detected!");
             print.indentedLine("Consider upgrading to Wheels 3.0+ for better CLI support.");
         }
-        
+
         print.line();
     }
 }
@@ -426,13 +426,13 @@ component extends="commands.wheels.BaseCommand" {
 ### Application Creation Command with SQLite
 ```javascript
 component extends="commands.wheels.BaseCommand" {
-    
+
     property name="packageService" inject="PackageService";
     property name="databaseService" inject="DatabaseService@wheels-cli";
-    
+
     /**
      * Create a new Wheels application
-     * 
+     *
      * @name Name of the application
      * @template Application template (default, api, spa)
      * @database Database type (sqlite, mysql, postgresql, mssql)
@@ -448,13 +448,13 @@ component extends="commands.wheels.BaseCommand" {
     ) {
         print.line("Creating new Wheels application: #arguments.name#");
         print.line();
-        
+
         var appPath = getCWD() & arguments.name;
-        
+
         // Create directory structure
         print.yellowLine("Creating directory structure...");
         createAppStructure(appPath);
-        
+
         // Create box.json for the project
         var boxJson = {
             "name": arguments.name,
@@ -468,31 +468,31 @@ component extends="commands.wheels.BaseCommand" {
                 "testbox": "^4.0.0"
             }
         };
-        
+
         if (arguments.database == "sqlite") {
             boxJson.dependencies["sqlite-jdbc"] = "^3.40.0";
         }
-        
+
         fileWrite(appPath & "/box.json", serializeJSON(boxJson, false, false));
-        
+
         // Create server.json with database configuration
         createServerJson(appPath, arguments.name, arguments.database);
-        
+
         // Create initial configuration files
         createConfigFiles(appPath, arguments.database);
-        
+
         // Setup database if requested
         if (arguments.setupDatabase && arguments.database == "sqlite") {
             print.yellowLine("Setting up SQLite database...");
             databaseService.setupSQLite(appPath);
         }
-        
+
         // Install dependencies
         if (arguments.installDependencies) {
             print.yellowLine("Installing dependencies...");
             command("install").inWorkingDirectory(appPath).run();
         }
-        
+
         print.line();
         print.greenLine("Application created successfully!");
         print.line();
@@ -502,14 +502,14 @@ component extends="commands.wheels.BaseCommand" {
         print.indentedLine("3. server start       # Start the server");
         print.indentedLine("4. Open http://localhost:8080");
     }
-    
+
     /**
      * Create application directory structure
      */
     private function createAppStructure(required string path) {
         var dirs = [
             "/app/controllers",
-            "/app/models", 
+            "/app/models",
             "/app/views",
             "/config/settings",
             "/db/migrate",
@@ -521,20 +521,20 @@ component extends="commands.wheels.BaseCommand" {
             "/tests/models",
             "/vendor"
         ];
-        
+
         for (var dir in dirs) {
             directoryCreate(arguments.path & dir, true);
         }
-        
+
         // Create .gitkeep files to preserve empty directories
         for (var dir in dirs) {
             fileWrite(arguments.path & dir & "/.gitkeep", "");
         }
-        
+
         // Create SQLite database directory
         directoryCreate(arguments.path & "/db/sqlite", true);
     }
-    
+
     /**
      * Create server.json with database configuration
      */
@@ -557,13 +557,13 @@ component extends="commands.wheels.BaseCommand" {
                 }
             }
         };
-        
+
         // Add database configuration
         if (arguments.database == "sqlite") {
             serverConfig.app.datasources = {
                 "wheelsdatasource": {
                     "driver": "org.sqlite.JDBC",
-                    "class": "org.sqlite.JDBC", 
+                    "class": "org.sqlite.JDBC",
                     "bundleName": "org.xerial.sqlite-jdbc",
                     "bundleVersion": "3.40.0.0",
                     "url": "jdbc:sqlite:{approot}/db/sqlite/#arguments.appName#_development.db",
@@ -583,7 +583,7 @@ component extends="commands.wheels.BaseCommand" {
             };
         }
         // Add other database types...
-        
+
         fileWrite(
             arguments.path & "/server.json",
             serializeJSON(serverConfig, false, false)
@@ -595,37 +595,37 @@ component extends="commands.wheels.BaseCommand" {
 ### Database Service for SQLite Support
 ```javascript
 component {
-    
+
     /**
      * Setup SQLite for a Wheels project
      */
     function setupSQLite(required string projectPath) {
         var dbPath = arguments.projectPath & "/db/sqlite/";
-        
+
         // Ensure directory exists
         if (!directoryExists(dbPath)) {
             directoryCreate(dbPath, true);
         }
-        
+
         // Create initial database files for each environment
         var environments = ["development", "testing", "production"];
         var appName = getAppNameFromBoxJson(arguments.projectPath);
-        
+
         for (var env in environments) {
             var dbFile = dbPath & appName & "_" & env & ".db";
-            
+
             if (!fileExists(dbFile)) {
                 // Create empty SQLite database
                 createEmptySQLiteDB(dbFile);
                 print.greenLine("Created SQLite database: #dbFile#");
             }
         }
-        
+
         // Create .gitignore for database files
         var gitignore = "*.db" & chr(10) & "*.db-journal" & chr(10) & "*.db-wal";
         fileWrite(dbPath & ".gitignore", gitignore);
     }
-    
+
     /**
      * Create an empty SQLite database file
      */
@@ -637,7 +637,7 @@ component {
                 class: "org.sqlite.JDBC",
                 connectionString: "jdbc:sqlite:#arguments.path#"
             };
-            
+
             // This will create the file if it doesn't exist
             var conn = createObject("java", "java.sql.DriverManager").getConnection(ds.connectionString);
             conn.close();
@@ -645,7 +645,7 @@ component {
             throw("Could not create SQLite database: #e.message#");
         }
     }
-    
+
     /**
      * Check if SQLite JDBC driver is available
      */
@@ -657,16 +657,16 @@ component {
             return false;
         }
     }
-    
+
     /**
      * Download and install SQLite JDBC driver
      */
     function installSQLiteDriver() {
         print.yellowLine("Installing SQLite JDBC driver...");
-        
+
         // CommandBox can handle this through dependencies
         command("install").params("sqlite-jdbc").run();
-        
+
         print.greenLine("SQLite JDBC driver installed successfully!");
     }
 }
@@ -675,12 +675,12 @@ component {
 ### Database Setup Command
 ```javascript
 component extends="commands.wheels.BaseCommand" {
-    
+
     property name="databaseService" inject="DatabaseService@wheels-cli";
-    
+
     /**
      * Setup database for the Wheels application
-     * 
+     *
      * @type Database type to setup
      * @env Environment
      */
@@ -689,14 +689,14 @@ component extends="commands.wheels.BaseCommand" {
         string env = "development"
     ) {
         ensureWheelsProject();
-        
+
         // Auto-detect database type if not provided
         if (!len(arguments.type)) {
             arguments.type = detectDatabaseType();
         }
-        
+
         print.line("Setting up #arguments.type# database for #arguments.env# environment...");
-        
+
         switch(arguments.type) {
             case "sqlite":
                 setupSQLite(arguments.env);
@@ -710,10 +710,10 @@ component extends="commands.wheels.BaseCommand" {
             default:
                 error("Unsupported database type: #arguments.type#");
         }
-        
+
         print.greenLine("Database setup complete!");
     }
-    
+
     /**
      * Setup SQLite database
      */
@@ -721,26 +721,26 @@ component extends="commands.wheels.BaseCommand" {
         // Check if driver is available
         if (!databaseService.isSQLiteDriverAvailable()) {
             print.yellowLine("SQLite JDBC driver not found.");
-            
+
             if (confirm("Would you like to install it now?")) {
                 databaseService.installSQLiteDriver();
             } else {
                 error("SQLite JDBC driver is required. Run 'box install sqlite-jdbc' to install it.");
             }
         }
-        
+
         // Create database file
         var dbPath = getCWD() & "db/sqlite/";
         var appName = getProjectName();
         var dbFile = dbPath & appName & "_" & arguments.env & ".db";
-        
+
         if (!fileExists(dbFile)) {
             databaseService.createEmptySQLiteDB(dbFile);
             print.greenLine("Created SQLite database: #dbFile#");
         } else {
             print.yellowLine("SQLite database already exists: #dbFile#");
         }
-        
+
         // Test connection
         print.line("Testing database connection...");
         if (testDatabaseConnection("sqlite", arguments.env)) {
@@ -749,29 +749,29 @@ component extends="commands.wheels.BaseCommand" {
             error("Could not connect to database. Check your configuration.");
         }
     }
-    
+
     /**
      * Detect database type from server.json
      */
     private function detectDatabaseType() {
         var serverJsonPath = getCWD() & "server.json";
-        
+
         if (fileExists(serverJsonPath)) {
             var config = deserializeJSON(fileRead(serverJsonPath));
-            
-            if (structKeyExists(config, "app") && 
+
+            if (structKeyExists(config, "app") &&
                 structKeyExists(config.app, "datasources") &&
                 structKeyExists(config.app.datasources, "wheelsdatasource")) {
-                
+
                 var url = config.app.datasources.wheelsdatasource.url;
-                
+
                 if (findNoCase("sqlite", url)) return "sqlite";
                 if (findNoCase("mysql", url)) return "mysql";
                 if (findNoCase("postgresql", url)) return "postgresql";
                 if (findNoCase("sqlserver", url)) return "mssql";
             }
         }
-        
+
         return "sqlite"; // Default
     }
 }
@@ -780,10 +780,10 @@ component extends="commands.wheels.BaseCommand" {
 ### Model Generation Command
 ```javascript
 component extends="commands.wheels.BaseCommand" {
-    
+
     /**
      * Create a new Wheels model
-     * 
+     *
      * @name Name of the model
      * @properties Comma-delimited list of properties (name:type:options)
      * @migration Create a migration file
@@ -802,30 +802,30 @@ component extends="commands.wheels.BaseCommand" {
         boolean api = false
     ) {
         ensureWheelsProject();
-        
+
         // Parse properties
         var props = parseProperties(arguments.properties);
-        
+
         // Generate model file
         var modelContent = generateModelContent(arguments.name, props);
         var modelsPath = getAppPath("models");
         var modelPath = modelsPath & arguments.name & ".cfc";
-        
+
         // Ensure models directory exists
         if (!directoryExists(modelsPath)) {
             directoryCreate(modelsPath, true);
         }
-        
+
         if (fileExists(modelPath)) {
             if (!confirm("Model '#arguments.name#' already exists. Overwrite?")) {
                 print.yellowLine("Model creation cancelled.");
                 return;
             }
         }
-        
+
         fileWrite(modelPath, modelContent);
         print.greenLine("Created model: #modelPath#");
-        
+
         // Generate migration if requested
         if (arguments.migration) {
             command("wheels create migration")
@@ -836,7 +836,7 @@ component extends="commands.wheels.BaseCommand" {
                 )
                 .run();
         }
-        
+
         // Generate controller if requested
         if (arguments.controller || arguments.resource) {
             command("wheels create controller")
@@ -848,7 +848,7 @@ component extends="commands.wheels.BaseCommand" {
                 )
                 .run();
         }
-        
+
         // Generate tests if requested
         if (arguments.tests) {
             command("wheels create test")
@@ -857,7 +857,7 @@ component extends="commands.wheels.BaseCommand" {
                     name = arguments.name
                 )
                 .run();
-                
+
             if (arguments.controller || arguments.resource) {
                 command("wheels create test")
                     .params(
@@ -867,35 +867,35 @@ component extends="commands.wheels.BaseCommand" {
                     .run();
             }
         }
-        
+
         print.line();
         print.boldLine("Next steps:");
-        
+
         if (arguments.migration) {
             print.indentedLine("1. Review and modify the migration file");
             print.indentedLine("2. Run 'wheels db:migrate' to create the database table");
         }
-        
+
         print.indentedLine("3. Add validations and associations to your model");
-        
+
         if (arguments.controller) {
             print.indentedLine("4. Implement controller actions");
             print.indentedLine("5. Create views for your controller actions");
         }
     }
-    
+
     /**
      * Parse property string into struct
      */
     private array function parseProperties(required string properties) {
         var props = [];
-        
+
         if (!len(trim(arguments.properties))) {
             return props;
         }
-        
+
         var propList = listToArray(arguments.properties);
-        
+
         for (var prop in propList) {
             var parts = listToArray(prop, ":");
             var property = {
@@ -903,20 +903,20 @@ component extends="commands.wheels.BaseCommand" {
                 type = parts[2] ?: "string",
                 options = {}
             };
-            
+
             // Parse additional options
             if (arrayLen(parts) > 2) {
                 for (var i = 3; i <= arrayLen(parts); i++) {
                     property.options[parts[i]] = true;
                 }
             }
-            
+
             arrayAppend(props, property);
         }
-        
+
         return props;
     }
-    
+
     /**
      * Generate model content
      */
@@ -929,10 +929,10 @@ component extends="commands.wheels.BaseCommand" {
             tableName = pluralize(lCase(arguments.name)),
             properties = arguments.properties
         };
-        
+
         return renderTemplate("model/Model.cfc.template", data);
     }
-    
+
     /**
      * Simple pluralization
      */
@@ -952,12 +952,12 @@ component extends="commands.wheels.BaseCommand" {
 ### Database Migration Command
 ```javascript
 component extends="commands.wheels.BaseCommand" {
-    
+
     property name="migrationService" inject="MigrationService@wheels-cli";
-    
+
     /**
      * Run database migrations
-     * 
+     *
      * @target Specific version to migrate to
      * @env Environment to run migrations in
      * @verbose Show detailed output
@@ -968,72 +968,72 @@ component extends="commands.wheels.BaseCommand" {
         boolean verbose = false
     ) {
         ensureWheelsProject();
-        
+
         // Check Wheels version compatibility
         var wheelsVersion = getWheelsVersion();
         if (wheelsVersion != "Unknown" && compareVersion(wheelsVersion, "3.0.0") < 0) {
             error("Database migrations require Wheels 3.0 or higher. Current version: #wheelsVersion#");
         }
-        
+
         print.line("Running migrations for environment: #arguments.env#");
         print.line("Wheels version: #wheelsVersion#");
         print.line();
-        
+
         // Get current version
         var currentVersion = migrationService.getCurrentVersion(arguments.env);
         print.yellowLine("Current database version: #currentVersion#");
-        
+
         // Get available migrations
         var migrations = migrationService.getAvailableMigrations();
-        
+
         if (arrayLen(migrations) == 0) {
             print.redLine("No migrations found!");
             return;
         }
-        
+
         // Determine target version
-        var targetVersion = len(arguments.target) ? 
+        var targetVersion = len(arguments.target) ?
             arguments.target : migrations[arrayLen(migrations)].version;
-        
+
         print.yellowLine("Target version: #targetVersion#");
         print.line();
-        
+
         // Run migrations
         var migrationsToRun = migrationService.getMigrationsToRun(
-            currentVersion, 
+            currentVersion,
             targetVersion
         );
-        
+
         if (arrayLen(migrationsToRun) == 0) {
             print.greenLine("Database is already up to date!");
             return;
         }
-        
+
         print.line("Migrations to run: #arrayLen(migrationsToRun)#");
         print.line();
-        
+
         var progressBar = progressBarGeneric();
         progressBar.update(percent = 0, statusText = "Starting migrations...");
-        
+
         var count = 0;
         var errors = [];
-        
+
         for (var migration in migrationsToRun) {
             count++;
             var percent = (count / arrayLen(migrationsToRun)) * 100;
-            
+
             progressBar.update(
-                percent = percent, 
+                percent = percent,
                 statusText = "Running: #migration.name#"
             );
-            
+
             try {
                 if (arguments.verbose) {
                     print.line("Executing: #migration.name#");
                 }
-                
+
                 migrationService.runMigration(migration, arguments.env);
-                
+
                 if (arguments.verbose) {
                     print.greenLine("Success: #migration.name#");
                 }
@@ -1042,15 +1042,15 @@ component extends="commands.wheels.BaseCommand" {
                     migration = migration.name,
                     error = e.message
                 });
-                
+
                 if (arguments.verbose) {
                     print.redLine("Failed: #migration.name# - #e.message#");
                 }
             }
         }
-        
+
         progressBar.clear();
-        
+
         if (arrayLen(errors) == 0) {
             print.greenLine("All migrations completed successfully!");
         } else {
@@ -1059,7 +1059,7 @@ component extends="commands.wheels.BaseCommand" {
                 print.redLine("  - #error.migration#: #error.error#");
             }
         }
-        
+
         // Update version
         var newVersion = migrationService.getCurrentVersion(arguments.env);
         print.line();
@@ -1071,56 +1071,56 @@ component extends="commands.wheels.BaseCommand" {
 ### Interactive Console Command
 ```javascript
 component extends="commands.wheels.BaseCommand" {
-    
+
     /**
      * Start an interactive Wheels console
-     * 
+     *
      * @env Environment to load
      */
     function run(string env = "development") {
         ensureWheelsProject();
-        
+
         print.greenLine("Starting Wheels Console...");
         print.line("Environment: #arguments.env#");
         print.line();
-        
+
         // Set up the environment
         var wheelsPath = getCWD();
-        
+
         // Create a custom REPL instance
         var repl = createObject("component", "commandbox.system.util.REPLParser").init();
-        
+
         // Load Wheels environment
         print.yellowLine("Loading Wheels framework...");
-        
+
         // Execute in Wheels context
         var script = "
             // Load Wheels
             application.name = 'WheelsConsole_#createUUID()#';
             application.wheels = {};
             application.wheels.environment = '#arguments.env#';
-            
+
             // Include Wheels core - adjust path based on your setup
             include '/vendor/wheels/events/onrequeststart.cfm';
             include '/vendor/wheels/global/public.cfm';
-            
+
             // Make common functions available
             model = function(name) {
                 return application.wheels.model(argumentCollection=arguments);
             };
-            
+
             controller = function(name) {
                 return application.wheels.controller(argumentCollection=arguments);
             };
-            
+
             get = function() {
                 return application.wheels.get(argumentCollection=arguments);
             };
-            
+
             set = function() {
                 return application.wheels.set(argumentCollection=arguments);
             };
-            
+
             print.greenLine('Wheels environment loaded!');
             print.line();
             print.line('Available functions:');
@@ -1132,24 +1132,24 @@ component extends="commands.wheels.BaseCommand" {
             print.line('Type .exit to quit');
             print.line();
         ";
-        
+
         evaluate(script);
-        
+
         // Start REPL loop
         while (true) {
             var input = ask("wheels> ");
-            
+
             if (input == ".exit" || input == "exit" || input == "quit") {
                 break;
             }
-            
+
             if (len(trim(input)) == 0) {
                 continue;
             }
-            
+
             try {
                 var result = evaluate(input);
-                
+
                 if (!isNull(result)) {
                     if (isSimpleValue(result)) {
                         print.line(result);
@@ -1159,13 +1159,13 @@ component extends="commands.wheels.BaseCommand" {
                 }
             } catch (any e) {
                 print.redLine("Error: #e.message#");
-                
+
                 if (structKeyExists(e, "detail") && len(e.detail)) {
                     print.redLine("Detail: #e.detail#");
                 }
             }
         }
-        
+
         print.line();
         print.yellowLine("Exiting Wheels Console...");
     }
@@ -1177,19 +1177,19 @@ component extends="commands.wheels.BaseCommand" {
 ### Model Template (/templates/model/Model.cfc.template)
 ```javascript
 component extends="wheels.Model" {
-    
+
     function config() {
         // Set the table name
         table("{{tableName}}");
-        
+
         {{#properties}}
         // Property definitions
         property(name="{{name}}", type="{{type}}"{{#options}}, {{optionName}}="{{optionValue}}"{{/options}});
         {{/properties}}
-        
+
         // Timestamps
         timeStamps();
-        
+
         // Validations
         {{#properties}}
         {{#if required}}
@@ -1202,22 +1202,22 @@ component extends="wheels.Model" {
         validatesFormatOf(property="{{name}}", regex="^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", message="must be a valid email address");
         {{/if}}
         {{/properties}}
-        
+
         // Associations
         // hasMany("relatedModel");
         // belongsTo("parentModel");
         // hasOne("childModel");
     }
-    
+
     // Custom methods
-    
+
 }
 ```
 
 ### Migration Template (/templates/migration/Migration.cfc.template)
 ```javascript
 component extends="wheels.migrator.Migration" hint="{{description}}" {
-    
+
     function up() {
         transaction {
             {{#if createTable}}
@@ -1228,7 +1228,7 @@ component extends="wheels.migrator.Migration" hint="{{description}}" {
                 table.{{dbType}}("{{name}}"{{#if limit}}, limit={{limit}}{{/if}});
                 {{/properties}}
                 table.timestamps();
-                
+
                 // Indexes
                 {{#properties}}
                 {{#if index}}
@@ -1237,7 +1237,7 @@ component extends="wheels.migrator.Migration" hint="{{description}}" {
                 {{/properties}}
             };
             {{/if}}
-            
+
             {{#if alterTable}}
             // Alter table
             updateTable(name="{{tableName}}") {
@@ -1251,13 +1251,13 @@ component extends="wheels.migrator.Migration" hint="{{description}}" {
             {{/if}}
         }
     }
-    
+
     function down() {
         transaction {
             {{#if createTable}}
             dropTable("{{tableName}}");
             {{/if}}
-            
+
             {{#if alterTable}}
             updateTable(name="{{tableName}}") {
                 {{#addColumns}}
@@ -1278,13 +1278,13 @@ component extends="wheels.migrator.Migration" hint="{{description}}" {
 #### config/app.cfm Template
 ```javascript
 component {
-    
+
     function init() {
         // Application settings
         this.name = "{{appName}}";
         this.sessionManagement = true;
         this.sessionTimeout = createTimeSpan(0, 0, 30, 0);
-        
+
         // Wheels settings
         this.wheels = {
             dataSourceName = "wheelsdatasource",
@@ -1292,20 +1292,20 @@ component {
             showErrorInformation = {{showErrors}},
             showDebugInformation = {{showDebug}}
         };
-        
+
         // Auto-detect database adapter from datasource
         this.wheels.databaseAdapter = detectDatabaseAdapter();
     }
-    
+
     /**
      * Detect database adapter from JDBC URL
      */
     private function detectDatabaseAdapter() {
         var ds = getApplicationSettings().datasources["wheelsdatasource"];
-        
+
         if (structKeyExists(ds, "url")) {
             var url = ds.url;
-            
+
             if (findNoCase("sqlite", url)) return "sqlite";
             if (findNoCase("mysql", url)) return "mysql";
             if (findNoCase("postgresql", url)) return "postgresql";
@@ -1313,7 +1313,7 @@ component {
             if (findNoCase("oracle", url)) return "oracle";
             if (findNoCase("h2", url)) return "h2";
         }
-        
+
         // Default to SQLite
         return "sqlite";
     }
@@ -1324,11 +1324,11 @@ component {
 ```javascript
 <cfscript>
     // Development environment settings
-    
+
     // Show full error information
     set(showErrorInformation = true);
     set(showDebugInformation = true);
-    
+
     // Cache settings (disable most caching in development)
     set(cacheFileChecking = false);
     set(cacheControllerInitialization = false);
@@ -1336,11 +1336,11 @@ component {
     set(cacheViewInitialization = false);
     set(cacheRoutes = false);
     set(cacheSchema = false);
-    
+
     // SQLite specific settings
     set(SQLiteQueryTimeout = 30);
     set(SQLiteBusyTimeout = 5000);
-    
+
     // Development-only routes (like debug toolbar)
     set(showDebugToolbar = true);
 </cfscript>
@@ -1398,14 +1398,14 @@ function getTemplate(required string type, string name = "default") {
     if (fileExists(projectTemplate)) {
         return fileRead(projectTemplate);
     }
-    
+
     // 2. Fall back to built-in templates
-    var builtInTemplate = getDirectoryFromPath(getCurrentTemplatePath()) & 
+    var builtInTemplate = getDirectoryFromPath(getCurrentTemplatePath()) &
                         "templates/#arguments.type#/#arguments.name#";
     if (fileExists(builtInTemplate)) {
         return fileRead(builtInTemplate);
     }
-    
+
     error("Template not found: #arguments.type#/#arguments.name#");
 }
 
@@ -1422,30 +1422,30 @@ function isUsingCustomTemplate(required string path) {
  */
 function renderTemplate(required string template, required struct data) {
     var content = arguments.template;
-    
+
     // Handle extends directive
     if (reFindNoCase("{{extends\s+""([^""]+)""}}", content)) {
         var parentTemplate = reReplaceNoCase(content, ".*{{extends\s+""([^""]+)""}}.*", "\1");
         var parentContent = getTemplate(listFirst(parentTemplate, "/"), listLast(parentTemplate, "/"));
         content = processTemplateInheritance(parentContent, content);
     }
-    
+
     // Process blocks
     content = processTemplateBlocks(content);
-    
+
     // Process conditionals
     content = processTemplateConditionals(content, arguments.data);
-    
+
     // Process loops
     content = processTemplateLoops(content, arguments.data);
-    
+
     // Simple variable replacement
     for (var key in arguments.data) {
         if (isSimpleValue(arguments.data[key])) {
             content = replaceNoCase(content, "{{#key#}}", arguments.data[key], "all");
         }
     }
-    
+
     return content;
 }
 ```
@@ -1457,31 +1457,31 @@ function renderTemplate(required string template, required struct data) {
 ```javascript
 // commands/wheels/templates/copy.cfc
 component extends="commands.wheels.BaseCommand" {
-    
+
     /**
      * Copy CLI templates to your project for customization
-     * 
+     *
      * @type Template type to copy (model, controller, view, migration, all)
      * @force Overwrite existing templates
      */
     function run(string type = "all", boolean force = false) {
         ensureWheelsProject();
-        
+
         var templateSource = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../templates";
         var templateDest = getConfigPath("templates");
-        
+
         // Ensure templates directory exists
         if (!directoryExists(templateDest)) {
             directoryCreate(templateDest, true);
         }
-        
+
         if (arguments.type == "all") {
             print.boldLine("Copying all templates...");
             copyAllTemplates(templateSource, templateDest, arguments.force);
         } else {
             copyTemplateType(arguments.type, templateSource, templateDest, arguments.force);
         }
-        
+
         print.line();
         print.greenLine("Templates copied successfully!");
         print.line();
@@ -1490,41 +1490,41 @@ component extends="commands.wheels.BaseCommand" {
         print.line();
         print.line("The CLI will automatically use your custom templates when generating files.");
     }
-    
+
     private function copyAllTemplates(source, dest, force) {
         var types = ["model", "controller", "migration", "view"];
-        
+
         for (var type in types) {
             if (directoryExists(arguments.source & "/" & type)) {
                 copyTemplateType(type, arguments.source, arguments.dest, arguments.force);
             }
         }
-        
+
         // Copy template configuration if exists
         var configFile = arguments.source & "/templates.json";
         if (fileExists(configFile)) {
             fileCopy(configFile, arguments.dest & "/templates.json");
         }
     }
-    
+
     private function copyTemplateType(type, source, dest, force) {
         var sourceDir = arguments.source & "/" & arguments.type;
         var destDir = arguments.dest & "/" & arguments.type;
-        
+
         if (!directoryExists(sourceDir)) {
             error("Template type '#arguments.type#' not found");
         }
-        
+
         if (directoryExists(destDir) && !arguments.force) {
             if (!confirm("Templates for '#arguments.type#' already exist. Overwrite?")) {
                 print.yellowLine("Skipping #arguments.type# templates...");
                 return;
             }
         }
-        
+
         print.line("Copying #arguments.type# templates...");
         directoryCreate(destDir, true);
-        
+
         var files = directoryList(sourceDir, false, "path", "*.cfc|*.cfm|*.txt");
         for (var file in files) {
             var fileName = getFileFromPath(file);
@@ -1540,33 +1540,33 @@ component extends="commands.wheels.BaseCommand" {
 ```javascript
 // commands/wheels/templates/list.cfc
 component extends="commands.wheels.BaseCommand" {
-    
+
     /**
      * List available templates and their override status
      */
     function run() {
         ensureWheelsProject();
-        
+
         print.boldLine("Wheels CLI Templates");
         print.line("=" repeatString 50);
         print.line();
-        
+
         var builtInPath = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../templates";
         var projectPath = getConfigPath("templates");
-        
+
         var types = ["model", "controller", "migration", "view"];
-        
+
         for (var type in types) {
             print.yellowLine(uCase(type) & " Templates:");
-            
+
             var builtInDir = builtInPath & "/" & type;
             if (directoryExists(builtInDir)) {
                 var templates = directoryList(builtInDir, false, "name", "*.cfc|*.cfm");
-                
+
                 for (var template in templates) {
                     var status = "Built-in";
                     var projectTemplate = projectPath & "/" & type & "/" & template;
-                    
+
                     if (fileExists(projectTemplate)) {
                         status = "Customized";
                         print.indentedGreenLine("✓ #template# [#status#]");
@@ -1577,7 +1577,7 @@ component extends="commands.wheels.BaseCommand" {
             }
             print.line();
         }
-        
+
         if (directoryExists(projectPath)) {
             print.boldLine("Custom templates location: #projectPath#");
         } else {
@@ -1592,23 +1592,23 @@ component extends="commands.wheels.BaseCommand" {
 ```javascript
 // commands/wheels/templates/variables.cfc
 component extends="commands.wheels.BaseCommand" {
-    
+
     /**
      * Show available variables for template types
-     * 
+     *
      * @type Template type (model, controller, view, migration)
      */
     function run(required string type) {
         var variables = getTemplateVariables(arguments.type);
-        
+
         print.boldLine("#uCase(arguments.type)# Template Variables");
         print.line("=" repeatString 50);
         print.line();
-        
+
         for (var section in variables) {
             if (section != "description") {
                 print.yellowLine(section & ":");
-                
+
                 if (isArray(variables[section])) {
                     for (var item in variables[section]) {
                         print.indentedLine("- " & item);
@@ -1621,12 +1621,12 @@ component extends="commands.wheels.BaseCommand" {
                 print.line();
             }
         }
-        
+
         if (structKeyExists(variables, "description")) {
             print.line(variables.description);
         }
     }
-    
+
     private struct function getTemplateVariables(required string type) {
         var variableMap = {
             model: {
@@ -1696,7 +1696,7 @@ component extends="commands.wheels.BaseCommand" {
                 ]
             }
         };
-        
+
         return variableMap[arguments.type] ?: {
             description: "Unknown template type: #arguments.type#"
         };
@@ -1712,21 +1712,21 @@ Update the model generation command to use the template system:
 // Update in commands/wheels/create/model.cfc
 function run(required string name, string properties = "", boolean migration = false) {
     ensureWheelsProject();
-    
+
     // Parse properties
     var props = parseProperties(arguments.properties);
-    
+
     // Get template (custom or built-in)
     var template = getTemplate("model", "Model.cfc");
-    
+
     // Check if using custom template
     if (isUsingCustomTemplate("model/Model.cfc")) {
         print.yellowLine("Using custom model template");
     }
-    
+
     // Load template configuration if exists
     var templateConfig = loadTemplateConfig();
-    
+
     // Prepare template data
     var data = {
         modelName: arguments.name,
@@ -1736,23 +1736,23 @@ function run(required string name, string properties = "", boolean migration = f
         generatedBy: "Wheels CLI v#getWheelsVersion()#",
         config: templateConfig.model ?: {}
     };
-    
+
     // Render template
     var content = renderTemplate(template, data);
-    
+
     // Write file
     var modelPath = getAppPath("models") & arguments.name & ".cfc";
-    
+
     if (fileExists(modelPath)) {
         if (!confirm("Model '#arguments.name#' already exists. Overwrite?")) {
             print.yellowLine("Model creation cancelled.");
             return;
         }
     }
-    
+
     fileWrite(modelPath, content);
     print.greenLine("Created model: #modelPath#");
-    
+
     // Create migration if requested
     if (arguments.migration) {
         command("wheels create migration")
@@ -1770,7 +1770,7 @@ function run(required string name, string properties = "", boolean migration = f
  */
 private struct function loadTemplateConfig() {
     var configPath = getConfigPath("templates/templates.json");
-    
+
     if (fileExists(configPath)) {
         try {
             return deserializeJSON(fileRead(configPath));
@@ -1778,7 +1778,7 @@ private struct function loadTemplateConfig() {
             // Invalid JSON, return empty struct
         }
     }
-    
+
     return {};
 }
 ```
@@ -1795,28 +1795,28 @@ private struct function loadTemplateConfig() {
  * Generator: {{generatedBy}}
  */
 component extends="models.base.BaseModel" {
-    
+
     function config() {
         // Table
         table("{{tableName}}");
-        
+
         {{#properties}}
         // Property: {{name}}
         property(name="{{name}}", type="{{type}}"{{#if required}}, required="true"{{/if}}{{#if unique}}, unique="true"{{/if}});
         {{/properties}}
-        
+
         // Timestamps
         timeStamps();
-        
+
         // Audit fields (custom addition)
         property(name="createdBy", type="string");
         property(name="updatedBy", type="string");
         property(name="deletedAt", type="datetime");
         property(name="deletedBy", type="string");
-        
+
         // Soft deletes
         softDeletes();
-        
+
         // Validations
         {{#properties}}
         {{#if required}}
@@ -1829,13 +1829,13 @@ component extends="models.base.BaseModel" {
         validatesFormatOf(property="{{name}}", regex="^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", message="must be a valid email address");
         {{/if}}
         {{/properties}}
-        
+
         // Callbacks
         beforeCreate("setAuditFields");
         beforeUpdate("updateAuditFields");
         beforeDelete("softDelete");
     }
-    
+
     // Audit trail methods
     private function setAuditFields() {
         if (hasUserContext()) {
@@ -1843,13 +1843,13 @@ component extends="models.base.BaseModel" {
             this.updatedBy = getUserContext().id;
         }
     }
-    
+
     private function updateAuditFields() {
         if (hasUserContext()) {
             this.updatedBy = getUserContext().id;
         }
     }
-    
+
     private function softDelete() {
         this.deletedAt = now();
         if (hasUserContext()) {
@@ -1858,12 +1858,12 @@ component extends="models.base.BaseModel" {
         this.save();
         return false; // Prevent actual deletion
     }
-    
+
     // Scopes
     public function scopeActive(query) {
         return arguments.query.where("deletedAt IS NULL");
     }
-    
+
     public function scopeDeleted(query) {
         return arguments.query.where("deletedAt IS NOT NULL");
     }
@@ -1879,22 +1879,22 @@ component extends="models.base.BaseModel" {
  * Generated: {{timestamp}}
  */
 component extends="controllers.base.SecureController" {
-    
+
     function config() {
         // Authentication required for all actions
         verifies(except="", params="isAuthenticated", handler="requireLogin");
-        
+
         {{#if resource}}
         // Authorization for resource actions
         verifies(only="edit,update,delete", params="canModify{{modelName}}", handler="unauthorized");
         {{/if}}
-        
+
         {{#if api}}
         // API configuration
         provides("json,xml");
         {{/if}}
     }
-    
+
     {{#if resource}}
     /**
      * Display a list of {{pluralLowerName}}
@@ -1904,40 +1904,40 @@ component extends="controllers.base.SecureController" {
             order="createdAt DESC",
             where="deletedAt IS NULL"
         );
-        
+
         {{#if api}}
         renderWith({{pluralLowerName}});
         {{/if}}
     }
-    
+
     /**
      * Display a single {{singularLowerName}}
      */
     function show() {
         {{singularLowerName}} = model("{{modelName}}").findByKey(params.key);
-        
+
         if (!isObject({{singularLowerName}})) {
             return renderNotFound();
         }
-        
+
         {{#if api}}
         renderWith({{singularLowerName}});
         {{/if}}
     }
-    
+
     /**
      * Show form for new {{singularLowerName}}
      */
     function new() {
         {{singularLowerName}} = model("{{modelName}}").new();
     }
-    
+
     /**
      * Create a new {{singularLowerName}}
      */
     function create() {
         {{singularLowerName}} = model("{{modelName}}").create(params.{{singularLowerName}});
-        
+
         if ({{singularLowerName}}.save()) {
             {{#if api}}
             renderWith({{singularLowerName}}, status=201);
@@ -1954,28 +1954,28 @@ component extends="controllers.base.SecureController" {
             {{/if}}
         }
     }
-    
+
     /**
      * Show form to edit {{singularLowerName}}
      */
     function edit() {
         {{singularLowerName}} = model("{{modelName}}").findByKey(params.key);
-        
+
         if (!isObject({{singularLowerName}})) {
             return renderNotFound();
         }
     }
-    
+
     /**
      * Update existing {{singularLowerName}}
      */
     function update() {
         {{singularLowerName}} = model("{{modelName}}").findByKey(params.key);
-        
+
         if (!isObject({{singularLowerName}})) {
             return renderNotFound();
         }
-        
+
         if ({{singularLowerName}}.update(params.{{singularLowerName}})) {
             {{#if api}}
             renderWith({{singularLowerName}});
@@ -1992,19 +1992,19 @@ component extends="controllers.base.SecureController" {
             {{/if}}
         }
     }
-    
+
     /**
      * Delete {{singularLowerName}}
      */
     function delete() {
         {{singularLowerName}} = model("{{modelName}}").findByKey(params.key);
-        
+
         if (!isObject({{singularLowerName}})) {
             return renderNotFound();
         }
-        
+
         {{singularLowerName}}.delete();
-        
+
         {{#if api}}
         renderWith({message="{{modelName}} deleted successfully"}, status=204);
         {{else}}
@@ -2013,14 +2013,14 @@ component extends="controllers.base.SecureController" {
         {{/if}}
     }
     {{/if}}
-    
+
     // Private methods
-    
+
     private function canModify{{modelName}}() {
         var {{singularLowerName}} = model("{{modelName}}").findByKey(params.key);
         return isObject({{singularLowerName}}) && {{singularLowerName}}.canBeModifiedBy(getCurrentUser());
     }
-    
+
     private function renderNotFound() {
         {{#if api}}
         renderWith({error="{{modelName}} not found"}, status=404);
@@ -2048,7 +2048,7 @@ component extends="controllers.base.SecureController" {
             </h1>
         </div>
     </div>
-    
+
     <cfif {{pluralLowerName}}.recordCount>
         <div class="card shadow-sm">
             <div class="card-body p-0">
@@ -2144,18 +2144,18 @@ component extends="controllers.base.SecureController" {
 ### Test Structure
 ```javascript
 component extends="testbox.system.BaseSpec" {
-    
+
     function beforeAll() {
         // Set up test environment
         variables.testProjectPath = expandPath("/tests/resources/test-project/");
-        
+
         // Create test project structure if needed
         if (!directoryExists(variables.testProjectPath)) {
             directoryCreate(variables.testProjectPath, true);
-            
+
             // Create vendor/wheels directory for testing
             directoryCreate(variables.testProjectPath & "vendor/wheels/", true);
-            
+
             // Create a mock box.json in vendor/wheels
             var mockBoxJson = {
                 "name": "wheels",
@@ -2166,14 +2166,14 @@ component extends="testbox.system.BaseSpec" {
                 variables.testProjectPath & "vendor/wheels/box.json",
                 serializeJSON(mockBoxJson)
             );
-            
+
             // Create app directories
             directoryCreate(variables.testProjectPath & "app/models/", true);
             directoryCreate(variables.testProjectPath & "app/controllers/", true);
             directoryCreate(variables.testProjectPath & "app/views/", true);
             directoryCreate(variables.testProjectPath & "db/migrate/", true);
             directoryCreate(variables.testProjectPath & "db/sqlite/", true);
-            
+
             // Create test SQLite database
             var testDb = variables.testProjectPath & "db/sqlite/test.db";
             if (!fileExists(testDb)) {
@@ -2182,26 +2182,26 @@ component extends="testbox.system.BaseSpec" {
             }
         }
     }
-    
+
     function afterAll() {
         // Clean up test project
         if (directoryExists(variables.testProjectPath)) {
             directoryDelete(variables.testProjectPath, true);
         }
     }
-    
+
     function run() {
         describe("Wheels CLI", function() {
-            
+
             describe("Model Generation", function() {
                 it("should create a basic model file", function() {
                     var command = application.wirebox.getInstance("command:wheels create model");
                     command.params(name="TestModel");
                     command.run();
-                    
+
                     expect(fileExists(testProjectPath & "app/models/TestModel.cfc")).toBeTrue();
                 });
-                
+
                 it("should create model with properties", function() {
                     var command = application.wirebox.getInstance("command:wheels create model");
                     command.params(
@@ -2209,28 +2209,28 @@ component extends="testbox.system.BaseSpec" {
                         properties="firstName:string,lastName:string,email:string:unique"
                     );
                     command.run();
-                    
+
                     var content = fileRead(testProjectPath & "app/models/User.cfc");
                     expect(content).toInclude('property(name="firstName"');
                     expect(content).toInclude('property(name="email"');
                     expect(content).toInclude('validatesUniquenessOf("email")');
                 });
             });
-            
+
             describe("Migration Management", function() {
                 it("should create a migration file", function() {
                     var command = application.wirebox.getInstance("command:wheels create migration");
                     command.params(name="create_users_table");
                     command.run();
-                    
+
                     var migrationDir = testProjectPath & "db/migrate/";
                     expect(directoryExists(migrationDir)).toBeTrue();
-                    
+
                     var files = directoryList(migrationDir, false, "name", "*.cfc");
                     expect(arrayLen(files)).toBeGT(0);
                 });
             });
-            
+
         });
     }
 }
@@ -2410,94 +2410,94 @@ Create a base test class for all command tests:
 ```javascript
 // tests/specs/BaseCommandSpec.cfc
 component extends="testbox.system.BaseSpec" {
-    
+
     // Properties
     property name="originalCWD";
     property name="testProjectPath";
     property name="wirebox";
-    
+
     function beforeAll() {
         // Store current directory
         variables.originalCWD = getCWD();
-        
+
         // Create temp directory for test projects
         variables.testProjectPath = getTempDirectory() & "wheels-cli-tests-" & createUUID();
         directoryCreate(variables.testProjectPath, true);
-        
+
         // Initialize WireBox for dependency injection
         variables.wirebox = new commandbox.system.ioc.Injector();
-        
+
         // Change to test directory
         shell.cd(variables.testProjectPath);
     }
-    
+
     function afterAll() {
         // Change back to original directory
         shell.cd(variables.originalCWD);
-        
+
         // Clean up test directory
         if (directoryExists(variables.testProjectPath)) {
             directoryDelete(variables.testProjectPath, true);
         }
     }
-    
+
     /**
      * Helper to run a command and capture output
      */
     function runCommand(required string command, struct params = {}) {
         var commandPath = "commands." & replace(arguments.command, " ", ".", "all");
         var commandObj = wirebox.getInstance(commandPath);
-        
+
         // Mock the print helper
         var mockPrint = getMockBox().createMock("commandbox.system.util.Print");
         var output = [];
         var errors = [];
-        
+
         // Capture all output types
         mockPrint.$("line").$args(any).$results(function(text) {
             output.append({type: "line", text: arguments.text ?: ""});
             return mockPrint;
         });
-        
+
         mockPrint.$("greenLine").$args(any).$results(function(text) {
             output.append({type: "success", text: arguments.text ?: ""});
             return mockPrint;
         });
-        
+
         mockPrint.$("yellowLine").$args(any).$results(function(text) {
             output.append({type: "warning", text: arguments.text ?: ""});
             return mockPrint;
         });
-        
+
         mockPrint.$("redLine").$args(any).$results(function(text) {
             errors.append(arguments.text ?: "");
             return mockPrint;
         });
-        
+
         mockPrint.$("boldLine").$args(any).$results(function(text) {
             output.append({type: "bold", text: arguments.text ?: ""});
             return mockPrint;
         });
-        
+
         mockPrint.$("indentedLine").$args(any).$results(function(text) {
             output.append({type: "indented", text: arguments.text ?: ""});
             return mockPrint;
         });
-        
+
         // Set the mock
         commandObj.setPrint(mockPrint);
-        
+
         // Run command
         var success = true;
         var errorDetail = "";
-        
+
         try {
             commandObj.run(argumentCollection = arguments.params);
         } catch (any e) {
             success = false;
             errorDetail = e.message;
         }
-        
+
         return {
             success: success,
             output: output,
@@ -2506,13 +2506,13 @@ component extends="testbox.system.BaseSpec" {
             outputText: output.map(function(item) { return item.text; }).toList(chr(10))
         };
     }
-    
+
     /**
      * Helper to create a test Wheels project
      */
     function createTestProject(string name = "test-app") {
         var projectPath = variables.testProjectPath & "/" & arguments.name;
-        
+
         // Create Wheels 3.0+ structure
         directoryCreate(projectPath & "/app/controllers", true);
         directoryCreate(projectPath & "/app/models", true);
@@ -2523,7 +2523,7 @@ component extends="testbox.system.BaseSpec" {
         directoryCreate(projectPath & "/public", true);
         directoryCreate(projectPath & "/tests", true);
         directoryCreate(projectPath & "/vendor/wheels", true);
-        
+
         // Create project box.json
         var boxJson = {
             "name": arguments.name,
@@ -2534,7 +2534,7 @@ component extends="testbox.system.BaseSpec" {
             }
         };
         fileWrite(projectPath & "/box.json", serializeJSON(boxJson));
-        
+
         // Create wheels box.json
         var wheelsBoxJson = {
             "name": "wheels",
@@ -2543,13 +2543,13 @@ component extends="testbox.system.BaseSpec" {
             "author": "Wheels Team"
         };
         fileWrite(projectPath & "/vendor/wheels/box.json", serializeJSON(wheelsBoxJson));
-        
+
         // Create basic config
         fileWrite(projectPath & "/config/app.cfm", "// App configuration");
-        
+
         return projectPath;
     }
-    
+
     /**
      * Helper to verify file contains expected content
      */
@@ -2570,19 +2570,19 @@ component extends="testbox.system.BaseSpec" {
 ```javascript
 // tests/specs/commands/wheels/create/AppTest.cfc
 component extends="tests.specs.BaseCommandSpec" {
-    
+
     function run() {
         describe("wheels create app", function() {
-            
+
             it("creates a new application with correct structure", function() {
                 var appName = "blog-" & left(createUUID(), 8);
                 var result = runCommand("wheels create app", {
                     name: appName
                 });
-                
+
                 expect(result.success).toBeTrue();
                 expect(result.outputText).toInclude("Application created successfully!");
-                
+
                 // Verify directory structure
                 var appPath = variables.testProjectPath & "/" & appName;
                 expect(directoryExists(appPath)).toBeTrue();
@@ -2591,40 +2591,40 @@ component extends="tests.specs.BaseCommandSpec" {
                 expect(directoryExists(appPath & "/app/views")).toBeTrue();
                 expect(directoryExists(appPath & "/config")).toBeTrue();
                 expect(directoryExists(appPath & "/db/sqlite")).toBeTrue();
-                
+
                 // Verify files
                 expect(fileExists(appPath & "/box.json")).toBeTrue();
                 expect(fileExists(appPath & "/server.json")).toBeTrue();
                 expect(fileExists(appPath & "/config/app.cfm")).toBeTrue();
             });
-            
+
             it("configures SQLite as default database", function() {
                 var appName = "sqlite-app";
                 var result = runCommand("wheels create app", {
                     name: appName,
                     database: "sqlite"
                 });
-                
+
                 expect(result.success).toBeTrue();
-                
+
                 var serverJson = deserializeJSON(
                     fileRead(variables.testProjectPath & "/" & appName & "/server.json")
                 );
-                
+
                 expect(serverJson).toHaveKey("app");
                 expect(serverJson.app).toHaveKey("datasources");
                 expect(serverJson.app.datasources).toHaveKey("wheelsdatasource");
                 expect(serverJson.app.datasources.wheelsdatasource.driver).toBe("org.sqlite.JDBC");
             });
-            
+
             it("handles existing directory error", function() {
                 var appName = "existing-app";
                 directoryCreate(variables.testProjectPath & "/" & appName);
-                
+
                 var result = runCommand("wheels create app", {
                     name: appName
                 });
-                
+
                 expect(result.success).toBeFalse();
                 expect(result.errors).toHaveLength(1);
                 expect(result.errorDetail).toInclude("already exists");
@@ -2639,38 +2639,38 @@ component extends="tests.specs.BaseCommandSpec" {
 ```javascript
 // tests/specs/commands/wheels/create/ModelTest.cfc
 component extends="tests.specs.BaseCommandSpec" {
-    
+
     function beforeAll() {
         super.beforeAll();
         // Create a test project for model generation
         variables.projectPath = createTestProject("model-test-app");
         shell.cd(variables.projectPath);
     }
-    
+
     function run() {
         describe("wheels create model", function() {
-            
+
             it("creates a basic model file", function() {
                 var result = runCommand("wheels create model", {
                     name: "Product"
                 });
-                
+
                 expect(result.success).toBeTrue();
-                
+
                 var modelPath = variables.projectPath & "/app/models/Product.cfc";
                 expect(fileExists(modelPath)).toBeTrue();
                 expect(fileContains(modelPath, 'extends="wheels.Model"')).toBeTrue();
                 expect(fileContains(modelPath, 'table("products")')).toBeTrue();
             });
-            
+
             it("creates model with properties", function() {
                 var result = runCommand("wheels create model", {
                     name: "User",
                     properties: "firstName:string,lastName:string,email:string:unique,age:integer"
                 });
-                
+
                 expect(result.success).toBeTrue();
-                
+
                 var modelPath = variables.projectPath & "/app/models/User.cfc";
                 expect(fileExists(modelPath)).toBeTrue();
                 expect(fileContains(modelPath, 'property(name="firstName", type="string")')).toBeTrue();
@@ -2678,18 +2678,18 @@ component extends="tests.specs.BaseCommandSpec" {
                 expect(fileContains(modelPath, 'validatesUniquenessOf("email")')).toBeTrue();
                 expect(fileContains(modelPath, 'property(name="age", type="integer")')).toBeTrue();
             });
-            
+
             it("creates migration when flag is set", function() {
                 var result = runCommand("wheels create model", {
                     name: "Post",
                     properties: "title:string,content:text,publishedAt:datetime",
                     migration: true
                 });
-                
+
                 expect(result.success).toBeTrue();
                 expect(result.outputText).toInclude("Created model");
                 expect(result.outputText).toInclude("Created migration");
-                
+
                 // Check migration was created
                 var migrations = directoryList(
                     variables.projectPath & "/db/migrate",
@@ -2697,7 +2697,7 @@ component extends="tests.specs.BaseCommandSpec" {
                     "name",
                     "*.cfc"
                 );
-                
+
                 var migrationFound = false;
                 for (var migration in migrations) {
                     if (findNoCase("create_posts_table", migration)) {
@@ -2705,17 +2705,17 @@ component extends="tests.specs.BaseCommandSpec" {
                         break;
                     }
                 }
-                
+
                 expect(migrationFound).toBeTrue("Migration file should be created");
             });
-            
+
             it("handles model already exists", function() {
                 // Create model first time
                 runCommand("wheels create model", {name: "Duplicate"});
-                
+
                 // Try to create again
                 var result = runCommand("wheels create model", {name: "Duplicate"});
-                
+
                 expect(result.success).toBeFalse();
                 expect(result.outputText).toInclude("already exists");
             });
@@ -2729,12 +2729,12 @@ component extends="tests.specs.BaseCommandSpec" {
 ```javascript
 // tests/specs/commands/wheels/db/MigrateTest.cfc
 component extends="tests.specs.BaseCommandSpec" {
-    
+
     function beforeAll() {
         super.beforeAll();
         variables.projectPath = createTestProject("migration-test-app");
         shell.cd(variables.projectPath);
-        
+
         // Create a sample migration
         var migrationContent = '
         component extends="wheels.migrator.Migration" {
@@ -2747,38 +2747,38 @@ component extends="tests.specs.BaseCommandSpec" {
                     table.timestamps();
                 };
             }
-            
+
             function down() {
                 dropTable("users");
             }
         }';
-        
+
         var timestamp = dateFormat(now(), "yyyymmddHHnnss");
         fileWrite(
             variables.projectPath & "/db/migrate/#timestamp#_create_users_table.cfc",
             migrationContent
         );
     }
-    
+
     function run() {
         describe("wheels db migrate", function() {
-            
+
             it("runs migrations successfully", function() {
                 var result = runCommand("wheels db migrate");
-                
+
                 expect(result.success).toBeTrue();
                 expect(result.outputText).toInclude("Running migrations");
                 expect(result.outputText).toInclude("completed successfully");
             });
-            
+
             it("handles no migrations gracefully", function() {
                 // Run again - should be no migrations
                 var result = runCommand("wheels db migrate");
-                
+
                 expect(result.success).toBeTrue();
                 expect(result.outputText).toInclude("up to date");
             });
-            
+
             it("reports errors in migrations", function() {
                 // Create a bad migration
                 var badMigration = '
@@ -2787,15 +2787,15 @@ component extends="tests.specs.BaseCommandSpec" {
                         throw("Migration error test");
                     }
                 }';
-                
+
                 var timestamp = dateFormat(now(), "yyyymmddHHnnss");
                 fileWrite(
                     variables.projectPath & "/db/migrate/#timestamp#_bad_migration.cfc",
                     badMigration
                 );
-                
+
                 var result = runCommand("wheels db migrate");
-                
+
                 expect(result.success).toBeFalse();
                 expect(result.errors).toHaveLength(1, "Should have one error");
                 expect(result.outputText).toInclude("Migration error test");
@@ -2810,23 +2810,23 @@ component extends="tests.specs.BaseCommandSpec" {
 ```javascript
 // tests/specs/integration/FullWorkflowTest.cfc
 component extends="tests.specs.BaseCommandSpec" {
-    
+
     function run() {
         describe("Full application workflow", function() {
-            
+
             it("creates a complete blog application", function() {
                 var appName = "blog-integration";
-                
+
                 // Step 1: Create app
                 var createResult = runCommand("wheels create app", {
                     name: appName,
                     database: "sqlite"
                 });
                 expect(createResult.success).toBeTrue();
-                
+
                 // Change to app directory
                 shell.cd(variables.testProjectPath & "/" & appName);
-                
+
                 // Step 2: Create Post model with migration
                 var modelResult = runCommand("wheels create model", {
                     name: "Post",
@@ -2834,7 +2834,7 @@ component extends="tests.specs.BaseCommandSpec" {
                     migration: true
                 });
                 expect(modelResult.success).toBeTrue();
-                
+
                 // Step 3: Create controller
                 var controllerResult = runCommand("wheels create controller", {
                     name: "Posts",
@@ -2842,41 +2842,41 @@ component extends="tests.specs.BaseCommandSpec" {
                     model: "Post"
                 });
                 expect(controllerResult.success).toBeTrue();
-                
+
                 // Step 4: Run migrations
                 var migrateResult = runCommand("wheels db migrate");
                 expect(migrateResult.success).toBeTrue();
-                
+
                 // Verify everything exists
                 expect(fileExists("app/models/Post.cfc")).toBeTrue();
                 expect(fileExists("app/controllers/Posts.cfc")).toBeTrue();
                 expect(fileExists("db/sqlite/blog-integration_development.db")).toBeTrue();
-                
+
                 // Verify model content
                 expect(fileContains("app/models/Post.cfc", "validatesUniquenessOf")).toBeTrue();
-                
+
                 // Verify controller content
                 expect(fileContains("app/controllers/Posts.cfc", "function index")).toBeTrue();
                 expect(fileContains("app/controllers/Posts.cfc", "function show")).toBeTrue();
                 expect(fileContains("app/controllers/Posts.cfc", "function create")).toBeTrue();
             });
-            
+
             it("handles database switching", function() {
                 var appName = "db-switch-app";
-                
+
                 // Create with SQLite
                 runCommand("wheels create app", {
                     name: appName,
                     database: "sqlite"
                 });
-                
+
                 shell.cd(variables.testProjectPath & "/" & appName);
-                
+
                 // Switch to MySQL
                 var switchResult = runCommand("wheels db setup", {
                     type: "mysql"
                 });
-                
+
                 // This would actually fail without MySQL running
                 // but we can test the command structure
                 expect(switchResult).toBeDefined();
@@ -2891,25 +2891,25 @@ component extends="tests.specs.BaseCommandSpec" {
 ```javascript
 // tests/specs/commands/InteractiveCommandTest.cfc
 component extends="tests.specs.BaseCommandSpec" {
-    
+
     function testInteractiveAppCreation() {
         describe("Interactive command flow", function() {
-            
+
             it("handles user input for app creation", function() {
                 var command = wirebox.getInstance("commands.wheels.create.app");
-                
+
                 // Mock user input
                 command.$("ask").$args("Application name?").$results("my-interactive-app");
                 command.$("ask").$args("Database type?").$results("sqlite");
                 command.$("confirm").$args(any).$results(true);
-                
+
                 // Mock print
                 var mockPrint = getMockBox().createMock("commandbox.system.util.Print");
                 command.setPrint(mockPrint);
-                
+
                 // Run
                 command.run();
-                
+
                 // Verify interactions
                 expect(command.$count("ask")).toBe(2);
                 expect(command.$count("confirm")).toBeGTE(1);
@@ -2984,29 +2984,29 @@ jobs:
     strategy:
       matrix:
         cfengine: ["lucee@5", "adobe@2021", "adobe@2023"]
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Setup CommandBox
       uses: Ortus-Solutions/setup-commandbox@v2.0.1
-    
+
     - name: Install Dependencies
       run: |
         box install
         box install commandbox-testbox
-    
+
     - name: Start Test Server
       run: |
         box server start cfengine=${{ matrix.cfengine }} port=8080
         sleep 10
-    
+
     - name: Run Tests
       run: box testbox run --verbose
-      
+
     - name: Upload Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-results-${{ matrix.cfengine }}
         path: tests/results/
@@ -3027,33 +3027,33 @@ jobs:
 ```javascript
 // tests/specs/performance/CommandPerformanceTest.cfc
 component extends="tests.specs.BaseCommandSpec" {
-    
+
     function testCommandPerformance() {
         describe("Command performance", function() {
-            
+
             it("creates model quickly", function() {
                 var startTime = getTickCount();
-                
+
                 runCommand("wheels create model", {
                     name: "PerfTest"
                 });
-                
+
                 var duration = getTickCount() - startTime;
-                
+
                 expect(duration).toBeLT(1000, "Model creation should take less than 1 second");
             });
-            
+
             it("handles large property lists", function() {
                 var properties = [];
                 for (var i = 1; i <= 50; i++) {
                     properties.append("field#i#:string");
                 }
-                
+
                 var result = runCommand("wheels create model", {
                     name: "LargeModel",
                     properties: properties.toList()
                 });
-                
+
                 expect(result.success).toBeTrue();
             });
         });
@@ -3075,12 +3075,12 @@ try {
     // Command logic
 } catch (WheelsException e) {
     print.redLine("Wheels Error: #e.message#");
-    
+
     if (verbose) {
         print.line("Stack trace:");
         print.line(e.stacktrace);
     }
-    
+
     // Suggest fixes
     if (e.type == "ModelNotFound") {
         print.yellowLine("Did you mean to create the model first?");
@@ -3088,7 +3088,7 @@ try {
     }
 } catch (DatabaseException e) {
     print.redLine("Database Error: #e.message#");
-    
+
     // SQLite-specific errors
     if (findNoCase("sqlite", e.message)) {
         if (findNoCase("locked", e.message)) {

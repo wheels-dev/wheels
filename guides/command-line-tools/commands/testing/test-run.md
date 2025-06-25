@@ -95,19 +95,19 @@ component extends="testbox.system.BaseSpec" {
 
     function run() {
         describe("User Model", function() {
-            
+
             beforeEach(function() {
                 // Reset test data
                 application.wirebox.getInstance("User").deleteAll();
             });
-            
+
             it("validates required fields", function() {
                 var user = model("User").new();
                 expect(user.valid()).toBeFalse();
                 expect(user.errors).toHaveKey("email");
                 expect(user.errors).toHaveKey("username");
             });
-            
+
             it("saves with valid data", function() {
                 var user = model("User").new(
                     email="test@example.com",
@@ -117,22 +117,22 @@ component extends="testbox.system.BaseSpec" {
                 expect(user.save()).toBeTrue();
                 expect(user.id).toBeGT(0);
             });
-            
+
             it("prevents duplicate emails", function() {
                 var user1 = model("User").create(
                     email="test@example.com",
                     username="user1"
                 );
-                
+
                 var user2 = model("User").new(
                     email="test@example.com",
                     username="user2"
                 );
-                
+
                 expect(user2.valid()).toBeFalse();
                 expect(user2.errors.email).toContain("already exists");
             });
-            
+
         });
     }
 
@@ -145,31 +145,31 @@ component extends="testbox.system.BaseSpec" {
 
     function run() {
         describe("Products Controller", function() {
-            
+
             it("lists all products", function() {
                 // Create test data
                 var product = model("Product").create(name="Test Product");
-                
+
                 // Make request
                 var event = execute(
                     event="products.index",
                     renderResults=true
                 );
-                
+
                 // Assert response
                 expect(event.getRenderedContent()).toInclude("Test Product");
                 expect(event.getValue("products")).toBeArray();
             });
-            
+
             it("requires auth for create", function() {
                 var event = execute(
                     event="products.create",
                     renderResults=false
                 );
-                
+
                 expect(event.getValue("relocate_URI")).toBe("/login");
             });
-            
+
         });
     }
 
@@ -182,13 +182,13 @@ component extends="testbox.system.BaseSpec" {
 ```cfc
 component {
     this.name = "WheelsTestingSuite" & Hash(GetCurrentTemplatePath());
-    
+
     // Use test datasource
     this.datasources["wheelstestdb"] = {
         url = "jdbc:h2:mem:wheelstestdb;MODE=MySQL"
     };
     this.datasource = "wheelstestdb";
-    
+
     // Test settings
     this.testbox = {
         testBundles = "tests",
@@ -344,24 +344,24 @@ Create reusable test utilities:
 ```cfc
 // /tests/helpers/TestHelper.cfc
 component {
-    
+
     function createTestUser(struct overrides={}) {
         var defaults = {
             email: "test#CreateUUID()#@example.com",
             username: "user#CreateUUID()#",
             password: "testpass123"
         };
-        
+
         return model("User").create(
             argumentCollection = defaults.append(arguments.overrides)
         );
     }
-    
+
     function loginAs(required user) {
         session.userId = arguments.user.id;
         session.isAuthenticated = true;
     }
-    
+
 }
 ```
 
@@ -392,7 +392,7 @@ function loadFixtures() {
     var users = deserializeJSON(
         fileRead("/tests/fixtures/users.json")
     );
-    
+
     for (var userData in users) {
         model("User").create(userData);
     }
@@ -406,9 +406,9 @@ function loadFixtures() {
 - name: Run tests
   run: |
     wheels test run reporter=junit outputFile=test-results.xml
-    
+
 - name: Upload results
-  uses: actions/upload-artifact@v2
+  uses: actions/upload-artifact@v4
   with:
     name: test-results
     path: test-results.xml

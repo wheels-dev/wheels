@@ -386,7 +386,7 @@ jobs:
           python-version: '3.x'
       - run: pip install mkdocs mkdocs-material
       - run: box task run docs:build
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: docs
           path: docs/build/

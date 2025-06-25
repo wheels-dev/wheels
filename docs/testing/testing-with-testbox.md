@@ -65,21 +65,21 @@ All tests extend `BaseSpec.cfc` which provides Wheels-specific helpers:
 
 ```cfc
 component extends="tests.BaseSpec" {
-    
+
     function run() {
-        
+
         describe("User Model", () => {
-            
+
             beforeEach(() => {
                 variables.user = model("User").new();
             });
-            
+
             it("should validate email presence", () => {
                 user.email = "";
                 expect(user.valid()).toBeFalse();
                 assertHasErrors(user, "email");
             });
-            
+
         });
     }
 }
@@ -91,23 +91,23 @@ TestBox provides lifecycle hooks for setup and teardown:
 
 ```cfc
 describe("Feature", () => {
-    
+
     beforeAll(() => {
         // Runs once before all tests in this describe block
     });
-    
+
     afterAll(() => {
         // Runs once after all tests in this describe block
     });
-    
+
     beforeEach(() => {
         // Runs before each test
     });
-    
+
     afterEach(() => {
         // Runs after each test
     });
-    
+
     // Tests go here
 });
 ```
@@ -118,47 +118,47 @@ describe("Feature", () => {
 
 ```cfc
 describe("Product Model", () => {
-    
+
     beforeEach(() => {
         variables.product = build("product");
     });
-    
+
     describe("Validations", () => {
-        
+
         it("should require a name", () => {
             product.name = "";
             expect(product.valid()).toBeFalse();
             assertHasErrors(product, "name");
         });
-        
+
         it("should validate price is numeric", () => {
             product.price = "not a number";
             expect(product.valid()).toBeFalse();
             assertHasErrors(product, "price");
         });
-        
+
     });
-    
+
     describe("Methods", () => {
-        
+
         it("should calculate discount price", () => {
             product.price = 100;
             product.discountPercent = 20;
             expect(product.getDiscountPrice()).toBe(80);
         });
-        
+
     });
-    
+
     describe("Associations", () => {
-        
+
         it("should belong to a category", () => {
             expect(product).toHaveMethod("category");
         });
-        
+
         it("should have many reviews", () => {
             expect(product).toHaveMethod("reviews");
         });
-        
+
     });
 });
 ```
@@ -167,49 +167,49 @@ describe("Product Model", () => {
 
 ```cfc
 describe("ProductsController", () => {
-    
+
     beforeEach(() => {
         // Login as admin user
         variables.admin = create("user", {role: "admin"});
         loginAs(admin.id);
     });
-    
+
     afterEach(() => {
         logout();
     });
-    
+
     describe("index action", () => {
-        
+
         it("should return a list of products", () => {
             // Create test data
             createList("product", 3);
-            
+
             var result = processRequest(
                 route = "products",
                 method = "GET"
             );
-            
+
             expect(result.status).toBe(200);
             expect(result.output).toInclude("Products");
         });
-        
+
         it("should paginate results", () => {
             createList("product", 25);
-            
+
             var result = processRequest(
                 route = "products",
                 method = "GET",
                 params = {page: 2, perPage: 10}
             );
-            
+
             expect(result.status).toBe(200);
             // Assert pagination is working
         });
-        
+
     });
-    
+
     describe("create action", () => {
-        
+
         it("should create a new product", () => {
             var params = {
                 product: {
@@ -218,34 +218,34 @@ describe("ProductsController", () => {
                     categoryId: create("category").id
                 }
             };
-            
+
             var result = processRequest(
                 route = "products",
                 method = "POST",
                 params = params
             );
-            
+
             expect(result.status).toBe(302); // Redirect on success
-            
+
             var created = model("Product").findOne(where="name='Test Product'");
             expect(created).toBeInstanceOf("app.models.Product");
         });
-        
+
         it("should handle validation errors", () => {
             var params = {
                 product: {name: ""} // Invalid
             };
-            
+
             var result = processRequest(
                 route = "products",
                 method = "POST",
                 params = params
             );
-            
+
             expect(result.status).toBe(200); // Re-render form
             expect(result.output).toInclude("error");
         });
-        
+
     });
 });
 ```
@@ -254,7 +254,7 @@ describe("ProductsController", () => {
 
 ```cfc
 describe("Products API v1", () => {
-    
+
     beforeEach(() => {
         variables.apiKey = create("apiKey");
         variables.headers = {
@@ -262,63 +262,63 @@ describe("Products API v1", () => {
             "Content-Type": "application/json"
         };
     });
-    
+
     describe("GET /api/v1/products", () => {
-        
+
         it("should return paginated products", () => {
             createList("product", 5);
-            
+
             var result = apiRequest(
                 route = "api/v1/products",
                 method = "GET",
                 headers = variables.headers
             );
-            
+
             expect(result.status).toBe(200);
             expect(result.json.data).toBeArray();
             expect(arrayLen(result.json.data)).toBe(5);
             expect(result.json).toHaveKey("pagination");
         });
-        
+
         it("should filter by category", () => {
             var electronics = create("category", {name: "Electronics"});
             create("product", {categoryId: electronics.id});
             create("product", {categoryId: create("category").id});
-            
+
             var result = apiRequest(
                 route = "api/v1/products",
                 method = "GET",
                 data = {categoryId: electronics.id},
                 headers = variables.headers
             );
-            
+
             expect(result.status).toBe(200);
             expect(arrayLen(result.json.data)).toBe(1);
         });
-        
+
     });
-    
+
     describe("POST /api/v1/products", () => {
-        
+
         it("should create a product", () => {
             var data = {
                 name: "API Product",
                 price: 149.99,
                 sku: "API-001"
             };
-            
+
             var result = apiRequest(
                 route = "api/v1/products",
                 method = "POST",
                 data = data,
                 headers = variables.headers
             );
-            
+
             expect(result.status).toBe(201);
             expect(result.json.data).toHaveKey("id");
             expect(result.json.data.name).toBe("API Product");
         });
-        
+
         it("should validate required fields", () => {
             var result = apiRequest(
                 route = "api/v1/products",
@@ -326,11 +326,11 @@ describe("Products API v1", () => {
                 data = {name: ""}, // Invalid
                 headers = variables.headers
             );
-            
+
             expect(result.status).toBe(422);
             expect(result.json).toHaveKey("errors");
         });
-        
+
     });
 });
 ```
@@ -434,7 +434,7 @@ beforeAll(() => {
 afterAll(() => {
 	var duration = getTickCount() - variables.startTime;
 	var memoryUsed = getJVMMemoryUsage() - variables.startMemory;
-	
+
 	writeOutput("Test Suite Performance:");
 	writeOutput("- Duration: #numberFormat(duration/1000, '9.99')# seconds");
 	writeOutput("- Memory: #numberFormat(memoryUsed/1024/1024, '9.99')# MB");
@@ -456,24 +456,24 @@ jobs:
     strategy:
       matrix:
         cfengine: ["lucee@5", "adobe@2021"]
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup CommandBox
         uses: Ortus-Solutions/setup-commandbox@v2
-        
+
       - name: Install Dependencies
         run: box install
-        
+
       - name: Start Server
         run: box server start cfengine=${{ matrix.cfengine }}
-        
+
       - name: Run Tests
         run: box testbox run --reporter=junit --outputFile=test-results.xml
-        
+
       - name: Upload Test Results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ matrix.cfengine }}
           path: test-results.xml
@@ -671,10 +671,10 @@ it("should calculate total with tax", () => {
     // Arrange
     var order = create("order", {subtotal: 100});
     var taxRate = 0.08;
-    
+
     // Act
     var total = order.calculateTotal(taxRate);
-    
+
     // Assert
     expect(total).toBe(108);
 });
@@ -706,7 +706,7 @@ Tests automatically run in transactions that roll back, ensuring test isolation:
 it("should not affect other tests", () => {
     // This will be rolled back
     create("user", {email: "test@example.com"});
-    
+
     // Test something
     expect(model("User").count()).toBe(1);
 });
@@ -721,19 +721,19 @@ it("should start with clean database", () => {
 
 ```cfc
 describe("Price Calculation", () => {
-    
+
     it("should handle zero quantity", () => {
         var item = build("orderItem", {quantity: 0, price: 10});
         expect(item.getTotal()).toBe(0);
     });
-    
+
     it("should handle negative prices gracefully", () => {
         var item = build("orderItem", {quantity: 1, price: -10});
         expect(() => {
             item.getTotal();
         }).toThrow("InvalidPriceException");
     });
-    
+
     it("should handle very large numbers", () => {
         var item = build("orderItem", {quantity: 999999, price: 999999.99});
         expect(() => {
@@ -742,7 +742,7 @@ describe("Price Calculation", () => {
             expect(total).toBeGT(0);
         }).notToThrow();
     });
-    
+
     it("should handle decimal precision", () => {
         var item = build("orderItem", {quantity: 3, price: 10.01});
         expect(item.getTotal()).toBe(30.03);
@@ -754,31 +754,31 @@ describe("Price Calculation", () => {
 
 ```cfc
 describe("User Registration", () => {
-    
+
     it("should handle database connection failure", () => {
         // Mock database failure
         var mockDB = createMock("wheels.Connection");
         mockDB.$("execute").throws("Database.ConnectionError", "Connection refused");
-        
+
         model("User").setConnection(mockDB);
-        
+
         expect(() => {
             create("user");
         }).toThrow("Database.ConnectionError");
     });
-    
+
     it("should handle concurrent registration attempts", () => {
         var email = "concurrent@test.com";
-        
+
         // Simulate race condition
         transaction {
             var user1 = model("User").new(email: email);
             var user2 = model("User").new(email: email);
-            
+
             expect(user1.save()).toBeTrue();
             expect(user2.save()).toBeFalse();
             expect(user2.errors()).toHaveKey("email");
-            
+
             transaction action="rollback";
         }
     });
@@ -789,31 +789,31 @@ describe("User Registration", () => {
 
 ```cfc
 describe("String Processing", () => {
-    
+
     it("should handle empty strings", () => {
         var processor = new StringProcessor();
         expect(processor.process("")).toBe("");
         expect(processor.process(" ")).toBe("");
     });
-    
+
     it("should handle null values", () => {
         var processor = new StringProcessor();
         expect(processor.process(javaCast("null", ""))).toBe("");
     });
-    
+
     it("should handle very long strings", () => {
         var longString = repeatString("a", 10000);
         var processor = new StringProcessor();
-        
+
         expect(() => {
             processor.process(longString);
         }).notToThrow();
     });
-    
+
     it("should handle special characters", () => {
         var specialChars = "!@##$%^&*()_+-=[]{}|;':"",./<>?";
         var processor = new StringProcessor();
-        
+
         var result = processor.sanitize(specialChars);
         expect(result).notToInclude("<");
         expect(result).notToInclude(">");
@@ -825,29 +825,29 @@ describe("String Processing", () => {
 
 ```cfc
 describe("Async Operations", () => {
-    
+
     it("should timeout long-running operations", () => {
         var service = new SlowService();
         service.setTimeout(1000); // 1 second timeout
-        
+
         expect(() => {
             service.performLongOperation(); // Takes 5 seconds
         }).toThrow("TimeoutException");
     });
-    
+
     it("should handle async callbacks", () => {
         var completed = false;
         var service = new AsyncService();
-        
+
         service.processAsync(
             data = {id: 1},
             onSuccess = () => { completed = true; },
             onError = () => { completed = false; }
         );
-        
+
         // Wait for async operation
         sleep(100);
-        
+
         expect(completed).toBeTrue();
     });
 });
@@ -857,27 +857,27 @@ describe("Async Operations", () => {
 
 ```cfc
 describe("Security", () => {
-    
+
     it("should prevent SQL injection", () => {
         var maliciousInput = "'; DROP TABLE users; --";
         var user = model("User").findOne(where="email='#maliciousInput#'");
-        
+
         expect(user).toBeFalse(); // No user found, query safely escaped
         expect(model("User").count()).toBeGT(0); // Table still exists
     });
-    
+
     it("should sanitize XSS attempts", () => {
         var xssPayload = "<script>alert('XSS')</script>";
         var comment = create("comment", {body: xssPayload});
-        
+
         expect(comment.getDisplayBody()).notToInclude("<script>");
         expect(comment.getDisplayBody()).toInclude("&lt;script&gt;");
     });
-    
+
     it("should handle path traversal attempts", () => {
         var maliciousPath = "../../../../../../etc/passwd";
         var fileService = new FileService();
-        
+
         expect(() => {
             fileService.readFile(maliciousPath);
         }).toThrow("Security.InvalidPath");
@@ -946,12 +946,12 @@ expect(calculatePi()).toBeWithinRange(3.14159, 0.00001);
 ```cfc
 it("should complete within performance threshold", () => {
     var startTime = getTickCount();
-    
+
     // Run operation 100 times
     for (var i = 1; i <= 100; i++) {
         processLargeDataSet();
     }
-    
+
     var duration = getTickCount() - startTime;
     expect(duration).toBeLT(1000); // Less than 1 second
 });
