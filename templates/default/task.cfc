@@ -30,5 +30,54 @@ component extends="../../tools/docker/SimpleTaskRunner" {
 	) {
 		super.run(argumentCollection = arguments);
 	}
+	
+	/**
+	 * Stop the development server
+	 */
+	function stop() {
+		super.stop();
+	}
+	
+	/**
+	 * Restart the development server
+	 */
+	function restart() {
+		super.restart();
+	}
+	
+	/**
+	 * Show server status
+	 */
+	function status() {
+		super.status();
+	}
+	
+	/**
+	 * Show server logs
+	 */
+	function logs(boolean follow = false, numeric tail = 100) {
+		super.logs(argumentCollection = arguments);
+	}
+	
+	/**
+	 * Run application tests
+	 */
+	function test(string reporter = "text") {
+		super.test(argumentCollection = arguments);
+	}
+	
+	/**
+	 * Run core framework tests
+	 */
+	function testCore(string format = "txt") {
+		super.testCore(argumentCollection = arguments);
+	}
+	
+	/**
+	 * Clean up Docker resources
+	 */
+	function clean() {
+		super.clean();
+	}
 
 }

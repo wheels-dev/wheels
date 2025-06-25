@@ -109,6 +109,92 @@ component {
 	}
 
 	/**
+	 * Run application tests
+	 */
+	function test(string reporter = "text") {
+		print.boldBlueLine("Running application tests...");
+		
+		// Check if server is running
+		if (!isServerRunning()) {
+			print.redLine("Server is not running. Start it with: box task run start");
+			return;
+		}
+		
+		// Get port from docker-compose.yml
+		var port = getPort();
+		var testUrl = "http://localhost:#port#/index.cfm/tests/runner?reporter=#arguments.reporter#";
+		
+		print.line("Running tests at: #testUrl#");
+		print.line();
+		
+		// Make HTTP request to run tests
+		try {
+			cfhttp(url=testUrl, method="GET", timeout=30, result="testResult");
+			
+			if (testResult.statusCode contains "200") {
+				// For text reporter, strip HTML if present
+				var output = testResult.fileContent;
+				if (arguments.reporter == "text" && output contains "<") {
+					// Try to extract just the text content
+					output = reReplace(output, "<[^>]*>", "", "all");
+					output = reReplace(output, "[\t\r\n]+", chr(10), "all");
+					output = trim(output);
+				}
+				print.line(output);
+			} else {
+				print.redLine("Failed to run tests. Status: #testResult.statusCode#");
+			}
+		} catch (any e) {
+			print.redLine("Error running tests: #e.message#");
+			print.line("You can manually access the tests at: #testUrl#");
+		}
+	}
+	
+	/**
+	 * Run core framework tests
+	 */
+	function testCore(string format = "txt") {
+		print.boldBlueLine("Running core framework tests...");
+		
+		// Check if server is running
+		if (!isServerRunning()) {
+			print.redLine("Server is not running. Start it with: box task run start");
+			return;
+		}
+		
+		// Get port from docker-compose.yml
+		var port = getPort();
+		var testUrl = "http://localhost:#port#/core-tests/runner.cfm?format=#arguments.format#";
+		
+		print.line("Running core tests at: #testUrl#");
+		print.line();
+		
+		// Make HTTP request to run tests
+		try {
+			cfhttp(url=testUrl, method="GET", timeout=60, result="testResult");
+			
+			if (testResult.statusCode contains "200") {
+				// For text format, the output should already be plain text
+				print.line(testResult.fileContent);
+			} else {
+				print.redLine("Failed to run core tests. Status: #testResult.statusCode#");
+				print.line("Make sure the core framework is properly mounted in Docker.");
+			}
+		} catch (any e) {
+			print.redLine("Error running core tests: #e.message#");
+			print.line("You can manually access the tests at: #testUrl#");
+		}
+	}
+	
+	/**
+	 * Restart the server
+	 */
+	function restart() {
+		stop();
+		run();
+	}
+	
+	/**
 	 * Show help
 	 */
 	function help() {
@@ -127,11 +213,20 @@ component {
 		print.greenLine("  box task run stop");
 		print.line("    Stop the development server");
 		print.line();
+		print.greenLine("  box task run restart");
+		print.line("    Restart the development server");
+		print.line();
 		print.greenLine("  box task run status");
 		print.line("    Check server status");
 		print.line();
 		print.greenLine("  box task run logs [--follow] [--tail=100]");
 		print.line("    View server logs");
+		print.line();
+		print.greenLine("  box task run test [--reporter=text|simple|json|junit|html]");
+		print.line("    Run application tests");
+		print.line();
+		print.greenLine("  box task run testCore [--format=txt|json|html]");
+		print.line("    Run core framework tests (requires core tests to be mounted)");
 		print.line();
 		print.greenLine("  box task run clean");
 		print.line("    Remove containers and volumes");
@@ -139,6 +234,37 @@ component {
 	}
 
 	// Private helper methods
+	
+	private function isServerRunning() {
+		// For now, just check if docker-compose.yml exists
+		// A more robust check would use docker compose ps
+		var cwd = getCWD();
+		return fileExists(cwd & "/docker-compose.yml");
+	}
+	
+	private function getPort() {
+		// Try to read from docker-compose.yml
+		var cwd = getCWD();
+		var dockerComposePath = cwd & "/docker-compose.yml";
+		
+		if (fileExists(dockerComposePath)) {
+			var content = fileRead(dockerComposePath);
+			// Look for port mapping like "60006:60006"
+			var portPattern = '- "(\d+):\d+"';
+			var matches = reMatchNoCase(portPattern, content);
+			if (arrayLen(matches)) {
+				// Extract just the numbers from the first match
+				var portMatch = matches[1];
+				var portNum = reReplace(portMatch, '[^0-9:]', '', 'all');
+				// Get the first port (before the colon)
+				if (find(":", portNum)) {
+					return listFirst(portNum, ":");
+				}
+				return portNum;
+			}
+		}
+		return 60006; // default
+	}
 
 	private function generateDockerCompose(required string engine, required string database, required numeric port) {
 		// Get current working directory using getCWD()
