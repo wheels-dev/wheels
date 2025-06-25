@@ -123,11 +123,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Copy server.json files
+      - name: Setup Test Environment
         run: |
+          # Copy server configuration files to root (for backward compatibility)
           cp ./docker/${{ matrix.cfengine }}/server.json ./
           cp ./docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
-          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./config/settings.cfm
+          
+          # Create config directory for settings
+          mkdir -p ./config
+          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./config/
+          
+          # Create public directory and copy wheels to it
+          mkdir -p ./public
+          cp -r ./core/src/wheels ./public/
+          
+          # Create a simple Application.cfc for testing
+          cat > ./Application.cfc << 'EOF'
+          component {
+              this.name = "WheelsTests";
+              this.sessionManagement = true;
+              this.sessionTimeout = createTimeSpan(0, 0, 30, 0);
+              
+              include "wheels/events/onapplicationstart.cfm";
+          }
+          EOF
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
