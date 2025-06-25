@@ -1,0 +1,22 @@
+name: Build Docs
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: Ortus-Solutions/setup-commandbox@v2.0.1
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - run: pip install mkdocs mkdocs-material
+      - run: box task run docs:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs
+          path: public/docs
