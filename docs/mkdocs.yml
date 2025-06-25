@@ -1,5 +1,5 @@
 site_name: Wheels Docs
-site_dir: ../public/docs
+site_dir: ../docs/public
 docs_dir: ../guides/src
 nav:
   - INTRODUCTION:

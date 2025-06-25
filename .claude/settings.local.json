@@ -94,7 +94,10 @@
       "Bash(npm run dev:*)",
       "Bash(VITE_PORT=3001 npm run dev)",
       "Bash(diff:*)",
-      "Bash(docker:*)"
+      "Bash(docker:*)",
+      "Bash(mkdocs:*)",
+      "Bash(pip3 install:*)",
+      "Bash(/Users/peter/Library/Python/3.9/bin/mkdocs build)"
     ],
     "deny": []
   }
