@@ -16,7 +16,7 @@
 			"allowRevoke": true,
 			"allowSelect": true,
 			"allowUpdate": true,
-			"class": "com.mysql.cj.jdbc.Driver",
+			"class": "org.gjt.mm.mysql.Driver",
 			"database": "wheelstestdb",
 			"dbdriver": "mysql",
 			"dsn": "jdbc:mysql://{host}:{port}/{database}?tinyInt1isBit=false",
