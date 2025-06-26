@@ -18,5 +18,8 @@
 			"libDirs":"tools/docker/lucee@7/lib",
 			"serverHomeDirectory":".engine/lucee@7"
 	},
-	"cfconfigFile":"CFConfig.json"
+	"cfconfigFile":"CFConfig.json",
+	"cfconfig": {
+		"cfEngineVersion": "luceeServer"
+	}
 }
