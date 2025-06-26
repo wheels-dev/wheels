@@ -125,36 +125,38 @@ jobs:
 
       - name: Setup Test Environment
         run: |
-          # Copy server configuration files to root (for backward compatibility)
-          cp ./tools/docker/${{ matrix.cfengine }}/server.json ./
-          cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
+          # Clear and prepare workspace
+          rm -rf ./tools/workspace/*
           
-          # Create H2 database directory for H2 datasource
-          mkdir -p ./tools/docker/${{ matrix.cfengine }}/H2.db/
+          # Copy base template to workspace root
+          cp -r ./templates/base/src/* ./tools/workspace/
           
-          # Create config directory for settings
-          mkdir -p ./config
-          cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./config/
+          # Copy wheels framework to vendor directory
+          mkdir -p ./tools/workspace/vendor
+          cp -r ./core/src/wheels ./tools/workspace/vendor/
           
-          # Update settings.cfm to use the correct datasource based on dbengine
+          # Copy engine-specific configurations
+          cp ./tools/docker/${{ matrix.cfengine }}/server.json ./tools/workspace/
+          cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./tools/workspace/CFConfig.json
+          cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./tools/workspace/config/
+          
+          # Create H2 database directory if needed
+          mkdir -p ./tools/workspace/db/
+          
+          # Update settings.cfm for the correct database
           if [ "${{ matrix.dbengine }}" != "h2" ]; then
-              sed -i.bak 's/wheelstestdb_h2/wheelstestdb_${{ matrix.dbengine }}/g' ./config/settings.cfm
+              sed -i.bak 's/wheelstestdb_h2/wheelstestdb_${{ matrix.dbengine }}/g' ./tools/workspace/config/settings.cfm
           fi
           
-          # Copy base template structure
-          cp -r ./templates/base/src/* ./
-          
-          # Create vendor directory and copy wheels to it
-          mkdir -p ./vendor
-          cp -r ./core/src/wheels ./vendor/
-          
-          # Copy test app resources if they don't exist
-          if [ ! -d "./app" ]; then
-              cp -r ./vendor/wheels/tests_testbox/resources/app ./
+          # Copy test app resources if they don't exist in workspace
+          if [ ! -d "./tools/workspace/app" ]; then
+              cp -r ./tools/workspace/vendor/wheels/tests_testbox/resources/app ./tools/workspace/
           fi
           
           # Update box.json with onServerInstall script
+          cd ./tools/workspace
           jq '.scripts.onServerInstall = "cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"' box.json > box.json.tmp && mv box.json.tmp box.json
+          cd ../..
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
@@ -173,16 +175,20 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          # Install dependencies at root level
+          # Install dependencies in workspace
+          cd ./tools/workspace
           box install
 
       - name: Start ${{ matrix.cfengine }} Server
         run: |
+          cd ./tools/workspace
           box server start serverConfigFile="server.json" --noSaveSettings --debug
 
       - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
         if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
-        run: box run-script onServerInstall
+        run: |
+          cd ./tools/workspace
+          box run-script onServerInstall
 
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
         run: |
@@ -200,6 +206,7 @@ jobs:
         if: ${{ failure() }}
         run: |
           box version
+          cd ./tools/workspace
           box server info serverConfigFile="server.json" --json
           box server log serverConfigFile="server.json"
 
