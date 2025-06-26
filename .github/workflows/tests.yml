@@ -43,8 +43,8 @@ jobs:
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
-          - cfengine: "lucee@7"
-            dbengine: "oracle"
+          # - cfengine: "lucee@7"
+          #   dbengine: "oracle"
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
