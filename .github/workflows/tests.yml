@@ -228,6 +228,12 @@ jobs:
           cd ./tools/workspace
           box install
 
+      - name: Manually load CFConfig for Lucee 7
+        if: ${{ startsWith(matrix.cfengine, 'lucee@7') }}
+        run: |
+          cd ./tools/workspace
+          box cfconfig import from=CFConfig.json to=.engine/lucee@7/lucee-server --engine=luceeServer
+
       - name: Start ${{ matrix.cfengine }} Server
         run: |
           cd ./tools/workspace
