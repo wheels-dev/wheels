@@ -20,6 +20,6 @@
 	},
 	"cfconfigFile":"CFConfig.json",
 	"scripts":{
-        "onServerInstall":"cfpm install image,mail,zip,caching"
+        "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"
     }
 }

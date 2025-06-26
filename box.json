@@ -2,7 +2,6 @@
     "name": "wheels-monorepo",
     "version": "3.0.0",
     "scripts": {
-        "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver",
         "test:all": "task run test:core && task run test:cli && task run test:templates",
         "test:core": "cd core && box testbox run",
         "test:cli": "cd cli && box testbox run",
