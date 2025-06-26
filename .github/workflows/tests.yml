@@ -228,6 +228,12 @@ jobs:
           cd ./tools/workspace
           box install
 
+      - name: Debug CFConfig Version
+        if: ${{ startsWith(matrix.cfengine, 'lucee@7') }}
+        run: |
+          cd ./tools/workspace
+          box list --system
+
       - name: Start ${{ matrix.cfengine }} Server
         run: |
           cd ./tools/workspace
