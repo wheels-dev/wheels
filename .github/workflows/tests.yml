@@ -228,11 +228,10 @@ jobs:
           cd ./tools/workspace
           box install
 
-      - name: Debug CFConfig Version
-        if: ${{ startsWith(matrix.cfengine, 'lucee@7') }}
+      - name: Force install latest cfconfig
         run: |
           cd ./tools/workspace
-          box list --system
+          box install commandbox-cfconfig@be
 
       - name: Start ${{ matrix.cfengine }} Server
         run: |
