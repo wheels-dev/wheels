@@ -45,9 +45,9 @@ jobs:
             experimental: true
           # - cfengine: "lucee@7"
           #   dbengine: "oracle"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
+          #   commandbox_version: "6.2.1"
+          #   jdkVersion: "21"
+          #   experimental: true
         exclude:
           # Lucee 5 has compatibility issues with Oracle JDBC driver
           - cfengine: lucee@5
