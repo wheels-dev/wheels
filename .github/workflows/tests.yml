@@ -236,6 +236,9 @@ jobs:
       - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
         if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
         run: box run-script onServerInstall
+        run: |
+          cd tools/workspace
+          box run-script onServerInstall
 
       # Database drivers are bundled with CommandBox/Lucee/Adobe CF
       # H2 driver is downloaded manually for Lucee engines in the setup step
