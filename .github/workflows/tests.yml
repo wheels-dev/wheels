@@ -149,13 +149,15 @@ jobs:
           # Fix MySQL dbdriver value if it's set to "localhost"
           jq 'if .datasources.wheelstestdb_mysql.dbdriver == "localhost" then .datasources.wheelstestdb_mysql.dbdriver = "mysql" else . end' ./tools/workspace/CFConfig.json > ./tools/workspace/CFConfig.json.tmp && mv ./tools/workspace/CFConfig.json.tmp ./tools/workspace/CFConfig.json
           
-          # Fix server.json libDirs path to be relative to workspace
-          jq '.app.libDirs = "./lib"' ./tools/workspace/server.json > ./tools/workspace/server.json.tmp && mv ./tools/workspace/server.json.tmp ./tools/workspace/server.json
+          # Fix server.json libDirs path to be relative to workspace (only for engines that have libDirs)
+          if jq -e '.app.libDirs' ./tools/workspace/server.json > /dev/null 2>&1; then
+              jq '.app.libDirs = "./lib"' ./tools/workspace/server.json > ./tools/workspace/server.json.tmp && mv ./tools/workspace/server.json.tmp ./tools/workspace/server.json
+          fi
           
-          # Create lib directory and download H2 driver for Lucee engines and H2 database tests
+          # Create lib directory and download H2 driver for Lucee engines
           mkdir -p ./tools/workspace/lib
-          if [[ "${{ matrix.cfengine }}" == lucee* ]] && [[ "${{ matrix.dbengine }}" == "h2" ]]; then
-              # Download H2 driver JAR only for Lucee with H2 database
+          if [[ "${{ matrix.cfengine }}" == lucee* ]]; then
+              # Download H2 driver JAR for all Lucee tests (framework may depend on it)
               curl -L -o ./tools/workspace/lib/h2-1.3.172.jar https://repo1.maven.org/maven2/com/h2database/h2/1.3.172/h2-1.3.172.jar
           fi
           
