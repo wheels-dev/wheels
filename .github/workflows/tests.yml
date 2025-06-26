@@ -149,6 +149,16 @@ jobs:
           # Fix MySQL dbdriver value if it's set to "localhost"
           jq 'if .datasources.wheelstestdb_mysql.dbdriver == "localhost" then .datasources.wheelstestdb_mysql.dbdriver = "mysql" else . end' ./tools/workspace/CFConfig.json > ./tools/workspace/CFConfig.json.tmp && mv ./tools/workspace/CFConfig.json.tmp ./tools/workspace/CFConfig.json
           
+          # Fix server.json libDirs path to be relative to workspace
+          jq '.app.libDirs = "./lib"' ./tools/workspace/server.json > ./tools/workspace/server.json.tmp && mv ./tools/workspace/server.json.tmp ./tools/workspace/server.json
+          
+          # Create lib directory and download H2 driver for Lucee engines
+          mkdir -p ./tools/workspace/lib
+          if [[ "${{ matrix.cfengine }}" == lucee* ]]; then
+              # Download H2 driver JAR
+              curl -L -o ./tools/workspace/lib/h2-1.3.172.jar https://repo1.maven.org/maven2/com/h2database/h2/1.3.172/h2-1.3.172.jar
+          fi
+          
           # Update settings.cfm for the correct database
           if [ "${{ matrix.dbengine }}" != "h2" ]; then
               sed -i.bak 's/wheelstestdb_h2/wheelstestdb_${{ matrix.dbengine }}/g' ./tools/workspace/config/settings.cfm
@@ -190,11 +200,8 @@ jobs:
           cd ./tools/workspace
           box server start serverConfigFile="server.json" --noSaveSettings --debug
 
-      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
-        if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
-        run: |
-          cd ./tools/workspace
-          box run-script onServerInstall
+      # Database drivers are bundled with CommandBox/Lucee/Adobe CF
+      # H2 driver is downloaded manually for Lucee engines in the setup step
 
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
         run: |
