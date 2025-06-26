@@ -49,6 +49,9 @@ jobs:
             jdkVersion: "21"
             experimental: true
         exclude:
+          # Lucee 5 has compatibility issues with Oracle JDBC driver
+          - cfengine: lucee@5
+            dbengine: oracle
           # - cfengine: lucee@5
           #   dbengine: mysql
           # - cfengine: lucee@5
