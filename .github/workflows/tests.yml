@@ -70,8 +70,8 @@ jobs:
           #   dbengine: sqlserver
           # - cfengine: lucee@6
           #   dbengine: h2
-          # - cfengine: lucee@6
-          #   dbengine: oracle
+          - cfengine: lucee@6
+            dbengine: oracle
           # - cfengine: lucee@7
           #   dbengine: mysql
           # - cfengine: lucee@7
@@ -130,47 +130,47 @@ jobs:
         run: |
           # Clear and prepare workspace
           rm -rf ./tools/workspace/*
-          
+
           # Copy base template to workspace root
           cp -r ./templates/base/src/* ./tools/workspace/
-          
+
           # Copy wheels framework to vendor directory
           mkdir -p ./tools/workspace/vendor
           cp -r ./core/src/wheels ./tools/workspace/vendor/
-          
+
           # Copy engine-specific configurations
           cp ./tools/docker/${{ matrix.cfengine }}/server.json ./tools/workspace/
           cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./tools/workspace/CFConfig.json
           cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./tools/workspace/config/
-          
+
           # Create H2 database directory if needed
           mkdir -p ./tools/workspace/db/
-          
+
           # Fix H2 database path in CFConfig to use workspace db directory
           jq '.datasources.wheelstestdb_h2.custom = "mode=MySQL&path=./db/"' ./tools/workspace/CFConfig.json > ./tools/workspace/CFConfig.json.tmp && mv ./tools/workspace/CFConfig.json.tmp ./tools/workspace/CFConfig.json
-          
+
           # Fix MySQL dbdriver value if it's set to "localhost"
           jq 'if .datasources.wheelstestdb_mysql.dbdriver == "localhost" then .datasources.wheelstestdb_mysql.dbdriver = "mysql" else . end' ./tools/workspace/CFConfig.json > ./tools/workspace/CFConfig.json.tmp && mv ./tools/workspace/CFConfig.json.tmp ./tools/workspace/CFConfig.json
-          
+
           # Fix Oracle database name and DSN format for Oracle XE
           if jq -e '.datasources.wheelstestdb_oracle' ./tools/workspace/CFConfig.json > /dev/null 2>&1; then
               jq '.datasources.wheelstestdb_oracle.database = "wheelstestdb" | .datasources.wheelstestdb_oracle.dsn = "jdbc:oracle:thin:@{host}:{port}/{database}"' ./tools/workspace/CFConfig.json > ./tools/workspace/CFConfig.json.tmp && mv ./tools/workspace/CFConfig.json.tmp ./tools/workspace/CFConfig.json
           fi
-          
+
           # Fix server.json libDirs path to be relative to workspace (only for engines that have libDirs)
           if jq -e '.app.libDirs' ./tools/workspace/server.json > /dev/null 2>&1; then
               jq '.app.libDirs = "./lib"' ./tools/workspace/server.json > ./tools/workspace/server.json.tmp && mv ./tools/workspace/server.json.tmp ./tools/workspace/server.json
           fi
-          
+
           # Create lib directory for database drivers
           mkdir -p ./tools/workspace/lib
-          
+
           # Download database drivers based on engine and database
           if [[ "${{ matrix.cfengine }}" == lucee* ]]; then
               # Download H2 driver JAR for all Lucee tests (framework may depend on it)
               curl -L -o ./tools/workspace/lib/h2-1.3.172.jar https://repo1.maven.org/maven2/com/h2database/h2/1.3.172/h2-1.3.172.jar
           fi
-          
+
           # Download Oracle driver if testing with Oracle
           if [[ "${{ matrix.dbengine }}" == "oracle" ]]; then
               # Oracle JDBC driver (using ojdbc8 for compatibility)
@@ -178,17 +178,17 @@ jobs:
               # Also download Oracle UCP (connection pooling) which might be required
               curl -L -o ./tools/workspace/lib/ucp.jar https://repo1.maven.org/maven2/com/oracle/database/jdbc/ucp/19.3.0.0/ucp-19.3.0.0.jar
           fi
-          
+
           # Update settings.cfm for the correct database
           if [ "${{ matrix.dbengine }}" != "h2" ]; then
               sed -i.bak 's/wheelstestdb_h2/wheelstestdb_${{ matrix.dbengine }}/g' ./tools/workspace/config/settings.cfm
           fi
-          
+
           # Copy test app resources if they don't exist in workspace
           if [ ! -d "./tools/workspace/app" ]; then
               cp -r ./tools/workspace/vendor/wheels/tests_testbox/resources/app ./tools/workspace/
           fi
-          
+
           # Update box.json with onServerInstall script
           cd ./tools/workspace
           jq '.scripts.onServerInstall = "cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"' box.json > box.json.tmp && mv box.json.tmp box.json
@@ -197,7 +197,7 @@ jobs:
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
         run: docker compose up -d ${{ matrix.dbengine }}
-        
+
       - name: Wait for Oracle database to be ready
         if: ${{ matrix.dbengine == 'oracle' }}
         run: |
