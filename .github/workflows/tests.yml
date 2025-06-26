@@ -232,7 +232,7 @@ jobs:
         if: ${{ startsWith(matrix.cfengine, 'lucee@7') }}
         run: |
           cd ./tools/workspace
-          box cfconfig import from=CFConfig.json to=.engine/lucee@7/lucee-server toFormat=JSON --engine=luceeServer
+          box cfconfig import from=CFConfig.json to=.engine/lucee@7/lucee-server toFormat=JSON --engine=luceeServer --version=6.0.0
 
       - name: Start ${{ matrix.cfengine }} Server
         run: |
