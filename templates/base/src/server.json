@@ -1,0 +1,8 @@
+{
+    "web": {
+        "rewrites": {
+            "enable": true,
+            "configFile": "urlrewrite.xml"
+        }
+    }
+}

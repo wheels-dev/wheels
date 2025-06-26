@@ -1,0 +1,30 @@
+FROM mcr.microsoft.com/mssql/server:2022-latest
+
+LABEL maintainer "Wheels Core Team"
+
+# Switch to root for setup operations
+USER root
+
+# Set environment variables
+ENV MSSQL_SA_PASSWORD="x!bsT8t60yo0cTVTPq"
+ENV ACCEPT_EULA="Y"
+ENV MSSQL_PID="Developer"
+
+# Create directory for scripts
+RUN mkdir -p /usr/src/app
+
+# Copy the initialization script
+COPY ./tools/docker/sqlserver/init-db.sh /usr/src/app/init-db.sh
+RUN chmod +x /usr/src/app/init-db.sh
+
+# Expose port 1433
+EXPOSE 1433
+
+# Health check - using correct path to sqlcmd
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=3 \
+  CMD /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "${MSSQL_SA_PASSWORD}" -Q "SELECT 1" -C || exit 1
+
+# Switch back to mssql user for running SQL Server
+USER mssql
+
+CMD ["/bin/bash", "/usr/src/app/init-db.sh"]

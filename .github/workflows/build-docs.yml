@@ -1,0 +1,47 @@
+name: Build Docs
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install MkDocs and dependencies
+        run: pip install mkdocs mkdocs-material mkdocs-minify-plugin pymdown-extensions
+
+      - name: Build documentation
+        run: |
+          cd docs
+          mkdocs build
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-docs-${{ github.sha }}
+          path: docs/public
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Add PR comment with artifact link
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '📚 Documentation build successful! Download the artifacts from the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).'
+            })

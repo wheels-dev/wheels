@@ -1,0 +1,280 @@
+site_name: CFWheels Guides
+site_url: https://guides.cfwheels.org/
+site_dir: ../docs/public
+docs_dir: ../guides/src
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.ico
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: 'Helvetica Neue'
+    code: 'Source Code Pro'
+
+extra_css:
+  - stylesheets/gitbook.css
+
+plugins:
+  - search:
+      separator: '[\s\-\.]+'
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/wheels-dev/wheels
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/cfwheels
+nav:
+  - INTRODUCTION:
+    - 'Getting Started': 'README.md'
+    - 'Running Local Development Servers': 'introduction/readme/running-local-development-servers.md'
+    - 'Beginner Tutorial: Hello World': 'introduction/readme/beginner-tutorial-hello-world.md'
+    - 'Beginner Tutorial: Hello Database': 'introduction/readme/beginner-tutorial-hello-database.md'
+    - 'Tutorial: Wheels, AJAX, and You': 'introduction/readme/tutorial-wheels-ajax-and-you.md'
+    - 'Frameworks and Wheels': 'introduction/frameworks-and-wheels.md'
+    - 'Requirements': 'introduction/requirements.md'
+    - 'Manual Installation': 'introduction/manual-installation.md'
+    - 'Upgrading': 'introduction/upgrading.md'
+    - 'Screencasts': 'introduction/screencasts.md'
+  - 'Command Line Tools':
+    - 'CLI Overview': 'command-line-tools/cli-overview.md'
+    - 'Quick Start Guide': 'command-line-tools/quick-start.md'
+    - 'Command Reference':
+      - 'Core Commands':
+        - 'wheels init': 'command-line-tools/commands/core/init.md'
+        - 'wheels info': 'command-line-tools/commands/core/info.md'
+        - 'wheels reload': 'command-line-tools/commands/core/reload.md'
+        - 'wheels deps': 'command-line-tools/commands/core/deps.md'
+        - 'wheels destroy': 'command-line-tools/commands/core/destroy.md'
+        - 'wheels watch': 'command-line-tools/commands/core/watch.md'
+      - 'Code Generation':
+        - 'wheels generate app': 'command-line-tools/commands/generate/app.md'
+        - 'wheels generate app-wizard': 'command-line-tools/commands/generate/app-wizard.md'
+        - 'wheels generate controller': 'command-line-tools/commands/generate/controller.md'
+        - 'wheels generate model': 'command-line-tools/commands/generate/model.md'
+        - 'wheels generate view': 'command-line-tools/commands/generate/view.md'
+        - 'wheels generate property': 'command-line-tools/commands/generate/property.md'
+        - 'wheels generate route': 'command-line-tools/commands/generate/route.md'
+        - 'wheels generate resource': 'command-line-tools/commands/generate/resource.md'
+        - 'wheels generate api-resource': 'command-line-tools/commands/generate/api-resource.md'
+        - 'wheels generate frontend': 'command-line-tools/commands/generate/frontend.md'
+        - 'wheels generate test': 'command-line-tools/commands/generate/test.md'
+        - 'wheels generate snippets': 'command-line-tools/commands/generate/snippets.md'
+        - 'wheels scaffold': 'command-line-tools/commands/generate/scaffold.md'
+      - 'Database Commands':
+        - 'Database Management Overview': 'command-line-tools/commands/database/database-management.md'
+        - 'Database Operations':
+          - 'wheels db create': 'command-line-tools/commands/database/db-create.md'
+          - 'wheels db drop': 'command-line-tools/commands/database/db-drop.md'
+          - 'wheels db setup': 'command-line-tools/commands/database/db-setup.md'
+          - 'wheels db reset': 'command-line-tools/commands/database/db-reset.md'
+          - 'wheels db status': 'command-line-tools/commands/database/db-status.md'
+          - 'wheels db version': 'command-line-tools/commands/database/db-version.md'
+          - 'wheels db rollback': 'command-line-tools/commands/database/db-rollback.md'
+          - 'wheels db seed': 'command-line-tools/commands/database/db-seed.md'
+          - 'wheels db dump': 'command-line-tools/commands/database/db-dump.md'
+          - 'wheels db restore': 'command-line-tools/commands/database/db-restore.md'
+          - 'wheels db shell': 'command-line-tools/commands/database/db-shell.md'
+          - 'wheels db schema': 'command-line-tools/commands/database/db-schema.md'
+        - 'Migration Commands':
+          - 'wheels dbmigrate info': 'command-line-tools/commands/database/dbmigrate-info.md'
+          - 'wheels dbmigrate latest': 'command-line-tools/commands/database/dbmigrate-latest.md'
+          - 'wheels dbmigrate up': 'command-line-tools/commands/database/dbmigrate-up.md'
+          - 'wheels dbmigrate down': 'command-line-tools/commands/database/dbmigrate-down.md'
+          - 'wheels dbmigrate reset': 'command-line-tools/commands/database/dbmigrate-reset.md'
+          - 'wheels dbmigrate exec': 'command-line-tools/commands/database/dbmigrate-exec.md'
+          - 'wheels dbmigrate create blank': 'command-line-tools/commands/database/dbmigrate-create-blank.md'
+          - 'wheels dbmigrate create table': 'command-line-tools/commands/database/dbmigrate-create-table.md'
+          - 'wheels dbmigrate create column': 'command-line-tools/commands/database/dbmigrate-create-column.md'
+          - 'wheels dbmigrate remove table': 'command-line-tools/commands/database/dbmigrate-remove-table.md'
+      - 'Testing Commands':
+        - 'wheels test': 'command-line-tools/commands/testing/test.md'
+        - 'wheels test run': 'command-line-tools/commands/testing/test-run.md'
+        - 'wheels test coverage': 'command-line-tools/commands/testing/test-coverage.md'
+        - 'wheels test debug': 'command-line-tools/commands/testing/test-debug.md'
+      - 'Configuration Commands':
+        - 'wheels config list': 'command-line-tools/commands/config/config-list.md'
+        - 'wheels config set': 'command-line-tools/commands/config/config-set.md'
+        - 'wheels config env': 'command-line-tools/commands/config/config-env.md'
+      - 'Environment Management':
+        - 'wheels env': 'command-line-tools/commands/environment/env.md'
+        - 'wheels env setup': 'command-line-tools/commands/environment/env-setup.md'
+        - 'wheels env list': 'command-line-tools/commands/environment/env-list.md'
+        - 'wheels env switch': 'command-line-tools/commands/environment/env-switch.md'
+        - 'wheels environment': 'command-line-tools/commands/environment/environment.md'
+        - 'wheels console': 'command-line-tools/commands/environment/console.md'
+        - 'wheels runner': 'command-line-tools/commands/environment/runner.md'
+      - 'Server Management':
+        - 'wheels server': 'command-line-tools/commands/server/server.md'
+        - 'wheels server start': 'command-line-tools/commands/server/server-start.md'
+        - 'wheels server stop': 'command-line-tools/commands/server/server-stop.md'
+        - 'wheels server restart': 'command-line-tools/commands/server/server-restart.md'
+        - 'wheels server status': 'command-line-tools/commands/server/server-status.md'
+        - 'wheels server log': 'command-line-tools/commands/server/server-log.md'
+        - 'wheels server open': 'command-line-tools/commands/server/server-open.md'
+      - 'Plugin Management':
+        - 'wheels plugins': 'command-line-tools/commands/plugins/plugins.md'
+        - 'wheels plugins list': 'command-line-tools/commands/plugins/plugins-list.md'
+        - 'wheels plugins install': 'command-line-tools/commands/plugins/plugins-install.md'
+        - 'wheels plugins remove': 'command-line-tools/commands/plugins/plugins-remove.md'
+      - 'Code Analysis':
+        - 'wheels analyze': 'command-line-tools/commands/analysis/analyze.md'
+        - 'wheels analyze code': 'command-line-tools/commands/analysis/analyze-code.md'
+        - 'wheels analyze performance': 'command-line-tools/commands/analysis/analyze-performance.md'
+        - 'wheels analyze security': 'command-line-tools/commands/analysis/analyze-security.md'
+      - 'Security Commands':
+        - 'wheels security': 'command-line-tools/commands/security/security.md'
+        - 'wheels security scan': 'command-line-tools/commands/security/security-scan.md'
+      - 'Performance Commands':
+        - 'wheels optimize': 'command-line-tools/commands/performance/optimize.md'
+        - 'wheels optimize performance': 'command-line-tools/commands/performance/optimize-performance.md'
+      - 'Documentation Commands':
+        - 'wheels docs': 'command-line-tools/commands/documentation/docs.md'
+        - 'wheels docs generate': 'command-line-tools/commands/documentation/docs-generate.md'
+        - 'wheels docs serve': 'command-line-tools/commands/documentation/docs-serve.md'
+      - 'CI/CD Commands':
+        - 'wheels ci init': 'command-line-tools/commands/ci/ci-init.md'
+      - 'Docker Commands':
+        - 'wheels docker init': 'command-line-tools/commands/docker/docker-init.md'
+        - 'wheels docker deploy': 'command-line-tools/commands/docker/docker-deploy.md'
+      - 'Deployment Commands':
+        - 'wheels deploy': 'command-line-tools/commands/deploy/deploy.md'
+        - 'wheels deploy audit': 'command-line-tools/commands/deploy/deploy-audit.md'
+        - 'wheels deploy exec': 'command-line-tools/commands/deploy/deploy-exec.md'
+        - 'wheels deploy hooks': 'command-line-tools/commands/deploy/deploy-hooks.md'
+        - 'wheels deploy init': 'command-line-tools/commands/deploy/deploy-init.md'
+        - 'wheels deploy lock': 'command-line-tools/commands/deploy/deploy-lock.md'
+        - 'wheels deploy logs': 'command-line-tools/commands/deploy/deploy-logs.md'
+        - 'wheels deploy proxy': 'command-line-tools/commands/deploy/deploy-proxy.md'
+        - 'wheels deploy push': 'command-line-tools/commands/deploy/deploy-push.md'
+        - 'wheels deploy rollback': 'command-line-tools/commands/deploy/deploy-rollback.md'
+        - 'wheels deploy secrets': 'command-line-tools/commands/deploy/deploy-secrets.md'
+        - 'wheels deploy setup': 'command-line-tools/commands/deploy/deploy-setup.md'
+        - 'wheels deploy status': 'command-line-tools/commands/deploy/deploy-status.md'
+        - 'wheels deploy stop': 'command-line-tools/commands/deploy/deploy-stop.md'
+    - 'CLI Development Guides':
+      - 'Configuration Management': 'command-line-tools/configuration.md'
+      - 'Creating Commands': 'command-line-tools/cli-guides/creating-commands.md'
+      - 'Service Architecture': 'command-line-tools/cli-guides/service-architecture.md'
+      - 'Migrations Guide': 'command-line-tools/cli-guides/migrations.md'
+      - 'Testing Guide': 'command-line-tools/cli-guides/testing.md'
+  - 'Working with Wheels':
+    - 'Conventions': 'working-with-wheels/conventions.md'
+    - 'Configuration and Defaults': 'working-with-wheels/configuration-and-defaults.md'
+    - 'Directory Structure': 'working-with-wheels/directory-structure.md'
+    - 'Switching Environments': 'working-with-wheels/switching-environments.md'
+    - 'Testing Your Application': 'working-with-wheels/testing-your-application.md'
+    - 'Using the Test Environment': 'working-with-wheels/using-the-test-environment.md'
+    - 'Contributing to Wheels': 'working-with-wheels/contributing-to-wheels.md'
+    - 'Submitting Pull Requests': 'working-with-wheels/submitting-pull-requests.md'
+    - 'Documenting your Code': 'working-with-wheels/documenting-your-code.md'
+  - 'Handling Requests with Controllers':
+    - 'Request Handling': 'handling-requests-with-controllers/request-handling.md'
+    - 'Rendering Content': 'handling-requests-with-controllers/rendering-content.md'
+    - 'Redirecting Users': 'handling-requests-with-controllers/redirecting-users.md'
+    - 'Sending Files': 'handling-requests-with-controllers/sending-files.md'
+    - 'Sending Email': 'handling-requests-with-controllers/sending-email.md'
+    - 'Responding with Multiple Formats': 'handling-requests-with-controllers/responding-with-multiple-formats.md'
+    - 'Using the Flash': 'handling-requests-with-controllers/using-the-flash.md'
+    - 'Using Filters': 'handling-requests-with-controllers/using-filters.md'
+    - 'Verification': 'handling-requests-with-controllers/verification.md'
+    - 'Event Handlers': 'handling-requests-with-controllers/event-handlers.md'
+    - 'Routing': 'handling-requests-with-controllers/routing.md'
+    - 'URL Rewriting':
+      - 'Apache': 'handling-requests-with-controllers/url-rewriting/apache.md'
+      - 'IIS': 'handling-requests-with-controllers/url-rewriting/iis.md'
+      - 'Tomcat': 'handling-requests-with-controllers/url-rewriting/tomcat.md'
+      - 'Nginx': 'handling-requests-with-controllers/url-rewriting/nginx.md'
+    - 'Obfuscating URLs': 'handling-requests-with-controllers/obfuscating-urls.md'
+    - 'Caching': 'handling-requests-with-controllers/caching.md'
+    - 'Nesting Controllers': 'handling-requests-with-controllers/nesting-controllers.md'
+    - 'CORS Requests': 'handling-requests-with-controllers/cors-requests.md'
+  - 'Displaying Views to Users':
+    - 'Pages': 'displaying-views-to-users/pages.md'
+    - 'Partials': 'displaying-views-to-users/partials.md'
+    - 'Linking Pages': 'displaying-views-to-users/linking-pages.md'
+    - 'Layouts': 'displaying-views-to-users/layouts.md'
+    - 'Form Helpers and Showing Errors': 'displaying-views-to-users/form-helpers-and-showing-errors.md'
+    - 'Displaying Links for Pagination': 'displaying-views-to-users/displaying-links-for-pagination.md'
+    - 'Date, Media, and Text Helpers': 'displaying-views-to-users/date-media-and-text-helpers.md'
+    - 'Creating Custom View Helpers': 'displaying-views-to-users/creating-custom-view-helpers.md'
+    - 'Localization': 'displaying-views-to-users/localization.md'
+  - 'Database Interaction Through Models':
+    - 'Object Relational Mapping': 'database-interaction-through-models/object-relational-mapping.md'
+    - 'Creating Records': 'database-interaction-through-models/creating-records.md'
+    - 'Reading Records': 'database-interaction-through-models/reading-records.md'
+    - 'Updating Records': 'database-interaction-through-models/updating-records.md'
+    - 'Deleting Records': 'database-interaction-through-models/deleting-records.md'
+    - 'Column Statistics': 'database-interaction-through-models/column-statistics.md'
+    - 'Dynamic Finders': 'database-interaction-through-models/dynamic-finders.md'
+    - 'Getting Paginated Data': 'database-interaction-through-models/getting-paginated-data.md'
+    - 'Associations': 'database-interaction-through-models/associations.md'
+    - 'Nested Properties': 'database-interaction-through-models/nested-properties.md'
+    - 'Object Validation': 'database-interaction-through-models/object-validation.md'
+    - 'Object Callbacks': 'database-interaction-through-models/object-callbacks.md'
+    - 'Calculated Properties': 'database-interaction-through-models/calculated-properties.md'
+    - 'Transactions': 'database-interaction-through-models/transactions.md'
+    - 'Dirty Records': 'database-interaction-through-models/dirty-records.md'
+    - 'Soft Delete': 'database-interaction-through-models/soft-delete.md'
+    - 'Automatic Time Stamps': 'database-interaction-through-models/automatic-time-stamps.md'
+    - 'Database Migrations':
+      - 'Migrations in Production': 'database-interaction-through-models/database-migrations/migrations-in-production.md'
+    - 'Using Multiple Data Sources': 'database-interaction-through-models/using-multiple-data-sources.md'
+  - 'Plugins':
+    - 'Installing and Using Plugins': 'plugins/installing-and-using-plugins.md'
+    - 'Developing Plugins': 'plugins/developing-plugins.md'
+    - 'Publishing Plugins': 'plugins/publishing-plugins.md'
+  - 'Project Documentation':
+    - 'Overview': 'project-documentation/overview.md'
+  - 'External Links':
+    - 'Source Code': 'https://github.com/wheels-dev/wheels'
+    - 'Issue Tracker': 'https://github.com/wheels-dev/wheels/issues'
+    - 'Sponsor Us': 'https://opencollective.com/wheels'
+    - 'Community': 'https://github.com/wheels-dev/wheels/discussions'

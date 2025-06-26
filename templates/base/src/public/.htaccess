@@ -1,0 +1,4 @@
+RewriteEngine On
+
+# Redirect /wheels/* requests to /vendor/wheels/*
+RewriteRule ^wheels/(.*)$ /vendor/wheels/$1 [L]

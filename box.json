@@ -1,69 +1,19 @@
 {
-    "name":"Wheels.dev",
-    "version":"3.0.0-SNAPSHOT",
-    "author":"Wheels Core Team and Community",
-    "shortDescription":"Wheels MVC Framework Core Directory",
-    "location":"ForgeboxStorage",
-    "slug":"wheels.fw",
-    "directory":"vendor/wheels",
-    "createPackageDirectory":true,
-    "packageDirectory":"vendor/wheels",
-    "homepage":"https://wheels.dev/",
-    "documentation":"https://docs.wheels.dev/",
-    "changelog":"https://github.com/cfwheels/cfwheels/blob/master/CHANGELOG.md",
-    "bugs":"https://github.com/cfwheels/cfwheels/issues",
-    "repository":{
-        "type":"git",
-        "URL":"https://github.com/cfwheels/cfwheels"
-    },
-    "keywords":[
-        "mvc",
-        "rails",
-        "wheels",
-        "core"
-    ],
-    "ignore":[
-        "box.json",
-        "readme.md"
-    ],
-    "installPathConvention":{
-        "modules":"vendor/",
-        "wheels-plugins":"vendor/"
-    },
-    "installPaths":{
-        "wheels":"vendor/wheels/",
-        "wirebox":"vendor/wirebox/",
-        "testbox":"vendor/testbox/"
-    },
-    "devDependencies":{
-        "commandbox-dotenv":"*",
-        "commandbox-cfconfig":"*",
-        "commandbox-cfformat":"*"
-    },
-    "dependencies":{
-        "wirebox":"^7",
-        "testbox":"^5"
-    },
-    "type":"mvc",
-    "private":false,
-    "license":[
-        {
-            "type":"Apache License 2.0",
-            "URL":"https://github.com/cfwheels/cfwheels/blob/master/LICENSE"
-        }
-    ],
-    "scripts":{
-        "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver",
-        "format":"cfformat run --overwrite",
-        "format:watch":"cfformat watch ./.cfformat.json",
-        "format:check":"cfformat check",
-        "test":"testbox run",
-        "test:watch":"testbox watch",
-        "test:unit":"testbox run --directory=tests/specs/unit",
-        "test:integration":"testbox run --directory=tests/specs/integration",
-        "test:coverage":"testbox run --coverage --coverageReporter=html",
-        "test:migrate":"wheels test migrate tests --backup",
-        "test:app":"wheels test app",
-        "test:core":"wheels test core"
+    "name": "wheels-monorepo",
+    "version": "3.0.0",
+    "scripts": {
+        "test:all": "task run test:core && task run test:cli && task run test:templates",
+        "test:core": "cd core && box testbox run",
+        "test:cli": "cd cli && box testbox run",
+        "test:templates": "task run tools/scripts/test-templates.cfc",
+        "format": "cfformat run --cwd=core/src,cli/src,templates/base/src --overwrite",
+        "format:check": "cfformat check --cwd=core/src,cli/src,templates/base/src",
+        "build:all": "task run build:core && task run build:cli",
+        "build:core": "cd core && box package",
+        "build:cli": "cd cli && box package",
+        "docs:build": "cd docs && mkdocs build",
+        "docs:preview": "cd docs && mkdocs serve",
+        "release:prepare": "task run tools/scripts/prepare-release.cfc",
+        "release:publish": "task run tools/scripts/publish-release.cfc"
     }
 }

@@ -8,7 +8,7 @@ services:
   # Modern TestUI
   testui:
     build:
-      context: ./docker/testui
+      context: ./tools/docker/testui
     image: cfwheels-testui:v2.0.0
     ports:
       - "3000:80"
@@ -19,7 +19,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./:/cfwheels-test-suite:ro
-      - ./docker/testui/logs/nginx:/var/log/nginx
+      - ./tools/docker/testui/logs/nginx:/var/log/nginx
     # Add healthcheck to verify container is working properly
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
@@ -39,16 +39,26 @@ services:
   lucee5:
     build:
       context: ./
-      dockerfile: ./docker/lucee@5/Dockerfile
+      dockerfile: ./tools/docker/lucee@5/Dockerfile
     image: cfwheels-test-lucee5:v1.0.2
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./templates/base/src:/cfwheels-test-suite
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./docker/lucee@5/server.json
+        source: ./tools/docker/lucee@5/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./docker/lucee@5/settings.cfm
+        source: ./tools/docker/lucee@5/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/lucee@5/box.json
+        target: /cfwheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/lucee@5/CFConfig.json
+        target: /cfwheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-lucee5:/cfwheels-test-suite/vendor/wirebox
+      - testbox-lucee5:/cfwheels-test-suite/vendor/testbox
     ports:
       - "60005:60005"
     networks:
@@ -57,16 +67,26 @@ services:
   lucee6:
     build:
       context: ./
-      dockerfile: ./docker/lucee@6/Dockerfile
+      dockerfile: ./tools/docker/lucee@6/Dockerfile
     image: cfwheels-test-lucee6:v1.0.2
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./templates/base/src:/cfwheels-test-suite
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./docker/lucee@6/server.json
+        source: ./tools/docker/lucee@6/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./docker/lucee@6/settings.cfm
+        source: ./tools/docker/lucee@6/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/lucee@6/box.json
+        target: /cfwheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/lucee@6/CFConfig.json
+        target: /cfwheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-lucee6:/cfwheels-test-suite/vendor/wirebox
+      - testbox-lucee6:/cfwheels-test-suite/vendor/testbox
     ports:
       - "60006:60006"
     networks:
@@ -75,16 +95,26 @@ services:
   lucee7:
     build:
       context: ./
-      dockerfile: ./docker/lucee@7/Dockerfile
+      dockerfile: ./tools/docker/lucee@7/Dockerfile
     image: cfwheels-test-lucee7:v1.0.0
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./templates/base/src:/cfwheels-test-suite
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./docker/lucee@7/server.json
+        source: ./tools/docker/lucee@7/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./docker/lucee@7/settings.cfm
+        source: ./tools/docker/lucee@7/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/lucee@7/box.json
+        target: /cfwheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/lucee@7/CFConfig.json
+        target: /cfwheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-lucee7:/cfwheels-test-suite/vendor/wirebox
+      - testbox-lucee7:/cfwheels-test-suite/vendor/testbox
     ports:
       - "60007:60007"
     networks:
@@ -93,16 +123,26 @@ services:
   adobe2018:
     build:
       context: ./
-      dockerfile: ./docker/adobe@2018/Dockerfile
+      dockerfile: ./tools/docker/adobe@2018/Dockerfile
     image: cfwheels-test-adobe2018:v1.0.2
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./templates/base/src:/cfwheels-test-suite
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./docker/adobe@2018/server.json
+        source: ./tools/docker/adobe@2018/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./docker/adobe@2018/settings.cfm
+        source: ./tools/docker/adobe@2018/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe@2018/box.json
+        target: /cfwheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe@2018/CFConfig.json
+        target: /cfwheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2018:/cfwheels-test-suite/vendor/wirebox
+      - testbox-adobe2018:/cfwheels-test-suite/vendor/testbox
     ports:
       - "62018:62018"
     networks:
@@ -111,16 +151,26 @@ services:
   adobe2021:
     build:
       context: ./
-      dockerfile: ./docker/adobe@2021/Dockerfile
+      dockerfile: ./tools/docker/adobe@2021/Dockerfile
     image: cfwheels-test-adobe2021:v1.0.2
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./templates/base/src:/cfwheels-test-suite
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./docker/adobe@2021/server.json
+        source: ./tools/docker/adobe@2021/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./docker/adobe@2021/settings.cfm
+        source: ./tools/docker/adobe@2021/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe@2021/box.json
+        target: /cfwheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe@2021/CFConfig.json
+        target: /cfwheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2021:/cfwheels-test-suite/vendor/wirebox
+      - testbox-adobe2021:/cfwheels-test-suite/vendor/testbox
     ports:
       - "62021:62021"
     networks:
@@ -129,16 +179,26 @@ services:
   adobe2023:
     build:
       context: ./
-      dockerfile: ./docker/adobe@2023/Dockerfile
+      dockerfile: ./tools/docker/adobe@2023/Dockerfile
     image: cfwheels-test-adobe2023:v1.0.1
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./templates/base/src:/cfwheels-test-suite
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./docker/adobe@2023/server.json
+        source: ./tools/docker/adobe@2023/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./docker/adobe@2023/settings.cfm
+        source: ./tools/docker/adobe@2023/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe@2023/box.json
+        target: /cfwheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe@2023/CFConfig.json
+        target: /cfwheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2023:/cfwheels-test-suite/vendor/wirebox
+      - testbox-adobe2023:/cfwheels-test-suite/vendor/testbox
     ports:
       - "62023:62023"
     networks:
@@ -147,16 +207,26 @@ services:
   adobe2025:
     build:
       context: ./
-      dockerfile: ./docker/adobe@2025/Dockerfile
+      dockerfile: ./tools/docker/adobe@2025/Dockerfile
     image: cfwheels-test-adobe2025:v1.0.0
     volumes:
-      - ./:/cfwheels-test-suite
+      - ./templates/base/src:/cfwheels-test-suite
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./docker/adobe@2025/server.json
+        source: ./tools/docker/adobe@2025/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./docker/adobe@2025/settings.cfm
+        source: ./tools/docker/adobe@2025/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe@2025/box.json
+        target: /cfwheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe@2025/CFConfig.json
+        target: /cfwheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2025:/cfwheels-test-suite/vendor/wirebox
+      - testbox-adobe2025:/cfwheels-test-suite/vendor/testbox
     ports:
       - "62025:62025"
     networks:
@@ -202,7 +272,7 @@ services:
   sqlserver:
     build:
       context: ./
-      dockerfile: ./docker/sqlserver/Dockerfile_CICD
+      dockerfile: ./tools/docker/sqlserver/Dockerfile_CICD
     image: cfwheels-sqlserver:v1.0.2
     restart: always
     environment:
@@ -258,3 +328,18 @@ volumes:
   postgres_data:
   sqlserver_data:
   oracle_data:
+  # Named volumes for dependency isolation
+  wirebox-lucee5:
+  testbox-lucee5:
+  wirebox-lucee6:
+  testbox-lucee6:
+  wirebox-lucee7:
+  testbox-lucee7:
+  wirebox-adobe2018:
+  testbox-adobe2018:
+  wirebox-adobe2021:
+  testbox-adobe2021:
+  wirebox-adobe2023:
+  testbox-adobe2023:
+  wirebox-adobe2025:
+  testbox-adobe2025:

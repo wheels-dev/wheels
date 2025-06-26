@@ -1,0 +1,25 @@
+{
+	"profile": "development",
+	"force":true,
+	"web":{
+			"host":"localhost",
+			"webroot":"public",
+			"http":{
+					"port":"62023",
+					"enable":true
+			},
+			"rewrites":{
+					"enable":true,
+					"config":"public/urlrewrite.xml"
+			}
+	},
+	"app":{
+			"cfengine":"adobe@2023",
+			"libDirs":"tools/docker/adobe@2023/lib",
+			"serverHomeDirectory":".engine/adobe@2023"
+	},
+	"cfconfigFile":"CFConfig.json",
+	"scripts":{
+        "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"
+    }
+}
