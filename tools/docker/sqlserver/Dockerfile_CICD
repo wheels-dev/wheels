@@ -14,7 +14,7 @@ ENV MSSQL_PID="Developer"
 RUN mkdir -p /usr/src/app
 
 # Copy the initialization script
-COPY ./docker/sqlserver/init-db.sh /usr/src/app/init-db.sh
+COPY ./tools/docker/sqlserver/init-db.sh /usr/src/app/init-db.sh
 RUN chmod +x /usr/src/app/init-db.sh
 
 # Expose port 1433

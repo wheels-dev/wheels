@@ -42,7 +42,7 @@
 		},
 		"wheelstestdb_sqlserver": {
 			"blob": "false",
-			"class": "com.microsoft.jdbc.sqlserver.SQLServerDriver",
+			"class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
 			"clob": "false",
 			"connectionLimit": "-1",
 			"connectionTimeout": "20",
@@ -57,7 +57,7 @@
 		},
 		"msdb_sqlserver": {
 			"blob": "false",
-			"class": "com.microsoft.jdbc.sqlserver.SQLServerDriver",
+			"class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
 			"clob": "false",
 			"connectionLimit": "-1",
 			"connectionTimeout": "20",
