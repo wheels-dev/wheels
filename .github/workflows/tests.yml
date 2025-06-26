@@ -143,6 +143,12 @@ jobs:
           # Create H2 database directory if needed
           mkdir -p ./tools/workspace/db/
           
+          # Fix H2 database path in CFConfig to use workspace db directory
+          jq '.datasources.wheelstestdb_h2.custom = "mode=MySQL&path=./db/"' ./tools/workspace/CFConfig.json > ./tools/workspace/CFConfig.json.tmp && mv ./tools/workspace/CFConfig.json.tmp ./tools/workspace/CFConfig.json
+          
+          # Fix MySQL dbdriver value if it's set to "localhost"
+          jq 'if .datasources.wheelstestdb_mysql.dbdriver == "localhost" then .datasources.wheelstestdb_mysql.dbdriver = "mysql" else . end' ./tools/workspace/CFConfig.json > ./tools/workspace/CFConfig.json.tmp && mv ./tools/workspace/CFConfig.json.tmp ./tools/workspace/CFConfig.json
+          
           # Update settings.cfm for the correct database
           if [ "${{ matrix.dbengine }}" != "h2" ]; then
               sed -i.bak 's/wheelstestdb_h2/wheelstestdb_${{ matrix.dbengine }}/g' ./tools/workspace/config/settings.cfm
