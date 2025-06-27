@@ -102,7 +102,10 @@
 						<a href="#urlFor(route = "wheelsDocs")#" class="btn" target="_blank">Docs</a>
 					</td>
 					<td>
-						<a href="#urlFor(route = "wheelsPackages", type = "app")#" class="btn" target="_blank">Tests</a>
+						<a href="#urlFor(route = "wheelstestbox")#" class="btn" target="_blank">Core Tests</a>
+					</td>
+					<td>
+						<a href="#urlFor(route = "wheelsapptests")#" class="btn" target="_blank">App Tests</a>
 					</td>
 					<cfif $get("enableMigratorComponent")>
 						<td>

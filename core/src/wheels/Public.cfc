@@ -75,6 +75,37 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		// Ensure we abort to prevent any further processing
 		abort;
 	}
+	
+	public function app_tests(){
+		// Set proper HTTP status first
+		cfheader(statuscode="200", statustext="OK");
+		
+		// Check if app tests directory exists
+		local.testDirectory = expandPath("/tests");
+		if (!directoryExists(local.testDirectory)) {
+			if (structKeyExists(url, "format") && url.format == "json") {
+				cfcontent(type="application/json");
+				writeOutput('{"success":false,"error":"No tests directory found in application root"}');
+			} else {
+				writeOutput("<h1>Application Tests</h1>");
+				writeOutput("<p>No tests directory found in application root. Create a /tests directory to add application tests.</p>");
+			}
+			abort;
+		}
+		
+		// Set content type based on format
+		if (structKeyExists(url, "format") && url.format == "json") {
+			cfcontent(type="application/json");
+		} else if (structKeyExists(url, "format") && url.format == "txt") {
+			cfcontent(type="text/plain");
+		} else if (structKeyExists(url, "format") && url.format == "junit") {
+			cfcontent(type="text/xml");
+		}
+		
+		// Include the app test runner
+		include "/wheels/tests_testbox/app-runner.cfm";
+		abort;
+	}
 	function packages() {
 		include "/wheels/public/views/packages.cfm";
 		return "";
