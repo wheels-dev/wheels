@@ -59,12 +59,17 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			cfcontent(type="text/plain");
 		}
 		
-		// Use the simple runner to avoid module loading issues
+		// Use the minimal runner to avoid module loading issues
 		try {
-			include "/wheels/tests_testbox/simple-runner.cfm";
+			include "/wheels/tests_testbox/minimal-runner.cfm";
 		} catch (any e) {
-			// If simple runner fails, fall back to original runner
-			include "/wheels/tests_testbox/runner.cfm";
+			// If minimal runner fails, try simple runner
+			try {
+				include "/wheels/tests_testbox/simple-runner.cfm";
+			} catch (any e2) {
+				// Last resort: original runner
+				include "/wheels/tests_testbox/runner.cfm";
+			}
 		}
 		
 		// Ensure we abort to prevent any further processing
