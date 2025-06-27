@@ -52,27 +52,28 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			abort;
 		}
 		
+		// Use minimal runner for debugging if requested
+		if (structKeyExists(url, "minimal") && url.minimal == "true") {
+			if (structKeyExists(url, "format") && url.format == "json") {
+				cfcontent(type="application/json");
+			} else if (structKeyExists(url, "format") && url.format == "txt") {
+				cfcontent(type="text/plain");
+			}
+			include "/wheels/tests_testbox/minimal-runner.cfm";
+			abort;
+		}
+		
 		// Set content type based on format
 		if (structKeyExists(url, "format") && url.format == "json") {
 			cfcontent(type="application/json");
 		} else if (structKeyExists(url, "format") && url.format == "txt") {
 			cfcontent(type="text/plain");
+		} else if (structKeyExists(url, "format") && url.format == "junit") {
+			cfcontent(type="text/xml");
 		}
 		
-		// Use the minimal runner to avoid module loading issues
-		try {
-			include "/wheels/tests_testbox/minimal-runner.cfm";
-		} catch (any e) {
-			// If minimal runner fails, try simple runner
-			try {
-				include "/wheels/tests_testbox/simple-runner.cfm";
-			} catch (any e2) {
-				// Last resort: original runner
-				include "/wheels/tests_testbox/runner.cfm";
-			}
-		}
-		
-		// Ensure we abort to prevent any further processing
+		// Use the new core runner that actually executes tests
+		include "/wheels/tests_testbox/core-runner.cfm";
 		abort;
 	}
 	
