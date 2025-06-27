@@ -20,3 +20,21 @@ Perfect! The wheels docker test command is now working correctly. The applicatio
   - box wheels docker test logs - View logs
   - box wheels docker test stop - Stop containers
   - box wheels docker test clean - Clean up everything
+
+Summary
+
+  I've successfully eliminated the empty directories from being created in the repository
+   while still allowing the Docker container to:
+  - Mount the Wheels framework directly into the container
+  - Install dependencies in the container without polluting the host
+
+  The solution involved:
+  1. Mounting individual directories instead of the entire application root to avoid
+  Docker creating mount points
+  2. Using a single named volume for the entire vendor directory
+  3. Conditionally mounting directories like tests only if they exist
+  4. Proper volume ordering to ensure the Wheels framework from the monorepo overrides
+  the vendor volume
+
+  Now when you run wheels docker:test, no vendor or other empty directories will be
+  created on your host filesystem, keeping your repository clean.

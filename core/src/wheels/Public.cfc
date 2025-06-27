@@ -59,8 +59,13 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			cfcontent(type="text/plain");
 		}
 		
-		// Include the TestBox runner directly without buffering
-		include "/wheels/tests_testbox/runner.cfm";
+		// Use the simple runner to avoid module loading issues
+		try {
+			include "/wheels/tests_testbox/simple-runner.cfm";
+		} catch (any e) {
+			// If simple runner fails, fall back to original runner
+			include "/wheels/tests_testbox/runner.cfm";
+		}
 		
 		// Ensure we abort to prevent any further processing
 		abort;

@@ -40,12 +40,13 @@ component extends="../../base" {
         var context = detectContext();
 
         if (!context.isValid) {
-            print.redLine("Error: This command must be run from a Wheels template or example directory.");
+            print.redLine("Error: This command must be run from a Wheels template, example, or core directory.");
             print.line("Current directory: #getCWD()#");
             print.line();
             print.yellowLine("Valid directories are:");
             print.line("  - Any directory under /templates/");
             print.line("  - Any directory under /examples/");
+            print.line("  - The /core directory (for framework tests)");
             return;
         }
         
@@ -131,7 +132,7 @@ component extends="../../base" {
      * Detect if we're in a template or example directory
      */
     private struct function detectContext() {
-        var cwd = getCWD();
+        var cwd = getCWD().rereplace("/$", ""); // Remove trailing slash
         var result = {
             isValid = false,
             type = "",
@@ -151,10 +152,6 @@ component extends="../../base" {
                 break;
             }
             currentPath = getDirectoryFromPath(currentPath.reReplace("[/\\][^/\\]+[/\\]?$", ""));
-        }
-
-        if (!len(result.monorepoRoot)) {
-            return result;
         }
 
         // Check if we're in a template directory
@@ -195,6 +192,17 @@ component extends="../../base" {
             // Examples typically don't have src subdirectory
             result.appPath = cwd;
         }
+        // Check if we're in the core directory
+        else if (cwd.endsWith("/core") && fileExists(cwd & "/tests/runner.cfm")) {
+            result.isValid = true;
+            result.type = "core";
+            result.name = "core";
+            result.appPath = cwd;
+            // For core, the monorepo root is the parent of core
+            if (!len(result.monorepoRoot)) {
+                result.monorepoRoot = getDirectoryFromPath(cwd.reReplace("[/\\]$", ""));
+            }
+        }
 
         return result;
     }
@@ -227,7 +235,29 @@ services:
   app:
     image: #engineConfig.image#
     container_name: #arguments.name#-app
-    volumes:
+    volumes:";
+    
+        // Different mounting strategy for core tests vs templates/examples
+        if (arguments.context.type == "core") {
+            // For core tests, we need a test harness structure
+            compose &= "
+      ## Mount the template base as the foundation
+      - #arguments.context.monorepoRoot#/templates/base/Application.cfc:/cfwheels-test-suite/Application.cfc
+      - #arguments.context.monorepoRoot#/templates/base/index.cfm:/cfwheels-test-suite/index.cfm
+      - #arguments.context.monorepoRoot#/templates/base/urlrewrite.xml:/cfwheels-test-suite/urlrewrite.xml
+      - #arguments.context.monorepoRoot#/templates/base/app:/cfwheels-test-suite/app
+      - #arguments.context.monorepoRoot#/templates/base/config:/cfwheels-test-suite/config
+      - #arguments.context.monorepoRoot#/templates/base/db:/cfwheels-test-suite/db
+      - #arguments.context.monorepoRoot#/templates/base/public:/cfwheels-test-suite/public
+      ## Mount core tests into the tests directory
+      - #arguments.context.appPath#/tests:/cfwheels-test-suite/tests
+      ## Use a named volume for vendor to prevent host pollution
+      - #arguments.name#-vendor:/cfwheels-test-suite/vendor
+      ## Mount the framework source code
+      - #arguments.context.appPath#/src/wheels:/cfwheels-test-suite/vendor/wheels:ro";
+        } else {
+            // Original logic for templates and examples
+            compose &= "
       ## Mount application files individually to avoid creating vendor directory on host
       - #arguments.context.appPath#/Application.cfc:/cfwheels-test-suite/Application.cfc
       - #arguments.context.appPath#/index.cfm:/cfwheels-test-suite/index.cfm
@@ -237,17 +267,20 @@ services:
       - #arguments.context.appPath#/db:/cfwheels-test-suite/db
       - #arguments.context.appPath#/public:/cfwheels-test-suite/public";
       
-        // Only mount tests directory if it exists
-        if (directoryExists("#arguments.context.appPath#/tests")) {
-            compose &= "
+            // Only mount tests directory if it exists
+            if (directoryExists("#arguments.context.appPath#/tests")) {
+                compose &= "
       - #arguments.context.appPath#/tests:/cfwheels-test-suite/tests";
-        }
-        
-        compose &= "
+            }
+            
+            compose &= "
       ## Use a named volume for the entire vendor directory to prevent host pollution
       - #arguments.name#-vendor:/cfwheels-test-suite/vendor
       ## Mount the framework from monorepo (this overrides the vendor volume for this specific path)
-      - #arguments.context.monorepoRoot#/core/src/wheels:/cfwheels-test-suite/vendor/wheels:ro
+      - #arguments.context.monorepoRoot#/core/src/wheels:/cfwheels-test-suite/vendor/wheels:ro";
+        }
+        
+        compose &= "
       ## Mount engine-specific configuration files (these override template files)
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/server.json:/cfwheels-test-suite/server.json:ro
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/box.json:/cfwheels-test-suite/box.json:ro
