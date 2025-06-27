@@ -60,6 +60,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Restart server: `server restart`
 - Reload CommandBox after CLI changes: `box reload`
 
+### Docker Testing for Templates/Examples
+- Test any template or example: `wheels docker:test` (from template/example directory)
+- Specify engine/database: `wheels docker:test --engine=adobe@2021 --db=mysql`
+- View logs: `wheels docker:test:logs --follow`
+- Stop containers: `wheels docker:test:stop`
+- Clean up: `wheels docker:test:clean`
+
 ### Database Management
 - Create database: `wheels db create`
 - Setup database (create + migrate + seed): `wheels db setup`

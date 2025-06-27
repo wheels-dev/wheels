@@ -33,7 +33,30 @@ A complete authentication system featuring:
 
 ## Running the Examples
 
-Each example includes its own README with specific setup instructions. Generally:
+Each example includes its own README with specific setup instructions. You have two options:
+
+### Option 1: Using Docker (Recommended for Testing)
+
+The easiest way to test examples is using Docker containers:
+
+1. Navigate to the example directory: `cd examples/blog-app`
+2. Run with Wheels CLI: `wheels docker:test`
+   - Or specify engine/database: `wheels docker:test --engine=adobe@2021 --db=mysql`
+   - Use `--port=8081` to change the default port (8080)
+3. Access the application at http://localhost:8080
+
+**Without Wheels CLI:**
+```bash
+cd examples/blog-app
+../../tools/docker/test-template.sh --engine=lucee@6 --db=postgres
+```
+
+**Docker Commands:**
+- View logs: `wheels docker:test:logs --follow`
+- Stop containers: `wheels docker:test:stop`
+- Clean up: `wheels docker:test:clean`
+
+### Option 2: Traditional Setup
 
 1. Navigate to the example directory
 2. Copy the example to your workspace: `cp -r examples/blog-app ../workspace/`
