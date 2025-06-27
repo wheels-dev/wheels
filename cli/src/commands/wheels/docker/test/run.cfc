@@ -1,0 +1,435 @@
+/**
+ * Test templates and examples in Docker containers
+ *
+ * This command allows you to quickly test any Wheels template or example
+ * by building and running it in a Docker container with your chosen
+ * CFML engine and database.
+ *
+ * {code:bash}
+ * # From a template or example directory:
+ * wheels docker:test
+ * wheels docker:test --engine=lucee@6 --db=postgres
+ * wheels docker:test --engine=adobe@2021 --db=mysql
+ * wheels docker:test --port=8081
+ * {code}
+ */
+component extends="../../base" {
+
+    property name="fileSystemUtil" inject="FileSystem";
+    property name="serverService" inject="ServerService";
+
+    /**
+     * @engine.hint CFML engine to use (lucee@5, lucee@6, lucee@7, adobe@2018, adobe@2021, adobe@2023, adobe@2025)
+     * @engine.options lucee@5,lucee@6,lucee@7,adobe@2018,adobe@2021,adobe@2023,adobe@2025
+     * @db.hint Database to use (h2, mysql, postgres, sqlserver)
+     * @db.options h2,mysql,postgres,sqlserver
+     * @port.hint Port to expose the application on (default: auto-assigned based on engine)
+     * @name.hint Container name prefix (default: wheels-test)
+     * @detach.hint Run containers in detached mode
+     * @build.hint Force rebuild of Docker images
+     */
+    function run(
+        string engine = "lucee@6",
+        string db = "h2",
+        numeric port = 0,
+        string name = "wheels-test",
+        boolean detach = false,
+        boolean build = false
+    ) {
+        // Detect context (template or example)
+        var context = detectContext();
+
+        if (!context.isValid) {
+            print.redLine("Error: This command must be run from a Wheels template or example directory.");
+            print.line("Current directory: #getCWD()#");
+            print.line();
+            print.yellowLine("Valid directories are:");
+            print.line("  - Any directory under /templates/");
+            print.line("  - Any directory under /examples/");
+            return;
+        }
+        
+        // Get engine configuration to determine default port
+        var engineConfig = getEngineConfig(arguments.engine);
+        
+        // Use engine's default port if not specified
+        if (arguments.port == 0) {
+            arguments.port = engineConfig.port;
+        }
+
+        print.line();
+        print.boldMagentaLine("Wheels Docker Test Environment");
+        print.line();
+        print.line("Context:    #context.type# (#context.name#)");
+        print.line("Engine:     #arguments.engine#");
+        print.line("Database:   #arguments.db#");
+        print.line("Port:       #arguments.port#");
+        print.line();
+
+        // Create .wheels-test directory for generated files
+        var testDir = fileSystemUtil.resolvePath(".wheels-test");
+        if (!directoryExists(testDir)) {
+            directoryCreate(testDir);
+        }
+
+        // Generate docker-compose.yml
+        var composeFile = generateDockerCompose(
+            context = context,
+            engine = arguments.engine,
+            db = arguments.db,
+            port = arguments.port,
+            name = arguments.name
+        );
+
+        fileWrite("#testDir#/docker-compose.yml", composeFile);
+        print.greenLine("✓ Generated docker-compose.yml");
+
+        // Create .gitignore if it doesn't exist
+        var gitignorePath = fileSystemUtil.resolvePath(".gitignore");
+        var gitignoreContent = "";
+        if (fileExists(gitignorePath)) {
+            gitignoreContent = fileRead(gitignorePath);
+        }
+
+        if (!findNoCase(".wheels-test/", gitignoreContent)) {
+            gitignoreContent &= chr(10) & ".wheels-test/" & chr(10);
+            fileWrite(gitignorePath, gitignoreContent);
+            print.greenLine("✓ Updated .gitignore");
+        }
+
+        // Run docker-compose
+        print.line();
+        print.yellowLine("Starting Docker containers...");
+
+        var dockerCommand = "cd .wheels-test && docker compose up";
+        if (arguments.build) {
+            dockerCommand &= " --build";
+        }
+        if (arguments.detach) {
+            dockerCommand &= " -d";
+        }
+
+        // Execute docker-compose
+        if (arguments.detach) {
+            command("!#dockerCommand#").run();
+            print.line();
+            print.greenBoldLine("✓ Docker containers started successfully!");
+            print.line();
+            print.line("Application URL: http://localhost:#arguments.port#");
+            print.line();
+            print.yellowLine("To view logs, run: wheels docker:test:logs");
+            print.yellowLine("To stop containers, run: wheels docker:test:stop");
+        } else {
+            print.line();
+            print.cyanLine("Press Ctrl+C to stop the containers");
+            print.line();
+            command("!#dockerCommand#").run();
+        }
+    }
+
+    /**
+     * Detect if we're in a template or example directory
+     */
+    private struct function detectContext() {
+        var cwd = getCWD();
+        var result = {
+            isValid = false,
+            type = "",
+            name = "",
+            path = cwd,
+            monorepoRoot = "",
+            appPath = ""
+        };
+
+        // Find monorepo root by looking for the main compose.yml
+        var currentPath = cwd;
+        while (len(currentPath) > 1) {
+            if (fileExists(currentPath & "/compose.yml") &&
+                directoryExists(currentPath & "/templates") &&
+                directoryExists(currentPath & "/examples")) {
+                result.monorepoRoot = currentPath;
+                break;
+            }
+            currentPath = getDirectoryFromPath(currentPath.reReplace("[/\\][^/\\]+[/\\]?$", ""));
+        }
+
+        if (!len(result.monorepoRoot)) {
+            return result;
+        }
+
+        // Check if we're in a template directory
+        if (findNoCase("/templates/", cwd)) {
+            result.isValid = true;
+            result.type = "template";
+            // Extract template name more reliably
+            var parts = listToArray(cwd, "/\");
+            var templatesIndex = 0;
+            for (var i = 1; i <= arrayLen(parts); i++) {
+                if (parts[i] == "templates") {
+                    templatesIndex = i;
+                    break;
+                }
+            }
+            if (templatesIndex > 0 && templatesIndex < arrayLen(parts)) {
+                result.name = parts[templatesIndex + 1];
+            }
+            // Templates now have flattened structure (no src directory)
+            result.appPath = cwd;
+        }
+        // Check if we're in an example directory
+        else if (findNoCase("/examples/", cwd)) {
+            result.isValid = true;
+            result.type = "example";
+            // Extract example name more reliably
+            var parts = listToArray(cwd, "/\");
+            var examplesIndex = 0;
+            for (var i = 1; i <= arrayLen(parts); i++) {
+                if (parts[i] == "examples") {
+                    examplesIndex = i;
+                    break;
+                }
+            }
+            if (examplesIndex > 0 && examplesIndex < arrayLen(parts)) {
+                result.name = parts[examplesIndex + 1];
+            }
+            // Examples typically don't have src subdirectory
+            result.appPath = cwd;
+        }
+
+        return result;
+    }
+
+    /**
+     * Generate docker-compose.yml content
+     */
+    private string function generateDockerCompose(
+        required struct context,
+        required string engine,
+        required string db,
+        required numeric port,
+        required string name
+    ) {
+        var engineParts = listToArray(arguments.engine, "@");
+        var engineName = engineParts[1];
+        var engineVersion = engineParts[2];
+
+        // Map engine to image and internal port
+        var engineConfig = getEngineConfig(arguments.engine);
+
+        // Start building compose file
+        var compose = "version: '3.8'
+
+networks:
+  #arguments.name#-network:
+    driver: bridge
+
+services:
+  app:
+    image: #engineConfig.image#
+    container_name: #arguments.name#-app
+    volumes:
+      ## Mount the application directory
+      - #arguments.context.appPath#:/cfwheels-test-suite
+      ## Mount the framework from monorepo
+      - #arguments.context.monorepoRoot#/core/src/wheels:/cfwheels-test-suite/vendor/wheels
+      ## Mount engine-specific configuration files
+      - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/server.json:/cfwheels-test-suite/server.json:ro
+      - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/box.json:/cfwheels-test-suite/box.json:ro
+      - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/CFConfig.json:/cfwheels-test-suite/CFConfig.json:ro
+      ## Use named volumes for dependencies to prevent host pollution
+      - #arguments.name#-vendor-testbox:/cfwheels-test-suite/vendor/testbox
+      - #arguments.name#-vendor-wirebox:/cfwheels-test-suite/vendor/wirebox";
+
+        // Add settings.cfm mount if not H2
+        if (arguments.db != "h2") {
+            compose &= "
+      - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/settings.cfm:/cfwheels-test-suite/config/settings.cfm:ro";
+        }
+
+        compose &= "
+    ports:
+      - ""#arguments.port#:#engineConfig.port#""
+    environment:
+      - WHEELS_ENV=development
+      - WHEELS_RELOAD_PASSWORD=wheels";
+
+        // Add database environment variables
+        if (arguments.db != "h2") {
+            compose &= "
+      - WHEELS_DATASOURCE=#arguments.db#
+      - WHEELS_DATABASE_HOST=#arguments.db#
+      - WHEELS_DATABASE_PORT=#getDatabasePort(arguments.db)#
+      - WHEELS_DATABASE_NAME=wheelstestdb
+      - WHEELS_DATABASE_USERNAME=wheelstestdb
+      - WHEELS_DATABASE_PASSWORD=wheelstestdb";
+        }
+
+        compose &= "
+    networks:
+      - #arguments.name#-network";
+
+        // Add depends_on if using external database
+        if (arguments.db != "h2") {
+            compose &= "
+    depends_on:
+      - #arguments.db#";
+        }
+
+        compose &= "
+    healthcheck:
+      test: [""CMD"", ""curl"", ""-f"", ""http://localhost:#engineConfig.port#""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s";
+
+        // Add database service if not H2
+        if (arguments.db != "h2") {
+            compose &= chr(10) & chr(10) & getDatabaseService(
+                db = arguments.db,
+                networkName = arguments.name & "-network"
+            );
+        }
+
+        // Add volumes section
+        compose &= "
+
+volumes:
+  #arguments.name#-vendor-testbox:
+  #arguments.name#-vendor-wirebox:";
+        
+        if (arguments.db != "h2") {
+            compose &= "
+  #arguments.db#-data:";
+        }
+
+        return compose;
+    }
+
+    /**
+     * Get engine configuration
+     */
+    private struct function getEngineConfig(required string engine) {
+        var configs = {
+            "lucee@5": {
+                image: "cfwheels-test-lucee5:v1.0.2",
+                port: 60005
+            },
+            "lucee@6": {
+                image: "cfwheels-test-lucee6:v1.0.2",
+                port: 60006
+            },
+            "lucee@7": {
+                image: "cfwheels-test-lucee7:v1.0.0",
+                port: 60007
+            },
+            "adobe@2018": {
+                image: "cfwheels-test-adobe2018:v1.0.2",
+                port: 62018
+            },
+            "adobe@2021": {
+                image: "cfwheels-test-adobe2021:v1.0.2",
+                port: 62021
+            },
+            "adobe@2023": {
+                image: "cfwheels-test-adobe2023:v1.0.1",
+                port: 62023
+            },
+            "adobe@2025": {
+                image: "cfwheels-test-adobe2025:v1.0.0",
+                port: 62025
+            }
+        };
+
+        if (!structKeyExists(configs, arguments.engine)) {
+            throw(message="Unsupported engine: #arguments.engine#");
+        }
+
+        return configs[arguments.engine];
+    }
+
+    /**
+     * Get database port
+     */
+    private numeric function getDatabasePort(required string db) {
+        var ports = {
+            mysql: 3306,
+            postgres: 5432,
+            sqlserver: 1433
+        };
+
+        return ports[arguments.db];
+    }
+
+    /**
+     * Get database service configuration
+     */
+    private string function getDatabaseService(
+        required string db,
+        required string networkName
+    ) {
+        var services = {
+            mysql: "  mysql:
+    image: mysql:8.0
+    container_name: #networkName#-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: wheelstestdb
+      MYSQL_DATABASE: wheelstestdb
+      MYSQL_USER: wheelstestdb
+      MYSQL_PASSWORD: wheelstestdb
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - #networkName#
+    healthcheck:
+      test: [""CMD"", ""mysqladmin"", ""ping"", ""-h"", ""localhost"", ""-u"", ""root"", ""-p$$MYSQL_ROOT_PASSWORD""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s",
+
+            postgres: "  postgres:
+    image: postgres:14
+    container_name: #networkName#-postgres
+    environment:
+      POSTGRES_USER: wheelstestdb
+      POSTGRES_PASSWORD: wheelstestdb
+      POSTGRES_DB: wheelstestdb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - #networkName#
+    healthcheck:
+      test: [""CMD-SHELL"", ""pg_isready -U wheelstestdb""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s",
+
+            sqlserver: "  sqlserver:
+    image: cfwheels-sqlserver:v1.0.2
+    container_name: #networkName#-sqlserver
+    environment:
+      MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
+      ACCEPT_EULA: Y
+      MSSQL_PID: Developer
+      MSSQL_MEMORY_LIMIT_MB: 2048
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - #networkName#
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P ""$$MSSQL_SA_PASSWORD"" -Q ""SELECT 1"" -C || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s"
+        };
+
+        if (!structKeyExists(services, arguments.db)) {
+            throw(message="Unsupported database: #arguments.db#");
+        }
+
+        return services[arguments.db];
+    }
+}

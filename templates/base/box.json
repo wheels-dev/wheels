@@ -1,5 +1,13 @@
 {
     "name": "wheels-base-template",
     "version": "3.0.0",
-    "location": "https://github.com/cfwheels/cfwheels/tree/3.0/templates/base"
+    "location": "https://github.com/cfwheels/cfwheels/tree/3.0/templates/base",
+    "dependencies": {
+        "wirebox": "^7.0.0",
+        "testbox": "^5.0.0"
+    },
+    "installPaths": {
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/"
+    }
 }

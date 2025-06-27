@@ -89,22 +89,27 @@ All templates follow this standard structure:
 
 ```
 template-name/
-├── box.json                 # CommandBox dependencies
-├── src/
-│   ├── Application.cfc      # Application configuration
-│   ├── index.cfm           # Entry point
-│   ├── app/                # Application code
-│   │   ├── controllers/    # Controllers
-│   │   ├── models/         # Models
-│   │   └── views/          # Views
-│   ├── config/             # Configuration files
-│   │   ├── routes.cfm      # URL routing
-│   │   ├── settings.cfm    # Application settings
-│   │   └── */              # Environment-specific settings
-│   ├── db/                 # Database migrations
-│   ├── public/             # Public assets
-│   └── vendor/             # Third-party dependencies
+├── box.json                # CommandBox dependencies
+├── server.json             # Server configuration
+├── Application.cfc         # Application configuration
+├── index.cfm              # Entry point
+├── app/                   # Application code
+│   ├── controllers/       # Controllers
+│   ├── models/            # Models
+│   └── views/             # Views
+├── config/                # Configuration files
+│   ├── routes.cfm         # URL routing
+│   ├── settings.cfm       # Application settings
+│   └── */                 # Environment-specific settings
+├── db/                    # Database migrations
+├── public/                # Public assets
+├── tests/                 # Test files
+└── vendor/                # Third-party dependencies
 ```
+
+### Docker Dependency Isolation
+
+When running templates with Docker, dependencies (WireBox, TestBox) are installed in Docker named volumes rather than the host filesystem. This prevents polluting your repository with vendor files during testing.
 
 ## Contributing Templates
 

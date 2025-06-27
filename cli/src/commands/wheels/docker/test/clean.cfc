@@ -49,7 +49,7 @@ component extends="../../base" {
         
         // Stop and remove containers and volumes
         if (fileExists("#testDir#/docker-compose.yml")) {
-            command("cd .wheels-test && docker-compose down -v").run();
+            command("!cd .wheels-test && docker compose down -v").run();
             print.greenLine("✓ Containers and volumes removed");
         }
         
@@ -67,7 +67,7 @@ component extends="../../base" {
                 }
                 print.line("  Removing image: #imageName#");
                 try {
-                    command("docker rmi #imageName#").run();
+                    command("!docker rmi #imageName#").run();
                 } catch (any e) {
                     // Image might be in use by other containers
                     print.yellowLine("  Could not remove #imageName# (may be in use)");

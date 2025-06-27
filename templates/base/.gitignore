@@ -1,0 +1,27 @@
+
+# Dependencies
+vendor/testbox/
+vendor/wirebox/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CommandBox
+.CommandBox/
+server.json.bak
+
+# Logs
+logs/
+*.log
+
+# Test artifacts
+.wheels-test/
+
+# Temporary files
+*.tmp
+*.temp

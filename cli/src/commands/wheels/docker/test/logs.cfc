@@ -35,7 +35,7 @@ component extends="../../base" {
         print.yellowLine("Fetching Docker test container logs...");
         print.line();
         
-        var dockerCommand = "cd .wheels-test && docker-compose logs";
+        var dockerCommand = "cd .wheels-test && docker compose logs";
         
         if (arguments.follow) {
             dockerCommand &= " -f";
@@ -58,6 +58,6 @@ component extends="../../base" {
             print.line();
         }
         
-        command(dockerCommand).run();
+        command("!#dockerCommand#").run();
     }
 }

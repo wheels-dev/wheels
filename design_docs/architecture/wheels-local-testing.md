@@ -61,3 +61,23 @@ Benefits:
 - Consistent testing environment across all contributors
 - Integrates seamlessly with existing CI/CD workflows
 - Supports all CFML engines for compatibility testing
+
+## Update (2025-06-27): Template Structure Changes
+
+### Flattened Directory Structure
+Templates now use a flattened directory structure with all application files at the root level instead of nested in a `src/` subdirectory. This change:
+- Simplifies the template structure
+- Aligns with standard CFML application layouts
+- Reduces confusion from duplicate configuration files
+
+### Docker Dependency Isolation
+The Docker test command now uses named volumes for vendor dependencies (WireBox, TestBox) to prevent:
+- Host filesystem pollution during testing
+- Git tracking of installed dependencies
+- Conflicts between host and container environments
+
+The implementation automatically creates named volumes like:
+- `wheels-test-vendor-testbox`
+- `wheels-test-vendor-wirebox`
+
+These volumes persist dependencies across container restarts while keeping the host repository clean.

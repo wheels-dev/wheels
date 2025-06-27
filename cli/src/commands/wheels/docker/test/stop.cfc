@@ -23,12 +23,12 @@ component extends="../../base" {
         
         print.yellowLine("Stopping Docker test containers...");
         
-        var dockerCommand = "cd .wheels-test && docker-compose down";
+        var dockerCommand = "cd .wheels-test && docker compose down";
         if (arguments.removeVolumes) {
             dockerCommand &= " -v";
         }
         
-        command(dockerCommand).run();
+        command("!#dockerCommand#").run();
         
         print.line();
         print.greenBoldLine("✓ Docker test containers stopped successfully!");
