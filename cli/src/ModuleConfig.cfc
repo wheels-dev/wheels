@@ -6,13 +6,13 @@ component {
     this.autoMapModels = false;
     this.cfmapping = "wheels-cli";
     this.modelNamespace = "wheels-cli";
-    
+
     // Dependencies
     this.dependencies = [
         "testbox-cli",
         "commandbox-migrations"
     ];
-    
+
     function configure() {
         // Settings
         settings = {
@@ -32,13 +32,13 @@ component {
                 seedDirectory: "db/seeds"
             }
         };
-        
+
         // Interceptors
         interceptors = [
             { class = "#moduleMapping#.interceptors.postInstall" }
         ];
     }
-    
+
     function onLoad() {
         // Register helper services
         binder.map("TemplateService@wheels-cli")
@@ -65,10 +65,10 @@ component {
             .to("#moduleMapping#.models.helpers");
         binder.map("DetailOutputService@wheels-cli")
             .to("#moduleMapping#.models.DetailOutputService");
-        
+
         log.info('Wheels CLI Module loaded successfully.');
     }
-    
+
     function onUnLoad() {
         log.info('Wheels CLI Module unloaded successfully.');
     }

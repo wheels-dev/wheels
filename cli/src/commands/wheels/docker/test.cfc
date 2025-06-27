@@ -14,10 +14,10 @@
  * {code}
  */
 component extends="../base" {
-    
+
     property name="fileSystemUtil" inject="FileSystem";
     property name="serverService" inject="ServerService";
-    
+
     /**
      * @engine.hint CFML engine to use (lucee@5, lucee@6, lucee@7, adobe@2018, adobe@2021, adobe@2023, adobe@2025)
      * @engine.options lucee@5,lucee@6,lucee@7,adobe@2018,adobe@2021,adobe@2023,adobe@2025
@@ -38,7 +38,7 @@ component extends="../base" {
     ) {
         // Detect context (template or example)
         var context = detectContext();
-        
+
         if (!context.isValid) {
             print.redLine("Error: This command must be run from a Wheels template or example directory.");
             print.line("Current directory: #getCWD()#");
@@ -48,7 +48,7 @@ component extends="../base" {
             print.line("  - Any directory under /examples/");
             return;
         }
-        
+
         print.line();
         print.boldMagentaLine("Wheels Docker Test Environment");
         print.line();
@@ -57,13 +57,13 @@ component extends="../base" {
         print.line("Database:   #arguments.db#");
         print.line("Port:       #arguments.port#");
         print.line();
-        
+
         // Create .wheels-test directory for generated files
         var testDir = fileSystemUtil.resolvePath(".wheels-test");
         if (!directoryExists(testDir)) {
             directoryCreate(testDir);
         }
-        
+
         // Generate docker-compose.yml
         var composeFile = generateDockerCompose(
             context = context,
@@ -72,27 +72,27 @@ component extends="../base" {
             port = arguments.port,
             name = arguments.name
         );
-        
+
         fileWrite("#testDir#/docker-compose.yml", composeFile);
         print.greenLine("✓ Generated docker-compose.yml");
-        
+
         // Create .gitignore if it doesn't exist
         var gitignorePath = fileSystemUtil.resolvePath(".gitignore");
         var gitignoreContent = "";
         if (fileExists(gitignorePath)) {
             gitignoreContent = fileRead(gitignorePath);
         }
-        
+
         if (!findNoCase(".wheels-test/", gitignoreContent)) {
             gitignoreContent &= chr(10) & ".wheels-test/" & chr(10);
             fileWrite(gitignorePath, gitignoreContent);
             print.greenLine("✓ Updated .gitignore");
         }
-        
+
         // Run docker-compose
         print.line();
         print.yellowLine("Starting Docker containers...");
-        
+
         var dockerCommand = "cd .wheels-test && docker-compose up";
         if (arguments.build) {
             dockerCommand &= " --build";
@@ -100,7 +100,7 @@ component extends="../base" {
         if (arguments.detach) {
             dockerCommand &= " -d";
         }
-        
+
         // Execute docker-compose
         if (arguments.detach) {
             command(dockerCommand).run();
@@ -118,7 +118,7 @@ component extends="../base" {
             command(dockerCommand).run();
         }
     }
-    
+
     /**
      * Detect if we're in a template or example directory
      */
@@ -131,23 +131,23 @@ component extends="../base" {
             path = cwd,
             monorepoRoot = ""
         };
-        
+
         // Find monorepo root by looking for the main compose.yml
         var currentPath = cwd;
         while (len(currentPath) > 1) {
-            if (fileExists(currentPath & "/compose.yml") && 
-                directoryExists(currentPath & "/templates") && 
+            if (fileExists(currentPath & "/compose.yml") &&
+                directoryExists(currentPath & "/templates") &&
                 directoryExists(currentPath & "/examples")) {
                 result.monorepoRoot = currentPath;
                 break;
             }
             currentPath = getDirectoryFromPath(currentPath.reReplace("[/\\][^/\\]+[/\\]?$", ""));
         }
-        
+
         if (!len(result.monorepoRoot)) {
             return result;
         }
-        
+
         // Check if we're in a template directory
         if (findNoCase("/templates/", cwd)) {
             result.isValid = true;
@@ -164,10 +164,10 @@ component extends="../base" {
             var relativePath = replaceNoCase(cwd, result.monorepoRoot & "/examples/", "");
             result.name = listFirst(relativePath, "/\");
         }
-        
+
         return result;
     }
-    
+
     /**
      * Generate docker-compose.yml content
      */
@@ -181,10 +181,10 @@ component extends="../base" {
         var engineParts = listToArray(arguments.engine, "@");
         var engineName = engineParts[1];
         var engineVersion = engineParts[2];
-        
+
         // Map engine to image and internal port
         var engineConfig = getEngineConfig(arguments.engine);
-        
+
         // Start building compose file
         var compose = "version: '3.8'
 
@@ -197,28 +197,28 @@ services:
     image: #engineConfig.image#
     container_name: #arguments.name#-app
     volumes:
-      # Mount the current directory as the application
+      ## Mount the current directory as the application
       - ..:/cfwheels-test-suite
-      # Mount the framework from monorepo
+      ## Mount the framework from monorepo
       - #arguments.context.monorepoRoot#/core/src/wheels:/cfwheels-test-suite/vendor/wheels
-      # Mount engine-specific configuration files
+      ## Mount engine-specific configuration files
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/server.json:/cfwheels-test-suite/server.json:ro
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/box.json:/cfwheels-test-suite/box.json:ro
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/CFConfig.json:/cfwheels-test-suite/CFConfig.json:ro";
-        
+
         // Add settings.cfm mount if not H2
         if (arguments.db != "h2") {
             compose &= "
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/settings.cfm:/cfwheels-test-suite/config/settings.cfm:ro";
         }
-        
+
         compose &= "
     ports:
       - ""#arguments.port#:#engineConfig.port#""
     environment:
       - WHEELS_ENV=development
       - WHEELS_RELOAD_PASSWORD=wheels";
-        
+
         // Add database environment variables
         if (arguments.db != "h2") {
             compose &= "
@@ -229,18 +229,18 @@ services:
       - WHEELS_DATABASE_USERNAME=wheelstestdb
       - WHEELS_DATABASE_PASSWORD=wheelstestdb";
         }
-        
+
         compose &= "
     networks:
       - #arguments.name#-network";
-        
+
         // Add depends_on if using external database
         if (arguments.db != "h2") {
             compose &= "
     depends_on:
       - #arguments.db#";
         }
-        
+
         compose &= "
     healthcheck:
       test: [""CMD"", ""curl"", ""-f"", ""http://localhost:#engineConfig.port#""]
@@ -248,7 +248,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s";
-        
+
         // Add database service if not H2
         if (arguments.db != "h2") {
             compose &= chr(10) & chr(10) & getDatabaseService(
@@ -256,7 +256,7 @@ services:
                 networkName = arguments.name & "-network"
             );
         }
-        
+
         // Add volumes section
         if (arguments.db != "h2") {
             compose &= "
@@ -264,10 +264,10 @@ services:
 volumes:
   #arguments.db#-data:";
         }
-        
+
         return compose;
     }
-    
+
     /**
      * Get engine configuration
      */
@@ -302,14 +302,14 @@ volumes:
                 port: 62025
             }
         };
-        
+
         if (!structKeyExists(configs, arguments.engine)) {
             throw(message="Unsupported engine: #arguments.engine#");
         }
-        
+
         return configs[arguments.engine];
     }
-    
+
     /**
      * Get database port
      */
@@ -319,10 +319,10 @@ volumes:
             postgres: 5432,
             sqlserver: 1433
         };
-        
+
         return ports[arguments.db];
     }
-    
+
     /**
      * Get database service configuration
      */
@@ -349,7 +349,7 @@ volumes:
       timeout: 5s
       retries: 5
       start_period: 30s",
-            
+
             postgres: "  postgres:
     image: postgres:14
     container_name: #networkName#-postgres
@@ -367,7 +367,7 @@ volumes:
       timeout: 5s
       retries: 5
       start_period: 30s",
-            
+
             sqlserver: "  sqlserver:
     image: cfwheels-sqlserver:v1.0.2
     container_name: #networkName#-sqlserver
@@ -387,11 +387,11 @@ volumes:
       retries: 3
       start_period: 120s"
         };
-        
+
         if (!structKeyExists(services, arguments.db)) {
             throw(message="Unsupported database: #arguments.db#");
         }
-        
+
         return services[arguments.db];
     }
 }
