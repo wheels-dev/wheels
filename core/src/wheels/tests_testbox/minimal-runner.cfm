@@ -10,7 +10,7 @@
         
         // Simple HTML output
         writeOutput("<h1>Wheels Framework Tests</h1>");
-        writeOutput("<p>Running tests from: #specsDirectory#</p>");
+        writeOutput("<p>Test directory: wheels.tests_testbox.specs</p>");
         
         // Get all test CFCs
         testFiles = directoryList(
@@ -29,10 +29,25 @@
         
         // Run each test file
         for (testFile in testFiles) {
-            // Convert file path to component path
-            componentPath = replaceNoCase(testFile, expandPath("/"), "", "one");
-            componentPath = listChangeDelims(componentPath, ".", "/\");
-            componentPath = replaceNoCase(componentPath, ".cfc", "", "one");
+            // Get just the filename without path
+            fileName = listLast(testFile, "/\");
+            fileName = replaceNoCase(fileName, ".cfc", "", "one");
+            
+            // Get the subdirectory path relative to specs
+            relativePath = replaceNoCase(testFile, specsDirectory, "", "one");
+            relativePath = replaceNoCase(relativePath, "/" & listLast(relativePath, "/"), "", "one");
+            
+            // Build component path
+            if (len(trim(relativePath))) {
+                // Remove leading slash and convert to dots
+                relativePath = listChangeDelims(trim(relativePath), ".", "/");
+                if (left(relativePath, 1) == ".") {
+                    relativePath = right(relativePath, len(relativePath) - 1);
+                }
+                componentPath = "wheels.tests_testbox.specs." & relativePath & "." & fileName;
+            } else {
+                componentPath = "wheels.tests_testbox.specs." & fileName;
+            }
             
             try {
                 writeOutput("<li><strong>#componentPath#</strong>");
