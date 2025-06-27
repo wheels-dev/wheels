@@ -1,7 +1,6 @@
 
 # Dependencies
-vendor/testbox/
-vendor/wirebox/
+vendor/
 
 # IDE
 .idea/

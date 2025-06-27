@@ -109,7 +109,11 @@ template-name/
 
 ### Docker Dependency Isolation
 
-When running templates with Docker, dependencies (WireBox, TestBox) are installed in Docker named volumes rather than the host filesystem. This prevents polluting your repository with vendor files during testing.
+When running templates with Docker:
+- Dependencies (WireBox, TestBox) are installed in Docker named volumes
+- Individual application directories are mounted to avoid creating empty directories on the host
+- The vendor directory only exists within the container, not on your host filesystem
+- This prevents any pollution of your repository during testing
 
 ## Contributing Templates
 

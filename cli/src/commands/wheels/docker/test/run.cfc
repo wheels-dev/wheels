@@ -228,17 +228,30 @@ services:
     image: #engineConfig.image#
     container_name: #arguments.name#-app
     volumes:
-      ## Mount the application directory
-      - #arguments.context.appPath#:/cfwheels-test-suite
-      ## Mount the framework from monorepo
-      - #arguments.context.monorepoRoot#/core/src/wheels:/cfwheels-test-suite/vendor/wheels
-      ## Mount engine-specific configuration files
+      ## Mount application files individually to avoid creating vendor directory on host
+      - #arguments.context.appPath#/Application.cfc:/cfwheels-test-suite/Application.cfc
+      - #arguments.context.appPath#/index.cfm:/cfwheels-test-suite/index.cfm
+      - #arguments.context.appPath#/urlrewrite.xml:/cfwheels-test-suite/urlrewrite.xml
+      - #arguments.context.appPath#/app:/cfwheels-test-suite/app
+      - #arguments.context.appPath#/config:/cfwheels-test-suite/config
+      - #arguments.context.appPath#/db:/cfwheels-test-suite/db
+      - #arguments.context.appPath#/public:/cfwheels-test-suite/public";
+      
+        // Only mount tests directory if it exists
+        if (directoryExists("#arguments.context.appPath#/tests")) {
+            compose &= "
+      - #arguments.context.appPath#/tests:/cfwheels-test-suite/tests";
+        }
+        
+        compose &= "
+      ## Use a named volume for the entire vendor directory to prevent host pollution
+      - #arguments.name#-vendor:/cfwheels-test-suite/vendor
+      ## Mount the framework from monorepo (this overrides the vendor volume for this specific path)
+      - #arguments.context.monorepoRoot#/core/src/wheels:/cfwheels-test-suite/vendor/wheels:ro
+      ## Mount engine-specific configuration files (these override template files)
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/server.json:/cfwheels-test-suite/server.json:ro
       - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/box.json:/cfwheels-test-suite/box.json:ro
-      - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/CFConfig.json:/cfwheels-test-suite/CFConfig.json:ro
-      ## Use named volumes for dependencies to prevent host pollution
-      - #arguments.name#-vendor-testbox:/cfwheels-test-suite/vendor/testbox
-      - #arguments.name#-vendor-wirebox:/cfwheels-test-suite/vendor/wirebox";
+      - #arguments.context.monorepoRoot#/tools/docker/#arguments.engine#/CFConfig.json:/cfwheels-test-suite/CFConfig.json:ro";
 
         // Add settings.cfm mount if not H2
         if (arguments.db != "h2") {
@@ -295,8 +308,7 @@ services:
         compose &= "
 
 volumes:
-  #arguments.name#-vendor-testbox:
-  #arguments.name#-vendor-wirebox:";
+  #arguments.name#-vendor:";
         
         if (arguments.db != "h2") {
             compose &= "
