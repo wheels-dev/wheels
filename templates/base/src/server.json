@@ -1,8 +1,16 @@
 {
-    "web": {
-        "rewrites": {
-            "enable": true,
-            "configFile": "urlrewrite.xml"
+    "name":"wheels",
+    "web":{
+        "host":"localhost",
+        "webroot":"public",
+        "rewrites":{
+            "enable":true,
+            "config":"public/urlrewrite.xml"
         }
-    }
+    },
+    "app":{
+        "cfengine":"lucee"
+    },
+    "rewritesEnable=true":true,
+    "openbrowser":"false"
 }
