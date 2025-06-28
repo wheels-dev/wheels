@@ -74,7 +74,7 @@
 		"wheelstestdb_h2": {
 			"class":"org.h2.Driver",
 			"dbdriver":"H2",
-			"custom":"mode=MySQL&path=./docker/lucee@7/H2.db/",
+			"custom":"mode=MySQL&path=./tools/docker/lucee@7/H2.db/",
 			"database":"wheelstestdb",
 			"dsn":"jdbc:h2:{path}{database};MODE={mode}",
 			"allow":"511",

@@ -1,6 +1,6 @@
 /**
  * Initialize Docker configuration for development
- * 
+ *
  * {code:bash}
  * wheels docker:init
  * wheels docker:init --db=mysql
@@ -25,18 +25,18 @@ component extends="../base" {
         print.line();
         print.boldMagentaLine("Wheels Docker Configuration");
         print.line();
-        
+
         // Validate inputs
         local.validDatabases = ["h2", "mysql", "postgres", "mssql"];
         if (!arrayContains(local.validDatabases, lCase(arguments.db))) {
             error("Invalid database: #arguments.db#. Please choose from: #arrayToList(local.validDatabases)#");
         }
-        
+
         local.validEngines = ["lucee", "adobe"];
         if (!arrayContains(local.validEngines, lCase(arguments.cfengine))) {
             error("Invalid ColdFusion engine: #arguments.cfengine#. Please choose from: #arrayToList(local.validEngines)#");
         }
-        
+
         // Set default DB versions if not specified
         if (len(trim(arguments.dbVersion)) == 0) {
             switch (lCase(arguments.db)) {
@@ -54,19 +54,19 @@ component extends="../base" {
                     break;
             }
         }
-        
+
         // Create docker-compose.yml
         createDockerComposeFile(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion);
-        
+
         // Create Dockerfile
         createDockerfile(arguments.cfengine, arguments.cfVersion);
-        
+
         // Create database initialization scripts
         createDbInitScripts(arguments.db);
-        
+
         // Create .dockerignore
         createDockerIgnore();
-        
+
         print.line();
         print.boldGreenLine("Docker configuration created successfully!");
         print.line();
@@ -75,7 +75,7 @@ component extends="../base" {
         print.line("2. Access your application at: http://localhost:8080");
         print.line();
     }
-    
+
     /**
      * Create docker-compose.yml file
      */
@@ -86,9 +86,9 @@ component extends="../base" {
         required string cfVersion
     ) {
         local.composePath = fileSystemUtil.resolvePath("docker-compose.yml");
-        
+
         local.dbService = getDbServiceConfig(arguments.db, arguments.dbVersion);
-        
+
         local.composeContent = "version: '3.8'
 
 services:
@@ -110,17 +110,17 @@ services:
 #local.dbService.cfEnvironment#
 
 #local.dbService.service#
-      
+
   # Add additional services as needed (redis, etc.)
 
 volumes:
   #arguments.db#_data:
     driver: local";
-        
+
         file action='write' file='#local.composePath#' mode='777' output='#local.composeContent#';
         print.greenLine("Created docker-compose.yml");
     }
-    
+
     /**
      * Create Dockerfile for the ColdFusion application
      */
@@ -129,9 +129,9 @@ volumes:
         required string cfVersion
     ) {
         local.dockerfilePath = fileSystemUtil.resolvePath("Dockerfile");
-        
+
         local.dockerfileContent = "";
-        
+
         // Use different Dockerfile content based on the CF engine
         if (lCase(arguments.cfengine) == "lucee") {
             local.dockerfileContent = "FROM lucee/lucee:#arguments.cfVersion#
@@ -188,21 +188,21 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhos
 # Start Adobe ColdFusion
 CMD ["/opt/coldfusion/bin/coldfusion", "start"]";
         }
-        
+
         file action='write' file='#local.dockerfilePath#' mode='777' output='#local.dockerfileContent#';
         print.greenLine("Created Dockerfile");
     }
-    
+
     /**
      * Create database initialization scripts
      */
     private void function createDbInitScripts(required string db) {
         local.dbScriptsPath = fileSystemUtil.resolvePath("docker/db");
-        
+
         if (!directoryExists(local.dbScriptsPath)) {
             directoryCreate(local.dbScriptsPath, true);
         }
-        
+
         // Create initialization script based on database type
         switch (lCase(arguments.db)) {
             case "mysql":
@@ -219,13 +219,13 @@ CMD ["/opt/coldfusion/bin/coldfusion", "start"]";
                 break;
         }
     }
-    
+
     /**
      * Create MySQL initialization script
      */
     private void function createMySqlInit(required string path) {
         local.initSqlPath = arguments.path & "/init.sql";
-        
+
         local.initSqlContent = "-- MySQL initialization script for Wheels Docker setup
 CREATE DATABASE IF NOT EXISTS cfwheels;
 USE cfwheels;
@@ -237,17 +237,17 @@ FLUSH PRIVILEGES;
 
 -- Add your schema initialization here or use migrations
 ";
-        
+
         file action='write' file='#local.initSqlPath#' mode='777' output='#local.initSqlContent#';
         print.greenLine("Created MySQL initialization script");
     }
-    
+
     /**
      * Create PostgreSQL initialization script
      */
     private void function createPostgresInit(required string path) {
         local.initSqlPath = arguments.path & "/init.sql";
-        
+
         local.initSqlContent = "-- PostgreSQL initialization script for Wheels Docker setup
 
 -- Create a user for the application
@@ -261,17 +261,17 @@ CREATE DATABASE cfwheels OWNER cfwheels;
 
 -- Add your schema initialization here or use migrations
 ";
-        
+
         file action='write' file='#local.initSqlPath#' mode='777' output='#local.initSqlContent#';
         print.greenLine("Created PostgreSQL initialization script");
     }
-    
+
     /**
      * Create MSSQL initialization script
      */
     private void function createMsSqlInit(required string path) {
         local.initSqlPath = arguments.path & "/init.sql";
-        
+
         local.initSqlContent = "-- SQL Server initialization script for Wheels Docker setup
 
 -- Create the database
@@ -300,17 +300,17 @@ GO
 
 -- Add your schema initialization here or use migrations
 ";
-        
+
         file action='write' file='#local.initSqlPath#' mode='777' output='#local.initSqlContent#';
         print.greenLine("Created SQL Server initialization script");
     }
-    
+
     /**
      * Create .dockerignore file
      */
     private void function createDockerIgnore() {
         local.dockerIgnorePath = fileSystemUtil.resolvePath(".dockerignore");
-        
+
         local.dockerIgnoreContent = "# .dockerignore for Wheels application
 
 # Version control
@@ -347,11 +347,11 @@ dist/
 .DS_Store
 Thumbs.db
 ";
-        
+
         file action='write' file='#local.dockerIgnorePath#' mode='777' output='#local.dockerIgnoreContent#';
         print.greenLine("Created .dockerignore");
     }
-    
+
     /**
      * Get database service configuration for docker-compose.yml
      */
@@ -363,7 +363,7 @@ Thumbs.db
             "service": "",
             "cfEnvironment": ""
         };
-        
+
         switch (lCase(arguments.db)) {
             case "mysql":
                 local.result.service = "  mysql:
@@ -375,16 +375,16 @@ Thumbs.db
       - MYSQL_PASSWORD=cfwheels
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/db:/docker-entrypoint-initdb.d
+      - ./tools/docker/db:/docker-entrypoint-initdb.d
     ports:
       - '3306:3306'";
-                
+
                 local.result.cfEnvironment = "      - WHEELS_DATASOURCE_USERNAME=cfwheels
       - WHEELS_DATASOURCE_PASSWORD=cfwheels
       - WHEELS_DATASOURCE_DATABASE=cfwheels
       - WHEELS_DATASOURCE_PORT=3306";
                 break;
-                
+
             case "postgres":
                 local.result.service = "  postgres:
     image: postgres:#arguments.dbVersion#
@@ -394,16 +394,16 @@ Thumbs.db
       - POSTGRES_DB=cfwheels
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/db:/docker-entrypoint-initdb.d
+      - ./tools/docker/db:/docker-entrypoint-initdb.d
     ports:
       - '5432:5432'";
-                
+
                 local.result.cfEnvironment = "      - WHEELS_DATASOURCE_USERNAME=cfwheels
       - WHEELS_DATASOURCE_PASSWORD=cfwheels
       - WHEELS_DATASOURCE_DATABASE=cfwheels
       - WHEELS_DATASOURCE_PORT=5432";
                 break;
-                
+
             case "mssql":
                 local.result.service = "  mssql:
     image: mcr.microsoft.com/mssql/server:#arguments.dbVersion#
@@ -413,16 +413,16 @@ Thumbs.db
       - MSSQL_PID=Developer
     volumes:
       - mssql_data:/var/opt/mssql
-      - ./docker/db:/docker-entrypoint-initdb.d
+      - ./tools/docker/db:/docker-entrypoint-initdb.d
     ports:
       - '1433:1433'";
-                
+
                 local.result.cfEnvironment = "      - WHEELS_DATASOURCE_USERNAME=sa
       - WHEELS_DATASOURCE_PASSWORD=cfWheels123
       - WHEELS_DATASOURCE_DATABASE=cfwheels
       - WHEELS_DATASOURCE_PORT=1433";
                 break;
-                
+
             case "h2":
                 local.result.service = "  h2:
     image: oscarfonts/h2:#arguments.dbVersion#
@@ -431,14 +431,14 @@ Thumbs.db
     ports:
       - '1521:1521'
       - '8082:81'";
-                
+
                 local.result.cfEnvironment = "      - WHEELS_DATASOURCE_USERNAME=sa
       - WHEELS_DATASOURCE_PASSWORD=
       - WHEELS_DATASOURCE_DATABASE=cfwheels
       - WHEELS_DATASOURCE_PORT=1521";
                 break;
         }
-        
+
         return local.result;
     }
 }

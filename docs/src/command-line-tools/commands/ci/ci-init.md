@@ -92,7 +92,7 @@ jobs:
       matrix:
         cfengine: [lucee@5, lucee@6, adobe@2023]
         database: [h2]
-    
+
     steps:
       - uses: actions/checkout@v4
       - name: Setup CommandBox
@@ -140,5 +140,5 @@ jobs:
 ## See Also
 
 - [wheels test](../testing/test.md) - Run tests locally
-- [wheels docker init](../docker/docker-init.md) - Initialize Docker configuration
+- [wheels docker init](../tools/docker/docker-init.md) - Initialize Docker configuration
 - [wheels deploy](../deploy/deploy.md) - Deployment commands

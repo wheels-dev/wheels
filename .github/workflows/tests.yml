@@ -125,9 +125,9 @@ jobs:
 
       - name: Copy server.json files
         run: |
-          cp ./docker/${{ matrix.cfengine }}/server.json ./
-          cp ./docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
-          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./app/config/settings.cfm
+          cp ./tools/docker/${{ matrix.cfengine }}/server.json ./
+          cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
+          cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./app/config/settings.cfm
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
