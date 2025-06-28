@@ -167,7 +167,8 @@ jobs:
 
       - name: Start ${{ matrix.cfengine }} Server
         run: |
-          wpd
+          cd /home/runner/work/wheels/wheels/
+          pwd
           box server start serverConfigFile="server.json" --noSaveSettings --debug
 
       - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
