@@ -178,6 +178,7 @@ jobs:
 
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
         run: |
+          cd /home/runner/work/wheels/wheels/
           pwd
           ./tools/docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
 
