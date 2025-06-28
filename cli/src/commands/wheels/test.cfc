@@ -95,7 +95,7 @@ component extends="base" {
 							   & "&reload=#loc.reload#";
 			} else if(loc.type eq 'core'){
 				loc.testurl = "http://" & loc.host & ":" & loc.port
-							   & "/" & "?controller=wheels.tests_testbox&action=runner&view=runner"
+							   & "/" & "?controller=wheels.core_tests&action=runner&view=runner"
 							   & "&type=#loc.type#"
 							   & "&format=#loc.format#"
 							   & "&reload=#loc.reload#";

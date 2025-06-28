@@ -16,9 +16,9 @@ component extends="testbox.system.BaseSpec" {
 				system = CreateObject("java", "java.lang.System").getProperties()
 
 				if(findNoCase('Windows', system['os.name'])){
-					expected = "\wheels\tests_testbox\specs\events\onerror.cfc:9"
+					expected = "\wheels\core_tests\specs\events\onerror.cfc:9"
 				}else {
-					expected = "/wheels/tests_testbox/specs/events/onerror.cfc:9"
+					expected = "/wheels/core_tests/specs/events/onerror.cfc:9"
 				}
 
 				expect(actual).toInclude(expected)

@@ -7,14 +7,14 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that $objectFileName", () => {
 
 			it("returns model class name in same case as file wo expandpath", () => {
-				actual = g.$objectFileName(name = "PhotoGallery", objectPath = "/wheels/tests_testbox/_assets/models/", type = "model")
+				actual = g.$objectFileName(name = "PhotoGallery", objectPath = "/wheels/core_tests/_assets/models/", type = "model")
 
 				expect(actual).toBe("PhotoGallery")
 			})
 
 			it("$fileExistsNoCase returns filename", () => {
-				actual = g.$fileExistsNoCase(ExpandPath("/wheels/tests_testbox/_assets/models/") & "PhotoGallery.cfc")
-	
+				actual = g.$fileExistsNoCase(ExpandPath("/wheels/core_tests/_assets/models/") & "PhotoGallery.cfc")
+
 				expect(actual).toBe("PhotoGallery.cfc")
 			})
 		})
@@ -71,11 +71,11 @@ component extends="testbox.system.BaseSpec" {
 				r = "id"
 
 				expect(e).toBe(r)
-				
+
 				author.setprimaryKeys("id2,id3")
 				e = "id,id2,id3"
 				r = author.primaryKeys()
-				
+
 				expect(e).toBe(r)
 			})
 
@@ -86,12 +86,12 @@ component extends="testbox.system.BaseSpec" {
 				r = "id"
 
 				expect(e).toBe(r)
-				
+
 				author.setprimaryKeys("id2")
 				author.setprimaryKeys("id2")
 				e = "id,id2"
 				r = author.primaryKeys()
-				
+
 				expect(e).toBe(r)
 			})
 

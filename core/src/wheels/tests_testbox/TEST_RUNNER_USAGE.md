@@ -64,7 +64,7 @@ Both runners support multiple output formats via the `format` URL parameter:
 - **format** - Output format (html, json, text, txt, simple, junit, xml)
 - **db** - Database to use for tests (mysql, sqlserver, sqlserver_cicd, postgres, h2)
 - **populate** - Whether to populate test database (true/false, default: true)
-- **reporter** - Custom TestBox reporter class (default: wheels.tests_testbox.Reporter)
+- **reporter** - Custom TestBox reporter class (default: wheels.core_tests.Reporter)
 - **only** - Filter results (e.g., "failure,error")
 
 ### Minimal Runner Parameters

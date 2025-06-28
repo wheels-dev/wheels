@@ -4,12 +4,12 @@
         // Disable module loading to avoid BINDER errors
         // Create a simple TestBox instance without modules
         testBoxConfig = {
-            directory: "wheels.tests_testbox.specs",
+            directory: "wheels.core_tests.specs",
             recurse: true,
             bundles: "",
             labels: "",
             excludes: "",
-            reportpath: "/wheels/tests_testbox",
+            reportpath: "/wheels/core_tests",
             runner: [],
             callbacks: {},
             modules: {
@@ -20,23 +20,23 @@
                 enabled: false
             }
         };
-        
+
         // Create TestBox instance with minimal configuration
         testBox = createObject("component", "testbox.system.TestBox");
         testBox.init(argumentCollection=testBoxConfig);
-        
+
         // Sort bundles alphabetically
         local.sortedArray = testBox.getBundles();
         arraySort(local.sortedArray, "textNoCase");
         testBox.setBundles(local.sortedArray);
-        
+
         // Run tests
         if (!structKeyExists(url, "reporter")) {
-            url.reporter = "wheels.tests_testbox.Reporter";
+            url.reporter = "wheels.core_tests.Reporter";
         }
-        
+
         results = testBox.run(reporter=url.reporter);
-        
+
         // Output based on reporter type
         if (findNoCase("json", url.reporter)) {
             cfcontent(type="application/json");
@@ -46,7 +46,7 @@
             include "_navigation.cfm";
             writeOutput(results);
         }
-        
+
     } catch (any e) {
         cfheader(statuscode="500", statustext="Internal Server Error");
         cfcontent(type="text/html");

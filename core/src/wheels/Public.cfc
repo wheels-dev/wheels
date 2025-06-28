@@ -40,18 +40,18 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/views/runner.cfm";
 		return "";
 	}
-	
-	public function tests_testbox(){
+
+	public function core_tests(){
 		// Set proper HTTP status first
 		cfheader(statuscode="200", statustext="OK");
-		
+
 		// Simple test to ensure the endpoint works
 		if (structKeyExists(url, "test") && url.test == "simple") {
 			cfcontent(type="application/json");
 			writeOutput('{"success":true,"message":"TestBox endpoint is working"}');
 			abort;
 		}
-		
+
 		// Use minimal runner for debugging if requested
 		if (structKeyExists(url, "minimal") && url.minimal == "true") {
 			if (structKeyExists(url, "format") && url.format == "json") {
@@ -59,10 +59,10 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			} else if (structKeyExists(url, "format") && url.format == "txt") {
 				cfcontent(type="text/plain");
 			}
-			include "/wheels/tests_testbox/minimal-runner.cfm";
+			include "/wheels/core_tests/minimal-runner.cfm";
 			abort;
 		}
-		
+
 		// Set content type based on format
 		if (structKeyExists(url, "format") && url.format == "json") {
 			cfcontent(type="application/json");
@@ -71,16 +71,16 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		} else if (structKeyExists(url, "format") && url.format == "junit") {
 			cfcontent(type="text/xml");
 		}
-		
+
 		// Use the new core runner that actually executes tests
-		include "/wheels/tests_testbox/core-runner.cfm";
+		include "/wheels/core_tests/core-runner.cfm";
 		abort;
 	}
-	
+
 	public function app_tests(){
 		// Set proper HTTP status first
 		cfheader(statuscode="200", statustext="OK");
-		
+
 		// Check if app tests directory exists
 		local.testDirectory = expandPath("/tests");
 		if (!directoryExists(local.testDirectory)) {
@@ -93,7 +93,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			}
 			abort;
 		}
-		
+
 		// Set content type based on format
 		if (structKeyExists(url, "format") && url.format == "json") {
 			cfcontent(type="application/json");
@@ -102,9 +102,9 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		} else if (structKeyExists(url, "format") && url.format == "junit") {
 			cfcontent(type="text/xml");
 		}
-		
+
 		// Include the app test runner
-		include "/wheels/tests_testbox/app-runner.cfm";
+		include "/wheels/core_tests/app-runner.cfm";
 		abort;
 	}
 	function packages() {
@@ -179,7 +179,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		local.action = StructKeyExists(request.wheels.params, "action") ? request.wheels.params.action : "";
 		local.view = StructKeyExists(request.wheels.params, "view") ? request.wheels.params.view : "";
 		local.type = StructKeyExists(request.wheels.params, "type") ? request.wheels.params.type : "";
-		
+
 		switch (local.view) {
 			case "routes":
 			case "docs":
@@ -190,7 +190,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 				break;
 			case "testbox":
 				// Handle testbox specifically
-				return tests_testbox();
+				return core_tests();
 			case "packages":
 				include "/wheels/public/views/packages.cfm";
 				break;
@@ -203,7 +203,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		}
 		return "";
 	}
-	
+
 	function legacy() {
 		// Handle legacy ?controller=wheels&action=wheels&view=xxx URLs
 		return wheels();

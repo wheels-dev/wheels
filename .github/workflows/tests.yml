@@ -186,7 +186,7 @@ jobs:
 
           # Copy test app resources if they don't exist in workspace
           if [ ! -d "./tools/workspace/app" ]; then
-              cp -r ./tools/workspace/vendor/wheels/tests_testbox/resources/app ./tools/workspace/
+              cp -r ./tools/workspace/vendor/wheels/core_tests/resources/app ./tools/workspace/
           fi
 
           # Update box.json with onServerInstall script
@@ -297,10 +297,10 @@ jobs:
         run: |
           echo "Consolidating JUnit test results..."
           mkdir -p consolidated-results
-          
+
           # Find all JUnit XML files and copy them to consolidated directory
           find test-results -name "*-junit.xml" -exec cp {} consolidated-results/ \;
-          
+
           # List all JUnit files found
           echo "Found JUnit files:"
           ls -la consolidated-results/
@@ -316,21 +316,21 @@ jobs:
         run: |
           echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Process each result file
           for file in test-results/*/\*-result.txt; do
             if [ -f "$file" ]; then
               engine=$(basename "$file" | cut -d'-' -f1,2)
               db=$(basename "$file" | cut -d'-' -f3 | sed 's/-result.txt//')
               echo "### $engine - $db" >> $GITHUB_STEP_SUMMARY
-              
+
               # Try to extract key metrics from JSON if jq is available
               if command -v jq >/dev/null 2>&1 && [ -s "$file" ]; then
                 pass=$(jq -r '.totalPass // 0' "$file" 2>/dev/null || echo "N/A")
                 fail=$(jq -r '.totalFail // 0' "$file" 2>/dev/null || echo "N/A")
                 error=$(jq -r '.totalError // 0' "$file" 2>/dev/null || echo "N/A")
                 skip=$(jq -r '.totalSkipped // 0' "$file" 2>/dev/null || echo "N/A")
-                
+
                 echo "- ✅ Passed: $pass" >> $GITHUB_STEP_SUMMARY
                 echo "- ❌ Failed: $fail" >> $GITHUB_STEP_SUMMARY
                 echo "- 🔥 Errors: $error" >> $GITHUB_STEP_SUMMARY

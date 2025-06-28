@@ -3,18 +3,18 @@
     try {
         // Get the requested format
         local.format = structKeyExists(url, "format") ? url.format : "html";
-        
+
         // Setup test environment function
         function setTestboxEnvironment() {
             // creating backup for original environment
             application.$$$wheels = Duplicate(application.wheels);
 
             // load testbox routes
-            application.wo.$include(template = "/wheels/tests_testbox/routes.cfm");
+            application.wo.$include(template = "/wheels/core_tests/routes.cfm");
             application.wo.$setNamedRoutePositions();
 
-            local.AssetPath = "/wheels/tests_testbox/_assets/";
-            
+            local.AssetPath = "/wheels/core_tests/_assets/";
+
             application.wo.set(rewriteFile = "index.cfm");
             application.wo.set(controllerPath = local.AssetPath & "controllers");
             application.wo.set(viewPath = local.AssetPath & "views");
@@ -23,7 +23,7 @@
 
             /* set migration level for tests*/
             application.wheels.migrationLevel = 2;
-            
+
             /* turn off default validations for testing */
             application.wheels.automaticValidations = false;
             application.wheels.assetQueryString = false;
@@ -54,7 +54,7 @@
                 application.wheels.csrfCookieEncryptionAlgorithm,
                 application.wheels.csrfCookieEncryptionEncoding
             );
-            
+
             // Set datasource based on URL parameter or default
             if (structKeyExists(url, "db") && listFind("mysql,sqlserver,sqlserver_cicd,postgres,h2", url.db)) {
                 if (listFind("sqlserver,sqlserver_cicd", url.db)) {
@@ -68,7 +68,7 @@
                 // Use the current datasource as fallback
                 application.wheels.dataSourceName = application.wheels.dataSourceName;
             }
-            
+
             try {
                 application.testenv.db = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "version");
             } catch (any e) {
@@ -88,15 +88,15 @@
                 // Tests that require database will fail individually
             }
         }
-        
+
         // Create TestBox configuration
         testBoxConfig = {
-            directory: "wheels.tests_testbox.specs",
+            directory: "wheels.core_tests.specs",
             recurse: true,
             bundles: "",
             labels: "",
             excludes: "",
-            reportpath: "/wheels/tests_testbox",
+            reportpath: "/wheels/core_tests",
             runner: [],
             callbacks: {},
             modules: {
@@ -107,26 +107,26 @@
                 enabled: false
             }
         };
-        
+
         // Create TestBox instance
         testBox = createObject("component", "testbox.system.TestBox");
         testBox.init(argumentCollection=testBoxConfig);
-        
+
         // Sort bundles alphabetically
         local.sortedArray = testBox.getBundles();
         arraySort(local.sortedArray, "textNoCase");
         testBox.setBundles(local.sortedArray);
-        
+
         // Setup test environment
         setTestboxEnvironment();
-        
+
         // Run tests based on format
         try {
             switch(local.format) {
                 case "json":
                     result = testBox.run(reporter="testbox.system.reports.JSONReporter");
                     cfheader(name="Access-Control-Allow-Origin", value="*");
-                    
+
                     // Parse result to set proper status code
                     DeJsonResult = DeserializeJSON(result);
                     if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
@@ -134,22 +134,22 @@
                     } else {
                         cfheader(statustext="OK", statuscode=200);
                     }
-                    
+
                     writeOutput(result);
                     break;
-                    
+
                 case "txt":
                 case "text":
                     // Use JSON reporter and format as text to avoid reporter issues
                     result = testBox.run(reporter="testbox.system.reports.JSONReporter");
                     local.jsonData = deserializeJSON(result);
-                    
+
                     writeOutput("WHEELS CORE TEST RESULTS" & chr(10));
                     writeOutput("========================" & chr(10) & chr(10));
                     writeOutput("Engine: " & local.jsonData.CFMLEngine & " " & local.jsonData.CFMLEngineVersion & chr(10));
                     writeOutput("TestBox: " & local.jsonData.version & chr(10));
                     writeOutput("Duration: " & numberFormat(local.jsonData.totalDuration/1000, "0.00") & " seconds" & chr(10) & chr(10));
-                    
+
                     writeOutput("SUMMARY" & chr(10));
                     writeOutput("-------" & chr(10));
                     writeOutput("Total Bundles: " & local.jsonData.totalBundles & chr(10));
@@ -159,7 +159,7 @@
                     writeOutput("Total Failed:  " & local.jsonData.totalFail & chr(10));
                     writeOutput("Total Errors:  " & local.jsonData.totalError & chr(10));
                     writeOutput("Total Skipped: " & local.jsonData.totalSkipped & chr(10) & chr(10));
-                    
+
                     if (local.jsonData.totalFail > 0 || local.jsonData.totalError > 0) {
                         writeOutput("FAILURES AND ERRORS" & chr(10));
                         writeOutput("===================" & chr(10));
@@ -182,7 +182,7 @@
                         }
                     }
                     break;
-                    
+
                 case "junit":
                 case "xml":
                     try {
@@ -199,12 +199,12 @@
                         writeOutput('</testsuites>');
                     }
                     break;
-                    
+
                 case "simple":
                     // Use JSON reporter and format as simple text
                     result = testBox.run(reporter="testbox.system.reports.JSONReporter");
                     local.jsonData = deserializeJSON(result);
-                    
+
                     writeOutput("TestBox v" & local.jsonData.version & " " & chr(10));
                     writeOutput("=" & repeatString("=", 50) & chr(10));
                     if (local.jsonData.totalFail == 0 && local.jsonData.totalError == 0) {
@@ -215,22 +215,22 @@
                     writeOutput("Bundles:#local.jsonData.totalBundles# Suites:#local.jsonData.totalSuites# Specs:#local.jsonData.totalSpecs# Pass:#local.jsonData.totalPass# Fail:#local.jsonData.totalFail# Error:#local.jsonData.totalError# Skipped:#local.jsonData.totalSkipped# Time:#numberFormat(local.jsonData.totalDuration/1000, '0.000')#s" & chr(10));
                     writeOutput("=" & repeatString("=", 50) & chr(10));
                     break;
-                    
+
                 default: // html
                     // Try to use custom reporter first, fallback to JSON if it fails
                     try {
                         if (!structKeyExists(url, "reporter")) {
-                            url.reporter = "wheels.tests_testbox.Reporter";
+                            url.reporter = "wheels.core_tests.Reporter";
                         }
                         results = testBox.run(reporter=url.reporter);
-                        
+
                         // Include navigation and output results
                         include "_navigation.cfm";
                         writeOutput(results);
                     } catch (any reporterError) {
                         // Fallback to JSON reporter with HTML formatting
                         result = testBox.run(reporter="testbox.system.reports.JSONReporter");
-                        
+
                         // Use the HTML formatter
                         type = "Core";
                         include "html.cfm";
@@ -243,7 +243,7 @@
                 structDelete(application, "$$$wheels");
             }
         }
-        
+
     } catch (any e) {
         // Handle errors based on format
         if (structKeyExists(url, "format")) {
@@ -256,7 +256,7 @@
                         type: e.type
                     }));
                     break;
-                    
+
                 case "txt":
                 case "text":
                     writeOutput("ERROR RUNNING CORE TESTS" & chr(10));
@@ -268,7 +268,7 @@
                         writeOutput(e.stackTrace);
                     }
                     break;
-                    
+
                 default:
                     writeOutput("<h1>Error Running Core Tests</h1>");
                     writeOutput("<p><strong>Message:</strong> #e.message#</p>");

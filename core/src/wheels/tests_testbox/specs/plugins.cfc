@@ -11,13 +11,13 @@ component extends="testbox.system.BaseSpec" {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests_testbox/_assets/plugins/standard",
+					pluginPath = "/wheels/core_tests/_assets/plugins/standard",
 					deletePluginDirectories = false,
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
 
-				config.pluginPath = "/wheels/tests_testbox/_assets/plugins/dependant"
+				config.pluginPath = "/wheels/core_tests/_assets/plugins/dependant"
 				PluginObj = $pluginObj(config)
 				iplugins = PluginObj.getDependantPlugins()
 
@@ -32,7 +32,7 @@ component extends="testbox.system.BaseSpec" {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests_testbox/_assets/plugins/standard",
+					pluginPath = "/wheels/core_tests/_assets/plugins/standard",
 					deletePluginDirectories = false,
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
@@ -73,7 +73,7 @@ component extends="testbox.system.BaseSpec" {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests_testbox/_assets/plugins/overwriting",
+					pluginPath = "/wheels/core_tests/_assets/plugins/overwriting",
 					deletePluginDirectories = false,
 					overwritePlugins = true,
 					loadIncompatiblePlugins = true
@@ -108,7 +108,7 @@ component extends="testbox.system.BaseSpec" {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests_testbox/_assets/plugins/removing",
+					pluginPath = "/wheels/core_tests/_assets/plugins/removing",
 					deletePluginDirectories = true,
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
@@ -137,7 +137,7 @@ component extends="testbox.system.BaseSpec" {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests_testbox/_assets/plugins/runner",
+					pluginPath = "/wheels/core_tests/_assets/plugins/runner",
 					deletePluginDirectories = false,
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
@@ -227,7 +227,7 @@ component extends="testbox.system.BaseSpec" {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests_testbox/_assets/plugins/standard",
+					pluginPath = "/wheels/core_tests/_assets/plugins/standard",
 					deletePluginDirectories = false,
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
@@ -269,7 +269,7 @@ component extends="testbox.system.BaseSpec" {
 					path = "wheels",
 					fileName = "Plugins",
 					method = "$init",
-					pluginPath = "/wheels/tests_testbox/_assets/plugins/unpacking",
+					pluginPath = "/wheels/core_tests/_assets/plugins/unpacking",
 					deletePluginDirectories = false,
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
@@ -283,7 +283,7 @@ component extends="testbox.system.BaseSpec" {
 
 				expect(ListFind(dirs, "testdefaultassignmixins")).toBeTrue()
 				expect(ListFind(dirs, "testglobalmixins")).toBeTrue()
-				
+
 				$deleteTestFolders()
 			})
 		})
@@ -322,7 +322,7 @@ component extends="testbox.system.BaseSpec" {
 	}
 
 	function $deleteTestFolders() {
-		var q = DirectoryList(ExpandPath('/wheels/tests_testbox/_assets/plugins/unpacking'), false, "query")
+		var q = DirectoryList(ExpandPath('/wheels/core_tests/_assets/plugins/unpacking'), false, "query")
 		for (row in q) {
 			dir = ListChangeDelims(ListAppend(row.directory, row.name, "/"), "/", "\")
 			if (DirectoryExists(dir)) {

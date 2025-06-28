@@ -8,7 +8,7 @@
 <cfscript>
     DeJsonResult = DeserializeJSON(result);
     if(type eq "Core") {
-        package = "wheels.tests_testbox.specs";
+        package = "wheels.core_tests.specs";
         route = "wheelstestbox";
     } else if(type eq "App") {
         package = "tests.Testbox.specs";
@@ -31,9 +31,9 @@
     duration.hours = int(totalSeconds / 3600);
     duration.minutes = int((totalSeconds mod 3600) / 60);
     duration.seconds = totalSeconds mod 60;
-    
+
     testResults.ok = (testResults.numFailures + testResults.numErrors) == 0;
-    
+
     for (bundle in DeJsonResult.bundleStats) {
         for (suite in bundle.suiteStats) {
             for (spec in suite.specStats) {
@@ -46,7 +46,7 @@
                     cleanTestCase = replaceNoCase(bundle.name, "#package#.", "", "all"),
                     cleanTestName = spec.name
                 };
-                
+
                 switch (spec.status) {
                     case "Failed":
                         thisResult.message = spec.failMessage;
@@ -64,16 +64,16 @@
                     default:
                         thisResult.status = "Success";
                 }
-                
+
                 arrayAppend(testResults.results, thisResult);
             }
         }
     }
-    
+
     failures = [];
     passes = [];
     skipped = [];
-    
+
     for (result in testResults.results) {
         switch (result.status) {
             case "Success": arrayAppend(passes, result); break;
@@ -88,7 +88,7 @@
 <div class="ui container">
 
     #pageHeader(title="TestBox #type# Test Results")#
-    <cfinclude template="/wheels/tests_testbox/_navigation.cfm">
+    <cfinclude template="/wheels/core_tests/_navigation.cfm">
 
     <cfif NOT isStruct(testResults)>
         <p style="margin-bottom: 50px;">Sorry, no tests were found.</p>

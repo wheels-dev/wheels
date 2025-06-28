@@ -49,7 +49,7 @@ component extends="testbox.system.BaseSpec" {
 				assetPath = "/javascripts/path/to/my/asset.js"
 				e = _controller.$assetDomain(assetPath)
 				iEnd = 100
-				
+
 				for (i = 1; i lte iEnd; i++) {
 					expect(e).toBe(_controller.$assetDomain(assetPath))
 				}
@@ -115,7 +115,7 @@ component extends="testbox.system.BaseSpec" {
 			beforeEach(() => {
 				_controller = g.controller(name = "dummy")
 				args = {}
-				args.source = "/wheels/tests_testbox/_assets/files/cfwheels-logo.png"
+				args.source = "/wheels/core_tests/_assets/files/cfwheels-logo.png"
 				args.alt = "wheelstestlogo"
 				args.class = "wheelstestlogoclass"
 				args.id = "wheelstestlogoid"
@@ -233,7 +233,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("throws exception on unsupported image", () => {
-				path = "/wheels/tests_testbox/_assets/files/cfwheels-logo.txt"
+				path = "/wheels/core_tests/_assets/files/cfwheels-logo.txt"
 
 				expect(function() {
 					_controller.imageTag(source=path)

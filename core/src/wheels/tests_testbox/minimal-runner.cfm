@@ -6,16 +6,16 @@
         local.format = structKeyExists(url, "format") ? url.format : "html";
         // Create TestBox TestResult object directly
         testResult = createObject("component", "testbox.system.TestResult");
-        
+
         // Get test specs directory
-        specsDirectory = expandPath("/wheels/tests_testbox/specs");
-        
+        specsDirectory = expandPath("/wheels/core_tests/specs");
+
         // Start output based on format
         if (local.format == "html") {
             writeOutput("<h1>Wheels Framework Tests</h1>");
-            writeOutput("<p>Test directory: wheels.tests_testbox.specs</p>");
+            writeOutput("<p>Test directory: wheels.core_tests.specs</p>");
         }
-        
+
         // Get all test CFCs
         testFiles = directoryList(
             specsDirectory,
@@ -23,26 +23,26 @@
             "path",
             "*.cfc"
         );
-        
+
         totalTests = 0;
         passedTests = 0;
         failedTests = 0;
         errors = [];
-        
+
         if (local.format == "html") {
             writeOutput("<ul>");
         }
-        
+
         // Run each test file
         for (testFile in testFiles) {
             // Get just the filename without path
             fileName = listLast(testFile, "/\");
             fileName = replaceNoCase(fileName, ".cfc", "", "one");
-            
+
             // Get the subdirectory path relative to specs
             relativePath = replaceNoCase(testFile, specsDirectory, "", "one");
             relativePath = replaceNoCase(relativePath, "/" & listLast(relativePath, "/"), "", "one");
-            
+
             // Build component path
             if (len(trim(relativePath))) {
                 // Remove leading slash and convert to dots
@@ -50,19 +50,19 @@
                 if (left(relativePath, 1) == ".") {
                     relativePath = right(relativePath, len(relativePath) - 1);
                 }
-                componentPath = "wheels.tests_testbox.specs." & relativePath & "." & fileName;
+                componentPath = "wheels.core_tests.specs." & relativePath & "." & fileName;
             } else {
-                componentPath = "wheels.tests_testbox.specs." & fileName;
+                componentPath = "wheels.core_tests.specs." & fileName;
             }
-            
+
             try {
                 if (local.format == "html") {
                     writeOutput("<li><strong>#componentPath#</strong>");
                 }
-                
+
                 // Create test instance
                 testInstance = createObject("component", componentPath);
-                
+
                 // Check if it has a run method (TestBox spec)
                 if (structKeyExists(testInstance, "run")) {
                     if (local.format == "html") {
@@ -75,11 +75,11 @@
                         writeOutput(" - <span style='color: orange;'>Skipped (not a test spec)</span>");
                     }
                 }
-                
+
                 if (local.format == "html") {
                     writeOutput("</li>");
                 }
-                
+
             } catch (any e) {
                 if (local.format == "html") {
                     writeOutput("<li><strong>#componentPath#</strong> - <span style='color: red;'>✗ Error: #e.message#</span></li>");
@@ -93,11 +93,11 @@
                 });
             }
         }
-        
+
         if (local.format == "html") {
             writeOutput("</ul>");
         }
-        
+
         // Output summary based on format
         switch(local.format) {
             case "json":
@@ -121,18 +121,18 @@
                 }
                 writeOutput(serializeJSON(local.jsonResponse));
                 break;
-                
+
             case "txt":
             case "text":
                 writeOutput("WHEELS MINIMAL TEST RUNNER" & chr(10));
                 writeOutput("=========================" & chr(10) & chr(10));
-                writeOutput("Test directory: wheels.tests_testbox.specs" & chr(10) & chr(10));
+                writeOutput("Test directory: wheels.core_tests.specs" & chr(10) & chr(10));
                 writeOutput("SUMMARY" & chr(10));
                 writeOutput("-------" & chr(10));
                 writeOutput("Total test files: " & totalTests & chr(10));
                 writeOutput("Passed: " & passedTests & chr(10));
                 writeOutput("Failed: " & failedTests & chr(10) & chr(10));
-                
+
                 if (arrayLen(errors) > 0) {
                     writeOutput("ERRORS" & chr(10));
                     writeOutput("------" & chr(10));
@@ -141,7 +141,7 @@
                     }
                 }
                 break;
-                
+
             case "simple":
                 writeOutput("Minimal Runner v1.0 " & chr(10));
                 writeOutput("=" & repeatString("=", 50) & chr(10));
@@ -153,7 +153,7 @@
                 writeOutput("Files:#totalTests# Pass:#passedTests# Fail:#failedTests#" & chr(10));
                 writeOutput("=" & repeatString("=", 50) & chr(10));
                 break;
-                
+
             case "junit":
             case "xml":
                 writeOutput('<?xml version="1.0" encoding="UTF-8"?>');
@@ -167,13 +167,13 @@
                 writeOutput('</testsuite>');
                 writeOutput('</testsuites>');
                 break;
-                
+
             default: // html
                 writeOutput("<h2>Summary</h2>");
                 writeOutput("<p>Total test files: #totalTests#</p>");
                 writeOutput("<p>Passed: #passedTests#</p>");
                 writeOutput("<p>Failed: #failedTests#</p>");
-                
+
                 if (arrayLen(errors) > 0) {
                     writeOutput("<h3>Errors:</h3>");
                     writeOutput("<ul>");
@@ -183,7 +183,7 @@
                     writeOutput("</ul>");
                 }
         }
-        
+
     } catch (any e) {
         // Handle errors based on format
         if (structKeyExists(url, "format")) {
@@ -197,7 +197,7 @@
                         type: e.type
                     }));
                     break;
-                    
+
                 case "txt":
                 case "text":
                     writeOutput("ERROR RUNNING MINIMAL TESTS" & chr(10));
@@ -205,7 +205,7 @@
                     writeOutput("Message: " & e.message & chr(10));
                     writeOutput("Detail: " & e.detail & chr(10));
                     break;
-                    
+
                 case "junit":
                 case "xml":
                     writeOutput('<?xml version="1.0" encoding="UTF-8"?>');
@@ -217,7 +217,7 @@
                     writeOutput('</testsuite>');
                     writeOutput('</testsuites>');
                     break;
-                    
+
                 default:
                     writeOutput("<h1>Error Running Tests</h1>");
                     writeOutput("<p><strong>Message:</strong> #e.message#</p>");

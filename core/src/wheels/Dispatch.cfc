@@ -31,7 +31,7 @@ component output="false" extends="wheels.Global"{
 		local.rv = $ensureControllerAndAction(params = local.rv, route = arguments.route);
 		local.rv = $addRouteFormat(params = local.rv, route = arguments.route);
 		local.rv = $addRouteName(params = local.rv, route = arguments.route);
-		
+
 		// Debug log for testbox route
 		if (structKeyExists(arguments.route, "name") && arguments.route.name == "wheelsTestbox") {
 			writeLog(file="application", text="Route details - controller: #arguments.route.controller#, action: #arguments.route.action#");
@@ -207,7 +207,7 @@ component output="false" extends="wheels.Global"{
 			} else {
 				// Debug log the controller and action being called
 				writeLog(file="application", text="Wheels dispatch - controller: #local.params.controller#, action: #local.params.action#");
-				
+
 				// Call the action method directly on the component to preserve context
 				// Use 'object' and 'methodname' for older Adobe CF versions compatibility
 				invoke(object=application.wheels.public, methodname=local.params.action);
@@ -444,7 +444,7 @@ component output="false" extends="wheels.Global"{
 
 		// Filter out illegal characters from the controller and action arguments.
 		// Debug log before filtering
-		if (local.rv.controller == "wheels.public" && local.rv.action == "tests_testbox") {
+		if (local.rv.controller == "wheels.public" && local.rv.action == "core_tests") {
 			writeLog(file="application", text="Before filter - action: #local.rv.action#");
 		}
 		local.rv.action = ReReplace(local.rv.action, "[^0-9A-Za-z-_\.]", "", "all");
@@ -459,7 +459,7 @@ component output="false" extends="wheels.Global"{
 
 		// Action to normal camelCase.
 		local.rv.action = ReReplace(local.rv.action, "-([a-z])", "\u\1", "all");
-		
+
 		// Debug log final values
 		if (local.rv.controller == "wheels.public") {
 			writeLog(file="application", text="Final dispatch params - controller: #local.rv.controller#, action: #local.rv.action#");

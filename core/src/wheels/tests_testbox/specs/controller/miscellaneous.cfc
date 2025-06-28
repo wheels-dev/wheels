@@ -99,7 +99,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("only supplies file", () => {
-				args.file = "/wheels/tests_testbox/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/core_tests/_assets/files/cfwheels-logo.png"
 				r = _controller.sendFile(argumentCollection = args)
 
 				expect(r.file.right(17)).toBe("cfwheels-logo.png")
@@ -108,7 +108,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("gets test info", () => {
-				args.file = "/wheels/tests_testbox/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/core_tests/_assets/files/cfwheels-logo.png"
 				args.name = "A Weird FileName.png"
 				_controller.sendFile(argumentCollection = args)
 				r = _controller.getFiles()
@@ -119,7 +119,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("supplies file and name", () => {
-				args.file = "/wheels/tests_testbox/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/core_tests/_assets/files/cfwheels-logo.png"
 				args.name = "A Weird FileName.png"
 				r = _controller.sendFile(argumentCollection = args)
 
@@ -129,7 +129,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("changes disposition", () => {
-				args.file = "/wheels/tests_testbox/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/core_tests/_assets/files/cfwheels-logo.png"
 				args.disposition = "attachment"
 				r = _controller.sendFile(argumentCollection = args)
 
@@ -140,7 +140,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("overloads mimetype", () => {
-				args.file = "/wheels/tests_testbox/_assets/files/cfwheels-logo.png"
+				args.file = "/wheels/core_tests/_assets/files/cfwheels-logo.png"
 				args.type = "wheels/custom"
 				r = _controller.sendFile(argumentCollection = args)
 
@@ -151,7 +151,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("checks single file exists", () => {
-				args.file = "/wheels/tests_testbox/_assets/files/sendFile.txt"
+				args.file = "/wheels/core_tests/_assets/files/sendFile.txt"
 				r = _controller.sendFile(argumentCollection = args)
 
 				expect(r.file.right(12)).toBe("sendFile.txt")
@@ -160,7 +160,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("checks no extension file does not exist", () => {
-				args.file = "/wheels/tests_testbox/_assets/files/cfwheels-logo"
+				args.file = "/wheels/core_tests/_assets/files/cfwheels-logo"
 
 				expect(function() {
 					_controller.sendFile(argumentCollection = args)
@@ -170,13 +170,13 @@ component extends="testbox.system.BaseSpec" {
 			it("is specifying a directory", () => {
 				// Skip this test temporarily to debug in CI
 				skip("Temporarily skipping to debug path issues in CI");
-				
+
 				// Get absolute path to test assets directory
-				local.testFile = "/wheels/tests_testbox/_assets/files/cfwheels-logo.png";
+				local.testFile = "/wheels/core_tests/_assets/files/cfwheels-logo.png";
 				// Extract directory and filename parts
 				local.dir = GetDirectoryFromPath(local.testFile);
 				local.filename = GetFileFromPath(local.testFile);
-				
+
 				// Use ExpandPath to get the absolute directory path
 				args.directory = ExpandPath(local.dir)
 				args.file = local.filename
@@ -199,7 +199,7 @@ component extends="testbox.system.BaseSpec" {
 				args.from = "from-dummy@dummy.com"
 				args.deliver = false
 				oldFilePath = application.wheels.filePath
-				application.wheels.filePath = "/wheels/tests_testbox/_assets/files"
+				application.wheels.filePath = "/wheels/core_tests/_assets/files"
 				oldArgs = application.wheels.functions.sendEmail
 				textBody = "dummy plain email body"
 				HTMLBody = "<p>dummy html email body</p>"

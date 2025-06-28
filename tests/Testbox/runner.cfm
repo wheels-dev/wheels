@@ -24,39 +24,39 @@
         // Check if 'only' parameter is provided in the URL
         if (structKeyExists(url, "only") && url.only eq "failure,error") {
             allBundles = DeJsonResult.bundleStats;
-            if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){  
+            if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){
 
                 // Filter test results
                 filteredBundles = [];
-                
+
                 for (bundle in DeJsonResult.bundleStats) {
                     if (bundle.totalError > 0 || bundle.totalFail > 0) {
                         filteredSuites = [];
-                
+
                         for (suite in bundle.suiteStats) {
                             if (suite.totalError > 0 || suite.totalFail > 0) {
                                 filteredSpecs = [];
-                
+
                                 for (spec in suite.specStats) {
                                     if (spec.status eq "Error" || spec.status eq "Failed") {
                                         arrayAppend(filteredSpecs, spec);
                                     }
                                 }
-                
+
                                 if (arrayLen(filteredSpecs) > 0) {
                                     suite.specStats = filteredSpecs;
                                     arrayAppend(filteredSuites, suite);
                                 }
                             }
                         }
-                
+
                         if (arrayLen(filteredSuites) > 0) {
                             bundle.suiteStats = filteredSuites;
                             arrayAppend(filteredBundles, bundle);
                         }
                     }
                 }
-            
+
                 DeJsonResult.bundleStats = filteredBundles;
                 // Update the result with filtered data
 
@@ -80,7 +80,7 @@
                     }
                     writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                 }
-                
+
             }else{
                 for(bundle in DeJsonResult.bundleStats){
                     writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
@@ -97,7 +97,7 @@
     else if (url.format eq "txt") {
         result = testBox.run(
             reporter = "testbox.system.reports.TextReporter"
-        )        
+        )
         cfcontent(type="text/plain");
         writeOutput(result)
     }
@@ -114,7 +114,7 @@
     if(!structKeyExists(url, "format") || url.format eq "html"){
         // Use our html template
         type = "App";
-        include "/wheels/tests_testbox/html.cfm";
+        include "/wheels/core_tests/html.cfm";
     }
 
     private function setTestboxEnvironment() {
@@ -126,7 +126,7 @@
         application.wo.$setNamedRoutePositions()
 
         local.AssetPath = "/tests/testbox/_assets/"
-        
+
         application.wo.set(rewriteFile = "index.cfm")
         application.wo.set(controllerPath = local.AssetPath & "controllers")
         application.wo.set(viewPath = local.AssetPath & "views")
@@ -167,12 +167,12 @@
         if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2", url.db)){
             application.wheels.dataSourceName = "wheelstestdb_" & url.db;
         } else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
-            application.wheels.dataSourceName = "wheelstestdb"; 
+            application.wheels.dataSourceName = "wheelstestdb";
         } else {
             application.wheels.dataSourceName = application.wheels.coreTestDataSourceName;
         }
         application.testenv.db = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
 
-        
+
     }
 </cfscript>

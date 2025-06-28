@@ -7,7 +7,7 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that binarydata", () => {
 
 			beforeEach(() => {
-				binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.png'))
+				binaryData = FileReadBinary(ExpandPath('/wheels/core_tests/_assets/files/cfwheels-logo.png'))
 			})
 
 			it("is updating", () => {
@@ -174,10 +174,10 @@ component extends="testbox.system.BaseSpec" {
 					result = author.isPersisted()
 
 					expect(result).toBeFalse()
-					
+
 					author.save(transaction = "none")
 					result = author.isPersisted()
-					
+
 					expect(result).toBeTrue()
 
 					transaction action="rollback";
@@ -201,7 +201,7 @@ component extends="testbox.system.BaseSpec" {
 				result = author.hasChanged()
 
 				expect(result).toBeTrue()
-				
+
 				author.lastName = "Djurner"
 				result = author.hasChanged()
 
@@ -231,7 +231,7 @@ component extends="testbox.system.BaseSpec" {
 					result = author.hasChanged()
 
 					expect(result).toBeFalse()
-					
+
 					transaction action="rollback";
 				}
 			})
@@ -252,7 +252,7 @@ component extends="testbox.system.BaseSpec" {
 				author = g.model("author").findOne(where = "lastName = 'Djurner'")
 				author.lastName = "Petruzzi"
 				result = author.changedFrom(property = "lastName")
-				
+
 				expect(result).toBe("Djurner")
 			})
 
@@ -260,7 +260,7 @@ component extends="testbox.system.BaseSpec" {
 				author = g.model("author").findOne(where = "lastName = 'Djurner'")
 				author.lastName = "Petruzzi"
 				result = author.lastNameChangedFrom(property = "lastName")
-				
+
 				expect(result).toBe("Djurner")
 			})
 
@@ -278,7 +278,7 @@ component extends="testbox.system.BaseSpec" {
 
 					expect(photo.hasChanged('fileData')).toBeFalse()
 
-					binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.png'))
+					binaryData = FileReadBinary(ExpandPath('/wheels/core_tests/_assets/files/cfwheels-logo.png'))
 					photo.fileData = binaryData
 
 					expect(photo.hasChanged('fileData')).toBeTrue()
@@ -292,7 +292,7 @@ component extends="testbox.system.BaseSpec" {
 
 					expect(photo.hasChanged('fileData')).toBeFalse()
 
-					binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.txt'))
+					binaryData = FileReadBinary(ExpandPath('/wheels/core_tests/_assets/files/cfwheels-logo.txt'))
 					photo.fileData = binaryData
 
 					expect(photo.hasChanged('fileData')).toBeTrue()
@@ -350,7 +350,7 @@ component extends="testbox.system.BaseSpec" {
 					expect(results.shop).toBeInstanceOf("shop")
 					expect(results.shop).toHaveKey(results.shop.primaryKey())
 					expect(results.shop[results.shop.primaryKey()]).toBe(99)
-					
+
 					transaction action="rollback";
 				}
 			})
@@ -751,27 +751,27 @@ component extends="testbox.system.BaseSpec" {
 
 			it("function findByKey returns correct type when no records", () => {
 				q = user.findByKey("0")
-				
+
 				expect(q).toBeBoolean()
 				expect(q).toBeFalse()
 
 				q = user.findByKey(key = "0", returnas = "query")
-				
+
 				expect(q).toBeQuery()
 				expect(q.recordcount).toBe(0)
 
 				q = user.findByKey(key = "0", returnas = "object")
-				
+
 				expect(q).toBeBoolean()
 				expect(q).toBeFalse()
 
 				q = user.findByKey(key = "0", returnas = "struct")
-				
+
 				expect(q).toBeStruct()
 				expect(q).toBeEmpty()
 
 				q = user.findByKey(key = "0", returnas = "array")
-				
+
 				expect(q).toBeArray()
 				expect(q).toBeEmpty()
 
@@ -994,7 +994,7 @@ component extends="testbox.system.BaseSpec" {
 					authorAfter = g.model("author").findByKey(1)
 					transaction action="rollback";
 				}
-				
+
 				expect(authorAfter.lastName).toBe("D")
 
 				application.wheels.cacheQueriesDuringRequest = local.oldCacheQueriesDuringRequest
@@ -1018,9 +1018,9 @@ component extends="testbox.system.BaseSpec" {
 				result = g.model("author").findOne(where = "lastName IS NULL")
 
 				expect(result).toBeFalse()
-				
+
 				result = g.model("author").findOne(where = "lastName IS NOT NULL")
-				
+
 				expect(result).toBeInstanceOf("author")
 			})
 

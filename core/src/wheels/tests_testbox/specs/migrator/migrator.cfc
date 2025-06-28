@@ -5,8 +5,8 @@ component extends="testbox.system.BaseSpec" {
 	function beforeAll() {
 		migration = CreateObject("component", "wheels.migrator.Migration").init()
 		migrator = CreateObject("component", "wheels.Migrator").init(
-			migratePath = "/wheels/tests_testbox/_assets/migrator/migrations/",
-			sqlPath = "/wheels/tests_testbox/_assets/migrator/sql/"
+			migratePath = "/wheels/core_tests/_assets/migrator/migrations/",
+			sqlPath = "/wheels/core_tests/_assets/migrator/sql/"
 		)
 	}
 
@@ -177,7 +177,7 @@ component extends="testbox.system.BaseSpec" {
 			// as part of the migrator test packing
 			// Skipped as it is also skipped in RocketUnit
 			xit("redomigration 001", () => {
-				local.path = ExpandPath("/wheels/tests_testbox/_assets/migrator/migrations/001_create_bunyips_table.cfc");
+				local.path = ExpandPath("/wheels/core_tests/_assets/migrator/migrations/001_create_bunyips_table.cfc");
 				local.originalColumnNames = 'columnNames="name"';
 				local.newColumnNames = 'columnNames="name,hobbies"';
 				local.originalContent = FileRead(local.path);

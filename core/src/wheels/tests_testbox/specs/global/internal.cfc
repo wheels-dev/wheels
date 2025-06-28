@@ -213,7 +213,7 @@ component extends="testbox.system.BaseSpec" {
 
 				expect(r).toBe("https://www.cfwheels.com:443")
 			})
-			
+
 			it("gets full domain string from cgi https non standard", () => {
 				r = g.$fullCgiDomainString({server_name = "www.cfwheels.com", server_port = 8443, server_port_secure = 1})
 
@@ -259,7 +259,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("tests same output", () => {
-				binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.png'));
+				binaryData = FileReadBinary(ExpandPath('/wheels/core_tests/_assets/files/cfwheels-logo.png'));
 				transaction action="begin" {
 					photo = g.model("photo").findOne();
 					photo.update(filename = "somefilename", fileData = binaryData);
@@ -292,7 +292,7 @@ component extends="testbox.system.BaseSpec" {
 		})
 
 		describe("Tests that $listToStruct", () => {
-			
+
 			it("is creating struct from list", () => {
 				actual = g.$listToStruct("a,b,c")
 
@@ -304,7 +304,7 @@ component extends="testbox.system.BaseSpec" {
 		})
 
 		describe("Tests that $wildcardDomainMatchCGI", () => {
-			
+
 			it("matches simple exact http", () => {
 				r = g.$wildcardDomainMatchCGI(
 					"http://www.domain.com",
@@ -322,7 +322,7 @@ component extends="testbox.system.BaseSpec" {
 
 				expect(r).toBeTrue()
 			})
-			
+
 			it("matches simple exact https", () => {
 				r = g.$wildcardDomainMatchCGI(
 					"https://www.domain.com",

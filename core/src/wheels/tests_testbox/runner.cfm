@@ -3,7 +3,7 @@
     try {
         // Try to create TestBox instance with coverage disabled
         testBox = new testbox.system.TestBox(
-            directory="wheels.tests_testbox.specs",
+            directory="wheels.core_tests.specs",
             options={ coverage = { enabled = false } }
         );
     } catch (any e) {
@@ -39,39 +39,39 @@
         // Check if 'only' parameter is provided in the URL
         if (structKeyExists(url, "only") && url.only eq "failure,error") {
             allBundles = DeJsonResult.bundleStats;
-            if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){  
+            if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){
 
                 // Filter test results
                 filteredBundles = [];
-                
+
                 for (bundle in DeJsonResult.bundleStats) {
                     if (bundle.totalError > 0 || bundle.totalFail > 0) {
                         filteredSuites = [];
-                
+
                         for (suite in bundle.suiteStats) {
                             if (suite.totalError > 0 || suite.totalFail > 0) {
                                 filteredSpecs = [];
-                
+
                                 for (spec in suite.specStats) {
                                     if (spec.status eq "Error" || spec.status eq "Failed") {
                                         arrayAppend(filteredSpecs, spec);
                                     }
                                 }
-                
+
                                 if (arrayLen(filteredSpecs) > 0) {
                                     suite.specStats = filteredSpecs;
                                     arrayAppend(filteredSuites, suite);
                                 }
                             }
                         }
-                
+
                         if (arrayLen(filteredSuites) > 0) {
                             bundle.suiteStats = filteredSuites;
                             arrayAppend(filteredBundles, bundle);
                         }
                     }
                 }
-            
+
                 DeJsonResult.bundleStats = filteredBundles;
                 // Update the result with filtered data
 
@@ -95,7 +95,7 @@
                     }
                     writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                 }
-                
+
             }else{
                 for(bundle in DeJsonResult.bundleStats){
                     writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
@@ -112,7 +112,7 @@
     else if (url.format eq "txt") {
         result = testBox.run(
             reporter = "testbox.system.reports.TextReporter"
-        )        
+        )
         cfcontent(type="text/plain");
         writeOutput(result)
     }
@@ -137,11 +137,11 @@
         application.$$$wheels = Duplicate(application.wheels)
 
         // load testbox routes
-        application.wo.$include(template = "/wheels/tests_testbox/routes.cfm")
+        application.wo.$include(template = "/wheels/core_tests/routes.cfm")
         application.wo.$setNamedRoutePositions()
 
-        local.AssetPath = "/wheels/tests_testbox/_assets/"
-        
+        local.AssetPath = "/wheels/core_tests/_assets/"
+
         application.wo.set(rewriteFile = "index.cfm")
         application.wo.set(controllerPath = local.AssetPath & "controllers")
         application.wo.set(viewPath = local.AssetPath & "views")
@@ -150,7 +150,7 @@
 
         /* set migration level for tests*/
         application.wheels.migrationLevel = 2;
-        
+
         /* turn off default validations for testing */
         application.wheels.automaticValidations = false
         application.wheels.assetQueryString = false
@@ -189,7 +189,7 @@
                 application.wheels.dataSourceName = "wheelstestdb_" & url.db;
             }
         } else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
-            application.wheels.dataSourceName = "wheelstestdb"; 
+            application.wheels.dataSourceName = "wheelstestdb";
         } else {
             application.wheels.dataSourceName = application.wheels.coreTestDataSourceName;
         }

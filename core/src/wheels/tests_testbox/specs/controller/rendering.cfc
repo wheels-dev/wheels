@@ -74,7 +74,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is rendering with default layout in controller folder", () => {
-				tempFile = ExpandPath("/wheels/tests_testbox/_assets/views/test/layout.cfm")
+				tempFile = ExpandPath("/wheels/core_tests/_assets/views/test/layout.cfm")
 				FileWrite(tempFile, "<cfoutput>start:controllerlayout##includeContent()##end:controllerlayout</cfoutput>")
 				application.wheels.existingLayoutFiles = "test"
 				_controller.renderView()
@@ -325,7 +325,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("xml")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false)
-				
+
 				expect(_controller.response()).toInclude("xml template content")
 			})
 
@@ -388,7 +388,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller = application.wo.controller("test", params)
 				_controller.provides("pdf")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
-				
+
 				expect(function() {
 					_controller.renderWith(data = user, layout = false)
 				}).toThrow()
@@ -400,7 +400,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller = application.wo.controller("test", params)
 				_controller.provides("xml")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
-				
+
 				expect(function() {
 					_controller.renderWith(data=user, layout=false, returnAs="string")
 				}).toThrow("Wheels.RenderingError")
@@ -414,7 +414,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false, returnAs = "string")
-				
+
 				expect(application.wo.$statusCode()).toBe(200)
 			})
 
@@ -425,7 +425,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false, returnAs = "string", status = 403)
-				
+
 				expect(application.wo.$statusCode()).toBe(403)
 			})
 
@@ -436,7 +436,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false, returnAs = "string", status = 404)
-				
+
 				expect(application.wo.$statusCode()).toBe(404)
 			})
 
@@ -445,7 +445,7 @@ component extends="testbox.system.BaseSpec" {
 				params.action = "test2"
 				_controller = application.wo.controller("test", params)
 				_controller.renderWith(data = "the rain in spain", layout = false, status = 403)
-				
+
 				expect(application.wo.$statusCode()).toBe(403)
 			})
 
@@ -456,7 +456,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false, returnAs = "string", status = "OK")
-				
+
 				expect(application.wo.$statusCode()).toBe(200)
 			})
 
@@ -468,7 +468,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false, returnAs = "string", status = "Not Found")
-				
+
 				expect(application.wo.$statusCode()).toBe(404)
 			})
 
@@ -480,7 +480,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false, returnAs = "string", status = "Method Not Allowed")
-				
+
 				expect(application.wo.$statusCode()).toBe(405)
 			})
 
@@ -492,7 +492,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
 				_controller.renderWith(data = user, layout = false, returnAs = "string", status = "method not allowed")
-				
+
 				expect(application.wo.$statusCode()).toBe(405)
 			})
 
@@ -502,7 +502,7 @@ component extends="testbox.system.BaseSpec" {
 				_controller = application.wo.controller("test", params)
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
-				
+
 				expect(function() {
 					_controller.renderWith(data=user, layout=false, returnAs="string", status=987654321)
 				}).toThrow("Wheels.RenderingError")
@@ -514,13 +514,13 @@ component extends="testbox.system.BaseSpec" {
 				_controller = application.wo.controller("test", params)
 				_controller.provides("json")
 				user = application.wo.model("user").findOne(where = "username = 'tonyp'")
-				
+
 				expect(function() {
 					_controller.renderWith(data=user, layout=false, returnAs="string", status="THECAKEISALIE")
 				}).toThrow("Wheels.RenderingError")
 			})
 		})
-		
+
 		describe("Tests that specified_layouts", () => {
 
 			beforeEach(() => {
@@ -675,7 +675,7 @@ component extends="testbox.system.BaseSpec" {
 
 				expect(_controller.$useLayout("show")).toBeFalse()
 			})
-			
+
 			it("should respect only ajax no match", () => {
 				request.cgi.http_x_requested_with = "XMLHTTPRequest"
 				args = {template = "mylayout", ajax = "mylayout_ajax", only = "index"}
