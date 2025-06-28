@@ -10,7 +10,7 @@ ls -la
 cfengine=${1}
 dbengine=${2}
 
-. $(dirname "$0")/functions.sh
+./functions.sh
 
 port="$(get_port ${cfengine})"
 db="$(get_db ${dbengine})"
