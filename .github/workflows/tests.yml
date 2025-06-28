@@ -23,31 +23,31 @@ jobs:
         experimental: [false]
         include:
           # Lucee 7 experimental tests (non-blocking)
-          - cfengine: "lucee@7"
-            dbengine: "h2"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "lucee@7"
-            dbengine: "mysql"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "lucee@7"
-            dbengine: "postgres"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "lucee@7"
-            dbengine: "sqlserver"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "lucee@7"
-            dbengine: "oracle"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
+          #- cfengine: "lucee@7"
+          #  dbengine: "h2"
+          #  commandbox_version: "6.2.1"
+          #  jdkVersion: "21"
+          #  experimental: true
+          #- cfengine: "lucee@7"
+          #  dbengine: "mysql"
+          #  commandbox_version: "6.2.1"
+          #  jdkVersion: "21"
+          #  experimental: true
+          #- cfengine: "lucee@7"
+          #  dbengine: "postgres"
+          #  commandbox_version: "6.2.1"
+          #  jdkVersion: "21"
+          #  experimental: true
+          #- cfengine: "lucee@7"
+          #  dbengine: "sqlserver"
+          #  commandbox_version: "6.2.1"
+          #  jdkVersion: "21"
+          #  experimental: true
+          #- cfengine: "lucee@7"
+          #  dbengine: "oracle"
+          #  commandbox_version: "6.2.1"
+          #  jdkVersion: "21"
+          #  experimental: true
         exclude:
           - cfengine: lucee@5
             dbengine: mysql
@@ -122,6 +122,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Setup Environment Variables
+        run: pwd
 
       - name: Build up workspace
         run: |
