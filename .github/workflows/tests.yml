@@ -161,6 +161,8 @@ jobs:
         run: |
           # Core dependencies
           pwd
+          cd ./tools/workspace/
+          pwd
           box install
 
       - name: Start ${{ matrix.cfengine }} Server
