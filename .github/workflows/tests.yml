@@ -21,7 +21,7 @@ jobs:
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
         experimental: [false]
-        include:
+        #include:
           # Lucee 7 experimental tests (non-blocking)
           #- cfengine: "lucee@7"
           #  dbengine: "h2"
