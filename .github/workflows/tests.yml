@@ -126,13 +126,12 @@ jobs:
       - name: Setup Environment Variables
         run: |
           pwd
-          tree
+          #tree
 
       - name: Build up workspace
         run: |
           pwd
           cp -r ./templates/base/src/* ./tools/workspace/
-          cd ./tools/workspace
           tree
 
       - name: Copy server.json files
