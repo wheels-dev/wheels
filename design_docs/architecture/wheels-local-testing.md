@@ -7,11 +7,11 @@ Key Findings:
 2. Examples Location: /examples/ directory with various sample applications
 3. Docker Setup: Comprehensive Docker configuration in /tools/docker/ with support for multiple CFML engines (Lucee 5/6/7, Adobe 2018/2021/2023/2025)
 4. Main compose.yml: Root-level Docker compose file that mounts /templates/base/src for testing
-5. CLI Infrastructure: Existing wheels docker:init and wheels docker:deploy commands in the CLI module
+5. CLI Infrastructure: Existing wheels docker init and wheels docker deploy commands in the CLI module
 
 Proposed Solution:
 
-Create a new CLI command wheels docker:test that will:
+Create a new CLI command wheels docker test that will:
 
 1. Auto-detect context: Determine if the command is run from a template or example directory
 2. Generate local Docker files: Create a lightweight docker-compose.yml that:
@@ -26,15 +26,15 @@ Create a new CLI command wheels docker:test that will:
 4. Simple usage:
 # From any template or example directory:
 cd examples/blog-app
-wheels docker:test
+wheels docker test
 
 # With options:
-wheels docker:test --engine=lucee@6 --db=postgres
-wheels docker:test --engine=adobe@2021 --db=mysql
+wheels docker test engine=lucee@6 db=postgres
+wheels docker test engine=adobe@2021 db=mysql
 5. Additional helper commands:
-	- wheels docker:test:stop - Stop the test containers
-	- wheels docker:test:clean - Remove test containers and volumes
-	- wheels docker:test:logs - View container logs
+	- wheels docker test stop - Stop the test containers
+	- wheels docker test clean - Remove test containers and volumes
+	- wheels docker test logs - View container logs
 
 Implementation Details:
 

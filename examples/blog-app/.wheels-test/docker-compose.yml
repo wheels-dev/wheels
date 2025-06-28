@@ -1,0 +1,43 @@
+version: '3.8'
+
+networks:
+  mytest-network:
+    driver: bridge
+
+services:
+  app:
+    image: cfwheels-test-lucee6:v1.0.2
+    container_name: mytest-app
+    volumes:
+      # Mount application files individually to avoid creating vendor directory on host
+      - /Users/peter/projects/wheels/examples/blog-app/Application.cfc:/cfwheels-test-suite/Application.cfc
+      - /Users/peter/projects/wheels/examples/blog-app/index.cfm:/cfwheels-test-suite/index.cfm
+      - /Users/peter/projects/wheels/examples/blog-app/urlrewrite.xml:/cfwheels-test-suite/urlrewrite.xml
+      - /Users/peter/projects/wheels/examples/blog-app/app:/cfwheels-test-suite/app
+      - /Users/peter/projects/wheels/examples/blog-app/config:/cfwheels-test-suite/config
+      - /Users/peter/projects/wheels/examples/blog-app/db:/cfwheels-test-suite/db
+      - /Users/peter/projects/wheels/examples/blog-app/public:/cfwheels-test-suite/public
+      # Use a named volume for the entire vendor directory to prevent host pollution
+      - mytest-vendor:/cfwheels-test-suite/vendor
+      # Mount the framework from monorepo (this overrides the vendor volume for this specific path)
+      - /Users/peter/projects/wheels//core/src/wheels:/cfwheels-test-suite/vendor/wheels:ro
+      # Mount engine-specific configuration files (these override template files)
+      - /Users/peter/projects/wheels//tools/docker/lucee@6/server.json:/cfwheels-test-suite/server.json:ro
+      - /Users/peter/projects/wheels//tools/docker/lucee@6/box.json:/cfwheels-test-suite/box.json:ro
+      - /Users/peter/projects/wheels//tools/docker/lucee@6/CFConfig.json:/cfwheels-test-suite/CFConfig.json:ro
+    ports:
+      - "8081:60006"
+    environment:
+      - WHEELS_ENV=development
+      - WHEELS_RELOAD_PASSWORD=wheels
+    networks:
+      - mytest-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:60006"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  mytest-vendor:
