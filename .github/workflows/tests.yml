@@ -167,15 +167,19 @@ jobs:
 
       - name: Start ${{ matrix.cfengine }} Server
         run: |
+          wpd
           box server start serverConfigFile="server.json" --noSaveSettings --debug
 
       - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
         if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
-        run: box run-script onServerInstall
+        run: |
+          pwd
+          box run-script onServerInstall
 
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
         run: |
-          docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+          pwd
+          ./tools/docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
 
       - name: Upload Test Results Artifacts
         if: always()
