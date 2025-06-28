@@ -137,9 +137,9 @@ jobs:
 
       - name: Copy server.json files
         run: |
-          cp ./tools/docker/${{ matrix.cfengine }}/server.json ./
-          cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
-          cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./app/config/settings.cfm
+          cp ./tools/docker/${{ matrix.cfengine }}/server.json ./tools/workspace/
+          cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./tools/workspace/CFConfig.json
+          cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./tools/workspace/app/config/settings.cfm
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
@@ -159,6 +159,7 @@ jobs:
       - name: Install Dependencies
         run: |
           # Core dependencies
+          pwd
           box install
 
       - name: Start ${{ matrix.cfengine }} Server
