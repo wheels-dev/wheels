@@ -3,7 +3,8 @@
 echo "------------------------------- Starting Core-tests.sh -------------------------------"
 
 pwd
-ls ../
+cd tools/docker/github
+ls -la
 # box server status
 
 cfengine=${1}
