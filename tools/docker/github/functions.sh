@@ -2,6 +2,7 @@
 
 echo "------------------------------- Starting functions.sh -------------------------------"
 
+
 get_port () {
   case $1 in
     lucee@5)
