@@ -105,7 +105,7 @@ component {
 					ArrayAppend(arguments.sql, "UPDATE #tableName()# SET");
 				}
 			}
-			else if (ListFind('PostgreSQL,H2', local.migration.adapter.adapterName())){
+			else if (ListFind('PostgreSQL,H2,Oracle', local.migration.adapter.adapterName())){
 				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET");
 			}
 			local.pos = 0;

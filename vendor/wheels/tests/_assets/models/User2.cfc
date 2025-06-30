@@ -12,7 +12,11 @@ component extends="Model" {
 				"all"
 			)
 		);
-		property(name = "firstLetter", sql = "SUBSTRING(c_o_r_e_tblusers.username, 1, 1)");
+		if(findNoCase("Oracle",local.db)){
+			property(name = "firstLetter", sql = "SUBSTR(c_o_r_e_tblusers.username, 1, 1)");
+		} else {
+			property(name = "firstLetter", sql = "SUBSTRING(c_o_r_e_tblusers.username, 1, 1)");
+		}
 		property(name = "groupCount", sql = "COUNT(c_o_r_e_tblusers.id)");
 	}
 

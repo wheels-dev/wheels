@@ -334,6 +334,8 @@ component output="false" extends="wheels.Global"{
 		);
 		if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)){
 			local.sql = "SELECT TOP 1 * FROM c_o_r_e_levels";
+		} else if(FindNoCase("Oracle", local.info.database_productname)){
+			local.sql = "SELECT * FROM c_o_r_e_levels FETCH FIRST 1 ROWS ONLY";
 		} else{
 			local.sql = "SELECT * FROM c_o_r_e_levels LIMIT 1";
 		}
@@ -372,35 +374,49 @@ component output="false" extends="wheels.Global"{
 		} catch (any e) {
 			if (application[local.appKey].createMigratorTable) {
 				try {
+					local.dbType = local.info.database_productname;
+					local.tableName = application[local.appKey].migratorTableName;
+
+					// DB-specific SQLs
+					if (FindNoCase("SQLServer", local.dbType) || FindNoCase("SQL Server", local.dbType)) {
+						local.renameSQL = "EXEC sp_rename 'migratorversions', '#local.tableName#'";
+						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
+						local.addColumnSQL = "ALTER TABLE #local.tableName# ADD core_level INT NOT NULL DEFAULT 1";
+					} else if (FindNoCase("Oracle", local.dbType)) {
+						local.renameSQL = "RENAME migratorversions TO #local.tableName#";
+						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR2(25), core_level NUMBER DEFAULT 1 NOT NULL)";
+						local.addColumnSQL = "ALTER TABLE #local.tableName# ADD core_level NUMBER DEFAULT 1 NOT NULL";
+					} else {
+						// Fallback: Postgres, MySQL and H2
+						local.renameSQL = "ALTER TABLE migratorversions RENAME TO #local.tableName#";
+						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
+						local.addColumnSQL = "ALTER TABLE #local.tableName# ADD core_level INT NOT NULL DEFAULT 1";
+					}
 					$query(
 						datasource = application[local.appKey].dataSourceName,
 						sql = "SELECT version FROM migratorversions"
 					);
-					if(FindNoCase("SQLServer", local.info.database_productname) || FindNoCase("SQL Server", local.info.database_productname)) {
-						local.sql = "EXEC sp_rename 'migratorversions', '#application[local.appKey].migratorTableName#'";
-					} else {
-						local.sql = "ALTER TABLE migratorversions RENAME TO #application[local.appKey].migratorTableName#";
-					}
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = local.sql
+						sql = local.renameSQL
 					);
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD core_level INT NOT NULL DEFAULT 1"
+						sql = local.addColumnSQL
 					);
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
+						sql = "ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
 					);
-				} catch ( any e ) {
+				} catch (any e) {
+					// If rename fails, create table instead
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = "CREATE TABLE #application[local.appKey].migratorTableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)"
+						sql = local.createSQL
 					);
 					$query(
 						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #application[local.appKey].migratorTableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
+						sql = "ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
 					);
 				}
 			}
