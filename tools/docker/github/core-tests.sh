@@ -54,7 +54,8 @@ case $1 in
     ;;
 esac
 
-test_url="http://localhost:${port}/wheels/testbox?db=${dbengine}&format=json&only=failure,error"
+# test_url="http://localhost:${port}/wheels/testbox?db=${dbengine}&format=json&only=failure,error"
+test_url="http://localhost:${port}/modify url?db=${dbengine}&format=json&only=failure,error"
 result_file="/tmp/${cfengine}-${db}-result.txt"
 
 echo "\nRUNNING SUITE (${cfengine}/${dbengine}):\n"
