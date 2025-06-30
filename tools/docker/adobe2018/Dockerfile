@@ -2,13 +2,9 @@ FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
-#Add the H2 extension
-#ADD https://ext.lucee.org/org.h2-1.3.172.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.h2-1.3.172.lex
-ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
-
-ENV PORT 60007
+ENV PORT 62018
 ENV APP_DIR                 "/cfwheels-test-suite"
-ENV HEALTHCHECK_URI         "http://127.0.0.1:60007/"
+ENV HEALTHCHECK_URI         "http://127.0.0.1:62018/"
 ENV ENV_MODE                "remote"
 ENV BOX_SERVER_CFCONFIGFILE "/cfwheels-test-suite/CFConfig.json"
 ENV BOX_SERVER_PROFILE      "none"
@@ -18,10 +14,10 @@ ENV BOX_INSTALL             TRUE
 WORKDIR ${APP_DIR}
 
 # Copy box.json for dependency management
-COPY tools/docker/lucee@7/box.json ${APP_DIR}/box.json
+COPY tools/docker/adobe2018/box.json ${APP_DIR}/box.json
 
 # Copy CFConfig
-COPY tools/docker/lucee@7/CFConfig.json ${APP_DIR}/CFConfig.json
+COPY tools/docker/adobe2018/CFConfig.json ${APP_DIR}/CFConfig.json
 
 # Install dependencies
 RUN box install

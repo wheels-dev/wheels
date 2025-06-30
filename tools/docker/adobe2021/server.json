@@ -5,7 +5,7 @@
 			"host":"localhost",
 			"webroot":"public",
 			"http":{
-					"port":"62023",
+					"port":"62021",
 					"enable":true
 			},
 			"rewrites":{
@@ -14,9 +14,9 @@
 			}
 	},
 	"app":{
-			"cfengine":"adobe@2023",
-			"libDirs":"tools/docker/adobe@2023/lib",
-			"serverHomeDirectory":".engine/adobe@2023"
+			"cfengine":"adobe2021.0.11+330247",
+			"libDirs":"tools/docker/adobe2021/lib",
+			"serverHomeDirectory":".engine/adobe2021"
 	},
 	"cfconfigFile":"CFConfig.json",
 	"scripts":{

@@ -546,7 +546,7 @@ component extends="commands.wheels.BaseCommand" {
         var serverConfig = {
             "name": arguments.appName,
             "app": {
-                "cfengine": "lucee@5"
+                "cfengine": "lucee5"
             },
             "web": {
                 "http": {
@@ -2983,7 +2983,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        cfengine: ["lucee@5", "adobe@2021", "adobe@2023"]
+        cfengine: ["lucee5", "adobe2021", "adobe2023"]
 
     steps:
     - uses: actions/checkout@v3

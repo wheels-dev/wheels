@@ -64,10 +64,10 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
    ) {
     // Initialize detail service
     var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
-    
+
     var appContent      = fileRead( getTemplate( '/ConfigAppContent.txt' ) );
     var routesContent   = fileRead( getTemplate( '/ConfigRoutes.txt' ) );
-    
+
     // If non-interactive mode, use defaults for missing values
     if (arguments.nonInteractive) {
       if (!len(arguments.name)) arguments.name = 'MyWheelsApp';
@@ -76,7 +76,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
       if (!len(arguments.datasourceName)) arguments.datasourceName = arguments.name;
       if (!len(arguments.cfmlEngine)) arguments.cfmlEngine = 'lucee';
       if (!len(arguments.directory)) arguments.directory = getCWD() & arguments.name;
-      
+
       // Skip all prompts and proceed directly
       command( 'wheels g app' ).params(
         name            = arguments.name,
@@ -112,11 +112,11 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
 
     var validAppName = false;
     var appName = "";
-    
+
     while (!validAppName) {
       appName = ask( message = 'Please enter a name for your application: ', defaultResponse = 'MyWheelsApp' );
       appName = helpers.stripSpecialChars( appName );
-      
+
       // Validate app name
       if (len(trim(appName)) == 0) {
         print.redLine("Application name cannot be empty. Please try again.");
@@ -134,7 +134,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
         }
       }
     }
-    
+
     print.line().toConsole();
 
     // ---------------- Template
@@ -202,11 +202,11 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
       .options( [
         {value: 'lucee', display: 'Lucee (Latest)', selected: true},
         {value: 'adobe', display: 'Adobe ColdFusion (Latest)'},
-        {value: 'lucee@6', display: 'Lucee 6.x'},
-        {value: 'lucee@5', display: 'Lucee 5.x'},
-        {value: 'adobe@2023', display: 'Adobe ColdFusion 2023'},
-        {value: 'adobe@2021', display: 'Adobe ColdFusion 2021'},
-        {value: 'adobe@2018', display: 'Adobe ColdFusion 2018'},
+        {value: 'lucee6', display: 'Lucee 6.x'},
+        {value: 'lucee5', display: 'Lucee 5.x'},
+        {value: 'adobe2023', display: 'Adobe ColdFusion 2023'},
+        {value: 'adobe2021', display: 'Adobe ColdFusion 2021'},
+        {value: 'adobe2018', display: 'Adobe ColdFusion 2018'},
         {value: 'custom', display: 'Enter a custom engine endpoint'}
       ] )
       .required()

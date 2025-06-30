@@ -68,7 +68,7 @@ jobs:
 
     strategy:
       matrix:
-        cfengine: [lucee@5, adobe@2023]
+        cfengine: [lucee5, adobe2023]
 
     steps:
     - uses: actions/checkout@v3
@@ -147,7 +147,7 @@ before_script:
 test:lucee:
   stage: test
   script:
-    - box server start cfengine=lucee@5
+    - box server start cfengine=lucee5
     - sleep 30
     - box testbox run
     - box server stop
@@ -155,7 +155,7 @@ test:lucee:
 test:adobe:
   stage: test
   script:
-    - box server start cfengine=adobe@2023
+    - box server start cfengine=adobe2023
     - sleep 30
     - box testbox run
     - box server stop';
@@ -209,7 +209,7 @@ deploy:production:
 
         stage(''Test Lucee'') {
             steps {
-                sh ''box server start cfengine=lucee@5''
+                sh ''box server start cfengine=lucee5''
                 sh ''sleep 30''
                 sh ''box testbox run''
                 sh ''box server stop''
@@ -218,7 +218,7 @@ deploy:production:
 
         stage(''Test Adobe'') {
             steps {
-                sh ''box server start cfengine=adobe@2023''
+                sh ''box server start cfengine=adobe2023''
                 sh ''sleep 30''
                 sh ''box testbox run''
                 sh ''box server stop''

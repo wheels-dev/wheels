@@ -455,7 +455,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        cfengine: ["lucee@5", "adobe@2021"]
+        cfengine: ["lucee5", "adobe2021"]
 
     steps:
       - uses: actions/checkout@v3

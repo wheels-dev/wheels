@@ -206,7 +206,7 @@ RUN box install
 EXPOSE 3000
 
 # Start command
-CMD ["box", "server", "start", "--console", "--force", "cfengine=adobe@2023", "port=3000"]
+CMD ["box", "server", "start", "--console", "--force", "cfengine=adobe2023", "port=3000"]
 ```
 
 ## Generated .env.deploy Template

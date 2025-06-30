@@ -6,7 +6,7 @@
         }
     },
     "app":{
-        "cfengine":"lucee@5"
+        "cfengine":"lucee5"
     },
     "name":"lucee5a"
 }

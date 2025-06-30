@@ -123,19 +123,67 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Start cfengine (${{ matrix.cfengine }}) ...
-        run: docker compose up -d ${{ matrix.cfengine }}
+      - name: Setup Environment Variables
+        run: |
+          pwd
+          #tree
+
+      - name: Build up workspace
+        run: |
+          pwd
+          cp -r ./templates/base/src/* ./tools/workspace/
+          tree
+
+      - name: Copy server.json files
+        run: |
+          cp ./tools/docker/${{ matrix.cfengine }}/server.json ./tools/workspace/
+          cp ./tools/docker/${{ matrix.cfengine }}/CFConfig-actions.json ./tools/workspace/CFConfig.json
+          cp ./tools/docker/${{ matrix.cfengine }}/settings.cfm ./tools/workspace/config/settings.cfm
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
         run: docker compose up -d ${{ matrix.dbengine }}
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: ${{ matrix.jdkVersion }}
+
+      - name: Setup CommandBox CLI
+        uses: Ortus-Solutions/setup-commandbox@v2.0.1
+        with:
+          version: ${{ matrix.commandbox_version }}
+          installSystemModules: true
+          warmup: true
+
+      - name: Install Dependencies
+        run: |
+          # Core dependencies
+          pwd
+          cd ./tools/workspace/
+          pwd
+          box install
+
+      - name: Start ${{ matrix.cfengine }} Server
+        run: |
+          cd /home/runner/work/wheels/wheels/
+          pwd
+          box server start serverConfigFile="server.json" --noSaveSettings --debug
+
+      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
+        if: ${{ matrix.cfengine == 'adobe2021' }} || ${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}
+        run: |
+          echo "Running onServerInstall for ${{ matrix.cfengine }}"
+          pwd
+          cd ./tools/workspace/
+          pwd
+          box run-script onServerInstall
+
       - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
         run: |
+          cd /home/runner/work/wheels/wheels/
           pwd
-          tree -L 2
-          ls -la
-          echo "Running tests for CFEngine: ${{ matrix.cfengine }} and DBEngine: ${{ matrix.dbengine }}"
           ./tools/docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
 
       - name: Upload Test Results Artifacts

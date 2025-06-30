@@ -1,6 +1,6 @@
 /**
  * Initialize deployment configuration for your Wheels application
- * 
+ *
  * {code:bash}
  * wheels deploy:init
  * wheels deploy:init provider=digitalocean
@@ -34,18 +34,18 @@ component extends="./base" {
         if (len(arguments.environment)) {
             configFileName = "deploy.#arguments.environment#.json";
         }
-        
+
         var deployConfigPath = fileSystemUtil.resolvePath(configFileName);
-        
+
         if (fileExists(deployConfigPath) && !arguments.force) {
             print.redLine("#configFileName# already exists! Use force=true to overwrite.");
             return;
         }
-        
+
         print.line();
         print.boldMagentaLine("Wheels Deploy Configuration");
         print.line("=".repeatString(50));
-        
+
         // Get app name from server.json if not provided
         if (!len(arguments.appName)) {
             var serverJSON = fileSystemUtil.resolvePath("server.json");
@@ -60,17 +60,17 @@ component extends="./base" {
                 arguments.appName = ask("Application name: ");
             }
         }
-        
+
         // Get domain if not provided
         if (!len(arguments.domain)) {
             arguments.domain = ask("Primary domain (e.g., myapp.com): ");
         }
-        
+
         // Get servers for custom provider
         if (arguments.provider == "custom" && !len(arguments.servers)) {
             arguments.servers = ask("Server IPs (comma-separated): ");
         }
-        
+
         var deployConfig = {
             "service": arguments.appName,
             "image": arguments.appName,
@@ -106,12 +106,12 @@ component extends="./base" {
             },
             "accessories": {
                 "db": {
-                    "image": arguments.db == "mysql" ? "mysql:8" : 
-                            arguments.db == "postgres" ? "postgres:15" : 
+                    "image": arguments.db == "mysql" ? "mysql:8" :
+                            arguments.db == "postgres" ? "postgres:15" :
                             "mcr.microsoft.com/mssql/server:2022-latest",
                     "host": "db",
-                    "port": arguments.db == "mysql" ? 3306 : 
-                            arguments.db == "postgres" ? 5432 : 
+                    "port": arguments.db == "mysql" ? 3306 :
+                            arguments.db == "postgres" ? 5432 :
                             1433,
                     "env": {
                         "clear": {},
@@ -144,30 +144,30 @@ component extends="./base" {
                 }
             }
         };
-        
+
         // Add provider-specific configuration
         if (arguments.provider != "custom") {
             deployConfig["provider"] = arguments.provider;
         }
-        
+
         // Write configuration
         fileWrite(deployConfigPath, serializeJSON(deployConfig, false, true));
-        
+
         // Create Dockerfile if it doesn't exist
         var dockerfilePath = fileSystemUtil.resolvePath("Dockerfile");
         if (!fileExists(dockerfilePath)) {
             print.line();
             print.yellowLine("Creating Dockerfile...");
-            
+
             var dockerfileContent = generateDockerfile(arguments.cfengine, arguments.db);
             fileWrite(dockerfilePath, dockerfileContent);
         }
-        
+
         // Create .env.deploy if it doesn't exist
         var envPath = fileSystemUtil.resolvePath(".env.deploy");
         if (!fileExists(envPath)) {
             print.yellowLine("Creating .env.deploy template...");
-            
+
             // Generate a random secret key
             var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             var secretKey = "";
@@ -189,7 +189,7 @@ component extends="./base" {
             };
             fileWrite(envPath, envContent);
         }
-        
+
         print.line();
         print.greenLine("✓ Deployment configuration created successfully!");
         print.line();
@@ -201,10 +201,10 @@ component extends="./base" {
         print.line("5. Run 'wheels deploy:push' to deploy your application");
         print.line();
     }
-    
+
     private string function generateDockerfile(required string cfengine, required string db) {
         var dockerfile = "";
-        
+
         if (arguments.cfengine == "lucee") {
             savecontent variable="dockerfile" {
                 writeOutput("FROM lucee/lucee:5.4" & chr(10) & chr(10));
@@ -246,13 +246,13 @@ component extends="./base" {
                 writeOutput("## Expose port" & chr(10));
                 writeOutput("EXPOSE 3000" & chr(10) & chr(10));
                 writeOutput("## Start command" & chr(10));
-                writeOutput("CMD [""box"", ""server"", ""start"", ""--console"", ""--force"", ""cfengine=adobe@2023"", ""port=3000""]");
+                writeOutput("CMD [""box"", ""server"", ""start"", ""--console"", ""--force"", ""cfengine=adobe2023"", ""port=3000""]");
             };
         }
-        
+
         return dockerfile;
     }
-    
+
     private numeric function getDBPort(required string db) {
         switch(arguments.db) {
             case "mysql": return 3306;
@@ -261,15 +261,15 @@ component extends="./base" {
             default: return 3306;
         }
     }
-    
+
     private string function generateSecretKey() {
         var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         var key = "";
-        
+
         for (var i = 1; i <= 64; i++) {
             key &= mid(chars, randRange(1, len(chars)), 1);
         }
-        
+
         return key;
     }
 }

@@ -39,22 +39,22 @@ services:
   lucee5:
     build:
       context: ./
-      dockerfile: ./tools/docker/lucee@5/Dockerfile
+      dockerfile: ./tools/docker/lucee5/Dockerfile
     image: cfwheels-test-lucee5:v1.0.2
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./tools/docker/lucee@5/server.json
+        source: ./tools/docker/lucee5/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./tools/docker/lucee@5/settings.cfm
+        source: ./tools/docker/lucee5/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
       - type: bind
-        source: ./tools/docker/lucee@5/box.json
+        source: ./tools/docker/lucee5/box.json
         target: /cfwheels-test-suite/box.json
       - type: bind
-        source: ./tools/docker/lucee@5/CFConfig.json
+        source: ./tools/docker/lucee5/CFConfig.json
         target: /cfwheels-test-suite/CFConfig.json
       # Named volumes to prevent dependency pollution
       - wirebox-lucee5:/cfwheels-test-suite/vendor/wirebox
@@ -67,22 +67,22 @@ services:
   lucee6:
     build:
       context: ./
-      dockerfile: ./tools/docker/lucee@6/Dockerfile
+      dockerfile: ./tools/docker/lucee6/Dockerfile
     image: cfwheels-test-lucee6:v1.0.2
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./tools/docker/lucee@6/server.json
+        source: ./tools/docker/lucee6/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./tools/docker/lucee@6/settings.cfm
+        source: ./tools/docker/lucee6/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
       - type: bind
-        source: ./tools/docker/lucee@6/box.json
+        source: ./tools/docker/lucee6/box.json
         target: /cfwheels-test-suite/box.json
       - type: bind
-        source: ./tools/docker/lucee@6/CFConfig.json
+        source: ./tools/docker/lucee6/CFConfig.json
         target: /cfwheels-test-suite/CFConfig.json
       # Named volumes to prevent dependency pollution
       - wirebox-lucee6:/cfwheels-test-suite/vendor/wirebox
@@ -95,22 +95,22 @@ services:
   lucee7:
     build:
       context: ./
-      dockerfile: ./tools/docker/lucee@7/Dockerfile
+      dockerfile: ./tools/docker/lucee7/Dockerfile
     image: cfwheels-test-lucee7:v1.0.0
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./tools/docker/lucee@7/server.json
+        source: ./tools/docker/lucee7/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./tools/docker/lucee@7/settings.cfm
+        source: ./tools/docker/lucee7/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
       - type: bind
-        source: ./tools/docker/lucee@7/box.json
+        source: ./tools/docker/lucee7/box.json
         target: /cfwheels-test-suite/box.json
       - type: bind
-        source: ./tools/docker/lucee@7/CFConfig.json
+        source: ./tools/docker/lucee7/CFConfig.json
         target: /cfwheels-test-suite/CFConfig.json
       # Named volumes to prevent dependency pollution
       - wirebox-lucee7:/cfwheels-test-suite/vendor/wirebox
@@ -123,22 +123,22 @@ services:
   adobe2018:
     build:
       context: ./
-      dockerfile: ./tools/docker/adobe@2018/Dockerfile
+      dockerfile: ./tools/docker/adobe2018/Dockerfile
     image: cfwheels-test-adobe2018:v1.0.2
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./tools/docker/adobe@2018/server.json
+        source: ./tools/docker/adobe2018/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./tools/docker/adobe@2018/settings.cfm
+        source: ./tools/docker/adobe2018/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
       - type: bind
-        source: ./tools/docker/adobe@2018/box.json
+        source: ./tools/docker/adobe2018/box.json
         target: /cfwheels-test-suite/box.json
       - type: bind
-        source: ./tools/docker/adobe@2018/CFConfig.json
+        source: ./tools/docker/adobe2018/CFConfig.json
         target: /cfwheels-test-suite/CFConfig.json
       # Named volumes to prevent dependency pollution
       - wirebox-adobe2018:/cfwheels-test-suite/vendor/wirebox
@@ -151,22 +151,22 @@ services:
   adobe2021:
     build:
       context: ./
-      dockerfile: ./tools/docker/adobe@2021/Dockerfile
+      dockerfile: ./tools/docker/adobe2021/Dockerfile
     image: cfwheels-test-adobe2021:v1.0.2
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./tools/docker/adobe@2021/server.json
+        source: ./tools/docker/adobe2021/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./tools/docker/adobe@2021/settings.cfm
+        source: ./tools/docker/adobe2021/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
       - type: bind
-        source: ./tools/docker/adobe@2021/box.json
+        source: ./tools/docker/adobe2021/box.json
         target: /cfwheels-test-suite/box.json
       - type: bind
-        source: ./tools/docker/adobe@2021/CFConfig.json
+        source: ./tools/docker/adobe2021/CFConfig.json
         target: /cfwheels-test-suite/CFConfig.json
       # Named volumes to prevent dependency pollution
       - wirebox-adobe2021:/cfwheels-test-suite/vendor/wirebox
@@ -179,22 +179,22 @@ services:
   adobe2023:
     build:
       context: ./
-      dockerfile: ./tools/docker/adobe@2023/Dockerfile
+      dockerfile: ./tools/docker/adobe2023/Dockerfile
     image: cfwheels-test-adobe2023:v1.0.1
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./tools/docker/adobe@2023/server.json
+        source: ./tools/docker/adobe2023/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./tools/docker/adobe@2023/settings.cfm
+        source: ./tools/docker/adobe2023/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
       - type: bind
-        source: ./tools/docker/adobe@2023/box.json
+        source: ./tools/docker/adobe2023/box.json
         target: /cfwheels-test-suite/box.json
       - type: bind
-        source: ./tools/docker/adobe@2023/CFConfig.json
+        source: ./tools/docker/adobe2023/CFConfig.json
         target: /cfwheels-test-suite/CFConfig.json
       # Named volumes to prevent dependency pollution
       - wirebox-adobe2023:/cfwheels-test-suite/vendor/wirebox
@@ -207,22 +207,22 @@ services:
   adobe2025:
     build:
       context: ./
-      dockerfile: ./tools/docker/adobe@2025/Dockerfile
+      dockerfile: ./tools/docker/adobe2025/Dockerfile
     image: cfwheels-test-adobe2025:v1.0.0
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - type: bind
-        source: ./tools/docker/adobe@2025/server.json
+        source: ./tools/docker/adobe2025/server.json
         target: /cfwheels-test-suite/server.json
       - type: bind
-        source: ./tools/docker/adobe@2025/settings.cfm
+        source: ./tools/docker/adobe2025/settings.cfm
         target: /cfwheels-test-suite/config/settings.cfm
       - type: bind
-        source: ./tools/docker/adobe@2025/box.json
+        source: ./tools/docker/adobe2025/box.json
         target: /cfwheels-test-suite/box.json
       - type: bind
-        source: ./tools/docker/adobe@2025/CFConfig.json
+        source: ./tools/docker/adobe2025/CFConfig.json
         target: /cfwheels-test-suite/CFConfig.json
       # Named volumes to prevent dependency pollution
       - wirebox-adobe2025:/cfwheels-test-suite/vendor/wirebox

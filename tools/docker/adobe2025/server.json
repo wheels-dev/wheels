@@ -5,7 +5,7 @@
 			"host":"localhost",
 			"webroot":"public",
 			"http":{
-					"port":"62021",
+					"port":"62025",
 					"enable":true
 			},
 			"rewrites":{
@@ -14,12 +14,12 @@
 			}
 	},
 	"app":{
-			"cfengine":"adobe@2021.0.11+330247",
-			"libDirs":"tools/docker/adobe@2021/lib",
-			"serverHomeDirectory":".engine/adobe@2021"
+			"cfengine":"adobe2025",
+			"libDirs":"tools/docker/adobe2025/lib",
+			"serverHomeDirectory":".engine/adobe2025"
 	},
 	"cfconfigFile":"CFConfig.json",
 	"scripts":{
-        "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"
+        "onServerInstall":"cfpm install all"
     }
 }

@@ -1,8 +1,8 @@
 component {
-    
+
     property name="serverService" inject="ServerService@commandbox-core";
     property name="templateService" inject="TemplateService@wheels-cli";
-    
+
     /**
      * Setup a Wheels development environment
      */
@@ -14,7 +14,7 @@ component {
     ) {
         try {
             var projectRoot = resolvePath(".");
-            
+
             // Check if environment already exists
             var envFile = projectRoot & "/.env.#arguments.environment#";
             if (fileExists(envFile) && !arguments.force) {
@@ -23,7 +23,7 @@ component {
                     error: "Environment '#arguments.environment#' already exists. Use --force to overwrite."
                 };
             }
-            
+
             // Setup based on template
             var result = {};
             switch (arguments.template) {
@@ -36,19 +36,19 @@ component {
                 default:
                     result = setupLocalEnvironment(argumentCollection = arguments);
             }
-            
+
             if (result.success) {
                 // Create environment file
                 createEnvironmentFile(arguments.environment, result.config);
-                
+
                 // Update server.json if needed
                 updateServerConfig(arguments.environment, result.config);
-                
+
                 result.nextSteps = generateNextSteps(arguments.template, arguments.environment);
             }
-            
+
             return result;
-            
+
         } catch (any e) {
             return {
                 success: false,
@@ -56,14 +56,14 @@ component {
             };
         }
     }
-    
+
     /**
      * List available environments
      */
     function list() {
         var environments = [];
         var projectRoot = resolvePath(".");
-        
+
         // Look for .env.* files
         var envFiles = directoryList(
             projectRoot,
@@ -71,12 +71,12 @@ component {
             "name",
             "*.env.*"
         );
-        
+
         for (var file in envFiles) {
             if (reFindNoCase("^\.env\.", file)) {
                 var envName = listLast(file, ".");
                 var config = loadEnvironmentConfig(envName);
-                
+
                 arrayAppend(environments, {
                     name: envName,
                     template: config.template ?: "local",
@@ -85,7 +85,7 @@ component {
                 });
             }
         }
-        
+
         // Check server.json for environments
         var serverJsonPath = projectRoot & "/server.json";
         if (fileExists(serverJsonPath)) {
@@ -103,26 +103,26 @@ component {
                 }
             }
         }
-        
+
         return environments;
     }
-    
+
     /**
      * Switch to a different environment
      */
     function switch(required string environment) {
         var envFile = resolvePath(".env.#arguments.environment#");
-        
+
         if (!fileExists(envFile)) {
             return {
                 success: false,
                 error: "Environment '#arguments.environment#' not found"
             };
         }
-        
+
         // Copy environment file to .env
         fileCopy(envFile, resolvePath(".env"));
-        
+
         // Update server.json default environment
         var serverJsonPath = resolvePath("server.json");
         if (fileExists(serverJsonPath)) {
@@ -130,13 +130,13 @@ component {
             serverJson.profile = arguments.environment;
             fileWrite(serverJsonPath, serializeJSON(serverJson, true));
         }
-        
+
         return {
             success: true,
             message: "Switched to '#arguments.environment#' environment"
         };
     }
-    
+
     /**
      * Setup local development environment
      */
@@ -145,9 +145,9 @@ component {
             template: "local",
             database: arguments.database,
             port: 8080,
-            cfengine: "lucee@5"
+            cfengine: "lucee5"
         };
-        
+
         // Database-specific configuration
         switch (arguments.database) {
             case "mysql":
@@ -188,13 +188,13 @@ component {
                     password: ""
                 };
         }
-        
+
         return {
             success: true,
             config: config
         };
     }
-    
+
     /**
      * Setup Docker environment
      */
@@ -204,18 +204,18 @@ component {
             database: arguments.database,
             port: 8080
         };
-        
+
         // Create docker-compose.yml
         var dockerComposeContent = generateDockerCompose(argumentCollection = arguments);
         fileWrite(resolvePath("docker-compose.#arguments.environment#.yml"), dockerComposeContent);
-        
+
         // Create Dockerfile if it doesn't exist
         var dockerfilePath = resolvePath("Dockerfile");
         if (!fileExists(dockerfilePath)) {
             var dockerfileContent = generateDockerfile();
             fileWrite(dockerfilePath, dockerfileContent);
         }
-        
+
         // Database configuration for Docker
         config.datasource = {
             driver: getDatabaseDriver(arguments.database),
@@ -225,13 +225,13 @@ component {
             username: "wheels",
             password: "wheels_password"
         };
-        
+
         return {
             success: true,
             config: config
         };
     }
-    
+
     /**
      * Setup Vagrant environment
      */
@@ -241,11 +241,11 @@ component {
             database: arguments.database,
             port: 8080
         };
-        
+
         // Create Vagrantfile
         var vagrantContent = generateVagrantfile(argumentCollection = arguments);
         fileWrite(resolvePath("Vagrantfile.#arguments.environment#"), vagrantContent);
-        
+
         // Create provisioning script
         var provisionScript = generateProvisionScript(argumentCollection = arguments);
         var provisionDir = resolvePath("vagrant");
@@ -253,19 +253,19 @@ component {
             directoryCreate(provisionDir);
         }
         fileWrite(provisionDir & "/provision-#arguments.environment#.sh", provisionScript);
-        
+
         return {
             success: true,
             config: config
         };
     }
-    
+
     /**
      * Create environment file
      */
     private function createEnvironmentFile(environment, config) {
         var envContent = [];
-        
+
         // Basic settings
         arrayAppend(envContent, "## Wheels Environment: #arguments.environment#");
         arrayAppend(envContent, "## Generated on: #dateTimeFormat(now(), 'yyyy-mm-dd HH:nn:ss')#");
@@ -274,7 +274,7 @@ component {
         arrayAppend(envContent, "WHEELS_ENV=#arguments.environment#");
         arrayAppend(envContent, "WHEELS_RELOAD_PASSWORD=wheels#arguments.environment#");
         arrayAppend(envContent, "");
-        
+
         // Database settings
         if (arguments.config.keyExists("datasource")) {
             arrayAppend(envContent, "## Database Settings");
@@ -286,39 +286,39 @@ component {
             arrayAppend(envContent, "DB_PASSWORD=#arguments.config.datasource.password#");
             arrayAppend(envContent, "");
         }
-        
+
         // Server settings
         arrayAppend(envContent, "## Server Settings");
         arrayAppend(envContent, "SERVER_PORT=#arguments.config.port#");
         if (arguments.config.keyExists("cfengine")) {
             arrayAppend(envContent, "SERVER_CFENGINE=#arguments.config.cfengine#");
         }
-        
+
         fileWrite(resolvePath(".env.#arguments.environment#"), arrayToList(envContent, chr(10)));
     }
-    
+
     /**
      * Update server.json configuration
      */
     private function updateServerConfig(environment, config) {
         var serverJsonPath = resolvePath("server.json");
         var serverJson = {};
-        
+
         if (fileExists(serverJsonPath)) {
             serverJson = deserializeJSON(fileRead(serverJsonPath));
         }
-        
+
         // Initialize env section if needed
         if (!serverJson.keyExists("env")) {
             serverJson.env = {};
         }
-        
+
         // Add environment-specific settings
         serverJson.env[arguments.environment] = {
             "WHEELS_ENV": arguments.environment,
             "SERVER_PORT": arguments.config.port
         };
-        
+
         // Add datasource if configured
         if (arguments.config.keyExists("datasource")) {
             var ds = arguments.config.datasource;
@@ -329,10 +329,10 @@ component {
             serverJson.env[arguments.environment]["DB_USER"] = ds.username;
             serverJson.env[arguments.environment]["DB_PASSWORD"] = ds.password;
         }
-        
+
         fileWrite(serverJsonPath, serializeJSON(serverJson, true));
     }
-    
+
     /**
      * Generate Docker Compose configuration
      */
@@ -355,7 +355,7 @@ services:
       - .:/app
     depends_on:
       - db
-    
+
   db:
     image: #getDatabaseImage(arguments.database)#
     ports:
@@ -367,10 +367,10 @@ services:
 
 volumes:
   db_data:";
-        
+
         return compose;
     }
-    
+
     /**
      * Generate Dockerfile
      */
@@ -390,7 +390,7 @@ EXPOSE 8080
 ## Start server
 CMD [""box"", ""server"", ""start"", ""--console""]";
     }
-    
+
     /**
      * Generate Vagrantfile
      */
@@ -400,19 +400,19 @@ CMD [""box"", ""server"", ""start"", ""--console""]";
 
 Vagrant.configure(""2"") do |config|
   config.vm.box = ""ubuntu/focal64""
-  
+
   config.vm.network ""forwarded_port"", guest: 8080, host: 8080
   config.vm.network ""private_network"", ip: ""192.168.56.10""
-  
+
   config.vm.provider ""virtualbox"" do |vb|
     vb.memory = ""2048""
     vb.cpus = 2
   end
-  
+
   config.vm.provision ""shell"", path: ""vagrant/provision-#arguments.environment#.sh""
 end";
     }
-    
+
     /**
      * Generate provisioning script
      */
@@ -439,14 +439,14 @@ cd /vagrant
 box install
 box server start port=8080 host=0.0.0.0";
     }
-    
+
     /**
      * Load environment configuration
      */
     private function loadEnvironmentConfig(environment) {
         var config = {};
         var envFile = resolvePath(".env.#arguments.environment#");
-        
+
         if (fileExists(envFile)) {
             var lines = fileRead(envFile).listToArray(chr(10));
             for (var line in lines) {
@@ -461,16 +461,16 @@ box server start port=8080 host=0.0.0.0";
                 }
             }
         }
-        
+
         return config;
     }
-    
+
     /**
      * Generate next steps based on template
      */
     private function generateNextSteps(template, environment) {
         var steps = [];
-        
+
         switch (arguments.template) {
             case "docker":
                 arrayAppend(steps, "1. Start Docker environment: docker-compose -f docker-compose.#arguments.environment#.yml up");
@@ -488,10 +488,10 @@ box server start port=8080 host=0.0.0.0";
                 arrayAppend(steps, "2. Start server: box server start");
                 arrayAppend(steps, "3. Access application at: http://localhost:8080");
         }
-        
+
         return steps;
     }
-    
+
     /**
      * Database helper functions
      */
@@ -503,7 +503,7 @@ box server start port=8080 host=0.0.0.0";
             default: return "H2";
         }
     }
-    
+
     private function getDatabasePort(database) {
         switch (arguments.database) {
             case "mysql": return 3306;
@@ -512,7 +512,7 @@ box server start port=8080 host=0.0.0.0";
             default: return 9092;
         }
     }
-    
+
     private function getDatabaseImage(database) {
         switch (arguments.database) {
             case "mysql": return "mysql:8";
@@ -521,7 +521,7 @@ box server start port=8080 host=0.0.0.0";
             default: return "oscarfonts/h2:latest";
         }
     }
-    
+
     private function getDatabaseEnvironment(database) {
         switch (arguments.database) {
             case "mysql":
@@ -540,7 +540,7 @@ box server start port=8080 host=0.0.0.0";
                 return "H2_OPTIONS=-ifNotExists";
         }
     }
-    
+
     private function getDatabaseVolumeDir(database) {
         switch (arguments.database) {
             case "mysql": return "mysql";
@@ -549,7 +549,7 @@ box server start port=8080 host=0.0.0.0";
             default: return "h2";
         }
     }
-    
+
     private function getProvisionDatabase(database) {
         switch (arguments.database) {
             case "mysql":
@@ -566,9 +566,9 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE wheels TO wheels;"""
                 return "## H2 database will be created automatically";
         }
     }
-    
+
     /**
-     * Resolve a file path  
+     * Resolve a file path
      */
     private function resolvePath(path, baseDirectory = "") {
         // Prepend app/ to common paths if not already present
@@ -579,21 +579,21 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE wheels TO wheels;"""
                 appPath = "app/" & appPath;
             }
         }
-        
+
         // If path is already absolute, return it
         if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
             return appPath;
         }
-        
+
         // Build absolute path from current working directory
         // Use provided base directory or fall back to expandPath
         var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
-        
+
         // Ensure we have a trailing slash
         if (right(baseDir, 1) != "/") {
             baseDir &= "/";
         }
-        
+
         return baseDir & appPath;
     }
 }

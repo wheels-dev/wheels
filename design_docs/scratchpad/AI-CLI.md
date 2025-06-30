@@ -162,7 +162,7 @@ wheels g app myapp datasourceName=mydb
 wheels g app myapp --useBootstrap --setupH2
 
 # With custom CFML engine
-wheels g app myapp cfmlEngine=adobe@2023
+wheels g app myapp cfmlEngine=adobe2023
 ```
 
 ### Generate Application Wizard
@@ -521,7 +521,7 @@ wheels db shell
 
 **PostgreSQL:**
 ```bash
-# Launches psql client  
+# Launches psql client
 wheels db shell
 # Equivalent to: psql -h host -p port -U user -d database
 ```
@@ -529,7 +529,7 @@ wheels db shell
 **SQL Server:**
 ```bash
 # Launches sqlcmd client
-wheels db shell  
+wheels db shell
 # Equivalent to: sqlcmd -S server -d database -U user
 ```
 
@@ -637,7 +637,7 @@ wheels test:unit --filter=UserModelTest
 
 #### Run Integration Tests
 ```bash
-# Run only integration tests  
+# Run only integration tests
 wheels test:integration
 
 # With verbose output
@@ -1047,7 +1047,7 @@ server start
 server start port=3000
 
 # Start with specific engine
-server start cfengine=lucee@5.3.9
+server start cfengine=lucee5.3.9
 
 # Stop server
 server stop
@@ -1797,11 +1797,11 @@ Features:
    ```bash
    # Check before cleanup
    df -h
-   
+
    # Run cleanup
    wheels cleanup:logs days=30 --force
    wheels cleanup:tmp --force
-   
+
    # Check after cleanup
    df -h
    ```
@@ -1810,14 +1810,14 @@ Features:
    ```bash
    # Enable maintenance
    wheels maintenance:on message="Upgrading to v2.0"
-   
+
    # Perform deployment/updates
    git pull
    wheels dbmigrate latest
-   
+
    # Clear caches
    wheels cache:clear
-   
+
    # Disable maintenance
    wheels maintenance:off
    ```
@@ -2975,10 +2975,10 @@ CommandBox has strict parameter requirements that must be followed:
    ```bash
    # ❌ WRONG - This will error
    wheels g app myapp template=base --force
-   
+
    # ✅ CORRECT - Use all named parameters
    wheels g app name=myapp template=base force=true
-   
+
    # ✅ CORRECT - Or all positional (if command supports it)
    wheels g app myapp
    ```
@@ -2987,7 +2987,7 @@ CommandBox has strict parameter requirements that must be followed:
    ```bash
    # ❌ WRONG
    wheels g model name User properties title:string
-   
+
    # ✅ CORRECT
    wheels g model name=User properties="title:string"
    ```
@@ -2997,7 +2997,7 @@ CommandBox has strict parameter requirements that must be followed:
    # Two ways to specify boolean true:
    wheels g scaffold Product --force      # Flag style (means force=true)
    wheels g scaffold Product force=true   # Explicit style
-   
+
    # For false, must use explicit style:
    wheels g model User migration=false
    ```
@@ -3006,7 +3006,7 @@ CommandBox has strict parameter requirements that must be followed:
    ```bash
    # ❌ WRONG - Space breaks parsing
    wheels g controller name=Users actions=index,show,new
-   
+
    # ✅ CORRECT - Quote values with spaces or special characters
    wheels g controller name=Users actions="index,show,new,create"
    wheels g model name=Article properties="title:string,content:text,userId:integer"
@@ -3025,7 +3025,7 @@ CommandBox has strict parameter requirements that must be followed:
    ```bash
    # ❌ WRONG
    wheels dbmigrate create CreateUsers
-   
+
    # ✅ CORRECT
    wheels dbmigrate create name=CreateUsers
    ```
@@ -3034,10 +3034,10 @@ CommandBox has strict parameter requirements that must be followed:
    ```bash
    # Controller actions
    wheels g controller name=Posts actions="index,show,new,create,edit,update,delete"
-   
+
    # Model properties
    wheels g model name=User properties="name:string,email:string,active:boolean"
-   
+
    # View names
    wheels g view name=posts views="index,show,edit,new"
    ```

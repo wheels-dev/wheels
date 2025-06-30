@@ -156,7 +156,7 @@ myapp/
     }
   },
   "app": {
-    "cfengine": "lucee@5"
+    "cfengine": "lucee5"
   }
 }
 ```

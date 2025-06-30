@@ -61,11 +61,11 @@ Wheels CLI Version: 3.0.0-SNAPSHOT
 **Status**: ✅ Success
 **Output**:
 ```
-,--.   ,--.,--.                   ,--.            ,-----.,--.   ,--. 
-|  |   |  ||  ,---.  ,---.  ,---. |  | ,---.     '  .--./|  |   |  | 
-|  |.'.|  ||  .-.  || .-. :| .-. :|  |(  .-'     |  |    |  |   |  | 
-|   ,'.   ||  | |  |\   --.\   --.|  |.-'  `)    '  '--'\|  '--.|  | 
-'--'   '--'`--' `--' `----' `----'`--'`----'      `-----'`-----'`--' 
+,--.   ,--.,--.                   ,--.            ,-----.,--.   ,--.
+|  |   |  ||  ,---.  ,---.  ,---. |  | ,---.     '  .--./|  |   |  |
+|  |.'.|  ||  .-.  || .-. :| .-. :|  |(  .-'     |  |    |  |   |  |
+|   ,'.   ||  | |  |\   --.\   --.|  |.-'  `)    '  '--'\|  '--.|  |
+'--'   '--'`--' `--' `----' `----'`--'`----'      `-----'`-----'`--'
 ============================ Wheels CLI ============================
 Current Working Directory: /Users/peter/projects/wheels/
 CommandBox Module Root: /cfwheels-cli/
@@ -78,9 +78,9 @@ Current Wheels Version in this directory: 3.0.0-SNAPSHOT
 **Status**: ✅ Success
 **Output**:
 ```
- __          ___               _     
- \ \        / / |             | |    
-  \ \  /\  / /| |__   ___  ___| |___ 
+ __          ___               _
+ \ \        / / |             | |
+  \ \  /\  / /| |__   ___  ___| |___
    \ \/  \/ / | '_ \ / _ \/ _ \ / __|
     \  /\  /  | | | |  __/  __/ \__ \
      \/  \/   |_| |_|\___|\___|_|___/
@@ -131,25 +131,25 @@ Resources
 
 Here is a list of commands in this namespace:
 
-wheels server    
+wheels server
 
 
 Here is a list of nested namespaces:
 
-wheels assets         
-wheels cache          
-wheels ci             
-wheels cleanup        
-wheels config         
-wheels dbmigrate      
-wheels docker         
-wheels g              
-wheels generate       
-wheels log            
-wheels maintenance    
-wheels plugin         
-wheels t              
-wheels tmp            
+wheels assets
+wheels cache
+wheels ci
+wheels cleanup
+wheels config
+wheels dbmigrate
+wheels docker
+wheels g
+wheels generate
+wheels log
+wheels maintenance
+wheels plugin
+wheels t
+wheels tmp
 
 
 To get further help on any of the items above, type "help command name".
@@ -192,7 +192,7 @@ These commands create new Wheels applications with various configurations.
 
 ### Command: `wheels g app myapp`
 **Status**: ✅ Success
-**Output**: 
+**Output**:
 ```
 🚀 Creating new Wheels application: myapp
 [Package installation output truncated for brevity]
@@ -204,7 +204,7 @@ These commands create new Wheels applications with various configurations.
    3. Generate your first model: wheels generate model User
    4. Generate a controller: wheels generate controller Users
 ```
-**Notes**: 
+**Notes**:
 - Successfully creates app with default template (wheels-base-template@BE)
 - Installs all dependencies correctly
 - Sets up H2 database configuration
@@ -212,16 +212,16 @@ These commands create new Wheels applications with various configurations.
 - Creates proper directory structure with all framework files
 
 ### Command: `wheels g app name=myapp2 template=wheels-base-template@BE`
-**Status**: ✅ Success  
+**Status**: ✅ Success
 **Output**: Similar to basic app generation
-**Notes**: 
+**Notes**:
 - Explicit template specification works correctly
 - Must use named parameters when mixing with other parameters
 - Attempting `wheels g app myapp2 template=wheels-base-template@BE` fails with parameter mixing error
 
 ### Command: `wheels g app myapp3 --useBootstrap --setupH2`
 **Status**: ✅ Success
-**Output**: 
+**Output**:
 ```
 [Standard app creation output]
 🎨 Installing Bootstrap...
@@ -229,15 +229,15 @@ These commands create new Wheels applications with various configurations.
         update  app/config/settings.cfm (Bootstrap settings)
 Creating /Users/peter/projects/wheels/workspace/test-phase2-1750393388/myapp3/app/plugins//FlashMessagesBootstrap-1.0.4.zip
 ```
-**Notes**: 
+**Notes**:
 - Bootstrap flag correctly installs Bootstrap plugin
 - Creates FlashMessagesBootstrap plugin in app/plugins/
 - H2 setup flag works as expected
 
-### Command: `wheels g app name=myapp4 directory=./subdirectory/`  
+### Command: `wheels g app name=myapp4 directory=./subdirectory/`
 **Status**: ✅ Success
 **Output**: App created in subdirectory location
-**Notes**: 
+**Notes**:
 - Successfully creates app in specified subdirectory
 - Directory parameter works correctly
 - Creates subdirectory if it doesn't exist
@@ -245,14 +245,14 @@ Creating /Users/peter/projects/wheels/workspace/test-phase2-1750393388/myapp3/ap
 ### Command: `wheels g app name=myapp5 datasourceName=mydb`
 **Status**: ✅ Success
 **Output**: Standard app creation
-**Notes**: 
+**Notes**:
 - Custom datasource name correctly set in app/config/settings.cfm
 - Both `set(coreTestDataSourceName="mydb")` and `set(dataSourceName="mydb")` configured
 
-### Command: `wheels g app name=myapp6 cfmlEngine=adobe@2023`
+### Command: `wheels g app name=myapp6 cfmlEngine=adobe2023`
 **Status**: ⚠️ Partial Success
 **Output**: App created but engine not set
-**Notes**: 
+**Notes**:
 - App creates successfully
 - CFML engine parameter appears to be ignored in server.json
 - server.json shows `"cfengine":"|cfmlEngine|"` instead of the specified engine
@@ -260,7 +260,7 @@ Creating /Users/peter/projects/wheels/workspace/test-phase2-1750393388/myapp3/ap
 
 ### Command: `wheels new`
 **Status**: ❌ Requires Interactive Input
-**Output**: 
+**Output**:
 ```
 🧿 Wheels Application Wizard
 Welcome to the Wheels app wizard!
@@ -276,7 +276,7 @@ CANCELLED
 **Output**: Same as `wheels new`
 **Notes**: Alias for `wheels new`, requires interactive input
 
-### Command: `wheels generate app-wizard`  
+### Command: `wheels generate app-wizard`
 **Status**: ❌ Requires Interactive Input
 **Output**: Same as `wheels new`
 **Notes**: Full command form, requires interactive input
@@ -284,7 +284,7 @@ CANCELLED
 ### Command: `wheels new --force` (in existing directory)
 **Status**: ❌ Requires Interactive Input
 **Output**: Same interactive wizard
-**Notes**: 
+**Notes**:
 - Even with --force flag, still launches interactive wizard
 - Cannot be tested in automated environment
 
@@ -613,7 +613,7 @@ The `wheels dbmigrate` commands are implemented and available, but require a run
 #### Command: `wheels dbmigrate info`
 **Status**: ❌ Failure
 **Output**: `Unable to determine server port. Please ensure your server is running or that server.json contains a valid port configuration.`
-**Notes**: 
+**Notes**:
 - Server was running but port detection failed
 - Updated server.json with port but still failed
 - Application had errors preventing proper CLI bridge communication
@@ -693,14 +693,14 @@ These commands run tests and provide test-related functionality. Testing was per
 
 #### Command: `wheels test run`
 **Status**: ❌ Failure
-**Output**: 
+**Output**:
 ```
 ⚠️  DEPRECATION WARNING: 'wheels test' is deprecated.
    Please use 'wheels test run' for the modern TestBox runner.
 
 Connection Failure
 ```
-**Notes**: 
+**Notes**:
 - Shows deprecation warning but tries to execute anyway
 - Connection fails due to port mismatch (tries 8080 instead of 51964)
 - The deprecation warning is confusing since we ARE using `wheels test run`
@@ -901,7 +901,7 @@ These commands manage server operations and environment configuration. Testing w
 
 #### Command: `wheels environment` (show current)
 **Status**: ✅ Success
-**Output**: 
+**Output**:
 ```
 Current Wheels Environment
 =========================
@@ -989,7 +989,7 @@ Note: Start the server to see the active runtime environment
 
 #### Command: `wheels console`
 **Status**: ❌ Dependency Error
-**Output**: 
+**Output**:
 ```
 Error creating command [/commandbox/modules/wheels-cli/commands.wheels.console]
 The target requested a missing dependency with a Name of 'CR' and DSL of 'CR'
@@ -1205,7 +1205,7 @@ These commands provide advanced functionality including plugin management, maint
 
 #### Command: `wheels assets precompile`
 **Status**: ✅ Success
-**Output**: 
+**Output**:
 ```
 ==> Precompiling assets for production...
 Created compiled assets directory
@@ -1312,19 +1312,19 @@ Asset manifest written
 
 #### Command: `wheels stats`
 **Status**: ✅ Success
-**Output**: 
+**Output**:
 ```
 Code Statistics
 ======================================================================
-Type                Files     Lines     LOC       Comments  Blank     
+Type                Files     Lines     LOC       Comments  Blank
 ----------------------------------------------------------------------
-Controllers         9         426       416       10        0         
-Models              10        70        43        0         27        
-Views               30        453       401       51        1         
-Helpers             1         21        19        2         0         
-Tests               28        1528      1216      124       188       
+Controllers         9         426       416       10        0
+Models              10        70        43        0         27
+Views               30        453       401       51        1
+Helpers             1         21        19        2         0
+Tests               28        1528      1216      124       188
 ----------------------------------------------------------------------
-Total               78        2498      2095      187       216       
+Total               78        2498      2095      187       216
 
 Code Metrics
 ======================================================================
@@ -1367,7 +1367,7 @@ Comment Percentage: 8%
 
 #### Command: `wheels config check`
 **Status**: ✅ Success
-**Output**: 
+**Output**:
 ```
 Checking configuration for environment: production
 

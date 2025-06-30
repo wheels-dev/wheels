@@ -296,7 +296,7 @@ jobs:
   test:
     strategy:
       matrix:
-        cfengine: ["lucee@5", "adobe@2018", "adobe@2021", "adobe@2023"]
+        cfengine: ["lucee5", "adobe2018", "adobe2021", "adobe2023"]
         db: ["sqlite", "mysql", "postgresql"]
 
     runs-on: ubuntu-latest
@@ -350,7 +350,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        cfengine: ["lucee@5", "adobe@2021"]
+        cfengine: ["lucee5", "adobe2021"]
     steps:
       - uses: actions/checkout@v3
       - uses: Ortus-Solutions/setup-commandbox@v2.0.1

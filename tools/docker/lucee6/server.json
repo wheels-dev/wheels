@@ -5,7 +5,7 @@
 			"host":"localhost",
 			"webroot":"public",
 			"http":{
-					"port":"62018",
+					"port":"60006",
 					"enable":true
 			},
 			"rewrites":{
@@ -14,9 +14,9 @@
 			}
 	},
 	"app":{
-			"cfengine":"adobe@2018.0.10+320417",
-			"libDirs":"tools/docker/adobe@2018/lib",
-			"serverHomeDirectory":".engine/adobe@2018"
+			"cfengine":"lucee6",
+			"libDirs":"tools/docker/lucee6/lib",
+			"serverHomeDirectory":".engine/lucee6"
 	},
 	"cfconfigFile":"CFConfig.json"
 }
