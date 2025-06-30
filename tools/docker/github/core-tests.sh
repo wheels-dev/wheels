@@ -55,14 +55,14 @@ case $1 in
 esac
 
 # test_url="http://localhost:${port}/wheels/testbox?db=${dbengine}&format=json&only=failure,error"
-test_url="http://localhost:${port}/?db=${dbengine}&format=json&only=failure,error"
+test_url="http://localhost:${port}/"
 result_file="/tmp/${cfengine}-${db}-result.txt"
 
 echo "\nRUNNING SUITE (${cfengine}/${dbengine}):\n"
 echo ${test_url}
 echo ${result_file}
 
-http_code=$(curl -s -o "${result_file}" --write-out "%{http_code}" "${test_url}";)
+http_code=$(curl -s -o "${result_file}" --max-time 900 --write-out "%{http_code}" "${test_url}";)
 
 echo ${http_code}
 
