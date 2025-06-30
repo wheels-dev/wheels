@@ -73,26 +73,111 @@ component {
 				includeSoftDeletes = arguments.includeSoftDeletes
 			);
 
-			// add join statement for each include separated by space
+			// Check if we need to nest inner joins (when both inner and outer joins are present)
+			// Only apply nesting for HABTM patterns, not for all mixed join scenarios
+			local.hasInnerJoins = false;
+			local.hasOuterJoins = false;
+			local.hasThroughAssociation = false;
 			local.iEnd = ArrayLen(local.associations);
-			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.indexHint = this.$indexHint(
-					useIndex = arguments.useIndex,
-					modelName = local.associations[local.i].modelName,
-					adapterName = arguments.adapterName
-				);
-				local.join = local.associations[local.i].join;
-				if (Len(local.indexHint)) {
-					// replace the table name with the table name & index hint
-					// TODO: factor in table aliases.. the index hint is placed after the table alias
-					local.join = Replace(
-						local.join,
-						" #local.associations[local.i].tableName# ",
-						" #local.associations[local.i].tableName# #local.indexHint# ",
-						"one"
-					);
+			
+			// Check if this is specifically a through association pattern
+			local.originalInclude = Replace(arguments.include, " ", "", "all");
+			if (Find("(", local.originalInclude)) {
+				// Parse the include to see if it matches through pattern: intermediate(target)
+				local.includePattern = ReFindNoCase("^([^(]+)\(([^)]+)\)$", local.originalInclude, 1, true);
+				if (ArrayLen(local.includePattern.pos) >= 3) {
+					local.hasThroughAssociation = true;
 				}
-				local.rv = ListAppend(local.rv, local.join, " ");
+			}
+			
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				if (FindNoCase("INNER", local.associations[local.i].join)) {
+					local.hasInnerJoins = true;
+				}
+				if (FindNoCase("OUTER", local.associations[local.i].join) || FindNoCase("LEFT", local.associations[local.i].join)) {
+					local.hasOuterJoins = true;
+				}
+			}
+			
+			// Only apply nesting for through associations with mixed join types
+			local.needsNesting = local.hasInnerJoins && local.hasOuterJoins && local.hasThroughAssociation;
+
+			// build the join statements
+			if (local.needsNesting) {
+				// group inner joins with parentheses and outer joins separately
+				local.innerJoins = [];
+				local.outerJoins = [];
+				
+				for (local.i = 1; local.i <= local.iEnd; local.i++) {
+					local.indexHint = this.$indexHint(
+						useIndex = arguments.useIndex,
+						modelName = local.associations[local.i].modelName,
+						adapterName = arguments.adapterName
+					);
+					local.join = local.associations[local.i].join;
+					if (Len(local.indexHint)) {
+						// replace the table name with the table name & index hint
+						// TODO: factor in table aliases.. the index hint is placed after the table alias
+						local.join = Replace(
+							local.join,
+							" #local.associations[local.i].tableName# ",
+							" #local.associations[local.i].tableName# #local.indexHint# ",
+							"one"
+						);
+					}
+					
+					if (FindNoCase("INNER", local.join)) {
+						ArrayAppend(local.innerJoins, local.join);
+					} else {
+						ArrayAppend(local.outerJoins, local.join);
+					}
+				}
+				
+				for (local.i = 1; local.i <= ArrayLen(local.outerJoins); local.i++) {
+					local.outerJoin = local.outerJoins[local.i];
+					
+					// If we have inner joins, we need to group them in the outer join
+					if (ArrayLen(local.innerJoins) > 0) {
+						// Find the table being joined in the outer join
+						local.joinTableMatch = ReFindNoCase("LEFT OUTER JOIN ([^\s]+)", local.outerJoin, 1, true);
+						if (ArrayLen(local.joinTableMatch.pos) >= 2 && local.joinTableMatch.pos[2] > 0) {
+							local.joinTable = Mid(local.outerJoin, local.joinTableMatch.pos[2], local.joinTableMatch.len[2]);
+							
+							// Build grouped inner joins: (subscriptions INNER JOIN magazines ON ...)
+							local.groupedInner = "(" & local.joinTable;
+							for (local.j = 1; local.j <= ArrayLen(local.innerJoins); local.j++) {
+								local.groupedInner &= " " & local.innerJoins[local.j];
+							}
+							local.groupedInner &= ")";
+							
+							// Replace in the outer join
+							local.outerJoin = Replace(local.outerJoin, "LEFT OUTER JOIN " & local.joinTable, "LEFT OUTER JOIN " & local.groupedInner);
+						}
+					}
+					
+					local.rv = ListAppend(local.rv, local.outerJoin, " ");
+				}
+			} else {
+				// original logic for when nesting is not needed
+				for (local.i = 1; local.i <= local.iEnd; local.i++) {
+					local.indexHint = this.$indexHint(
+						useIndex = arguments.useIndex,
+						modelName = local.associations[local.i].modelName,
+						adapterName = arguments.adapterName
+					);
+					local.join = local.associations[local.i].join;
+					if (Len(local.indexHint)) {
+						// replace the table name with the table name & index hint
+						// TODO: factor in table aliases.. the index hint is placed after the table alias
+						local.join = Replace(
+							local.join,
+							" #local.associations[local.i].tableName# ",
+							" #local.associations[local.i].tableName# #local.indexHint# ",
+							"one"
+						);
+					}
+					local.rv = ListAppend(local.rv, local.join, " ");
+				}
 			}
 		}
 		return local.rv;
@@ -801,22 +886,105 @@ component {
 	/**
 	 * Internal function.
 	 */
+	public string function $expandThroughAssociations(required string include) {
+		local.rv = "";
+		local.associations = variables.wheels.class.associations;
+		
+		// If the include string contains parentheses, it's already a complex nested include
+		// Don't try to process it for through associations - return as-is
+		if (Find("(", arguments.include)) {
+			return arguments.include;
+		}
+		
+		// Split the include string by commas to handle multiple simple includes
+		local.includeList = ListToArray(arguments.include);
+		
+		for (local.i = 1; local.i <= ArrayLen(local.includeList); local.i++) {
+			local.currentInclude = Trim(local.includeList[local.i]);
+			
+			// Check if this association has a 'through' defined
+			if (StructKeyExists(local.associations, local.currentInclude) 
+				&& StructKeyExists(local.associations[local.currentInclude], "through")
+				&& Len(local.associations[local.currentInclude].through)) {
+				
+				local.throughPath = local.associations[local.currentInclude].through;
+				
+				if (ListLen(local.throughPath) == 1) {
+					local.intermediateAssociationName = local.throughPath;
+					
+					// Get the current association info for the target we're trying to include
+					local.currentAssociation = local.associations[local.currentInclude];
+					
+					// Check if we have a direct association to the intermediate model
+					if (StructKeyExists(local.associations, local.intermediateAssociationName)) {
+						local.intermediateAssociation = local.associations[local.intermediateAssociationName];
+						
+						// Get the intermediate model to find what it relates to
+						local.intermediateModel = model(local.intermediateAssociation.modelName);
+						local.intermediateAssociations = local.intermediateModel.$classData().associations;
+						
+						// Find the association that leads to our target model
+						local.targetModelName = local.currentAssociation.modelName;
+						local.targetAssociation = "";
+						
+						for (local.assocName in local.intermediateAssociations) {
+							local.assoc = local.intermediateAssociations[local.assocName];
+							if (local.assoc.modelName == local.targetModelName) {
+								local.targetAssociation = local.assocName;
+								break;
+							}
+						}
+						
+						if (Len(local.targetAssociation)) {
+							local.expandedInclude = local.intermediateAssociationName & "(" & local.targetAssociation & ")";
+							local.rv = ListAppend(local.rv, local.expandedInclude);
+						} else {
+							// Fallback to original include if we can't determine the path
+							local.rv = ListAppend(local.rv, local.currentInclude);
+						}
+					} else {
+						// Intermediate association not found, use as-is
+						local.rv = ListAppend(local.rv, local.currentInclude);
+					}
+				} else {
+					local.firstAssociation = ListFirst(local.throughPath);
+					local.targetAssociation = ListLast(local.throughPath);
+					
+					local.expandedInclude = local.firstAssociation & "(" & local.targetAssociation & ")";
+					local.rv = ListAppend(local.rv, local.expandedInclude);
+				}
+			} else {
+				// No through association, use as-is
+				local.rv = ListAppend(local.rv, local.currentInclude);
+			}
+		}
+		
+		return local.rv;
+	}
+
+	/**
+	 * Internal function.
+	 */
 	public array function $expandedAssociations(required string include, boolean includeSoftDeletes = "false") {
 		local.rv = [];
 
 		// add the current class name so that the levels list start at the lowest level
 		local.levels = variables.wheels.class.modelName;
 
+		// expand through associations before processing
+		local.include = $expandThroughAssociations(arguments.include);
+
 		// count the included associations
-		local.iEnd = ListLen(Replace(arguments.include, "(", ",", "all"));
+		local.iEnd = ListLen(Replace(local.include, "(", ",", "all"));
 
 		// clean up spaces in list and add a comma at the end to indicate end of string
-		local.include = Replace(arguments.include, " ", "", "all") & ",";
+		local.include = Replace(local.include, " ", "", "all") & ",";
 
 		// store all tables used in the query so we can alias them when needed
 		local.tables = tableName();
 
 		local.pos = 1;
+
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			// look for the next delimiter sequence in the string and set it (can be single delims or a chain, e.g ',' or ')),'
 			local.delimFind = ReFind("[(\(|\)|,)]+", local.include, local.pos, true);
@@ -920,7 +1088,6 @@ component {
 						local.tableName = local.classAssociations[local.name].pluralizedName;
 						;
 					}
-
 					local.toAppend = ListAppend(
 						local.toAppend,
 						"#local.class.$classData().tableName#.#local.class.$classData().properties[local.first].column# = #local.tableName#.#local.associatedClass.$classData().properties[local.second].column#"
