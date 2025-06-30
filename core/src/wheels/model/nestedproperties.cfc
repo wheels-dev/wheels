@@ -62,12 +62,14 @@ component {
 				}
 				if (IsArray(local.array)) {
 					for (local.i = 1; local.i <= ArrayLen(local.array); local.i++) {
-						local.isAssociationValid = local.array[local.i].valid(
-							callbacks = arguments.callbacks,
-							validateAssociations = arguments.validateAssociations
-						);
-						if (!local.isAssociationValid) {
-							local.rv = false;
+						if (!isNull(local.array[local.i])) {
+							local.isAssociationValid = local.array[local.i].valid(
+								callbacks = arguments.callbacks,
+								validateAssociations = arguments.validateAssociations
+							);
+							if (!local.isAssociationValid) {
+								local.rv = false;
+							}
 						}
 					}
 				}
@@ -102,15 +104,16 @@ component {
 					local.info = $expandedAssociations(include = local.association);
 					local.info = local.info[1];
 
-					loc.iEnd = ArrayLen(local.array);
-					for (local.i = 1; local.i <= loc.iEnd; local.i++) {
-						if (ListFindNoCase("hasMany,hasOne", local.associations[local.association].type)) {
-							$setForeignKeyValues(missingMethodArguments = local.array[local.i], keys = local.info.foreignKey);
-						}
-						local.saveResult = $invoke(componentReference = local.array[local.i], method = "save", invokeArgs = arguments);
-						if (local.rv) {
-							// Don't change the return value when we have already received a false.
-							local.rv = local.saveResult;
+					for (local.i = 1; local.i <= ArrayLen(local.array); local.i++) {
+						if (!isNull(local.array[local.i])) {
+							if (ListFindNoCase("hasMany,hasOne", local.associations[local.association].type)) {
+								$setForeignKeyValues(missingMethodArguments = local.array[local.i], keys = local.info.foreignKey);
+							}
+							local.saveResult = $invoke(componentReference = local.array[local.i], method = "save", invokeArgs = arguments);
+							if (local.rv) {
+								// Don't change the return value when we have already received a false.
+								local.rv = local.saveResult;
+							}
 						}
 					}
 				}
