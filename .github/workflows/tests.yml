@@ -119,6 +119,15 @@ jobs:
             dbengine: postgres
           - cfengine: adobe2025
             dbengine: sqlserver
+    env:
+      # Port mappings for each CF engine
+      PORT_lucee5: 60005
+      PORT_lucee6: 60006
+      PORT_lucee7: 60007
+      PORT_adobe2018: 62018
+      PORT_adobe2021: 62021
+      PORT_adobe2023: 62023
+      PORT_adobe2025: 62025
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -130,13 +139,123 @@ jobs:
         if: ${{ matrix.dbengine != 'h2' }}
         run: docker compose up -d ${{ matrix.dbengine }}
 
-      - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+      - name: Wait for containers to be ready
         run: |
-          pwd
-          tree -L 2
-          ls -la
-          echo "Running tests for CFEngine: ${{ matrix.cfengine }} and DBEngine: ${{ matrix.dbengine }}"
-          ./tools/docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+          echo "Waiting for ${{ matrix.cfengine }} to be ready..."
+          
+          # First, wait for container to be running
+          timeout 60 bash -c 'until docker ps --filter "name=${{ matrix.cfengine }}" | grep -q "${{ matrix.cfengine }}"; do
+            echo "Waiting for container to start..."
+            sleep 2
+          done'
+          
+          # Get the port for this CF engine
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+          
+          # Wait for service to respond
+          echo "Waiting for service on port ${PORT} to be ready..."
+          MAX_WAIT=30
+          WAIT_COUNT=0
+          
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            echo -n "Checking service (attempt ${WAIT_COUNT}/${MAX_WAIT})... "
+            
+            # Check if port is open and service responds
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
+              echo "Service is ready!"
+              break
+            else
+              echo "Not ready yet"
+              if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
+                sleep 5
+              fi
+            fi
+          done
+          
+          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+            echo "Warning: Service may not be fully ready after ${MAX_WAIT} attempts"
+          fi
+
+      - name: Set test variables
+        id: test-vars
+        run: |
+          # Get the port for this CF engine
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+          echo "port=${PORT}" >> $GITHUB_OUTPUT
+          
+          # Construct test URL
+          TEST_URL="http://localhost:${PORT}/wheels/testbox?db=${{ matrix.dbengine }}&format=json&only=failure,error"
+          echo "test_url=${TEST_URL}" >> $GITHUB_OUTPUT
+          
+          # Result file path
+          RESULT_FILE="/tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt"
+          echo "result_file=${RESULT_FILE}" >> $GITHUB_OUTPUT
+
+      - name: Check service connectivity
+        run: |
+          echo "Checking if service is ready on localhost:${{ steps.test-vars.outputs.port }}..."
+          nc -zv localhost ${{ steps.test-vars.outputs.port }} || echo "Port not open yet"
+          
+          # Try a basic curl to see if service responds
+          curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
+
+      - name: Run Tests with Retry
+        id: run-tests
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          HTTP_CODE="000"
+          
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ] && [ "$HTTP_CODE" = "000" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
+            
+            HTTP_CODE=$(curl -s -o "${{ steps.test-vars.outputs.result_file }}" \
+              --max-time 900 \
+              --write-out "%{http_code}" \
+              "${{ steps.test-vars.outputs.test_url }}" || echo "000")
+            
+            echo "HTTP Code: ${HTTP_CODE}"
+            
+            if [ "$HTTP_CODE" = "000" ] && [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+              echo "Connection failed, waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+          
+          echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
+          
+          # Check result
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Tests passed with HTTP 200"
+            exit 0
+          else
+            echo "❌ Tests failed with HTTP code: ${HTTP_CODE}"
+            if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
+              echo "Response content:"
+              cat "${{ steps.test-vars.outputs.result_file }}"
+            fi
+            exit 1
+          fi
+
+      - name: Debug Information
+        if: failure()
+        run: |
+          echo "=== Docker Container Status ==="
+          docker ps -a
+          
+          echo -e "\n=== Container Logs for ${{ matrix.cfengine }} ==="
+          docker logs $(docker ps -aq -f "name=${{ matrix.cfengine }}") 2>&1 | tail -50 || echo "Could not get logs"
+          
+          echo -e "\n=== Test Result File ==="
+          if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
+            cat "${{ steps.test-vars.outputs.result_file }}"
+          else
+            echo "Result file not found"
+          fi
 
       - name: Upload Test Results Artifacts
         if: always()
@@ -145,13 +264,6 @@ jobs:
           name: test-results-${{ matrix.cfengine }}-${{ matrix.dbengine }}
           path: |
             /tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt
-
-      - name: Failure Debugging Info
-        if: ${{ failure() }}
-        run: |
-          box version
-          box server info serverConfigFile="server.json" --json
-          box server log serverConfigFile="server.json"
 
       - name: Upload Workflow Logs
         if: always()

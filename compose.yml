@@ -91,6 +91,12 @@ services:
       - "60006:60006"
     networks:
       - cfwheels-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:60006/ || wget -q --spider http://localhost:60006/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   lucee7:
     build:
