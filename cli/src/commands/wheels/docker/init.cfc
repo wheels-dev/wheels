@@ -58,7 +58,7 @@ component extends="../base" {
             local.dockerContent = 'FROM lucee/lucee:#arguments.cfVersion#
 
 ## Install CommandBox
-RUN apt-get update && apt-get install -y curl unzip \
+RUN apt-get update && apt-get install -y curl unzip gnupg \
     && curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add - \
     && echo "deb https://downloads.ortussolutions.com/debs/noarch /" | tee -a /etc/apt/sources.list.d/commandbox.list \
     && apt-get update && apt-get install -y commandbox \
@@ -179,7 +179,9 @@ services:
 #local.dbEnvironment#
     volumes:
       - .:/app
-      - /app/node_modules';
+      - ../../../core/src/wheels:/app/core/wheels
+      - /app/node_modules
+    command: sh -c "box install && box server start --console --force"';
 
         if (len(local.dbService)) {
             local.composeContent &= '

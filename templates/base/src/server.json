@@ -1,8 +1,12 @@
 {
     "name":"wheels",
     "web":{
-        "host":"localhost",
+        "host":"0.0.0.0",
         "webroot":"public",
+        "http":{
+            "port":"8080",
+            "enable":true
+        },
         "rewrites":{
             "enable":true,
             "config":"public/urlrewrite.xml"
