@@ -488,17 +488,17 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	 * @path The path to get component files from
 	 */
 	private function $integrateComponents(required string path) {
-    local.basePath = arguments.path;
-    local.folderPath = expandPath("/#replace(local.basePath, ".", "/", "all")#");
+		local.basePath = arguments.path;
+		local.folderPath = expandPath("/#replace(local.basePath, ".", "/", "all")#");
 
-    // Get a list of all CFC files in the folder
-    local.fileList = directoryList(local.folderPath, false, "name", "*.cfc");
-    for (local.fileName in local.fileList) {
-      // Remove the file extension to get the component name
-      local.componentName = replace(local.fileName, ".cfc", "", "all");
+		// Get a list of all CFC files in the folder
+		local.fileList = directoryList(local.folderPath, false, "name", "*.cfc");
+		for (local.fileName in local.fileList) {
+			// Remove the file extension to get the component name
+			local.componentName = replace(local.fileName, ".cfc", "", "all");
 
-      $integrateFunctions(createObject("component", "#local.basePath#.#local.componentName#"));
-    }
+			$integrateFunctions(createObject("component", "#local.basePath#.#local.componentName#"));
+		}
 	}
 
 	/**
@@ -512,15 +512,44 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.functionName = local.method.name;
 
 			// Only add public, non-inherited methods
-			if (
-				local.method.access eq "public"
-				&& !structKeyExists(variables, local.method.name)
-				&& !structKeyExists(this, local.method.name)
-			) {
-				variables[local.functionName] = componentInstance[local.functionName];
-				this[local.functionName] = componentInstance[local.functionName];
+			if (local.method.access eq "public") {
+				local.methodExists = structKeyExists(variables, local.method.name) || structKeyExists(this, local.method.name);
+				
+				if (!local.methodExists) {
+					variables[local.functionName] = componentInstance[local.functionName];
+					this[local.functionName] = componentInstance[local.functionName];
+				}
+				
+				// Only add super prefix for functions that will be overridden by plugins/mixins
+				if ($willBeOverriddenByMixin(local.functionName)) {
+					local.superMethodName = "super" & local.functionName;
+					variables[local.superMethodName] = componentInstance[local.functionName];
+					this[local.superMethodName] = componentInstance[local.functionName];
+				}
 			}
 		}
+	}
+
+	/**
+	 * Check if a function will be overridden by a plugin/mixin
+	 */
+	private boolean function $willBeOverriddenByMixin(required string functionName) {
+		// Check if application and mixins are available
+		if (!IsDefined("application") || !StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "mixins")) {
+			return false;
+		}
+		
+		// Check for both "model" and "global" mixins
+		local.componentTypes = ["model", "global"];
+		
+		for (local.componentType in local.componentTypes) {
+			if (StructKeyExists(application.wheels.mixins, local.componentType) && 
+				StructKeyExists(application.wheels.mixins[local.componentType], arguments.functionName)) {
+				return true;
+			}
+		}
+		
+		return false;
 	}
 
 	function onDIcomplete(){
