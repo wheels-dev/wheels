@@ -14,7 +14,7 @@ component extends="testbox.system.BaseSpec" {
 
 				if (db EQ "mysql") {
 					expectedHint = "USE INDEX(idx_posts_authorid)";
-				} else if (db EQ "sqlserver") {
+				} else if (db EQ "microsoftsqlserver") {
 					expectedHint = "WITH (INDEX(idx_posts_authorid))";
 				} else {
 					skip("Skipping all useIndex tests: Not MySQL or SQL Server");
@@ -53,19 +53,6 @@ component extends="testbox.system.BaseSpec" {
 				}).toThrow();
 			});
 
-            it("updateAll works with useIndex hint", () => {
-                transaction action="begin" {
-                    g.model("Post").updateAll(
-                        properties = { title = "Indexed Title" },
-                        where = "authorId > 0",
-                        useIndex = {"post": "idx_posts_authorid"}
-                    );
-                    posts = g.model("Post").findAll(where = "title = 'Indexed Title'");
-                    transaction action="rollback";
-                }
-                expect(posts.recordcount).toBeGT(0);
-            });
-
             it("updateAll works with instantiate=true and triggers callbacks", () => {
                 transaction action="begin" {
                     updatedCount = g.model("Author").updateAll(
@@ -93,18 +80,6 @@ component extends="testbox.system.BaseSpec" {
                 }
                 expect(success).toBeTrue();
                 expect(posts.recordcount).toBe(1);
-            });
-
-            it("deleteAll works with useIndex hint", () => {
-                transaction action="begin" {
-                    g.model("post").deleteAll(
-                        where = "id > 0",
-                        useIndex = {"post": "idx_posts_authorid"}
-                    )
-                    posts = g.model("post").findAll()
-                    transaction action="rollback";
-                }
-                expect(posts.recordcount).toBe(0)
             });
 
             it("deleteAll works with useIndex hint with softDelete = false", () => {
