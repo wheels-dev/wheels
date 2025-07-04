@@ -45,6 +45,7 @@ component extends="../base" {
         createDockerfile(arguments.cfengine, arguments.cfVersion, local.appPort);
         createDockerCompose(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion, local.appPort);
         createDockerIgnore();
+        configureDatasource(arguments.db);
 
         print.line();
         print.greenLine("Docker configuration created successfully!");
@@ -61,7 +62,7 @@ component extends="../base" {
             local.dockerContent = 'FROM lucee/lucee:#arguments.cfVersion#
 
 ## Install CommandBox
-RUN apt-get update && apt-get install -y curl unzip gnupg \
+RUN apt-get update && apt-get install -y curl nano unzip gnupg \
     && curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add - \
     && echo "deb https://downloads.ortussolutions.com/debs/noarch /" | tee -a /etc/apt/sources.list.d/commandbox.list \
     && apt-get update && apt-get install -y commandbox \
@@ -80,7 +81,22 @@ EXPOSE #arguments.appPort#
 ## Start the application
 CMD ["box", "server", "start", "--console", "--force"]';
         } else {
-            local.dockerContent = 'FROM ortussolutions/commandbox:adobe#arguments.cfVersion#
+            local.dockerContent = 'FROM adobecoldfusion/coldfusion:latest
+
+## Accept the ColdFusion EULA
+ENV acceptEULA=YES
+
+## Install dependencies, including Java
+RUN apt-get update && apt-get install -y curl nano unzip gnupg ca-certificates openjdk-17-jre-headless
+
+## Add CommandBox GPG key and repo
+RUN curl -fsSL https://downloads.ortussolutions.com/debs/gpg | gpg --dearmor -o /usr/share/keyrings/commandbox.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/commandbox.gpg] https://downloads.ortussolutions.com/debs/noarch /" \
+    | tee /etc/apt/sources.list.d/commandbox.list
+
+## Install CommandBox
+RUN apt-get update && apt-get install -y commandbox \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ## Copy application files
 COPY . /app
@@ -239,6 +255,14 @@ tests
                     updateServerJsonPort(local.serverData, local.appPort);
                     print.yellowLine("Updated server.json with default port #local.appPort#");
                 }
+                
+                // Check for CFConfigFile setting
+                if (!structKeyExists(local.serverData, "CFConfigFile")) {
+                    local.serverData["CFConfigFile"] = "CFConfig.json";
+                    local.updatedContent = serializeJSON(local.serverData);
+                    file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
+                    print.greenLine("Added CFConfigFile setting to server.json");
+                }
             } catch (any e) {
                 print.redLine("Error reading server.json: #e.message#");
                 print.yellowLine("Using default port #local.appPort#");
@@ -266,5 +290,85 @@ tests
         local.serverJsonPath = fileSystemUtil.resolvePath("server.json");
         local.updatedContent = serializeJSON(arguments.serverData);
         file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
+    }
+    
+    private function configureDatasource(string db) {
+        local.cfconfigPath = fileSystemUtil.resolvePath("CFConfig.json");
+        local.datasourceConfig = {};
+        
+        // Skip H2 as it's embedded and doesn't need container connection
+        if (arguments.db == "h2") {
+            print.yellowLine("Skipping datasource configuration for H2 (embedded database)");
+            return;
+        }
+        
+        // Read existing CFConfig.json or create new structure
+        if (fileExists(local.cfconfigPath)) {
+            try {
+                local.cfconfigContent = fileRead(local.cfconfigPath);
+                local.cfconfigData = deserializeJSON(local.cfconfigContent);
+            } catch (any e) {
+                print.redLine("Error reading CFConfig.json: #e.message#");
+                local.cfconfigData = { "datasources": {} };
+            }
+        } else {
+            local.cfconfigData = { "datasources": {} };
+        }
+        
+        // Configure datasource based on database type
+        switch(arguments.db) {
+            case "mysql":
+                local.datasourceConfig = {
+                    "class":"com.mysql.cj.jdbc.Driver",
+                    "connectionLimit":"-1",
+                    "connectionTimeout":"1",
+                    "database":"wheels",
+                    "dbdriver":"MySQL",
+                    "dsn":"jdbc:mysql://{host}:{port}/{database}",
+                    "host":"db",
+                    "password":"wheels",
+                    "port":"3306",
+                    "username":"wheels"
+                };
+                break;
+                
+            case "postgres":
+                local.datasourceConfig = {
+                    "class":"org.postgresql.Driver",
+                    "connectionLimit":"-1",
+                    "connectionTimeout":"1",
+                    "database":"wheels",
+                    "dbdriver":"PostgreSql",
+                    "dsn":"jdbc:postgresql://{host}:{port}/{database}",
+                    "host":"db",
+                    "password":"wheels",
+                    "port":"5433",
+                    "username":"wheels"
+                };
+                break;
+                
+            case "mssql":
+                local.datasourceConfig = {
+                    "class":"com.microsoft.sqlserver.jdbc.SQLServerDriver",
+                    "connectionLimit":"-1",
+                    "connectionTimeout":"1",
+                    "database":"wheels",
+                    "dbdriver":"MSSQL",
+                    "dsn":"jdbc:sqlserver://{host}:{port}",
+                    "host":"db",
+                    "password":"Wheels123!",
+                    "port":"1433",
+                    "username":"sa"
+                };
+                break;
+        }
+        
+        // Add or update the 'wheels-dev' datasource
+        local.cfconfigData.datasources["wheels-dev"] = local.datasourceConfig;
+        
+        // Write updated CFConfig.json
+        local.updatedContent = serializeJSON(local.cfconfigData);
+        file action='write' file='#local.cfconfigPath#' mode='777' output='#local.updatedContent#';
+        print.greenLine("Updated CFConfig.json with #arguments.db# datasource configuration");
     }
 }
