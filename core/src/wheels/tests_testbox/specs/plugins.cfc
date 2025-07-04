@@ -7,6 +7,9 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that dependant", () => {
 
 			it("works", () => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -18,16 +21,26 @@ component extends="testbox.system.BaseSpec" {
 				}
 
 				config.pluginPath = "/wheels/tests_testbox/_assets/plugins/dependant"
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/dependant"
+				
 				PluginObj = $pluginObj(config)
 				iplugins = PluginObj.getDependantPlugins()
 
 				expect(iplugins).toBe("TestPlugin1|TestPlugin2,TestPlugin1|TestPlugin3")
+				
+				// Restore original value
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
 		describe("Tests that injection", () => {
 
 			beforeEach(() => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				originalMixins = Duplicate(application.wheels.mixins)
+				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -37,6 +50,9 @@ component extends="testbox.system.BaseSpec" {
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/standard"
+				
 				PluginObj = $pluginObj(config)
 				application.wheels.mixins = PluginObj.getMixins()
 				m = g.model("_c_o_r_e_authors").new()
@@ -47,7 +63,9 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			afterEach(() => {
-				application.wheels.mixins = {}
+				// Restore original values
+				application.wheels.mixins = originalMixins
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("works for Global method", () => {
@@ -69,6 +87,9 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that overwriting", () => {
 
 			beforeEach(() => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -78,7 +99,15 @@ component extends="testbox.system.BaseSpec" {
 					overwritePlugins = true,
 					loadIncompatiblePlugins = true
 				}
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/overwriting"
+				
 				$writeTestFile()
+			})
+			
+			afterEach(() => {
+				// Restore original value
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("overwrites plugins", () => {
@@ -104,6 +133,9 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that removing", () => {
 
 			it("removes unused plugin directories", () => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -113,6 +145,9 @@ component extends="testbox.system.BaseSpec" {
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/removing"
+				
 				dir = ExpandPath(config.pluginPath)
 				dir = ListChangeDelims(dir, "/", "\")
 
@@ -127,12 +162,19 @@ component extends="testbox.system.BaseSpec" {
 				expect(DirectoryExists(badDir)).notToBeTrue()
 
 				$deleteDirs()
+				
+				// Restore original value
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 
 		describe("Tests that runner", () => {
 
 			beforeEach(() => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				previousMixins = Duplicate(application.wheels.mixins)
+				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -142,9 +184,11 @@ component extends="testbox.system.BaseSpec" {
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/runner"
+				
 				_params = {controller = "test", action = "index"}
 				PluginObj = $pluginObj(config)
-				previousMixins = Duplicate(application.wheels.mixins)
 				application.wheels.mixins = PluginObj.getMixins()
 
 				c = g.controller("test", _params)
@@ -153,7 +197,9 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			afterEach(() => {
+				// Restore original values
 				application.wheels.mixins = previousMixins
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("calls plugin methods from other methods", () => {
@@ -223,6 +269,9 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that standard", () => {
 
 			beforeEach(() => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -232,6 +281,13 @@ component extends="testbox.system.BaseSpec" {
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/standard"
+			})
+			
+			afterEach(() => {
+				// Restore original value
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 
 			it("loads all plugins", () => {
@@ -265,6 +321,9 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that unpacking", () => {
 
 			it("is unpacking plugins", () => {
+				// Store original values
+				originalPluginComponentPath = application.wheels.pluginComponentPath
+				
 				config = {
 					path = "wheels",
 					fileName = "Plugins",
@@ -274,6 +333,8 @@ component extends="testbox.system.BaseSpec" {
 					overwritePlugins = false,
 					loadIncompatiblePlugins = true
 				}
+				// Set pluginComponentPath to match the test plugin path
+				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/unpacking"
 
 				$deleteTestFolders()
 
@@ -285,6 +346,9 @@ component extends="testbox.system.BaseSpec" {
 				expect(ListFind(dirs, "testglobalmixins")).toBeTrue()
 				
 				$deleteTestFolders()
+				
+				// Restore original value
+				application.wheels.pluginComponentPath = originalPluginComponentPath
 			})
 		})
 	}
