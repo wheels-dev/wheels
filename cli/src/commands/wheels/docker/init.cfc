@@ -83,6 +83,9 @@ ENV BOX_INSTALL             TRUE
 ## Expose port
 EXPOSE #arguments.appPort#
 
+## Set Healthcheck URI
+ENV HEALTHCHECK_URI         "http://127.0.0.1:#arguments.appPort#/"
+
 ## Start the application
 CMD ["box", "server", "start", "--console", "--force"]'
 
@@ -280,7 +283,11 @@ tests
         if (fileExists(local.cfconfigPath)) {
             try {
                 local.cfconfigContent = fileRead(local.cfconfigPath);
-                local.cfconfigData = deserializeJSON(local.cfconfigContent);
+                if ( len( local.cfconfigContent ) ) {
+                    local.cfconfigData = deserializeJSON(local.cfconfigContent);
+                } else {
+                    local.cfconfigData = {};
+                }
             } catch (any e) {
                 print.redLine("Error reading CFConfig.json: #e.message#");
                 local.cfconfigData = { "datasources": {} };
