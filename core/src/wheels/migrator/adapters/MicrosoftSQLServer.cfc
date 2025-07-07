@@ -278,14 +278,22 @@ component extends="Abstract" {
 	 * prepends sql server identity_insert on to allow inserting primary key values
 	 */
 	public string function addRecordPrefix(required string table) {
-		return "SET IDENTITY_INSERT #quoteTableName(arguments.table)# ON";
+		return "
+			IF EXISTS (SELECT * FROM sys.identity_columns WHERE OBJECT_NAME(object_id) = '#objectCase(arguments.table)#') BEGIN
+				SET IDENTITY_INSERT #quoteTableName(arguments.table)# ON
+			END
+		";
 	}
 
 	/**
 	 * appends sql server identity_insert on to disallow inserting primary key values
 	 */
 	public string function addRecordSuffix(required string table) {
-		return "SET IDENTITY_INSERT #quoteTableName(arguments.table)# OFF";
+		return "
+			IF EXISTS (SELECT * FROM sys.identity_columns WHERE OBJECT_NAME(object_id) = '#objectCase(arguments.table)#') BEGIN
+				SET IDENTITY_INSERT #quoteTableName(arguments.table)# OFF
+			END
+		";
 	}
 
 }
