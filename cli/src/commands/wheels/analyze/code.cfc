@@ -25,7 +25,7 @@ component extends="wheels-cli.models.BaseCommand" {
         string severity = "warning",
         boolean report = false
     ) {
-        print.yellowLine("🔍 Analyzing code quality...")
+        print.yellowLine("Analyzing code quality...")
              .line();
         
         var results = analysisService.analyze(
@@ -35,8 +35,8 @@ component extends="wheels-cli.models.BaseCommand" {
         
         if (arguments.fix) {
             var fixed = analysisService.autoFix(results);
-            print.greenLine("✅ Fixed #fixed.count# issues automatically");
-            
+            print.greenLine("Fixed #fixed.count# issues automatically");
+
             // Re-analyze after fixes
             results = analysisService.analyze(
                 path = resolvePath(arguments.path),
@@ -70,7 +70,7 @@ component extends="wheels-cli.models.BaseCommand" {
     
     private function displayConsoleResults(results) {
         if (results.totalIssues == 0) {
-            print.greenBoldLine("✅ No issues found! Your code is clean.");
+            print.greenBoldLine("No issues found! Your code is clean.");
             return;
         }
         
@@ -79,13 +79,13 @@ component extends="wheels-cli.models.BaseCommand" {
         
         // Summary
         if (results.summary.errors > 0) {
-            print.redLine("  🔴 Errors: #results.summary.errors#");
+            print.redLine("Errors: #results.summary.errors#");
         }
         if (results.summary.warnings > 0) {
-            print.yellowLine("  🟡 Warnings: #results.summary.warnings#");
+            print.yellowLine("Warnings: #results.summary.warnings#");
         }
         if (results.summary.info > 0) {
-            print.blueLine("  🔵 Info: #results.summary.info#");
+            print.blueLine("Info: #results.summary.info#");
         }
         
         print.line();
@@ -94,9 +94,9 @@ component extends="wheels-cli.models.BaseCommand" {
         for (var filePath in results.files) {
             var fileIssues = results.files[filePath];
             var relativePath = replace(filePath, getCWD(), "");
-            
-            print.boldLine("📄 #relativePath#");
-            
+
+            print.boldLine("#relativePath#");
+
             for (var issue in fileIssues) {
                 var icon = getSeverityIcon(issue.severity);
                 var color = getSeverityColor(issue.severity);
@@ -105,7 +105,7 @@ component extends="wheels-cli.models.BaseCommand" {
                 print.line("     Rule: #issue.rule#");
                 
                 if (issue.fixable) {
-                    print.greenLine("     💡 Auto-fixable");
+                    print.greenLine("      Auto-fixable");
                 }
             }
             
@@ -113,7 +113,7 @@ component extends="wheels-cli.models.BaseCommand" {
         }
         
         // Recommendations
-        print.yellowBoldLine("💡 Recommendations:");
+        print.yellowBoldLine("Recommendations:");
         print.line("  • Run with --fix to automatically fix #countFixableIssues(results)# issues");
         print.line("  • Consider using a .wheelscheck config file for custom rules");
         print.line("  • Integrate this check into your CI/CD pipeline");

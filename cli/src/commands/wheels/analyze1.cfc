@@ -1,6 +1,6 @@
 /**
  * Analyze your Wheels application for performance, security, and code quality
- * 
+ *
  * {code:bash}
  * wheels analyze
  * wheels analyze performance
@@ -29,27 +29,27 @@ component extends="base" {
         print.line();
         print.boldMagentaLine("🔍 Wheels Application Analyzer");
         print.line();
-        
+
         // Validate type
         local.validTypes = ["all", "performance", "code", "security"];
         if (!arrayContainsNoCase(local.validTypes, arguments.type)) {
             error("Invalid type: #arguments.type#. Please choose from: #arrayToList(local.validTypes)#");
         }
-        
+
         // Run appropriate analysis
         if (arguments.type == "all" || arguments.type == "performance") {
             runPerformanceAnalysis(argumentCollection=arguments);
         }
-        
+
         if (arguments.type == "all" || arguments.type == "code") {
             runCodeAnalysis(argumentCollection=arguments);
         }
-        
+
         if (arguments.type == "all" || arguments.type == "security") {
             runSecurityAnalysis(argumentCollection=arguments);
         }
     }
-    
+
     /**
      * Run performance analysis
      */
@@ -57,13 +57,13 @@ component extends="base" {
         print.line();
         print.yellowBoldLine("⚡ Performance Analysis");
         print.line("────────────────────────");
-        
+
         // Delegate to existing performance analysis logic
         command("wheels analyze performance")
             .params(argumentCollection=arguments)
             .run();
     }
-    
+
     /**
      * Run code quality analysis
      */
@@ -71,13 +71,13 @@ component extends="base" {
         print.line();
         print.yellowBoldLine("📝 Code Quality Analysis");
         print.line("────────────────────────");
-        
+
         var analysisService = getInstance("AnalysisService@wheels-cli");
         var results = analysisService.analyze(
             path = arguments.path,
             severity = "info"
         );
-        
+
         // Display results
         if (arguments.format == "console") {
             displayCodeAnalysisResults(results);
@@ -87,7 +87,7 @@ component extends="base" {
             generateHTMLReport(results, "code-analysis");
         }
     }
-    
+
     /**
      * Run security analysis
      */
@@ -95,12 +95,12 @@ component extends="base" {
         print.line();
         print.yellowBoldLine("🔒 Security Analysis");
         print.line("────────────────────────");
-        
+
         command("wheels analyze security")
             .params(argumentCollection=arguments)
             .run();
     }
-    
+
     /**
      * Display code analysis results
      */
@@ -109,18 +109,18 @@ component extends="base" {
             print.greenLine("✅ No issues found!");
             return;
         }
-        
+
         print.line("Found #results.totalIssues# issues:");
         print.line("  🔴 Errors: #results.summary.errors#");
         print.line("  🟡 Warnings: #results.summary.warnings#");
         print.line("  🔵 Info: #results.summary.info#");
         print.line();
-        
+
         // Display issues by file
         for (var filePath in results.files) {
             var fileIssues = results.files[filePath];
             print.boldLine("📄 #filePath#");
-            
+
             for (var issue in fileIssues) {
                 var icon = "";
                 switch(issue.severity) {
@@ -128,31 +128,31 @@ component extends="base" {
                     case "warning": icon = "🟡"; break;
                     case "info": icon = "🔵"; break;
                 }
-                
+
                 print.line("  #icon# Line #issue.line#: #issue.message# (#issue.rule#)");
             }
             print.line();
         }
     }
-    
+
     /**
      * Generate HTML report
      */
     private function generateHTMLReport(required struct results, required string reportType) {
         var reportPath = fileSystemUtil.resolvePath("reports/#arguments.reportType#-#dateFormat(now(), 'yyyymmdd-HHmmss')#.html");
         var reportDir = getDirectoryFromPath(reportPath);
-        
+
         if (!directoryExists(reportDir)) {
             directoryCreate(reportDir);
         }
-        
+
         // Generate HTML content
         var html = generateReportHTML(arguments.results, arguments.reportType);
         fileWrite(reportPath, html);
-        
+
         print.greenLine("📊 HTML report generated: #reportPath#");
     }
-    
+
     /**
      * Generate HTML content for report
      */
@@ -182,7 +182,7 @@ component extends="base" {
 </body>
 </html>';
     }
-    
+
     /**
      * Helper to check if array contains value (case insensitive)
      */
@@ -194,7 +194,7 @@ component extends="base" {
         }
         return false;
     }
-    
+
     /**
      * Display controller analysis results
      */
@@ -202,30 +202,30 @@ component extends="base" {
         if (structKeyExists(arguments.analysis, "controllers") && isArray(arguments.analysis.controllers)) {
             print.boldYellowLine("Controller Analysis:");
             print.line();
-            
+
             if (arrayLen(arguments.analysis.controllers) == 0) {
                 print.line("No controller issues detected");
                 print.line();
                 return;
             }
-            
+
             local.controllersTable = [];
-            
+
             for (local.controller in arguments.analysis.controllers) {
                 local.action = structKeyExists(local.controller, "action") ? local.controller.action : "";
                 local.avgTime = structKeyExists(local.controller, "avgExecutionTime") ? local.controller.avgExecutionTime & " ms" : "";
                 local.callCount = structKeyExists(local.controller, "callCount") ? local.controller.callCount : "";
                 local.severity = structKeyExists(local.controller, "severity") ? local.controller.severity : "";
                 local.issue = structKeyExists(local.controller, "issue") ? local.controller.issue : "";
-                
+
                 arrayAppend(local.controllersTable, [local.controller.name, local.action, local.avgTime, local.callCount, local.severity, local.issue]);
             }
-            
+
             print.table(local.controllersTable, ["Controller", "Action", "Avg Time", "Calls", "Severity", "Issue"]);
             print.line();
         }
     }
-    
+
     /**
      * Display view analysis results
      */
@@ -233,29 +233,29 @@ component extends="base" {
         if (structKeyExists(arguments.analysis, "views") && isArray(arguments.analysis.views)) {
             print.boldYellowLine("View Analysis:");
             print.line();
-            
+
             if (arrayLen(arguments.analysis.views) == 0) {
                 print.line("No view issues detected");
                 print.line();
                 return;
             }
-            
+
             local.viewsTable = [];
-            
+
             for (local.view in arguments.analysis.views) {
                 local.renderTime = structKeyExists(local.view, "renderTime") ? local.view.renderTime & " ms" : "";
                 local.size = structKeyExists(local.view, "size") ? local.view.size & " KB" : "";
                 local.severity = structKeyExists(local.view, "severity") ? local.view.severity : "";
                 local.issue = structKeyExists(local.view, "issue") ? local.view.issue : "";
-                
+
                 arrayAppend(local.viewsTable, [local.view.name, local.renderTime, local.size, local.severity, local.issue]);
             }
-            
+
             print.table(local.viewsTable, ["View", "Render Time", "Size", "Severity", "Issue"]);
             print.line();
         }
     }
-    
+
     /**
      * Display query analysis results
      */
@@ -263,29 +263,29 @@ component extends="base" {
         if (structKeyExists(arguments.analysis, "queries") && isArray(arguments.analysis.queries)) {
             print.boldYellowLine("Query Analysis:");
             print.line();
-            
+
             if (arrayLen(arguments.analysis.queries) == 0) {
                 print.line("No query issues detected");
                 print.line();
                 return;
             }
-            
+
             local.queriesTable = [];
-            
+
             for (local.query in arguments.analysis.queries) {
                 local.execTime = structKeyExists(local.query, "executionTime") ? local.query.executionTime & " ms" : "";
                 local.callCount = structKeyExists(local.query, "callCount") ? local.query.callCount : "";
                 local.severity = structKeyExists(local.query, "severity") ? local.query.severity : "";
                 local.issue = structKeyExists(local.query, "issue") ? local.query.issue : "";
-                
+
                 arrayAppend(local.queriesTable, [local.query.name, local.execTime, local.callCount, local.severity, local.issue]);
             }
-            
+
             print.table(local.queriesTable, ["Query", "Exec Time", "Calls", "Severity", "Issue"]);
             print.line();
         }
     }
-    
+
     /**
      * Display memory analysis results
      */
@@ -293,24 +293,24 @@ component extends="base" {
         if (structKeyExists(arguments.analysis, "memory") && isArray(arguments.analysis.memory)) {
             print.boldYellowLine("Memory Analysis:");
             print.line();
-            
+
             if (arrayLen(arguments.analysis.memory) == 0) {
                 print.line("No memory issues detected");
                 print.line();
                 return;
             }
-            
+
             local.memoryTable = [];
-            
+
             for (local.item in arguments.analysis.memory) {
                 local.usage = structKeyExists(local.item, "usage") ? local.item.usage & " MB" : "";
                 local.peak = structKeyExists(local.item, "peak") ? local.item.peak & " MB" : "";
                 local.severity = structKeyExists(local.item, "severity") ? local.item.severity : "";
                 local.issue = structKeyExists(local.item, "issue") ? local.item.issue : "";
-                
+
                 arrayAppend(local.memoryTable, [local.item.name, local.usage, local.peak, local.severity, local.issue]);
             }
-            
+
             print.table(local.memoryTable, ["Component", "Usage", "Peak", "Severity", "Issue"]);
             print.line();
         }
