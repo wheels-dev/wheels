@@ -34,7 +34,7 @@ component extends="base" {
 		// CLI Version
 		print.boldGreenLine("Wheels CLI");
 		print.greenLine("  Version: " & getWheelsCliVersion());
-		print.greenLine("  Location: " & expandPath("/cfwheels-cli/"));
+		print.greenLine("  Location: " & expandPath("/wheels-cli/"));
 		print.line();
 		
 		// Application Info
@@ -90,10 +90,10 @@ component extends="base" {
 		
 		// Helpful Links
 		print.boldGreenLine("Resources");
-		print.cyanLine("  Documentation: https://guides.wheels.dev");
-		print.cyanLine("  API Reference: https://api.wheels.dev");
-		print.cyanLine("  GitHub: https://github.com/cfwheels/cfwheels");
-		print.cyanLine("  Community: https://community.wheels.dev");
+		print.cyanLine("  Documentation: https://wheels.dev/docs");
+		print.cyanLine("  API Reference: https://wheels.dev/api");
+		print.cyanLine("  GitHub: https://github.com/wheels-dev/wheels");
+		print.cyanLine("  Community: https://wheels.dev/community");
 		print.line();
 	}
 
