@@ -19,7 +19,7 @@ component extends="../base" {
         string db="mysql",
         string dbVersion="",
         string cfengine="lucee",
-        string cfVersion="5.3"
+        string cfVersion="6"
     ) {
         // Welcome message
         print.line();
@@ -42,7 +42,7 @@ component extends="../base" {
         local.appPort = getAppPortFromServerJson();
 
         // Create Docker configuration files
-        createDockerfile(arguments.cfengine, arguments.cfVersion, local.appPort);
+        createDockerfile(arguments.cfengine, arguments.cfVersion, local.appPort, arguments.db);
         createDockerCompose(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion, local.appPort);
         createDockerIgnore();
         configureDatasource(arguments.db);
@@ -55,62 +55,36 @@ component extends="../base" {
         print.line();
     }
 
-    private function createDockerfile(string cfengine, string cfVersion, numeric appPort) {
+    private function createDockerfile(string cfengine, string cfVersion, numeric appPort, string db) {
         local.dockerContent = '';
 
-        if (arguments.cfengine == "lucee") {
-            local.dockerContent = 'FROM lucee/lucee:#arguments.cfVersion#
-
-## Install CommandBox
-RUN apt-get update && apt-get install -y curl nano unzip gnupg \
-    && curl -fsSl https://downloads.ortussolutions.com/debs/gpg | apt-key add - \
-    && echo "deb https://downloads.ortussolutions.com/debs/noarch /" | tee -a /etc/apt/sources.list.d/commandbox.list \
-    && apt-get update && apt-get install -y commandbox \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-## Copy application files
-COPY . /app
-WORKDIR /app
-
-## Install dependencies
-RUN box install
-
-## Expose port
-EXPOSE #arguments.appPort#
-
-## Start the application
-CMD ["box", "server", "start", "--console", "--force"]';
-        } else {
-            local.dockerContent = 'FROM adobecoldfusion/coldfusion:latest
-
-## Accept the ColdFusion EULA
-ENV acceptEULA=YES
-
-## Install dependencies, including Java
-RUN apt-get update && apt-get install -y curl nano unzip gnupg ca-certificates openjdk-17-jre-headless
-
-## Add CommandBox GPG key and repo
-RUN curl -fsSL https://downloads.ortussolutions.com/debs/gpg | gpg --dearmor -o /usr/share/keyrings/commandbox.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/commandbox.gpg] https://downloads.ortussolutions.com/debs/noarch /" \
-    | tee /etc/apt/sources.list.d/commandbox.list
-
-## Install CommandBox
-RUN apt-get update && apt-get install -y commandbox \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-## Copy application files
-COPY . /app
-WORKDIR /app
-
-## Install dependencies
-RUN box install
-
-## Expose port
-EXPOSE #arguments.appPort#
-
-## Start the application
-CMD ["box", "server", "start", "--console", "--force"]';
+        local.H2extension = '';
+        if (arguments.cfengine == "lucee" && lCase(arguments.db) eq 'h2') {
+            local.H2extension = '
+##Add the H2 extension
+ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
+            ';
         }
+        local.dockerContent = 'FROM ortussolutions/commandbox:latest
+#local.H2extension#
+## Install curl and nano
+RUN apt-get update && apt-get install -y curl nano
+
+## Clean up the image
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+## Copy application files
+COPY . /app
+WORKDIR /app
+
+## Install Dependencies
+ENV BOX_INSTALL             TRUE
+
+## Expose port
+EXPOSE #arguments.appPort#
+
+## Start the application
+CMD ["box", "server", "start", "--console", "--force"]'
 
         file action='write' file='#fileSystemUtil.resolvePath("Dockerfile")#' mode='777' output='#trim(local.dockerContent)#';
         print.greenLine("Created Dockerfile");
