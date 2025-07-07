@@ -40,7 +40,7 @@ component extends="../base" {
         
         // Get application port from existing server.json or use default
         local.appPort = getAppPortFromServerJson();
-
+        setCFengine(arguments.cfengine, arguments.cfVersion);
         // Create Docker configuration files
         createDockerfile(arguments.cfengine, arguments.cfVersion, local.appPort, arguments.db);
         createDockerCompose(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion, local.appPort);
@@ -344,5 +344,28 @@ tests
         local.updatedContent = serializeJSON(local.cfconfigData);
         file action='write' file='#local.cfconfigPath#' mode='777' output='#local.updatedContent#';
         print.greenLine("Updated CFConfig.json with #arguments.db# datasource configuration");
+    }
+
+    private function setCFengine(string cfengine, string cfVersion){
+        local.serverJsonPath = fileSystemUtil.resolvePath("server.json");
+        
+        // Check if server.json exists
+        if (fileExists(local.serverJsonPath)) {
+            try {
+                local.serverContent = deserializeJSON(fileRead(local.serverJsonPath));
+                // Ensure the structure exists
+                if (!structKeyExists(local.serverContent, "app")) {
+                    local.serverContent.app = {};
+                }
+                // Set the cfengine
+                local.serverContent.app.cfengine = "#arguments.cfengine#@#arguments.cfVersion#";
+                local.updatedContent = serializeJSON(local.serverContent);
+                file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
+            } catch ( any e ){
+                error("Not able to read server.json: #e.message#");
+            }
+        } else {
+            error("server.json does not exist at #local.serverJsonPath#");
+        }
     }
 }
