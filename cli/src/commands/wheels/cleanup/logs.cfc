@@ -20,7 +20,7 @@ component extends="../base" {
 		boolean force = false
 	) {
 		// Ensure we're in a Wheels app directory
-		if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
+		if (!isWheelsApp()) {
 			error("This command must be run from a Wheels application root directory.");
 		}
 

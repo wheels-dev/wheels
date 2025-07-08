@@ -41,7 +41,8 @@ component extends="../base" {
 		print.boldGreenLine("==> Cleaning old compiled assets...");
 		print.line();
 		
-		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
+		// var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
+		var compiledDir = fileSystemUtil.resolvePath("templates/base/src/public/assets/compiled");
 		
 		if (!directoryExists(compiledDir)) {
 			print.yellowLine("No compiled assets directory found. Nothing to clean.");

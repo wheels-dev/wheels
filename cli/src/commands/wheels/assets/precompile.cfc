@@ -45,7 +45,10 @@ component extends="../base" {
 		print.line();
 		
 		// Define asset directories
-		var publicDir = fileSystemUtil.resolvePath("public");
+		// var publicDir = fileSystemUtil.resolvePath("public");		
+		var publicDir = fileSystemUtil.resolvePath("templates\base\src\public");
+
+		print.line(publicDir);
 		var assetsDir = publicDir & "/assets";
 		var jsDir = publicDir & "/javascripts";
 		var cssDir = publicDir & "/stylesheets";
@@ -123,7 +126,8 @@ component extends="../base" {
 		// Provide instructions for production
 		print.line();
 		print.yellowLine("To use precompiled assets in production:");
-		print.line("1. Configure your web server to serve static files from /public/assets/compiled");
+		// print.line("1. Configure your web server to serve static files from /public/assets/compiled");
+		print.line("1. Configure your web server to serve static files from templates/base/src/public/assets/compiled");
 		print.line("2. Update your application to use the asset manifest for cache-busted URLs");
 		print.line("3. Set wheels.assetManifest = true in your production environment");
 	}
