@@ -71,7 +71,7 @@ services:
     image: cfwheels-test-lucee6:v1.0.2
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
-      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
+      - ./core/src/wheels:/cfwheels-test-suite/core/wheels
       - type: bind
         source: ./tools/docker/lucee6/server.json
         target: /cfwheels-test-suite/server.json

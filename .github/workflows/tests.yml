@@ -260,6 +260,9 @@ jobs:
           echo "=== Directory structure ==="
           ls
 
+          echo "=== Directory structure for core ==="
+          ls /cfwheels-test-suite/core
+
       - name: Upload Test Results Artifacts
         if: always()
         uses: actions/upload-artifact@v4
