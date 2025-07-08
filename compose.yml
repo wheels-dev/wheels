@@ -178,7 +178,7 @@ services:
       - wirebox-adobe2021:/cfwheels-test-suite/vendor/wirebox
       - testbox-adobe2021:/cfwheels-test-suite/vendor/testbox
     ports:
-      - "62021:62021"
+      - "62021:8080"
     networks:
       - cfwheels-network
 
