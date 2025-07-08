@@ -2,6 +2,7 @@
     "name": "cfwheels-test-suite",
     "version": "1.0.0",
     "dependencies": {
+        "wheels-core": "^3.0.0-SNAPSHOT+824",
         "wirebox": "^7.0.0",
         "testbox": "^5.0.0"
     },
