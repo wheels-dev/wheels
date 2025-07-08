@@ -155,7 +155,7 @@ jobs:
           
           # Wait for service to respond
           echo "Waiting for service on port ${PORT} to be ready..."
-          MAX_WAIT=30
+          MAX_WAIT=60
           WAIT_COUNT=0
           
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
