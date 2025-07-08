@@ -257,6 +257,9 @@ jobs:
             echo "Result file not found"
           fi
 
+          echo "=== Directory structure ==="
+          ls
+
       - name: Upload Test Results Artifacts
         if: always()
         uses: actions/upload-artifact@v4
