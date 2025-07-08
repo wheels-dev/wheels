@@ -208,7 +208,7 @@ jobs:
           MAX_RETRIES=3
           RETRY_COUNT=0
           HTTP_CODE="000"
-
+          
           while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ] && [ "$HTTP_CODE" = "000" ]; do
             RETRY_COUNT=$((RETRY_COUNT + 1))
             echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
@@ -216,17 +216,10 @@ jobs:
             HTTP_CODE=$(curl -s -o "${{ steps.test-vars.outputs.result_file }}" \
               --max-time 900 \
               --write-out "%{http_code}" \
-              "${{ steps.test-vars.outputs.test_url}")
-
-            CURL_EXIT=$?
-
-            if [ "$CURL_EXIT" -ne 0 ]; then
-              echo "curl failed with exit code $CURL_EXIT"
-              HTTP_CODE="000"
-            fi
-
+              "${{ steps.test-vars.outputs.test_url }}" || echo "000")
+            
             echo "HTTP Code: ${HTTP_CODE}"
-
+            
             if [ "$HTTP_CODE" = "000" ] && [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
               echo "Connection failed, waiting 10 seconds before retry..."
               sleep 10
