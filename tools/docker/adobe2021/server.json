@@ -15,8 +15,7 @@
 	},
 	"app":{
 			"cfengine":"adobe@2021.0.11+330247",
-			"libDirs":"tools/docker/adobe2021/lib",
-			"serverHomeDirectory":".engine/adobe2021"
+			"libDirs":"tools/docker/adobe2021/lib"
 	},
 	"cfconfigFile":"CFConfig.json",
 	"scripts":{
