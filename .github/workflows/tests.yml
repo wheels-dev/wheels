@@ -21,33 +21,33 @@ jobs:
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
         experimental: [false]
-        #include:
+        include:
           # Lucee 7 experimental tests (non-blocking)
-          #- cfengine: "lucee7"
-          #  dbengine: "h2"
-          #  commandbox_version: "6.2.1"
-          #  jdkVersion: "21"
-          #  experimental: true
-          #- cfengine: "lucee7"
-          #  dbengine: "mysql"
-          #  commandbox_version: "6.2.1"
-          #  jdkVersion: "21"
-          #  experimental: true
-          #- cfengine: "lucee7"
-          #  dbengine: "postgres"
-          #  commandbox_version: "6.2.1"
-          #  jdkVersion: "21"
-          #  experimental: true
-          #- cfengine: "lucee7"
-          #  dbengine: "sqlserver"
-          #  commandbox_version: "6.2.1"
-          #  jdkVersion: "21"
-          #  experimental: true
-          #- cfengine: "lucee7"
-          #  dbengine: "oracle"
-          #  commandbox_version: "6.2.1"
-          #  jdkVersion: "21"
-          #  experimental: true
+          - cfengine: "lucee7"
+            dbengine: "h2"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee7"
+            dbengine: "mysql"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee7"
+            dbengine: "postgres"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          - cfengine: "lucee7"
+            dbengine: "sqlserver"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
+          # - cfengine: "lucee7"
+          #   dbengine: "oracle"
+          #   commandbox_version: "6.2.1"
+          #   jdkVersion: "21"
+          #   experimental: true
         exclude:
           # - cfengine: lucee5
           #   dbengine: mysql
