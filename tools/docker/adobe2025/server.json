@@ -14,7 +14,7 @@
 			}
 	},
 	"app":{
-			"cfengine":"adobe2025",
+			"cfengine":"adobe@2025",
 			"libDirs":"tools/docker/adobe2025/lib",
 			"serverHomeDirectory":".engine/adobe2025"
 	},

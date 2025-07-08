@@ -6,7 +6,7 @@
         "testbox": "^5.0.0"
     },
     "installPaths": {
-        "wirebox": "vendor/wirebox/",
-        "testbox": "vendor/testbox/"
+        "wirebox": "core/wirebox/",
+        "testbox": "core/testbox/"
     }
 }

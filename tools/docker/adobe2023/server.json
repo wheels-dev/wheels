@@ -14,7 +14,7 @@
 			}
 	},
 	"app":{
-			"cfengine":"adobe2023",
+			"cfengine":"adobe@2023",
 			"libDirs":"tools/docker/adobe2023/lib",
 			"serverHomeDirectory":".engine/adobe2023"
 	},
