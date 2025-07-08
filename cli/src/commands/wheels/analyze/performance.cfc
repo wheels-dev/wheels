@@ -22,12 +22,12 @@ component extends="wheels-cli.commands.wheels.base" {
         numeric threshold = 100,
         boolean profile = false
     ) {
-        print.yellowLine("⚡ Analyzing application performance...")
+        print.yellowLine("Analyzing application performance...")
              .line();
         
         // Validate we're in a Wheels project
         // if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
-        if (!directoryExists(fileSystemUtil.resolvePath("core/src/wheels"))) {
+        if (!directoryExists(fileSystemUtil.resolvePath("core/src/wheels"))) { 
             error("This command must be run from the root of a Wheels application.");
             return;
         }
@@ -66,47 +66,47 @@ component extends="wheels-cli.commands.wheels.base" {
         print.line("Threshold: #arguments.threshold#ms");
         print.line();
 
-// Monitor performance
-var progress = 0;
-var spinner = ["|", "/", "-", "\\"];
-var spinIndex = 1;
+        // Monitor performance
+        var progress = 0;
+        var spinner = ["|", "/", "-", "\\"];
+        var spinIndex = 1;
 
-// ANSI escape code for green text
-var greenStart = chr(27) & "[32m";
-var reset = chr(27) & "[0m";
+        // ANSI escape code for green text
+        var greenStart = chr(27) & "[32m";
+        var reset = chr(27) & "[0m";
 
-while (now() < results.endTime) {
-    var currentProgress = int((dateDiff("s", results.startTime, now()) / arguments.duration) * 100);
+        while (now() < results.endTime) {
+            var currentProgress = int((dateDiff("s", results.startTime, now()) / arguments.duration) * 100);
 
-    if (currentProgress > progress) {
-        progress = currentProgress;
+            if (currentProgress > progress) {
+                progress = currentProgress;
 
-        var spinChar = spinner[spinIndex];
-        spinIndex = spinIndex == arrayLen(spinner) ? 1 : spinIndex + 1;
+                var spinChar = spinner[spinIndex];
+                spinIndex = spinIndex == arrayLen(spinner) ? 1 : spinIndex + 1;
 
-        var bar = repeatString("=", int(progress / 5)) & repeatString(" ", 20 - int(progress / 5));
-        var progressStr = "[#bar#] #progress#% #spinChar#";
+                var bar = repeatString("=", int(progress / 5)) & repeatString(" ", 20 - int(progress / 5));
+                var progressStr = "[#bar#] #progress#% #spinChar#";
 
-        // Print with green color using ANSI and inline update
-        systemOutput(chr(13) & greenStart & progressStr & reset);
+                // Print with green color using ANSI and inline update
+                systemOutput(chr(13) & greenStart & progressStr & reset);
 
-        // Collect metrics
-        if (arguments.target == "all" || arguments.target == "controller") {
-            collectControllerMetrics(results);
+                // Collect metrics
+                if (arguments.target == "all" || arguments.target == "controller") {
+                    collectControllerMetrics(results);
+                }
+                if (arguments.target == "all" || arguments.target == "query") {
+                    collectQueryMetrics(results);
+                }
+                if (arguments.target == "all" || arguments.target == "view") {
+                    collectViewMetrics(results);
+                }
+                if (arguments.target == "all" || arguments.target == "memory") {
+                    collectMemoryMetrics(results);
+                }
+            }
+
+            sleep(1000); // Check every second
         }
-        if (arguments.target == "all" || arguments.target == "query") {
-            collectQueryMetrics(results);
-        }
-        if (arguments.target == "all" || arguments.target == "view") {
-            collectViewMetrics(results);
-        }
-        if (arguments.target == "all" || arguments.target == "memory") {
-            collectMemoryMetrics(results);
-        }
-    }
-
-    sleep(1000); // Check every second
-}
 
         if (arguments.profile) {
             disableProfiling();
@@ -260,7 +260,7 @@ while (now() < results.endTime) {
         
         // Summary
         print.yellowBoldLine("Summary:");
-        print.line("─────────────────────────────────────");
+        print.line("-----------------------------------------");
         
         if (arguments.results.summary.totalRequests > 0) {
             print.line("Requests Analyzed: #arguments.results.summary.totalRequests#");
@@ -294,7 +294,7 @@ while (now() < results.endTime) {
         // Detailed results
         if (arrayLen(arguments.results.metrics.requests) && arguments.results.summary.slowRequests > 0) {
             print.yellowBoldLine("Slow Requests:");
-            print.line("─────────────────────────────────────");
+            print.line("-----------------------------------------");
             
             var slowRequests = arguments.results.metrics.requests.filter(function(req) {
                 return req.responseTime > 100;
@@ -308,7 +308,7 @@ while (now() < results.endTime) {
         
         if (arrayLen(arguments.results.metrics.queries) && arguments.results.summary.slowQueries > 0) {
             print.yellowBoldLine("Slow Queries:");
-            print.line("─────────────────────────────────────");
+            print.line("-----------------------------------------");
             
             var slowQueries = arguments.results.metrics.queries.filter(function(qry) {
                 return qry.executionTime > 50;
@@ -322,7 +322,7 @@ while (now() < results.endTime) {
         
         // Recommendations
         print.yellowBoldLine("Performance Recommendations:");
-        print.line("─────────────────────────────────────");
+        print.line("-----------------------------------------");
         
         if (arguments.results.summary.avgResponseTime > 200) {
             print.line("  • Consider implementing caching for frequently accessed data");

@@ -14,11 +14,12 @@ component extends="../base" {
         string severity = "medium",
         boolean deep = false
     ) {
-        print.yellowBoldLine("⚠️  DEPRECATED: This command is deprecated")
+        print.yellowBoldLine("DEPRECATED: This command is deprecated")
              .yellowLine("Please use 'wheels security scan' instead")
              .line();
         
         // Forward to new command
+        print.line("Wait Running Command 'wheels security scan'...")
         command("wheels security scan")
             .params(argumentCollection = arguments)
             .run();
