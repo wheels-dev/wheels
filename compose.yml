@@ -131,6 +131,8 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2018/Dockerfile
     image: cfwheels-test-adobe2018:v1.0.2
+    tty: true          
+    stdin_open: true
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
@@ -159,6 +161,8 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2021/Dockerfile
     image: cfwheels-test-adobe2021:v1.0.2
+    tty: true          
+    stdin_open: true
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
@@ -187,6 +191,8 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2023/Dockerfile
     image: cfwheels-test-adobe2023:v1.0.1
+    tty: true          
+    stdin_open: true
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
@@ -215,6 +221,8 @@ services:
       context: ./
       dockerfile: ./tools/docker/adobe2025/Dockerfile
     image: cfwheels-test-adobe2025:v1.0.0
+    tty: true          
+    stdin_open: true
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
