@@ -75,29 +75,35 @@ component excludeFromHelp=true {
 		return true;
 	}
 
-	// Compare against current wheels version
-	// scope can be one of major/minor/patch
-	boolean function $isWheelsVersion(required any version, string scope="major"){
-		// Assume a string like 2, or 2.0, or 2.0.1, or 1.x
-		var currentversion=listToArray($getWheelsVersion(), ".");
-		var compareversion=listToArray(arguments.version, ".");
-		if(arguments.scope == "major"){
-			if(compareversion[1] == currentversion[1]){
-				return true;
-			}
+	/**
+	* Checks whether the current Wheels version matches the provided version.
+	* @version The version to compare against. Accepts "2", "2.0", "2.0.1", etc.
+	* @scope One of "major", "minor", or "patch"
+	*/
+	boolean function $isWheelsVersion(required any version, string scope="major") {
+		var current = listToArray($getWheelsVersion(), ".");
+		var compare = listToArray(arguments.version, ".");
+
+		// Fill missing parts with 0s
+		while (arrayLen(current) < 3) {
+			arrayAppend(current, "0");
 		}
-		if(arguments.scope == "minor"){
-			if(compareversion[2] == currentversion[2]){
-				return true;
-			}
+		while (arrayLen(compare) < 3) {
+			arrayAppend(compare, "0");
 		}
-		if(arguments.scope == "patch"){
-			if(compareversion[3] == currentversion[3]){
-				return true;
-			}
+
+		switch (scope) {
+			case "major":
+				return compare[1] == current[1];
+			case "minor":
+				return compare[1] == current[1] && compare[2] == current[2];
+			case "patch":
+				return compare[1] == current[1] && compare[2] == current[2] && compare[3] == current[3];
+			default:
+				return false;
 		}
-		return false;
 	}
+
 
 	/**
 	 * Prompt user for confirmation
