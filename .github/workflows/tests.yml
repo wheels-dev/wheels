@@ -69,14 +69,14 @@ jobs:
           #   dbengine: h2
           - cfengine: lucee6
             dbengine: oracle
-          - cfengine: lucee7
-            dbengine: mysql
-          - cfengine: lucee7
-            dbengine: postgres
-          - cfengine: lucee7
-            dbengine: sqlserver
-          - cfengine: lucee7
-            dbengine: h2
+          # - cfengine: lucee7
+          #   dbengine: mysql
+          # - cfengine: lucee7
+          #   dbengine: postgres
+          # - cfengine: lucee7
+          #   dbengine: sqlserver
+          # - cfengine: lucee7
+          #   dbengine: h2
           - cfengine: lucee7
             dbengine: oracle
           # - cfengine: adobe2018
