@@ -256,6 +256,8 @@ services:
       start_period: 30s
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - cfwheels-network
 
   postgres:
     image: postgres:14
@@ -274,6 +276,8 @@ services:
       start_period: 30s
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cfwheels-network
 
   sqlserver:
     build:
@@ -303,6 +307,8 @@ services:
           memory: 4G
         reservations:
           memory: 2G
+    networks:
+      - cfwheels-network
 
   oracle:
     image: gvenzl/oracle-xe:21-slim
@@ -328,6 +334,8 @@ services:
           memory: 2G
         reservations:
           memory: 1G
+    networks:
+      - cfwheels-network
 
 volumes:
   mysql_data:
