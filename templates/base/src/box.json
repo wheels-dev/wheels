@@ -7,7 +7,8 @@
         "testbox": "^5.0.0"
     },
     "installPaths": {
-        "wirebox": "core/wirebox/",
-        "testbox": "core/testbox/"
+        "wheels-core": "vendor/wheels/",
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/"
     }
 }
