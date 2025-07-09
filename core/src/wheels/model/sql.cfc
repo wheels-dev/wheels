@@ -301,6 +301,21 @@ component {
 			// if we want a distinct statement, we can do it grouping every field in the select
 			local.args.list = arguments.select;
 			local.rv = $createSQLFieldList(argumentCollection = local.args);
+
+			// Remove any [[duplicate]] markers in the GROUP BY clause
+			local.rv = ReReplaceNoCase(local.rv, "\[\[duplicate\]\]\d+", "", "all");
+
+			local.groupByItems = [];
+			local.selectItems = ListToArray(local.rv);
+
+			for (local.item in local.selectItems) {
+				// Only skip subqueries (items with SELECT inside parentheses)
+				if (!Find("(", local.item) || !FindNoCase("SELECT", local.item)) {
+					ArrayAppend(local.groupByItems, local.item);
+				}
+			}
+
+			local.rv = ArrayToList(local.groupByItems);
 		} else if (Len(arguments.group)) {
 			local.args.list = arguments.group;
 			local.rv = $createSQLFieldList(argumentCollection = local.args);
