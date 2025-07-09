@@ -439,7 +439,9 @@ component {
                 arrayAppend(report, "[#uCase(issue.severity)#] #issue.type#");
                 arrayAppend(report, "File: #issue.file#:#issue.line#");
                 arrayAppend(report, "Message: #issue.message#");
-                arrayAppend(report, "Fix: #issue.fix#");
+                if (structKeyExists(issue, "fix")) {
+                    arrayAppend(report, "Fix: #issue.fix#");
+                }
             }
         }
         

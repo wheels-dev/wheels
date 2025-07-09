@@ -61,15 +61,18 @@ component excludeFromHelp=true {
 	// Check if current directory is a Wheels application
 	boolean function isWheelsApp(string path = getCWD()) {
 		// Check for vendor/wheels folder
-		if (!directoryExists(arguments.path & "/vendor/wheels")) {
+		// if (!directoryExists(arguments.path & "/vendor/wheels")) {
+		if (!directoryExists(arguments.path & "/core/src/wheels")) {
 			return false;
 		}
 		// Check for config folder
-		if (!directoryExists(arguments.path & "/config")) {
+		// if (!directoryExists(arguments.path & "/config")) {
+		if (!directoryExists(arguments.path & "/templates/base/src/config")) {
 			return false;
 		}
 		// Check for app folder
-		if (!directoryExists(arguments.path & "/app")) {
+		// if (!directoryExists(arguments.path & "/app")) {
+		if (!directoryExists(arguments.path & "/templates/base/src/app")) {
 			return false;
 		}
 		return true;

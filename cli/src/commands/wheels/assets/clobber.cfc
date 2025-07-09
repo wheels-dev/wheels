@@ -32,7 +32,8 @@ component extends="../base" {
 			error("This command must be run from a Wheels application root directory.");
 		}
 		
-		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
+		// var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
+		var compiledDir = fileSystemUtil.resolvePath("templates/base/src/public/assets/compiled");
 		
 		if (!directoryExists(compiledDir)) {
 			print.yellowLine("No compiled assets directory found. Nothing to clobber.");

@@ -86,7 +86,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			ArrayAppend(arguments.issues, {
 				type: "error",
 				message: "No datasource configured",
-				fix: "Add set(dataSourceName = 'your_datasource') to config/settings.cfm"
+				fix: "Add set(dataSourceName = 'your_datasource') to templates/base/src/config/settings.cfm"
 			});
 		}
 	}
