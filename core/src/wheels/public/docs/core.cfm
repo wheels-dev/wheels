@@ -16,8 +16,28 @@ if (StructKeyExists(application.wheels, "docs")) {
 		}
 	}
 
-	ArrayAppend(documentScope, {"name" = "controller", "scope" = CreateObject("component", "app.controllers.Controller").init()});
-	ArrayAppend(documentScope, {"name" = "model", "scope" = CreateObject("component", "app.models.Model").init()});
+	controllerInstance = CreateObject("component", "app.controllers.Controller").init();
+	// Remove functions starting with "super"
+	for (key in structKeyArray(controllerInstance)) {
+		if ((isCustomFunction(controllerInstance[key]) || isClosure(controllerInstance[key])) &&
+			left(lCase(key), 5) == "super") {
+			structDelete(controllerInstance, key);
+		}
+	}
+
+	ArrayAppend(documentScope, {"name" = "controller", "scope" = controllerInstance});
+
+	modelInstance = CreateObject("component", "app.models.Model").init();
+	// Remove functions starting with "super"
+	for (key in structKeyArray(modelInstance)) {
+		if ((isCustomFunction(modelInstance[key]) || isClosure(modelInstance[key])) &&
+			left(lCase(key), 5) == "super") {
+			structDelete(modelInstance, key);
+		}
+	}
+
+	// Now safely append to documentScope
+	ArrayAppend(documentScope, {"name" = "model", "scope" = modelInstance});
 	
 	/* 
 		To fix the issue below:
