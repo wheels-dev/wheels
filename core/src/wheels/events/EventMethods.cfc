@@ -41,6 +41,9 @@ component extends="wheels.Global" {
 				}
 			}
 			if (application.wheels.showErrorInformation) {
+				// Detect request format for format-specific error handling
+				local.format = $getRequestFormat();
+				
 				if (StructKeyExists(arguments.exception, "rootCause") && Left(arguments.exception.rootCause.type, 6) == "Wheels") {
 					local.wheelsError = arguments.exception.rootCause;
 				} else if (
@@ -52,29 +55,62 @@ component extends="wheels.Global" {
 				}
 				if (StructKeyExists(local, "wheelsError")) {
 					local.rv = "";
-
-					if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
-						local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_header_simple.cfm");
-					}
-
-					local.rv &= $includeAndReturnOutput(
-						$template = "/wheels/events/onerror/wheelserror.cfm",
-						wheelsError = local.wheelsError
-					);
-
-					if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
-						local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_footer_simple.cfm");
+					if (local.format == "json") {
+						$header(name = "Content-Type", value = "application/json");
+						local.rv = SerializeJSON(local.wheelsError);
+					} else if (local.format == "xml") {
+						$header(name = "Content-Type", value = "text/xml");
+						local.rv = $toXml(local.wheelsError);
+					} else {
+						// Default HTML error display
+						if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
+							local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_header_simple.cfm");
+						}
+						local.rv &= $includeAndReturnOutput(
+							$template = "/wheels/events/onerror/wheelserror.cfm",
+							wheelsError = local.wheelsError
+						);
+						if (!StructKeyExists(request.wheels, "internalHeaderLoaded")) {
+							local.rv &= $includeAndReturnOutput($template = "/wheels/public/layout/_footer_simple.cfm");
+						}
 					}
 				} else {
-					Throw(object = arguments.exception);
+					if (local.format == "json") {
+						$header(name = "Content-Type", value = "application/json");
+						$header(statusCode = 500, statusText = "Internal Server Error");
+						local.rv = SerializeJSON(arguments.exception);
+					} else if (local.format == "xml") {
+						$header(name = "Content-Type", value = "text/xml");
+						$header(statusCode = 500, statusText = "Internal Server Error");
+						local.rv = $toXml(arguments.exception);
+					} else {
+						// Default behavior: throw the exception for HTML display
+						Throw(object = arguments.exception);
+					}
 				}
 			} else {
 				$header(statusCode = 500, statusText = "Internal Server Error");
+				
+				local.format = $getRequestFormat();
+				local.formatSpecificTemplate = "#application.wheels.eventPath#/onerror.#local.format#.cfm";
+
+				if (FileExists(ExpandPath(local.formatSpecificTemplate))) {
+					local.errorTemplate = local.formatSpecificTemplate;
+				} else {
+					local.errorTemplate = "#application.wheels.eventPath#/onerror.cfm";
+				}
+				
 				local.rv = $includeAndReturnOutput(
-					$template = "#application.wheels.eventPath#/onerror.cfm",
+					$template = local.errorTemplate,
 					eventName = arguments.eventName,
 					exception = arguments.exception
 				);
+				
+				if (local.format == "json") {
+					$header(name = "Content-Type", value = "application/json");
+				} else if (local.format == "xml") {
+					$header(name = "Content-Type", value = "application/xml");
+				}
 			}
 		} else {
 			Throw(object = arguments.exception);
@@ -213,4 +249,26 @@ component extends="wheels.Global" {
 		$includeAndOutput(template = "#application.wheels.eventPath#/onmissingtemplate.cfm");
 		abort;
 	}
+	
+	/**
+	 * Internal function to detect the request format.
+	 */
+	public string function $getRequestFormat() {
+		local.rv = "html";
+		if (StructKeyExists(url, "format")) {
+			local.rv = url.format;
+		} else if ((StructKeyExists(request, "cgi") && StructKeyExists(request.cgi, "http_accept"))){
+			local.httpAccept = request.cgi.http_accept;
+			local.formats = $get("formats");
+			for (local.item in local.formats) {
+				if (FindNoCase(local.formats[local.item], local.httpAccept)) {
+					local.rv = local.item;
+					break;
+				}
+			}
+		}
+
+		return local.rv;
+	}
+
 }
