@@ -200,3 +200,21 @@ HTML
     </table>
 </cfdocument>
 ```
+
+### Error Handling with Multiple Formats
+
+When an error occurs in your application, Wheels will automatically respond with an error in the same format as the original request. This ensures consistent API behavior across all supported formats.
+
+For example:
+
+- If a request is made to `/products.json` and an error occurs, the error response will be returned as JSON
+- If a request is made to `/products.xml` and an error occurs, the error response will be returned as XML
+- If a request is made with an `Accept: application/json` header and an error occurs, the error response will be JSON
+
+Wheels provides default error templates for different formats that can be executed when `showErrorInformation` is set to false (like in `production` environment):
+
+- `app/events/onerror.cfm` - HTML error page (default)
+- `app/events/onerror.json.cfm` - JSON error response
+- `app/events/onerror.xml.cfm` - XML error response
+
+You can customize these templates to provide more specific error information or branding for your application. The error response will automatically include the appropriate `Content-Type` header matching the requested format.
