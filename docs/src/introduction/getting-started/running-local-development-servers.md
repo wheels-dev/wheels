@@ -97,7 +97,7 @@ CommandBox> start
 
 _Start the latest stable Lucee 5.x engine_
 
-CommandBox> start cfengine=lucee@5
+CommandBox> start cfengine=lucee5
 
 \_\_
 
@@ -136,7 +136,7 @@ Or via `server.json`
         }
     },
     "app":{
-        "cfengine":"adobe@2018"
+        "cfengine":"adobe2018"
     },
 }
 ```

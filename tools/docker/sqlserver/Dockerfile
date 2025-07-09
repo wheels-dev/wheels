@@ -26,6 +26,6 @@ ENV MSSQL_PID "Developer"
 EXPOSE 1433
 
 # Copy the initialization script into the container
-COPY ./docker/sqlserver/init-db.sh /usr/src/app/init-db.sh
+COPY ./tools/docker/sqlserver/init-db.sh /usr/src/app/init-db.sh
 
 CMD ["/bin/bash", "/usr/src/app/init-db.sh"]

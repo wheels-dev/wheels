@@ -1,0 +1,25 @@
+{
+	"profile": "development",
+	"force":true,
+	"web":{
+			"host":"localhost",
+			"webroot":"public",
+			"http":{
+					"port":"62021",
+					"enable":true
+			},
+			"rewrites":{
+					"enable":true,
+					"config":"public/urlrewrite.xml"
+			}
+	},
+	"app":{
+			"cfengine":"adobe@2021.0.11+330247",
+			"libDirs":"tools/docker/adobe2021/lib",
+			"serverHomeDirectory":".engine/adobe2021"
+	},
+	"cfconfigFile":"CFConfig.json",
+	"scripts":{
+        "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver"
+    }
+}

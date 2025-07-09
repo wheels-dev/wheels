@@ -46,7 +46,7 @@ Then visit http://localhost:3000 in your browser.
 docker-compose -f docker-compose.dev.yml up
 ```
 
-For more detailed Docker instructions, see [DOCKER-INTEGRATION.md](./DOCKER-INTEGRATION.md).
+For more detailed Docker instructions, see [DOCKER-INTEGRATION.md](./tools/docker-INTEGRATION.md).
 
 ### Manual Development
 
@@ -109,7 +109,7 @@ The TestUI includes an API server that enables container management directly fro
 - **Automatic container detection** when services start
 - **Real-time status updates** every 5 seconds
 
-See [DOCKER-INTEGRATION.md](./DOCKER-INTEGRATION.md) for detailed information on Docker integration.
+See [DOCKER-INTEGRATION.md](./tools/docker-INTEGRATION.md) for detailed information on Docker integration.
 
 ## Container Profiles
 

@@ -47,19 +47,19 @@ component  extends="base"  {
 			var wheelsBoxJSON = fileRead( getTemplate('/WheelsBoxJSON.txt' ) );
 			wheelsBoxJSON = replaceNoCase( wheelsBoxJSON, "|version|", trim(wheelsVersion), 'all' );
 
-				 // Make box.json 
+				 // Make box.json
 	 		print.greenline( "========= Creating wheels/box.json" ).toConsole();
 			file action='write' file=wheelsBoxJsonLocation mode ='777' output='#trim(wheelsBoxJSON)#';
 
 		} else {
  			print.greenline( "========= wheels/box.json exists, skipping" ).toConsole();
 		}
-		
+
 		// Create a server.json if one doesn't exist
 		if(!fileExists(serverJsonLocation)){
 			var appName       = ask( message = "Please enter an application name: we use this to make the server.json servername unique: ", defaultResponse = 'myapp');
 				appName 	  = helpers.stripSpecialChars(appName);
-			var setEngine     = ask( message = 'Please enter a default cfengine: ', defaultResponse = 'lucee@5' );
+			var setEngine     = ask( message = 'Please enter a default cfengine: ', defaultResponse = 'lucee5' );
 
 			// Make server.json server name unique to this app: assumes lucee by default
 	 		print.greenline( "========= Creating default server.json" ).toConsole();
@@ -82,7 +82,7 @@ component  extends="base"  {
 			boxJSON = replaceNoCase( boxJSON, "|version|", trim(wheelsVersion), 'all' );
 			boxJSON = replaceNoCase( boxJSON, "|appName|", trim(appName), 'all' );
 
-				 // Make box.json 
+				 // Make box.json
 	 		print.greenline( "========= Creating box.json" ).toConsole();
 			file action='write' file=boxJsonLocation mode ='777' output='#trim(boxJSON)#';
 

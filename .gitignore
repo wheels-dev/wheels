@@ -24,7 +24,3 @@ settings.xml
 .claude/settings.local.json
 cli/tests/
 test-output/
-workspace/**
-!workspace/.keep
-/tools/workspace/**
-!tools/workspace/.gitkeep

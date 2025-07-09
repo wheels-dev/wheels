@@ -1,0 +1,12 @@
+{
+    "name": "cfwheels-test-suite-adobe2025",
+    "version": "1.0.0",
+    "dependencies": {
+        "wirebox": "^7.0.0",
+        "testbox": "^5.0.0"
+    },
+    "installPaths": {
+        "wirebox": "core/wirebox/",
+        "testbox": "core/testbox/"
+    }
+}

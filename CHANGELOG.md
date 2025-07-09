@@ -262,7 +262,7 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 ### Bug Fixes
 
 - Fixed pagination order ambiguous column name exception - [#980](https://github.com/cfwheels/cfwheels/issues/#980) [Adam Chapman, Mike Lange]
-- Renames findLast() to findLastOne() for lucee@5.3.5+92 upwards compatibility [#988](https://github.com/cfwheels/cfwheels/issues/#988)
+- Renames findLast() to findLastOne() for lucee5.3.5+92 upwards compatibility [#988](https://github.com/cfwheels/cfwheels/issues/#988)
 
 ----
 

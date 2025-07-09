@@ -177,4 +177,4 @@ Deployment configuration is stored in `.wheels-deploy.json`:
 - [wheels deploy init](deploy-init.md) - Initialize deployment
 - [wheels deploy exec](deploy-exec.md) - Execute deployment
 - [wheels deploy rollback](deploy-rollback.md) - Rollback deployment
-- [wheels docker deploy](../docker/docker-deploy.md) - Docker deployments
+- [wheels docker deploy](../tools/docker/docker-deploy.md) - Docker deployments

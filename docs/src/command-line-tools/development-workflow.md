@@ -47,7 +47,7 @@ The command creates three essential files:
 When you run `wheels init`, it will ask for:
 
 - **Application Name**: Used for unique server naming (special characters are removed)
-- **Default CFML Engine**: Your preference (e.g., lucee@5, adobe@2023)
+- **Default CFML Engine**: Your preference (e.g., lucee5, adobe2023)
 
 ### Example
 
@@ -61,7 +61,7 @@ You don't have a box.json. Let's create one
 Application name: My Awesome App
 We'll use: myawesomeapp for the server name
 
-What's your preferred CFML Engine [lucee@5]: lucee@5
+What's your preferred CFML Engine [lucee5]: lucee5
 
 ✓ Created vendor/wheels/box.json
 ✓ Created server.json

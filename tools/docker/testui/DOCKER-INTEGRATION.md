@@ -55,8 +55,8 @@ You can also build and run the TestUI directly using Docker:
 
 ```bash
 # From the docker/testui directory
-./docker-build.sh       # For production mode
-./docker-build.sh dev   # For development mode
+./tools/docker-build.sh       # For production mode
+./tools/docker-build.sh dev   # For development mode
 ```
 
 ## Container Configuration
@@ -255,7 +255,7 @@ The TestUI now logs to persistent files on the host:
 ```bash
 # Monitor all logs in real-time
 cd /path/to/wheels
-./docker/testui/monitor-logs.sh
+./tools/docker/testui/monitor-logs.sh
 
 # Or check individual log files
 tail -f docker/testui/logs/api/api-server.log
@@ -287,7 +287,7 @@ docker compose --profile ui build --no-cache
 docker compose --profile ui up -d
 
 # Monitor logs
-./docker/testui/monitor-logs.sh
+./tools/docker/testui/monitor-logs.sh
 ```
 
 ## Contributing

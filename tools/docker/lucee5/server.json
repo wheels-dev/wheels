@@ -1,0 +1,21 @@
+{
+	"profile": "development",
+	"force":true,
+	"web":{
+			"host":"localhost",
+			"webroot":"public",
+			"http":{
+					"port":"60005",
+					"enable":true
+			},
+			"rewrites":{
+					"enable":true,
+					"config":"public/urlrewrite.xml"
+			}
+	},
+	"app":{
+			"cfengine":"lucee@5",
+			"libDirs":"tools/docker/lucee5/lib"
+	},
+	"cfconfigFile":"CFConfig.json"
+}

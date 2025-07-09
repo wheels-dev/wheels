@@ -21,7 +21,7 @@ So the first step in submitting changes to the API Documentation is similar to t
 
 Once approved and merged in, then the json file is generated using a utility embedded in the framework itself. So once a version has been published to ForgeBox (either a SNAPSHOT or a stable release), use command box to install that version of the framework.
 
-```wheels generate app name=json template=wheels-base-template@be cfmlEngine=lucee@5```
+```wheels generate app name=json template=wheels-base-template@be cfmlEngine=lucee5```
 
 This will install the Bleeding Edge version of the framework with the Lucee v5 CFML Engine. Once the installation completes start your server.
 

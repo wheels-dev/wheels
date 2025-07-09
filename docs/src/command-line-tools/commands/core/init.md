@@ -28,7 +28,7 @@ When you run `wheels init`, you'll be prompted for:
 
 1. **Confirmation** - Confirm you want to proceed with initialization
 2. **Application Name** - Used to make server.json server name unique (if box.json doesn't exist)
-3. **CF Engine** - Default CFML engine (e.g., `lucee@5`, `adobe@2021`) (if server.json doesn't exist)
+3. **CF Engine** - Default CFML engine (e.g., `lucee5`, `adobe2021`) (if server.json doesn't exist)
 
 ## Examples
 
@@ -40,14 +40,14 @@ wheels init
 Example interaction:
 ```
 ==================================== Wheels init ===================================
- This function will attempt to add a few things 
- to an EXISTING Wheels installation to help   
+ This function will attempt to add a few things
+ to an EXISTING Wheels installation to help
  the CLI interact.
- 
+
  We're going to assume the following:
   - you've already setup a local datasource/database
   - you've already set a reload password
- 
+
  We're going to try and do the following:
   - create a box.json to help keep track of the wheels version
   - create a server.json
@@ -55,7 +55,7 @@ Example interaction:
 
 Sound ok? [y/n] y
 Please enter an application name: myapp
-Please enter a default cfengine: lucee@5
+Please enter a default cfengine: lucee5
 ```
 
 ## What It Does
@@ -82,7 +82,7 @@ Please enter a default cfengine: lucee@5
     }
   },
   "app": {
-    "cfengine": "lucee@5"
+    "cfengine": "lucee5"
   }
 }
 ```

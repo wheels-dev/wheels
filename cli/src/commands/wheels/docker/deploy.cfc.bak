@@ -1,6 +1,6 @@
 /**
  * Create production-ready Docker configurations
- * 
+ *
  * {code:bash}
  * wheels docker:deploy
  * wheels docker:deploy --environment=staging
@@ -25,30 +25,30 @@ component extends="../base" {
         print.line();
         print.boldMagentaLine("Wheels Docker Production Deployment");
         print.line();
-        
+
         // Validate inputs
         local.validDatabases = ["h2", "mysql", "postgres", "mssql"];
         if (!arrayContains(local.validDatabases, lCase(arguments.db))) {
             error("Invalid database: #arguments.db#. Please choose from: #arrayToList(local.validDatabases)#");
         }
-        
+
         local.validEngines = ["lucee", "adobe"];
         if (!arrayContains(local.validEngines, lCase(arguments.cfengine))) {
             error("Invalid ColdFusion engine: #arguments.cfengine#. Please choose from: #arrayToList(local.validEngines)#");
         }
-        
+
         // Create docker-compose.production.yml
         createProductionComposeFile(arguments.environment, arguments.db, arguments.cfengine);
-        
+
         // Create production Dockerfile
         createProductionDockerfile(arguments.cfengine, arguments.optimize);
-        
+
         // Create .env.production file
         createEnvFile(arguments.environment, arguments.db);
-        
+
         // Create deployment scripts
         createDeploymentScripts(arguments.environment);
-        
+
         print.line();
         print.boldGreenLine("Production Docker configuration created successfully!");
         print.line();
@@ -57,7 +57,7 @@ component extends="../base" {
         print.line("2. Run: ./deploy.sh #arguments.environment#");
         print.line();
     }
-    
+
     /**
      * Create docker-compose.production.yml file
      */
@@ -67,7 +67,7 @@ component extends="../base" {
         required string cfengine
     ) {
         local.composePath = fileSystemUtil.resolvePath("docker-compose.#arguments.environment#.yml");
-        
+
         local.composeContent = "version: '3.8'
 
 services:
@@ -86,7 +86,7 @@ services:
       - .env.#arguments.environment#
     depends_on:
       - #arguments.db#
-      
+
   #arguments.db#:
     image: #arguments.db#:latest
     restart: always
@@ -94,8 +94,8 @@ services:
       - #arguments.db#_data:/var/lib/mysql
     env_file:
       - .env.#arguments.environment#
-      
-  ## Optional reverse proxy with HTTPS  
+
+  ## Optional reverse proxy with HTTPS
   web:
     image: nginx:alpine
     restart: always
@@ -103,41 +103,41 @@ services:
       - '443:443'
       - '80:80'
     volumes:
-      - ./docker/nginx:/etc/nginx/conf.d
-      - ./docker/certbot/conf:/etc/letsencrypt
-      - ./docker/certbot/www:/var/www/certbot
+      - ./tools/docker/nginx:/etc/nginx/conf.d
+      - ./tools/docker/certbot/conf:/etc/letsencrypt
+      - ./tools/docker/certbot/www:/var/www/certbot
     depends_on:
       - cfwheels
-      
+
   certbot:
     image: certbot/certbot
     volumes:
-      - ./docker/certbot/conf:/etc/letsencrypt
-      - ./docker/certbot/www:/var/www/certbot
+      - ./tools/docker/certbot/conf:/etc/letsencrypt
+      - ./tools/docker/certbot/www:/var/www/certbot
     command: certonly --webroot -w /var/www/certbot --email admin@example.com -d example.com --agree-tos
 
 volumes:
   cfwheels_logs:
   #arguments.db#_data:";
-        
+
         file action='write' file='#local.composePath#' mode='777' output='#local.composeContent#';
         print.greenLine("Created docker-compose.#arguments.environment#.yml");
-        
+
         // Create nginx configuration
         local.nginxDir = fileSystemUtil.resolvePath("docker/nginx");
         if (!directoryExists(local.nginxDir)) {
             directoryCreate(local.nginxDir, true);
         }
-        
+
         local.nginxPath = local.nginxDir & "/default.conf";
         local.nginxContent = "server {
     listen 80;
     server_name example.com;
-    
+
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
-    
+
     location / {
         return 301 https://$host$request_uri;
     }
@@ -146,23 +146,23 @@ volumes:
 server {
     listen 443 ssl;
     server_name example.com;
-    
+
     ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
-    
+
     # SSL configurations
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    
+
     # HSTS
     add_header Strict-Transport-Security 'max-age=31536000; includeSubDomains; preload' always;
-    
+
     # Other security headers
     add_header X-Content-Type-Options nosniff;
     add_header X-Frame-Options SAMEORIGIN;
     add_header X-XSS-Protection '1; mode=block';
-    
+
     location / {
         proxy_pass http://cfwheels:8080;
         proxy_set_header Host $host;
@@ -174,7 +174,7 @@ server {
         file action='write' file='#local.nginxPath#' mode='777' output='#local.nginxContent#';
         print.greenLine("Created nginx configuration");
     }
-    
+
     /**
      * Create production Dockerfile
      */
@@ -183,9 +183,9 @@ server {
         required boolean optimize
     ) {
         local.dockerfilePath = fileSystemUtil.resolvePath("Dockerfile.production");
-        
+
         local.dockerfileContent = "";
-        
+
         // Use different Dockerfile content based on the CF engine
         if (lCase(arguments.cfengine) == "lucee") {
             local.dockerfileContent = "FROM lucee/lucee:5.3-nginx AS builder
@@ -286,11 +286,11 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhos
 # Start Adobe ColdFusion
 CMD [\"/opt/coldfusion/bin/coldfusion\", \"start\"]";
         }
-        
+
         file action='write' file='#local.dockerfilePath#' mode='777' output='#local.dockerfileContent#';
         print.greenLine("Created Dockerfile.production");
     }
-    
+
     /**
      * Create .env.production file
      */
@@ -299,7 +299,7 @@ CMD [\"/opt/coldfusion/bin/coldfusion\", \"start\"]";
         required string db
     ) {
         local.envPath = fileSystemUtil.resolvePath(".env.#arguments.environment#");
-        
+
         local.envContent = "# Environment variables for #arguments.environment# environment
 
 # Application settings
@@ -307,7 +307,7 @@ WHEELS_ENVIRONMENT=#arguments.environment#
 WHEELS_RELOAD_PASSWORD=changeme123!
 
 # Database settings";
-        
+
         switch (lCase(arguments.db)) {
             case "mysql":
                 local.envContent &= "
@@ -359,23 +359,23 @@ WHEELS_DATASOURCE_PASSWORD=
 WHEELS_DATASOURCE_PORT=1521";
                 break;
         }
-        
+
         local.envContent &= "
 
 # Miscellaneous settings
 TZ=UTC
 ";
-        
+
         file action='write' file='#local.envPath#' mode='777' output='#local.envContent#';
         print.greenLine("Created .env.#arguments.environment#");
     }
-    
+
     /**
      * Create deployment scripts
      */
     private void function createDeploymentScripts(required string environment) {
         local.deployPath = fileSystemUtil.resolvePath("deploy.sh");
-        
+
         local.deployContent = "#!/bin/bash
 # Deployment script for Wheels Docker
 
@@ -390,22 +390,22 @@ docker-compose -f docker-compose.\$ENV.yml up -d
 
 echo \"Wheels deployed to \$ENV environment!\"
 ";
-        
+
         file action='write' file='#local.deployPath#' mode='777' output='#local.deployContent#';
         // Make the script executable
         command("chmod +x #local.deployPath#").run();
         print.greenLine("Created deploy.sh");
-        
+
         // Create nginx SSL renewal script
         local.renewPath = fileSystemUtil.resolvePath("renew-ssl.sh");
-        
+
         local.renewContent = "#!/bin/bash
 # SSL certificate renewal script
 
 docker-compose -f docker-compose.production.yml run --rm certbot renew
 docker-compose -f docker-compose.production.yml exec web nginx -s reload
 ";
-        
+
         file action='write' file='#local.renewPath#' mode='777' output='#local.renewContent#';
         // Make the script executable
         command("chmod +x #local.renewPath#").run();

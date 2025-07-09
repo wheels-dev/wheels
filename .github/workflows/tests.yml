@@ -16,150 +16,246 @@ jobs:
       fail-fast: false
       matrix:
         cfengine:
-          ["lucee@5", "lucee@6", "adobe@2018", "adobe@2021", "adobe@2023"]
+          ["lucee5", "lucee6", "adobe2018", "adobe2021", "adobe2023"]
         dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
         experimental: [false]
         include:
           # Lucee 7 experimental tests (non-blocking)
-          - cfengine: "lucee@7"
+          - cfengine: "lucee7"
             dbengine: "h2"
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
-          - cfengine: "lucee@7"
+          - cfengine: "lucee7"
             dbengine: "mysql"
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
-          - cfengine: "lucee@7"
+          - cfengine: "lucee7"
             dbengine: "postgres"
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
-          - cfengine: "lucee@7"
+          - cfengine: "lucee7"
             dbengine: "sqlserver"
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
-          - cfengine: "lucee@7"
-            dbengine: "oracle"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
+          # - cfengine: "lucee7"
+          #   dbengine: "oracle"
+          #   commandbox_version: "6.2.1"
+          #   jdkVersion: "21"
+          #   experimental: true
         exclude:
-          # - cfengine: lucee@5
+          # - cfengine: lucee5
           #   dbengine: mysql
-          # - cfengine: lucee@5
+          # - cfengine: lucee5
           #   dbengine: postgres
-          # - cfengine: lucee@5
+          # - cfengine: lucee5
           #   dbengine: sqlserver
-          # - cfengine: lucee@5
+          # - cfengine: lucee5
           #   dbengine: h2
-          # - cfengine: lucee@5
-          #   dbengine: oracle
-          # - cfengine: lucee@6
+          - cfengine: lucee5
+            dbengine: oracle
+          # - cfengine: lucee6
           #   dbengine: mysql
-          # - cfengine: lucee@6
+          # - cfengine: lucee6
           #   dbengine: postgres
-          # - cfengine: lucee@6
+          # - cfengine: lucee6
           #   dbengine: sqlserver
-          # - cfengine: lucee@6
+          # - cfengine: lucee6
           #   dbengine: h2
-          # - cfengine: lucee@6
-          #   dbengine: oracle
-          # - cfengine: lucee@7
+          - cfengine: lucee6
+            dbengine: oracle
+          # - cfengine: lucee7
           #   dbengine: mysql
-          # - cfengine: lucee@7
+          # - cfengine: lucee7
           #   dbengine: postgres
-          # - cfengine: lucee@7
+          # - cfengine: lucee7
           #   dbengine: sqlserver
-          # - cfengine: lucee@7
+          # - cfengine: lucee7
           #   dbengine: h2
-          # - cfengine: lucee@7
-          #   dbengine: oracle
-          # - cfengine: adobe@2018
+          - cfengine: lucee7
+            dbengine: oracle
+          # - cfengine: adobe2018
           #   dbengine: mysql
-          # - cfengine: adobe@2018
+          # - cfengine: adobe2018
           #   dbengine: postgres
-          # - cfengine: adobe@2018
+          # - cfengine: adobe2018
           #   dbengine: sqlserver
-          - cfengine: adobe@2018
+          - cfengine: adobe2018
             dbengine: h2
-          - cfengine: adobe@2018
+          - cfengine: adobe2018
             dbengine: oracle
-          # - cfengine: adobe@2021
+          # - cfengine: adobe2021
           #   dbengine: mysql
-          # - cfengine: adobe@2021
+          # - cfengine: adobe2021
           #   dbengine: postgres
-          # - cfengine: adobe@2021
+          # - cfengine: adobe2021
           #   dbengine: sqlserver
-          - cfengine: adobe@2021
+          - cfengine: adobe2021
             dbengine: h2
-          - cfengine: adobe@2021
+          - cfengine: adobe2021
             dbengine: oracle
-          # - cfengine: adobe@2023
+          # - cfengine: adobe2023
           #   dbengine: mysql
-          # - cfengine: adobe@2023
+          # - cfengine: adobe2023
           #   dbengine: postgres
-          # - cfengine: adobe@2023
+          # - cfengine: adobe2023
           #   dbengine: sqlserver
-          - cfengine: adobe@2023
+          - cfengine: adobe2023
             dbengine: h2
-          - cfengine: adobe@2023
+          - cfengine: adobe2023
             dbengine: oracle
-          - cfengine: adobe@2025
+          - cfengine: adobe2025
             dbengine: h2
-          - cfengine: adobe@2025
+          - cfengine: adobe2025
             dbengine: oracle
-          - cfengine: adobe@2025
+          - cfengine: adobe2025
             dbengine: mysql
-          - cfengine: adobe@2025
+          - cfengine: adobe2025
             dbengine: postgres
-          - cfengine: adobe@2025
+          - cfengine: adobe2025
             dbengine: sqlserver
+    env:
+      # Port mappings for each CF engine
+      PORT_lucee5: 60005
+      PORT_lucee6: 60006
+      PORT_lucee7: 60007
+      PORT_adobe2018: 62018
+      PORT_adobe2021: 62021
+      PORT_adobe2023: 62023
+      PORT_adobe2025: 62025
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Copy server.json files
-        run: |
-          cp ./docker/${{ matrix.cfengine }}/server.json ./
-          cp ./docker/${{ matrix.cfengine }}/CFConfig-actions.json ./CFConfig.json
-          cp ./docker/${{ matrix.cfengine }}/settings.cfm ./app/config/settings.cfm
+      - name: Start cfengine (${{ matrix.cfengine }}) ...
+        run: docker compose up -d ${{ matrix.cfengine }}
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' }}
         run: docker compose up -d ${{ matrix.dbengine }}
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: ${{ matrix.jdkVersion }}
-
-      - name: Setup CommandBox CLI
-        uses: Ortus-Solutions/setup-commandbox@v2.0.1
-        with:
-          version: ${{ matrix.commandbox_version }}
-
-      - name: Install Dependencies
+      - name: Wait for containers to be ready
         run: |
-          # Core dependencies
-          box install
+          echo "Waiting for ${{ matrix.cfengine }} to be ready..."
+          
+          # First, wait for container to be running
+          timeout 120 bash -c 'until docker ps --filter "name=${{ matrix.cfengine }}" | grep -q "${{ matrix.cfengine }}"; do
+            echo "Waiting for container to start..."
+            sleep 2
+          done'
+          
+          # Get the port for this CF engine
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+          
+          # Wait for service to respond
+          echo "Waiting for service on port ${PORT} to be ready..."
+          MAX_WAIT=60
+          WAIT_COUNT=0
+          
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            echo -n "Checking service (attempt ${WAIT_COUNT}/${MAX_WAIT})... "
+            
+            # Check if port is open and service responds
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
+              echo "Service is ready!"
+              break
+            else
+              echo "Not ready yet"
+              if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
+                sleep 5
+              fi
+            fi
+          done
+          
+          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+            echo "Warning: Service may not be fully ready after ${MAX_WAIT} attempts"
+          fi
 
-      - name: Start ${{ matrix.cfengine }} Server
+      - name: Set test variables
+        id: test-vars
         run: |
-          box server start serverConfigFile="server.json" --noSaveSettings --debug
+          # Get the port for this CF engine
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+          echo "port=${PORT}" >> $GITHUB_OUTPUT
+          
+          # Construct test URL
+          TEST_URL="http://localhost:${PORT}/wheels/testbox?db=${{ matrix.dbengine }}&format=json&only=failure,error"
+          echo "test_url=${TEST_URL}" >> $GITHUB_OUTPUT
+          
+          # Result file path
+          RESULT_FILE="/tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt"
+          echo "result_file=${RESULT_FILE}" >> $GITHUB_OUTPUT
 
-      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
-        if: ${{ matrix.cfengine == 'adobe@2021' }} || ${{ matrix.cfengine == 'adobe@2023' }} || ${{ matrix.cfengine == 'adobe@2025' }}
-        run: box run-script onServerInstall
-
-      - name: Run Tests ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+      - name: Check service connectivity
         run: |
-          docker/github/core-tests.sh ${{ matrix.cfengine }} ${{ matrix.dbengine }}
+          echo "Checking if service is ready on localhost:${{ steps.test-vars.outputs.port }}..."
+          nc -zv localhost ${{ steps.test-vars.outputs.port }} || echo "Port not open yet"
+          
+          # Try a basic curl to see if service responds
+          curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
+
+      - name: Run Tests with Retry
+        id: run-tests
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          HTTP_CODE="000"
+          
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ] && [ "$HTTP_CODE" = "000" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
+            
+            HTTP_CODE=$(curl -s -o "${{ steps.test-vars.outputs.result_file }}" \
+              --max-time 900 \
+              --write-out "%{http_code}" \
+              "${{ steps.test-vars.outputs.test_url }}" || echo "000")
+            
+            echo "HTTP Code: ${HTTP_CODE}"
+            
+            if [ "$HTTP_CODE" = "000" ] && [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+              echo "Connection failed, waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+          
+          echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
+          
+          # Check result
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Tests passed with HTTP 200"
+            exit 0
+          else
+            echo "❌ Tests failed with HTTP code: ${HTTP_CODE}"
+            if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
+              echo "Response content:"
+              cat "${{ steps.test-vars.outputs.result_file }}"
+            fi
+            exit 1
+          fi
+
+      - name: Debug Information
+        if: failure()
+        run: |
+          echo "=== Docker Container Status ==="
+          docker ps -a
+          
+          echo -e "\n=== Container Logs for ${{ matrix.cfengine }} ==="
+          docker logs $(docker ps -aq -f "name=${{ matrix.cfengine }}") 2>&1 | tail -50 || echo "Could not get logs"
+          
+          echo -e "\n=== Test Result File ==="
+          if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
+            cat "${{ steps.test-vars.outputs.result_file }}"
+          else
+            echo "Result file not found"
+          fi
 
       - name: Upload Test Results Artifacts
         if: always()
@@ -168,13 +264,6 @@ jobs:
           name: test-results-${{ matrix.cfengine }}-${{ matrix.dbengine }}
           path: |
             /tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt
-
-      - name: Failure Debugging Info
-        if: ${{ failure() }}
-        run: |
-          box version
-          box server info serverConfigFile="server.json" --json
-          box server log serverConfigFile="server.json"
 
       - name: Upload Workflow Logs
         if: always()

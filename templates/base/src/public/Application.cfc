@@ -12,14 +12,13 @@ component output="false" {
 
 	// Set up the application paths.
 	this.appDir     = expandPath("../app/");
-	this.vendorDir  = expandPath("../vendor/");
-	this.wheelsDir  = this.vendorDir & "wheels/";
-	this.wireboxDir = this.vendorDir & "wirebox/";
-	this.testboxDir = this.vendorDir & "testbox/";
-
+	this.coreDir  = expandPath("../core/");
+	this.wheelsDir  = this.coreDir & "wheels/";
+	this.wireboxDir = this.coreDir & "wirebox/";
+	this.testboxDir = this.coreDir & "testbox/";
 	// Set up the mappings for the application.
 	this.mappings["/app"]     = this.appDir;
-	this.mappings["/vendor"]  = this.vendorDir;
+	this.mappings["/vendor"]  = this.coreDir;
 	this.mappings["/wheels"]  = this.wheelsDir;
 	this.mappings["/wirebox"] = this.wireboxDir;
 	this.mappings["/testbox"] = this.testboxDir;
