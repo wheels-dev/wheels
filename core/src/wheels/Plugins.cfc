@@ -332,8 +332,7 @@ component output="false" extends="wheels.Global"{
 	}
 
 	public string function $componentPathToPlugin(required string folder, required string file) {
-		local.path = [ListChangeDelims(variables.$class.pluginPath, ".", "/"), arguments.folder, arguments.file];
-		return ArrayToList(local.path, ".");
+		return "#application[$appKey()].pluginComponentPath#.#arguments.folder#.#arguments.file#";
 	}
 
 	public query function $folders() {
