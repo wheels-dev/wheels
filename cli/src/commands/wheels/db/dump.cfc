@@ -343,8 +343,82 @@ component extends="../base" {
 	}
 
 	private struct function getDatasourceInfo(required string datasourceName) {
-		// Placeholder implementation
-		return {};
+		try {
+			// Try to get datasource info from application.cfc
+			local.appPath = getCWD();
+			local.appCfcPath = local.appPath & "/config/app.cfm";
+			
+			if (fileExists(local.appCfcPath)) {
+				local.content = fileRead(local.appCfcPath);
+				
+				// Look for datasource definition in this.datasources['name']
+				local.pattern = "this\.datasources\['#arguments.datasourceName#'\]\s*=\s*\{([^}]+)\}";
+				local.match = reFindNoCase(local.pattern, local.content, 1, true);
+				
+				if (local.match.pos[1] > 0) {
+					local.dsDefinition = mid(local.content, local.match.pos[1], local.match.len[1]);
+					local.dsInfo = {
+						"datasource": arguments.datasourceName,
+						"database": "",
+						"driver": "",
+						"host": "localhost",
+						"port": "",
+						"username": "",
+						"password": ""
+					};
+					
+					// Extract driver class
+					local.classMatch = reFindNoCase("class\s*:\s*'([^']+)'", local.dsDefinition, 1, true);
+					if (local.classMatch.pos[2] > 0) {
+						local.className = mid(local.dsDefinition, local.classMatch.pos[2], local.classMatch.len[2]);
+						switch(local.className) {
+							case "org.h2.Driver":
+								local.dsInfo.driver = "H2";
+								break;
+							case "com.mysql.cj.jdbc.Driver":
+							case "com.mysql.jdbc.Driver":
+								local.dsInfo.driver = "MySQL";
+								break;
+							case "org.postgresql.Driver":
+								local.dsInfo.driver = "PostgreSQL";
+								break;
+							case "com.microsoft.sqlserver.jdbc.SQLServerDriver":
+								local.dsInfo.driver = "MSSQL";
+								break;
+						}
+					}
+					
+					// Extract connection string
+					local.connMatch = reFindNoCase("connectionString\s*:\s*'([^']+)'", local.dsDefinition, 1, true);
+					if (local.connMatch.pos[2] > 0) {
+						local.connString = mid(local.dsDefinition, local.connMatch.pos[2], local.connMatch.len[2]);
+						
+						// Parse H2 database path
+						if (local.dsInfo.driver == "H2") {
+							if (find("jdbc:h2:file:", local.connString)) {
+								local.dbPath = replaceNoCase(local.connString, "jdbc:h2:file:", "");
+								local.dbPath = listFirst(local.dbPath, ";");
+								local.dsInfo.database = local.dbPath;
+							}
+						}
+					}
+					
+					// Extract username
+					local.userMatch = reFindNoCase("username\s*[=:]\s*'([^']*)'", local.dsDefinition, 1, true);
+					if (local.userMatch.pos[2] > 0) {
+						local.dsInfo.username = mid(local.dsDefinition, local.userMatch.pos[2], local.userMatch.len[2]);
+					}
+					
+					return local.dsInfo;
+				}
+			}
+			
+			// If not found in app.cfm, return empty struct
+			return {};
+		} catch (any e) {
+			// Server might not be running or file read error
+			return {};
+		}
 	}
 
 	private string function getEnvironment(required string appPath) {
@@ -397,10 +471,18 @@ component extends="../base" {
 	}
 
 	private string function extractDataSourceName(required string content) {
-		local.pattern = 'set\s*\(\s*dataSourceName\s*=\s*["'']([^"'']+)["'']';
-		local.match = REFind(local.pattern, arguments.content, 1, true);
-		if (local.match.pos[1] > 0) {
-			return Mid(arguments.content, local.match.pos[2], local.match.len[2]);
+		// Step 1: Remove multi-line block comments: /* ... */
+		local.cleaned = REReplace(arguments.content, "/\*[\s\S]*?\*/", "", "all");
+
+		// Step 2: Remove single-line comments: // ... until end of line
+		local.cleaned = REReplace(local.cleaned, "//.*", "", "all");
+
+		// Step 3: Match set(dataSourceName="...")
+		local.pattern = "set\s*\(\s*dataSourceName\s*=\s*[""']([^""']+)[""']";
+		local.match = REFind(local.pattern, local.cleaned, 1, true);
+
+		if (arrayLen(local.match.pos) >= 2 && local.match.pos[2] > 0) {
+			return Mid(local.cleaned, local.match.pos[2], local.match.len[2]);
 		}
 		return "";
 	}
