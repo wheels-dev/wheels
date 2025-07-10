@@ -363,6 +363,7 @@ component extends="base" {
                     }
                 } catch (any e) {
                     // Ignore errors
+                } 
             }
             
             // Check installed modules
@@ -490,7 +491,7 @@ component extends="base" {
      */
     private boolean function checkIfInstalled(required string packageName) {
         // Check modules directory
-        local.modulesPath = fileSystemUtil.resolvePath("vendor");
+        local.modulesPath = fileSystemUtil.resolvePath("core");
         if (directoryExists(local.modulesPath)) {
             // Simple name check
             local.simpleName = listLast(arguments.packageName, ":");
