@@ -45,6 +45,17 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Load configurations for both environments
 		local.env1SettingsFile = local.configPath & "/" & arguments.env1 & "/settings.cfm";
 		local.env2SettingsFile = local.configPath & "/" & arguments.env2 & "/settings.cfm";
+		
+		//Ensure environment exists
+		if(!fileExists(local.env1SettingsFile)){
+			print.boldRedLine("Environment '#arguments.env1#' not found!");
+			return;
+		}
+
+		if(!fileExists(local.env2SettingsFile)){
+			print.boldRedLine("Environment '#arguments.env2#' not found!");
+			return;
+		}
 
 		local.config1 = loadConfiguration(local.settingsFile, local.env1SettingsFile);
 		local.config2 = loadConfiguration(local.settingsFile, local.env2SettingsFile);
@@ -221,7 +232,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
 		if (!local.hasChanges) {
 			print.line();
-			print.greenLine("✓ Configurations are identical!");
+			print.greenLine("Configurations are identical!");
 		}
 	}
 

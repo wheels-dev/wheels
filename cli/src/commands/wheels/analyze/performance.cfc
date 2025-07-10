@@ -22,11 +22,12 @@ component extends="wheels-cli.commands.wheels.base" {
         numeric threshold = 100,
         boolean profile = false
     ) {
-        print.yellowLine("⚡ Analyzing application performance...")
+        print.yellowLine("Analyzing application performance...")
              .line();
         
         // Validate we're in a Wheels project
-        if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
+        // if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
+        if (!directoryExists(fileSystemUtil.resolvePath("core/src/wheels"))) { 
             error("This command must be run from the root of a Wheels application.");
             return;
         }
@@ -64,16 +65,31 @@ component extends="wheels-cli.commands.wheels.base" {
         print.line("Target: #arguments.target#");
         print.line("Threshold: #arguments.threshold#ms");
         print.line();
-        
+
         // Monitor performance
         var progress = 0;
+        var spinner = ["|", "/", "-", "\\"];
+        var spinIndex = 1;
+
+        // ANSI escape code for green text
+        var greenStart = chr(27) & "[32m";
+        var reset = chr(27) & "[0m";
+
         while (now() < results.endTime) {
             var currentProgress = int((dateDiff("s", results.startTime, now()) / arguments.duration) * 100);
-            
+
             if (currentProgress > progress) {
                 progress = currentProgress;
-                print.line("Progress: #progress#%");
-                
+
+                var spinChar = spinner[spinIndex];
+                spinIndex = spinIndex == arrayLen(spinner) ? 1 : spinIndex + 1;
+
+                var bar = repeatString("=", int(progress / 5)) & repeatString(" ", 20 - int(progress / 5));
+                var progressStr = "[#bar#] #progress#% #spinChar#";
+
+                // Print with green color using ANSI and inline update
+                systemOutput(chr(13) & greenStart & progressStr & reset);
+
                 // Collect metrics
                 if (arguments.target == "all" || arguments.target == "controller") {
                     collectControllerMetrics(results);
@@ -88,10 +104,10 @@ component extends="wheels-cli.commands.wheels.base" {
                     collectMemoryMetrics(results);
                 }
             }
-            
+
             sleep(1000); // Check every second
         }
-        
+
         if (arguments.profile) {
             disableProfiling();
         }
@@ -116,18 +132,18 @@ component extends="wheels-cli.commands.wheels.base" {
         // Enable CF debugging/profiling
         try {
             // This would enable server-side profiling
-            print.greenLine("✅ Profiling enabled");
+            print.greenLine("Profiling enabled");
         } catch (any e) {
-            print.yellowLine("⚠️  Could not enable profiling: #e.message#");
+            print.yellowLine("Could not enable profiling: #e.message#");
         }
     }
     
     private function disableProfiling() {
         // Disable CF debugging/profiling
         try {
-            print.greenLine("✅ Profiling disabled");
+            print.greenLine("Profiling disabled");
         } catch (any e) {
-            print.yellowLine("⚠️  Could not disable profiling: #e.message#");
+            print.yellowLine("Could not disable profiling: #e.message#");
         }
     }
     
@@ -136,23 +152,22 @@ component extends="wheels-cli.commands.wheels.base" {
         // to collect actual metrics. For now, we'll simulate some data.
         
         // Simulate request data
-        var request = {
+        var requestData = {
             controller = "users",
             action = "index",
             responseTime = randRange(50, 500),
             timestamp = now(),
             memory = randRange(10, 100)
         };
-        
-        arrayAppend(arguments.results.metrics.requests, request);
-        
-        if (request.responseTime > arguments.results.summary.maxResponseTime) {
-            arguments.results.summary.maxResponseTime = request.responseTime;
+        arrayAppend(arguments.results.metrics.requests, requestData);
+
+        if (requestData.responseTime > arguments.results.summary.maxResponseTime) {
+            arguments.results.summary.maxResponseTime = requestData.responseTime;
         }
-        if (request.responseTime < arguments.results.summary.minResponseTime) {
-            arguments.results.summary.minResponseTime = request.responseTime;
+        if (requestData.responseTime < arguments.results.summary.minResponseTime) {
+            arguments.results.summary.minResponseTime = requestData.responseTime;
         }
-        if (request.responseTime > 100) { // threshold
+        if (requestData.responseTime > 100) { // threshold
             arguments.results.summary.slowRequests++;
         }
     }
@@ -240,46 +255,46 @@ component extends="wheels-cli.commands.wheels.base" {
     
     private function displayResults(results) {
         print.line();
-        print.boldGreenLine("📊 Performance Analysis Complete!");
+        print.boldGreenLine("Performance Analysis Complete!");
         print.line();
         
         // Summary
         print.yellowBoldLine("Summary:");
-        print.line("─────────────────────────────────────");
+        print.line("-----------------------------------------");
         
         if (arguments.results.summary.totalRequests > 0) {
-            print.line("📈 Requests Analyzed: #arguments.results.summary.totalRequests#");
-            print.line("⏱️  Average Response Time: #arguments.results.summary.avgResponseTime#ms");
-            print.line("🐌 Slowest Request: #arguments.results.summary.maxResponseTime#ms");
-            print.line("⚡ Fastest Request: #arguments.results.summary.minResponseTime#ms");
-            
+            print.line("Requests Analyzed: #arguments.results.summary.totalRequests#");
+            print.line("Average Response Time: #arguments.results.summary.avgResponseTime#ms");
+            print.line("Slowest Request: #arguments.results.summary.maxResponseTime#ms");
+            print.line("Fastest Request: #arguments.results.summary.minResponseTime#ms");
+
             if (arguments.results.summary.slowRequests > 0) {
-                print.redLine("⚠️  Slow Requests (>#arguments.results.threshold#ms): #arguments.results.summary.slowRequests#");
+                print.redLine("Slow Requests (>#arguments.results.threshold#ms): #arguments.results.summary.slowRequests#");
             }
         }
         
         if (arguments.results.summary.totalQueries > 0) {
             print.line();
-            print.line("🗄️  Queries Executed: #arguments.results.summary.totalQueries#");
-            print.line("⏱️  Average Query Time: #arguments.results.summary.avgQueryTime#ms");
-            
+            print.line("Queries Executed: #arguments.results.summary.totalQueries#");
+            print.line("Average Query Time: #arguments.results.summary.avgQueryTime#ms");
+
             if (arguments.results.summary.slowQueries > 0) {
-                print.redLine("⚠️  Slow Queries (>50ms): #arguments.results.summary.slowQueries#");
+                print.redLine("Slow Queries (>50ms): #arguments.results.summary.slowQueries#");
             }
         }
         
         if (structKeyExists(arguments.results.summary, "memoryUsage") && isStruct(arguments.results.summary.memoryUsage)) {
             print.line();
-            print.line("💾 Average Memory Usage: #arguments.results.summary.memoryUsage.avg#MB");
-            print.line("📈 Peak Memory Usage: #arguments.results.summary.memoryUsage.max#MB");
+            print.line("Average Memory Usage: #arguments.results.summary.memoryUsage.avg#MB");
+            print.line("Peak Memory Usage: #arguments.results.summary.memoryUsage.max#MB");
         }
         
         print.line();
         
         // Detailed results
         if (arrayLen(arguments.results.metrics.requests) && arguments.results.summary.slowRequests > 0) {
-            print.yellowBoldLine("🐌 Slow Requests:");
-            print.line("─────────────────────────────────────");
+            print.yellowBoldLine("Slow Requests:");
+            print.line("-----------------------------------------");
             
             var slowRequests = arguments.results.metrics.requests.filter(function(req) {
                 return req.responseTime > 100;
@@ -292,8 +307,8 @@ component extends="wheels-cli.commands.wheels.base" {
         }
         
         if (arrayLen(arguments.results.metrics.queries) && arguments.results.summary.slowQueries > 0) {
-            print.yellowBoldLine("🐌 Slow Queries:");
-            print.line("─────────────────────────────────────");
+            print.yellowBoldLine("Slow Queries:");
+            print.line("-----------------------------------------");
             
             var slowQueries = arguments.results.metrics.queries.filter(function(qry) {
                 return qry.executionTime > 50;
@@ -306,8 +321,8 @@ component extends="wheels-cli.commands.wheels.base" {
         }
         
         // Recommendations
-        print.yellowBoldLine("💡 Performance Recommendations:");
-        print.line("─────────────────────────────────────");
+        print.yellowBoldLine("Performance Recommendations:");
+        print.line("-----------------------------------------");
         
         if (arguments.results.summary.avgResponseTime > 200) {
             print.line("  • Consider implementing caching for frequently accessed data");
