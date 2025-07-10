@@ -333,9 +333,6 @@ component {
 				local.sql = $addKeyWhereClause(sql = local.sql);
 				variables.wheels.class.adapter.$querySetup(sql = local.sql, parameterize = arguments.parameterize);
 				$clearRequestCache();
-				if (arguments.reload) {
-					this.reload();
-				}
 			}
 		}
 
