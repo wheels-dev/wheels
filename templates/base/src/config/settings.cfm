@@ -12,8 +12,8 @@
 		You can also change the value for the "coreTestDataSourceName" to set your testing datasource.
 		You can also uncomment the 2 "set" functions below them to set the username and password for the datasource.
 	*/
-	set(coreTestDataSourceName="wheels.dev");
-	set(dataSourceName="wheels.dev");
+	set(coreTestDataSourceName="wheels-dev");
+	set(dataSourceName="wheels-dev");
 	// set(dataSourceUserName="");
 	// set(dataSourcePassword="");
 

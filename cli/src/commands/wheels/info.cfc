@@ -14,7 +14,7 @@ component  extends="base"  {
 	function run(  ) {
 		var current={
 			directory		= getCWD(),
-			moduleRoot		= expandPath("/cfwheels-cli/"),
+			moduleRoot		= expandPath("/wheels-cli/"),
 			wheelsVersion	= $getWheelsVersion()
 		};
 		print.redLine(",--.   ,--.,--.                   ,--.            ,-----.,--.   ,--. ")

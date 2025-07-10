@@ -353,14 +353,16 @@ component extends="base" {
                 }
             }
             
-            // Get Wheels version
-            try {
-                local.versionInfo = $sendToCliCommand(urlstring="&command=info");
-                if (structKeyExists(local.versionInfo, "wheelsVersion")) {
-                    local.report.wheelsVersion = local.versionInfo.wheelsVersion;
-                }
-            } catch (any e) {
-                // Ignore
+            // Try to get Wheels version from vendor/wheels/box.json
+            local.wheelsBoxPath = fileSystemUtil.resolvePath("vendor/wheels/box.json");
+            if (fileExists(local.wheelsBoxPath)) {
+                try {
+                    local.wheelsBox = deserializeJSON(fileRead(local.wheelsBoxPath));
+                    if (structKeyExists(local.wheelsBox, "version")) {
+                        local.report.wheelsVersion = local.wheelsBox.version;
+                    }
+                } catch (any e) {
+                    // Ignore errors
             }
             
             // Check installed modules
@@ -488,7 +490,7 @@ component extends="base" {
      */
     private boolean function checkIfInstalled(required string packageName) {
         // Check modules directory
-        local.modulesPath = fileSystemUtil.resolvePath("modules");
+        local.modulesPath = fileSystemUtil.resolvePath("vendor");
         if (directoryExists(local.modulesPath)) {
             // Simple name check
             local.simpleName = listLast(arguments.packageName, ":");

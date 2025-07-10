@@ -338,10 +338,18 @@ component extends="../base" {
 	}
 
 	private string function extractDataSourceName(required string content) {
-		local.pattern = 'set\s*\(\s*dataSourceName\s*=\s*["'']([^"'']+)["'']';
-		local.match = REFind(local.pattern, arguments.content, 1, true);
-		if (local.match.pos[1] > 0) {
-			return Mid(arguments.content, local.match.pos[2], local.match.len[2]);
+		// Step 1: Remove multi-line block comments: /* ... */
+		local.cleaned = REReplace(arguments.content, "/\*[\s\S]*?\*/", "", "all");
+
+		// Step 2: Remove single-line comments: // ... until end of line
+		local.cleaned = REReplace(local.cleaned, "//.*", "", "all");
+
+		// Step 3: Match set(dataSourceName="...")
+		local.pattern = "set\s*\(\s*dataSourceName\s*=\s*[""']([^""']+)[""']";
+		local.match = REFind(local.pattern, local.cleaned, 1, true);
+
+		if (arrayLen(local.match.pos) >= 2 && local.match.pos[2] > 0) {
+			return Mid(local.cleaned, local.match.pos[2], local.match.len[2]);
 		}
 		return "";
 	}
