@@ -1,0 +1,50 @@
+{
+  "projectTitle": "Wheels.dev (formerly CFWheels)",
+  "description": "An open source CFML framework inspired by Ruby on Rails for rapid web application development",
+  "folders": [
+    "docs/api",
+    "docs/src",
+		"guides"
+  ],
+  "excludeFolders": [
+    "cli",
+    "core",
+    "design_docs",
+    "docs/overrides",
+    "docs/public",
+    "examples",
+    "templates",
+    "test-artifacts",
+		"tests",
+		"tools"
+  ],
+  "excludeFiles": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    ".gitignore"
+  ],
+  "rules": [
+    "Wheels uses MVC architecture with conventions over configuration",
+    "Controllers should extend the base Controller component",
+    "Models represent database tables and handle data persistence",
+    "Views use .cfm templates with embedded CFML code",
+    "Use the built-in ORM for database operations when possible",
+    "Routing follows RESTful conventions by default",
+    "Database migrations are handled through the built-in migration system",
+		"Use the CLI for generating components and running migrations",
+		"Follow the community coding standards for CFML",
+		"Documentation should be kept up-to-date with code changes",
+		"Tests should be written for all new features and bug fixes"
+  ],
+  "versions": [
+    {
+      "tag": "v3.0.0",
+      "description": "Latest version with modern directory structure and enhanced features"
+    },
+    {
+      "tag": "v2.5.0",
+      "description": "Stable release with traditional CFWheels structure"
+    }
+  ]
+}
