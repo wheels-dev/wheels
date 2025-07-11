@@ -179,6 +179,9 @@ component {
 						&& $callback("afterSave", arguments.callbacks)
 					) {
 						$updatePersistedProperties();
+						if (arguments.reload) {
+							this.reload();
+						}
 						local.rv = true;
 					} else if (local.rollback) {
 						$resetToNew();
@@ -202,6 +205,9 @@ component {
 						&& $callback("afterSave", arguments.callbacks)
 					) {
 						$updatePersistedProperties();
+						if (arguments.reload) {
+							this.reload();
+						}
 						local.rv = true;
 					}
 				} else {
@@ -334,9 +340,6 @@ component {
 			this[primaryKeys(1)] = local.inserted.result[local.generatedKey];
 		}
 
-		if (arguments.reload) {
-			this.reload();
-		}
 		return true;
 	}
 
