@@ -4,6 +4,7 @@
   "folders": [
     "docs/api",
     "docs/src",
+		"templates/base/src/app/snippets",
 		"guides"
   ],
   "excludeFolders": [
