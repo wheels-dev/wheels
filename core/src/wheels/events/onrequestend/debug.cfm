@@ -99,7 +99,7 @@
 						<a href="#urlFor(route = "wheelsRoutes")#" class="btn" target="_blank">Routes</a>
 					</td>
 					<td>
-						<a href="#urlFor(route = "wheelsDocs")#" class="btn" target="_blank">Docs</a>
+						<a href="#urlFor(route = "wheelsApiDocs")#" class="btn" target="_blank">Docs</a>
 					</td>
 					<td>
 						<a href="#urlFor(route = "wheelsPackages", type = "app")#" class="btn" target="_blank">Tests</a>
