@@ -14,7 +14,13 @@ component output=false extends="wheels.Global"{
 		// We do this by putting all our own variables inside a $wheels struct.
 		local.$wheels = {};
 		local.$wheels.rv = {};
-
+	
+		local.info = $dbinfo(
+			type = "version",
+			datasource = application.wheels.dataSourceName,
+			username = application.wheels.dataSourceUserName,
+			password = application.wheels.dataSourcePassword
+		);
     cfquery(attributeCollection=arguments.queryAttributes){
       local.$wheels.pos = 0;
 
@@ -48,7 +54,11 @@ component output=false extends="wheels.Global"{
       }
 
       if (arguments.limit) {
-        writeOutput("LIMIT " & arguments.limit);
+		if(FindNoCase("Oracle", local.info.database_productname)){
+			writeOutput("FETCH FIRST " & arguments.limit & "ROWS ONLY");
+		} else {
+			writeOutput("LIMIT " & arguments.limit);
+		}
         if (arguments.offset) {
           writeOutput(chr(13) & chr(10) & "OFFSET " & arguments.offset);
         }

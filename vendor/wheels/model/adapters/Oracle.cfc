@@ -72,7 +72,6 @@ component extends="Base" output=false {
 		$addColumnsToSelectAndGroupBy(args = arguments);
 
 		// Oracle DB doesn't support limit and offset in SQL.
-		StructDelete(arguments, "limit");
 		StructDelete(arguments, "offset");
 
 		$moveAggregateToHaving(args = arguments);
