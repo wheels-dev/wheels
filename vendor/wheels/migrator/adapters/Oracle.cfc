@@ -262,33 +262,31 @@ component extends="Abstract" {
      */
     public string function typeToSQL(
         required string type,
-        numeric limit = 0,
-        numeric precision = 0,
-        numeric scale = 0
+        struct options = {}
     ) {
         local.base = variables.sqlTypes[arguments.type];
 
         // VARCHAR2 length
-        if (StructKeyExists(local.base, "limit") && arguments.limit EQ 0) {
-            arguments.limit = local.base.limit;
+        if (StructKeyExists(local.base, "limit") && (!structKeyExists(arguments.options, "limit") || arguments.options.limit EQ 0)) {
+            arguments.options.limit = local.base.limit;
         }
 
         switch (local.base.name) {
             case "NUMBER":
-                if (arguments.precision GT 0) {
-                    if (arguments.scale GT 0) {
-                        return "NUMBER(#arguments.precision#,#arguments.scale#)";
+                if (structKeyExists(arguments.options, "precision") && arguments.options.precision GT 0) {
+                    if (structKeyExists(arguments.options, "scale") && arguments.options.scale GT 0) {
+                        return "NUMBER(#arguments.options.precision#,#arguments.options.scale#)";
                     }
-                    return "NUMBER(#arguments.precision#)";
+                    return "NUMBER(#arguments.options.precision#)";
                 }
                 return "NUMBER";
             case "VARCHAR2":
-                return "VARCHAR2(#arguments.limit#)";
+                return "VARCHAR2(#arguments.options.limit#)";
             case "RAW":
-                return "RAW(#arguments.limit#)";
+                return "RAW(#arguments.options.limit#)";
             default:
-                if (arguments.limit GT 0) {
-                    return "#local.base.name#(#arguments.limit#)";
+                if (structKeyExists(arguments.options, "limit") && arguments.options.limit GT 0) {
+                    return "#local.base.name#(#arguments.options.limit#)";
                 }
                 return local.base.name;
         }

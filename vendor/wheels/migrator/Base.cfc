@@ -84,7 +84,13 @@ component extends="wheels.Global"{
 	private void function $execute(required string sql) {
 		local.appKey = $appKey();
 		local.sql = Trim(arguments.sql);
-		if (Right(local.sql, 1) neq ";") {
+		local.info = $dbinfo(
+			type = "version",
+			datasource = application.wheels.dataSourceName,
+			username = application.wheels.dataSourceUserName,
+			password = application.wheels.dataSourcePassword
+		);
+		if (Right(local.sql, 1) neq ";" && !FindNoCase("Oracle", local.info.database_productname)) {
 			local.sql = local.sql &= ";";
 		}
 		if (StructKeyExists(request, "$wheelsMigrationSQLFile") && application[local.appKey].writeMigratorSQLFiles) {

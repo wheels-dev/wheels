@@ -28,6 +28,7 @@
 <cfset local.identityColumnType = "">
 <cfset local.bitColumnType = "bit">
 <cfset local.bitColumnDefault = 0>
+<cfset local.charType = 'char(9)'>
 
 <cfif local.db IS "microsoftsqlserver">
 	<cfset local.identityColumnType = "int NOT NULL IDENTITY(1,1)">
@@ -52,6 +53,7 @@
 	<cfset local.intColumnType = "NUMBER(10)">
 	<cfset local.textColumnType = "VARCHAR2(255)">
 	<cfset local.dateTimeDefault = "TIMESTAMP '2000-01-01 18:26:08.490'">
+	<cfset local.charType = "VARCHAR2(9)">
 </cfif>
 
 <!--- get a listing of all the tables and view in the database --->
@@ -208,7 +210,7 @@ CREATE TABLE c_o_r_e_profiles
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
 CREATE TABLE c_o_r_e_shops
 (
-	shopid char(9) NOT NULL
+	shopid #local.charType# NOT NULL
 	,citycode #local.intColumnType# NULL
 	,name varchar(80) NOT NULL
 	,PRIMARY KEY(shopid)
