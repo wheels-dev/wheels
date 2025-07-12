@@ -53,16 +53,20 @@ component output=false extends="wheels.Global"{
         writeOutput(chr(13) & chr(10));
       }
 
-      if (arguments.limit) {
+	  if(arguments.limit){
 		if(FindNoCase("Oracle", local.info.database_productname)){
-			writeOutput("FETCH FIRST " & arguments.limit & "ROWS ONLY");
+			if(arguments.offset){
+				writeOutput("OFFSET " & arguments.offset & " ROWS" & chr(13) & chr(10) &  "FETCH NEXT " & arguments.limit & " ROWS ONLY");
+			} else {
+				writeOutput("FETCH FIRST " & arguments.limit & " ROWS ONLY");
+			}
 		} else {
 			writeOutput("LIMIT " & arguments.limit);
+			if (arguments.offset) {
+				writeOutput(chr(13) & chr(10) & "OFFSET " & arguments.offset);
+			}
 		}
-        if (arguments.offset) {
-          writeOutput(chr(13) & chr(10) & "OFFSET " & arguments.offset);
-        }
-      }
+	  }
 
       if (len(arguments.comment)) {
         writeOutput(arguments.comment);

@@ -70,10 +70,6 @@ component extends="Base" output=false {
 	) {
 		$removeColumnAliasesInOrderClause(args = arguments);
 		$addColumnsToSelectAndGroupBy(args = arguments);
-
-		// Oracle DB doesn't support limit and offset in SQL.
-		StructDelete(arguments, "offset");
-
 		$moveAggregateToHaving(args = arguments);
 		return $performQuery(argumentCollection = arguments);
 	}
@@ -127,7 +123,7 @@ component extends="Base" output=false {
 	 * Override Base adapter's function.
 	 */
 	public string function $defaultValues() {
-		return "() VALUES()";
+		return "(#arguments.$primaryKey#) VALUES(DEFAULT)";
 	}
 
 	/**
