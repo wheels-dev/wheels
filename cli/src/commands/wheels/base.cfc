@@ -18,12 +18,12 @@ component excludeFromHelp=true {
 	// we could also test for the existence of /wheels/dbmigrate, but that only gives us the major version.
 	string function $getWheelsVersion(){
 		// First, look for a wheels folder..
-		if(!directoryExists( fileSystemUtil.resolvePath("vendor/wheels") ) ){
-			error("We're currently looking in #getCWD()#, but can't find the /vendor/wheels/ folder. Are you sure you are in the root?");
+		if(!directoryExists( fileSystemUtil.resolvePath("core/src/wheels") ) ){
+			error("We're currently looking in #getCWD()#, but can't find the core/src/wheels folder. Are you sure you are in the root?");
 		}
 		// Check vendor/wheels/box.json first for wheels-core version
-		if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/box.json"))){
-			local.wheelsBoxJSON = packageService.readPackageDescriptorRaw( fileSystemUtil.resolvePath("vendor/wheels") );
+		if(fileExists(fileSystemUtil.resolvePath("core/src/wheels/box.json"))){
+			local.wheelsBoxJSON = packageService.readPackageDescriptorRaw( fileSystemUtil.resolvePath("core/src/wheels") );
 			if(structKeyExists(local.wheelsBoxJSON, "version")){
 				return local.wheelsBoxJSON.version;
 			}
@@ -38,8 +38,8 @@ component excludeFromHelp=true {
 				return local.wheelsDep;
 			}
 			return local.boxJSON.version;
-		} else if(fileExists(fileSystemUtil.resolvePath("vendor/wheels/events/onapplicationstart.cfm"))) {
-			var output = command( 'cd vendor\wheels' ).run( returnOutput=true );
+		} else if(fileExists(fileSystemUtil.resolvePath("core/src/wheels/events/onapplicationstart.cfm"))) {
+			var output = command( 'cd \core\src\wheels' ).run( returnOutput=true );
 			local.target=fileSystemUtil.resolvePath("app/events/onapplicationstart.cfm");
 			local.content=fileRead(local.target);
 			local.content=listFirst(mid(local.content, (find('application.$wheels.version',local.content)+31),20),'"');
@@ -267,7 +267,7 @@ component excludeFromHelp=true {
  			}
 
 			 // Wheels folder in expected place? (just a good check to see if the user has actually installed wheels...)
- 		var wheelsFolder=fileSystemUtil.resolvePath("vendor/wheels");
+ 		var wheelsFolder=fileSystemUtil.resolvePath("core/src/wheels");
  			if(!directoryExists(wheelsFolder)){
  				error("We can't find your wheels folder. Check you have installed Wheels, and you're running this from the site root: If you've not started an app yet, try wheels new myApp");
  			}
