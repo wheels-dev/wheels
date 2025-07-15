@@ -27,8 +27,14 @@ component extends="Base" output=false {
 				local.rv = "cf_sql_integer";
 				break;
 			case "numeric":
-			case "number":
 				local.rv = "cf_sql_numeric";
+				break;
+			case "number":
+				if (arguments.scale EQ 0) {
+					local.rv = "cf_sql_integer";
+				} else {
+					local.rv = "cf_sql_numeric";
+				}
 				break;
 			case "real":
 			case "binary_float":
