@@ -43,11 +43,11 @@ jobs:
             commandbox_version: "6.2.1"
             jdkVersion: "21"
             experimental: true
-          # - cfengine: "lucee7"
-          #   dbengine: "oracle"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
+          - cfengine: "lucee7"
+            dbengine: "oracle"
+            commandbox_version: "6.2.1"
+            jdkVersion: "21"
+            experimental: true
         exclude:
           # - cfengine: lucee5
           #   dbengine: mysql
@@ -57,8 +57,8 @@ jobs:
           #   dbengine: sqlserver
           # - cfengine: lucee5
           #   dbengine: h2
-          - cfengine: lucee5
-            dbengine: oracle
+          # - cfengine: lucee5
+          #   dbengine: oracle
           # - cfengine: lucee6
           #   dbengine: mysql
           # - cfengine: lucee6
@@ -67,8 +67,8 @@ jobs:
           #   dbengine: sqlserver
           # - cfengine: lucee6
           #   dbengine: h2
-          - cfengine: lucee6
-            dbengine: oracle
+          # - cfengine: lucee6
+          #   dbengine: oracle
           # - cfengine: lucee7
           #   dbengine: mysql
           # - cfengine: lucee7
@@ -87,8 +87,8 @@ jobs:
           #   dbengine: sqlserver
           - cfengine: adobe2018
             dbengine: h2
-          - cfengine: adobe2018
-            dbengine: oracle
+          # - cfengine: adobe2018
+          #   dbengine: oracle
           # - cfengine: adobe2021
           #   dbengine: mysql
           # - cfengine: adobe2021
@@ -97,8 +97,8 @@ jobs:
           #   dbengine: sqlserver
           - cfengine: adobe2021
             dbengine: h2
-          - cfengine: adobe2021
-            dbengine: oracle
+          # - cfengine: adobe2021
+          #   dbengine: oracle
           # - cfengine: adobe2023
           #   dbengine: mysql
           # - cfengine: adobe2023
@@ -107,8 +107,8 @@ jobs:
           #   dbengine: sqlserver
           - cfengine: adobe2023
             dbengine: h2
-          - cfengine: adobe2023
-            dbengine: oracle
+          # - cfengine: adobe2023
+          #   dbengine: oracle
           - cfengine: adobe2025
             dbengine: h2
           - cfengine: adobe2025
