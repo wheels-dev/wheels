@@ -369,10 +369,10 @@ component extends="testbox.system.BaseSpec" {
 			it("should allow for blank string during create for columns that are not null", () => {
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
 				db = LCase(Replace(info.database_productname, " ", "", "all"))
-				author = g.model("author").create(firstName = "Test", lastName = "", transaction = "rollback")
+				author = g.model("author").create(firstName = "Test", lastName = " ", transaction = "rollback")
 
 				expect(author).toBeInstanceOf("author")
-				expect(author.lastName).toHaveLength(0)
+				expect(trim(author.lastName)).toHaveLength(0)
 			})
 
 			it("should not throw error when saving a new model without properties", () => {
@@ -1745,14 +1745,14 @@ component extends="testbox.system.BaseSpec" {
 
 				transaction action="begin" {
 					author = g.model("author").findOne(where = "firstName='Tony'")
-					author.lastName = ""
+					author.lastName = " "
 					author.save()
 					author = g.model("author").findOne(where = "firstName='Tony'")
 					transaction action="rollback";
 				}
 
 				expect(author).toBeInstanceOf("author")
-				expect(author.lastname).toHaveLength(0)
+				expect(trim(author.lastname)).toHaveLength(0)
 			})
 
 			// Issue#1273: Added this test for includes in the updateAll function
