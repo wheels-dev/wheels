@@ -173,7 +173,11 @@ component {
 			local.rv &= authenticityTokenField();
 		}
 		if (StructKeyExists(local, "method") && local.method != "get") {
-			local.rv &= hiddenFieldTag(name = "_method", value = local.method);
+			local.methodField = hiddenFieldTag(name = "_method", value = local.method);
+			// Delete the id="_method" part of the string.
+			// There could be multiple forms on a page and duplicate "id" attributes are not allowed in HTML.
+			local.methodField = Replace(local.methodField, ' id="_method" ', " ");
+			local.rv &= local.methodField;
 		}
 		return local.rv;
 	}
