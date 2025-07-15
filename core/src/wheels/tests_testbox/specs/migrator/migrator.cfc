@@ -38,7 +38,7 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that getCurrentMigrationVersion", () => {
 
 			it("is returning expected value", () => {
-				for (local.table in ["_c_o_r_e_bunyips", "_c_o_r_e_dropbears", "_c_o_r_e_hoopsnakes"]) {
+				for (local.table in ["c_o_r_e_bunyips", "c_o_r_e_dropbears", "c_o_r_e_hoopsnakes"]) {
 					migration.dropTable(local.table)
 				}
 				deleteMigratorVersions(2);
@@ -55,7 +55,7 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that migrateTo", () => {
 
 			beforeEach(() => {
-				for (local.table in ["_c_o_r_e_bunyips", "_c_o_r_e_dropbears", "_c_o_r_e_hoopsnakes", "migrations"]) {
+				for (local.table in ["c_o_r_e_bunyips", "c_o_r_e_dropbears", "c_o_r_e_hoopsnakes", "migrations"]) {
 					migration.dropTable(local.table)
 				}
 				deleteMigratorVersions(2);
@@ -73,41 +73,41 @@ component extends="testbox.system.BaseSpec" {
 
 			it("is migrating up from 0 to 001", () => {
 				migrator.migrateTo(001)
-				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "_c_o_r_e_bunyips")
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
 
 				actual = ValueList(info.table_name)
-				expected = "_c_o_r_e_bunyips"
+				expected = "c_o_r_e_bunyips"
 
 				expect(listFindNoCase(actual, expected)).toBeTrue()
 			})
 
 			it("is migrating up from 0 to 003", () => {
 				migrator.migrateTo(003)
-				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "_c_o_r_e_bunyips")
-				info2 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "_c_o_r_e_dropbears")
-				info3 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "_c_o_r_e_hoopsnakes")
+				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
+				info2 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_dropbears")
+				info3 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_hoopsnakes")
 				actual1 = ValueList(info1.table_name)
 				actual2 = ValueList(info2.table_name)
 				actual3 = ValueList(info3.table_name)
 
-				expect(listFindNoCase(actual1, "_c_o_r_e_bunyips")).toBeTrue()
-				expect(listFindNoCase(actual2, "_c_o_r_e_dropbears")).toBeTrue()
-				expect(listFindNoCase(actual3, "_c_o_r_e_hoopsnakes")).toBeTrue()
+				expect(listFindNoCase(actual1, "c_o_r_e_bunyips")).toBeTrue()
+				expect(listFindNoCase(actual2, "c_o_r_e_dropbears")).toBeTrue()
+				expect(listFindNoCase(actual3, "c_o_r_e_hoopsnakes")).toBeTrue()
 			})
 
 			it("is migrating down from 003 to 001", () => {
 				migrator.migrateTo(003)
 				migrator.migrateTo(001)
-				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "_c_o_r_e_bunyips")
-				info2 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "_c_o_r_e_dropbears")
-				info3 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "_c_o_r_e_hoopsnakes")
+				info1 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_bunyips")
+				info2 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_dropbears")
+				info3 = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables", pattern = "c_o_r_e_hoopsnakes")
 				actual1 = ValueList(info1.table_name)
 				actual2 = ValueList(info2.table_name)
 				actual3 = ValueList(info3.table_name)
 
-				expect(listFindNoCase(actual1, "_c_o_r_e_bunyips")).toBeTrue()
-				expect(listFindNoCase(actual2, "_c_o_r_e_dropbears")).toBeFalse()
-				expect(listFindNoCase(actual3, "_c_o_r_e_hoopsnakes")).toBeFalse()
+				expect(listFindNoCase(actual1, "c_o_r_e_bunyips")).toBeTrue()
+				expect(listFindNoCase(actual2, "c_o_r_e_dropbears")).toBeFalse()
+				expect(listFindNoCase(actual3, "c_o_r_e_hoopsnakes")).toBeFalse()
 			})
 
 			it("generates sql files", () => {
@@ -140,7 +140,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("uses specified versions table name", () => {
-				tableName = "_c_o_r_e_migrator_versions"
+				tableName = "c_o_r_e_migrator_versions"
 				application.wheels.migratorTableName = tableName
 
 				migrator.migrateTo(001)
@@ -155,14 +155,14 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that redomigration", () => {
 
 			beforeEach(() => {
-				tableName = "_c_o_r_e_bunyips"
+				tableName = "c_o_r_e_bunyips"
 
 				migration.dropTable(tableName)
 				t = migration.createTable(name = tableName)
 				t.string(columnNames = "name", default = "", null = true, limit = 255)
 				t.create()
-				migration.removeRecord(table = "_c_o_r_e_migrator_versions")
-				migration.addRecord(table = "_c_o_r_e_migrator_versions", version = "001")
+				migration.removeRecord(table = "c_o_r_e_migrator_versions")
+				migration.addRecord(table = "c_o_r_e_migrator_versions", version = "001")
 
 				$cleanSqlDirectory()
 			})

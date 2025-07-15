@@ -3,7 +3,7 @@ component extends="wheels.tests.Test" {
 	function test_numeric_operators() {
 		operators = ListToArray("=,<>,!=,<,<=,!<,>,>=,!>");
 		for (i in operators) {
-			check = "Len(result[2]) IS (20+#Len(i)#) AND ArrayLen(result) IS 3 AND result[3].type IS 'cf_sql_integer' AND Right(result[2], #Len(i)#) IS '#i#'";
+			check = "Len(result[2]) IS (19+#Len(i)#) AND ArrayLen(result) IS 3 AND result[3].type IS 'cf_sql_integer' AND Right(result[2], #Len(i)#) IS '#i#'";
 			result = model("author").$whereClause(where = "id#i#0");
 			assert(check);
 			result = model("author").$whereClause(where = "id#i# 11");

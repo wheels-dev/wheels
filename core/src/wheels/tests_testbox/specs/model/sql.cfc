@@ -12,21 +12,21 @@ component extends="testbox.system.BaseSpec" {
 				for (i in operators) {
 					result = g.model("author").$whereClause(where = "id#i#0")
 
-					expect(result[2]).toHaveLength(20+len(i))
+					expect(result[2]).toHaveLength(19+len(i))
 					expect(result).toHaveLength(3)
 					expect(result[3].type).toBe("cf_sql_integer")
 					expect(Right(result[2], Len(i))).toBe(i)
 
 					result = g.model("author").$whereClause(where = "id#i# 11")
 
-					expect(result[2]).toHaveLength(20+len(i))
+					expect(result[2]).toHaveLength(19+len(i))
 					expect(result).toHaveLength(3)
 					expect(result[3].type).toBe("cf_sql_integer")
 					expect(Right(result[2], Len(i))).toBe(i)
 					
 					result = g.model("author").$whereClause(where = "id #i#999")
 
-					expect(result[2]).toHaveLength(20+len(i))
+					expect(result[2]).toHaveLength(19+len(i))
 					expect(result).toHaveLength(3)
 					expect(result[3].type).toBe("cf_sql_integer")
 					expect(Right(result[2], Len(i))).toBe(i)
@@ -115,7 +115,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it( "CONCAT works with table alias", function(){
-				actual = g.model("user").findAll(where = "username='tonyp'", select = "CONCAT(_c_o_r_e_users.firstname,' ',_c_o_r_e_users.lastname) as fullname")
+				actual = g.model("user").findAll(where = "username='tonyp'", select = "CONCAT(c_o_r_e_users.firstname,' ',c_o_r_e_users.lastname) as fullname")
 
 				expect(	actual.fullname ).toBe("Tony Petruzzi")
 			});

@@ -882,7 +882,7 @@ component extends="testbox.system.BaseSpec" {
 				// only supported with these adapters
 				if (ListFindNoCase("MicrosoftSQLServer", migration.adapter.adapterName())) {
 					v = migration.createView(name = viewName)
-					v.selectStatement(sql = "SELECT * FROM _c_o_r_e_users")
+					v.selectStatement(sql = "SELECT * FROM c_o_r_e_users")
 					v.create()
 
 					info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables")
@@ -964,7 +964,7 @@ component extends="testbox.system.BaseSpec" {
 				// only supported with these adapters
 				if (ListFindNoCase("MicrosoftSQLServer", migration.adapter.adapterName())) {
 					v = migration.createView(name = viewName)
-					v.selectStatement(sql = "SELECT * FROM _c_o_r_e_users")
+					v.selectStatement(sql = "SELECT * FROM c_o_r_e_users")
 					v.create()
 					info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "tables")
 					created = g.$query(

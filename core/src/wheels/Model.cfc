@@ -117,9 +117,11 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.iEnd = local.columns.recordCount;
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				// set up properties and column mapping
-				if (!StructKeyExists(local.processedColumns, local.columns["column_name"][local.i])) {
+				local.columnName = lCase(local.columns["column_name"][local.i]);
+
+				if (!StructKeyExists(local.processedColumns, local.columnName)) {
 					// default the column to map to a property with the same name
-					local.property = local.columns["column_name"][local.i];
+					local.property = local.columnName;
 					for (local.key in variables.wheels.class.mapping) {
 						if (
 							StructKeyExists(variables.wheels.class.mapping[local.key], "type")
@@ -153,7 +155,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 						local.columns["decimal_digits"][local.i],
 						local.details
 					);
-					variables.wheels.class.properties[local.property].column = local.columns["column_name"][local.i];
+					variables.wheels.class.properties[local.property].column = local.columnName;
 					variables.wheels.class.properties[local.property].scale = local.columns["decimal_digits"][local.i];
 					variables.wheels.class.properties[local.property].columndefault = local.columns["column_default_value"][local.i];
 
@@ -294,7 +296,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 						variables.wheels.class.columnList,
 						variables.wheels.class.properties[local.property].column
 					);
-					local.processedColumns[local.columns["column_name"][local.i]] = true;
+					local.processedColumns[local.columnName] = true;
 				}
 			}
 

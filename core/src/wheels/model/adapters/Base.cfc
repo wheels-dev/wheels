@@ -15,6 +15,12 @@ component output=false extends="wheels.Global"{
 		local.$wheels = {};
 		local.$wheels.rv = {};
 
+		local.info = $dbinfo(
+			type = "version",
+			datasource = application.wheels.dataSourceName,
+			username = application.wheels.dataSourceUserName,
+			password = application.wheels.dataSourcePassword
+		);
     cfquery(attributeCollection=arguments.queryAttributes){
       local.$wheels.pos = 0;
 
@@ -47,12 +53,20 @@ component output=false extends="wheels.Global"{
         writeOutput(chr(13) & chr(10));
       }
 
-      if (arguments.limit) {
-        writeOutput("LIMIT " & arguments.limit);
-        if (arguments.offset) {
-          writeOutput(chr(13) & chr(10) & "OFFSET " & arguments.offset);
-        }
-      }
+      if(arguments.limit){
+		if(FindNoCase("Oracle", local.info.database_productname)){
+			if(arguments.offset){
+				writeOutput("OFFSET " & arguments.offset & " ROWS" & chr(13) & chr(10) &  "FETCH NEXT " & arguments.limit & " ROWS ONLY");
+			} else {
+				writeOutput("FETCH FIRST " & arguments.limit & " ROWS ONLY");
+			}
+		} else {
+			writeOutput("LIMIT " & arguments.limit);
+			if (arguments.offset) {
+				writeOutput(chr(13) & chr(10) & "OFFSET " & arguments.offset);
+			}
+		}
+	  }
 
       if (len(arguments.comment)) {
         writeOutput(arguments.comment);
