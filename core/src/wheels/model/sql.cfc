@@ -342,6 +342,13 @@ component {
 			includeSoftDeletes = arguments.includeSoftDeletes,
 			returnAs = arguments.returnAs
 		);
+		
+		// Look for " AS " followed by text containing multiple dots (namespaced aliases)
+		if (Find(" AS ", local.rv)) {
+			// Wrap column aliases that contain multiple dots with double quotes (ANSI SQL standard)
+			local.rv = REReplace(local.rv, " AS ([^,\s]+\.[^,\s]*\.[^,\s]*)", " AS ""\1""", "all");
+		}
+		
 		local.rv = "SELECT " & local.rv;
 		return local.rv;
 	}
