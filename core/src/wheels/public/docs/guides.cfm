@@ -4,40 +4,8 @@ param name="request.wheels.params.path" default="";
 param name="request.wheels.params.format" default="html";
 
 // Setup paths
-local.docsPath = "../../../../../docs/src";
+local.docsPath = "/wheels/docs/src/";
 local.summaryPath = local.docsPath & "SUMMARY.md";
-
-
-// Function to parse markdown content
-function parseMarkdown(content) {
-    // Simple markdown to HTML conversion
-    local.html = arguments.content;
-    
-    // Convert headers
-    local.html = reReplaceNoCase(local.html, "^## (.+)$", "<h3>\1</h3>", "all");
-    local.html = reReplaceNoCase(local.html, "^## (.+)$", "<h2>\1</h2>", "all");
-    local.html = reReplaceNoCase(local.html, "^## (.+)$", "<h1>\1</h1>", "all");
-    
-    // Convert links
-    local.html = reReplaceNoCase(local.html, "\[([^\]]+)\]\(([^\)]+)\)", "<a href=""\2"">\1</a>", "all");
-    
-    // Convert bold and italic
-    local.html = reReplaceNoCase(local.html, "\*\*([^\*]+)\*\*", "<strong>\1</strong>", "all");
-    local.html = reReplaceNoCase(local.html, "\*([^\*]+)\*", "<em>\1</em>", "all");
-    
-    // Convert code blocks
-    local.html = reReplaceNoCase(local.html, "```([^`]+)```", "<pre><code>\1</code></pre>", "all");
-    local.html = reReplaceNoCase(local.html, "`([^`]+)`", "<code>\1</code>", "all");
-    
-    // Convert paragraphs
-    local.html = reReplaceNoCase(local.html, "(\r?\n\r?\n)", "</p><p>", "all");
-    local.html = "<p>" & local.html & "</p>";
-    
-    // Clean up empty paragraphs
-    local.html = reReplaceNoCase(local.html, "<p>\s*</p>", "", "all");
-    
-    return local.html;
-}
 
 // Function to parse navigation from SUMMARY.md
 function parseSummary(summaryPath) {
@@ -162,8 +130,7 @@ if (len(request.wheels.params.path)) {
     }
 }
 
-// Convert markdown to HTML
-local.htmlContent = parseMarkdown(local.guideContent);
+local.htmlContent = local.guideContent;
 
 // Create docs structure similar to API docs
 local.guides = {

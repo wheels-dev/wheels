@@ -20,7 +20,7 @@
 					</div>
 				</div>
 				<div class="menu">
-					<a href="/wheels/guides/" class="item">Home</a>
+					<a href="/wheels/guides" class="item">Home</a>
 				</div>
 
 				<div id="guides-menu" class="ui list link forcescroll sticky">
@@ -29,11 +29,7 @@
 						<div class="item">
 							<div class="header">#sectionData.title#</div>
 							<div class="list">
-								<cfloop from="1" to="#arraylen(sectionData.items)#" index="item">
-									<cfset itemData = sectionData.items[item]>
-									<cfset isActive = (docs.path EQ itemData.link) ? " active" : "">
-									<a href="/wheels/guides/#itemData.link#" class="item#isActive#">#itemData.title#</a>
-								</cfloop>
+								#renderGuideItems(sectionData.items, docs.path)#
 							</div>
 						</div>
 					</cfloop>
@@ -46,7 +42,11 @@
 	<div class="nine wide column" id="guides-content">
 		<div class="ui raised segment">
 			<div class="content">
-				#docs.content#
+				<!-- Raw Markdown -->
+				<textarea id="raw-markdown" style="display: none;">#encodeForHTML(docs.content)#</textarea>
+
+				<!-- Rendered HTML will go here -->
+				<div id="rendered-markdown"></div>
 			</div>
 		</div>
 	</div>
@@ -55,7 +55,7 @@
 	<div class="four wide column" id="guides-toc">
 		<div class="ui pointing vertical menu fluid sticky">
 			<div class="item">
-				<div class="header">Table of Contents</div>
+				<div class="header">On this page</div>
 				<div class="menu" id="toc-menu">
 					<!--- TOC will be populated by JavaScript --->
 				</div>
@@ -63,12 +63,57 @@
 		</div>
 	</div>
 
+	<cffunction name="renderGuideItems" access="public" returntype="string" output="true">
+		<cfargument name="items" required="true" type="array">
+		<cfargument name="currentPath" required="true" type="string">
+
+		<cfloop array="#arguments.items#" index="item">
+			<cfif structKeyExists(item, "link")>
+				<!--- Determine if the link is external --->
+				<cfset isExternal = reFindNoCase("^(http|https)://", item.link) GT 0>
+
+				<!--- Clean internal .md links --->
+				<cfif !isExternal>
+					<cfset cleanLink = lcase(reReplace(item.link, "\.md$", ""))>
+					<cfset isActive = (arguments.currentPath EQ cleanLink) ? " active" : "">
+				</cfif>
+
+				<cfif isExternal>
+					<!--- External Link --->
+					<a href="#item.link#" target="_blank" rel="noopener noreferrer" class="item">#item.title#</a>
+				<cfelse>
+					<!--- Internal Guide Link (routed through /wheels/guides/) --->
+					<a href="/wheels/guides/#cleanLink#" class="item#isActive#">#item.title#</a>
+				</cfif>
+
+			<cfelseif structKeyExists(item, "items")>
+				<!--- It's a subsection/group --->
+				<div class="header">#item.title#</div>
+				<div class="list">
+					<cfoutput>
+						#renderGuideItems(item.items, arguments.currentPath)#
+					</cfoutput>
+				</div>
+			</cfif>
+		</cfloop>
+
+		<cfreturn "">
+	</cffunction>
+
+
 	<!--- JavaScript for enhanced functionality --->
 	<script>
 		$(document).ready(function() {
+			let raw = $('##raw-markdown').val();
+			
+			// Remove everything between --- and --- (inclusive)
+			raw = raw.replace(/^\s*---\s*$(?:\r?\n|\r)[\s\S]*?^\s*---\s*$(?:\r?\n|\r)?/gm, '');
+			const html = marked.parse(raw);
+			$('##rendered-markdown').html(html);
+
 			// Generate table of contents
 			var toc = $('##toc-menu');
-			var headers = $('##guides-content h1, ##guides-content h2, ##guides-content h3');
+			var headers = $('##rendered-markdown h1, ##rendered-markdown h2, ##rendered-markdown h3');
 			
 			headers.each(function(i, header) {
 				var $header = $(header);
@@ -147,7 +192,7 @@
 			overflow-x: auto;
 		}
 		
-		#guides-content blockquote {
+		##guides-content blockquote {
 			border-left: 4px solid ##ddd;
 			margin: 0;
 			padding-left: 16px;

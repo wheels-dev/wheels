@@ -15,6 +15,7 @@ Static simple version of the header/navigation for output on error screens
 	<script>
 		<cfinclude  template="/wheels/public/assets/js/jquery.min.js">
 		<cfinclude  template="/wheels/public/assets/js/semantic.min.js">
+		<cfinclude template="/wheels/public/assets/js/marked.min.js">
 	</script>
 </head>
 <body>
