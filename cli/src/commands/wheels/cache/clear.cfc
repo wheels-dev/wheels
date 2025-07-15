@@ -105,7 +105,7 @@ component extends="../base" {
 			print.line("Reloading application to ensure caches are cleared...");
 			var http = new Http(url=reloadURL);
 			http.send();
-			print.greenLine("✓ Application reloaded successfully");
+			print.greenLine("Application reloaded successfully");
 		} catch (any e) {
 			print.yellowLine("Note: Could not reload application automatically. You may need to reload manually.");
 		}
@@ -115,9 +115,9 @@ component extends="../base" {
 		
 		for (var result in clearedCaches) {
 			if (result.success) {
-				print.greenLine("    ✓ #result.cache# cache cleared (#result.details#)");
+				print.greenLine("    #result.cache# cache cleared (#result.details#)");
 			} else {
-				print.yellowLine("    ⚠ #result.cache# cache: #result.details#");
+				print.yellowLine("    #result.cache# cache: #result.details#");
 			}
 		}
 	}

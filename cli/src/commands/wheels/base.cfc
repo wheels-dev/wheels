@@ -445,7 +445,9 @@ component excludeFromHelp=true {
   			if(structKeyexists(loc.result, "success") && loc.result.success){
 					print.line("Call to bridge was successful.");
   				return loc.result;
-  			}
+  			}else{
+				error("Bridge response received but indicates failure.");
+			}
   		} else {
   			// Check if this is likely an application error
   			if (find("<title>", loc.filecontent) && find("error", lCase(loc.filecontent))) {
