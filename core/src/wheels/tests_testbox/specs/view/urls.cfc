@@ -71,14 +71,14 @@ component extends="testbox.system.BaseSpec" {
 
 			it("works with delete method arguments", () => {
 				actual = _controller.buttonTo(method = "delete")
-				expected = '<form action="#application.wheels.webpath#" method="post"><input id="_method" name="_method" type="hidden" value="delete"><button type="submit" value="save">' & '</button>' & _controller.authenticityTokenField() & '</form>'
+				expected = '<form action="#application.wheels.webpath#" method="post"><input name="_method" type="hidden" value="delete"><button type="submit" value="save">' & '</button>' & _controller.authenticityTokenField() & '</form>'
 				
 				expect(actual).toBe(expected)
 			})
 
 			it("works with put method arguments", () => {
 				actual = _controller.buttonTo(method = "put")
-				expected = '<form action="#application.wheels.webpath#" method="post"><input id="_method" name="_method" type="hidden" value="put"><button type="submit" value="save">' & '</button>' & _controller.authenticityTokenField() & '</form>'
+				expected = '<form action="#application.wheels.webpath#" method="post"><input name="_method" type="hidden" value="put"><button type="submit" value="save">' & '</button>' & _controller.authenticityTokenField() & '</form>'
 				
 				expect(actual).toBe(expected)
 			})

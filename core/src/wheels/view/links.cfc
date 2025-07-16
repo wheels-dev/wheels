@@ -120,7 +120,11 @@ component {
 		local.content = "";
 		if (StructKeyExists(arguments, "method")) {
 			if (!ListFindNoCase("post,get", arguments.method)) {
-				local.content &= hiddenFieldTag(name = "_method", value = arguments.method);
+				local.methodField = hiddenFieldTag(name = "_method", value = arguments.method);
+				// Delete the id="_method" part of the string.
+				// There could be multiple forms on a page and duplicate "id" attributes are not allowed in HTML.
+				local.methodField = Replace(local.methodField, ' id="_method" ', " ");
+				local.content &= local.methodField;
 			} else if (arguments.method == "get") {
 				local.method = "get";
 			}
