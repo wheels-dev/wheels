@@ -41,13 +41,13 @@
 	<!--- Main content --->
 	<div class="nine wide column" id="guides-content">
 		<div class="ui raised segment">
-			<div class="content">
-				<!-- Raw Markdown -->
-				<textarea id="raw-markdown" style="display: none;">#encodeForHTML(docs.content)#</textarea>
+	<div class="content markdown-body">
+		<!-- Raw Markdown -->
+		<textarea id="raw-markdown" style="display: none;">#encodeForHTML(docs.content)#</textarea>
 
-				<!-- Rendered HTML will go here -->
-				<div id="rendered-markdown"></div>
-			</div>
+		<!-- Rendered HTML will go here -->
+		<div id="rendered-markdown"></div>
+	</div>
 		</div>
 	</div>
 
@@ -163,42 +163,95 @@
 	</script>
 	
 	<style>
-		##guides-content {
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+		.markdown-body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 			line-height: 1.6;
+			color: ##24292e;
+			background-color: ##fff;
+			padding: 1.5rem;
+			border-radius: 6px;
+			box-shadow: 0 1px 3px rgb(27 31 35 / 0.1);
 		}
-		
-		##guides-content h1, ##guides-content h2, ##guides-content h3 {
-			margin-top: 2em;
+
+		.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+			margin-top: 1.5em;
+			margin-bottom: 1em;
+			font-weight: 600;
+			line-height: 1.25;
+			color: ##ef3b2d;
+		}
+
+		.markdown-body h1 {
+			border-bottom: 1px solid ##eaecef;
+			padding-bottom: 0.3em;
+			font-size: 2rem;
+		}
+
+		.markdown-body p {
+			margin-top: 0;
 			margin-bottom: 1em;
 		}
-		
-		##guides-content h1 {
-			border-bottom: 2px solid ##eee;
-			padding-bottom: 0.5em;
-		}
-		
-		##guides-content code {
-			background-color: ##f4f4f4;
-			padding: 2px 4px;
-			border-radius: 3px;
-		}
-		
-		##guides-content pre {
-			background-color: ##f8f8f8;
-			border: 1px solid ##ddd;
-			border-radius: 4px;
-			padding: 12px;
-			overflow-x: auto;
-		}
-		
-		##guides-content blockquote {
-			border-left: 4px solid ##ddd;
+
+		.markdown-body code {
+			background-color: rgba(27,31,35,.05);
+			padding: 0.2em 0.4em;
 			margin: 0;
-			padding-left: 16px;
-			color: ##666;
+			font-size: 85%;
+			border-radius: 3px;
+			font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
 		}
-		
+
+		.markdown-body pre {
+			background-color: ##f6f8fa;
+			padding: 1em;
+			overflow: auto;
+			font-size: 85%;
+			line-height: 1.45;
+			border-radius: 6px;
+			border: 1px solid ##d1d5da;
+		}
+
+		.markdown-body blockquote {
+			margin: 0;
+			padding-left: 1em;
+			color: ##6a737d;
+			border-left: 0.25em solid ##dfe2e5;
+		}
+
+		.markdown-body table {
+			border-collapse: collapse;
+			border-spacing: 0;
+			display: block;
+			width: 100%;
+			overflow: auto;
+		}
+
+		.markdown-body table th,
+		.markdown-body table td {
+			padding: 6px 13px;
+			border: 1px solid ##dfe2e5;
+		}
+
+		.markdown-body table th {
+			font-weight: 600;
+		}
+
+		.markdown-body img {
+			max-width: 100%;
+			box-sizing: content-box;
+			background-color: ##fff;
+			border: 1px solid ##d1d5da;
+			border-radius: 6px;
+			padding: 0.2em 0.4em;
+		}
+
+		.markdown-body figcaption {
+			color: ##6a737d;
+			font-size: 0.875em;
+			text-align: center;
+			margin-top: 0.5em;
+		}
+
 		.toc-h1 { font-weight: bold; }
 		.toc-h2 { margin-left: 10px; }
 		.toc-h3 { margin-left: 20px; font-size: 0.9em; }
