@@ -105,13 +105,13 @@ component output="false" {
 
 	public void function onApplicationEnd( struct ApplicationScope ) {
 		application.wo.$include(
-			template = "/app/#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
+			template = "../../#arguments.applicationScope.wheels.eventPath#/onapplicationend.cfm",
 			argumentCollection = arguments
 		);
 	}
 
 	public void function onSessionStart() {
-		local.lockName = "reloadLock" & application.applicationName;
+		local.lockName = "reloadLock" & this.name;
 
 		// Fix for shared application name (issue 359).
 		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "eventpath")) {
@@ -125,7 +125,7 @@ component output="false" {
 	}
 
 	public void function onSessionEnd( struct SessionScope, struct ApplicationScope ) {
-		local.lockName = "reloadLock" & arguments.applicationScope.applicationName;
+		local.lockName = "reloadLock" & this.name;
 
 		arguments.componentReference = "wheels.events.EventMethods";
 		application.wo.$simpleLock(
@@ -147,7 +147,7 @@ component output="false" {
 			application.contentOnly = false;
 		}
 
-		local.lockName = "reloadLock" & application.applicationName;
+		local.lockName = "reloadLock" & this.name;
 
 		// Abort if called from incorrect file.
 		application.wo.$abortInvalidRequest();
@@ -191,7 +191,7 @@ component output="false" {
 			}
 		}
 
-		// Reload application by calling onApplicationStart if requested.
+		// Reload application properly using applicationStop() if requested.
 		if (
 			StructKeyExists(url, "reload")
 			&& (
@@ -202,11 +202,12 @@ component output="false" {
 		) {
 			application.wo.$debugPoint("total,reload");
 			if (StructKeyExists(url, "lock") && !url.lock) {
-				this.onApplicationStart();
+				this.handleRestartAppRequest();
 			} else {
 				local.executeArgs = {"componentReference" = "application"};
-				application.wo.$simpleLock(name = local.lockName, execute = "onApplicationStart", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
+				application.wo.$simpleLock(name = local.lockName, execute = "handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 			}
+			return false; // Stop processing this request after restart
 		}
 
 		// Run the rest of the request start code.
@@ -223,7 +224,7 @@ component output="false" {
 	}
 
 	public boolean function onRequest( string targetPage ) {
-		lock name="reloadLock#application.applicationName#" type="readOnly" timeout="180" {
+		lock name="reloadLock#this.name#" type="readOnly" timeout="180" {
 			include "#arguments.targetpage#";
 		}
 
@@ -231,7 +232,7 @@ component output="false" {
 	}
 
 	public void function onRequestEnd( string targetPage ) {
-		local.lockName = "reloadLock" & application.applicationName;
+		local.lockName = "reloadLock" & this.name;
 
 		arguments.componentReference = "wheels.events.EventMethods";
 
@@ -252,8 +253,13 @@ component output="false" {
 	}
 
 	public boolean function onAbort( string targetPage ) {
-		application.wo.$restoreTestRunnerApplicationScope();
-		application.wo.$include(template = "#application.wheels.eventPath#/onabort.cfm");
+		if (
+			StructKeyExists(application, "wo")
+			&& StructKeyExists(application.wo, "$restoreTestRunnerApplicationScope")
+		) {
+			application.wo.$restoreTestRunnerApplicationScope();
+			application.wo.$include(template = "#application.wheels.eventPath#/onabort.cfm");
+		}
 		return true;
 	}
 
@@ -272,7 +278,7 @@ component output="false" {
 		application.wo.$initializeRequestScope();
 		arguments.componentReference = "wheels.events.EventMethods";
 
-		local.lockName = "reloadLock" & application.applicationName;
+		local.lockName = "reloadLock" & this.name;
 		local.rv = application.wo.$simpleLock(
 			name = local.lockName,
 			execute = "$runOnError",
@@ -284,7 +290,7 @@ component output="false" {
 	}
 
 	public boolean function onMissingTemplate( string targetPage ) {
-		local.lockName = "reloadLock" & application.applicationName;
+		local.lockName = "reloadLock" & this.name;
 
 		arguments.componentReference = "wheels.events.EventMethods";
 
@@ -297,6 +303,48 @@ component output="false" {
 		);
 
 		return true;
+	}
+
+	public void function handleRestartAppRequest() {
+		local.redirectUrl = this.buildRedirectUrl();
+		applicationStop();
+		location(url = local.redirectUrl, addToken = false);
+	}
+
+	private string function buildRedirectUrl() {
+		// Determine the base URL
+		if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
+			local.url = cgi.path_info;
+		} else if (StructKeyExists(cgi, "path_info")) {
+			local.url = "/";
+		} else {
+			local.url = cgi.script_name;
+		}
+
+		// Process query string parameters, removing reload-related ones
+		if (StructKeyExists(cgi, "query_string") && Len(cgi.query_string)) {
+			local.oldQueryString = ListToArray(cgi.query_string, "&");
+			local.newQueryString = [];
+			local.iEnd = ArrayLen(local.oldQueryString);
+			
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
+				local.keyValue = local.oldQueryString[local.i];
+				local.key = ListFirst(local.keyValue, "=");
+				
+				// Remove reload-related parameters
+				if (!ListFindNoCase("reload,password,lock", local.key)) {
+					ArrayAppend(local.newQueryString, local.keyValue);
+				}
+			}
+			
+			// Add query string to URL if any parameters remain
+			if (ArrayLen(local.newQueryString)) {
+				local.queryString = ArrayToList(local.newQueryString, "&");
+				local.url = "#local.url#?#local.queryString#";
+			}
+		}
+
+		return local.url;
 	}
 
 	/**
