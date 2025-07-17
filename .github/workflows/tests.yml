@@ -206,6 +206,11 @@ jobs:
       - name: Check cfengine version
         run: docker exec wheels-${{ matrix.cfengine }}-1 box server status
 
+      - name: Inspect Container
+        run: |
+          docker inspect wheels-${{ matrix.cfengine }}-1
+          docker inspect wheels-${{ matrix.dbengine }}-1
+
       - name: Run Tests with Retry
         id: run-tests
         run: |
