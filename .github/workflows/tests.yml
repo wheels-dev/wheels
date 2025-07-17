@@ -202,7 +202,7 @@ jobs:
           # Try a basic curl to see if service responds
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
       - name: Check cfengine version
-        run: box server status
+        run: docker exec wheels-${{ matrix.cfengine }}-1 box server status
 
       - name: Run Tests with Retry
         id: run-tests
@@ -234,7 +234,7 @@ jobs:
             echo "Response content:"
             cat "${{ steps.test-vars.outputs.result_file }}"
           fi
-          
+
           # Check result
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Tests passed with HTTP 200"
