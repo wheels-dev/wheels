@@ -22,6 +22,8 @@ jobs:
         jdkVersion: ["21"]
         experimental: [false]
         include:
+          - cfengine: lucee6
+            dbengine: oracle
           # Lucee 7 experimental tests (non-blocking)
           # - cfengine: "lucee7"
           #   dbengine: "h2"
