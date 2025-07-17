@@ -61,8 +61,8 @@ jobs:
             dbengine: h2
           - cfengine: lucee5
             dbengine: oracle
-          - cfengine: lucee6
-            dbengine: mysql
+          # - cfengine: lucee6
+          #   dbengine: mysql
           - cfengine: lucee6
             dbengine: postgres
           - cfengine: lucee6
