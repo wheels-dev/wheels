@@ -31,9 +31,9 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "views/routetesterprocess.cfm";
 		return "";
 	}
-	function docs() {
+	function api() {
 		include "/wheels/public/helpers.cfm";
-		include "/wheels/public/views/docs.cfm";
+		include "/wheels/public/views/api.cfm";
 		return "";
 	}
 	function runner(){
@@ -165,6 +165,12 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	function legacy() {
 		// Handle legacy ?controller=wheels&action=wheels&view=xxx URLs
 		return wheels();
+	}
+
+	function guides() {
+		include "/wheels/public/helpers.cfm";
+		include "/wheels/public/views/guides.cfm";
+		return "";
 	}
 
 }
