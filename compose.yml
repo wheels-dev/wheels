@@ -334,8 +334,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 120s
-    volumes:
-      - oracle_data:/opt/oracle/oradata
     deploy:
       resources:
         limits:
@@ -349,7 +347,6 @@ volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
-  oracle_data:
   # Named volumes for dependency isolation
   wirebox-lucee5:
   testbox-lucee5:
