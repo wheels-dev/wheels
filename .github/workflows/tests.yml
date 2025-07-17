@@ -203,7 +203,7 @@ jobs:
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
 
       - name: Show TestBox version
-        run: docker exec cfwheels-test-${{ matrix.cfengine }} cat /cfwheels-test-suite/core/testbox/box.json || echo "box.json not found"
+        run: docker exec wheels-${{ matrix.cfengine }}-1 cat /cfwheels-test-suite/core/testbox/box.json || echo "box.json not found"
 
       - name: Run Tests with Retry
         id: run-tests
