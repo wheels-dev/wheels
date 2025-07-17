@@ -202,6 +202,9 @@ jobs:
           # Try a basic curl to see if service responds
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
 
+      - name: Show TestBox version
+        run: docker exec ${{ matrix.cfengine }} cat /app/core/testbox/box.json || echo "box.json not found"
+
       - name: Run Tests with Retry
         id: run-tests
         run: |
