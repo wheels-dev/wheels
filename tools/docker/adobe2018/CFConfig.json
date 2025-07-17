@@ -88,7 +88,7 @@
 			"connectionTimeout": "20",
 			"database": "wheelstestdb",
 			"dbdriver": "Oracle",
-			"dsn": "jdbc:oracle:thin:@{host}:{port}/{database}",
+			"dsn": "jdbc:oracle:thin:@//{host}:{port}/{database}",
 			"host": "oracle",
 			"password": "wheelstestdb",
 			"port": "1521",
