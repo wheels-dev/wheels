@@ -141,6 +141,9 @@ jobs:
         if: ${{ matrix.dbengine != 'h2' }}
         run: docker compose up -d ${{ matrix.dbengine }}
 
+      - name: Check cfengine version in server.json
+        run: docker exec wheels-${{ matrix.cfengine }}-1 cat /cfwheels-test-suite/server.json
+
       - name: Wait for containers to be ready
         run: |
           echo "Waiting for ${{ matrix.cfengine }} to be ready..."
