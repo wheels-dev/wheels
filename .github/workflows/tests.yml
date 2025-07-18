@@ -139,9 +139,6 @@ jobs:
         if: ${{ matrix.dbengine != 'h2' }}
         run: docker compose up -d ${{ matrix.dbengine }}
 
-      - name: Check server webroot
-        run: docker exec wheels-${{ matrix.cfengine }}-1 box server list
-
       - name: Wait for containers to be ready
         run: |
           echo "Waiting for ${{ matrix.cfengine }} to be ready..."
@@ -204,13 +201,6 @@ jobs:
           
           # Try a basic curl to see if service responds
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
-      - name: Check cfengine version
-        run: docker exec wheels-${{ matrix.cfengine }}-1 box server status
-
-      - name: Inspect Container
-        run: |
-          docker inspect wheels-${{ matrix.cfengine }}-1
-          docker inspect wheels-${{ matrix.dbengine }}-1
 
       - name: Run Tests with Retry
         id: run-tests

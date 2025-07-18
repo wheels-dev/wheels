@@ -319,7 +319,7 @@ services:
       - cfwheels-network
 
   oracle:
-    image: gvenzl/oracle-xe:21-slim
+    image: gvenzl/oracle-free:23-slim
     restart: always
     environment:
       ORACLE_PASSWORD: wheelstestdb
