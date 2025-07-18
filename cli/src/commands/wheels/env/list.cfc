@@ -15,7 +15,9 @@ component extends="../base" {
     function run(
         string format = "table"
     ) {
-        var environments = environmentService.list();
+        var projectRoot = resolvePath(".");
+        var environments = environmentService.list(projectRoot);
+
         
         if (arrayLen(environments) == 0) {
             print.yellowLine("No environments configured");
@@ -26,7 +28,7 @@ component extends="../base" {
         if (arguments.format == "json") {
             print.line(serializeJSON(environments, true));
         } else {
-            print.greenBoldLine("🌍 Available Environments")
+            print.greenBoldLine("Available Environments")
                  .line();
             
             // Get current environment
@@ -42,17 +44,16 @@ component extends="../base" {
             // Display environments
             for (var env in environments) {
                 var isCurrent = (env.name == currentEnv);
-                var marker = isCurrent ? " ⭐" : "";
                 
-                print.line("📁 #env.name##marker#");
-                print.line("   📋 Template: #env.template#");
-                print.line("   🗄️  Database: #env.database#");
-                print.line("   📅 Created: #dateTimeFormat(env.created, 'yyyy-mm-dd HH:nn:ss')#");
+                print.line("#env.name#");
+                print.line("    Template: #env.template#");
+                print.line("    Database: #env.database#");
+                print.line("    Created: #dateTimeFormat(env.created, 'yyyy-mm-dd HH:nn:ss')#");
                 print.line();
             }
             
             if (len(currentEnv)) {
-                print.yellowLine("⭐ Current environment: #currentEnv#");
+                print.yellowLine(" Current environment: #currentEnv#");
             } else {
                 print.yellowLine("No environment currently active");
                 print.line("Switch to an environment with: wheels env switch <environment>");

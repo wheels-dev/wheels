@@ -1,6 +1,6 @@
 component {
 
-    property name="serverService" inject="ServerService@commandbox-core";
+    property name="serverService" inject="ServerService";
     property name="templateService" inject="TemplateService@wheels-cli";
 
     /**
@@ -8,19 +8,22 @@ component {
      */
     function setup(
         required string environment,
+        required string rootPath,
         string template = "local",
         string database = "h2",
-        boolean force = false
+        boolean force = false,
     ) {
         try {
-            var projectRoot = resolvePath(".");
+            var projectRoot = arguments.rootPath;
 
             // Check if environment already exists
-            var envFile = projectRoot & "/.env.#arguments.environment#";
+            var envFile = projectRoot & ".env.#arguments.environment#";
+
             if (fileExists(envFile) && !arguments.force) {
                 return {
                     success: false,
-                    error: "Environment '#arguments.environment#' already exists. Use --force to overwrite."
+                    // error: "Environment '#arguments.environment#' already exists. Use --force to overwrite."
+                    error: envFile
                 };
             }
 
@@ -28,10 +31,10 @@ component {
             var result = {};
             switch (arguments.template) {
                 case "docker":
-                    result = setupDockerEnvironment(argumentCollection = arguments);
+                    result = setupDockerEnvironment(argumentCollection = arguments, projectRoot);
                     break;
                 case "vagrant":
-                    result = setupVagrantEnvironment(argumentCollection = arguments);
+                    result = setupVagrantEnvironment(argumentCollection = arguments, projectRoot);
                     break;
                 default:
                     result = setupLocalEnvironment(argumentCollection = arguments);
@@ -39,10 +42,10 @@ component {
 
             if (result.success) {
                 // Create environment file
-                createEnvironmentFile(arguments.environment, result.config);
+                createEnvironmentFile(arguments.environment, result.config, projectRoot);
 
                 // Update server.json if needed
-                updateServerConfig(arguments.environment, result.config);
+                updateServerConfig(arguments.environment, result.config, projectRoot);
 
                 result.nextSteps = generateNextSteps(arguments.template, arguments.environment);
             }
@@ -60,9 +63,11 @@ component {
     /**
      * List available environments
      */
-    function list() {
+    function list(
+        required string rootPath
+    ) {
         var environments = [];
-        var projectRoot = resolvePath(".");
+        var projectRoot = arguments.rootPath;
 
         // Look for .env.* files
         var envFiles = directoryList(
@@ -75,7 +80,7 @@ component {
         for (var file in envFiles) {
             if (reFindNoCase("^\.env\.", file)) {
                 var envName = listLast(file, ".");
-                var config = loadEnvironmentConfig(envName);
+                var config = loadEnvironmentConfig(envName,projectRoot);
 
                 arrayAppend(environments, {
                     name: envName,
@@ -110,8 +115,9 @@ component {
     /**
      * Switch to a different environment
      */
-    function switch(required string environment) {
-        var envFile = resolvePath(".env.#arguments.environment#");
+    function switch(required string environment, required string rootPath) {
+        var projectRoot = arguments.rootPath;
+        var envFile = "#projectRoot#.env.#arguments.environment#";
 
         if (!fileExists(envFile)) {
             return {
@@ -121,10 +127,10 @@ component {
         }
 
         // Copy environment file to .env
-        fileCopy(envFile, resolvePath(".env"));
+        fileCopy(envFile, "#projectRoot#.env");
 
         // Update server.json default environment
-        var serverJsonPath = resolvePath("server.json");
+        var serverJsonPath = "#projectRoot#server.json";
         if (fileExists(serverJsonPath)) {
             var serverJson = deserializeJSON(fileRead(serverJsonPath));
             serverJson.profile = arguments.environment;
@@ -183,6 +189,8 @@ component {
             default: // h2
                 config.datasource = {
                     driver: "H2",
+                    host:"",
+                    port:"",
                     database: "./db/wheels_#arguments.environment#",
                     username: "sa",
                     password: ""
@@ -198,7 +206,7 @@ component {
     /**
      * Setup Docker environment
      */
-    private function setupDockerEnvironment(argumentCollection) {
+    private function setupDockerEnvironment(argumentCollection, rootPath) {
         var config = {
             template: "docker",
             database: arguments.database,
@@ -207,10 +215,10 @@ component {
 
         // Create docker-compose.yml
         var dockerComposeContent = generateDockerCompose(argumentCollection = arguments);
-        fileWrite(resolvePath("docker-compose.#arguments.environment#.yml"), dockerComposeContent);
+        fileWrite("#arguments.rootPath#docker-compose.#arguments.environment#.yml", dockerComposeContent);
 
         // Create Dockerfile if it doesn't exist
-        var dockerfilePath = resolvePath("Dockerfile");
+        var dockerfilePath = "#projectRoot#Dockerfile";
         if (!fileExists(dockerfilePath)) {
             var dockerfileContent = generateDockerfile();
             fileWrite(dockerfilePath, dockerfileContent);
@@ -235,7 +243,7 @@ component {
     /**
      * Setup Vagrant environment
      */
-    private function setupVagrantEnvironment(argumentCollection) {
+    private function setupVagrantEnvironment(argumentCollection, rootPath) {
         var config = {
             template: "vagrant",
             database: arguments.database,
@@ -244,11 +252,11 @@ component {
 
         // Create Vagrantfile
         var vagrantContent = generateVagrantfile(argumentCollection = arguments);
-        fileWrite(resolvePath("Vagrantfile.#arguments.environment#"), vagrantContent);
+        fileWrite("#arguments.rootPath#Vagrantfile.#arguments.environment#", vagrantContent);
 
         // Create provisioning script
         var provisionScript = generateProvisionScript(argumentCollection = arguments);
-        var provisionDir = resolvePath("vagrant");
+        var provisionDir = "#projectRoot#vagrant";
         if (!directoryExists(provisionDir)) {
             directoryCreate(provisionDir);
         }
@@ -263,7 +271,7 @@ component {
     /**
      * Create environment file
      */
-    private function createEnvironmentFile(environment, config) {
+    private function createEnvironmentFile(environment, config, rootPath) {
         var envContent = [];
 
         // Basic settings
@@ -294,14 +302,14 @@ component {
             arrayAppend(envContent, "SERVER_CFENGINE=#arguments.config.cfengine#");
         }
 
-        fileWrite(resolvePath(".env.#arguments.environment#"), arrayToList(envContent, chr(10)));
+        fileWrite("#arguments.rootPath#.env.#arguments.environment#", arrayToList(envContent, chr(10)));
     }
 
     /**
      * Update server.json configuration
      */
-    private function updateServerConfig(environment, config) {
-        var serverJsonPath = resolvePath("server.json");
+    private function updateServerConfig(environment, config, rootPath) {
+        var serverJsonPath = "#arguments.rootPath#server.json";
         var serverJson = {};
 
         if (fileExists(serverJsonPath)) {
@@ -443,9 +451,9 @@ box server start port=8080 host=0.0.0.0";
     /**
      * Load environment configuration
      */
-    private function loadEnvironmentConfig(environment) {
+    private function loadEnvironmentConfig(environment,rootPath) {
         var config = {};
-        var envFile = resolvePath(".env.#arguments.environment#");
+        var envFile = "#arguments.rootPath#.env.#arguments.environment#";
 
         if (fileExists(envFile)) {
             var lines = fileRead(envFile).listToArray(chr(10));

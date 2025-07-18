@@ -24,17 +24,19 @@ component extends="../base" {
         string database = "h2",
         boolean force = false
     ) {
-        print.yellowLine("🛠️  Setting up #arguments.environment# environment...")
+        var projectRoot = resolvePath(".");
+
+        print.yellowLine("Setting up #arguments.environment# environment...")
              .line();
         
-        var result = environmentService.setup(argumentCollection = arguments);
+        var result = environmentService.setup(argumentCollection = arguments, rootPath=projectRoot );
         
         if (result.success) {
-            print.greenLine("✅ Environment setup complete!")
+            print.greenLine("Environment setup complete!")
                  .line();
             
             if (result.keyExists("nextSteps") && arrayLen(result.nextSteps)) {
-                print.yellowBoldLine("📋 Next Steps:")
+                print.yellowBoldLine("Next Steps:")
                      .line();
                 
                 for (var step in result.nextSteps) {
@@ -42,7 +44,7 @@ component extends="../base" {
                 }
             }
         } else {
-            print.redLine("❌ Setup failed: #result.error#");
+            print.redLine("Setup failed: #result.error#");
             setExitCode(1);
         }
     }
