@@ -22,8 +22,7 @@ component {
             if (fileExists(envFile) && !arguments.force) {
                 return {
                     success: false,
-                    // error: "Environment '#arguments.environment#' already exists. Use --force to overwrite."
-                    error: envFile
+                    error: "Environment '#arguments.environment#' already exists. Use --force to overwrite."
                 };
             }
 
@@ -43,6 +42,7 @@ component {
             if (result.success) {
                 // Create environment file
                 createEnvironmentFile(arguments.environment, result.config, projectRoot);
+                createEnvironmentSettings(arguments.environment, result.config, projectRoot);
 
                 // Update server.json if needed
                 updateServerConfig(arguments.environment, result.config, projectRoot);
@@ -304,6 +304,63 @@ component {
 
         fileWrite("#arguments.rootPath#.env.#arguments.environment#", arrayToList(envContent, chr(10)));
     }
+
+     /**
+     * Create Settings file
+     */
+    function createEnvironmentSettings(environment, config, rootPath) {
+        var projectRoot = arguments.rootPath;
+        var envDir = projectRoot & "/config/#arguments.environment#";
+        var settingsFile = envDir & "/settings.cfm";
+
+        // Create directory if it doesn't exist
+        if (!directoryExists(envDir)) {
+            directoryCreate(envDir, true); // recursive = true
+        }
+        
+        // Generate timestamp
+        var now = dateFormat(now(), "yyyy-mm-dd") & " " & timeFormat(now(), "HH:mm:ss");
+
+        // Define default content
+        var content = '<cfscript>
+    // Environment: #now#
+    // Generated: 2024-01-15 10:30:45
+
+    // Database settings
+    set(dataSourceName="wheels_staging");
+
+    // Environment settings
+    set(environment="staging");
+    set(showDebugInformation=true);
+    set(showErrorInformation=true);
+
+    // Caching
+    set(cacheFileChecking=false);
+    set(cacheImages=false);
+    set(cacheModelInitialization=false);
+    set(cacheControllerInitialization=false);
+    set(cacheRoutes=false);
+    set(cacheActions=false);
+    set(cachePages=false);
+    set(cachePartials=false);
+    set(cacheQueries=false);
+
+    // Security
+    set(reloadPassword="generated_secure_password");
+
+    // URLs
+    set(urlRewriting="partial");
+
+    // Custom settings for staging
+    set(sendEmailOnError=true);
+    set(errorEmailAddress="dev-team@example.com");
+</cfscript>';
+
+        // Write to settings.cfm
+        fileWrite(settingsFile, content);
+        return "settings.cfm created at /config/#arguments.environment#/";
+    }
+
 
     /**
      * Update server.json configuration
