@@ -206,10 +206,10 @@ jobs:
         if: ${{ matrix.dbengine == 'oracle' }}
         run: |
           echo "Waiting for Oracle DB to be ready..."
-          for i in {1..60}; do
+          for i in {1..30}; do
             echo "Attempt $i: Trying to connect to Oracle..."
 
-            echo "exit" | sqlplus -s system/wheelstestdb@localhost:1521/freepdb1 && {
+            docker exec wheels-oracle-1 bash -c "echo exit | sqlplus -s system/wheelstestdb@localhost:1521/freepdb1" && {
               echo "✅ Oracle is ready!"
               break
             }

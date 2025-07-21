@@ -13,6 +13,9 @@ ENV BOX_INSTALL             TRUE
 # Set working directory
 WORKDIR ${APP_DIR}
 
+#Add JDBC 10 to adobe
+ADD https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar /cfwheels-test-suite/.engine/adobe2023/WEB-INF/lib/ojdbc10.jar
+
 # Copy box.json for dependency management
 COPY tools/docker/adobe2023/box.json ${APP_DIR}/box.json
 
