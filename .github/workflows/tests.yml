@@ -212,6 +212,10 @@ jobs:
         if: ${{ matrix.dbengine == 'oracle' }}
         run: sleep 120
 
+      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
+        if: ${{ matrix.cfengine == 'adobe2021' }} || ${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}
+        run: docker exec wheels-${{ matrix.cfengine }}-1 box run-script onServerInstall
+
       - name: Check if ojdbc10.jar exists in container
         run: |
           docker exec wheels-${{ matrix.cfengine }}-1 ls -l /cfwheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib
