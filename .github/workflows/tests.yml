@@ -203,10 +203,17 @@ jobs:
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
 
       - name: Wait for Oracle to be ready
+        if: ${{ matrix.dbengine == 'oracle' }}
         run: |
+          echo "Waiting for Oracle DB to be ready..."
           for i in {1..60}; do
-            echo "Trying to connect to Oracle..."
-            echo "exit" | sqlplus -s system/wheelstestdb@localhost:1521/freepdb1 && break
+            echo "Attempt $i: Trying to connect to Oracle..."
+
+            echo "exit" | sqlplus -s system/wheelstestdb@localhost:1521/freepdb1 && {
+              echo "✅ Oracle is ready!"
+              break
+            }
+            echo "❌ Not ready yet. Retrying in 10s..."
             sleep 10
           done
 
