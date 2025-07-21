@@ -44,15 +44,28 @@ component extends="wheels.Global" {
 				// Detect request format for format-specific error handling
 				local.format = $getRequestFormat();
 				
-				if (StructKeyExists(arguments.exception, "rootCause") && Left(arguments.exception.rootCause.type, 6) == "Wheels") {
-					local.wheelsError = arguments.exception.rootCause;
-				} else if (
-					StructKeyExists(arguments.exception, "cause")
-					&& StructKeyExists(arguments.exception.cause, "rootCause")
-					&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
-				) {
-					local.wheelsError = arguments.exception.cause.rootCause;
+				if (structKeyExists(server, "boxlang")) {
+					if (StructKeyExists(arguments.exception, "type") && Left(arguments.exception.type, 6) == "Wheels") {
+						local.wheelsError = arguments.exception;
+					} else if (
+						StructKeyExists(arguments.exception, "cause")
+						&& StructKeyExists(arguments.exception.cause, "rootCause")
+						&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
+					) {
+						local.wheelsError = arguments.exception.cause.rootCause;
+					}
+				} else {
+					if (StructKeyExists(arguments.exception, "rootCause") && Left(arguments.exception.rootCause.type, 6) == "Wheels") {
+						local.wheelsError = arguments.exception.rootCause;
+					} else if (
+						StructKeyExists(arguments.exception, "cause")
+						&& StructKeyExists(arguments.exception.cause, "rootCause")
+						&& Left(arguments.exception.cause.rootCause.type, 6) == "Wheels"
+					) {
+						local.wheelsError = arguments.exception.cause.rootCause;
+					}
 				}
+				
 				if (StructKeyExists(local, "wheelsError")) {
 					local.rv = "";
 					if (local.format == "json") {

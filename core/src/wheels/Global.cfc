@@ -250,9 +250,17 @@ component output="false" {
 	 * Call CFML's canonicalize() function but set to blank string if the result is null (happens on Lucee 5).
 	 */
 	public string function $canonicalize(required string input) {
-		local.rv = Canonicalize(arguments.input, false, false);
-		if (IsNull(local.rv)) {
-			local.rv = "";
+		// BoxLang compatibility
+		if (structKeyExists(server, "boxlang")) {
+			local.rv = arguments.input;
+			local.rv = replace(local.rv, chr(0), "", "all");
+			local.rv = replace(local.rv, "%00", "", "all");
+			local.rv = trim(local.rv);
+		} else {
+			local.rv = Canonicalize(arguments.input, false, false);
+			if (IsNull(local.rv)) {
+				local.rv = "";
+			}
 		}
 		return local.rv;
 	}
@@ -765,7 +773,11 @@ component output="false" {
 			local.params = ListToArray(ListGetAt(arguments.params, local.i, "&"), "=");
 			local.name = local.params[1];
 			if (arguments.encode && $get("encodeURLs")) {
-				local.name = EncodeForURL($canonicalize(local.name));
+				if (structKeyExists(server, "boxlang")) {
+					local.name = URLEncodedFormat($canonicalize(local.name));
+				} else {
+					local.name = EncodeForURL($canonicalize(local.name));
+				}
 				if (arguments.$encodeForHtmlAttribute) {
 					local.name = EncodeForHTMLAttribute(local.name);
 				}
@@ -775,7 +787,11 @@ component output="false" {
 			if (ArrayLen(local.params) == 2) {
 				local.value = local.params[2];
 				if (arguments.encode && $get("encodeURLs")) {
-					local.value = EncodeForURL($canonicalize(local.value));
+					if (structKeyExists(server, "boxlang")) {
+						local.value = URLEncodedFormat($canonicalize(local.value));
+					} else {
+						local.value = EncodeForURL($canonicalize(local.value));
+					}
 					if (arguments.$encodeForHtmlAttribute) {
 						local.value = EncodeForHTMLAttribute(local.value);
 					}
@@ -831,7 +847,16 @@ component output="false" {
 			}
 		}
 		if (StructKeyExists(application.wheels.functions, arguments.name)) {
-			StructAppend(arguments.args, application.wheels.functions[arguments.name], false);
+			if (structKeyExists(server, "boxlang")) {
+				// Manual implementation for BoxLang
+				for (local.key in application.wheels.functions[arguments.name]) {
+					if (!StructKeyExists(arguments.args, local.key)) {
+						arguments.args[local.key] = application.wheels.functions[arguments.name][local.key];
+					}
+				}
+			} else {
+				StructAppend(arguments.args, application.wheels.functions[arguments.name], false);
+			}
 		}
 
 		// make sure that the arguments marked as required exist
@@ -1210,7 +1235,32 @@ component output="false" {
 		if (ListLen(local.version) > 3) {
 			local.build = Val(ListGetAt(local.version, 4));
 		}
-		if (arguments.engine == "Lucee") {
+		if (arguments.engine == "BoxLang") {
+			local.minimumMajor = "1";
+			local.minimumMinor = "0";
+			local.minimumPatch = "0";
+			local.maximumMajor = "1";
+			local.maximumMinor = "3";
+			local.maximumPatch = "999";
+			
+			// Check minimum version
+			if (
+				local.major < local.minimumMajor
+				|| (local.major == local.minimumMajor && local.minor < local.minimumMinor)
+				|| (local.major == local.minimumMajor && local.minor == local.minimumMinor && local.patch < local.minimumPatch)
+			) {
+				local.rv = "The CFWheels framework requires BoxLang version #local.minimumMajor#.#local.minimumMinor#.#local.minimumPatch# or higher. You are currently running version #arguments.version#.";
+			}
+			
+			// Check maximum version (optional - for major version compatibility)
+			if (
+				local.major > local.maximumMajor
+				|| (local.major == local.maximumMajor && local.minor > local.maximumMinor)
+				|| (local.major == local.maximumMajor && local.minor == local.maximumMinor && local.patch > local.maximumPatch)
+			) {
+				local.rv = "The CFWheels framework has been tested up to BoxLang version #local.maximumMajor#.#local.maximumMinor#.#local.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
+			}
+		} else if (arguments.engine == "Lucee") {
 			local.minimumMajor = "5";
 			local.minimumMinor = "3";
 			local.minimumPatch = "2";
@@ -1391,7 +1441,12 @@ component output="false" {
 	/**
 	 * Internal function.
 	 */
-	public string function $prependUrl(required string path) {
+	public string function $prependUrl(
+		required string path,
+		string host = "",
+		string protocol = "",
+		numeric port = 0
+	) {
 		local.rv = arguments.path;
 		if (arguments.port != 0) {
 			// use the port that was passed in by the developer
@@ -1683,7 +1738,10 @@ component output="false" {
 	 * Returns the request timeout value in seconds
 	 */
 	public numeric function $getRequestTimeout() {
-		if (StructKeyExists(server, "lucee")) {
+		// Check for BoxLang first using unique BoxLang identifier
+		if (application.wheels.servername == "boxlang") {
+			return 30;
+		} else if (StructKeyExists(server, "lucee") && StructKeyExists(server.lucee, "version")) {
 			return (GetPageContext().getRequestTimeout() / 1000);
 		} else {
 			return CreateObject("java", "coldfusion.runtime.RequestMonitor").GetRequestTimeout();
@@ -2397,7 +2455,11 @@ component output="false" {
 
 			// Any value we find from above, URL encode it here.
 			if (arguments.encode && $get("encodeURLs")) {
-				local.value = EncodeForURL($canonicalize(local.value));
+				if (structKeyExists(server, "boxlang")) {
+					local.value = URLEncodedFormat($canonicalize(local.value));
+				} else {
+					local.value = EncodeForURL($canonicalize(local.value));
+				}
 				if (arguments.$encodeForHtmlAttribute) {
 					local.value = EncodeForHTMLAttribute(local.value);
 				}

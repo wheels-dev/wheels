@@ -250,7 +250,21 @@ component output="false" extends="wheels.Global"{
 		}
 
 		if (IsDefined("application") && !StructIsEmpty(application[$wheels.appKey].mixins)) {
-			$wheels.metaData = GetMetadata(variablesScope.this);
+			// BoxLang compatibility: this scope is not available in variables scope
+			if (StructKeyExists(variablesScope, "this")) {
+				$wheels.metaData = GetMetadata(variablesScope.this);
+			} else {
+				// Fallback for BoxLang
+				try {
+					$wheels.metaData = GetMetadata(this);
+				} catch (any e) {
+					// Last resort - create a minimal metadata structure
+					$wheels.metaData = {
+						"fullname": "wheels.component",
+						"displayName": "component"
+					};
+				}
+			}
 			if (StructKeyExists($wheels.metaData, "displayName")) {
 				$wheels.className = $wheels.metaData.displayName;
 			} else if (findNoCase("controllers", $wheels.metaData.fullname)){
