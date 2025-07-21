@@ -138,6 +138,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Download jdbc10 
+        if: ${{ matrix.cfengine == 'adobe2018' }} || ${{ matrix.cfengine == 'adobe2021' }} || ${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}
+        run: |
+          
+          mkdir -p ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib
+          
+          wget https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
+            -O ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+          
+          ls -l ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/
+
       - name: Start cfengine (${{ matrix.cfengine }}) ...
         run: docker compose up -d ${{ matrix.cfengine }}
 
