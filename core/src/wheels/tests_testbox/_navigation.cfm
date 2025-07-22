@@ -15,7 +15,7 @@
 </cfscript>
 <cfoutput>
     <div class="ui segment">
-        <div class="ui grid">
+        <div class="ui stackable grid">
             <div class="two column row">
                 <div class="four wide column">
                     <!--- Route Filter --->
