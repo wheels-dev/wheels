@@ -329,7 +329,7 @@ services:
     ports:
       - "1522:1521"
     volumes:
-      - ./tools/docker/Oracle/01-configure-cursors.sql:/container-entrypoint-startdb.d
+      - ./tools/docker/Oracle:/container-entrypoint-startdb.d
     healthcheck:
       test: ["CMD", "sqlplus", "-S", "wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb", "<<<", "SELECT 1 FROM DUAL;"]
       interval: 30s
