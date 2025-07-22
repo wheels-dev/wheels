@@ -15,12 +15,18 @@ component output=false extends="wheels.Global"{
 		local.$wheels = {};
 		local.$wheels.rv = {};
 
-		local.info = $dbinfo(
-			type = "version",
-			datasource = application.wheels.dataSourceName,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
-		);
+		if(structKeyExists(arguments.queryAttributes, "DATASOURCE") && len(arguments.queryAttributes.DATASOURCE)){
+			local.info = $dbinfo(
+				type = "version",
+				datasource = arguments.queryAttributes.DATASOURCE);
+		} else {
+			local.info = $dbinfo(
+				type = "version",
+				datasource = application.wheels.dataSourceName,
+				username = application.wheels.dataSourceUserName,
+				password = application.wheels.dataSourcePassword
+			);
+		}
     cfquery(attributeCollection=arguments.queryAttributes){
       local.$wheels.pos = 0;
 
