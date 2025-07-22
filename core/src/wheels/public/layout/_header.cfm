@@ -106,6 +106,7 @@ if (StructKeyExists(url, "refresh")) {
 			.h-100 {height:100%;}
 			.forcescroll { overflow-y: scroll; max-height: 40rem;   }
 			.margin-top { margin-top: 5em; }
+			.flex-wrap { flex-wrap: wrap; }
 		</style>
 	</head>
 	<body>

@@ -148,7 +148,7 @@ settings = [
 	<div class="ui container">
 		#pageHeader("System Information", "Note, these settings reflect the currently loaded environment")#
 
-		<div class="ui top attached tabular menu stackable">
+		<div class="ui top attached tabular menu stackable flex-wrap">
 			<a class="item active" data-tab="system">System</a>
 			<a class="item" data-tab="security">Security</a>
 			<cfloop from="1" to="#ArrayLen(settings)#" index="s">
@@ -285,7 +285,7 @@ settings = [
 		</cfloop>
 
 		#startTab(tab = 'utils')#
-		<div class="ui three column grid">
+		<div class="ui two column grid">
 			<div class="column">
 				<div class="ui card fluid">
 					<div class="content">
