@@ -30,9 +30,23 @@ component output="false" {
 	}
 
 	public struct function $image(){
-    local.rv = {};
-		arguments.structName = "rv";
-    cfimage(attributeCollection="#arguments#");
+    	local.rv = {};
+		if (structKeyExists(server, "boxlang")) {
+			if (arguments.action == "info") {
+				var img = ImageRead(arguments.source);
+				local.rv = ImageInfo(img);
+			} else {
+				throw(
+					type = "Wheels.Image.UnsupportedAction",
+					message = "The `$image()` function in BoxLang currently supports only the 'info' action."
+				);
+			}
+		} else {
+			// Adobe or Lucee: use cfimage
+			arguments.structName = "rv";
+			cfimage(attributeCollection = arguments);
+			local.rv = local.rv;
+		}
 		return local.rv;
 	}
 
@@ -282,15 +296,29 @@ component output="false" {
 	 */
 	public string function $contentType() {
 		local.rv = "";
-		if (StructKeyExists(server, "lucee")) {
-			local.response = GetPageContext().getResponse();
+		local.pageContext = getPageContext();
+		if (structKeyExists(server, "boxlang")) {
+			local.response = local.pageContext;
+		} else if (structKeyExists(server, "lucee")) {
+			local.response = local.pageContext.getResponse();
 		} else {
-			local.response = GetPageContext().getFusionContext().getResponse();
+			local.response = local.pageContext.getFusionContext().getResponse();
 		}
-		if (local.response.containsHeader("Content-Type")) {
-			local.header = local.response.getHeader("Content-Type");
-			if (!IsNull(local.header)) {
-				local.rv = local.header;
+
+		if (structKeyExists(server, "boxlang")) {
+			local.headerMap = local.response.getResponseHeaderMap();
+			if (structKeyExists(local.headerMap, "Content-Type")) {
+				local.headerArray = local.headerMap["Content-Type"];
+				if (arrayLen(local.headerArray) > 0 && !isNull(local.headerArray[1])) {
+					local.rv = local.headerArray[1];
+				}
+			}
+		} else {
+			if (local.response.containsHeader("Content-Type")) {
+				local.header = local.response.getHeader("Content-Type");
+				if (!isNull(local.header)) {
+					local.rv = local.header;
+				}
 			}
 		}
 		return local.rv;
@@ -469,9 +497,19 @@ component output="false" {
 			// this might fail if a query contains binary data so in those rare cases we fall back on using cfwddx (which is a little bit slower which is why we don't use it all the time)
 			try {
 				local.rv = SerializeJSON(local.values);
-				// remove the characters that indicate array or struct so that we can sort it as a list below
-				local.rv = ReplaceList(local.rv, "{,},[,],/", ",,,,");
-				local.rv = ListSort(local.rv, "text");
+
+				// BoxLang compatibility: For consistent hashing, normalize array representations
+				if (structKeyExists(server, "boxlang")) {
+					// Convert to a more predictable format by removing structural chars and sorting
+					local.normalized = REReplace(local.rv, '[\[\]{}"]', "", "all");
+					local.parts = listToArray(local.normalized, ",");
+					arraySort(local.parts, "textnocase");
+					local.rv = arrayToList(local.parts, ",");
+				} else {
+					// remove the characters that indicate array or struct so that we can sort it as a list below
+					local.rv = ReplaceList(local.rv, "{,},[,],/", ",,,,");
+					local.rv = ListSort(local.rv, "text");
+				}
 			} catch (any e) {
 				local.rv = $wddx(input = local.values);
 			}
@@ -601,7 +639,7 @@ component output="false" {
 				"/"
 			);
 		}
-		if (StructKeyExists(local, "requestUrl") && ReFind("[^\0-\x80]", local.requestUrl)) {
+		if (StructKeyExists(local, "requestUrl") && ReFind("[^\x00-\x80]", local.requestUrl)) {
 			// strip out the script_name and query_string leaving us with only the part of the string that should go in path_info
 			local.rv.path_info = Replace(
 				Replace(local.requestUrl, arguments.scope.script_name, ""),
@@ -773,11 +811,7 @@ component output="false" {
 			local.params = ListToArray(ListGetAt(arguments.params, local.i, "&"), "=");
 			local.name = local.params[1];
 			if (arguments.encode && $get("encodeURLs")) {
-				if (structKeyExists(server, "boxlang")) {
-					local.name = URLEncodedFormat($canonicalize(local.name));
-				} else {
-					local.name = EncodeForURL($canonicalize(local.name));
-				}
+				local.name = EncodeForURL($canonicalize(local.name));
 				if (arguments.$encodeForHtmlAttribute) {
 					local.name = EncodeForHTMLAttribute(local.name);
 				}
@@ -787,11 +821,7 @@ component output="false" {
 			if (ArrayLen(local.params) == 2) {
 				local.value = local.params[2];
 				if (arguments.encode && $get("encodeURLs")) {
-					if (structKeyExists(server, "boxlang")) {
-						local.value = URLEncodedFormat($canonicalize(local.value));
-					} else {
-						local.value = EncodeForURL($canonicalize(local.value));
-					}
+					local.value = EncodeForURL($canonicalize(local.value));
 					if (arguments.$encodeForHtmlAttribute) {
 						local.value = EncodeForHTMLAttribute(local.value);
 					}
@@ -1740,7 +1770,7 @@ component output="false" {
 	public numeric function $getRequestTimeout() {
 		// Check for BoxLang first using unique BoxLang identifier
 		if (application.wheels.servername == "boxlang") {
-			return 30;
+			return 10000;
 		} else if (StructKeyExists(server, "lucee") && StructKeyExists(server.lucee, "version")) {
 			return (GetPageContext().getRequestTimeout() / 1000);
 		} else {
@@ -2455,11 +2485,7 @@ component output="false" {
 
 			// Any value we find from above, URL encode it here.
 			if (arguments.encode && $get("encodeURLs")) {
-				if (structKeyExists(server, "boxlang")) {
-					local.value = URLEncodedFormat($canonicalize(local.value));
-				} else {
-					local.value = EncodeForURL($canonicalize(local.value));
-				}
+				local.value = EncodeForURL($canonicalize(local.value));
 				if (arguments.$encodeForHtmlAttribute) {
 					local.value = EncodeForHTMLAttribute(local.value);
 				}

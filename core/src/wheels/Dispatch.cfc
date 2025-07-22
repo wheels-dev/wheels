@@ -218,6 +218,13 @@ component output="false" extends="wheels.Global"{
 				// Hard abort if GUI turned off
 				cfabort;
 			} else {
+				// BoxLang compatibility: Check for null action parameter
+				if (IsNull(local.params.action) || !Len(local.params.action)) {
+					throw(
+						type="Wheels.ActionParameterMissing", 
+						message="The action parameter is missing or null. Controller: #local.params.controller#");
+				}
+
 				if (structKeyExists(server, "boxlang")) {
 					local.method = application.wheels.public[local.params.action];
 					local.method();

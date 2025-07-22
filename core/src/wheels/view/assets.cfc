@@ -218,7 +218,7 @@ component {
 					Throw(
 						type = "Wheels.ImageFormatNotSupported",
 						message = "CFWheels can't read image files with that format.",
-						extendedInfo = "Use one of these image types instead: #GetReadableImageFormats()#."
+						extendedInfo = "Use one of these image types instead: #ArrayToList(GetReadableImageFormats(), ', ')#."
 					);
 				}
 			}

@@ -166,7 +166,7 @@ component {
 			local.pattern = "/";
 		}
 
-	  // If arguments.to is not passed in, we check for the existance of app/views/home/index.cfm if found we set that as the root
+	  // If arguments.to is not passed in, we check for the existence of app/views/home/index.cfm if found we set that as the root
 	  // else we set wheels##wheels as the root.
 	  if (!structKeyExists(arguments, "to")) {
 	    if (fileExists(application.AppDir & "views/home/index.cfm")) {

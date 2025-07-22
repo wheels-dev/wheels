@@ -431,39 +431,39 @@ component extends="testbox.system.BaseSpec" {
 
 		describe("Tests that beforeValidation", () => {
 
-			 beforeEach(() => {
+			beforeEach(() => {
 			 	g.model("tag").$registerCallback(
 					type = "beforeValidation",
 					methods = "callbackThatSetsProperty,callbackThatReturnsFalse"
 				)
 				obj = g.model("tag").findOne()
 				obj.name = "somethingElse"
-			 })
+			})
 
-			 afterEach(() => {
+			afterEach(() => {
 			 	g.model("tag").$clearCallbacks(type = "beforeValidation")
-			 })
+			})
 
-			 it("is working when saving object", () => {
+			it("is working when saving object", () => {
 			 	obj.save()
 
 			 	expect(obj).toHaveKey("setByCallback")
-			 })
+			})
 
-			 it("is working when saving object without callbacks", () => {
+			it("is working when saving object without callbacks", () => {
 			 	obj.save(callbacks = false, transaction = "rollback")
 
 			 	expect(obj).notToHaveKey('setByCallback')
-			 })
+			})
 
-			 it("should register callback when validating nested property object", () => {
+			it("should register callback when validating nested property object", () => {
 			 	obj = $setGalleryNestedProperties()
 				obj.gallery.valid()
 
 				expect(obj.gallery.photos[1].properties()).toHaveKey("beforeValidationCallbackRegistered")
-			 })
+			})
 
-			 it("should register callback only once when saving nested property object", () => {
+			it("should register callback only once when saving nested property object", () => {
 			 	transaction {
 					obj = $setGalleryNestedProperties()
 					obj.gallery.save()
