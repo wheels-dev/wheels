@@ -10,33 +10,42 @@ component {
         required string environment,
         required string rootPath,
         string template = "local",
-        string database = "h2",
+        required string dbtype,
+        string database = "",
+        string datasource = "",
         boolean force = false,
+        string base = ""
     ) {
         try {
             var projectRoot = arguments.rootPath;
 
             // Check if environment already exists
-            var envFile = projectRoot & ".env.#arguments.environment#";
-
+            var envFile = projectRoot & ".env." & arguments.environment;
+            
             if (fileExists(envFile) && !arguments.force) {
                 return {
                     success: false,
-                    error: "Environment '#arguments.environment#' already exists. Use --force to overwrite."
+                    error: "Environment '" & arguments.environment & "' already exists. Use --force to overwrite."
                 };
             }
 
-            // Setup based on template
             var result = {};
-            switch (arguments.template) {
-                case "docker":
-                    result = setupDockerEnvironment(argumentCollection = arguments, projectRoot);
-                    break;
-                case "vagrant":
-                    result = setupVagrantEnvironment(argumentCollection = arguments, projectRoot);
-                    break;
-                default:
-                    result = setupLocalEnvironment(argumentCollection = arguments);
+            
+            // Check if base environment is specified
+            if (len(trim(arguments.base))) {
+                result = setupFromBaseEnvironment(argumentCollection = arguments, projectRoot = projectRoot);
+            } else {
+                // Setup based on template (existing logic)
+                switch (arguments.template) {
+                    case "docker":
+                        result = setupDockerEnvironment(argumentCollection = arguments, projectRoot);
+                        break;
+                    case "vagrant":
+                        result = setupVagrantEnvironment(argumentCollection = arguments, projectRoot);
+                        break;
+                    default:
+                        result = setupLocalEnvironment(argumentCollection = arguments);
+                }
             }
 
             if (result.success) {
@@ -85,6 +94,7 @@ component {
                 arrayAppend(environments, {
                     name: envName,
                     template: config.template ?: "local",
+                    dbtype: config.dbtype ?: "unknown",
                     database: config.database ?: "unknown",
                     created: getFileInfo(projectRoot & "/" & file).lastModified
                 });
@@ -101,6 +111,7 @@ component {
                         arrayAppend(environments, {
                             name: envName,
                             template: "server.json",
+                            dbtype: "configured",
                             database: "configured",
                             created: getFileInfo(serverJsonPath).lastModified
                         });
@@ -147,51 +158,67 @@ component {
      * Setup local development environment
      */
     private function setupLocalEnvironment(argumentCollection) {
+        writeDump(arguments);
+        // Default database name if not provided
+        var databaseName = len(trim(arguments.database)) ? 
+            arguments.database : 
+            "wheels_#arguments.environment#";
+        var datasourceName = len(trim(arguments.datasource)) ? 
+            arguments.database : 
+            "wheels_#arguments.environment#";
+            
         var config = {
             template: "local",
-            database: arguments.database,
+            dbtype: arguments.dbtype,
+            database: databaseName,
             port: 8080,
             cfengine: "lucee5"
         };
 
         // Database-specific configuration
-        switch (arguments.database) {
+        switch (arguments.dbtype) {
             case "mysql":
-                config.datasource = {
+                config.datasourceInfo = {
                     driver: "MySQL",
                     host: "localhost",
                     port: 3306,
-                    database: "wheels_#arguments.environment#",
+                    database: databaseName,
+                    datasource: datasourceName,
                     username: "wheels",
                     password: "wheels_password"
                 };
                 break;
             case "postgres":
-                config.datasource = {
+                config.datasourceInfo = {
                     driver: "PostgreSQL",
                     host: "localhost",
                     port: 5432,
-                    database: "wheels_#arguments.environment#",
+                    database: databaseName,
+                    datasource: datasourceName,
                     username: "wheels",
                     password: "wheels_password"
                 };
                 break;
             case "mssql":
-                config.datasource = {
+                config.datasourceInfo = {
                     driver: "MSSQL",
                     host: "localhost",
                     port: 1433,
-                    database: "wheels_#arguments.environment#",
+                    database: databaseName,
+                    datasource: datasourceName,
                     username: "sa",
                     password: "Wheels_Pass123!"
                 };
                 break;
             default: // h2
-                config.datasource = {
+                config.datasourceInfo = {
                     driver: "H2",
                     host:"",
                     port:"",
-                    database: "./db/wheels_#arguments.environment#",
+                    database: len(trim(arguments.database)) ? 
+                        "./db/#arguments.database#" : 
+                        "./db/wheels_#arguments.environment#",
+                    datasource:datasourceName,
                     username: "sa",
                     password: ""
                 };
@@ -207,9 +234,15 @@ component {
      * Setup Docker environment
      */
     private function setupDockerEnvironment(argumentCollection, rootPath) {
+        // Default database name if not provided
+        var databaseName = len(trim(arguments.database)) ? 
+            arguments.database : 
+            "wheels";
+            
         var config = {
             template: "docker",
-            database: arguments.database,
+            dbtype: arguments.dbtype,
+            database: databaseName,
             port: 8080
         };
 
@@ -225,11 +258,11 @@ component {
         }
 
         // Database configuration for Docker
-        config.datasource = {
-            driver: getDatabaseDriver(arguments.database),
+        config.datasourceInfo = {
+            driver: getDatabaseDriver(arguments.dbtype),
             host: "db",
-            port: getDatabasePort(arguments.database),
-            database: "wheels",
+            port: getDatabasePort(arguments.dbtype),
+            database: databaseName,
             username: "wheels",
             password: "wheels_password"
         };
@@ -244,9 +277,15 @@ component {
      * Setup Vagrant environment
      */
     private function setupVagrantEnvironment(argumentCollection, rootPath) {
+        // Default database name if not provided
+        var databaseName = len(trim(arguments.database)) ? 
+            arguments.database : 
+            "wheels";
+            
         var config = {
             template: "vagrant",
-            database: arguments.database,
+            dbtype: arguments.dbtype,
+            database: databaseName,
             port: 8080
         };
 
@@ -284,14 +323,15 @@ component {
         arrayAppend(envContent, "");
 
         // Database settings
-        if (arguments.config.keyExists("datasource")) {
+        if (arguments.config.keyExists("datasourceInfo")) {
             arrayAppend(envContent, "## Database Settings");
-            arrayAppend(envContent, "DB_DRIVER=#arguments.config.datasource.driver#");
-            arrayAppend(envContent, "DB_HOST=#arguments.config.datasource.host#");
-            arrayAppend(envContent, "DB_PORT=#arguments.config.datasource.port#");
-            arrayAppend(envContent, "DB_NAME=#arguments.config.datasource.database#");
-            arrayAppend(envContent, "DB_USER=#arguments.config.datasource.username#");
-            arrayAppend(envContent, "DB_PASSWORD=#arguments.config.datasource.password#");
+            arrayAppend(envContent, "DB_TYPE=#arguments.config.dbtype#");
+            arrayAppend(envContent, "DB_DRIVER=#arguments.config.datasourceInfo.driver#");
+            arrayAppend(envContent, "DB_HOST=#arguments.config.datasourceInfo.host#");
+            arrayAppend(envContent, "DB_PORT=#arguments.config.datasourceInfo.port#");
+            arrayAppend(envContent, "DB_NAME=#arguments.config.datasourceInfo.database#");
+            arrayAppend(envContent, "DB_USER=#arguments.config.datasourceInfo.username#");
+            arrayAppend(envContent, "DB_PASSWORD=#arguments.config.datasourceInfo.password#");
             arrayAppend(envContent, "");
         }
 
@@ -320,17 +360,22 @@ component {
         
         // Generate timestamp
         var now = dateFormat(now(), "yyyy-mm-dd") & " " & timeFormat(now(), "HH:mm:ss");
+        
+        // Get database name from config
+        var datasourceName = arguments.config.keyExists("datasourceInfo") && arguments.config.datasourceInfo.keyExists("datasource") ? 
+            arguments.config.datasourceInfo.datasource : 
+            "wheels_" & arguments.environment;
 
         // Define default content
         var content = '<cfscript>
-    // Environment: #now#
-    // Generated: 2024-01-15 10:30:45
+    // Environment: #arguments.environment#
+    // Generated: #now#
 
     // Database settings
-    set(dataSourceName="wheels_staging");
+    set(dataSourceName="#datasourceName#");
 
     // Environment settings
-    set(environment="staging");
+    set(environment="#arguments.environment#");
     set(showDebugInformation=true);
     set(showErrorInformation=true);
 
@@ -346,12 +391,12 @@ component {
     set(cacheQueries=false);
 
     // Security
-    set(reloadPassword="generated_secure_password");
+    set(reloadPassword="wheels#arguments.environment#");
 
     // URLs
     set(urlRewriting="partial");
 
-    // Custom settings for staging
+    // Custom settings for #arguments.environment#
     set(sendEmailOnError=true);
     set(errorEmailAddress="dev-team@example.com");
 </cfscript>';
@@ -385,8 +430,9 @@ component {
         };
 
         // Add datasource if configured
-        if (arguments.config.keyExists("datasource")) {
-            var ds = arguments.config.datasource;
+        if (arguments.config.keyExists("datasourceInfo")) {
+            var ds = arguments.config.datasourceInfo;
+            serverJson.env[arguments.environment]["DB_TYPE"] = arguments.config.dbtype;
             serverJson.env[arguments.environment]["DB_DRIVER"] = ds.driver;
             serverJson.env[arguments.environment]["DB_HOST"] = ds.host;
             serverJson.env[arguments.environment]["DB_PORT"] = ds.port;
@@ -402,6 +448,11 @@ component {
      * Generate Docker Compose configuration
      */
     private function generateDockerCompose(argumentCollection) {
+        // Default database name if not provided
+        var databaseName = len(trim(arguments.database)) ? 
+            arguments.database : 
+            "wheels";
+            
         var compose = "version: '3.8'
 
 services:
@@ -411,9 +462,10 @@ services:
       - ""8080:8080""
     environment:
       - WHEELS_ENV=#arguments.environment#
+      - DB_TYPE=#arguments.dbtype#
       - DB_HOST=db
-      - DB_PORT=#getDatabasePort(arguments.database)#
-      - DB_NAME=wheels
+      - DB_PORT=#getDatabasePort(arguments.dbtype)#
+      - DB_NAME=#databaseName#
       - DB_USER=wheels
       - DB_PASSWORD=wheels_password
     volumes:
@@ -422,13 +474,13 @@ services:
       - db
 
   db:
-    image: #getDatabaseImage(arguments.database)#
+    image: #getDatabaseImage(arguments.dbtype)#
     ports:
-      - ""##getDatabasePort(arguments.database)##:##getDatabasePort(arguments.database)##""
+      - ""##getDatabasePort(arguments.dbtype)##:##getDatabasePort(arguments.dbtype)##""
     environment:
-      ##getDatabaseEnvironment(arguments.database)##
+      ##getDatabaseEnvironment(arguments.dbtype, databaseName)##
     volumes:
-      - db_data:/var/lib/##getDatabaseVolumeDir(arguments.database)##
+      - db_data:/var/lib/##getDatabaseVolumeDir(arguments.dbtype)##
 
 volumes:
   db_data:";
@@ -497,7 +549,7 @@ echo ""deb https://downloads.ortussolutions.com/debs/noarch /"" | tee -a /etc/ap
 apt-get update && apt-get install -y commandbox
 
 ## Install database
-##getProvisionDatabase(arguments.database)##
+##getProvisionDatabase(arguments.dbtype)##
 
 ## Setup application
 cd /vagrant
@@ -560,8 +612,8 @@ box server start port=8080 host=0.0.0.0";
     /**
      * Database helper functions
      */
-    private function getDatabaseDriver(database) {
-        switch (arguments.database) {
+    private function getDatabaseDriver(dbtype) {
+        switch (arguments.dbtype) {
             case "mysql": return "MySQL";
             case "postgres": return "PostgreSQL";
             case "mssql": return "MSSQL";
@@ -569,8 +621,8 @@ box server start port=8080 host=0.0.0.0";
         }
     }
 
-    private function getDatabasePort(database) {
-        switch (arguments.database) {
+    private function getDatabasePort(dbtype) {
+        switch (arguments.dbtype) {
             case "mysql": return 3306;
             case "postgres": return 5432;
             case "mssql": return 1433;
@@ -578,8 +630,8 @@ box server start port=8080 host=0.0.0.0";
         }
     }
 
-    private function getDatabaseImage(database) {
-        switch (arguments.database) {
+    private function getDatabaseImage(dbtype) {
+        switch (arguments.dbtype) {
             case "mysql": return "mysql:8";
             case "postgres": return "postgres:14";
             case "mssql": return "mcr.microsoft.com/mssql/server:2019-latest";
@@ -587,15 +639,15 @@ box server start port=8080 host=0.0.0.0";
         }
     }
 
-    private function getDatabaseEnvironment(database) {
-        switch (arguments.database) {
+    private function getDatabaseEnvironment(dbtype, databaseName = "wheels") {
+        switch (arguments.dbtype) {
             case "mysql":
                 return "MYSQL_ROOT_PASSWORD=root_password
-      MYSQL_DATABASE=wheels
+      MYSQL_DATABASE=#arguments.databaseName#
       MYSQL_USER=wheels
       MYSQL_PASSWORD=wheels_password";
             case "postgres":
-                return "POSTGRES_DB=wheels
+                return "POSTGRES_DB=#arguments.databaseName#
       POSTGRES_USER=wheels
       POSTGRES_PASSWORD=wheels_password";
             case "mssql":
@@ -606,8 +658,8 @@ box server start port=8080 host=0.0.0.0";
         }
     }
 
-    private function getDatabaseVolumeDir(database) {
-        switch (arguments.database) {
+    private function getDatabaseVolumeDir(dbtype) {
+        switch (arguments.dbtype) {
             case "mysql": return "mysql";
             case "postgres": return "postgresql/data";
             case "mssql": return "mssql";
@@ -615,18 +667,18 @@ box server start port=8080 host=0.0.0.0";
         }
     }
 
-    private function getProvisionDatabase(database) {
-        switch (arguments.database) {
+    private function getProvisionDatabase(dbtype, databaseName = "wheels") {
+        switch (arguments.dbtype) {
             case "mysql":
                 return "apt-get install -y mysql-server
-mysql -e ""CREATE DATABASE wheels;""
+mysql -e ""CREATE DATABASE #arguments.databaseName#;""
 mysql -e ""CREATE USER 'wheels'@'localhost' IDENTIFIED BY 'wheels_password';""
-mysql -e ""GRANT ALL ON wheels.* TO 'wheels'@'localhost';""";
+mysql -e ""GRANT ALL ON #arguments.databaseName#.* TO 'wheels'@'localhost';""";
             case "postgres":
                 return "apt-get install -y postgresql postgresql-contrib
-sudo -u postgres createdb wheels
+sudo -u postgres createdb #arguments.databaseName#
 sudo -u postgres psql -c ""CREATE USER wheels WITH PASSWORD 'wheels_password';""
-sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE wheels TO wheels;""";
+sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseName# TO wheels;""";
             default:
                 return "## H2 database will be created automatically";
         }
@@ -661,4 +713,148 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE wheels TO wheels;"""
 
         return baseDir & appPath;
     }
+    
+    // New function to handle base environment copying
+    function setupFromBaseEnvironment(
+        required string environment,
+        required string rootPath,
+        required string base,
+        string template = "local",
+        required string dbtype,
+        string database = ""
+    ) {
+        try {
+            var projectRoot = arguments.rootPath;
+            var baseEnvFile = projectRoot & ".env." & arguments.base;
+            
+            // Check if base environment exists
+            if (!fileExists(baseEnvFile)) {
+                return {
+                    success: false,
+                    error: "Base environment '" & arguments.base & "' does not exist."
+                };
+            }
+            
+            // Read base environment file
+            var baseEnvContent = fileRead(baseEnvFile);
+            var baseEnvConfig = parseEnvironmentFile(baseEnvContent);
+            
+            // Transform the parsed env config into the structure expected by createEnvironmentFile
+            var newConfig = transformEnvConfigToExpectedFormat(
+                baseEnvConfig, 
+                arguments.environment, 
+                arguments.dbtype,
+                arguments.database
+            );
+            
+            return {
+                success: true,
+                config: newConfig,
+                message: "Environment '" & arguments.environment & "' created from base environment '" & arguments.base & "'"
+            };
+            
+        } catch (any e) {
+            return {
+                success: false,
+                error: e
+            };
+        }
+    }
+
+    // Helper function to parse environment file content
+    function parseEnvironmentFile(required string content) {
+        var config = {};
+        var lines = listToArray(arguments.content, chr(10));
+        
+        for (var line in lines) {
+            line = trim(line);
+            
+            // Skip empty lines and comments
+            if (len(line) == 0 || left(line, 1) == "##") {
+                continue;
+            }
+            
+            // Parse key=value pairs
+            if (find("=", line)) {
+                var key = trim(listFirst(line, "="));
+                var value = trim(listRest(line, "="));
+                
+                // Remove quotes if present
+                if ((left(value, 1) == '"' && right(value, 1) == '"') || 
+                    (left(value, 1) == "'" && right(value, 1) == "'")) {
+                    value = mid(value, 2, len(value) - 2);
+                }
+                
+                config[key] = value;
+            }
+        }
+        
+        return config;
+    }
+
+    // Helper function to transform parsed env config to the format expected by createEnvironmentFile
+    function transformEnvConfigToExpectedFormat(
+        required struct envConfig,
+        required string environment,
+        required string dbtype,
+        string database = ""
+    ) {
+        var config = {};
+        
+        // Set database type and name
+        config["dbtype"] = arguments.dbtype;
+        
+        // Use provided database name or fall back to environment-based naming
+        var databaseName = len(trim(arguments.database)) ? 
+            arguments.database : 
+            (structKeyExists(arguments.envConfig, "DB_NAME") ? 
+                arguments.envConfig["DB_NAME"] : 
+                arguments.environment & "_db");
+                
+        config["database"] = databaseName;
+        
+        // Set port from SERVER_PORT or default
+        config["port"] = structKeyExists(arguments.envConfig, "SERVER_PORT") ? 
+            val(arguments.envConfig["SERVER_PORT"]) : 8080;
+        
+        // Add unique offset to avoid port conflicts
+        var envHash = 0;
+        for (var i = 1; i <= len(arguments.environment); i++) {
+            envHash += asc(mid(arguments.environment, i, 1));
+        }
+        envHash = envHash mod 1000;
+        config["port"] = config["port"] + envHash;
+        
+        // Set cfengine if exists
+        if (structKeyExists(arguments.envConfig, "SERVER_CFENGINE")) {
+            config["cfengine"] = arguments.envConfig["SERVER_CFENGINE"];
+        }
+        
+        // Create datasource structure if database keys exist
+        if (structKeyExists(arguments.envConfig, "DB_DRIVER") || 
+            structKeyExists(arguments.envConfig, "DB_HOST")) {
+            
+            config["datasource"] = {};
+            config["datasource"]["driver"] = getDatabaseDriver(arguments.dbtype);
+            config["datasource"]["host"] = structKeyExists(arguments.envConfig, "DB_HOST") ? 
+                arguments.envConfig["DB_HOST"] : "localhost";
+            config["datasource"]["port"] = getDatabasePort(arguments.dbtype);
+            config["datasource"]["database"] = databaseName;
+            config["datasource"]["username"] = structKeyExists(arguments.envConfig, "DB_USER") ? 
+                arguments.envConfig["DB_USER"] : "wheels";
+            config["datasource"]["password"] = structKeyExists(arguments.envConfig, "DB_PASSWORD") ? 
+                arguments.envConfig["DB_PASSWORD"] : "wheels_password";
+        }
+        
+        // Add any other keys that don't follow the standard patterns
+        for (var key in arguments.envConfig) {
+            // Skip keys we've already processed
+            if (!listFindNoCase("SERVER_PORT,SERVER_CFENGINE,DB_TYPE,DB_DRIVER,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD,WHEELS_ENV,WHEELS_RELOAD_PASSWORD", key)) {
+                config[key] = arguments.envConfig[key];
+            }
+        }
+        
+        return config;
+    }
+
 }

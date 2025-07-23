@@ -595,4 +595,23 @@ component excludeFromHelp=true {
 		}
 	}
 
+	function reconstructArgs(required struct argStruct) {
+        var result = {};
+
+        for (key in argStruct) {
+            if (find("=", key)) {
+                var parts = listToArray(key, "=");
+                if (arrayLen(parts) == 2 && argStruct[key] == true) {
+                    result[parts[1]] = parts[2];
+                } else {
+                    result[parts[1]] = parts[2] ?: true;
+                }
+            } else {
+                result[key] = argStruct[key];
+            }
+        }
+
+        return result;
+    }
+
 }

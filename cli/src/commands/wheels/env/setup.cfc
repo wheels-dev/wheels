@@ -21,10 +21,11 @@ component extends="../base" {
     function run(
         required string environment,
         string template = "local",
-        string database = "h2",
+        string dbtype = "h2",
         boolean force = false
     ) {
         var projectRoot = resolvePath(".");
+        arguments = reconstructArgs(arguments);
 
         print.yellowLine("Setting up #arguments.environment# environment...")
              .line();
