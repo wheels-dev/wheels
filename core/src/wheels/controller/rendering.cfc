@@ -232,6 +232,13 @@ component {
 
 			// If we do not have the local.content variable and we are not rendering html then try to create it.
 			if (!StructKeyExists(local, "content")) {
+				if(isStruct(arguments.data)){
+					for(local.item in arguments.data){
+						if(isInstanceOf(arguments.data[local.item], "oracle.sql.TIMESTAMP")){
+							arguments.data[local.item] = arguments.data[local.item].timestampValue();
+						}
+					}
+				}
 				switch (local.contentType) {
 					case "json":
 						local.namedArgs = {};
@@ -249,13 +256,6 @@ component {
 										// Force to string by wrapping in non printable character (that we later remove again).
 										arguments.data[local.i][local.key] = Chr(7) & arguments.data[local.i][local.key] & Chr(7);
 									}
-								}
-							}
-						}
-						if(isStruct(arguments.data)){
-							for(local.item in arguments.data){
-								if(isInstanceOf(arguments.data[local.item], "oracle.sql.TIMESTAMP")){
-									arguments.data[local.item] = arguments.data[local.item].timestampValue();
 								}
 							}
 						}
