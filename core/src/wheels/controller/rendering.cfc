@@ -252,6 +252,13 @@ component {
 								}
 							}
 						}
+						if(isStruct(arguments.data)){
+							for(local.item in arguments.data){
+								if(isInstanceOf(arguments.data[local.item], "oracle.sql.TIMESTAMP")){
+									arguments.data[local.item] = arguments.data[local.item].timestampValue();
+								}
+							}
+						}
 						local.content = SerializeJSON(arguments.data);
 						if (Find(Chr(7), local.content)) {
 							local.content = Replace(local.content, Chr(7), "", "all");
