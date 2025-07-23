@@ -101,6 +101,8 @@ component extends="testbox.system.BaseSpec" {
 				}
 				if(isInstanceOf(user.birthTime,"java.time.LocalDateTime")){
 					user.birthTime = createDateTime(user.birthTime.getYear(),user.birthTime.getMonthValue(),user.birthTime.getDayOfMonth(),user.birthTime.getHour(),user.birthTime.getMinute(),user.birthTime.getSecond());
+				} else if (isInstanceOf(user.birthTime, "oracle.sql.TIMESTAMP")){
+					user.birthTime = user.birthTime.timestampValue();
 				}
 				expect(user).toHaveKey("birthTime")
 				expect(TimeFormat(user.birthTime, "HH:mm:ss")).toBe("18:26:08")
@@ -114,6 +116,8 @@ component extends="testbox.system.BaseSpec" {
 				}
 				if(isInstanceOf(user.birthTime,"java.time.LocalDateTime")){
 					user.birthTime = createDateTime(user.birthTime.getYear(),user.birthTime.getMonthValue(),user.birthTime.getDayOfMonth(),user.birthTime.getHour(),user.birthTime.getMinute(),user.birthTime.getSecond());
+				} else if (isInstanceOf(user.birthTime, "oracle.sql.TIMESTAMP")){
+					user.birthTime = user.birthTime.timestampValue();
 				}
 				expect(user).toHaveKey("birthTime")
 				expect(TimeFormat(user.birthTime, "HH:mm:ss")).toBe("18:26:08")
@@ -530,6 +534,9 @@ component extends="testbox.system.BaseSpec" {
 					if(isInstanceOf(orgUpdatedAt,"java.time.LocalDateTime") and isInstanceOf(newUpdatedAt,"java.time.LocalDateTime")){
 						orgUpdatedAt = createDateTime(orgUpdatedAt.getYear(),orgUpdatedAt.getMonthValue(),orgUpdatedAt.getDayOfMonth(),orgUpdatedAt.getHour(),orgUpdatedAt.getMinute(),orgUpdatedAt.getSecond());
 						newUpdatedAt = createDateTime(newUpdatedAt.getYear(),newUpdatedAt.getMonthValue(),newUpdatedAt.getDayOfMonth(),newUpdatedAt.getHour(),newUpdatedAt.getMinute(),newUpdatedAt.getSecond());
+					} else if (isInstanceOf(orgUpdatedAt, "oracle.sql.TIMESTAMP") and isInstanceOf(newUpdatedAt, "oracle.sql.TIMESTAMP")){
+						orgUpdatedAt = orgUpdatedAt.timestampValue();
+						newUpdatedAt = newUpdatedAt.timestampValue();
 					}
 					expect(orgUpdatedAt).toBe(newUpdatedAt)
 
@@ -547,6 +554,9 @@ component extends="testbox.system.BaseSpec" {
 					if(isInstanceOf(orgUpdatedAt,"java.time.LocalDateTime") and isInstanceOf(newUpdatedAt,"java.time.LocalDateTime")){
 						orgUpdatedAt = createDateTime(orgUpdatedAt.getYear(),orgUpdatedAt.getMonthValue(),orgUpdatedAt.getDayOfMonth(),orgUpdatedAt.getHour(),orgUpdatedAt.getMinute(),orgUpdatedAt.getSecond());
 						newUpdatedAt = createDateTime(newUpdatedAt.getYear(),newUpdatedAt.getMonthValue(),newUpdatedAt.getDayOfMonth(),newUpdatedAt.getHour(),newUpdatedAt.getMinute(),newUpdatedAt.getSecond());
+					} else if (isInstanceOf(orgUpdatedAt, "oracle.sql.TIMESTAMP") and isInstanceOf(newUpdatedAt, "oracle.sql.TIMESTAMP")){
+						orgUpdatedAt = orgUpdatedAt.timestampValue();
+						newUpdatedAt = newUpdatedAt.timestampValue();
 					}
 					expect(orgUpdatedAt).toBe(newUpdatedAt)
 					
