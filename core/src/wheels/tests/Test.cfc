@@ -9,7 +9,7 @@ component extends="wheels.Test" {
 		local.tables = $dbinfo(datasource = application.wheels.dataSourceName, type = "tables");
 		local.tableList = ValueList(local.tables.table_name);
 		local.populate = StructKeyExists(url, "populate") ? url.populate : true;
-		if (local.populate || !FindNoCase("_c_o_r_e_authors", local.tableList)) {
+		if (local.populate || !FindNoCase("c_o_r_e_authors", local.tableList)) {
 			include "populate.cfm";
 		}
 	}

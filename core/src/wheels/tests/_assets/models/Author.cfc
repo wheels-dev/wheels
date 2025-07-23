@@ -1,7 +1,7 @@
 component extends="Model" {
 
 	function config() {
-		table("_c_o_r_e_authors");
+		table("c_o_r_e_authors");
 		hasMany("posts");
 		hasOne("profile");
 		/* crazy join to test the joinKey argument */
@@ -9,7 +9,7 @@ component extends="Model" {
 		beforeSave("callbackThatReturnsTrue");
 		beforeDelete("callbackThatReturnsTrue");
 		property(name = "firstName", label = "First name(s)", defaultValue = "Dave");
-		property(name = "numberofitems", sql = "SELECT COUNT(id) FROM _c_o_r_e_posts WHERE authorid = _c_o_r_e_authors.id", select = false);
+		property(name = "numberofitems", sql = "SELECT COUNT(id) FROM c_o_r_e_posts WHERE authorid = c_o_r_e_authors.id", select = false);
 		property(name = "lastName", label = "Last name", defaultValue = "");
 		nestedProperties(associations = "profile", allowDelete = true);
 		validatesPresenceOf("firstName");

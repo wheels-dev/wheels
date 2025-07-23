@@ -8,7 +8,7 @@ component extends="wheels.tests.Test" {
 			migratePath = "/wheels/tests/_assets/migrator/migrations/",
 			sqlPath = "/wheels/tests/_assets/migrator/sql/"
 		);
-		tableName = "_c_o_r_e_bunyips";
+		tableName = "c_o_r_e_bunyips";
 
 		migration.dropTable(tableName);
 		t = migration.createTable(name = tableName);
@@ -19,8 +19,8 @@ component extends="wheels.tests.Test" {
 			limit = 255
 		);
 		t.create();
-		migration.removeRecord(table = "_c_o_r_e_migrator_versions");
-		migration.addRecord(table = "_c_o_r_e_migrator_versions", version = "001");
+		migration.removeRecord(table = "c_o_r_e_migrator_versions");
+		migration.addRecord(table = "c_o_r_e_migrator_versions", version = "001");
 
 		$cleanSqlDirectory();
 	}

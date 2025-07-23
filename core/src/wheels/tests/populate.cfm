@@ -50,7 +50,7 @@
 <cfset local.tableList = ValueList(local.dbinfo.table_name, Chr(7))>
 
 <!--- list of views to delete --->
-<cfset local.views = "_c_o_r_e_userphotos">
+<cfset local.views = "c_o_r_e_userphotos">
 <cfloop list="#local.views#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
@@ -63,7 +63,7 @@
 </cfloop>
 
 <!--- list of tables to delete --->
-<cfset local.tables = "_c_o_r_e_authors,_c_o_r_e_cities,_c_o_r_e_classifications,_c_o_r_e_comments,_c_o_r_e_galleries,_c_o_r_e_photos,_c_o_r_e_posts,_c_o_r_e_profiles,_c_o_r_e_shops,_c_o_r_e_trucks,_c_o_r_e_tags,_c_o_r_e_users,_c_o_r_e_collisiontests,_c_o_r_e_combikeys,_c_o_r_e_tblusers,_c_o_r_e_sqltypes,_c_o_r_e_CATEGORIES">
+<cfset local.tables = "c_o_r_e_authors,c_o_r_e_cities,c_o_r_e_classifications,c_o_r_e_comments,c_o_r_e_galleries,c_o_r_e_photos,c_o_r_e_posts,c_o_r_e_profiles,c_o_r_e_shops,c_o_r_e_trucks,c_o_r_e_tags,c_o_r_e_users,c_o_r_e_collisiontests,c_o_r_e_combikeys,c_o_r_e_tblusers,c_o_r_e_sqltypes,c_o_r_e_CATEGORIES">
 <cfloop list="#local.tables#" index="local.i">
 	<cfif ListFindNoCase(local.tableList, local.i, Chr(7))>
 		<cftry>
@@ -77,7 +77,7 @@
 
 <!--- create tables --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_authors
+CREATE TABLE c_o_r_e_authors
 (
 	id #local.identityColumnType#
 	,firstname varchar(100) NOT NULL
@@ -87,7 +87,7 @@ CREATE TABLE _c_o_r_e_authors
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_cities
+CREATE TABLE c_o_r_e_cities
 (
 	countyid char(4) NOT NULL
 	,citycode #local.intColumnType# NOT NULL
@@ -97,7 +97,7 @@ CREATE TABLE _c_o_r_e_cities
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_classifications
+CREATE TABLE c_o_r_e_classifications
 (
 	id #local.identityColumnType#
 	,postid #local.intColumnType# NOT NULL
@@ -107,7 +107,7 @@ CREATE TABLE _c_o_r_e_classifications
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_collisiontests
+CREATE TABLE c_o_r_e_collisiontests
 (
 	id #local.identityColumnType#
 	,method varchar(100) NOT NULL
@@ -116,7 +116,7 @@ CREATE TABLE _c_o_r_e_collisiontests
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_combikeys
+CREATE TABLE c_o_r_e_combikeys
 (
 	id1 int NOT NULL
 	,id2 int NOT NULL
@@ -126,7 +126,7 @@ CREATE TABLE _c_o_r_e_combikeys
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_comments
+CREATE TABLE c_o_r_e_comments
 (
 	id #local.identityColumnType#
 	,postid #local.intColumnType# NOT NULL
@@ -140,7 +140,7 @@ CREATE TABLE _c_o_r_e_comments
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_galleries
+CREATE TABLE c_o_r_e_galleries
 (
 	id #local.identityColumnType#
 	,userid #local.intColumnType# NOT NULL
@@ -151,7 +151,7 @@ CREATE TABLE _c_o_r_e_galleries
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_photos
+CREATE TABLE c_o_r_e_photos
 (
 	id #local.identityColumnType#
 	,galleryid #local.intColumnType# NOT NULL
@@ -163,7 +163,7 @@ CREATE TABLE _c_o_r_e_photos
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_posts
+CREATE TABLE c_o_r_e_posts
 (
 	id #local.identityColumnType#
 	,authorid #local.intColumnType# NULL
@@ -179,7 +179,7 @@ CREATE TABLE _c_o_r_e_posts
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_profiles
+CREATE TABLE c_o_r_e_profiles
 (
 	id #local.identityColumnType#
 	,authorid #local.intColumnType# NULL
@@ -190,7 +190,7 @@ CREATE TABLE _c_o_r_e_profiles
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_shops
+CREATE TABLE c_o_r_e_shops
 (
 	shopid char(9) NOT NULL
 	,citycode #local.intColumnType# NULL
@@ -202,7 +202,7 @@ CREATE TABLE _c_o_r_e_shops
 
 <!--- this table is for testing ambiguous column names (shopid) --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_trucks
+CREATE TABLE c_o_r_e_trucks
 (
 	id #local.identityColumnType#
 	,shopid char(9) NOT NULL
@@ -212,7 +212,7 @@ CREATE TABLE _c_o_r_e_trucks
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_sqltypes
+CREATE TABLE c_o_r_e_sqltypes
 (
 	id #local.identityColumnType#
 	,booleanType #local.bitColumnType# DEFAULT #local.bitColumnDefault# NOT NULL
@@ -228,7 +228,7 @@ CREATE TABLE _c_o_r_e_sqltypes
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_tags
+CREATE TABLE c_o_r_e_tags
 (
 	id #local.identityColumnType#
 	,parentid #local.intColumnType# NULL
@@ -239,7 +239,7 @@ CREATE TABLE _c_o_r_e_tags
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_tblusers
+CREATE TABLE c_o_r_e_tblusers
 (
 	id #local.identityColumnType#
 	,username varchar(50) NOT NULL
@@ -263,7 +263,7 @@ CREATE TABLE _c_o_r_e_tblusers
 </cfquery>
 
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_users
+CREATE TABLE c_o_r_e_users
 (
 	id #local.identityColumnType#
 	,username varchar(50) NOT NULL
@@ -288,7 +288,7 @@ CREATE TABLE _c_o_r_e_users
 
 <!--- specifically for testing uppercase table name containing OR substring --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE TABLE _c_o_r_e_CATEGORIES
+CREATE TABLE c_o_r_e_CATEGORIES
 (
 	ID #local.identityColumnType#
 	,CATEGORY_NAME varchar(100) NOT NULL
@@ -298,9 +298,9 @@ CREATE TABLE _c_o_r_e_CATEGORIES
 
 <!--- create views --->
 <cfquery name="local.query" datasource="#application.wheels.dataSourceName#">
-CREATE VIEW _c_o_r_e_userphotos AS
+CREATE VIEW c_o_r_e_userphotos AS
 SELECT u.id AS userid, u.username AS username, u.firstname AS firstname, u.lastname AS lastname, g.title AS title, g.id AS galleryid
-FROM _c_o_r_e_users u INNER JOIN _c_o_r_e_galleries g ON u.id = g.userid
+FROM c_o_r_e_users u INNER JOIN c_o_r_e_galleries g ON u.id = g.userid
 </cfquery>
 
 <!--- populate with data --->

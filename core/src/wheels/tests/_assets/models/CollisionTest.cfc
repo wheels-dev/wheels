@@ -1,7 +1,7 @@
 component extends="Model" {
 
 	function config() {
-		table("_c_o_r_e_collisiontests");
+		table("c_o_r_e_collisiontests");
 		afterFind("afterFindCallback");
 	}
 

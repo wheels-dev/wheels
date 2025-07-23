@@ -14,7 +14,7 @@ component extends="wheels.tests.Test" {
 		};
 		PluginObj = $pluginObj(config);
 		application.wheels.mixins = PluginObj.getMixins();
-		m = model("_c_o_r_e_authors").new();
+		m = model("c_o_r_e_authors").new();
 		_params = {controller = "test", action = "index"};
 		c = controller("test", _params);
 		d = $createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
