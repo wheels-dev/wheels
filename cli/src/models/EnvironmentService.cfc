@@ -14,8 +14,14 @@ component {
         string database = "",
         string datasource = "",
         boolean force = false,
-        string base = ""
+        string base = "",
+        boolean debug = false,
+        boolean cache = false,
+        string reloadPassword = "",
+        boolean help = false
     ) {
+
+
         try {
             var projectRoot = arguments.rootPath;
 
@@ -38,10 +44,10 @@ component {
                 // Setup based on template (existing logic)
                 switch (arguments.template) {
                     case "docker":
-                        result = setupDockerEnvironment(argumentCollection = arguments, projectRoot);
+                        result = setupDockerEnvironment(argumentCollection = arguments, projectRoot = projectRoot);
                         break;
                     case "vagrant":
-                        result = setupVagrantEnvironment(argumentCollection = arguments, projectRoot);
+                        result = setupVagrantEnvironment(argumentCollection = arguments, projectRoot = projectRoot);
                         break;
                     default:
                         result = setupLocalEnvironment(argumentCollection = arguments);
@@ -51,7 +57,7 @@ component {
             if (result.success) {
                 // Create environment file
                 createEnvironmentFile(arguments.environment, result.config, projectRoot);
-                createEnvironmentSettings(arguments.environment, result.config, projectRoot);
+                createEnvironmentSettings(argumentCollection = arguments, config = result.config, rootPath = projectRoot);
 
                 // Update server.json if needed
                 updateServerConfig(arguments.environment, result.config, projectRoot);
@@ -89,7 +95,7 @@ component {
         for (var file in envFiles) {
             if (reFindNoCase("^\.env\.", file)) {
                 var envName = listLast(file, ".");
-                var config = loadEnvironmentConfig(envName,projectRoot);
+                var config = loadEnvironmentConfig(envName, projectRoot);
 
                 arrayAppend(environments, {
                     name: envName,
@@ -158,13 +164,13 @@ component {
      * Setup local development environment
      */
     private function setupLocalEnvironment(argumentCollection) {
-        writeDump(arguments);
+
         // Default database name if not provided
         var databaseName = len(trim(arguments.database)) ? 
             arguments.database : 
             "wheels_#arguments.environment#";
         var datasourceName = len(trim(arguments.datasource)) ? 
-            arguments.database : 
+            arguments.datasource : 
             "wheels_#arguments.environment#";
             
         var config = {
@@ -251,7 +257,7 @@ component {
         fileWrite("#arguments.rootPath#docker-compose.#arguments.environment#.yml", dockerComposeContent);
 
         // Create Dockerfile if it doesn't exist
-        var dockerfilePath = "#projectRoot#Dockerfile";
+        var dockerfilePath = "#arguments.rootPath#Dockerfile";
         if (!fileExists(dockerfilePath)) {
             var dockerfileContent = generateDockerfile();
             fileWrite(dockerfilePath, dockerfileContent);
@@ -295,7 +301,7 @@ component {
 
         // Create provisioning script
         var provisionScript = generateProvisionScript(argumentCollection = arguments);
-        var provisionDir = "#projectRoot#vagrant";
+        var provisionDir = "#arguments.rootPath#vagrant";
         if (!directoryExists(provisionDir)) {
             directoryCreate(provisionDir);
         }
@@ -346,9 +352,16 @@ component {
     }
 
      /**
-     * Create Settings file
+     * Create Settings file - Enhanced with debug, cache, and reload-password support
      */
-    function createEnvironmentSettings(environment, config, rootPath) {
+    function createEnvironmentSettings(
+        required string environment,
+        required struct config,
+        required string rootPath,
+        boolean debug = true,
+        boolean cache = false,
+        string reloadPassword = ""
+    ) {
         var projectRoot = arguments.rootPath;
         var envDir = projectRoot & "/config/#arguments.environment#";
         var settingsFile = envDir & "/settings.cfm";
@@ -361,51 +374,63 @@ component {
         // Generate timestamp
         var now = dateFormat(now(), "yyyy-mm-dd") & " " & timeFormat(now(), "HH:mm:ss");
         
-        // Get database name from config
+        // Get Datasource name from config
         var datasourceName = arguments.config.keyExists("datasourceInfo") && arguments.config.datasourceInfo.keyExists("datasource") ? 
             arguments.config.datasourceInfo.datasource : 
             "wheels_" & arguments.environment;
+        
+        // Determine reload password
+        var reloadPass = len(trim(arguments.reloadPassword)) ? 
+            arguments.reloadPassword : 
+            "wheels" & arguments.environment;
 
-        // Define default content
+        // Define content with dynamic debug/cache settings
         var content = '<cfscript>
     // Environment: #arguments.environment#
     // Generated: #now#
+    // Debug Mode: #arguments.debug ? "Enabled" : "Disabled"#
+    // Cache Mode: #arguments.cache ? "Enabled" : "Disabled"#
 
     // Database settings
     set(dataSourceName="#datasourceName#");
 
     // Environment settings
     set(environment="#arguments.environment#");
-    set(showDebugInformation=true);
-    set(showErrorInformation=true);
+    
+    // Debug settings - controlled by debug argument
+    set(showDebugInformation=#arguments.debug#);
+    set(showErrorInformation=#arguments.debug#);
 
-    // Caching
-    set(cacheFileChecking=false);
-    set(cacheImages=false);
-    set(cacheModelInitialization=false);
-    set(cacheControllerInitialization=false);
-    set(cacheRoutes=false);
-    set(cacheActions=false);
-    set(cachePages=false);
-    set(cachePartials=false);
-    set(cacheQueries=false);
+    // Caching settings - controlled by cache argument
+    set(cacheFileChecking=#arguments.cache#);
+    set(cacheImages=#arguments.cache#);
+    set(cacheModelInitialization=#arguments.cache#);
+    set(cacheControllerInitialization=#arguments.cache#);
+    set(cacheRoutes=#arguments.cache#);
+    set(cacheActions=#arguments.cache#);
+    set(cachePages=#arguments.cache#);
+    set(cachePartials=#arguments.cache#);
+    set(cacheQueries=#arguments.cache#);
 
     // Security
-    set(reloadPassword="wheels#arguments.environment#");
+    set(reloadPassword="#reloadPass#");
 
     // URLs
     set(urlRewriting="partial");
 
-    // Custom settings for #arguments.environment#
-    set(sendEmailOnError=true);
+    // Environment-specific settings
+    set(sendEmailOnError=#arguments.debug ? "false" : "true"#);
     set(errorEmailAddress="dev-team@example.com");
 </cfscript>';
 
         // Write to settings.cfm
         fileWrite(settingsFile, content);
-        return "settings.cfm created at /config/#arguments.environment#/";
+        
+        return {
+            success: true,
+            message: "settings.cfm created at /config/#arguments.environment#/ with debug=#arguments.debug#, cache=#arguments.cache#"
+        };
     }
-
 
     /**
      * Update server.json configuration
@@ -560,7 +585,7 @@ box server start port=8080 host=0.0.0.0";
     /**
      * Load environment configuration
      */
-    private function loadEnvironmentConfig(environment,rootPath) {
+    private function loadEnvironmentConfig(environment, rootPath) {
         var config = {};
         var envFile = "#arguments.rootPath#.env.#arguments.environment#";
 
