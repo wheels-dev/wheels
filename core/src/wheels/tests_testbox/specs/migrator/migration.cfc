@@ -678,7 +678,7 @@ component extends="testbox.system.BaseSpec" {
 				migration.dropTable(tableName)
 				migration.dropTable(referenceTableName)
 
-				sql = "SELECT * FROM query WHERE pkcolumn_name = 'id' AND fktable_name = '#tableName#' AND fkcolumn_name = 'barid'"
+				sql = "SELECT * FROM query WHERE LOWER(pkcolumn_name) = 'id' AND LOWER(fktable_name) = '#tableName#' AND LOWER(fkcolumn_name) = 'barid'"
 
 				actual = g.$query(query = info, dbtype = "query", sql = sql)
 
@@ -712,7 +712,7 @@ component extends="testbox.system.BaseSpec" {
 
 				sql = "SELECT * FROM query WHERE index_name = '#indexName#'"
 
-				actual = g.$query(query = info, dbtype = "query", sql = sql)
+				actual = g.$query(query = info, dbtype = "query", sql = "SELECT * FROM query WHERE LOWER(index_name) = '#indexName#'")
 
 				expect(actual.recordcount).toBe(1)
 				expect(actual.non_unique).toBeTrue()
@@ -734,7 +734,7 @@ component extends="testbox.system.BaseSpec" {
 
 				migration.dropTable(tableName)
 
-				sql = "SELECT * FROM query WHERE index_name = '#indexName#'"
+				sql = "SELECT * FROM query WHERE LOWER(index_name) = '#indexName#'"
 
 				actual = g.$query(query = info, dbtype = "query", sql = sql)
 
@@ -810,7 +810,7 @@ component extends="testbox.system.BaseSpec" {
 
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
 				migration.dropTable(tableName)
-				sql = "SELECT * FROM query WHERE column_name = '#columnName#'"
+				sql = "SELECT * FROM query WHERE LOWER(column_name) = '#columnName#'"
 				actual = g.$query(query = info, dbtype = "query", sql = sql)
 
 				expect(actual.column_size).toBe(50)
@@ -923,7 +923,7 @@ component extends="testbox.system.BaseSpec" {
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = referenceTableName, type = "foreignkeys")
 
 
-				sql = "SELECT * FROM query WHERE fktable_name = '#tableName#' AND fkcolumn_name = 'barid' AND pkcolumn_name = 'id'"
+				sql = "SELECT * FROM query WHERE LOWER(fktable_name) = '#tableName#' AND LOWER(fkcolumn_name) = 'barid' AND LOWER(pkcolumn_name) = 'id'"
 
 				created = g.$query(query = info, dbtype = "query", sql = sql)
 
@@ -1050,7 +1050,7 @@ component extends="testbox.system.BaseSpec" {
 
 				migration.addIndex(table = tableName, columnNames = 'integercolumn', indexName = indexName)
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "index")
-				sql = "SELECT * FROM query WHERE index_name = '#indexName#'"
+				sql = "SELECT * FROM query WHERE LOWER(index_name) = '#indexName#'"
 				created = g.$query(query = info, dbtype = "query", sql = sql)
 
 				migration.removeIndex(table = tableName, indexName = indexName)
