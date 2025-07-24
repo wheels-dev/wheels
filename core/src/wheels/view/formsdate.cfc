@@ -122,6 +122,15 @@ component {
 		if(isInstanceOf(local.value,"java.time.LocalDateTime")){
 			local.value = createDateTime(local.value.getYear(),local.value.getMonthValue(),local.value.getDayOfMonth(),local.value.getHour(),local.value.getMinute(),local.value.getSecond());
 		}
+		if (structKeyExists(server, "boxlang")) {
+			// BoxLang compatibility: Fix date parsing where MM/DD/YYYY becomes DD/MM/YYYY  
+			if (IsSimpleValue(local.value) && ReFindNoCase("^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", local.value)) {
+				local.parts = ListToArray(Left(local.value, 10), "-");
+				if (ArrayLen(local.parts) == 3) {
+					local.value = CreateDateTime(local.parts[1], local.parts[3], local.parts[2], 0, 0, 0);
+				}
+			}
+		}
 		local.rv = "";
 		local.firstDone = false;
 		local.iEnd = ListLen(arguments.order);
@@ -185,15 +194,19 @@ component {
 		string errorElement = "",
 		string errorClass = "",
 		required string $type,
-		required numeric $loopFrom,
-		required numeric $loopTo,
+		required any $loopFrom,
+		required any $loopTo,
 		required string $id,
-		required numeric $step,
+		required any $step,
 		string $optionNames = "",
 		boolean twelveHour = false,
 		date $now = Now(),
 		any encode = false
 	) {
+		// Ensure numeric types for BoxLang compatibility
+		arguments.$loopFrom = Val(arguments.$loopFrom);
+		arguments.$loopTo = Val(arguments.$loopTo);
+		arguments.$step = Val(arguments.$step);
 		local.optionContent = "";
 
 		// only set the default value if the value is blank and includeBlank is false
