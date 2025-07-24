@@ -202,10 +202,10 @@ component output="false" {
 		) {
 			application.wo.$debugPoint("total,reload");
 			if (StructKeyExists(url, "lock") && !url.lock) {
-				this.handleRestartAppRequest();
+				this.$handleRestartAppRequest();
 			} else {
 				local.executeArgs = {"componentReference" = "application"};
-				application.wo.$simpleLock(name = local.lockName, execute = "handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
+				application.wo.$simpleLock(name = local.lockName, execute = "$handleRestartAppRequest", type = "exclusive", timeout = 180, executeArgs = local.executeArgs);
 			}
 			return false; // Stop processing this request after restart
 		}
@@ -305,13 +305,13 @@ component output="false" {
 		return true;
 	}
 
-	public void function handleRestartAppRequest() {
-		local.redirectUrl = this.buildRedirectUrl();
+	private void function $handleRestartAppRequest() {
+		local.redirectUrl = this.$buildRedirectUrl();
 		applicationStop();
 		location(url = local.redirectUrl, addToken = false);
 	}
 
-	private string function buildRedirectUrl() {
+	private string function $buildRedirectUrl() {
 		// Determine the base URL
 		if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
 			local.url = cgi.path_info;
