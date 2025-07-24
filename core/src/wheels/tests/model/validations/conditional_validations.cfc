@@ -2,7 +2,7 @@ component extends="wheels.tests.Test" {
 
 	function setup() {
 		user = application.wirebox.getInstance( "wheels.tests._assets.models.Model" ).$initModelClass(
-			name = "_c_o_r_e_Users",
+			name = "c_o_r_e_Users",
 			path = get("modelPath")
 		);
 		user.username = "TheLongestNameInTheWorld";

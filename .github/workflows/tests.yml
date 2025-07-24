@@ -22,93 +22,83 @@ jobs:
         jdkVersion: ["21"]
         experimental: [false]
         include:
+          - cfengine: lucee5
+            dbengine: mysql
+          - cfengine: lucee5
+            dbengine: postgres
+          - cfengine: lucee5
+            dbengine: sqlserver
+          - cfengine: lucee5
+            dbengine: h2
+          - cfengine: lucee5
+            dbengine: oracle
+          - cfengine: lucee6
+            dbengine: mysql
+          - cfengine: lucee6
+            dbengine: postgres
+          - cfengine: lucee6
+            dbengine: sqlserver
+          - cfengine: lucee6
+            dbengine: h2
+          - cfengine: lucee6
+            dbengine: oracle
+          - cfengine: adobe2018
+            dbengine: mysql
+          - cfengine: adobe2018
+            dbengine: postgres
+          - cfengine: adobe2018
+            dbengine: sqlserver
+          - cfengine: adobe2018
+            dbengine: oracle
+          - cfengine: adobe2021
+            dbengine: mysql
+          - cfengine: adobe2021
+            dbengine: postgres
+          - cfengine: adobe2021
+            dbengine: sqlserver
+          - cfengine: adobe2021
+            dbengine: oracle
+          - cfengine: adobe2023
+            dbengine: mysql
+          - cfengine: adobe2023
+            dbengine: postgres
+          - cfengine: adobe2023
+            dbengine: sqlserver
+          - cfengine: adobe2023
+            dbengine: oracle
           # Lucee 7 experimental tests (non-blocking)
-          - cfengine: "lucee7"
-            dbengine: "h2"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "lucee7"
-            dbengine: "mysql"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "lucee7"
-            dbengine: "postgres"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
-          - cfengine: "lucee7"
-            dbengine: "sqlserver"
-            commandbox_version: "6.2.1"
-            jdkVersion: "21"
-            experimental: true
+          # - cfengine: "lucee7"
+          #   dbengine: "h2"
+          #   commandbox_version: "6.2.1"
+          #   jdkVersion: "21"
+          #   experimental: true
+          # - cfengine: "lucee7"
+          #   dbengine: "mysql"
+          #   commandbox_version: "6.2.1"
+          #   jdkVersion: "21"
+          #   experimental: true
+          # - cfengine: "lucee7"
+          #   dbengine: "postgres"
+          #   commandbox_version: "6.2.1"
+          #   jdkVersion: "21"
+          #   experimental: true
+          # - cfengine: "lucee7"
+          #   dbengine: "sqlserver"
+          #   commandbox_version: "6.2.1"
+          #   jdkVersion: "21"
+          #   experimental: true
           # - cfengine: "lucee7"
           #   dbengine: "oracle"
           #   commandbox_version: "6.2.1"
           #   jdkVersion: "21"
           #   experimental: true
         exclude:
-          # - cfengine: lucee5
-          #   dbengine: mysql
-          # - cfengine: lucee5
-          #   dbengine: postgres
-          # - cfengine: lucee5
-          #   dbengine: sqlserver
-          # - cfengine: lucee5
-          #   dbengine: h2
-          - cfengine: lucee5
-            dbengine: oracle
-          # - cfengine: lucee6
-          #   dbengine: mysql
-          # - cfengine: lucee6
-          #   dbengine: postgres
-          # - cfengine: lucee6
-          #   dbengine: sqlserver
-          # - cfengine: lucee6
-          #   dbengine: h2
-          - cfengine: lucee6
-            dbengine: oracle
-          # - cfengine: lucee7
-          #   dbengine: mysql
-          # - cfengine: lucee7
-          #   dbengine: postgres
-          # - cfengine: lucee7
-          #   dbengine: sqlserver
-          # - cfengine: lucee7
-          #   dbengine: h2
-          - cfengine: lucee7
-            dbengine: oracle
-          # - cfengine: adobe2018
-          #   dbengine: mysql
-          # - cfengine: adobe2018
-          #   dbengine: postgres
-          # - cfengine: adobe2018
-          #   dbengine: sqlserver
           - cfengine: adobe2018
             dbengine: h2
-          - cfengine: adobe2018
-            dbengine: oracle
-          # - cfengine: adobe2021
-          #   dbengine: mysql
-          # - cfengine: adobe2021
-          #   dbengine: postgres
-          # - cfengine: adobe2021
-          #   dbengine: sqlserver
           - cfengine: adobe2021
             dbengine: h2
-          - cfengine: adobe2021
-            dbengine: oracle
-          # - cfengine: adobe2023
-          #   dbengine: mysql
-          # - cfengine: adobe2023
-          #   dbengine: postgres
-          # - cfengine: adobe2023
-          #   dbengine: sqlserver
           - cfengine: adobe2023
             dbengine: h2
-          - cfengine: adobe2023
-            dbengine: oracle
           - cfengine: adobe2025
             dbengine: h2
           - cfengine: adobe2025
@@ -131,6 +121,17 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Download jdbc10 
+        if: ${{ matrix.cfengine == 'adobe2018' }} || ${{ matrix.cfengine == 'adobe2021' }} || ${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}
+        run: |
+          
+          mkdir -p ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib
+          
+          wget https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
+            -O ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+          
+          ls -l ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/
 
       - name: Start cfengine (${{ matrix.cfengine }}) ...
         run: docker compose up -d ${{ matrix.cfengine }}
@@ -202,6 +203,20 @@ jobs:
           # Try a basic curl to see if service responds
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
 
+      - name: Wait for Oracle to be ready
+        if: ${{ matrix.dbengine == 'oracle' }}
+        run: sleep 120
+
+      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
+        if: ${{ matrix.cfengine == 'adobe2021' || matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }}
+        run: |
+          if [ "${{ matrix.cfengine }}" = "adobe2018" ]; then
+            echo "Skipping cfpm install for adobe2018"
+            exit 0
+          fi
+
+          docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle
+
       - name: Run Tests with Retry
         id: run-tests
         run: |
@@ -228,16 +243,17 @@ jobs:
           
           echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
           
+          if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
+            echo "Response content:"
+            cat "${{ steps.test-vars.outputs.result_file }}"
+          fi
+
           # Check result
           if [ "$HTTP_CODE" = "200" ]; then
             echo "✅ Tests passed with HTTP 200"
             exit 0
           else
             echo "❌ Tests failed with HTTP code: ${HTTP_CODE}"
-            if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
-              echo "Response content:"
-              cat "${{ steps.test-vars.outputs.result_file }}"
-            fi
             exit 1
           fi
 

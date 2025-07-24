@@ -145,7 +145,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("works", () => {
 				user = g.model("user2")
-				expect(user.tableName()).toBe("_c_o_r_e_tblusers")
+				expect(user.tableName()).toBe("c_o_r_e_tblusers")
 			})
 
 			it("works in finders - fixes issue 667", () => {

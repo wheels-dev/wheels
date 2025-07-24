@@ -114,7 +114,7 @@ component extends="wheels.tests.Test" {
 		transaction action="begin"	{
 			loc.query0 = model("Post").findAll(where="averagerating = '5.0'");
 			assert("loc.query0.recordcount eq 0");
-			loc.query1 = model("Post").updateAll(averagerating = "5.0", where = "_c_o_r_e_comments.postid = '1'", include = "_c_o_r_e_Comments");
+			loc.query1 = model("Post").updateAll(averagerating = "5.0", where = "c_o_r_e_comments.postid = '1'", include = "c_o_r_e_Comments");
 			loc.query2 = model("Post").findAll(where="averagerating = '5.0'");
 			transaction action="rollback";
 		}

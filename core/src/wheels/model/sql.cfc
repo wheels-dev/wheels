@@ -621,7 +621,7 @@ component {
 		// Issue#1273: Added this section to allow included tables to be referenced in the query
 		local.migration = CreateObject("component", "wheels.migrator.Migration").init();
 		local.tempSql = "";
-		if(arguments.include != "" && ListFind('PostgreSQL,H2,MicrosoftSQLServer', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		if(arguments.include != "" && ListFind('PostgreSQL,H2,MicrosoftSQLServer,Oracle', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			local.tempSql = arguments.sql;
 		}
 		local.whereClause = $whereClause(
@@ -642,7 +642,7 @@ component {
 				ArrayAppend(arguments.sql, "FROM #tablename()#");
 			}
 		}
-		else if(arguments.include != "" && ListFind('H2', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		else if(arguments.include != "" && ListFind('H2,Oracle', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			if(left(arguments.sql[1], 6) == 'UPDATE'){
 				ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #arguments.include#");
 			}
@@ -685,7 +685,11 @@ component {
 				}
 				ArrayAppend(local.rv, "#local.joinclause# WHERE ");
 			}
-			else{
+			else if(arguments.include != "" && ListFind('Oracle', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+				ArrayAppend(local.rv, "WHERE");
+				ArrayAppend(local.rv, local.classes[2].JOIN.Split("ON")[2] & " AND");
+			}
+			else {
 				ArrayAppend(local.rv, "WHERE");
 			}
 			local.wherePos = ArrayLen(local.rv) + 1;
@@ -808,7 +812,9 @@ component {
 			local.addToWhere = Replace(local.addToWhere, ",", " AND ", "all");
 			if (Len(local.addToWhere)) {
 				if (Len(arguments.where)) {
-					ArrayInsertAt(local.rv, local.wherePos, " (");
+					if(!(ListFind('Oracle', local.migration.adapter.adapterName()) && (isArray(arguments.sql) && left(arguments.sql[1], 6) == 'UPDATE'))){
+						ArrayInsertAt(local.rv, local.wherePos, " (");
+					}
 					ArrayAppend(local.rv, ") AND (");
 					ArrayAppend(local.rv, local.addToWhere);
 					ArrayAppend(local.rv, ")");

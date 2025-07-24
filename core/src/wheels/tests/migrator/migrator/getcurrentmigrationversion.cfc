@@ -10,9 +10,9 @@ component extends="wheels.tests.Test" {
 		);
 		for (
 			local.table in [
-				"_c_o_r_e_bunyips",
-				"_c_o_r_e_dropbears",
-				"_c_o_r_e_hoopsnakes"
+				"c_o_r_e_bunyips",
+				"c_o_r_e_dropbears",
+				"c_o_r_e_hoopsnakes"
 			]
 		) {
 			migration.dropTable(local.table);

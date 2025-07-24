@@ -1,10 +1,10 @@
-<cfcomponent extends="wheels.migrator.Migration" hint="create _c_o_r_e_bunyips table">
+<cfcomponent extends="wheels.migrator.Migration" hint="create c_o_r_e_bunyips table">
 	<cffunction name="up">
 		<cfset hasError = false/>
 		<cftransaction>
 			<cfscript>
 			try {
-				t = createTable(name = "_c_o_r_e_bunyips");
+				t = createTable(name = "c_o_r_e_bunyips");
 				t.string(
 					columnNames = "name",
 					default = "",
@@ -31,7 +31,7 @@
 		<cftransaction>
 			<cfscript>
 			try {
-				dropTable('_c_o_r_e_bunyips');
+				dropTable('c_o_r_e_bunyips');
 			} catch (any ex) {
 				hasError = true;
 				catchObject = ex;
