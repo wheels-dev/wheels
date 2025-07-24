@@ -2,7 +2,7 @@
 
 	public void function deleteMigratorVersions(required numeric levelId) {
 		queryExecute(
-			"DELETE FROM _c_o_r_e_migrator_versions WHERE core_level = :levelId",
+			"DELETE FROM c_o_r_e_migrator_versions WHERE core_level = :levelId",
 			{
 				levelId = {
 					value      = arguments.levelId,

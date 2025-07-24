@@ -415,6 +415,9 @@ component output="false" {
 				}
 				break;
 			case "datetime":
+				if(isInstanceOf(arguments.value, "oracle.sql.TIMESTAMP")){
+					arguments.value = arguments.value.timestampValue();
+				}
 				// createdatetime will throw an error
 				if (IsDate(arguments.value)) {
 					arguments.value = CreateDateTime(

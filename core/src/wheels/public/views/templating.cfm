@@ -62,7 +62,7 @@ try {
 			Or Use Existing Template
 		</div>
 
-		<div class="ui grid">
+		<div class="ui stackable grid">
 			<div class="column four wide">
 				<h4 class="ui dividing header">Tables</h4>
 				<div class="field"><div class="ui radio checkbox"><input type="radio" name="templateName" value="create-table"><label> Create table</label></div></div>

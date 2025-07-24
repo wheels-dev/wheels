@@ -15,6 +15,7 @@ component extends="Base" output=false {
 				break;
 			case "date":
 			case "timestamp":
+			case "datetime":
 				local.rv = "cf_sql_timestamp";
 				break;
 			case "decimal":
@@ -26,8 +27,14 @@ component extends="Base" output=false {
 				local.rv = "cf_sql_integer";
 				break;
 			case "numeric":
-			case "number":
 				local.rv = "cf_sql_numeric";
+				break;
+			case "number":
+				if (arguments.scale EQ 0) {
+					local.rv = "cf_sql_integer";
+				} else {
+					local.rv = "cf_sql_numeric";
+				}
 				break;
 			case "real":
 			case "binary_float":
@@ -67,13 +74,9 @@ component extends="Base" output=false {
 		required boolean parameterize,
 		string $primaryKey = ""
 	) {
+		$convertMaxRowsToLimit(args = arguments);
 		$removeColumnAliasesInOrderClause(args = arguments);
 		$addColumnsToSelectAndGroupBy(args = arguments);
-
-		// Oracle DB doesn't support limit and offset in SQL.
-		StructDelete(arguments, "limit");
-		StructDelete(arguments, "offset");
-
 		$moveAggregateToHaving(args = arguments);
 		return $performQuery(argumentCollection = arguments);
 	}
@@ -127,7 +130,7 @@ component extends="Base" output=false {
 	 * Override Base adapter's function.
 	 */
 	public string function $defaultValues() {
-		return "() VALUES()";
+		return "(#arguments.$primaryKey#) VALUES(DEFAULT)";
 	}
 
 	/**

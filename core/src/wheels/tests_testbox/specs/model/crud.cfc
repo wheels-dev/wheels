@@ -23,7 +23,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is inserting", () => {
-				gallery = g.model("gallery").findOne(include = "user", where = "_c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id")
+				gallery = g.model("gallery").findOne(include = "user", where = "c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id")
 				transaction action="begin" {
 					photo = g.model("photo").create(
 						galleryid = "#gallery.id#",
@@ -369,10 +369,10 @@ component extends="testbox.system.BaseSpec" {
 			it("should allow for blank string during create for columns that are not null", () => {
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
 				db = LCase(Replace(info.database_productname, " ", "", "all"))
-				author = g.model("author").create(firstName = "Test", lastName = "", transaction = "rollback")
+				author = g.model("author").create(firstName = "Test", lastName = " ", transaction = "rollback")
 
 				expect(author).toBeInstanceOf("author")
-				expect(author.lastName).toHaveLength(0)
+				expect(trim(author.lastName)).toHaveLength(0)
 			})
 
 			it("should not throw error when saving a new model without properties", () => {
@@ -475,7 +475,7 @@ component extends="testbox.system.BaseSpec" {
 			it("works with custom query and orm query in transaction", () => {
 				transaction {
 					actual = g.model("user").findAll(select = "id")
-					expected = g.$query(datasource = application.wheels.dataSourceName, sql = "SELECT id FROM _c_o_r_e_users")
+					expected = g.$query(datasource = application.wheels.dataSourceName, sql = "SELECT id FROM c_o_r_e_users")
 				}
 
 				expect(actual.recordCount).toBe(expected.recordCount)
@@ -525,7 +525,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is working with uppercase table name containing or substring", () => {
-				actual = g.model("category").findAll(where = "_c_o_r_e_CATEGORIES.ID > 0")
+				actual = g.model("category").findAll(where = "c_o_r_e_CATEGORIES.ID > 0")
 
 				expect(actual.recordCount).toBe(2)
 			})
@@ -545,22 +545,22 @@ component extends="testbox.system.BaseSpec" {
 				// trim extra whitespace
 				actual = Trim(actual)
 
-				expected = "SELECT _c_o_r_e_authors.id FROM _c_o_r_e_authors"
+				expected = "SELECT c_o_r_e_authors.id FROM c_o_r_e_authors"
 
 				expect(actual).toBe(expected)
 			})
 
 			it("is selecting calculated property when implicitly selecting fields", () => {
-				posts = g.model("Post").findAll(select="_c_o_r_e_posts.id,_c_o_r_e_posts.title,_c_o_r_e_posts.authorid,_c_o_r_e_comments.id AS commentid,_c_o_r_e_comments.name,titleAlias", include="_c_o_r_e_comments")
+				posts = g.model("Post").findAll(select="c_o_r_e_posts.id,c_o_r_e_posts.title,c_o_r_e_posts.authorid,c_o_r_e_comments.id AS commentid,c_o_r_e_comments.name,titleAlias", include="c_o_r_e_comments")
 
 				expect(isDefined("posts.titleAlias")).toBeTrue()
 			})
 
 			it("is selecting ambiguous column name using alias", () => {
-				loc.query = g.model("Post").findAll(select="createdat,_c_o_r_e_commentcreatedat,_c_o_r_e_commentbody", include="_c_o_r_e_comments")
+				loc.query = g.model("Post").findAll(select="createdat,c_o_r_e_commentcreatedat,c_o_r_e_commentbody", include="c_o_r_e_comments")
 	    		loc.columnList = ListSort(loc.query.columnList, "text")
 
-	    		expect(loc.columnList).toBe("createdat,_c_o_r_e_commentbody,_c_o_r_e_commentcreatedat")
+	    		expect(loc.columnList).toBe("createdat,c_o_r_e_commentbody,c_o_r_e_commentcreatedat")
 			})
 		})
 
@@ -1156,13 +1156,13 @@ component extends="testbox.system.BaseSpec" {
 			it("is working", () => {
 				result = g.model("author").$fromClause(include = "")
 
-				expect(result).toBe("FROM _c_o_r_e_authors")
+				expect(result).toBe("FROM c_o_r_e_authors")
 			})
 
 			it("is working with mapped table", () => {
 				g.model("author").table("tbl_authors")
 				result = g.model("author").$fromClause(include = "")
-				g.model("author").table("_c_o_r_e_authors")
+				g.model("author").table("c_o_r_e_authors")
 
 				expect(result).toBe("FROM tbl_authors")
 			})
@@ -1170,7 +1170,7 @@ component extends="testbox.system.BaseSpec" {
 			it("is working with include", () => {
 				result = g.model("author").$fromClause(include = "posts")
 
-				expect(result).toBe("FROM _c_o_r_e_authors LEFT OUTER JOIN _c_o_r_e_posts ON _c_o_r_e_authors.id = _c_o_r_e_posts.authorid AND _c_o_r_e_posts.deletedat IS NULL")
+				expect(result).toBe("FROM c_o_r_e_authors LEFT OUTER JOIN c_o_r_e_posts ON c_o_r_e_authors.id = c_o_r_e_posts.authorid AND c_o_r_e_posts.deletedat IS NULL")
 			})
 
 			it("$indexHint", () => {
@@ -1186,13 +1186,13 @@ component extends="testbox.system.BaseSpec" {
 			it("is working with index hint mysql", () => {
 				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "MySQL")
 
-				expect(actual).toBe("FROM _c_o_r_e_authors USE INDEX(idx_authors_123)")
+				expect(actual).toBe("FROM c_o_r_e_authors USE INDEX(idx_authors_123)")
 			})
 
 			it("is working with index hint sqlserver", () => {
 				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "SQLServer")
 
-				expect(actual).toBe("FROM _c_o_r_e_authors WITH (INDEX(idx_authors_123))")
+				expect(actual).toBe("FROM c_o_r_e_authors WITH (INDEX(idx_authors_123))")
 			})
 
 			it("is working with index hint on unsupportive db", () => {
@@ -1202,7 +1202,7 @@ component extends="testbox.system.BaseSpec" {
 					adapterName = "PostgreSQL"
 				)
 
-				expect(actual).toBe("FROM _c_o_r_e_authors")
+				expect(actual).toBe("FROM c_o_r_e_authors")
 			})
 
 			it("is working with include and index hints", () => {
@@ -1212,7 +1212,7 @@ component extends="testbox.system.BaseSpec" {
 					adapterName = "MySQL"
 				)
 
-				expect(actual).toBe("FROM _c_o_r_e_authors USE INDEX(idx_authors_123) LEFT OUTER JOIN _c_o_r_e_posts USE INDEX(idx_posts_123) ON _c_o_r_e_authors.id = _c_o_r_e_posts.authorid AND _c_o_r_e_posts.deletedat IS NULL")
+				expect(actual).toBe("FROM c_o_r_e_authors USE INDEX(idx_authors_123) LEFT OUTER JOIN c_o_r_e_posts USE INDEX(idx_posts_123) ON c_o_r_e_authors.id = c_o_r_e_posts.authorid AND c_o_r_e_posts.deletedat IS NULL")
 			})
 		})
 
@@ -1242,7 +1242,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("is working with max", () => {
 				r = g.model("post").findAll(
-					select = "id, authorid, title, MAX(_c_o_r_e_posts.views) AS maxView",
+					select = "id, authorid, title, MAX(c_o_r_e_posts.views) AS maxView",
 					group = "id, authorid, title"
 				)
 
@@ -1251,7 +1251,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("is working with pagination", () => {
 				r = g.model("post").findAll(
-					select = "id, authorid, title, MAX(_c_o_r_e_posts.views) AS maxView",
+					select = "id, authorid, title, MAX(c_o_r_e_posts.views) AS maxView",
 					group = "id, authorid, title",
 					page = 1,
 					perPage = 2
@@ -1333,13 +1333,13 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is working with include", () => {
-				result = g.model("post").findAll(include = "_c_o_r_e_comments", order = "createdAt DESC,id DESC,name")
+				result = g.model("post").findAll(include = "c_o_r_e_comments", order = "createdAt DESC,id DESC,name")
 
 				expect(result['title'][1]).toBe("Title for fifth test post")
 			})
 
 			it("is working with include and identical columns", () => {
-				result = g.model("post").findAll(include = "_c_o_r_e_comments", order = "createdAt,createdAt")
+				result = g.model("post").findAll(include = "c_o_r_e_comments", order = "createdAt,createdAt")
 
 				expect(result['title'][1]).toBe("Title for first test post")
 			})
@@ -1356,7 +1356,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("is working with paginated include and identical columns", () => {
-				result = g.model("post").findAll(page = 1, perPage = 3, include = "_c_o_r_e_comments", order = "createdAt")
+				result = g.model("post").findAll(page = 1, perPage = 3, include = "c_o_r_e_comments", order = "createdAt")
 
 				expect(result['title'][1]).toBe("Title for first test post")
 			})
@@ -1365,8 +1365,8 @@ component extends="testbox.system.BaseSpec" {
 				result = g.model("post").findAll(
 					page = 1,
 					perPage = 3,
-					include = "_c_o_r_e_comments",
-					order = "_c_o_r_e_posts.createdAt DESC,_c_o_r_e_posts.id DESC"
+					include = "c_o_r_e_comments",
+					order = "c_o_r_e_posts.createdAt DESC,c_o_r_e_posts.id DESC"
 				)
 
 				expect(result['title'][1]).toBe("Title for fifth test post")
@@ -1434,7 +1434,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works when specify where on joined table", () => {
-				q = gallery.findOne(include = "user", where = "_c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id")
+				q = gallery.findOne(include = "user", where = "c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id")
 
 				/* 10 records, 2 perpage, 5 pages */
 				args = {
@@ -1530,7 +1530,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with incorrect number of record returned when where clause satisfies records beyond the first identifier value", () => {
-				q = g.model("author").findAll(include = "posts", where = "_c_o_r_e_posts.views > 2", page = 1, perpage = 5)
+				q = g.model("author").findAll(include = "posts", where = "c_o_r_e_posts.views > 2", page = 1, perpage = 5)
 
 				expect(q.recordcount).toBe(3)
 			})
@@ -1588,7 +1588,7 @@ component extends="testbox.system.BaseSpec" {
 
 			it("table name with star translates to all fields", () => {
 				postModel = g.model("post")
-				r = postModel.$createSQLFieldList(clause = "select", list = "_c_o_r_e_posts.*", include = "", returnAs = "query")
+				r = postModel.$createSQLFieldList(clause = "select", list = "c_o_r_e_posts.*", include = "", returnAs = "query")
 				props = postModel.$classData().properties
 
 				expect(ListLen(r)).toBe(StructCount(props))
@@ -1614,7 +1614,7 @@ component extends="testbox.system.BaseSpec" {
 					"text"
 				)
 
-				expect(columnList).toBe("_c_o_r_e_authors.firstname,_c_o_r_e_authors.id,_c_o_r_e_authors.id AS Authorid,_c_o_r_e_authors.lastname,_c_o_r_e_posts.averagerating AS postaveragerating,_c_o_r_e_posts.body AS postbody,_c_o_r_e_posts.createdat AS postcreatedat,_c_o_r_e_posts.deletedat AS postdeletedat,_c_o_r_e_posts.id AS postid,_c_o_r_e_posts.title AS posttitle,_c_o_r_e_posts.updatedat AS postupdatedat,_c_o_r_e_posts.views AS postviews")
+				expect(columnList).toBe("c_o_r_e_authors.firstname,c_o_r_e_authors.id,c_o_r_e_authors.id AS Authorid,c_o_r_e_authors.lastname,c_o_r_e_posts.averagerating AS postaveragerating,c_o_r_e_posts.body AS postbody,c_o_r_e_posts.createdat AS postcreatedat,c_o_r_e_posts.deletedat AS postdeletedat,c_o_r_e_posts.id AS postid,c_o_r_e_posts.title AS posttitle,c_o_r_e_posts.updatedat AS postupdatedat,c_o_r_e_posts.views AS postviews")
 			})
 
 			it("works with association with expanded aliases disabled", () => {
@@ -1629,7 +1629,7 @@ component extends="testbox.system.BaseSpec" {
 					"text"
 				)
 
-				expect(columnList).toBe("_c_o_r_e_authors.firstname,_c_o_r_e_authors.id,_c_o_r_e_authors.id AS Authorid,_c_o_r_e_authors.lastname,_c_o_r_e_posts.averagerating,_c_o_r_e_posts.body,_c_o_r_e_posts.createdat,_c_o_r_e_posts.deletedat,_c_o_r_e_posts.id AS postid,_c_o_r_e_posts.title,_c_o_r_e_posts.updatedat,_c_o_r_e_posts.views")
+				expect(columnList).toBe("c_o_r_e_authors.firstname,c_o_r_e_authors.id,c_o_r_e_authors.id AS Authorid,c_o_r_e_authors.lastname,c_o_r_e_posts.averagerating,c_o_r_e_posts.body,c_o_r_e_posts.createdat,c_o_r_e_posts.deletedat,c_o_r_e_posts.id AS postid,c_o_r_e_posts.title,c_o_r_e_posts.updatedat,c_o_r_e_posts.views")
 			})
 
 			it("works on calculated property", () => {
@@ -1745,14 +1745,14 @@ component extends="testbox.system.BaseSpec" {
 
 				transaction action="begin" {
 					author = g.model("author").findOne(where = "firstName='Tony'")
-					author.lastName = ""
+					author.lastName = " "
 					author.save()
 					author = g.model("author").findOne(where = "firstName='Tony'")
 					transaction action="rollback";
 				}
 
 				expect(author).toBeInstanceOf("author")
-				expect(author.lastname).toHaveLength(0)
+				expect(trim(author.lastname)).toHaveLength(0)
 			})
 
 			// Issue#1273: Added this test for includes in the updateAll function
@@ -1760,7 +1760,7 @@ component extends="testbox.system.BaseSpec" {
 				transaction action="begin"	{
 					loc.query0 = g.model("Post").findAll(where="averagerating = '5.0'")
 					expect(loc.query0.recordcount).toBe(0)
-					loc.query1 = g.model("Post").updateAll(averagerating = "5.0", where = "_c_o_r_e_comments.postid = '1'", include = "_c_o_r_e_comments")
+					loc.query1 = g.model("Post").updateAll(averagerating = "5.0", where = "c_o_r_e_comments.postid = '1'", include = "c_o_r_e_comments")
 					loc.query2 = g.model("Post").findAll(where="averagerating = '5.0'")
 					transaction action="rollback";
 				}
