@@ -264,17 +264,9 @@ component output="false" {
 	 * Call CFML's canonicalize() function but set to blank string if the result is null (happens on Lucee 5).
 	 */
 	public string function $canonicalize(required string input) {
-		// BoxLang compatibility
-		if (structKeyExists(server, "boxlang")) {
-			local.rv = arguments.input;
-			local.rv = replace(local.rv, chr(0), "", "all");
-			local.rv = replace(local.rv, "%00", "", "all");
-			local.rv = trim(local.rv);
-		} else {
-			local.rv = Canonicalize(arguments.input, false, false);
-			if (IsNull(local.rv)) {
-				local.rv = "";
-			}
+		local.rv = Canonicalize(arguments.input, false, false);
+		if (IsNull(local.rv)) {
+			local.rv = "";
 		}
 		return local.rv;
 	}
@@ -369,6 +361,32 @@ component output="false" {
 	 * Internal function.
 	 */
 	public string function $convertToString(required any value, string type = "") {
+		// BoxLang compatibility: Pre-process problematic date strings before type detection
+		if (StructKeyExists(server, "boxlang") && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
+			// Manually parse DD/MM/YYYY format to avoid BoxLang's MM/DD/YYYY interpretation
+			local.parts = ListToArray(arguments.value, " ");
+			local.datePart = local.parts[1];
+			local.timePart = local.parts[2];
+			local.amPm = local.parts[3];
+			
+			local.dateComponents = ListToArray(local.datePart, "/");
+			local.timeComponents = ListToArray(local.timePart, ":");
+			
+			local.day = Val(local.dateComponents[1]);    // First = day (DD/MM/YYYY)
+			local.month = Val(local.dateComponents[2]);  // Second = month
+			local.year = Val(local.dateComponents[3]);
+			local.hour = Val(local.timeComponents[1]);
+			local.minute = Val(local.timeComponents[2]);
+			
+			if (local.amPm == "PM" && local.hour != 12) {
+				local.hour += 12;
+			} else if (local.amPm == "AM" && local.hour == 12) {
+				local.hour = 0;
+			}
+			
+			arguments.value = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+		}
+
 		if (!Len(arguments.type)) {
 			if (IsArray(arguments.value)) {
 				arguments.type = "array";

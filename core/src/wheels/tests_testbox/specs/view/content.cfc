@@ -60,7 +60,12 @@ component extends="testbox.system.BaseSpec" {
 				}
 
 				expect(issimplevalue(result)).toBeFalse()
-				expect(result.type).toBe("expression")
+				// BoxLang compatibility: Different CFML engines may throw different error types
+				if (StructKeyExists(server, "boxlang")) {
+					expect(result.message).toInclude("The key [FRUIT] was not found in the struct.")
+				} else {
+					expect(result.type).toBe("expression")
+				}
 			})
 
 			it("is including partial with query", () => {
