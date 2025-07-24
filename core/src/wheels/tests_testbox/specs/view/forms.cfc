@@ -36,14 +36,14 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with hasMany associations nested", () => {
-				objectName = _controller.$objectName(objectName = "author", association = "posts,_c_o_r_e_comments", position = "1,2")
+				objectName = _controller.$objectName(objectName = "author", association = "posts,c_o_r_e_comments", position = "1,2")
 
-				expect(objectName).toBe("author['posts'][1]['_c_o_r_e_comments'][2]")
+				expect(objectName).toBe("author['posts'][1]['c_o_r_e_comments'][2]")
 			})
 
 			it("throws error without correct positions", () => {
 				expect(() => {
-					_controller.$objectName(objectName="author", association="posts,_c_o_r_e_comments", position="1")
+					_controller.$objectName(objectName="author", association="posts,c_o_r_e_comments", position="1")
 				}).toThrow("Wheels.InvalidArgument")
 			})
 		})

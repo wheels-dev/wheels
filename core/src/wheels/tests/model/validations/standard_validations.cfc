@@ -1,8 +1,8 @@
 component extends="wheels.tests.Test" {
 
 	function setup() {
-		StructDelete(application.wheels.models, "_c_o_r_e_users", false);
-		user = model("_c_o_r_e_users").new();
+		StructDelete(application.wheels.models, "c_o_r_e_users", false);
+		user = model("c_o_r_e_users").new();
 	}
 
 	function teardown() {
