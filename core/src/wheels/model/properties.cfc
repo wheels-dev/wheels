@@ -224,7 +224,7 @@ component {
 
 			This will return a numeric value if the primary key is Numeric and a String otherwise.
 		*/
-		if (isNumeric(local.rv) && !reFind("^0\d*$", local.rv)) {
+		if (isNumeric(local.rv) && !reFind("^0\d*$", local.rv) && !Find(",", local.rv)) {
 			if (local.rv <= 2147483647) {
 				return JavaCast("int", local.rv);
 			} else if (local.rv <= 9223372036854775807) {

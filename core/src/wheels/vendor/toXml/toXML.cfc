@@ -42,7 +42,16 @@
 				---><cfelseif IsArray(arguments.data)><!---
 					--->#$arrayToXML(argumentCollection=arguments)#<!---
 				---><cfelseif IsObject(arguments.data)><!---
-					--->#$objectToXML(argumentCollection=arguments)#<!---
+					---><cftry><!---
+						---><cfif FindNoCase("java.time.", arguments.data.getClass().getName())><!---
+							--->#$simpleValueToXml(data=ToString(arguments.data), rootelement=arguments.rootelement, elementattributes=arguments.elementattributes)#<!---
+						---><cfelse><!---
+							--->#$objectToXML(argumentCollection=arguments)#<!---
+						---></cfif><!---
+						---><cfcatch><!---
+							--->#$objectToXML(argumentCollection=arguments)#<!---
+						---></cfcatch><!---
+					---></cftry><!---
 				---><cfelseif IsStruct(arguments.data)><!---
 					--->#$structToXML(argumentCollection=arguments)#<!---
 				---><cfelseif REFindNoCase("^coldfusion\..*Exception$", arguments.data.getClass().getName())><!---

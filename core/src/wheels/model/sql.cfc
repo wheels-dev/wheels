@@ -838,14 +838,26 @@ component {
 				local.temp = ReFind(variables.wheels.class.RESQLWhere, arguments.where, local.start, true);
 				if (ArrayLen(local.temp.len) > 1) {
 					local.start = local.temp.pos[4] + local.temp.len[4];
-					ArrayAppend(
-						local.originalValues,
-						ReplaceList(
-							Chr(7) & Mid(arguments.where, local.temp.pos[4], local.temp.len[4]) & Chr(7),
-							"#Chr(7)#(,)#Chr(7)#,#Chr(7)#','#Chr(7)#,#Chr(7)#"",""#Chr(7)#,#Chr(7)#",
-							",,,,,,"
-						)
-					);
+					local.extractedValue = Mid(arguments.where, local.temp.pos[4], local.temp.len[4]);
+
+					// BoxLang compatibility: Handle comma-separated values in IN clauses differently
+					if (StructKeyExists(server, "boxlang")) {
+						local.processedValue = local.extractedValue;
+						// Remove outer parentheses if present (e.g., "(1,2,3)" -> "1,2,3")
+						if (Left(local.processedValue, 1) == "(" && Right(local.processedValue, 1) == ")") {
+							local.processedValue = Mid(local.processedValue, 2, Len(local.processedValue) - 2);
+						}
+						ArrayAppend(local.originalValues, local.processedValue);
+					} else {
+						ArrayAppend(
+							local.originalValues,
+							ReplaceList(
+								Chr(7) & local.extractedValue & Chr(7),
+								"#Chr(7)#(,)#Chr(7)#,#Chr(7)#','#Chr(7)#,#Chr(7)#"",""#Chr(7)#,#Chr(7)#",
+								",,,,,,"
+							)
+						);
+					}
 				}
 			}
 			if (

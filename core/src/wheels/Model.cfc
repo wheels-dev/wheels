@@ -157,7 +157,8 @@ component output="false" displayName="Model" extends="wheels.Global"{
 					);
 					variables.wheels.class.properties[local.property].column = local.columnName;
 					variables.wheels.class.properties[local.property].scale = local.columns["decimal_digits"][local.i];
-					variables.wheels.class.properties[local.property].columndefault = local.columns["column_default_value"][local.i];
+					// BoxLang compatibility - handle different column names from dbinfo
+					variables.wheels.class.properties[local.property].columnDefault = $getColumnDefaultValue(local.columns, local.i);
 
 					// get a boolean value for whether this column can be set to null or not
 					// if we don't get a boolean back we try to translate y/n to proper boolean values in cfml (yes/no)
@@ -224,7 +225,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 								&& !variables.wheels.class.properties[local.property].nullable
 								&& !$validationExists(property = local.property, validation = "validatesPresenceOf")
 							) {
-								if (Len(local.columns["column_default_value"][local.i])) {
+								if (Len(variables.wheels.class.properties[local.property].columnDefault)) {
 									validatesPresenceOf(properties = local.property, when = "onUpdate");
 								} else {
 									validatesPresenceOf(properties = local.property);
@@ -233,7 +234,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 							// always allow blank if a database default or validatesPresenceOf() has been set
 							if (
-								Len(local.columns["column_default_value"][local.i])
+								Len(variables.wheels.class.properties[local.property].columnDefault)
 								|| $validationExists(property = local.property, validation = "validatesPresenceOf")
 							) {
 								local.defaultValidationsAllowBlank = true;
@@ -554,6 +555,45 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		return false;
 	}
 
+	/**
+	 * Helper function to get column default value with BoxLang compatibility
+	 * Different CFML engines return different column names for default values
+	 */
+	private string function $getColumnDefaultValue(required query columns, required numeric index) {
+		local.rv = "";
+
+		try {
+			// Try different column names used by different CFML engines
+			if (ListFindNoCase(arguments.columns.columnList, "column_default_value")) {
+				local.rv = arguments.columns["column_default_value"][arguments.index];
+			} else if (ListFindNoCase(arguments.columns.columnList, "column_default")) {
+				local.rv = arguments.columns["column_default"][arguments.index];
+			} else if (ListFindNoCase(arguments.columns.columnList, "default_value")) {
+				local.rv = arguments.columns["default_value"][arguments.index];
+			} else if (ListFindNoCase(arguments.columns.columnList, "COLUMN_DEF")) {
+				// Standard JDBC column name used by BoxLang
+				local.rv = arguments.columns["COLUMN_DEF"][arguments.index];
+			}
+		} catch (any e) {
+			// If there's any error accessing the column, return empty string
+			return "";
+		}
+
+		if (IsArray(local.rv)) {
+			if (ArrayLen(local.rv) > 0) {
+				local.rv = local.rv[1];
+			} else {
+				return "";
+			}
+		}
+
+		if (IsSimpleValue(local.rv)) {
+			return Trim(ToString(local.rv));
+		} else {
+			return "";
+		}
+	}
+	
 	function onDIcomplete(){
 		Mixins.$initializeMixins(variables);
 	}

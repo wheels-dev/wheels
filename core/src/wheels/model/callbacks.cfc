@@ -322,6 +322,11 @@ component {
 						if (!QueryKeyExists(arguments.collection, local.key)) {
 							QueryAddColumn(arguments.collection, local.key, []);
 						}
+						if (structKeyExists(server, "boxlang")) {
+							if (local.result[local.key] == "") {
+								continue;
+							}
+						}
 						arguments.collection[local.key][local.rowNumber] = local.result[local.key];
 					}
 				} else if (IsBoolean(local.result) && !local.result) {

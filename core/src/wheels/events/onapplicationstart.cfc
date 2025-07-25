@@ -34,7 +34,10 @@ component {
 
 
 		// Check and store server engine name, throw error if using a version that we don't support.
-		if (StructKeyExists(server, "lucee")) {
+		else if (StructKeyExists(server, "boxlang")) {
+			application.$wheels.serverName = "BoxLang";
+			application.$wheels.serverVersion = server.boxlang.version;
+		} else if (StructKeyExists(server, "lucee")) {
 			application.$wheels.serverName = "Lucee";
 			application.$wheels.serverVersion = server.lucee.version;
 		} else {

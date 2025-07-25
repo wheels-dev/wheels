@@ -440,9 +440,13 @@ component {
 		// Create anchor elements with an href attribute for all URLs found in the text.
 		if (arguments.link != "emailAddresses") {
 			if (arguments.relative) {
-				arguments.regex = "(?:(?:<a\s[^>]+)?(?:https?://|www\.|\/)[^\s\b]+)";
+				arguments.regex = structKeyExists(server, "boxlang") 
+				? "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|/[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*)" // BoxLang-safe with explicit chars
+				: "(?:(?:<a\s[^>]+)?(?:https?://|www\.|\/)[^\s\b]+)";
 			} else {
-				arguments.regex = "(?:(?:<a\s[^>]+)?(?:https?://|www\.)[^\s\b]+)";
+				arguments.regex = structKeyExists(server, "boxlang") 
+				? "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*)" // BoxLang-safe with explicit chars
+				: "(?:(?:<a\s[^>]+)?(?:https?://|www\.)[^\s\b]+)";
 			}
 			local.rv = $autoLinkLoop(text = local.rv, argumentCollection = arguments);
 		}
@@ -489,6 +493,10 @@ component {
 				local.startPosition = local.match.pos[1] + Len(local.element);
 			}
 			local.startPosition++;
+			// BoxLang compatibility: Add bounds check to prevent IndexOutOfBoundsException
+			if (local.startPosition > Len(arguments.text)) {
+				break;
+			}
 			local.match = ReFindNoCase(arguments.regex, arguments.text, local.startPosition, true);
 		}
 		return arguments.text;

@@ -132,11 +132,21 @@ component {
 			StructDelete(arguments.missingMethodArguments, "values");
 
 			// call finder method
-			local.rv = IIf(
-				Left(arguments.missingMethodName, 9) == "findOneBy",
-				"findOne(argumentCollection=arguments.missingMethodArguments)",
-				"findAll(argumentCollection=arguments.missingMethodArguments)"
-			);
+			if (StructKeyExists(server, "boxlang")) {
+				// BoxLang-specific handling to avoid argumentCollection parsing issues
+				if (Left(arguments.missingMethodName, 9) == "findOneBy") {
+					local.rv = findOne(argumentCollection = arguments.missingMethodArguments);
+				} else {
+					local.rv = findAll(argumentCollection = arguments.missingMethodArguments);
+				}
+			} else {
+				// Adobe ColdFusion and Lucee compatibility
+				local.rv = IIf(
+					Left(arguments.missingMethodName, 9) == "findOneBy",
+					"findOne(argumentCollection=arguments.missingMethodArguments)",
+					"findAll(argumentCollection=arguments.missingMethodArguments)"
+				);
+			}
 		} else if (Left(arguments.missingMethodName, 14) == "findOrCreateBy") {
 			local.rv = $findOrCreateBy(argumentCollection = arguments);
 		} else {
