@@ -134,22 +134,7 @@
 
     private function setTestboxEnvironment() {
         // creating backup for original environment
-        try {
-            application.$$$wheels = Duplicate(application.wheels)
-        } catch (any e) {
-            // BoxLang compatibility - use simpler backup approach
-            application.$$$wheels = {}
-            for (local.key in application.wheels) {
-                try {
-                    if (IsSimpleValue(application.wheels[local.key]) || IsArray(application.wheels[local.key]) || IsStruct(application.wheels[local.key])) {
-                        application.$$$wheels[local.key] = application.wheels[local.key]
-                    }
-                } catch (any e2) {
-                    // Skip items that can't be copied (like complex objects)
-                    continue
-                }
-            }
-        }
+        application.$$$wheels = Duplicate(application.wheels)
 
         // load testbox routes
         application.wo.$include(template = "/wheels/tests_testbox/routes.cfm")
