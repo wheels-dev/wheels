@@ -134,7 +134,20 @@
 
     private function setTestboxEnvironment() {
         // creating backup for original environment
-        application.$$$wheels = Duplicate(application.wheels)
+        try {
+            application.$$$wheels = Duplicate(application.wheels)
+        } catch (any e) {
+            // BoxLang compatibility - use simpler backup approach
+            application.$$$wheels = {}
+            for (local.key in application.wheels) {
+                try {
+                    application.$$$wheels[local.key] = application.wheels[local.key]
+                } catch (any e2) {
+                    // Skip items that can't be copied
+                    continue
+                }
+            }
+        }
 
         // load testbox routes
         application.wo.$include(template = "/wheels/tests_testbox/routes.cfm")
