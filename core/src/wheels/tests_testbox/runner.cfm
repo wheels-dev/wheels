@@ -141,9 +141,11 @@
             application.$$$wheels = {}
             for (local.key in application.wheels) {
                 try {
-                    application.$$$wheels[local.key] = application.wheels[local.key]
+                    if (IsSimpleValue(application.wheels[local.key]) || IsArray(application.wheels[local.key]) || IsStruct(application.wheels[local.key])) {
+                        application.$$$wheels[local.key] = application.wheels[local.key]
+                    }
                 } catch (any e2) {
-                    // Skip items that can't be copied
+                    // Skip items that can't be copied (like complex objects)
                     continue
                 }
             }
