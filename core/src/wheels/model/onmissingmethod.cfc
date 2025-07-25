@@ -119,11 +119,21 @@ component {
 
 			// construct where clause
 			local.addToWhere = ArrayToList(local.addToWhere, " AND ");
-			arguments.missingMethodArguments.where = IIf(
-				StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where),
-				"'(' & arguments.missingMethodArguments.where & ') AND (' & local.addToWhere & ')'",
-				"local.addToWhere"
-			);
+			
+			// BoxLang compatibility: Use explicit if/else instead of IIf for string concatenation
+			if (StructKeyExists(server, "boxlang")) {
+				if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
+					arguments.missingMethodArguments.where = "(" & arguments.missingMethodArguments.where & ") AND (" & local.addToWhere & ")";
+				} else {
+					arguments.missingMethodArguments.where = local.addToWhere;
+				}
+			} else {
+				arguments.missingMethodArguments.where = IIf(
+					StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where),
+					"'(' & arguments.missingMethodArguments.where & ') AND (' & local.addToWhere & ')'",
+					"local.addToWhere"
+				);
+			}
 
 			// remove unneeded arguments
 			StructDelete(arguments.missingMethodArguments, "delimiter");

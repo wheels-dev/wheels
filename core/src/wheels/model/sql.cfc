@@ -847,7 +847,18 @@ component {
 						if (Left(local.processedValue, 1) == "(" && Right(local.processedValue, 1) == ")") {
 							local.processedValue = Mid(local.processedValue, 2, Len(local.processedValue) - 2);
 						}
-						ArrayAppend(local.originalValues, local.processedValue);
+						
+						// BoxLang: Only apply quote cleanup if the value contains quotes
+						if (Find("'", local.processedValue) > 0 || Find(Chr(34), local.processedValue) > 0) {
+							local.cleanedValue = local.processedValue;							
+							local.cleanedValue = ReReplace(local.cleanedValue, "'([^']*)'", "\1", "ALL");
+							local.doubleQuote = Chr(34);
+							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#([^#local.doubleQuote#]*)#local.doubleQuote#", "\1", "ALL");
+							
+							ArrayAppend(local.originalValues, local.cleanedValue);
+						} else {
+							ArrayAppend(local.originalValues, local.processedValue);
+						}
 					} else {
 						ArrayAppend(
 							local.originalValues,

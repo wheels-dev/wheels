@@ -865,6 +865,8 @@ component extends="testbox.system.BaseSpec" {
 
 				if (isACF2021 || isACF2023) {
 					expect(actual.resultset['1']).toBeStruct()
+				} else if (structKeyExists(server, "boxlang")) {
+					expect(actual['1']['1']).toBeStruct()
 				} else {
 					expect(actual['1']).toBeStruct()
 				}
