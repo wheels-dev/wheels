@@ -25,7 +25,7 @@ component extends="../base" {
         boolean serve = false,
         boolean verbose = false
     ) {
-        print.yellowLine("📚 Generating documentation...")
+        print.yellowLine("Generating documentation...")
              .line();
         
         var outputPath = fileSystemUtil.resolvePath(arguments.output);
@@ -71,17 +71,17 @@ component extends="../base" {
         
         // Display summary
         print.line();
-        print.greenBoldLine("✅ Documentation generated successfully!");
+        print.greenBoldLine("Documentation generated successfully!");
         print.line();
-        print.line("📊 Summary:");
+        print.line("Summary:");
         for (var type in componentsToDocument) {
             if (arrayLen(documentedComponents[type])) {
-                print.line("  • #helpers.capitalize(type)#: #arrayLen(documentedComponents[type])# files");
+                print.line("  #helpers.capitalize(type)#: #arrayLen(documentedComponents[type])# files");
             }
         }
-        print.line("  • Total: #documentedComponents.total# components documented");
+        print.line("  Total: #documentedComponents.total# components documented");
         print.line();
-        print.greenLine("📁 Output directory: #outputPath#");
+        print.greenLine("Output directory: #outputPath#");
         
         if (arguments.serve) {
             print.line();
@@ -101,7 +101,7 @@ component extends="../base" {
         
         if (!directoryExists(sourcePath)) {
             if (arguments.verbose) {
-                print.yellowLine("  ⚠️  Directory not found: app/#arguments.type#");
+                print.yellowLine("Directory not found: app/#arguments.type#");
             }
             return documented;
         }
@@ -143,7 +143,7 @@ component extends="../base" {
                 }
             } catch (any e) {
                 if (arguments.verbose) {
-                    print.redLine("  ✗ Error documenting #getFileFromPath(file)#: #e.message#");
+                    print.redLine("Error documenting #getFileFromPath(file)#: #e.message#");
                 }
             }
         }

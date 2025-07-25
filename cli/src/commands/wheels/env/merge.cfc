@@ -16,16 +16,15 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 	 * @dry-run.hint Show what would be merged without writing
 	 **/
 	function run(
-		required string source,
+		required string source1,
+		required string source2,
 		string output = ".env.merged",
 		boolean dryRun = false
 	) {
 
 		// Collect all source files from arguments
-		local.sourceFiles = [];
+		local.sourceFiles = [arguments.source1, arguments.source2];
 		
-		// Add the required source parameter
-		ArrayAppend(local.sourceFiles, arguments.source);
 		
 		// Check for additional positional arguments
 		local.i = 2;
@@ -37,7 +36,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		}
 
 		if (ArrayLen(local.sourceFiles) < 2) {
-			error("At least two source files are required. Usage: wheels env merge file1 file2 [file3...] --output=merged.env");
+			error("At least two source files are required. Usage: wheels env merge file1 file2");
 		}
 
 		// Validate all source files exist
@@ -64,7 +63,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			// Write the merged file
 			writeMergedFile(arguments.output, local.merged);
 			print.line();
-			print.greenLine("✓ Merged #ArrayLen(local.sourceFiles)# files into #arguments.output#");
+			print.greenLine("Merged #ArrayLen(local.sourceFiles)# files into #arguments.output#");
 			print.line("  Total variables: #StructCount(local.merged.vars)#");
 			
 			// Show conflicts if any

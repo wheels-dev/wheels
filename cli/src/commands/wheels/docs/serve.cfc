@@ -7,7 +7,7 @@
  */
 component extends="../base" {
     
-    property name="serverService" inject="ServerService@commandbox-core";
+    property name="serverService" inject="ServerService";
     
     /**
      * @root.hint Root directory to serve (default: docs/api)
@@ -26,11 +26,11 @@ component extends="../base" {
         if (!directoryExists(docRoot)) {
             print.redLine("Documentation directory not found: #docRoot#");
             print.line();
-            print.yellowLine("💡 Tip: Run 'wheels docs generate' first to create documentation");
+            print.yellowLine("Tip: Run 'wheels docs generate' first to create documentation");
             return;
         }
         
-        print.yellowLine("🌐 Starting documentation server...")
+        print.yellowLine("Starting documentation server...")
              .line();
         
         // Check if index file exists
@@ -39,7 +39,7 @@ component extends="../base" {
                       fileExists(docRoot & "/index.json");
         
         if (!hasIndex) {
-            print.yellowLine("⚠️  No index file found. Creating a simple directory listing...");
+            print.yellowLine("No index file found. Creating a simple directory listing...");
             createDirectoryListing(docRoot);
         }
         
@@ -48,24 +48,25 @@ component extends="../base" {
             directory = docRoot,
             port = arguments.port,
             openBrowser = arguments.open,
-            name = "wheels-docs-#createUUID()#"
+            name = "wheels-docs-#createUUID()#",
+            saveSettings = false
         };
         
         try {
             serverService.start(serverArgs);
             
-            print.greenLine("✅ Documentation server started!");
+            print.greenLine("Documentation server started!");
             print.line();
-            print.line("📄 Serving: #docRoot#");
-            print.line("🌐 URL: http://localhost:#arguments.port#");
+            print.line("Serving: #docRoot#");
+            print.line("URL: http://localhost:#arguments.port#");
             
             if (arguments.open) {
-                print.line("🌏 Opening browser...");
+                print.line("Opening browser...");
             }
             
             if (arguments.watch) {
                 print.line();
-                print.yellowLine("👀 Watching for changes...");
+                print.yellowLine("Watching for changes...");
                 watchDocumentation(docRoot, serverArgs.name);
             } else {
                 print.line();
@@ -73,15 +74,35 @@ component extends="../base" {
                 
                 // Keep the command running
                 while (true) {
-                    sleep(5000);
-                    
-                    // Check if server is still running
-                    var serverInfo = serverService.getServerInfo(serverArgs.name);
-                    if (!structKeyExists(serverInfo, "status") || serverInfo.status != "running") {
-                        print.redLine("Server stopped unexpectedly");
+                    sleep(5000); // wait for 5 seconds
+
+                    // Check if server is still running or still starting
+                    var serverInfo = serverService.getServerInfo(name=serverArgs.name, webroot=docRoot);
+                    systemOutput("Status: " & serverInfo.status & chr(10));
+
+                    // If status is missing or server crashed, break
+                    if (!structKeyExists(serverInfo, "status")) {
+                        systemOutput("Server info missing. Exiting..."& chr(10));
                         break;
                     }
+
+                    // If server is fully running, continue
+                    if (serverInfo.status == "running") {
+                        systemOutput("Server is up and running!"& chr(10));
+                        break;
+                    }
+
+                    // If still starting, just wait and continue
+                    if (serverInfo.status == "starting") {
+                        systemOutput("Server is still starting... waiting..."& chr(10));
+                        continue;
+                    }
+
+                    // Any other status (like "stopped", "error", etc.)
+                    print.redLine("Unexpected server status: " & serverInfo.status);
+                    break;
                 }
+
             }
             
         } catch (any e) {
@@ -195,7 +216,7 @@ component extends="../base" {
             paths = ["app/models/**", "app/controllers/**", "app/views/**", "app/services/**"],
             callback = function(changes) {
                 print.line()
-                     .cyanLine("📝 Source files changed, regenerating documentation...")
+                     .cyanLine("Source files changed, regenerating documentation...")
                      .line();
                 
                 // Regenerate documentation
@@ -203,7 +224,7 @@ component extends="../base" {
                     .params(output = arguments.docRoot, serve = false)
                     .run();
                 
-                print.greenLine("✅ Documentation updated!")
+                print.greenLine("Documentation updated!")
                      .line();
             }
         );

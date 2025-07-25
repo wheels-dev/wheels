@@ -27,7 +27,7 @@ component extends="wheels-cli.commands.wheels.base" {
         
         // Validate we're in a Wheels project
         // if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
-        if (!directoryExists(fileSystemUtil.resolvePath("core/src/wheels"))) { 
+        if (!isWheelsApp() && !isWheelsInstall) { 
             error("This command must be run from the root of a Wheels application.");
             return;
         }
@@ -301,7 +301,7 @@ component extends="wheels-cli.commands.wheels.base" {
             });
             
             for (var req in slowRequests) {
-                print.line("  • #req.controller#.#req.action#() - #req.responseTime#ms");
+                print.line("   #req.controller#.#req.action#() - #req.responseTime#ms");
             }
             print.line();
         }
@@ -315,7 +315,7 @@ component extends="wheels-cli.commands.wheels.base" {
             });
             
             for (var qry in slowQueries) {
-                print.line("  • #left(qry.sql, 50)#... - #qry.executionTime#ms");
+                print.line("  #left(qry.sql, 50)#... - #qry.executionTime#ms");
             }
             print.line();
         }
@@ -325,18 +325,18 @@ component extends="wheels-cli.commands.wheels.base" {
         print.line("-----------------------------------------");
         
         if (arguments.results.summary.avgResponseTime > 200) {
-            print.line("  • Consider implementing caching for frequently accessed data");
+            print.line("   Consider implementing caching for frequently accessed data");
         }
         if (arguments.results.summary.slowQueries > 0) {
-            print.line("  • Add indexes to improve query performance");
-            print.line("  • Use query caching for repetitive queries");
+            print.line("   Add indexes to improve query performance");
+            print.line("   Use query caching for repetitive queries");
         }
         if (structKeyExists(arguments.results.summary, "memoryUsage") && arguments.results.summary.memoryUsage.max > 500) {
-            print.line("  • Monitor memory usage and optimize object creation");
+            print.line("   Monitor memory usage and optimize object creation");
         }
-        print.line("  • Enable query result caching in production");
-        print.line("  • Use CDN for static assets");
-        print.line("  • Implement lazy loading for heavy operations");
+        print.line("   Enable query result caching in production");
+        print.line("   Use CDN for static assets");
+        print.line("   Implement lazy loading for heavy operations");
     }
     
     private function generatePerformanceReport(results) {

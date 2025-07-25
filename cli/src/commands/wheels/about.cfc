@@ -38,7 +38,7 @@ component extends="base" {
 		print.line();
 		
 		// Application Info
-		if (isWheelsApp(local.appPath)) {
+		if (isWheelsInstall(local.appPath) || isWheelsApp(local.appPath)) {
 			print.boldGreenLine("Application");
 			print.greenLine("  Path: " & local.appPath);
 			

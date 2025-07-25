@@ -3,60 +3,42 @@
  * Examples:
  * wheels env list
  * wheels env list --format=json
+ * wheels env list --verbose
+ * wheels env list --check --filter=production
  */
 component extends="../base" {
     
     property name="environmentService" inject="EnvironmentService@wheels-cli";
     
     /**
-     * @format.hint Output format: table (default) or json
-     * @format.options table,json
+     * @format.hint Output format: table (default), json, or yaml
+     * @format.options table,json,yaml
+     * @verbose.hint Show detailed configuration
+     * @check.hint Validate environment configurations
+     * @filter.hint Filter by environment type (All, local, development, staging, production, file, server.json, valid, issues)
+     * @sort.hint Sort by (name, type, modified)
+     * @help.hint Show help information
      */
     function run(
-        string format = "table"
+        string format = "table",
+        boolean verbose = false,
+        boolean check = false,
+        string filter = "All",
+        string sort = "name",
+        boolean help = false
     ) {
-        var environments = environmentService.list();
+        var projectRoot = resolvePath(".");
+        arguments = reconstructArgs(arguments);
+        arguments.rootPath = projectRoot;
         
-        if (arrayLen(environments) == 0) {
-            print.yellowLine("No environments configured");
-            print.line("Create an environment with: wheels env setup <environment>");
-            return;
-        }
         
+        var result = environmentService.list(argumentCollection=arguments);
+        
+        // Handle different format outputs
         if (arguments.format == "json") {
-            print.line(serializeJSON(environments, true));
-        } else {
-            print.greenBoldLine("🌍 Available Environments")
-                 .line();
-            
-            // Get current environment
-            var currentEnv = "";
-            if (fileExists(resolvePath(".env"))) {
-                var envContent = fileRead(resolvePath(".env"));
-                var matches = reMatchNoCase("WHEELS_ENV=([^\r\n]+)", envContent);
-                if (arrayLen(matches)) {
-                    currentEnv = listLast(matches[1], "=");
-                }
-            }
-            
-            // Display environments
-            for (var env in environments) {
-                var isCurrent = (env.name == currentEnv);
-                var marker = isCurrent ? " ⭐" : "";
-                
-                print.line("📁 #env.name##marker#");
-                print.line("   📋 Template: #env.template#");
-                print.line("   🗄️  Database: #env.database#");
-                print.line("   📅 Created: #dateTimeFormat(env.created, 'yyyy-mm-dd HH:nn:ss')#");
-                print.line();
-            }
-            
-            if (len(currentEnv)) {
-                print.yellowLine("⭐ Current environment: #currentEnv#");
-            } else {
-                print.yellowLine("No environment currently active");
-                print.line("Switch to an environment with: wheels env switch <environment>");
-            }
+            print.line(deserializeJSON(result));
+        } else{
+            print.line(result);
         }
     }
 }

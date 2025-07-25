@@ -43,7 +43,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		if (IsJSON(local.content)) {
 			try {
 				local.envVars = DeserializeJSON(local.content);
-				print.greenLine("✓ Valid JSON format");
+				print.greenLine("Valid JSON format");
 			} catch (any e) {
 				ArrayAppend(local.issues, {
 					line: 0,
@@ -241,12 +241,12 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Final status
 		if (ArrayLen(arguments.issues) == 0) {
 			if (ArrayLen(arguments.warnings) == 0) {
-				print.greenLine("✓ Validation passed with no issues!");
+				print.greenLine("Validation passed with no issues!");
 			} else {
-				print.yellowLine("✓ Validation passed with #ArrayLen(arguments.warnings)# warning#ArrayLen(arguments.warnings) != 1 ? 's' : ''#");
+				print.yellowLine("Validation passed with #ArrayLen(arguments.warnings)# warning#ArrayLen(arguments.warnings) != 1 ? 's' : ''#");
 			}
 		} else {
-			print.redLine("✗ Validation failed with #ArrayLen(arguments.issues)# error#ArrayLen(arguments.issues) != 1 ? 's' : ''#");
+			print.redLine("Validation failed with #ArrayLen(arguments.issues)# error#ArrayLen(arguments.issues) != 1 ? 's' : ''#");
 			setExitCode(1);
 		}
 	}

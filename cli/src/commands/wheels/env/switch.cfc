@@ -14,18 +14,20 @@ component extends="../base" {
     function run(
         required string environment
     ) {
-        print.yellowLine("🔄 Switching to '#arguments.environment#' environment...")
+        var projectRoot = resolvePath(".");
+        print.line(projectRoot);
+        print.yellowLine("Switching to '#arguments.environment#' environment...")
              .line();
         
-        var result = environmentService.switch(arguments.environment);
+        var result = environmentService.switch(arguments.environment, projectRoot);
         
         if (result.success) {
-            print.greenLine("✅ #result.message#")
+            print.greenLine(" #result.message#")
                  .line();
             
-            print.yellowLine("⚠️  Note: You may need to restart your server for all changes to take effect");
+            print.yellowLine("Note: You may need to restart your server for all changes to take effect");
         } else {
-            print.redLine("❌ Failed to switch environment: #result.error#");
+            print.redLine("Failed to switch environment: #result.error#");
             setExitCode(1);
         }
     }
