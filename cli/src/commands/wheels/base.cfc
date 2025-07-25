@@ -17,18 +17,43 @@ component excludeFromHelp=true {
 	// alternative is to get via /wheels/events/onapplicationstart.cfm but that feels a bit hacky.
 	// we could also test for the existence of /wheels/dbmigrate, but that only gives us the major version.
 	string function $getWheelsVersion(){
-		// First, look for a wheels folder..
-		if(!directoryExists( fileSystemUtil.resolvePath("core/src/wheels") ) ){
-			error("We're currently looking in #getCWD()#, but can't find the core/src/wheels folder. Are you sure you are in the root?");
+		// Determine which directory structure we're in
+		local.currentPath = getCWD();
+		local.wheelsPath = "";
+		local.boxJsonPath = "";
+		
+		// Check if we're in a running wheels app (core/wheels structure)
+		if(isWheelsApp(getCWD())) {
+			local.wheelsPath = fileSystemUtil.resolvePath("core/wheels");
+			local.boxJsonPath = fileSystemUtil.resolvePath("core/wheels/box.json");
+			var rootJson = fileSystemUtil.resolvePath("box.json");
 		}
-		// Check vendor/wheels/box.json first for wheels-core version
-		if(fileExists(fileSystemUtil.resolvePath("core/src/wheels/box.json"))){
-			local.wheelsBoxJSON = packageService.readPackageDescriptorRaw( fileSystemUtil.resolvePath("core/src/wheels") );
+		// Check if we're in wheels source structure (core/src/wheels)
+		else if(isWheelsInstall(getCWD())) {
+			local.wheelsPath = fileSystemUtil.resolvePath("core/src/wheels");
+			local.boxJsonPath = fileSystemUtil.resolvePath("core/src/wheels/box.json");
+			var rootJson = fileSystemUtil.resolvePath("template/base/src/box.json");
+		}
+		// If neither structure is detected, throw an error
+		else {
+			error("We're currently looking in #getCWD()#, can't find a valid wheels directory structure. Are you sure you are in the correct root directory?");
+		}
+		
+		// Verify the wheels directory exists
+		if(!directoryExists(local.wheelsPath)) {
+			error("We're currently looking in #getCWD()#, can't find the wheels folder at #local.wheelsPath#. Are you sure you are in the correct root?");
+		}
+		
+		// Check wheels box.json first for wheels-core version
+		if(fileExists(local.boxJsonPath)){
+			local.wheelsBoxJSON = packageService.readPackageDescriptorRaw(local.wheelsPath);
 			if(structKeyExists(local.wheelsBoxJSON, "version")){
 				return local.wheelsBoxJSON.version;
 			}
 		}
-		if(fileExists(fileSystemUtil.resolvePath("box.json"))){
+		
+		// Check root box.json
+		if(fileExists(rootJson)){
 			local.boxJSON = packageService.readPackageDescriptorRaw( getCWD() );
 			// Check if wheels-core is in dependencies
 			if(structKeyExists(local.boxJSON, "dependencies") && structKeyExists(local.boxJSON.dependencies, "wheels-core")){
@@ -38,18 +63,27 @@ component excludeFromHelp=true {
 				return local.wheelsDep;
 			}
 			return local.boxJSON.version;
-		} else if(fileExists(fileSystemUtil.resolvePath("core/src/wheels/events/onapplicationstart.cfm"))) {
-			var output = command( 'cd \core\src\wheels' ).run( returnOutput=true );
-			local.target=fileSystemUtil.resolvePath("app/events/onapplicationstart.cfm");
-			local.content=fileRead(local.target);
-			local.content=listFirst(mid(local.content, (find('application.$wheels.version',local.content)+31),20),'"');
-			var output = command( 'cd ../../' ).run( returnOutput=true );
+		}
+		// Check for onapplicationstart.cfm method (adjust path based on structure)
+		else if(isWheelsApp() && fileExists(fileSystemUtil.resolvePath("app/events/onapplicationstart.cfm"))) {
+			// For running app structure
+			local.target = fileSystemUtil.resolvePath("app/events/onapplicationstart.cfm");
+			local.content = fileRead(local.target);
+			local.content = listFirst(mid(local.content, (find('application.$wheels.version', local.content) + 31), 20), '"');
 			return local.content;
-		} else {
-			print.line("You've not got a box.json, so we don't know which version of wheels this is.");
+		}
+		else if(isWheelsInstall() && fileExists(fileSystemUtil.resolvePath("templates/base/src/app/events/onapplicationstart.cfm"))) {
+			// For wheels source structure
+			local.target = fileSystemUtil.resolvePath("templates/base/src/app/events/onapplicationstart.cfm");
+			local.content = fileRead(local.target);
+			local.content = listFirst(mid(local.content, (find('application.$wheels.version', local.content) + 31), 20), '"');
+			return local.content;
+		}
+		else {
+			print.line("You don't have a box.json, so we don't know which version of wheels this is.");
 			print.line("We're currently looking in #getCWD()#");
 			if(confirm("Would you like to try and create one? [y/n]")){
-				local.version=ask("Which Version is it? Please enter your response in semVar format, i.e '1.4.5'");
+				local.version = ask("Which Version is it? Please enter your response in semVar format, i.e '1.4.5'");
 				command('init').params(name="WHEELS", version=local.version, slugname="wheels").run();
 				return local.version;
 			} else {
@@ -58,8 +92,28 @@ component excludeFromHelp=true {
 		}
 	}
 
-	// Check if current directory is a Wheels application
+	//Use this function for commands that should work Only if the application is running
 	boolean function isWheelsApp(string path = getCWD()) {
+		// Check for vendor/wheels folder
+		// if (!directoryExists(arguments.path & "/vendor/wheels")) {
+		if (!directoryExists(arguments.path & "/core/wheels")) {
+			return false;
+		}
+		// Check for config folder
+		// if (!directoryExists(arguments.path & "/config")) {
+		if (!directoryExists(arguments.path & "/config")) {
+			return false;
+		}
+		// Check for app folder
+		// if (!directoryExists(arguments.path & "/app")) {
+		if (!directoryExists(arguments.path & "/app")) {
+			return false;
+		}
+		return true;
+	}
+
+	// Use this function for commands that should work even if the application is not running
+	boolean function isWheelsInstall(string path = getCWD()) {
 		// Check for vendor/wheels folder
 		// if (!directoryExists(arguments.path & "/vendor/wheels")) {
 		if (!directoryExists(arguments.path & "/core/src/wheels")) {
