@@ -26,13 +26,13 @@ component excludeFromHelp=true {
 		if(isWheelsApp(getCWD())) {
 			local.wheelsPath = fileSystemUtil.resolvePath("core/wheels");
 			local.boxJsonPath = fileSystemUtil.resolvePath("core/wheels/box.json");
-			var rootJson = fileSystemUtil.resolvePath("box.json");
+			local.rootJson = fileSystemUtil.resolvePath("box.json");
 		}
 		// Check if we're in wheels source structure (core/src/wheels)
 		else if(isWheelsInstall(getCWD())) {
 			local.wheelsPath = fileSystemUtil.resolvePath("core/src/wheels");
 			local.boxJsonPath = fileSystemUtil.resolvePath("core/src/wheels/box.json");
-			var rootJson = fileSystemUtil.resolvePath("template/base/src/box.json");
+			local.rootJson = fileSystemUtil.resolvePath("template/base/src/box.json");
 		}
 		// If neither structure is detected, throw an error
 		else {
@@ -53,7 +53,7 @@ component excludeFromHelp=true {
 		}
 		
 		// Check root box.json
-		if(fileExists(rootJson)){
+		if(fileExists(local.rootJson)){
 			local.boxJSON = packageService.readPackageDescriptorRaw( getCWD() );
 			// Check if wheels-core is in dependencies
 			if(structKeyExists(local.boxJSON, "dependencies") && structKeyExists(local.boxJSON.dependencies, "wheels-core")){
@@ -94,18 +94,15 @@ component excludeFromHelp=true {
 
 	//Use this function for commands that should work Only if the application is running
 	boolean function isWheelsApp(string path = getCWD()) {
-		// Check for vendor/wheels folder
-		// if (!directoryExists(arguments.path & "/vendor/wheels")) {
+		// Check for core/wheels folder
 		if (!directoryExists(arguments.path & "/core/wheels")) {
 			return false;
 		}
 		// Check for config folder
-		// if (!directoryExists(arguments.path & "/config")) {
 		if (!directoryExists(arguments.path & "/config")) {
 			return false;
 		}
 		// Check for app folder
-		// if (!directoryExists(arguments.path & "/app")) {
 		if (!directoryExists(arguments.path & "/app")) {
 			return false;
 		}
@@ -114,18 +111,15 @@ component excludeFromHelp=true {
 
 	// Use this function for commands that should work even if the application is not running
 	boolean function isWheelsInstall(string path = getCWD()) {
-		// Check for vendor/wheels folder
-		// if (!directoryExists(arguments.path & "/vendor/wheels")) {
+		// Check for /core/src/wheels folder
 		if (!directoryExists(arguments.path & "/core/src/wheels")) {
 			return false;
 		}
 		// Check for config folder
-		// if (!directoryExists(arguments.path & "/config")) {
 		if (!directoryExists(arguments.path & "/templates/base/src/config")) {
 			return false;
 		}
 		// Check for app folder
-		// if (!directoryExists(arguments.path & "/app")) {
 		if (!directoryExists(arguments.path & "/templates/base/src/app")) {
 			return false;
 		}
@@ -650,22 +644,22 @@ component excludeFromHelp=true {
 	}
 
 	function reconstructArgs(required struct argStruct) {
-        var result = {};
+        local.result = {};
 
-        for (key in argStruct) {
-            if (find("=", key)) {
-                var parts = listToArray(key, "=");
-                if (arrayLen(parts) == 2 && argStruct[key] == true) {
-                    result[parts[1]] = parts[2];
+        for (local.key in arguments.argStruct) {
+            if (find("=", local.key)) {
+                local.parts = listToArray(local.key, "=");
+                if (arrayLen(local.parts) == 2 && arguments.argStruct[local.key] == true) {
+                    local.result[local.parts[1]] = local.parts[2];
                 } else {
-                    result[parts[1]] = parts[2] ?: true;
+                    local.result[local.parts[1]] = local.parts[2] ?: true;
                 }
             } else {
-                result[key] = argStruct[key];
+                local.result[local.key] = arguments.argStruct[local.key];
             }
         }
 
-        return result;
+        return local.result;
     }
 
 }

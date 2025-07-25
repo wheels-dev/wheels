@@ -23,7 +23,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 	) {
 
 		// Collect all source files from arguments
-		local.sourceFiles = [source1, source2];
+		local.sourceFiles = [arguments.source1, arguments.source2];
 		
 		
 		// Check for additional positional arguments

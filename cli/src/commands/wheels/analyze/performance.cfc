@@ -27,7 +27,7 @@ component extends="wheels-cli.commands.wheels.base" {
         
         // Validate we're in a Wheels project
         // if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
-        if (!directoryExists(fileSystemUtil.resolvePath("core/src/wheels"))) { 
+        if (!isWheelsApp() && !isWheelsInstall) { 
             error("This command must be run from the root of a Wheels application.");
             return;
         }

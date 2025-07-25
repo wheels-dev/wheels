@@ -76,10 +76,10 @@ component extends="../base" {
         print.line("Summary:");
         for (var type in componentsToDocument) {
             if (arrayLen(documentedComponents[type])) {
-                print.line("  • #helpers.capitalize(type)#: #arrayLen(documentedComponents[type])# files");
+                print.line("  #helpers.capitalize(type)#: #arrayLen(documentedComponents[type])# files");
             }
         }
-        print.line("  • Total: #documentedComponents.total# components documented");
+        print.line("  Total: #documentedComponents.total# components documented");
         print.line();
         print.greenLine("Output directory: #outputPath#");
         
