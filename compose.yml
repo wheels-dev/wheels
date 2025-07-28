@@ -44,6 +44,7 @@ services:
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/lucee5/server.json
         target: /cfwheels-test-suite/server.json
@@ -72,6 +73,7 @@ services:
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/lucee6/server.json
         target: /cfwheels-test-suite/server.json
@@ -106,6 +108,7 @@ services:
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/lucee7/server.json
         target: /cfwheels-test-suite/server.json
@@ -136,6 +139,7 @@ services:
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/adobe2018/server.json
         target: /cfwheels-test-suite/server.json
@@ -166,6 +170,7 @@ services:
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/adobe2021/server.json
         target: /cfwheels-test-suite/server.json
@@ -196,6 +201,7 @@ services:
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/adobe2023/server.json
         target: /cfwheels-test-suite/server.json
@@ -226,6 +232,7 @@ services:
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
       - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/adobe2025/server.json
         target: /cfwheels-test-suite/server.json
