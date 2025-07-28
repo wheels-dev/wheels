@@ -277,17 +277,6 @@ set(features={
 - Verify server variables
 - Test detection rules
 
-## Migration
-
-### From Existing Environment
-```bash
-# Export existing config
-wheels env export production > prod-config.json
-
-# Import to new environment
-wheels env setup staging --from-config=prod-config.json
-```
-
 ## Use Cases
 
 1. **Multi-Stage Pipeline**: dev → staging → production

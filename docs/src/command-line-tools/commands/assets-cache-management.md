@@ -19,13 +19,13 @@ The `wheels assets:precompile` command prepares your assets for production deplo
 
 ```bash
 # Basic precompilation
-wheels assets:precompile
+wheels assets precompile
 
 # Force recompilation of all assets
-wheels assets:precompile --force
+wheels assets precompile --force
 
 # Target specific environment
-wheels assets:precompile --environment=staging
+wheels assets precompile --environment=staging
 ```
 
 **What it does:**
@@ -51,13 +51,13 @@ The `wheels assets:clean` command removes old compiled assets while keeping rece
 
 ```bash
 # Clean old assets (keeps 3 versions by default)
-wheels assets:clean
+wheels assets clean
 
 # Keep 5 versions of each asset
-wheels assets:clean --keep=5
+wheels assets clean --keep=5
 
 # Preview what would be deleted
-wheels assets:clean --dryRun
+wheels assets clean --dryRun
 ```
 
 This is useful for:
@@ -67,14 +67,14 @@ This is useful for:
 
 ### Removing All Assets
 
-The `wheels assets:clobber` command completely removes all compiled assets.
+The `wheels assets clobber` command completely removes all compiled assets.
 
 ```bash
 # Remove all compiled assets (with confirmation)
-wheels assets:clobber
+wheels assets clobber
 
 # Skip confirmation prompt
-wheels assets:clobber --force
+wheels assets clobber --force
 ```
 
 **Warning:** This command deletes all compiled assets and the manifest file. You'll need to run `wheels assets:precompile` again before deploying.
@@ -93,21 +93,21 @@ Wheels uses several cache types to improve performance:
 
 ### Clearing Caches
 
-The `wheels cache:clear` command manages these caches:
+The `wheels cache clear` command manages these caches:
 
 ```bash
 # Clear all caches (with confirmation)
-wheels cache:clear
+wheels cache clear
 
 # Clear all caches without confirmation
-wheels cache:clear --force
+wheels cache clear --force
 
 # Clear specific cache type
-wheels cache:clear query      # Database query results
-wheels cache:clear page       # Full page cache
-wheels cache:clear partial    # View fragments
-wheels cache:clear action     # Controller actions
-wheels cache:clear sql        # SQL file cache
+wheels cache clear query      # Database query results
+wheels cache clear page       # Full page cache
+wheels cache clear partial    # View fragments
+wheels cache clear action     # Controller actions
+wheels cache clear sql        # SQL file cache
 ```
 
 **Note:** The command automatically reloads the application after clearing caches to ensure changes take effect.
@@ -116,20 +116,20 @@ wheels cache:clear sql        # SQL file cache
 
 ### Clearing Log Files
 
-The `wheels log:clear` command manages application log files:
+The `wheels log clear` command manages application log files:
 
 ```bash
 # Clear all log files (with confirmation)
-wheels log:clear
+wheels log clear
 
 # Clear specific environment logs
-wheels log:clear --environment=production
+wheels log clear --environment=production
 
 # Clear logs older than 30 days
-wheels log:clear --days=30
+wheels log clear --days=30
 
 # Combine options
-wheels log:clear --environment=production --days=7 --force
+wheels log clear --environment=production --days=7 --force
 ```
 
 ### Tailing Log Files
@@ -138,19 +138,19 @@ The `wheels log:tail` command displays log content in real-time:
 
 ```bash
 # Tail development log (default)
-wheels log:tail
+wheels log tail
 
 # Tail production log
-wheels log:tail --environment=production
+wheels log tail --environment=production
 
 # Show last 50 lines
-wheels log:tail --lines=50
+wheels log tail --lines=50
 
 # Tail specific log file
-wheels log:tail --file=custom.log
+wheels log tail --file=custom.log
 
 # Non-follow mode (just display and exit)
-wheels log:tail --follow=false
+wheels log tail --follow=false
 ```
 
 **Log Entry Color Coding:**
@@ -165,25 +165,25 @@ Press `Ctrl+C` to stop following the log file.
 
 ### Clearing Temporary Files
 
-The `wheels tmp:clear` command manages temporary files:
+The `wheels tmp clear` command manages temporary files:
 
 ```bash
 # Clear all temporary files (with confirmation)
-wheels tmp:clear
+wheels tmp clear
 
 # Skip confirmation
-wheels tmp:clear --force
+wheels tmp clear --force
 
 # Clear specific types
-wheels tmp:clear cache        # Cache files only
-wheels tmp:clear sessions     # Session files only
-wheels tmp:clear uploads      # Upload files only
+wheels tmp clear cache        # Cache files only
+wheels tmp clear sessions     # Session files only
+wheels tmp clear uploads      # Upload files only
 
 # Clear files older than 7 days
-wheels tmp:clear --days=7
+wheels tmp clear --days=7
 
 # Combine options
-wheels tmp:clear --type=sessions --days=30 --force
+wheels tmp clear --type=sessions --days=30 --force
 ```
 
 The command also cleans up empty directories after removing files.
@@ -195,19 +195,19 @@ The command also cleans up empty directories after removing files.
 1. **Before Deployment:**
    ```bash
    # Compile assets
-   wheels assets:precompile --environment=production
+   wheels assets precompile --environment=production
    
    # Clean old assets
-   wheels assets:clean --keep=3
+   wheels assets clean --keep=3
    ```
 
 2. **After Deployment:**
    ```bash
    # Clear all caches
-   wheels cache:clear all --force
+   wheels cache clear all --force
    
    # Monitor logs
-   wheels log:tail --environment=production
+   wheels log tail --environment=production
    ```
 
 ### Regular Maintenance
@@ -219,16 +219,16 @@ Create a maintenance script for regular cleanup:
 # maintenance.sh
 
 # Clear old logs (older than 30 days)
-wheels log:clear --days=30 --force
+wheels log clear --days=30 --force
 
 # Clear old temp files (older than 7 days)
-wheels tmp:clear --days=7 --force
+wheels tmp clear --days=7 --force
 
 # Clean old assets (keep last 5 versions)
-wheels assets:clean --keep=5
+wheels assets clean --keep=5
 
 # Clear query cache
-wheels cache:clear query --force
+wheels cache clear query --force
 ```
 
 ### Development Workflow
@@ -237,16 +237,16 @@ During development:
 
 ```bash
 # Watch logs while developing
-wheels log:tail
+wheels log tail
 
 # Clear cache after model changes
-wheels cache:clear query
+wheels cache clear query
 
 # Clear all caches when debugging
-wheels cache:clear all --force
+wheels cache clear all --force
 
 # Clean temp files periodically
-wheels tmp:clear --force
+wheels tmp clear --force
 ```
 
 ## Troubleshooting
@@ -260,7 +260,7 @@ If assets aren't updating in production:
 wheels assets:precompile --force
 
 # Clear all caches
-wheels cache:clear all --force
+wheels cache clear all --force
 
 # Verify manifest
 cat public/assets/compiled/manifest.json
@@ -278,7 +278,7 @@ ls -la tmp/cache/
 wheels reload --force
 
 # Clear specific cache with reload
-wheels cache:clear query && wheels reload
+wheels cache clear query && wheels reload
 ```
 
 ### Log File Issues
@@ -290,7 +290,7 @@ If log files are missing or not updating:
 ls -la logs/
 
 # Create new log file
-wheels log:clear --environment=development
+wheels log clear --environment=development
 
 # Check permissions
 ls -la logs/*.log
@@ -306,9 +306,9 @@ du -sh tmp/ logs/ public/assets/compiled/
 
 # Clean everything
 wheels assets:clean --keep=1
-wheels log:clear --days=7 --force
-wheels tmp:clear --force
-wheels cache:clear all --force
+wheels log clear --days=7 --force
+wheels tmp clear --force
+wheels cache clear all --force
 ```
 
 ## Configuration
@@ -353,21 +353,21 @@ set(logQueries = false); // Set to true for debugging
 ```yaml
 # .github/workflows/deploy.yml
 - name: Compile Assets
-  run: wheels assets:precompile --environment=production
+  run: wheels assets precompile --environment=production
 
 - name: Clean Old Assets
-  run: wheels assets:clean --keep=3
+  run: wheels assets clean --keep=3
 
 - name: Clear Caches
-  run: wheels cache:clear all --force
+  run: wheels cache clear all --force
 ```
 
 ### Docker Integration
 
 ```dockerfile
 # Dockerfile
-RUN wheels assets:precompile --environment=production
-RUN wheels assets:clean --keep=1
+RUN wheels assets precompile --environment=production
+RUN wheels assets clean --keep=1
 ```
 
 ## Summary

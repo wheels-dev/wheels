@@ -58,11 +58,11 @@ Available Environments
 =====================
 
   NAME          TYPE         DATABASE           STATUS
-  development * Development  wheels_dev         ✓ Active
-  testing       Testing      wheels_test        ✓ Valid
-  staging       Staging      wheels_staging     ✓ Valid
-  production    Production   wheels_prod        ✓ Valid
-  qa            Custom       wheels_qa          ⚠ Issues
+  development * Development  wheels_dev         OK Valid
+  testing       Testing      wheels_test        OK Valid
+  staging       Staging      wheels_staging     OK Valid
+  production    Production   wheels_prod        OK Valid
+  qa            Custom       wheels_qa          WARN Invalid
 
 * = Current environment
 ```
@@ -138,10 +138,9 @@ staging
 ## Environment Status
 
 ### Status Indicators
-- `✓ Valid` - Configuration is valid and working
-- `✓ Active` - Currently active environment
-- `⚠ Issues` - Configuration issues detected
-- `✗ Invalid` - Configuration errors
+- `OK Valid` - Configuration is valid and working
+- `Active` - Currently active environment
+- `WARN Invalid` - Configuration errors
 
 ### Validation Checks
 When using `--check`:
@@ -187,6 +186,9 @@ wheels env list --filter=issues
 ```bash
 # Environments containing "prod"
 wheels env list --filter="*prod*"
+
+# Can also be written as
+wheels env list --filter=*prod*
 ```
 
 ## Sorting Options
@@ -206,24 +208,6 @@ wheels env list --sort=type
 wheels env list --sort=modified
 ```
 
-## Integration
-
-### Script Usage
-```bash
-# Get current environment
-current=$(wheels env list --format=json | jq -r '.current')
-
-# List all environment names
-wheels env list --format=json | jq -r '.environments[].name'
-```
-
-### CI/CD Usage
-```bash
-# Verify environment exists
-if wheels env list | grep -q "staging"; then
-    wheels env switch staging
-fi
-```
 
 ## Environment Details
 
@@ -237,17 +221,12 @@ When using `--verbose`, shows:
 2. **Database**:
    - Database name
    - Datasource name
-   - Connection status
 
 3. **Settings**:
    - Debug mode
    - Cache settings
    - Custom configurations
 
-4. **Validation**:
-   - Syntax check
-   - Connection test
-   - Dependencies
 
 ## Troubleshooting
 
@@ -265,23 +244,6 @@ When using `--verbose`, shows:
 - Check WHEELS_ENV variable
 - Verify environment.cfm logic
 - Set environment explicitly
-
-## Export Capabilities
-
-### Export Configuration
-```bash
-# Export all environments
-wheels env list --format=json > environments.json
-
-# Export for documentation
-wheels env list --format=markdown > ENVIRONMENTS.md
-```
-
-### Environment Comparison
-```bash
-# Compare environments
-wheels env list --compare=development,production
-```
 
 ## Best Practices
 

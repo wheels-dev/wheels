@@ -14,11 +14,11 @@ The `wheels db create` command creates a new database using the connection infor
 
 ## Options
 
-### --datasource=<name>
+### datasource=<name>
 Specify which datasource to use. If not provided, uses the default datasource from your Wheels configuration.
 
 ```bash
-wheels db create --datasource=myapp_dev
+wheels db create datasource=myapp_dev
 ```
 
 ### --environment=<env>
@@ -41,12 +41,12 @@ wheels db create
 
 Create database for development:
 ```bash
-wheels db create --datasource=myapp_dev
+wheels db create datasource=myapp_dev
 ```
 
 Create database for testing:
 ```bash
-wheels db create --datasource=myapp_test --environment=testing
+wheels db create datasource=myapp_test --environment=testing
 ```
 
 ## Database-Specific Behavior
