@@ -243,8 +243,14 @@ component extends="testbox.system.BaseSpec" {
 				author = g.model("author").findByKey(1)
 				authorArr = []
 
+				// BoxLang compatibility: Ensure numeric ID remains numeric
+				local.authorId = author.key()
+				if (StructKeyExists(server, "boxlang") && IsNumeric(local.authorId)) {
+					local.authorId = Int(local.authorId)
+				}
+
 				arrayAppend(authorArr, {
-					"id": author.key(),
+					"id": local.authorId,
 					"firstname": author.firstname,
 					"lastname": author.lastname
 				})

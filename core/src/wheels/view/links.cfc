@@ -439,16 +439,34 @@ component {
 
 		// Create anchor elements with an href attribute for all URLs found in the text.
 		if (arguments.link != "emailAddresses") {
-			if (arguments.relative) {
-				arguments.regex = structKeyExists(server, "boxlang") 
-				? "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|/[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*)" // BoxLang-safe with explicit chars
-				: "(?:(?:<a\s[^>]+)?(?:https?://|www\.|\/)[^\s\b]+)";
+			// For BoxLang compatibility
+			if (structKeyExists(server, "boxlang")) {
+				local.anchors = [];
+				local.tempText = arguments.text;
+				local.anchorMatches = ReMatchNoCase("<a\s[^>]*>.*?</a>", local.tempText);
+				for (local.i = 1; local.i <= ArrayLen(local.anchorMatches); local.i++) {
+					ArrayAppend(local.anchors, local.anchorMatches[local.i]);
+					local.tempText = Replace(local.tempText, local.anchorMatches[local.i], "___ANCHOR_PLACEHOLDER_" & local.i & "___", "one");
+				}
+				
+				if (arguments.relative) {
+					arguments.regex = "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*|/[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*)";
+				} else {
+					arguments.regex = "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*)";
+				}
+				local.rv = $autoLinkLoop(text = local.tempText, argumentCollection = arguments);
+				
+				for (local.i = 1; local.i <= ArrayLen(local.anchors); local.i++) {
+					local.rv = Replace(local.rv, "___ANCHOR_PLACEHOLDER_" & local.i & "___", local.anchors[local.i], "one");
+				}
 			} else {
-				arguments.regex = structKeyExists(server, "boxlang") 
-				? "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*)" // BoxLang-safe with explicit chars
-				: "(?:(?:<a\s[^>]+)?(?:https?://|www\.)[^\s\b]+)";
+				if (arguments.relative) {
+					arguments.regex = "(?:(?:<a\s[^>]+)?(?:https?://|www\.|\/)[^\s\b]+)";
+				} else {
+					arguments.regex = "(?:(?:<a\s[^>]+)?(?:https?://|www\.)[^\s\b]+)";
+				}
+				local.rv = $autoLinkLoop(text = local.rv, argumentCollection = arguments);
 			}
-			local.rv = $autoLinkLoop(text = local.rv, argumentCollection = arguments);
 		}
 
 		// Create anchor elements with a "mailto:" link in an href attribute for all email addresses found in the text.
