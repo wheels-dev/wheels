@@ -305,7 +305,7 @@ component output="false" {
 		return true;
 	}
 
-	private void function $handleRestartAppRequest() {
+	public void function $handleRestartAppRequest() {
 		local.redirectUrl = this.$buildRedirectUrl();
 		applicationStop();
 		location(url = local.redirectUrl, addToken = false);
