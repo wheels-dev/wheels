@@ -124,12 +124,43 @@ component {
 		} else if (isInstanceOf(local.value, "oracle.sql.TIMESTAMP")){
 			local.value = local.value.timestampValue();
 		}
-		if (structKeyExists(server, "boxlang")) {
-			// BoxLang compatibility: Fix date parsing where MM/DD/YYYY becomes DD/MM/YYYY  
-			if (IsSimpleValue(local.value) && ReFindNoCase("^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", local.value)) {
+		if (structKeyExists(server, "boxlang") && IsSimpleValue(local.value) && Len(local.value)) {
+			// BoxLang compatibility: Fix date parsing issues
+			// Handle ISO format YYYY-MM-DDTHH:MM where day/month are swapped
+			if (ReFindNoCase("^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", local.value)) {
 				local.parts = ListToArray(Left(local.value, 10), "-");
-				if (ArrayLen(local.parts) == 3) {
+				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
 					local.value = CreateDateTime(local.parts[1], local.parts[3], local.parts[2], 0, 0, 0);
+				}
+			}
+			// Handle MM/DD/YYYY format parsing inconsistencies
+			else if (ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4}$", local.value)) {
+				local.parts = ListToArray(local.value, "/");
+				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
+					local.expectedMonth = Val(local.parts[1]);
+					local.expectedDay = Val(local.parts[2]);
+					local.year = Val(local.parts[3]);
+					
+					// Validate date components before creating date
+					if (local.expectedMonth >= 1 && local.expectedMonth <= 12 && 
+						local.expectedDay >= 1 && local.expectedDay <= 31 &&
+						local.year >= 1900 && local.year <= 2200) {
+						try {
+							local.testParsed = ParseDateTime(local.value);
+							// If parsed month doesn't match expected, use manual creation
+							if (Month(local.testParsed) != local.expectedMonth) {
+								local.value = CreateDate(local.year, local.expectedMonth, local.expectedDay);
+							} else {
+								local.value = local.testParsed;
+							}
+						} catch (any e) {
+							try {
+								local.value = CreateDate(local.year, local.expectedMonth, local.expectedDay);
+							} catch (any e2) {
+								// Leave original value if all parsing fails
+							}
+						}
+					}
 				}
 			}
 		}
@@ -206,9 +237,9 @@ component {
 		any encode = false
 	) {
 		// Ensure numeric types for BoxLang compatibility
-		arguments.$loopFrom = Val(arguments.$loopFrom);
-		arguments.$loopTo = Val(arguments.$loopTo);
-		arguments.$step = Val(arguments.$step);
+		if (!IsNumeric(arguments.$loopFrom)) arguments.$loopFrom = Val(arguments.$loopFrom);
+		if (!IsNumeric(arguments.$loopTo)) arguments.$loopTo = Val(arguments.$loopTo);
+		if (!IsNumeric(arguments.$step)) arguments.$step = Val(arguments.$step);
 		local.optionContent = "";
 
 		// only set the default value if the value is blank and includeBlank is false

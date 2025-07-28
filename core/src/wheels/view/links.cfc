@@ -450,9 +450,9 @@ component {
 				}
 				
 				if (arguments.relative) {
-					arguments.regex = "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*|/[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*)";
+					arguments.regex = "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|www\.[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|/[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*)";
 				} else {
-					arguments.regex = "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*|www\\.[a-zA-Z0-9][a-zA-Z0-9./_~:?####@!$&'()*+,;=%-]*)";
+					arguments.regex = "(?:https?://[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*|www\.[a-zA-Z0-9][a-zA-Z0-9./_~:?##@!$&'()*+,;=%-]*)";
 				}
 				local.rv = $autoLinkLoop(text = local.tempText, argumentCollection = arguments);
 				
