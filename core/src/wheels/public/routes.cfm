@@ -31,5 +31,6 @@ mapper()
 	.end()
 	// Add route for tests controller outside the wheels namespace
 	.get(name = "testsController", pattern = "tests", to = "tests##index")
+	.get(name = "testbox", pattern = "testbox", to = "tests##runner")
 .end();
 </cfscript>
