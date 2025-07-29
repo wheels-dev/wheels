@@ -124,6 +124,41 @@ component extends="wheels.Global"{
 		return ValueList(local.columns.COLUMN_NAME);
 	}
 
+	/**
+	 * Helper function to get column default value with BoxLang compatibility
+	 * Different CFML engines return different column names for default values
+	 */
+	private string function $getColumnDefaultValue(required query columns, required numeric index) {
+		local.rv = "";
+		try {
+			// Try different column names used by different CFML engines
+			if (ListFindNoCase(arguments.columns.columnList, "COLUMN_DEFAULT_VALUE")) {
+				local.rv = arguments.columns["COLUMN_DEFAULT_VALUE"][arguments.index];
+			} else if (ListFindNoCase(arguments.columns.columnList, "column_default")) {
+				local.rv = arguments.columns["column_default"][arguments.index];
+			} else if (ListFindNoCase(arguments.columns.columnList, "default_value")) {
+				local.rv = arguments.columns["default_value"][arguments.index];
+			} else if (ListFindNoCase(arguments.columns.columnList, "COLUMN_DEF")) {
+				// Standard JDBC column name used by BoxLang
+				local.rv = arguments.columns["COLUMN_DEF"][arguments.index];
+			}
+		} catch (any e) {
+			// If there's any error accessing the column, return empty string
+			return "";
+		}
+		if (IsArray(local.rv)) {
+			if (ArrayLen(local.rv) > 0) {
+				local.rv = local.rv[1];
+			} else {
+				local.rv = "";
+			}
+		}
+		if (!IsSimpleValue(local.rv)) {
+			local.rv = "";
+		}
+		return local.rv;
+	}
+
 	private string function $getColumnDefinition(required string tableName, required string columnName) {
 		local.appKey = $appKey();
 		local.columns = $dbinfo(
@@ -149,12 +184,16 @@ component extends="wheels.Global"{
 				} else {
 					local.columnDefinition = local.columnDefinition & " NOT NULL";
 				}
-				if (Len(local.columns["COLUMN_DEFAULT_VALUE"][local.i]) == 0) {
+				
+				// Get column default value with CFML engine compatibility
+				local.defaultValue = $getColumnDefaultValue(local.columns, local.i);
+				
+				if (Len(local.defaultValue) == 0) {
 					local.columnDefinition = local.columnDefinition & " DEFAULT NULL";
 				} else if (ListFindNoCase("char,varchar,binary,varbinary", local.columnType)) {
-					local.columnDefinition = local.columnDefinition & " DEFAULT '#local.columns["COLUMN_DEFAULT_VALUE"][local.i]#'";
+					local.columnDefinition = local.columnDefinition & " DEFAULT '#local.defaultValue#'";
 				} else if (ListFindNoCase("int,bigint,smallint,tinyint,decimal,float,double", local.columnType)) {
-					local.columnDefinition = local.columnDefinition & " DEFAULT #local.columns["COLUMN_DEFAULT_VALUE"][local.i]#";
+					local.columnDefinition = local.columnDefinition & " DEFAULT #local.defaultValue#";
 				}
 				break;
 			}

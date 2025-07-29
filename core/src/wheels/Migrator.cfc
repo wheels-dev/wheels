@@ -43,7 +43,7 @@ component output="false" extends="wheels.Global"{
 						break;
 					}
 					if (local.migration.status == "migrated" && application[local.appKey].allowMigrationDown) {
-						transaction action="begin" {
+						transaction datasource="#application[local.appKey].dataSourceName#" {
 							try {
 								local.rv = local.rv & "#Chr(13)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
 								request.$wheelsMigrationOutput = "";
@@ -72,7 +72,7 @@ component output="false" extends="wheels.Global"{
 				}
 				for (local.migration in local.migrations) {
 					if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
-						transaction {
+						transaction datasource="#application[local.appKey].dataSourceName#" {
 							try {
 								local.rv = local.rv & "#Chr(13)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
 								request.$wheelsMigrationOutput = "";
