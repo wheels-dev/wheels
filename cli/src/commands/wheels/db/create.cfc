@@ -15,8 +15,11 @@ component extends="../base" {
 	 */
 	public void function run(
 		string datasource = "",
-		string environment = ""
+		string environment = "",
+		string database = "wheels-dev",
+		boolean force = false
 	) {
+		arguments = reconstructArgs(arguments);
 		local.appPath = getCWD();
 		
 		if (!isWheelsApp(local.appPath)) {
@@ -55,7 +58,7 @@ component extends="../base" {
 			}
 			
 			// Extract database name and connection info
-			local.dbName = local.dsInfo.database;
+			local.dbName = local.dsInfo.database ? local.dsInfo.database :  arguments.database;
 			local.dbType = local.dsInfo.driver;
 			
 			print.line("Database Type: " & local.dbType);
@@ -73,7 +76,7 @@ component extends="../base" {
 					break;
 				case "MSSQLServer":
 				case "MSSQL":
-					createSQLServerDatabase(local.dsInfo, local.dbName);
+					createSQLServerDatabase(local.dsInfo, local.dbName, arguments.force);
 					break;
 				case "H2":
 					print.yellowLine("H2 databases are created automatically on first connection");
@@ -102,7 +105,7 @@ component extends="../base" {
 				local.content = fileRead(local.appCfcPath);
 				
 				// Look for datasource definition in this.datasources['name']
-				local.pattern = "this\.datasources\['#arguments.datasourceName#'\]\s*=\s*\{([^}]+)\}";
+				local.pattern = "this\.datasources\[['""]#arguments.datasourceName#['""]]\s*=\s*\{([^}]+)\}";
 				local.match = reFindNoCase(local.pattern, local.content, 1, true);
 				
 				if (local.match.pos[1] > 0) {
@@ -117,8 +120,8 @@ component extends="../base" {
 						"password": ""
 					};
 					
-					// Extract driver class
-					local.classMatch = reFindNoCase("class\s*:\s*'([^']+)'", local.dsDefinition, 1, true);
+					// Extract driver class - handle both single and double quotes
+					local.classMatch = reFindNoCase("class\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
 					if (local.classMatch.pos[2] > 0) {
 						local.className = mid(local.dsDefinition, local.classMatch.pos[2], local.classMatch.len[2]);
 						switch(local.className) {
@@ -138,8 +141,8 @@ component extends="../base" {
 						}
 					}
 					
-					// Extract connection string
-					local.connMatch = reFindNoCase("connectionString\s*:\s*'([^']+)'", local.dsDefinition, 1, true);
+					// Extract connection string - handle both single and double quotes
+					local.connMatch = reFindNoCase("connectionString\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
 					if (local.connMatch.pos[2] > 0) {
 						local.connString = mid(local.dsDefinition, local.connMatch.pos[2], local.connMatch.len[2]);
 						
@@ -153,10 +156,15 @@ component extends="../base" {
 						}
 					}
 					
-					// Extract username
-					local.userMatch = reFindNoCase("username\s*[=:]\s*'([^']*)'", local.dsDefinition, 1, true);
+					// Extract username - handle both single and double quotes
+					local.userMatch = reFindNoCase("username\s*[=:]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
 					if (local.userMatch.pos[2] > 0) {
 						local.dsInfo.username = mid(local.dsDefinition, local.userMatch.pos[2], local.userMatch.len[2]);
+					}
+					// Extract password - handle both single and double quotes
+					local.passwordMatch = reFindNoCase("password\s*[=:]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
+					if (local.passwordMatch.pos[2] > 0) {
+						local.dsInfo.password = mid(local.dsDefinition, local.passwordMatch.pos[2], local.passwordMatch.len[2]);
 					}
 					
 					return local.dsInfo;
@@ -252,44 +260,104 @@ component extends="../base" {
 		}
 	}
 
-	private void function createSQLServerDatabase(required struct dsInfo, required string dbName) {
+	private void function createSQLServerDatabase(required struct dsInfo, required string dbName, boolean force) {
+		// Create Database Test
 		try {
-			// Create a temporary datasource without database specification
+
 			local.tempDS = Duplicate(arguments.dsInfo);
-			local.tempDS.database = "master"; // Connect to system database
+			print.line("=== SQL Server Create Database ===");
+
+			// Connection details (same as your working connection)
+			local.url = buildJDBCUrl(local.tempDS);
+			local.username = local.tempDS.username;
+			local.password = local.tempDS.password;
+
+			print.boldYellowLine("Connecting to SQL Server...");
 			
-			// Create connection
-			local.conn = CreateObject("java", "java.sql.DriverManager").getConnection(
-				buildJDBCUrl(local.tempDS),
-				local.tempDS.username ?: "",
-				local.tempDS.password ?: ""
-			);
+			// Create driver instance
+			local.driver = createObject("java", "com.microsoft.sqlserver.jdbc.SQLServerDriver");
 			
-			try {
-				// Check if database exists
-				local.checkStmt = local.conn.prepareStatement(
-					"SELECT 1 FROM sys.databases WHERE name = ?"
-				);
-				local.checkStmt.setString(1, arguments.dbName);
-				local.rs = local.checkStmt.executeQuery();
-				
-				if (local.rs.next()) {
-					print.yellowLine("Database already exists: " & arguments.dbName);
-				} else {
-					// Create database
-					local.stmt = local.conn.createStatement();
-					local.sql = "CREATE DATABASE [#arguments.dbName#]";
-					local.stmt.executeUpdate(local.sql);
-					
-					print.greenLine("Database created successfully: " & arguments.dbName);
+			// Create properties for connection
+			local.props = createObject("java", "java.util.Properties");
+			local.props.setProperty("user", local.username);
+			local.props.setProperty("password", local.password);
+			
+			// Connect using driver directly
+			local.conn = local.driver.connect(local.url, local.props);
+			
+			if (isNull(local.conn)) {
+				error("Failed to connect to SQL Server");
+			}
+			
+			print.greenLine("Connected successfully!");
+			
+			// Database name to create
+			local.databaseName = arguments.dbName;
+			
+			// Optional: Get default data directory from SQL Server
+			local.pathStmt = local.conn.createStatement();
+			local.pathRs = local.pathStmt.executeQuery("SELECT SERVERPROPERTY('InstanceDefaultDataPath') as DefaultDataPath");
+			local.defaultPath = "";
+			if (local.pathRs.next()) {
+				local.defaultPath = local.pathRs.getString("DefaultDataPath");
+			}
+			local.pathRs.close();
+			local.pathStmt.close();
+			
+			// Check if database already exists
+			local.checkStmt = local.conn.createStatement();
+			local.checkQuery = "SELECT name FROM sys.databases WHERE name = '" & local.databaseName & "'";
+			local.checkRs = local.checkStmt.executeQuery(local.checkQuery);
+			
+			if (local.checkRs.next()) {
+
+				//Throw error if --force is false 
+				if(!arguments.force){
+					error("Database '" & local.databaseName & "' already exists! Use --force to drop existing database or use --database to change database name.");
 				}
 				
-			} finally {
-				if (IsDefined("local.rs")) local.rs.close();
-				if (IsDefined("local.checkStmt")) local.checkStmt.close();
-				if (IsDefined("local.stmt")) local.stmt.close();
-				if (IsDefined("local.conn")) local.conn.close();
+				// Optional: Drop existing database first
+				print.line("Database '" & local.databaseName & "' already exists!");
+				print.line("Dropping existing database...");
+				local.dropStmt = local.conn.createStatement();
+				local.dropStmt.execute("DROP DATABASE [" & local.databaseName & "]");
+				local.dropStmt.close();
+				print.cyanLine("Existing database dropped.");
 			}
+			
+			local.checkRs.close();
+			local.checkStmt.close();
+			
+			// Create the database
+			local.createStmt = local.conn.createStatement();
+			
+			// Simple CREATE DATABASE statement
+			local.createSQL = "CREATE DATABASE [" & local.databaseName & "]";
+			
+			// Execute the CREATE DATABASE statement
+			local.createStmt.execute(local.createSQL);
+			print.boldGreenLine("Database '" & local.databaseName & "' created successfully!");
+			
+			local.createStmt.close();
+			
+			// Verify database was created
+			print.line("Verifying database creation...");
+			local.verifyStmt = local.conn.createStatement();
+			local.verifyRs = local.verifyStmt.executeQuery("SELECT name FROM sys.databases WHERE name = '" & local.databaseName & "'");
+			
+			if (local.verifyRs.next()) {
+				print.greenBoldLine("Database '" & local.databaseName & "' verified in sys.databases");
+			} else {
+				print.line("Database creation verification failed");
+			}
+			
+			local.verifyRs.close();
+			local.verifyStmt.close();
+			
+			// Clean up
+			local.conn.close();
+			
+			print.greenBoldLine("Database created successfully!");
 			
 		} catch (any e) {
 			rethrow;
@@ -313,7 +381,8 @@ component extends="../base" {
 			case "MSSQLServer":
 			case "MSSQL":
 				if (!Len(local.port)) local.port = "1433";
-				return "jdbc:sqlserver://#local.host#:#local.port#;databaseName=#local.database#";
+				local.database = "master";
+				return "jdbc:sqlserver://#local.host#:#local.port#;databaseName=#local.database#;encrypt=false;trustServerCertificate=true";
 			case "H2":
 				return "jdbc:h2:#local.database#";
 			default:
