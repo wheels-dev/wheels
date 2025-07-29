@@ -370,9 +370,14 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Load base settings
 		if (FileExists(arguments.settingsFile)) {
 			local.content = FileRead(arguments.settingsFile);
+
+			// Remove block comments (/* ... */) and line comments (// ...)
+			local.cleaned = REReplace(local.content, "/\*[\s\S]*?\*/", "", "all"); // block comments
+			local.cleaned = REReplace(local.cleaned, "//.*", "", "all"); // line comments
+
 			// Extract set() calls
 			local.pattern = 'set\s*\(\s*([^)]+)\s*\)';
-			local.matches = REMatchNoCase(local.pattern, local.content);
+			local.matches = REMatchNoCase(local.pattern, local.cleaned);
 			
 			for (local.match in local.matches) {
 				try {
@@ -388,7 +393,12 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Load environment-specific settings
 		if (Len(arguments.envSettingsFile) && FileExists(arguments.envSettingsFile)) {
 			local.content = FileRead(arguments.envSettingsFile);
-			local.matches = REMatchNoCase(local.pattern, local.content);
+
+			// Remove block comments (/* ... */) and line comments (// ...)
+			local.cleaned = REReplace(local.content, "/\*[\s\S]*?\*/", "", "all"); // block comments
+			local.cleaned = REReplace(local.cleaned, "//.*", "", "all"); // line comments
+
+			local.matches = REMatchNoCase(local.pattern, local.cleaned);
 			
 			for (local.match in local.matches) {
 				try {

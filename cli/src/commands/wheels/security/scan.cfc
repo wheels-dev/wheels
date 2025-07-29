@@ -25,7 +25,7 @@ component extends="../base" {
         string severity = "medium",
         string output = ""
     ) {
-        print.yellowLine("🔒 Scanning for security issues...")
+        print.yellowLine("Scanning for security issues...")
              .line();
         
         var scanPath = fileSystemUtil.resolvePath(arguments.path);
@@ -47,31 +47,31 @@ component extends="../base" {
              .boldLine("Summary:");
         
         if (results.severityCounts.critical > 0) {
-            print.redBoldLine("  🔴 Critical: #results.severityCounts.critical#");
+            print.redBoldLine("Critical: #results.severityCounts.critical#");
         }
         if (results.severityCounts.high > 0) {
-            print.redLine("  🟠 High: #results.severityCounts.high#");
+            print.redLine("High: #results.severityCounts.high#");
         }
         if (results.severityCounts.medium > 0) {
-            print.yellowLine("  🟡 Medium: #results.severityCounts.medium#");
+            print.yellowLine("Medium: #results.severityCounts.medium#");
         }
         if (results.severityCounts.low > 0) {
-            print.greenLine("  🟢 Low: #results.severityCounts.low#");
+            print.greenLine("Low: #results.severityCounts.low#");
         }
         
         print.line();
         
         // Attempt fixes if requested
         if (arguments.fix && arrayLen(results.fixableIssues)) {
-            print.yellowLine("🔧 Attempting to fix #arrayLen(results.fixableIssues)# issues...")
+            print.yellowLine("Attempting to fix #arrayLen(results.fixableIssues)# issues...")
                  .line();
             
             var fixedCount = securityService.autoFix(results.fixableIssues);
             
             if (fixedCount > 0) {
-                print.greenLine("✅ Fixed #fixedCount# security issues");
+                print.greenLine("Fixed #fixedCount# security issues");
             } else {
-                print.yellowLine("⚠️  No issues could be automatically fixed");
+                print.yellowLine("No issues could be automatically fixed");
             }
             
             print.line();
@@ -83,7 +83,7 @@ component extends="../base" {
         if (len(arguments.output)) {
             // Write to file
             fileWrite(fileSystemUtil.resolvePath(arguments.output), reportContent);
-            print.greenLine("📄 Report saved to: #arguments.output#");
+            print.greenLine("Report saved to: #arguments.output#");
         } else if (arguments.report == "console") {
             // Display console report
             print.line(reportContent);
@@ -97,10 +97,10 @@ component extends="../base" {
         // Set exit code if high severity issues found
         if (results.hasHighSeverity) {
             print.line()
-                 .redBoldLine("❌ Security vulnerabilities found!");
+                 .redBoldLine("Security vulnerabilities found!");
             setExitCode(1);
         } else if (arrayLen(results.issues) == 0) {
-            print.greenBoldLine("✅ No security issues found!");
+            print.greenBoldLine("No security issues found!");
         }
     }
 }

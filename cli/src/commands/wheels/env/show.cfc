@@ -31,7 +31,7 @@ component extends="../base" {
                 return error("This command must be run from a Wheels project root directory");
             }
             
-            print.greenBoldLine("🔧 Environment Variables Viewer")
+            print.greenBoldLine("Environment Variables Viewer")
                  .line();
             
             // Read the .env file
@@ -158,9 +158,9 @@ component extends="../base" {
                 }
                 
                 print.line();
-                print.greyLine("💡 Tip: Access these in your app with application.env['KEY_NAME']");
-                print.greyLine("💡 Or use them in config files: set(dataSourceName=application.env['DB_NAME'])");
-                print.greyLine("💡 Wheels automatically loads .env on application start");
+                print.greyLine("Tip: Access these in your app with application.env['KEY_NAME']");
+                print.greyLine("Or use them in config files: set(dataSourceName=application.env['DB_NAME'])");
+                print.greyLine("Wheels automatically loads .env on application start");
             }
             
         } catch (any e) {
