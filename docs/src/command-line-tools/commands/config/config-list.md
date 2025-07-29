@@ -5,7 +5,7 @@ List all configuration settings for your Wheels application.
 ## Usage
 
 ```bash
-wheels config list [--environment=<env>] [--filter=<pattern>] [--show-sensitive]
+wheels config list
 ```
 
 ## Parameters
