@@ -71,27 +71,44 @@ The analysis provides:
 
 ### Sample Output
 ```
-Performance Analysis Results
-===========================
+Starting performance monitoring for 30 seconds...
+Target: all
+Threshold: 100ms
 
-Slowest Requests:
-1. GET /users/search (avg: 850ms, calls: 45)
-2. POST /orders/create (avg: 650ms, calls: 12)
-3. GET /reports/generate (avg: 1200ms, calls: 8)
 
-Database Issues:
-- N+1 queries detected in UsersController.index
-- Slow query in Order.findRecent() - 450ms avg
-- Missing index suggested for users.created_at
+Performance Analysis Complete!
 
-Memory Usage:
-- High allocation in ReportService.generate()
-- Potential memory leak in SessionManager
+Summary:
+-----------------------------------------
+Requests Analyzed: 29
+Average Response Time: 290ms
+Slowest Request: 491ms
+Fastest Request: 51ms
+Slow Requests (>100ms): 26
 
-Recommendations:
-1. Add eager loading to UsersController.index
-2. Create index on users.created_at
-3. Implement query result caching for Order.findRecent()
+Queries Executed: 29
+Average Query Time: 95ms
+Slow Queries (>50ms): 23
+
+Average Memory Usage: 193MB
+Peak Memory Usage: 193.911277770996MB
+
+Slow Requests:
+-----------------------------------------
+#list of requests
+
+Slow Queries:
+-----------------------------------------
+#list of quries
+
+Performance Recommendations:
+-----------------------------------------
+   Consider implementing caching for frequently accessed data
+   Add indexes to improve query performance
+   Use query caching for repetitive queries
+   Enable query result caching in production
+   Use CDN for static assets
+   Implement lazy loading for heavy operations
 ```
 
 ## Notes

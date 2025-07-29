@@ -25,10 +25,10 @@ The `wheels env` command provides environment management for Wheels applications
 When called without subcommands, displays help information:
 
 ```bash
-wheels env
+wheels env help
 ```
 
-Output:
+Example Output:
 ```
 🌍 Wheels Environment Management
 
@@ -129,7 +129,7 @@ Order of precedence:
 
 ## Environment Files
 
-### .wheels-env
+### .env
 Local environment override:
 ```
 production
@@ -172,7 +172,7 @@ Access current environment:
 
 ## Best Practices
 
-1. **Never commit** `.wheels-env` file
+1. **Never commit** `.env` file
 2. **Use testing** environment for tests
 3. **Match staging** to production closely
 4. **Separate databases** per environment
