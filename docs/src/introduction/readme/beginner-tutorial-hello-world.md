@@ -27,10 +27,10 @@ To continue with Programming Tutorial Tradition, we'll create the ubiquitous _He
 Let's create a controller from scratch to illustrate how easy it is to set up a\
 controller and plug it into the Wheels framework.
 
-First, create a file called `Say.cfc` in the `app/controllers` directory and add the\
+First, create a file called `Say.cfc` in the `templates/base/src/app/controllers` directory and add the\
 code below to the file.
 
-{% code title="app/controllers/Say.cfc" %}
+{% code title="templates/base/src/app/controllers/Say.cfc" %}
 ```javascript
 component extends="Controller"{
 }
@@ -65,7 +65,7 @@ But let's jump ahead. Now that we have the controller created, let's add an\
 action to it called `hello`. Change your `say` controller so it looks like the\
 code block below:
 
-{% code title="app/controllers/Say.cfc" %}
+{% code title="templates/base/src/app/controllers/Say.cfc" %}
 ```javascript
 component extends="Controller" {
     function hello() {
@@ -98,15 +98,15 @@ return HTML code to the browser. By default, the view files will have the same\
 name as our controller actions and will be grouped into a directory under the\
 view directory. This new directory will have the same name as our controller.
 
-Find the `views` directory inside the `app` directory, located at the root of your \
-Wheels installation. There will be a few directories in there already. For \
+Find the `views` directory inside the `app` directory, located at `templates/base/src/` \
+in your Wheels installation. There will be a few directories in there already. For \
 now, we need to create a new directory in the `views` directory called `say`. \
 This is the same name as the controller that we created above.
 
 Now inside the `say` directory, create a file called `hello.cfm`. In the\
 `hello.cfm` file, add the following line of code:
 
-{% code title="app/views/say/hello.cfm" %}
+{% code title="templates/base/src/app/views/say/hello.cfm" %}
 ```html
 <h1>Hello World!</h1>
 ```
@@ -135,7 +135,7 @@ The first thing we are going to do is to add some dynamic content to our\
 `say/hello` action. Modify your `say` controller so it looks like the code block\
 below:
 
-{% code title="app/controllers/Say.cfc" %}
+{% code title="templates/base/src/app/controllers/Say.cfc" %}
 ```javascript
 component extends="Controller" {
     function hello() {
@@ -160,7 +160,7 @@ is supposed to coordinate all of the data and business logic, not the view.
 Next, we will modify our `say/hello.cfm` view file so that it looks like the\
 code block below. When we do this, the value will be displayed in the browser.
 
-{% code title="app/views/say/hello.cfm" %}
+{% code title="templates/base/src/app/views/say/hello.cfm" %}
 ```html
 <h1>Hello World!</h1>
 <p>Current time: <cfoutput>#time#</cfoutput></p>
@@ -188,7 +188,7 @@ not feeling that adventurous, we'll quickly go step by step.
 First, modify the the `say` controller file so that it looks like the code block\
 below.
 
-{% code title="app/controllers/Say.cfc" %}
+{% code title="templates/base/src/app/controllers/Say.cfc" %}
 ```javascript
 component extends="Controller" {
     function hello() {
@@ -201,11 +201,11 @@ component extends="Controller" {
 ```
 {% endcode %}
 
-Now go to the `app/views/say` directory and create a `goodbye.cfm` page.
+Now go to the `templates/base/src/app/views/say` directory and create a `goodbye.cfm` page.
 
 Add the following code to the `goodbye.cfm` page and save it.
 
-{% code title="app/views/say/goodbye.cfm" %}
+{% code title="templates/base/src/app/views/say/goodbye.cfm" %}
 ```
 Goodbye World!
 ```
@@ -231,7 +231,7 @@ Open the `say/hello.cfm` view file. We are going to add a line of code to the\
 end of this file so our `say/hello.cfm` view file looks like the code block\
 below:
 
-{% code title="app/views/say/hello.cfm" %}
+{% code title="templates/base/src/app/views/say/hello.cfm" %}
 ```html
 <h1>Hello World!</h1>
 <p>Current time: <cfoutput>#time#</cfoutput></p>
@@ -260,9 +260,7 @@ Let's complete our little app and add a corresponding link to the bottom of our\
 Open your `say/goodbye.cfm` view page and modify it so it looks like the code\
 block below.
 
-CFML: app/views/say/goodbye.cfm
-
-{% code title="app/views/say/goodbye.cfm" %}
+{% code title="templates/base/src/app/views/say/goodbye.cfm" %}
 ```html
 <h1>Goodbye World!</h1>
 <p>Time to say <cfoutput>#linkTo(text="hello", action="hello")#?</cfoutput></p>

@@ -1,170 +1,149 @@
 # Running Local Development Servers
 
-### Starting a local development server
+Wheels uses a Docker-based development environment that provides consistent, containerized development with support for multiple CFML engines and databases.
 
-With CommandBox, we don't need to have Lucee or Adobe ColdFusion installed locally. With a simple command, we can make CommandBox go and get the CFML engine we've requested, and quickly create a server running on Undertow. Make sure you're in the root of your website, and then run:
+### Prerequisites
 
-{% tabs %}
-{% tab title="CommandBox" %}
-server start
-{% endtab %}
-{% endtabs %}
+1. **Docker**: Install Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
+2. **Wheels CLI**: Install the Wheels CommandBox module:
+   ```bash
+   box install wheels-cli
+   ```
 
-The server will then start on a random port on `127.0.0.1` based the configuration from the `server.json` file that is in the root of your application that comes with wheels. We can add various options to `server.json` to customize our server. Your default `server.json` will look something like this:
+### Setting up Docker Development Environment
+
+Navigate to the Wheels framework directory and go to the application template:
+
+```bash
+cd templates/base/src
+```
+
+Initialize your Docker development environment:
+
+```bash
+wheels docker init cfengine=adobe cfversion=2018 db=mysql
+```
+
+#### Command Options
+
+**cfengine** options:
+- `lucee` - Lucee CFML engine
+- `adobe` - Adobe ColdFusion
+
+**cfversion** options:
+- Major versions for Adobe ColdFusion: `2018`, `2021`, `2023`, `2025`
+- Major versions for Lucee: `5`, `6`
+
+**db** options:
+- `mysql` - MySQL database
+- `postgres` - PostgreSQL database  
+- `mssql` - Microsoft SQL Server
+- `h2` - H2 embedded database
+
+#### Generated Files
+
+The `wheels docker init` command creates several files in your project:
+
+- **`.dockerignore`** - Specifies files to exclude from Docker build context
+- **`Dockerfile`** - Container definition for your chosen CFML engine
+- **`docker-compose.yml`** - Multi-container application definition
+- **`CFConfig.json`** - CFML engine configuration with datasource setup
+
+### Starting Your Development Environment  
+
+After running the init command, start your containers:
+
+```bash
+docker-compose up -d
+```
+
+The containers will take a few minutes to start the first time as Docker downloads the necessary images. Once started, your application will be available at:
+
+- **Default**: `http://localhost:8080`
+- **Custom port**: Check your `server.json` file for the configured port
+
+### Managing Your Docker Environment
+
+```bash
+# Stop the containers
+docker-compose down
+
+# View running containers
+docker-compose ps
+
+# View container logs
+docker-compose logs
+
+# Rebuild and restart
+docker-compose up -d --build
+```
+
+## Additional Configuration
+
+### Custom Ports
+
+The default port is 8080, but you can customize this by modifying the `server.json` file in `templates/base/src`:
 
 ```json
 {
     "name":"wheels",
     "web":{
         "host":"localhost",
+        "http":{
+            "port":3000
+        },
         "webroot":"public",
         "rewrites":{
             "enable":true,
             "config":"public/urlrewrite.xml"
         }
-    },
-    "app":{
-        "cfengine":"lucee"
     }
 }
 ```
 
-In this `server.json` file, the server name is set to `wheels`, meaning I can now start the server from any directory by simply calling `start myApp`. We don't have any port specified, but you can specify any port you want. Lastly, we have URL rewriting enabled and pointed the URL rewrite configuration file to `public/urlrewrite.xml`, which is included starting from Wheels 2.x.
+### Database Configuration
 
-#### Using custom host names
+The generated `CFConfig.json` file automatically configures a datasource for your chosen database. The configuration includes:
 
-You can also specify hosts other than localhost: there's a useful CommandBox module to do that ([Host updater](https://www.forgebox.io/view/commandbox-hostupdater)) which will automatically create entries in your hosts file to allow for domains such as `myapp.local` running on port 80. You can install it via `install commandbox-hostupdater` when running the box shell with administrator privileges.
+- **Connection settings** for your selected database type
+- **Default datasource** named `wheels-dev`
+- **Appropriate drivers** for the database engine
 
-### Controlling local servers
+### Development Workflow
 
-Obviously, anything you start, you might want to stop. Servers can be stopped either via right/ctrl clicking on the icon in the taskbar, or by the `stop` command. To stop a server running in the current directory issue the following:
+1. **Make code changes** in your `templates/base/src` directory
+2. **Changes are reflected immediately** due to Docker volume mounting
+3. **Database changes persist** between container restarts
+4. **Use standard Wheels commands** like migrations, generators, etc.
 
-{% tabs %}
-{% tab title="CommandBox" %}
-server stop
-{% endtab %}
-{% endtabs %}
+### Troubleshooting
 
-You can also stop a server from anywhere by using its name:
+**Containers won't start:**
+```bash
+# Check if ports are in use
+docker-compose ps
+netstat -an | grep 8080
 
-{% tabs %}
-{% tab title="CommandBox" %}
-server stop myApp
-{% endtab %}
-{% endtabs %}
-
-If you want to see what server configurations exist on your system and their current status, simply do `server list`
-
-{% tabs %}
-{% tab title="CommandBox" %}
-server list
-{% endtab %}
-{% endtabs %}
-
-```shell-session
-myapp (stopped)
- http://127.0.0.1:60000
- Webroot: /Users/wheels/Documents/myapp
-
-myAPI (stopped)
- http://127.0.0.1:60010
- Webroot: /Users/wheels/Documents/myAPI
-
-megasite (stopped)
- http://127.0.0.1:61280
- CF Engine: lucee 4.5.4+017
- Webroot: /Users/wheels/Documents/megasite
-
-awesomesite (stopped)
- http://127.0.0.1:60015
- CF Engine: lucee 4.5.4+017
- Webroot: /Users/wheels/Documents/awesomeo
+# Force recreate containers
+docker-compose down
+docker-compose up -d --force-recreate
 ```
 
-To remove a server configuration from the list, you can use `server forget myapp`. Note the status of the servers on the list are somewhat unreliable, as it only remembers the last known state of the server: so if you start a server and then turn off your local machine, it may still remember it as `running` when you turn your local machine back on, which is why we recommend the use of `force: true` in the `server.json` file.
+**Database connection issues:**
+```bash
+# Check database container logs
+docker-compose logs db
 
-### Specifying different CF engines
-
-By default, CommandBox will run Lucee (version 6.x at time of writing). You may wish to specify an exact version of Lucee, or use Adobe ColdFusion. We can do this via either setting the appropriate `cfengine` setting in `server.json`, or at runtime with the `cfengine=` argument.
-
-{% tabs %}
-{% tab title="CommandBox" %}
-_Start the default engine_
-
-CommandBox> start
-
-\_\_
-
-_Start the latest stable Lucee 5.x engine_
-
-CommandBox> start cfengine=lucee5
-
-\_\_
-
-_Start a specific engine and version_
-
-CommandBox> start cfengine=adobe@10.0.12
-
-\_\_
-
-_Start the most recent Adobe server that starts with version "11"_
-
-CommandBox> start cfengine=adobe@11
-
-\_\_
-
-_Start the most recent adobe engine that matches the range_
-
-CommandBox> start cfengine="adobe@>9.0 <=11"
-{% endtab %}
-{% endtabs %}
-
-Or via `server.json`
-
-```json
-{
-    "name":"myApp",
-    "force":true,
-    "web":{
-        "http":{
-            "host":"localhost",
-            "port":60000
-        },
-        "rewrites":{
-            "enable":true,
-            "config":"urlrewrite.xml"
-        }
-    },
-    "app":{
-        "cfengine":"adobe2018"
-    },
-}
+# Restart just the database
+docker-compose restart db
 ```
+
+**Performance issues:**
+- Ensure Docker Desktop has adequate memory allocated (4GB+ recommended)
+- On Windows/Mac, enable file sharing for your project directory
 
 {% hint style="info" %}
 #### CFIDE / Lucee administrators
 
 The default username and password for all administrators is `admin` & `commandbox`
 {% endhint %}
-
-You can of course run multiple servers, so if you need to test your app on Lucee 5.x, Lucee 6.x and Adobe 2018, you can just start three servers with different `cfengine=` arguments!
-
-{% hint style="info" %}
-#### Watch out
-
-CommandBox 5.1 required to install dependencies easily
-{% endhint %}
-
-By default, the Lucee server that CommandBox starts includes all the essential Lucee extensions you need, but if need to minimize the size of the Lucee instance you launch, then you can use Lucee-Light by specifying `cfengine=lucee-light` in your `server.json` file. Wheels can run just fine on lucee-light (which is after all, Lucee, minus all the extensions) but at a minimum, requires the following extensions to be installed as dependencies in your `box.json`. Please note you may have to add any drivers you need for your database to this list as well.
-
-```json
-"dependencies":{
-    "lucee-image":"lex:https://ext.lucee.org/lucee.image.extension-1.0.0.35.lex",
-    "lucee-zip": "lex:https://ext.lucee.org/compress-extension-1.0.0.2.lex",
-    "lucee-esapi": "lex:https://ext.lucee.org/esapi-extension-2.1.0.18.lex"
-}
-```
-
-Once added to your box.json file, while the server is running, just do `box install`, which will install the dependencies, and load them into the running server within 60 seconds.
-
-Alternatively you can download the extensions and add them manually to your server root's deploy folder (i.e `\WEB-INF\lucee-server\deploy`)
