@@ -159,6 +159,9 @@ component extends="wheels.Global" {
 
 		// Inject methods from plugins directly to Application.cfc.
 		if (!StructIsEmpty(application.wheels.mixins)) {
+			if (structKeyExists(server, "boxlang")) {
+				variables.this = this;
+			}
 			local.Mixins.$initializeMixins(variables);
 		}
 

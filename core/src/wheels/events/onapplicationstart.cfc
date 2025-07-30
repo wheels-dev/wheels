@@ -951,6 +951,9 @@ component {
 
 		// Allow developers to inject plugins into the application variables scope.
 		if (!StructIsEmpty(application.$wheels.mixins)) {
+			if (structKeyExists(server, "boxlang")) {
+				variables.this = this;
+			}
 			Mixins.$initializeMixins(variables);
 		}
 
