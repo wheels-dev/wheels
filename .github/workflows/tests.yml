@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         cfengine:
-          ["lucee5", "lucee6", "adobe2018", "adobe2021", "adobe2023"]
+          ["lucee5", "lucee6", "adobe2018", "adobe2021", "adobe2023", "boxlang"]
         dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
@@ -66,6 +66,14 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2023
             dbengine: oracle
+          - cfengine: boxlang
+            dbengine: mysql
+          - cfengine: boxlang
+            dbengine: postgres
+          - cfengine: boxlang
+            dbengine: sqlserver
+          - cfengine: boxlang
+            dbengine: oracle
           # Lucee 7 experimental tests (non-blocking)
           # - cfengine: "lucee7"
           #   dbengine: "h2"
@@ -101,6 +109,8 @@ jobs:
             dbengine: h2
           - cfengine: adobe2025
             dbengine: h2
+          - cfengine: boxlang
+            dbengine: h2
           - cfengine: adobe2025
             dbengine: oracle
           - cfengine: adobe2025
@@ -118,6 +128,7 @@ jobs:
       PORT_adobe2021: 62021
       PORT_adobe2023: 62023
       PORT_adobe2025: 62025
+      PORT_boxlang: 60001
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4

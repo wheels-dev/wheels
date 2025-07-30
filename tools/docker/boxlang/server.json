@@ -1,0 +1,25 @@
+{
+	"profile": "development",
+	"force":true,
+	"web":{
+			"host":"localhost",
+			"webroot":"public",
+			"http":{
+					"port":"60001",
+					"enable":true
+			},
+			"rewrites":{
+					"enable":true,
+					"config":"public/urlrewrite.xml"
+			}
+	},
+	"app":{
+			"cfengine":"boxlang",
+			"libDirs":"tools/docker/boxlang/lib",
+			"serverHomeDirectory":".engine/boxlang"
+	},
+	"cfconfigFile":"CFConfig.json",
+	"JVM":{
+        "javaVersion":"openjdk21"
+    }
+}
