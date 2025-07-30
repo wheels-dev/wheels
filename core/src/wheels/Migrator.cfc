@@ -43,23 +43,13 @@ component output="false" extends="wheels.Global"{
 						break;
 					}
 					if (local.migration.status == "migrated" && application[local.appKey].allowMigrationDown) {
-						transaction datasource="#application[local.appKey].dataSourceName#" {
-							try {
-								local.rv = local.rv & "#Chr(13)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
-								request.$wheelsMigrationOutput = "";
-								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_down.sql";
-								if (application[local.appKey].writeMigratorSQLFiles) {
-									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
-								}
-								local.migration.cfc.down();
-								local.rv = local.rv & request.$wheelsMigrationOutput;
-								$removeVersionAsMigrated(local.migration.version);
-							} catch (any e) {
-								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
-								transaction action="rollback";
-								break;
-							}
-							transaction action="commit";
+						local.rv = local.rv & $executeMigrationInTransaction(
+							migration = local.migration,
+							direction = "down",
+							output = local.rv
+						);
+						if (Find("Error migrating", local.rv)) {
+							break;
 						}
 					}
 				}
@@ -72,23 +62,13 @@ component output="false" extends="wheels.Global"{
 				}
 				for (local.migration in local.migrations) {
 					if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
-						transaction datasource="#application[local.appKey].dataSourceName#" {
-							try {
-								local.rv = local.rv & "#Chr(13)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
-								request.$wheelsMigrationOutput = "";
-								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_up.sql";
-								if (application[local.appKey].writeMigratorSQLFiles) {
-									$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
-								}
-								local.migration.cfc.up();
-								local.rv = local.rv & request.$wheelsMigrationOutput;
-								$setVersionAsMigrated(local.migration.version);
-							} catch (any e) {
-								local.rv = local.rv & "Error migrating to #local.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
-								transaction action="rollback";
-								break;
-							}
-							transaction action="commit";
+						local.rv = local.rv & $executeMigrationInTransaction(
+							migration = local.migration,
+							direction = "up",
+							output = local.rv
+						);
+						if (Find("Error migrating", local.rv)) {
+							break;
 						}
 					} else if (local.migration.version > arguments.version) {
 						break;
@@ -442,6 +422,71 @@ component output="false" extends="wheels.Global"{
 		} catch (any e) {
 			// move along
 		}
+	}
+
+	/**
+	 * Executes a migration within a transaction, handling BoxLang/Lucee compatibility
+	 */
+	private string function $executeMigrationInTransaction(
+		required struct migration,
+		required string direction,
+		required string output
+	) {
+		local.appKey = $appKey();
+		local.rv = "";
+		
+		// Start transaction with engine-specific attributes
+		if (structKeyExists(server, "boxlang")) {
+			transaction datasource="#application[local.appKey].dataSourceName#" {
+				try {
+					local.rv = $performMigration(arguments.migration, arguments.direction);
+					transaction action="commit";
+				} catch (any e) {
+					local.rv = "Error migrating to #arguments.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
+					transaction action="rollback";
+				}
+			}
+		} else {
+			transaction {
+				try {
+					local.rv = $performMigration(arguments.migration, arguments.direction);
+					transaction action="commit";
+				} catch (any e) {
+					local.rv = "Error migrating to #arguments.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
+					transaction action="rollback";
+				}
+			}
+		}
+		
+		return local.rv;
+	}
+
+	/**
+	 * Performs the actual migration logic
+	 */
+	private string function $performMigration(required struct migration, required string direction) {
+		local.appKey = $appKey();
+		local.rv = "";
+		
+		local.rv = local.rv & "#Chr(13)#" & RepeatString("-", 7) & " " & arguments.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(arguments.migration.cfcfile)))##Chr(13)#";
+		request.$wheelsMigrationOutput = "";
+		request.$wheelsMigrationSQLFile = "#this.paths.sql#/#arguments.migration.cfcfile#_#arguments.direction#.sql";
+		
+		if (application[local.appKey].writeMigratorSQLFiles) {
+			$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
+		}
+		
+		// Execute the migration method
+		if (arguments.direction == "up") {
+			arguments.migration.cfc.up();
+			$setVersionAsMigrated(arguments.migration.version);
+		} else {
+			arguments.migration.cfc.down();
+			$removeVersionAsMigrated(arguments.migration.version);
+		}
+		
+		local.rv = local.rv & request.$wheelsMigrationOutput;
+		return local.rv;
 	}
 
 }

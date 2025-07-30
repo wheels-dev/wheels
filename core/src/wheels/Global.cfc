@@ -242,7 +242,15 @@ component output="false" {
 	}
 
 	public any function $zip(){
-    cfzip(attributeCollection="#arguments#");
+		if (structKeyExists(server, "boxlang")) {
+			if (!left(arguments.file, 1) == "/") {
+				arguments.file = "/" & arguments.file;
+			}
+			if (!left(arguments.destination, 1) == "/") {
+				arguments.destination = "/" & arguments.destination;
+			}
+		}
+ 		cfzip(attributeCollection="#arguments#");
 	}
 
 	public any function $query(required string sql){

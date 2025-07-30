@@ -50,9 +50,41 @@ component output="false" extends="wheels.Global"{
 				sql = "SELECT name FROM query WHERE LOWER(name) = '#LCase(local.folders["name"][i])#.cfc'"
 			);
 			local.temp = {};
-			local.temp.name = Replace(local.pluginCfc.name, ".cfc", "");
-			local.temp.folderPath = $fullPathToPlugin(local.folders["name"][i]);
-			local.temp.componentName = local.folders["name"][i] & "." & Replace(local.pluginCfc.name, ".cfc", "");
+			if (structKeyExists(server, "boxlang")) {
+				// BoxLang compatibility: Handle case where query returns no results
+				if (local.pluginCfc.recordCount > 0) {
+					local.temp.name = Replace(local.pluginCfc.name, ".cfc", "");
+				} else {
+					// Fallback: Look for any CFC file in the directory
+					local.cfcFiles = $query(
+						dbtype = "query",
+						query = local.subfolder,
+						sql = "SELECT name FROM query WHERE LOWER(name) LIKE '%.cfc' ORDER BY name"
+					);
+					if (local.cfcFiles.recordCount > 0) {
+						// BoxLang fix: Take the first CFC file found (usually the main plugin file)
+						local.temp.name = Replace(local.cfcFiles.name, ".cfc", "");
+					} else {
+						local.folderPattern = local.folders["name"][i];
+						local.possibleFiles = $query(
+							dbtype = "query", 
+							query = local.subfolder,
+							sql = "SELECT name FROM query WHERE LOWER(name) LIKE '%#LCase(local.folderPattern)#%.cfc'"
+						);
+						if (local.possibleFiles.recordCount > 0) {
+							local.temp.name = Replace(local.possibleFiles.name, ".cfc", "");
+						} else {
+							local.temp.name = local.folders["name"][i];
+						}
+					}
+				}
+				local.temp.folderPath = $fullPathToPlugin(local.folders["name"][i]);
+				local.temp.componentName = local.folders["name"][i] & "." & local.temp.name;
+			} else {
+				local.temp.name = Replace(local.pluginCfc.name, ".cfc", "");
+				local.temp.folderPath = $fullPathToPlugin(local.folders["name"][i]);
+				local.temp.componentName = local.folders["name"][i] & "." & Replace(local.pluginCfc.name, ".cfc", "");
+			}
 			local.plugins[local.folders["name"][i]] = local.temp;
 		}
 		return local.plugins;
@@ -346,7 +378,22 @@ component output="false" extends="wheels.Global"{
 	}
 
 	public string function $componentPathToPlugin(required string folder, required string file) {
-		return "#application[$appKey()].pluginComponentPath#.#arguments.folder#.#arguments.file#";
+		// BoxLang compatibility: Handle component path construction more carefully
+		if (structKeyExists(server, "boxlang")) {
+			local.basePath = application[$appKey()].pluginComponentPath;
+			local.fileName = Len(Trim(arguments.file)) ? arguments.file : arguments.folder;
+			if (Find("/", local.basePath)) {
+				local.basePath = Replace(local.basePath, "/", ".", "all");
+				local.basePath = REReplace(local.basePath, "^\.+", "", "all");
+			}
+			
+			local.componentPath = "#local.basePath#.#arguments.folder#.#local.fileName#";
+			local.componentPath = REReplaceNoCase(local.componentPath, "\.+$", "", "all");
+
+			return local.componentPath;
+		} else {
+			return "#application[$appKey()].pluginComponentPath#.#arguments.folder#.#arguments.file#";
+		}
 	}
 
 	public query function $folders() {
