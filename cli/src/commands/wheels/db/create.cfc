@@ -43,58 +43,422 @@ component extends="../base" {
 				return;
 			}
 			
-			print.line();
-			print.boldLine("Creating database for datasource: " & arguments.datasource);
-			print.line("Environment: " & arguments.environment);
-			print.line();
+			printHeader("Database Creation Process");
+			printInfo("Datasource", arguments.datasource);
+			printInfo("Environment", arguments.environment);
+			printDivider();
 			
 			// Get datasource configuration
 			local.dsInfo = getDatasourceInfo(arguments.datasource);
 			
 			if (StructIsEmpty(local.dsInfo)) {
 				error("Datasource '" & arguments.datasource & "' not found in server configuration");
-				print.line("Please create the datasource in your CFML server admin first.");
+				systemOutput("Please create the datasource in your CFML server admin first.", true, true);
 				return;
 			}
 			
 			// Extract database name and connection info
-			local.dbName = local.dsInfo.database ? local.dsInfo.database :  arguments.database;
+			local.dbName = local.dsInfo.database != '' ? local.dsInfo.database : arguments.database;
 			local.dbType = local.dsInfo.driver;
 			
-			print.line("Database Type: " & local.dbType);
-			print.line("Database Name: " & local.dbName);
-			print.line();
+			printInfo("Database Type", local.dbType);
+			printInfo("Database Name", local.dbName);
+			printDivider();
 			
 			// Create database based on type
 			switch (local.dbType) {
 				case "MySQL":
 				case "MySQL5":
-					createMySQLDatabase(local.dsInfo, local.dbName);
+					createDatabase(local.dsInfo, local.dbName, arguments.force, "MySQL");
 					break;
 				case "PostgreSQL":
-					createPostgreSQLDatabase(local.dsInfo, local.dbName);
+					createDatabase(local.dsInfo, local.dbName, arguments.force, "PostgreSQL");
 					break;
 				case "MSSQLServer":
 				case "MSSQL":
-					createSQLServerDatabase(local.dsInfo, local.dbName, arguments.force);
+					createDatabase(local.dsInfo, local.dbName, arguments.force, "SQLServer");
 					break;
 				case "H2":
-					print.yellowLine("H2 databases are created automatically on first connection");
-					print.greenLine("No action needed - database will be created when application starts");
+					printWarning("H2 databases are created automatically on first connection");
+					printSuccess("No action needed - database will be created when application starts");
 					break;
 				default:
 					error("Database creation not supported for driver: " & local.dbType);
-					print.line("Please create the database manually using your database management tools.");
+					systemOutput("Please create the database manually using your database management tools.", true, true);
 			}
 			
 		} catch (any e) {
-			error("Error creating database: " & e.message);
+			printError("Error creating database: " & e.message);
 			if (StructKeyExists(e, "detail") && Len(e.detail)) {
-				error("Details: " & e.detail);
+				printError("Details: " & e.detail);
 			}
 		}
 	}
 
+	/**
+	 * Unified database creation function
+	 */
+	private void function createDatabase(required struct dsInfo, required string dbName, boolean force = false, required string dbType) {
+		try {
+			printStep("Initializing " & arguments.dbType & " database creation...");
+			
+			// Get database-specific configuration
+			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo, arguments.dbName);
+			
+			// Build connection URL
+			local.url = buildJDBCUrl(local.dbConfig.tempDS);
+			local.username = local.dbConfig.tempDS.username ?: "";
+			local.password = local.dbConfig.tempDS.password ?: "";
+			
+			printStep("Connecting to " & arguments.dbType & " server...");
+			
+			// Create driver instance
+			local.driver = "";
+			local.driverFound = false;
+			
+			for (local.driverClass in local.dbConfig.driverClasses) {
+				try {
+					local.driver = createObject("java", local.driverClass);
+					printSuccess("Driver found: " & local.driverClass);
+					local.driverFound = true;
+					break;
+				} catch (any driverError) {
+					printWarning("Driver not available: " & local.driverClass);
+				}
+			}
+			
+			if (!local.driverFound) {
+				throw(message="No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.");
+			}
+			
+			// Create properties for connection
+			local.props = createObject("java", "java.util.Properties");
+			local.props.setProperty("user", local.username);
+			local.props.setProperty("password", local.password);
+			
+			// Test if driver accepts the URL
+			if (!local.driver.acceptsURL(local.url)) {
+				throw(message=arguments.dbType & " driver does not accept the URL format");
+			}
+			
+			// Connect using driver directly
+			local.conn = local.driver.connect(local.url, local.props);
+			
+			if (isNull(local.conn)) {
+				printError("Driver returned null connection. Common causes:");
+				printError("1. " & arguments.dbType & " server is not running");
+				printError("2. Wrong server/port configuration");
+				printError("3. Invalid credentials");
+				printError("4. Network/firewall issues");
+				if (arguments.dbType == "PostgreSQL") {
+					printError("5. pg_hba.conf authentication issues");
+				}
+				throw(message="Connection failed");
+			}
+			
+			printSuccess("Connected successfully to " & arguments.dbType & " server!");
+			
+			// Check if database already exists
+			printStep("Checking if database exists...");
+			local.exists = checkDatabaseExists(local.conn, arguments.dbName, arguments.dbType);
+			
+			if (local.exists) {
+				if (!arguments.force) {
+					throw(message="Database '" & arguments.dbName & "' already exists! Use force=true to drop existing database.");
+				}
+				
+				printWarning("Database '" & arguments.dbName & "' already exists!");
+				
+				// Handle active connections for PostgreSQL
+				if (arguments.dbType == "PostgreSQL") {
+					printStep("Terminating active connections...");
+					terminatePostgreSQLConnections(local.conn, arguments.dbName);
+				}
+				
+				// Drop existing database
+				printStep("Dropping existing database...");
+				dropDatabase(local.conn, arguments.dbName, arguments.dbType);
+				printSuccess("Existing database dropped.");
+			}
+			
+			// Create the database
+			printStep("Creating " & arguments.dbType & " database '" & arguments.dbName & "'...");
+			executeCreateDatabase(local.conn, arguments.dbName, arguments.dbType);
+			printSuccess("Database '" & arguments.dbName & "' created successfully!");
+			
+			// Verify database was created
+			printStep("Verifying database creation...");
+			if (verifyDatabaseCreated(local.conn, arguments.dbName, arguments.dbType)) {
+				printSuccess("Database '" & arguments.dbName & "' verified successfully!");
+			} else {
+				printWarning("Database creation verification failed");
+			}
+			
+			// Clean up
+			local.conn.close();
+			
+			printDivider();
+			printSuccess(arguments.dbType & " database creation completed successfully!", true);
+			
+		} catch (any e) {
+			handleDatabaseError(e, arguments.dbType, arguments.dbName);
+		}
+	}
+
+	/**
+	 * Get database-specific configuration
+	 */
+	private struct function getDatabaseConfig(required string dbType, required struct dsInfo, required string dbName) {
+		local.config = {
+			tempDS: Duplicate(arguments.dsInfo),
+			driverClasses: []
+		};
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.config.tempDS.database = ""; // Connect without database
+				local.config.driverClasses = [
+					"com.mysql.cj.jdbc.Driver",      // MySQL 8.0+
+					"com.mysql.jdbc.Driver",         // MySQL 5.x
+					"org.mariadb.jdbc.Driver"        // MariaDB
+				];
+				break;
+				
+			case "PostgreSQL":
+				local.config.tempDS.database = "postgres"; // Connect to system database
+				local.config.driverClasses = [
+					"org.postgresql.Driver",         // Standard PostgreSQL driver
+					"postgresql.Driver"              // Alternative name
+				];
+				break;
+				
+			case "SQLServer":
+				local.config.tempDS.database = "master"; // Connect to system database
+				local.config.driverClasses = [
+					"com.microsoft.sqlserver.jdbc.SQLServerDriver"
+				];
+				break;
+		}
+		
+		return local.config;
+	}
+
+	/**
+	 * Check if database exists
+	 */
+	private boolean function checkDatabaseExists(required any conn, required string dbName, required string dbType) {
+		local.exists = false;
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+				
+			case "PostgreSQL":
+				local.stmt = arguments.conn.prepareStatement("SELECT 1 FROM pg_database WHERE datname = ?");
+				local.stmt.setString(1, arguments.dbName);
+				local.rs = local.stmt.executeQuery();
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+				
+			case "SQLServer":
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT name FROM sys.databases WHERE name = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+		}
+		
+		return local.exists;
+	}
+
+	/**
+	 * Drop database
+	 */
+	private void function dropDatabase(required any conn, required string dbName, required string dbType) {
+		local.stmt = arguments.conn.createStatement();
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.stmt.executeUpdate("DROP DATABASE `" & arguments.dbName & "`");
+				break;
+			case "PostgreSQL":
+				local.stmt.executeUpdate('DROP DATABASE "' & arguments.dbName & '"');
+				break;
+			case "SQLServer":
+				local.stmt.execute("DROP DATABASE [" & arguments.dbName & "]");
+				break;
+		}
+		
+		local.stmt.close();
+	}
+
+	/**
+	 * Execute database creation
+	 */
+	private void function executeCreateDatabase(required any conn, required string dbName, required string dbType) {
+		local.stmt = arguments.conn.createStatement();
+		local.createSQL = "";
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.createSQL = "CREATE DATABASE `" & arguments.dbName & "` " &
+								"CHARACTER SET utf8mb4 " &
+								"COLLATE utf8mb4_unicode_ci";
+				local.stmt.executeUpdate(local.createSQL);
+				break;
+				
+			case "PostgreSQL":
+				local.createSQL = 'CREATE DATABASE "' & arguments.dbName & '" ' &
+								'WITH ENCODING ''UTF8'' ' &
+								'LC_COLLATE ''en_US.UTF-8'' ' &
+								'LC_CTYPE ''en_US.UTF-8'' ' &
+								'TEMPLATE template0';
+				local.stmt.executeUpdate(local.createSQL);
+				break;
+				
+			case "SQLServer":
+				local.createSQL = "CREATE DATABASE [" & arguments.dbName & "]";
+				local.stmt.execute(local.createSQL);
+				break;
+		}
+		
+		local.stmt.close();
+	}
+
+	/**
+	 * Verify database was created
+	 */
+	private boolean function verifyDatabaseCreated(required any conn, required string dbName, required string dbType) {
+		return checkDatabaseExists(arguments.conn, arguments.dbName, arguments.dbType);
+	}
+
+	/**
+	 * Terminate PostgreSQL connections
+	 */
+	private void function terminatePostgreSQLConnections(required any conn, required string dbName) {
+		local.stmt = arguments.conn.createStatement();
+		local.sql = "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '" & arguments.dbName & "' AND pid <> pg_backend_pid()";
+		local.stmt.executeQuery(local.sql);
+		local.stmt.close();
+	}
+
+	/**
+	 * Handle database-specific errors
+	 */
+	private void function handleDatabaseError(required any e, required string dbType, required string dbName) {
+		local.errorHandled = false;
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				if (FindNoCase("database exists", arguments.e.message)) {
+					printError("Database already exists: " & arguments.dbName);
+					local.errorHandled = true;
+				} else if (FindNoCase("Access denied", arguments.e.message)) {
+					printError("Access denied - check MySQL credentials and permissions");
+					local.errorHandled = true;
+				} else if (FindNoCase("Communications link failure", arguments.e.message)) {
+					printError("Cannot connect to MySQL server - check if MySQL is running and accessible");
+					local.errorHandled = true;
+				}
+				break;
+				
+			case "PostgreSQL":
+				if (FindNoCase("already exists", arguments.e.message)) {
+					printError("Database already exists: " & arguments.dbName);
+					local.errorHandled = true;
+				} else if (FindNoCase("authentication failed", arguments.e.message)) {
+					printError("Authentication failed - check PostgreSQL credentials");
+					local.errorHandled = true;
+				} else if (FindNoCase("Connection refused", arguments.e.message)) {
+					printError("Connection refused - check if PostgreSQL is running and accessible");
+					local.errorHandled = true;
+				} else if (FindNoCase("database is being accessed by other users", arguments.e.message)) {
+					printError("Cannot drop database - other users are connected");
+					local.errorHandled = true;
+				}
+				break;
+				
+			case "SQLServer":
+				if (FindNoCase("database exists", arguments.e.message)) {
+					printError("Database already exists: " & arguments.dbName);
+					local.errorHandled = true;
+				} else if (FindNoCase("Login failed", arguments.e.message)) {
+					printError("Login failed - check SQL Server credentials");
+					local.errorHandled = true;
+				}
+				break;
+		}
+		
+		if (!local.errorHandled) {
+			printError(arguments.dbType & " Error: " & arguments.e.message);
+			if (isDefined("arguments.e.detail")) {
+				printError("Detail: " & arguments.e.detail);
+			}
+			throw(message=arguments.e.message, detail=(isDefined("arguments.e.detail") ? arguments.e.detail : ""));
+		}
+	}
+
+	/**
+	 * Print formatted output helpers
+	 */
+	private void function printHeader(required string text) {
+		systemOutput("", true, true);
+		systemOutput("==================================================================", true, true);
+		systemOutput("  " & arguments.text, true, true);
+		systemOutput("==================================================================", true, true);
+		systemOutput("", true, true);
+	}
+
+	private void function printDivider() {
+		systemOutput("------------------------------------------------------------------", true, true);
+	}
+
+	private void function printInfo(required string label, required string value) {
+		systemOutput("  " & PadRight(arguments.label & ":", 20) & arguments.value, true, true);
+	}
+
+	private void function printStep(required string message) {
+		systemOutput("", true, true);
+		systemOutput(">> " & arguments.message, true, true);
+	}
+
+	private void function printSuccess(required string message, boolean bold = false) {
+		if (arguments.bold) {
+			print.boldGreenLine(arguments.message);
+		} else {
+			print.greenLine("  [OK] " & arguments.message);
+		}
+		systemOutput("", true, false); // Force flush
+	}
+
+	private void function printWarning(required string message) {
+		print.yellowLine("  [WARN] " & arguments.message);
+		systemOutput("", true, false); // Force flush
+	}
+
+	private void function printError(required string message) {
+		print.redLine("  [ERROR] " & arguments.message);
+		systemOutput("", true, false); // Force flush
+	}
+
+	private string function PadRight(required string text, required numeric length) {
+		if (Len(arguments.text) >= arguments.length) {
+			return Left(arguments.text, arguments.length);
+		}
+		return arguments.text & RepeatString(" ", arguments.length - Len(arguments.text));
+	}
+
+	// Keep existing helper functions unchanged
 	private struct function getDatasourceInfo(required string datasourceName) {
 		try {
 			// Try to get datasource info from application.cfc
@@ -154,15 +518,45 @@ component extends="../base" {
 								local.dsInfo.database = local.dbPath;
 							}
 						}
+						
+						// Parse database name from connection string for other drivers
+						if (local.dsInfo.driver == "MySQL") {
+							// jdbc:mysql://host:port/database
+							local.dbMatch = reFindNoCase("jdbc:mysql://[^/]+/([^?;]+)", local.connString, 1, true);
+							if (local.dbMatch.pos[2] > 0) {
+								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
+							}
+						} else if (local.dsInfo.driver == "PostgreSQL") {
+							// jdbc:postgresql://host:port/database
+							local.dbMatch = reFindNoCase("jdbc:postgresql://[^/]+/([^?;]+)", local.connString, 1, true);
+							if (local.dbMatch.pos[2] > 0) {
+								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
+							}
+						} else if (local.dsInfo.driver == "MSSQL") {
+							// jdbc:sqlserver://host:port;databaseName=database
+							local.dbMatch = reFindNoCase("databaseName=([^;]+)", local.connString, 1, true);
+							if (local.dbMatch.pos[2] > 0) {
+								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
+							}
+						}
+						
+						// Extract host and port from connection string
+						local.hostPortMatch = reFindNoCase("jdbc:[^:]+://([^:/]+)(?::(\d+))?", local.connString, 1, true);
+						if (local.hostPortMatch.pos[2] > 0) {
+							local.dsInfo.host = mid(local.connString, local.hostPortMatch.pos[2], local.hostPortMatch.len[2]);
+							if (local.hostPortMatch.pos[3] > 0) {
+								local.dsInfo.port = mid(local.connString, local.hostPortMatch.pos[3], local.hostPortMatch.len[3]);
+							}
+						}
 					}
 					
 					// Extract username - handle both single and double quotes
-					local.userMatch = reFindNoCase("username\s*[=:]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
+					local.userMatch = reFindNoCase("username\s*[:=]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
 					if (local.userMatch.pos[2] > 0) {
 						local.dsInfo.username = mid(local.dsDefinition, local.userMatch.pos[2], local.userMatch.len[2]);
 					}
 					// Extract password - handle both single and double quotes
-					local.passwordMatch = reFindNoCase("password\s*[=:]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
+					local.passwordMatch = reFindNoCase("password\s*[:=]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
 					if (local.passwordMatch.pos[2] > 0) {
 						local.dsInfo.password = mid(local.dsDefinition, local.passwordMatch.pos[2], local.passwordMatch.len[2]);
 					}
@@ -176,191 +570,6 @@ component extends="../base" {
 		} catch (any e) {
 			// Server might not be running or file read error
 			return {};
-		}
-	}
-
-	private void function createMySQLDatabase(required struct dsInfo, required string dbName) {
-		try {
-			// Create a temporary datasource without database specification
-			local.tempDS = Duplicate(arguments.dsInfo);
-			local.tempDS.database = "information_schema"; // Connect to system database
-			
-			// Create connection
-			local.conn = CreateObject("java", "java.sql.DriverManager").getConnection(
-				buildJDBCUrl(local.tempDS),
-				local.tempDS.username ?: "",
-				local.tempDS.password ?: ""
-			);
-			
-			try {
-				local.stmt = local.conn.createStatement();
-				local.sql = "CREATE DATABASE IF NOT EXISTS `#arguments.dbName#` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
-				local.stmt.executeUpdate(local.sql);
-				
-				print.greenLine("Database created successfully: " & arguments.dbName);
-				print.line("Character set: utf8mb4");
-				print.line("Collation: utf8mb4_unicode_ci");
-				
-			} finally {
-				if (IsDefined("local.stmt")) local.stmt.close();
-				if (IsDefined("local.conn")) local.conn.close();
-			}
-			
-		} catch (any e) {
-			if (FindNoCase("database exists", e.message)) {
-				print.yellowLine("Database already exists: " & arguments.dbName);
-			} else {
-				rethrow;
-			}
-		}
-	}
-
-	private void function createPostgreSQLDatabase(required struct dsInfo, required string dbName) {
-		try {
-			// Create a temporary datasource without database specification
-			local.tempDS = Duplicate(arguments.dsInfo);
-			local.tempDS.database = "postgres"; // Connect to system database
-			
-			// Create connection
-			local.conn = CreateObject("java", "java.sql.DriverManager").getConnection(
-				buildJDBCUrl(local.tempDS),
-				local.tempDS.username ?: "",
-				local.tempDS.password ?: ""
-			);
-			
-			try {
-				// Check if database exists
-				local.checkStmt = local.conn.prepareStatement(
-					"SELECT 1 FROM pg_database WHERE datname = ?"
-				);
-				local.checkStmt.setString(1, arguments.dbName);
-				local.rs = local.checkStmt.executeQuery();
-				
-				if (local.rs.next()) {
-					print.yellowLine("Database already exists: " & arguments.dbName);
-				} else {
-					// Create database
-					local.stmt = local.conn.createStatement();
-					local.sql = 'CREATE DATABASE "#arguments.dbName#" ENCODING ''UTF8''';
-					local.stmt.executeUpdate(local.sql);
-					
-					print.greenLine("Database created successfully: " & arguments.dbName);
-					print.line("Encoding: UTF8");
-				}
-				
-			} finally {
-				if (IsDefined("local.rs")) local.rs.close();
-				if (IsDefined("local.checkStmt")) local.checkStmt.close();
-				if (IsDefined("local.stmt")) local.stmt.close();
-				if (IsDefined("local.conn")) local.conn.close();
-			}
-			
-		} catch (any e) {
-			rethrow;
-		}
-	}
-
-	private void function createSQLServerDatabase(required struct dsInfo, required string dbName, boolean force) {
-		// Create Database Test
-		try {
-
-			local.tempDS = Duplicate(arguments.dsInfo);
-			print.line("=== SQL Server Create Database ===");
-
-			// Connection details (same as your working connection)
-			local.url = buildJDBCUrl(local.tempDS);
-			local.username = local.tempDS.username;
-			local.password = local.tempDS.password;
-
-			print.boldYellowLine("Connecting to SQL Server...");
-			
-			// Create driver instance
-			local.driver = createObject("java", "com.microsoft.sqlserver.jdbc.SQLServerDriver");
-			
-			// Create properties for connection
-			local.props = createObject("java", "java.util.Properties");
-			local.props.setProperty("user", local.username);
-			local.props.setProperty("password", local.password);
-			
-			// Connect using driver directly
-			local.conn = local.driver.connect(local.url, local.props);
-			
-			if (isNull(local.conn)) {
-				error("Failed to connect to SQL Server");
-			}
-			
-			print.greenLine("Connected successfully!");
-			
-			// Database name to create
-			local.databaseName = arguments.dbName;
-			
-			// Optional: Get default data directory from SQL Server
-			local.pathStmt = local.conn.createStatement();
-			local.pathRs = local.pathStmt.executeQuery("SELECT SERVERPROPERTY('InstanceDefaultDataPath') as DefaultDataPath");
-			local.defaultPath = "";
-			if (local.pathRs.next()) {
-				local.defaultPath = local.pathRs.getString("DefaultDataPath");
-			}
-			local.pathRs.close();
-			local.pathStmt.close();
-			
-			// Check if database already exists
-			local.checkStmt = local.conn.createStatement();
-			local.checkQuery = "SELECT name FROM sys.databases WHERE name = '" & local.databaseName & "'";
-			local.checkRs = local.checkStmt.executeQuery(local.checkQuery);
-			
-			if (local.checkRs.next()) {
-
-				//Throw error if --force is false 
-				if(!arguments.force){
-					error("Database '" & local.databaseName & "' already exists! Use --force to drop existing database or use --database to change database name.");
-				}
-				
-				// Optional: Drop existing database first
-				print.line("Database '" & local.databaseName & "' already exists!");
-				print.line("Dropping existing database...");
-				local.dropStmt = local.conn.createStatement();
-				local.dropStmt.execute("DROP DATABASE [" & local.databaseName & "]");
-				local.dropStmt.close();
-				print.cyanLine("Existing database dropped.");
-			}
-			
-			local.checkRs.close();
-			local.checkStmt.close();
-			
-			// Create the database
-			local.createStmt = local.conn.createStatement();
-			
-			// Simple CREATE DATABASE statement
-			local.createSQL = "CREATE DATABASE [" & local.databaseName & "]";
-			
-			// Execute the CREATE DATABASE statement
-			local.createStmt.execute(local.createSQL);
-			print.boldGreenLine("Database '" & local.databaseName & "' created successfully!");
-			
-			local.createStmt.close();
-			
-			// Verify database was created
-			print.line("Verifying database creation...");
-			local.verifyStmt = local.conn.createStatement();
-			local.verifyRs = local.verifyStmt.executeQuery("SELECT name FROM sys.databases WHERE name = '" & local.databaseName & "'");
-			
-			if (local.verifyRs.next()) {
-				print.greenBoldLine("Database '" & local.databaseName & "' verified in sys.databases");
-			} else {
-				print.line("Database creation verification failed");
-			}
-			
-			local.verifyRs.close();
-			local.verifyStmt.close();
-			
-			// Clean up
-			local.conn.close();
-			
-			print.greenBoldLine("Database created successfully!");
-			
-		} catch (any e) {
-			rethrow;
 		}
 	}
 

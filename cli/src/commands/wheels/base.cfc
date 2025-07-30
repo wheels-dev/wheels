@@ -314,15 +314,15 @@ component excludeFromHelp=true {
  				error("We really need a server.json with a port number and a servername. We can't seem to find it.");
  			}
 
-			 // Wheels folder in expected place? (just a good check to see if the user has actually installed wheels...)
+		// Wheels folder in expected place? (just a good check to see if the user has actually installed wheels...)
  		var wheelsFolder=fileSystemUtil.resolvePath("core/src/wheels");
- 			if(!directoryExists(wheelsFolder)){
+ 			if(!isWheelsApp()){
  				error("We can't find your wheels folder. Check you have installed Wheels, and you're running this from the site root: If you've not started an app yet, try wheels new myApp");
  			}
 
 			 // Plugins in place?
- 		var pluginsFolder=fileSystemUtil.resolvePath("plugins");
- 			if(!directoryExists(wheelsFolder)){
+ 		var pluginsFolder=fileSystemUtil.resolvePath("app/plugins");
+ 			if(!directoryExists(pluginsFolder)){
  				error("We can't find your plugins folder. Check you have installed Wheels, and you're running this from the site root.");
  			}
 
