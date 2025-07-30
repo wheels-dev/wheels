@@ -176,8 +176,8 @@ services:
     volumes:
       - .:/app
       - ../../../core/src/wheels:/app/core/wheels
+      - ../../../docs:/app/core/wheels/docs
       - ../../../tests:/app/tests
-      - /app/node_modules
     command: sh -c "box install && box server start --console --force"';
 
         if (len(local.dbService)) {
