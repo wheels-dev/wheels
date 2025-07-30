@@ -55,14 +55,12 @@ component output="false" extends="wheels.Global"{
 				if (local.pluginCfc.recordCount > 0) {
 					local.temp.name = Replace(local.pluginCfc.name, ".cfc", "");
 				} else {
-					// Fallback: Look for any CFC file in the directory
 					local.cfcFiles = $query(
 						dbtype = "query",
 						query = local.subfolder,
 						sql = "SELECT name FROM query WHERE LOWER(name) LIKE '%.cfc' ORDER BY name"
 					);
 					if (local.cfcFiles.recordCount > 0) {
-						// BoxLang fix: Take the first CFC file found (usually the main plugin file)
 						local.temp.name = Replace(local.cfcFiles.name, ".cfc", "");
 					} else {
 						local.folderPattern = local.folders["name"][i];

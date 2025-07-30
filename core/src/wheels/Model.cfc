@@ -562,21 +562,16 @@ component output="false" displayName="Model" extends="wheels.Global"{
 	private string function $getColumnDefaultValue(required query columns, required numeric index) {
 		local.rv = "";
 
-		try {
-			// Try different column names used by different CFML engines
-			if (ListFindNoCase(arguments.columns.columnList, "column_default_value")) {
-				local.rv = arguments.columns["column_default_value"][arguments.index];
-			} else if (ListFindNoCase(arguments.columns.columnList, "column_default")) {
-				local.rv = arguments.columns["column_default"][arguments.index];
-			} else if (ListFindNoCase(arguments.columns.columnList, "default_value")) {
-				local.rv = arguments.columns["default_value"][arguments.index];
-			} else if (ListFindNoCase(arguments.columns.columnList, "COLUMN_DEF")) {
-				// Standard JDBC column name used by BoxLang
-				local.rv = arguments.columns["COLUMN_DEF"][arguments.index];
-			}
-		} catch (any e) {
-			// If there's any error accessing the column, return empty string
-			return "";
+		// Try different column names used by different CFML engines
+		if (ListFindNoCase(arguments.columns.columnList, "column_default_value")) {
+			local.rv = arguments.columns["column_default_value"][arguments.index];
+		} else if (ListFindNoCase(arguments.columns.columnList, "column_default")) {
+			local.rv = arguments.columns["column_default"][arguments.index];
+		} else if (ListFindNoCase(arguments.columns.columnList, "default_value")) {
+			local.rv = arguments.columns["default_value"][arguments.index];
+		} else if (ListFindNoCase(arguments.columns.columnList, "COLUMN_DEF")) {
+			// Standard JDBC column name used by BoxLang
+			local.rv = arguments.columns["COLUMN_DEF"][arguments.index];
 		}
 
 		if (IsArray(local.rv)) {
