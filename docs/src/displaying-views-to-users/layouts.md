@@ -24,9 +24,9 @@ Layouts to the rescue!
 
 ### Implementing a Layout
 
-In your Wheels installation, layout files are stored either directly in the `app/views` folder or contained in one of the controllers' view folders. Let's go over how layouts work, starting with the simplest way and then moving on to more complex setups.
+In your Wheels installation, layout files are stored either directly in the `templates/base/src/app/views` folder or contained in one of the controllers' view folders. Let's go over how layouts work, starting with the simplest way and then moving on to more complex setups.
 
-Let's say that you want to define one layout to be used by every view in your application. You would accomplish this by editing the _default layout_. The default layout is the `app/views/layout.cfm` file. In a fresh install of Wheels, you'll notice that it only contains a few lines of code:
+Let's say that you want to define one layout to be used by every view in your application. You would accomplish this by editing the _default layout_. The default layout is the `templates/base/src/app/views/layout.cfm` file. In a fresh install of Wheels, you'll notice that it only contains a few lines of code:
 
 ```html
 <html>
@@ -108,9 +108,9 @@ There's also a different way to set variables that goes hand in hand with the [i
 
 ### The Default Layout
 
-One layout file that is already created for you is `app/views/layout.cfm`. Think of it as the default layout to be used by any given controller.
+One layout file that is already created for you is `templates/base/src/app/views/layout.cfm`. Think of it as the default layout to be used by any given controller.
 
-If you're writing code for a controller called `press` and there is no layout created for `press`, Wheels will automatically use `app/views/layout.cfm` as the layout.
+If you're writing code for a controller called `press` and there is no layout created for `press`, Wheels will automatically use `templates/base/src/app/views/layout.cfm` as the layout.
 
 If you implement a layout for the `press` controller, then that layout will be used instead of the default layout.
 
@@ -118,7 +118,7 @@ So, how exactly do you implement a layout meant specifically for just one contro
 
 ### Overriding the Default Layout with a Controller-Specific Layout
 
-Let's pretend that you want to create a layout to be used only in a controller called `blog`. To do this, you would simply create the layout and save it as `app/views/blog/layout.cfm`.
+Let's pretend that you want to create a layout to be used only in a controller called `blog`. To do this, you would simply create the layout and save it as `templates/base/src/app/views/blog/layout.cfm`.
 
 As you can see, the convention is to place your layout file together with the other view files for the controller.
 
@@ -132,7 +132,7 @@ function config(){
 }
 ```
 
-With that code placed in the `app/controllers/Blog.cfc` file, all actions will now wrap their contents with the `bloglayoutone.cfm` file instead of the `layout.cfm` file.
+With that code placed in the `templates/base/src/app/controllers/Blog.cfc` file, all actions will now wrap their contents with the `bloglayoutone.cfm` file instead of the `layout.cfm` file.
 
 The [usesLayout()](https://wheels.dev/api/v3.0.0/controller.useslayout.html) function also accepts `except, only`, and `useDefault` arguments for further customization.
 
@@ -142,7 +142,7 @@ function config(){
 }
 ```
 
-That code tells Wheels to apply the `blogLayoutOne` layout for any actions in this controller except for the `home`action. In the case of the `home` action, it will fall back to the default behavior (i.e. using the `app/views/blog/layout.cfm`file).
+That code tells Wheels to apply the `blogLayoutOne` layout for any actions in this controller except for the `home`action. In the case of the `home` action, it will fall back to the default behavior (i.e. using the `templates/base/src/app/views/blog/layout.cfm`file).
 
 If for some reason you do not want the default behavior to be used when conditions aren't met, you can set the `useDefault` argument to `false`.
 
@@ -187,11 +187,11 @@ function display(){
 }
 ```
 
-This assumes that you want for your action to use the layout stored at `app/views/blog/visitorlayout.cfm`.
+This assumes that you want for your action to use the layout stored at `templates/base/src/app/views/blog/visitorlayout.cfm`.
 
 The default behavior for the `layout` argument is to look for the file in the _current_ controller's view folder, so here we're still assuming that the `display` action is in the `blog` controller. The `.cfm` extension will also be added automatically by Wheels, so you don't need to specifically include that part.
 
-If you want Wheels to locate the file in a different folder, you can start the `layout` argument with a forward slash, `/`. By doing this, Wheels will know you want to start the search in the `app/views` folder. Let's say that you're storing all miscellaneous layouts in its own folder, simply called `layouts`. You would display one of them with the following code:
+If you want Wheels to locate the file in a different folder, you can start the `layout` argument with a forward slash, `/`. By doing this, Wheels will know you want to start the search in the `templates/base/src/app/views` folder. Let's say that you're storing all miscellaneous layouts in its own folder, simply called `layouts`. You would display one of them with the following code:
 
 ```javascript
 function display(){
@@ -203,7 +203,7 @@ Note that setting the `layout` argument on [renderView()](https://wheels.dev/api
 
 ### Using No Layout
 
-If you don't want for a given template to be wrapped by a layout at all, you may want to consider creating the page as a _partial_. See the chapter about [Partials](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/partials) for more information.
+If you don't want for a given template to be wrapped by a layout at all, you may want to consider creating the page as a _partial_. See the chapter about [Partials](https://wheels.dev/3.0.0/guides/displaying-views-to-users/partials) for more information.
 
 Another alternative is to use the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function and set the `layout` argument to `false`.
 
@@ -260,4 +260,4 @@ That was a fairly basic example of how you can achieve nested layouts in Wheels 
 
 ### Layouts for Emails and Partials
 
-Besides having layouts for view pages in Wheels, you can also have them on emails that you send out and partial files that you include. We have chosen to speak about these in their respective chapters though: [Sending Email](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/sending-email) and [Partials](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/partials).
+Besides having layouts for view pages in Wheels, you can also have them on emails that you send out and partial files that you include. We have chosen to speak about these in their respective chapters though: [Sending Email](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/sending-email) and [Partials](https://wheels.dev/3.0.0/guides/displaying-views-to-users/partials).
