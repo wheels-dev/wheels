@@ -94,7 +94,7 @@ The only thing you need to make sure of is that the number of variables in the `
 
 ### Controller Verification vs. Model Object Validation
 
-[verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) exists solely to validate _controller_ and _environment level_ variables and is not a substitute for [Object Validation](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-validation)in your model.
+[verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) exists solely to validate _controller_ and _environment level_ variables and is not a substitute for [Object Validation](https://wheels.dev/3.0.0/guides/database-interaction-through-models/object-validation)in your model.
 
 A basic example of this is to validate params passed through to your controller from routes. Suppose we have the following route in our application:
 

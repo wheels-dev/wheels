@@ -88,7 +88,7 @@ of the box.
 * `xls`
 
 You can use [addFormat()](https://wheels.dev/api/v3.0.0/controller.addformat.html) to set more types to the appropriate MIME type for reference. For example, we could set a Microsoft Word MIME type in\
-`/config/settings.cfm` like so:
+`/templates/base/src/config/settings.cfm` like so:
 
 ```javascript
 addFormat(extension="doc", mimeType="application/msword");
@@ -129,7 +129,7 @@ When Wheels handles this response, it will set the appropriate MIME type in the\
 
 ### Providing the HTML Format
 
-Responding to requests for the HTML version is the same as you're already used to with [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content). [renderwith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html) will accept the same arguments as [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html), and you create just a view template in the `views` folder like normal.
+Responding to requests for the HTML version is the same as you're already used to with [Rendering Content](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/rendering-content). [renderwith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html) will accept the same arguments as [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html), and you create just a view template in the `views` folder like normal.
 
 ### Automatic Generation of XML and JSON Formats
 
@@ -160,17 +160,17 @@ With that in place you can be sure that `firstName` will always be treated as a 
 If you need to provide content for another type than `xml` or `json`, or if you\
 need to customize what your Wheels application generates, you have that option.
 
-In your controller's corresponding folder in `app/views`, all you need to do is\
+In your controller's corresponding folder in `templates/base/src/app/views`, all you need to do is\
 implement a view file like so:
 
-| Type | Example                           |
-| ---- | --------------------------------- |
-| html | app/views/products/index.cfm      |
-| xml  | app/views/products/index.xml.cfm  |
-| json | app/views/products/index.json.cfm |
-| csv  | app/views/products/index.csv.cfm  |
-| pdf  | app/views/products/index.pdf.cfm  |
-| xls  | app/views/products/index.xls.cfm  |
+| Type | Example                                              |
+| ---- | ---------------------------------------------------- |
+| html | templates/base/src/app/views/products/index.cfm      |
+| xml  | templates/base/src/app/views/products/index.xml.cfm  |
+| json | templates/base/src/app/views/products/index.json.cfm |
+| csv  | templates/base/src/app/views/products/index.csv.cfm  |
+| pdf  | templates/base/src/app/views/products/index.pdf.cfm  |
+| xls  | templates/base/src/app/views/products/index.xls.cfm  |
 
 If you need to implement your own XML-based or JSON-based output, the presence of\
 your new custom view file will override the automatic generation that Wheels\
@@ -179,7 +179,7 @@ normally performs.
 **Example: PDF Generation**
 
 If you need to provide a PDF version of the product catalog, the view file at\
-`app/views/products/index.pdf.cfm` may look something like this:
+`templates/base/src/app/views/products/index.pdf.cfm` may look something like this:
 
 HTML
 
@@ -213,8 +213,8 @@ For example:
 
 Wheels provides default error templates for different formats that can be executed when `showErrorInformation` is set to false (like in `production` environment):
 
-- `app/events/onerror.cfm` - HTML error page (default)
-- `app/events/onerror.json.cfm` - JSON error response
-- `app/events/onerror.xml.cfm` - XML error response
+- `templates/base/src/app/events/onerror.cfm` - HTML error page (default)
+- `templates/base/src/app/events/onerror.json.cfm` - JSON error response
+- `templates/base/src/app/events/onerror.xml.cfm` - XML error response
 
 You can customize these templates to provide more specific error information or branding for your application. The error response will automatically include the appropriate `Content-Type` header matching the requested format.
