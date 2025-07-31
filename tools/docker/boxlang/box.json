@@ -7,10 +7,18 @@
         "bx-compat-cfml":"^1.27.0+35",
         "bx-csrf":"^1.2.0+3",
         "bx-esapi":"^1.6.0+9",
-        "bx-image":"^1.0.1"
+        "bx-image":"^1.0.1",
+        "bx-mssql":"^1.4.0+11",
+        "bx-mysql":"^1.0.1+7"
     },
     "installPaths": {
         "wirebox": "core/wirebox/",
-        "testbox": "core/testbox/"
+        "testbox": "core/testbox/",
+        "bx-compat-cfml": "core/bx-compat-cfml/",
+        "bx-csrf": "core/bx-csrf/",
+        "bx-esapi": "core/bx-esapi/",
+        "bx-image": "core/bx-image/",
+        "bx-mssql": "core/bx-mssql",
+        "bx-mysql": "core/bx-mysql"
     }
 }
