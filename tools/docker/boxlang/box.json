@@ -13,12 +13,6 @@
     },
     "installPaths": {
         "wirebox": "core/wirebox/",
-        "testbox": "core/testbox/",
-        "bx-compat-cfml": "core/bx-compat-cfml/",
-        "bx-csrf": "core/bx-csrf/",
-        "bx-esapi": "core/bx-esapi/",
-        "bx-image": "core/bx-image/",
-        "bx-mssql": "core/bx-mssql",
-        "bx-mysql": "core/bx-mysql"
+        "testbox": "core/testbox/"
     }
 }
