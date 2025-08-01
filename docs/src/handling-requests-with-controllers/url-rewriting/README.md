@@ -10,7 +10,7 @@ For example, with no URL rewriting, a URL in your application could look like th
 
 {% code title="HTTP" %}
 ```
-http://localhost/index.cfm/blog/new
+http://localhost:8080/index.cfm/blog/new
 ```
 {% endcode %}
 
@@ -18,7 +18,7 @@ After turning on URL rewriting, it would look like this:
 
 {% code title="HTTP" %}
 ```
-http://localhost/blog/new
+http://localhost:8080/blog/new
 ```
 {% endcode %}
 

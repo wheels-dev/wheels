@@ -15,7 +15,7 @@ Generally speaking, if you try and add Unicode characters such as umlauts into t
 
 ### Using cfprocessingdirective
 
-{% code title="/app/views/main/example.cfm" %}
+{% code title="/templates/base/src/app/views/main/example.cfm" %}
 ```html
 <h1>Über uns</h1>
 ```
@@ -25,7 +25,7 @@ Generally speaking, if you try and add Unicode characters such as umlauts into t
 
 Incorrect encoding example
 
-{% code title="/app/views/main/example.cfm" %}
+{% code title="/templates/base/src/app/views/main/example.cfm" %}
 ```html
 <cfprocessingdirective pageEncoding="utf-8">
 <h1>Über uns</h1>
@@ -36,9 +36,9 @@ Incorrect encoding example
 
 Correct encoding
 
-Likewise, umlauts in routes would need for the `/config/routes.cfm` file to have the correct encoding:
+Likewise, umlauts in routes would need for the `/templates/base/src/config/routes.cfm` file to have the correct encoding:
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```html
 <cfprocessingdirective pageEncoding="utf-8">
 <cfscript>

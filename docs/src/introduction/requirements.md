@@ -73,7 +73,7 @@ Your ColdFusion or Lucee engine can be installed on Windows, Mac, UNIX, or Linux
 
 You also need a web server. Wheels runs on all popular web servers, including Apache, Microsoft IIS, Jetty, and the JRun or Tomcat web server that ships with Adobe ColdFusion. Some web servers support URL rewriting out of the box, some support the `cgi.PATH_INFO` variable which is used to achieve partial rewriting, and some don't have support for either. For local development, we strongly encourage the use of [CommandBox](https://www.ortussolutions.com/products/commandbox).
 
-Don't worry though. Wheels will adopt to your setup and run just fine, but the URLs that it creates might differ a bit. You can read more about this in the [URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) chapter.
+Don't worry though. Wheels will adopt to your setup and run just fine, but the URLs that it creates might differ a bit. You can read more about this in the [URL Rewriting](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/url-rewriting/README) chapter.
 
 #### Database Engines
 
@@ -83,13 +83,14 @@ Finally, to build any kind of meaningful website application, you will likely in
 * MySQL 5+ \*
 * PostgreSQL 8.4+
 * H2 1.4+
+* Oracle 19c+
 
 {% hint style="info" %}
 **MySQL**
 
 * Wheels maybe incompatible with newer MySQL JDBC drivers. It is recommended you downgrade the driver to version 5.1.x for full ORM functionality.
 * If you're using MySQL 5.7.5+ you should be aware that the `ONLY_FULL_GROUP_BY` setting is enabled by default and it's currently not compatible with the Wheels ORM. However, you can work around this by either disabling the `ONLY_FULL_GROUP_BY` setting or using `ANY_VALUE()` in a calculated property. You can read more about it [here](https://dev.mysql.com/doc/refman/5.7/en/group-by-handling.html).
-* We also recommend using the InnoDB engine if you want [Transactions](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/transactions) to work.
+* We also recommend using the InnoDB engine if you want [Transactions](https://wheels.dev/3.0.0/guides/database-interaction-through-models/transactions) to work.
 * **MySQL 4 is not supported.**
 {% endhint %}
 

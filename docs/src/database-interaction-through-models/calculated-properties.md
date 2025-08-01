@@ -20,7 +20,7 @@ In most object-oriented languages, you would add a method to your class called `
 
 Wheels still allows for you to do this sort of dynamic calculation with the `returnAs="objects"` argument in methods like [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html), but we advise against it when fetching large data sets because of the slowness of `CreateObject()` across CFML engines.
 
-See the chapter on [Reading Records](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/reading-records) for more information.
+See the chapter on [Reading Records](https://wheels.dev/3.0.0/guides/database-interaction-through-models/reading-records) for more information.
 
 #### Using Calculated Properties to Generate fullName in the Database at Runtime
 

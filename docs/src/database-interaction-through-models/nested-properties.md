@@ -12,7 +12,7 @@ _Nested properties_ in Wheels makes this scenario dead simple. With a configurat
 
 Consider a `user` model that has one `profile`:
 
-{% code title="app/models/User.cfc" %}
+{% code title="templates/base/src/app/models/User.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -31,9 +31,9 @@ By adding the call to [nestedProperties()](https://wheels.dev/api/v3.0.0/model.n
 
 First, in our controller, let's set the data needed for our form:
 
-{% code title="app/controllers/User.cfc" %}
+{% code title="templates/base/src/app/controllers/User.cfc" %}
 ```javascript
-// In app/controllers/User.cfc
+// In templates/base/src/app/controllers/User.cfc
 function new() {
     var newProfile = model("profile").new();
     user = model("user").new(profile=newProfile);
@@ -47,7 +47,7 @@ Also, because we don't intend on using the particular `newProfile` object set in
 
 If this were an `edit` action calling an existing object, our call would need to look similar to this:
 
-{% code title="app/controllers/User.cfc" %}
+{% code title="templates/base/src/app/controllers/User.cfc" %}
 ```javascript
 function edit() {
     user = model("user").findByKey(key=params.key, include="profile");
@@ -59,9 +59,9 @@ Because the form will also expect data set in the `profile` property, you must i
 
 ### Building a Form for Posting Nested Properties
 
-For this example, our form at `app/views/users/new.cfm` will end up looking like this:
+For this example, our form at `templates/base/src/app/views/users/new.cfm` will end up looking like this:
 
-{% code title="app/views/users/new.cfm" %}
+{% code title="templates/base/src/app/views/users/new.cfm" %}
 ```javascript
 #startFormTag(action="create")#
 
@@ -97,7 +97,7 @@ Take a minute to read that last statement again. OK, let's move on to the action
 
 You may be surprised to find out that our standard `create` action does not change at all from what you're used to.
 
-{% code title="app/controllers/Users.cfc" %}
+{% code title="templates/base/src/app/controllers/Users.cfc" %}
 ```javascript
 function create() {
     user = model("user").new(params.user);
@@ -120,7 +120,7 @@ When calling `user.save()` in the example above, Wheels takes care of the follow
 
 For the `edit` scenario, this is what our `update` action would look like (which is very similar to `create`):
 
-{% code title="app/controllers/Users.cfc" %}
+{% code title="templates/base/src/app/controllers/Users.cfc" %}
 ```javascript
 function update() {
     user = model("user").findByKey(params.user.id);
@@ -140,7 +140,7 @@ Nested properties work with one-to-many associations as well, except now the nes
 
 In the `user` model, let's add an association called `addresses` and also enable it as nested properties.
 
-{% code title="app/models/User.cfc" %}
+{% code title="templates/base/src/app/models/User.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -161,7 +161,7 @@ In this example, we have added the `addresses` association to the call to [neste
 
 The `addresses` table contains a foreign key to the `Users` table called `userid`, Now in the `addresses` model, let's associate it with its parent `User` and also enable it as nested properties.
 
-{% code title="app/models/Address.cfc" %}
+{% code title="templates/base/src/app/models/Address.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -183,7 +183,7 @@ Setting up data for the form is similar to the one-to-one scenario, but this tim
 
 In this example, we'll just put one new `address` in the array.
 
-{% code title="app/controllers/Users.cfc" %}
+{% code title="templates/base/src/app/controllers/Users.cfc" %}
 ```javascript
 function new() {
     var newAddresses = [ model("address").new() ];
@@ -194,7 +194,7 @@ function new() {
 
 In the `edit` scenario, we just need to remember to call the `include` argument to include the array of addresses saved for the particular `user`:
 
-{% code title="app/controllers/Users.cfc" %}
+{% code title="templates/base/src/app/controllers/Users.cfc" %}
 ```javascript
 function edit() {
     user = model("user").findByKey(key=params.key, include="addresses");
@@ -206,7 +206,7 @@ function edit() {
 
 This time, we'll add a section for addresses on our form:
 
-{% code title="app/views/users/_form.cfm" %}
+{% code title="templates/base/src/app/views/users/_form.cfm" %}
 ```javascript
 #startFormTag(action="create")#
 
@@ -237,9 +237,9 @@ In this case, you'll see that the form for addresses is broken into a partial. (
 
 ### The \_address Partial
 
-Here is the code for the partial at `app/views/users/_address.cfm`. Wheels will loop through each `address` in your nested properties and display this piece of code for each one.
+Here is the code for the partial at `templates/base/src/app/views/users/_address.cfm`. Wheels will loop through each `address` in your nested properties and display this piece of code for each one.
 
-{% code title="app/views/users/_address.cfm" %}
+{% code title="templates/base/src/app/views/users/_address.cfm" %}
 ```javascript
 <div class="address">
     #textField(
@@ -290,16 +290,16 @@ Writing the action to save the data is clearly the easiest part of this process!
 
 As mentioned earlier, Wheels will automatically wrap your database operations for nested properties in a transaction. That way if something goes wrong with any of the operations, the transaction will rollback, and you won't end up with incomplete saves.
 
-See the chapter on [Transactions](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/transactions) for more details.
+See the chapter on [Transactions](https://wheels.dev/3.0.0/guides/database-interaction-through-models/transactions) for more details.
 
 ### Many-to-Many Relationships with Nested Properties
 
 We all enter the scenario where we have "join tables" where we need to associate models in a many-to-many fashion. Wheels makes this pairing of entities simple with some form helpers.
 
-Consider the many-to-many associations related to `customers, publications`, and `subscriptions`, straight from the [Associations](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/associations) chapter.
+Consider the many-to-many associations related to `customers, publications`, and `subscriptions`, straight from the [Associations](https://wheels.dev/3.0.0/guides/database-interaction-through-models/associations) chapter.
 
 ```javascript
-//  app/models/Customer.cfc
+//  templates/base/src/app/models/Customer.cfc
 component extends="Model" {
 
     public function config() {
@@ -307,7 +307,7 @@ component extends="Model" {
     }
 
 }
-//  app/models/Publication.cfc
+//  templates/base/src/app/models/Publication.cfc
 component extends="Model" {
 
     public function config() {
@@ -315,7 +315,7 @@ component extends="Model" {
     }
 
 }
-//  app/models/Subscription.cfc
+//  templates/base/src/app/models/Subscription.cfc
 component extends="Model" {
 
     public function config() {
@@ -332,7 +332,7 @@ When it's time to save `customer`s' subscriptions in the `subscriptions` join ta
 
 Here is how we would set up the nested properties in the `customer` model for this example:
 
-{% code title="app/models/Customer.cfc" %}
+{% code title="templates/base/src/app/models/Customer.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -352,9 +352,9 @@ component extends="Model" {
 
 ### Setting up Data for the customer Form in the Controller
 
-Let's define the data needed in an `edit` action in the controller at `app/controllers/Customers.cfc`.
+Let's define the data needed in an `edit` action in the controller at `templates/base/src/app/controllers/Customers.cfc`.
 
-{% code title="app/controllers/Customers.cfc" %}
+{% code title="templates/base/src/app/controllers/Customers.cfc" %}
 ```javascript
 function edit() {
     customer = model("customer").findByKey(
@@ -372,9 +372,9 @@ For the view, we need to pull the `customer` with its associated `subscriptions`
 
 We can now build a series of check boxes that will allow the end user choose which `publications` to assign to the `customer`.
 
-The view template at `app/views/customers/edit.cfm` is where the magic happens. In this view, we will have a form for editing the `customer` and check boxes for selecting the `customer`'s `subscriptions`.
+The view template at `templates/base/src/app/views/customers/edit.cfm` is where the magic happens. In this view, we will have a form for editing the `customer` and check boxes for selecting the `customer`'s `subscriptions`.
 
-{% code title="app/views/customers/edit.cfm" %}
+{% code title="templates/base/src/app/views/customers/edit.cfm" %}
 ```javascript
 <cfparam name="customer">
 <cfparam name="publications" type="query">
@@ -434,7 +434,7 @@ Handling the form submission is the most powerful part of the process, but like 
 
 You'll notice that this example `update` action is fairly standard for a Wheels application:
 
-{% code title="app/controllers/Customers.cfc" %}
+{% code title="templates/base/src/app/controllers/Customers.cfc" %}
 ```javascript
 function update() {
     //  Load customer object
@@ -459,4 +459,4 @@ In fact, there is nothing special about this. But with the nested properties def
 
 * Wheels will update the `customers` table with any changes submitted in the Customers `<fieldset>`.
 * Wheels will add and remove records in the `subscriptions` table depending on which check boxes are selected by the user in the Subscriptions `<fieldset>`.
-* All of these database queries will be wrapped in a [Transaction](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/transactions) . If any of the above updates don't pass validation or if the database queries fail, the transaction will roll back.
+* All of these database queries will be wrapped in a [Transaction](https://wheels.dev/3.0.0/guides/database-interaction-through-models/transactions) . If any of the above updates don't pass validation or if the database queries fail, the transaction will roll back.

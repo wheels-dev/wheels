@@ -12,9 +12,9 @@ As you'll soon realize, the [linkTo()](https://wheels.dev/api/v3.0.0/controller.
 
 ### Default Wildcard Linking
 
-When installing Wheels, if you open the file at `/config/routes.cfm`, you'll see something like this:
+When installing Wheels, if you open the file at `/templates/base/src/config/routes.cfm`, you'll see something like this:
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
     .wildcard()
@@ -39,13 +39,13 @@ That would generally produce this HTML markup:
 
 ### Linking to Routes
 
-If you're developing a non-trivial Wheels application, you'll quickly grow out of the wildcard-based routing. You'll likely need to link to URLs containing primary keys, URL-friendly slugged titles, and nested subfolders. Now would be a good time to take a deep dive into the [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter and learn the concepts.
+If you're developing a non-trivial Wheels application, you'll quickly grow out of the wildcard-based routing. You'll likely need to link to URLs containing primary keys, URL-friendly slugged titles, and nested subfolders. Now would be a good time to take a deep dive into the [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter and learn the concepts.
 
 When you're using [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) to create links to routes, you need to pay attention to 2 pieces of information: the route _name_ and any _parameters_ that the route requires.
 
 Let's work with a set of sample routes to practice creating links:
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
     .get(name="newWidget", pattern="widgets/new", to="widgets##new")
@@ -96,7 +96,7 @@ If you have a route with multiple parameters, you must pass all of the placehold
 
 {% code title="Example" %}
 ```html
-<!--- /config/routes.cfm --->
+<!--- /templates/base/src/config/routes.cfm --->
 <cfscript>
 mapper()
     .get(
@@ -127,11 +127,11 @@ mapper()
 
 Resources are the encouraged routing pattern in Wheels, and you will likely find yourself using this type of route most often.
 
-Once you setup a resource in `/config/routes.cfm`, the key is to inspect the routes generated and get a feel for the names and parameters that are expected.
+Once you setup a resource in `/templates/base/src/config/routes.cfm`, the key is to inspect the routes generated and get a feel for the names and parameters that are expected.
 
 Consider this sample `posts` resource:
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
     .resources("posts")
@@ -139,7 +139,7 @@ mapper()
 ```
 {% endcode %}
 
-We would see these linkable routes generated related to the posts. (See the chapter on [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) for information about posting forms to the rest of the routes.)
+We would see these linkable routes generated related to the posts. (See the chapter on [Form Helpers and Showing Errors](https://wheels.dev/3.0.0/guides/displaying-views-to-users/form-helpers-and-showing-errors) for information about posting forms to the rest of the routes.)
 
 | Name     | Method | Pattern            | Controller | Action |
 | -------- | ------ | ------------------ | ---------- | ------ |
@@ -150,7 +150,7 @@ We would see these linkable routes generated related to the posts. (See the chap
 
 If we wanted to link to the various pages within that resource, we may write something like this on the index:
 
-{% code title="app/views/posts/index.cfm" %}
+{% code title="templates/base/src/app/views/posts/index.cfm" %}
 ```html
 <nav class="global-nav">
     #linkTo(text="All Posts", route="posts")#
@@ -194,7 +194,7 @@ The above code would generate markup like this:
 
 ### A Deep Dive into Linking and Routing
 
-The [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing) chapter lists your options for generating URLs that are available in your application. Following is an explanation of how to link to the various types of routes available.
+The [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter lists your options for generating URLs that are available in your application. Following is an explanation of how to link to the various types of routes available.
 
 ### Namespaces
 
@@ -375,7 +375,7 @@ Wheels will still correctly build the link markup:
 
 ### Linking in a Subfolder Deployment of Wheels
 
-The same would be true if you had Wheels installed in a subfolder, thus perhaps eliminating your ability to use [URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) (depending on what web server you have). The same [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) code above may generate this HTML if you had Wheels installed in a subfolder called `foo`:
+The same would be true if you had Wheels installed in a subfolder, thus perhaps eliminating your ability to use [URL Rewriting](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/url-rewriting/README) (depending on what web server you have). The same [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) code above may generate this HTML if you had Wheels installed in a subfolder called `foo`:
 
 ```html
 <a
@@ -394,6 +394,6 @@ What's more, Wheels is smart enough to build URLs for you. And it'll do this for
 
 If you see the pattern, this gives your application a good deal of portability. For example, you could later enable URL rewriting or move your application to a different subfolder. As long as you're using [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) to build your links, you won't need to change anything extra to your code in order to accommodate this change.
 
-Lastly, if you later install a [plugin](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/plugins/installing-and-using-plugins) that needs to modify link markup, that plugin's hook is the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) helper.
+Lastly, if you later install a [plugin](https://wheels.dev/3.0.0/guides/plugins/installing-and-using-plugins) that needs to modify link markup, that plugin's hook is the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) helper.
 
 Oh, and another reason is that it's just plain cool too. ;)

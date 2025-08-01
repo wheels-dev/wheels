@@ -12,7 +12,7 @@ As you work with Wheels and move away from that procedural spaghetti mess you us
 
 ### An Example with Callbacks
 
-One area where this sense of losing control is especially noticeable is when you are using _callbacks_ on objects (see the chapter on [Object Callbacks](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-callbacks) for more info). So let's use that for our example.
+One area where this sense of losing control is especially noticeable is when you are using _callbacks_ on objects (see the chapter on [Object Callbacks](https://wheels.dev/3.0.0/guides/database-interaction-through-models/object-callbacks) for more info). So let's use that for our example.
 
 Let's say you have used a callback to specify that a method should be called whenever a `user` object is saved to the database. You won't know exactly **where** this method was called from. It could have been the user doing it themselves on the website, or it could have been done from your internal administration area. Generally speaking, you don't need to know this either.
 

@@ -26,7 +26,7 @@ As we've not setup any migrations before, the system needs to know what prefix w
 
 For this tutorial, we're going to create the `users` table. So under `Create a Template`, we will select `Create table` and add a description of `Create User Table`.
 
-Clicking on `Create Migration File` will then create a CFC at `/app/migrator/migrations/20170420100502_Create_User_Table.cfc`. The system will also display all messages at the bottom of the GUI whenever it does something - so for this command, we see `The migration 20170420100502_Create_User_Table.cfc file was created`
+Clicking on `Create Migration File` will then create a CFC at `/templates/base/src/app/migrator/migrations/20170420100502_Create_User_Table.cfc`. The system will also display all messages at the bottom of the GUI whenever it does something - so for this command, we see `The migration 20170420100502_Create_User_Table.cfc file was created`
 
 ### Populating the Create User Table Template
 
@@ -79,7 +79,7 @@ t.create();
 ```
 {% endcode %}
 
-`t.timestamps();` creates Wheels [automatic timestamp](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/automatic-time-stamps) columns of `createdAt`,`updatedAt` and `deletedAt`.
+`t.timestamps();` creates Wheels [automatic timestamp](https://wheels.dev/3.0.0/guides/database-interaction-through-models/automatic-time-stamps) columns of `createdAt`,`updatedAt` and `deletedAt`.
 
 The `t.create();` is the final statement which executes the actual action.
 
@@ -155,7 +155,7 @@ Simply click the button to migrate the database to our new version. From this sc
 | autoMigrateDatabase   | Boolean | false                            | Automatically runs available migration on applicationstart.                                                                    	 |
 | migratorTableName     | String  | migratorversions                 | The name of the table that stores the versions migrated.                                                                       	 |
 | createMigratorTable   | Boolean | true                             | Create the migratorversions database table.                                                                                    	 |
-| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the app/migrator/sql directory.                                                         |
+| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the templates/base/src/app/migrator/sql directory.                                      |
 | migratorObjectCase    | String  | lower                            | Specifies the case of created database object. Options are 'lower', 'upper' and 'none' (which uses the given value unmodified) 	 |
 | allowMigrationDown    | Boolean | false (true in development mode) | Prevents 'down' migrations (rollbacks)                                                                                         	 |
 

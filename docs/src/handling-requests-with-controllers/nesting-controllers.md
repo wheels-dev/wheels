@@ -4,7 +4,7 @@ With the new routing system in Wheels 2.x, there are lots of nice features which
 
 For example, we may have a whole "Admin" section, where for each endpoint, we need to check some permissions, and possibly load some default data. Let's say we have a `Users` controller which provides standard CRUD operations.
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 .mapper()
   .namespace("admin")
@@ -14,7 +14,7 @@ For example, we may have a whole "Admin" section, where for each endpoint, we ne
 ```
 {% endcode %}
 
-This will automatically look for the `Users.cfc` controller in `app/controllers/admin/`.
+This will automatically look for the `Users.cfc` controller in `templates/base/src/app/controllers/admin/`.
 
 By default, all your controllers `extend="Controller"`, but with a nested controller, we need to change this, as the main `Controller.cfc` isn't at the same folder level.
 
@@ -22,7 +22,7 @@ By default, all your controllers `extend="Controller"`, but with a nested contro
 
 We've added a new mapping in 3.x, called `app`; This mapping will correspond to the `app` folder, so in our `Users.cfc` we now have two options - extend the core `Controller.cfc` via the app mapping, or perhaps extend another component (possibly `Admin.cfc`) which extends the core Controller instead.
 
-{% code title="app/controllers/admin/Users.cfc" %}
+{% code title="templates/base/src/app/controllers/admin/Users.cfc" %}
 ```javascript
 component extends="app.controllers.Controller" {
 
@@ -58,7 +58,7 @@ And then add the `app.controllers.Controller` mapping to `Admin.cfc`, and the `e
 
 Of course, we can _extend_ this concept (ha!) to Models too. However, this is either limited to tableless models, or models where you implicitly specify the `table()` call. As Wheels will look for the tablename dependent on the model file location, it'll get confused if in a sub-directory.
 
-{% code title="app/models/auth/LDAP.cfc" %}
+{% code title="templates/base/src/app/models/auth/LDAP.cfc" %}
 ```javascript
 component extends="app.models.Model"
 {

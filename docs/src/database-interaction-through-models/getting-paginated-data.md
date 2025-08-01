@@ -15,7 +15,7 @@ And in Wheels, it's really simple to do this type of pagination. Here's how:
 * Get records from the database based on a page number. Going back to the Google example, this would mean getting records 11-20 when the user is viewing the second results page. This is (mostly) done using the `findAll()` function and the `page` and `perPage` arguments.
 * Display the links to all the other pages that the user should be able to go to. This is done using the [paginationLinks()](https://wheels.dev/api/v3.0.0/controller.paginationLinks.html) function or using a lower-level function [pagination()](https://wheels.dev/api/v3.0.0/controller.pagination.html).
 
-This chapter will deal with the first part: getting the paginated data. Please proceed to the chapter called [Displaying Links for Pagination](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/displaying-links-for-pagination) if you wish to learn how to output the page links in your view.
+This chapter will deal with the first part: getting the paginated data. Please proceed to the chapter called [Displaying Links for Pagination](https://wheels.dev/3.0.0/guides/displaying-views-to-users/displaying-links-for-pagination) if you wish to learn how to output the page links in your view.
 
 ### Learning by Example
 
@@ -53,4 +53,4 @@ If you need to know more about the returned query, you can use the `pagination()
 
 That's all there is to it, really. The best way to learn pagination is to play around with it with debugging turned on.
 
-Don't forget to check the chapter [Displaying Links for Pagination](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/displaying-links-for-pagination).
+Don't forget to check the chapter [Displaying Links for Pagination](https://wheels.dev/3.0.0/guides/displaying-views-to-users/displaying-links-for-pagination).

@@ -15,13 +15,13 @@ But before we do that, a quick introduction to URLs in Wheels is in order.
 URLs in Wheels generally look something like this:
 
 ```
-http://localhost/index.cfm/shop/products
+http://localhost:8080/index.cfm/shop/products
 ```
 
 It's also possible that the URLs will look like this in your application:
 
 ```
-http://localhost/index.cfm?controller=shop&action=products
+http://localhost:8080/index.cfm?controller=shop&action=products
 ```
 
 This happens when your web server does not support the `cgi.path_info` variable.
@@ -30,7 +30,7 @@ Regardless of your specific setup, Wheels will try to figure out how to handle\
 the URLs. If Wheels fails to do this properly (i.e. you _know_ that your web\
 server supports `cgi.path_info`, but Wheels insists on creating the URLs with\
 the query string format), you can override it by setting `URLRewriting` in\
-`/config/settings.cfm` to either `On, Partial`, or `Off`. The line of code should\
+`/templates/base/src/config/settings.cfm` to either `On, Partial`, or `Off`. The line of code should\
 look something like this:
 
 ```javascript
@@ -74,9 +74,9 @@ documentation for the [URLFor()](https://wheels.dev/api/v3.0.0/controller.urlfor
 
 By the way, by using URL rewriting in Apache or IIS, you can completely get rid\
 of the `index.cfm` part of the URL so that\
-`http://localhost/index.cfm/shop/products` becomes\
-`http://localhost/shop/products`. You can read more about this in the\
-[URL Rewriting](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/url-rewriting) chapter.
+`http://localhost:8080/index.cfm/shop/products` becomes\
+`http://localhost:8080/shop/products`. You can read more about this in the\
+[URL Rewriting](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/url-rewriting/README) chapter.
 
 For the remainder of this chapter, we'll type out the URLs in this shorter and\
 prettier way.
@@ -87,7 +87,7 @@ Let's look a little closer at what happens when Wheels receives this example\
 incoming request.
 
 First, it will create an instance of the `shop` controller\
-(`app/controllers/Shop.cfc`) and call the function inside it named `products`.
+(`/templates/base/src/app/controllers/Shop.cfc`) and call the function inside it named `products`.
 
 Let's show how the code for the `products` function could look to make it more\
 clear what goes on:
@@ -109,9 +109,9 @@ The only thing this does is specify the view page to render using the\
 
 The [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function is available to you because the `shop` controller extends the main Wheels `Controller`component. Don't forget to include that `extends` attribute in your `cfcomponent` call as you build your controllers!
 
-So, how does [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) work? Well, it accepts the arguments `controller` and `action` (among others, such as `route`), and, based on these, it will try to include a view file. In our case, the view file is stored at `app/views/shop/products.cfm`.
+So, how does [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) work? Well, it accepts the arguments `controller` and `action` (among others, such as `route`), and, based on these, it will try to include a view file. In our case, the view file is stored at `/templates/base/src/app/views/shop/products.cfm`.
 
-You can read the chapter about [Rendering Content](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/rendering-content) for more information about the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function.
+You can read the chapter about [Rendering Content](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/rendering-content) for more information about the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function.
 
 It's important to note that the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html) function does not cause any controller actions or functions to be executed. It just specifies what view\
 files to get content from. Keep this in mind going forward because it's a common assumption that it does. (Especially when you want to include the view page for another action, it's easy to jump to the incorrect conclusion that the code for that action would also get executed.)
@@ -180,8 +180,8 @@ delete it from the file system altogether!
 
 This is quite useful when you're just adding simple pages to a website and you\
 don't need the controller and model to be involved at all. For example, you can\
-create a file named `about.cfm` in the `app/views/home` folder and access it at\
-`http://localhost/home/about` without having to create a specific controller\
+create a file named `about.cfm` in the `/templates/base/src/app/views/home` folder and access it at\
+`http://localhost:8080/home/about` without having to create a specific controller\
 and/or action for it, assuming you're still using wildcard routing.
 
 This also highlights the fact that Wheels is a very easy framework to get\
@@ -206,7 +206,7 @@ If the same variable exists in both the `url` and `form` scopes, the value in\
 the form scope will take precedence.
 
 To make this concept easier to grasp, imagine a login form on your website that\
-submits to `http://localhost/account/login?sendTo=dashboard` with the variables\
+submits to `http://localhost:8080/account/login?sendTo=dashboard` with the variables\
 `username` and `password` present in the form. Your `params` struct would look\
 like this:
 
@@ -223,7 +223,7 @@ you can just use the `params` struct for all of them instead.
 
 This concept becomes even more useful once we start getting into creating forms\
 specifically meant for accessing object properties. But let's save the details\
-of all that for the [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) chapter.
+of all that for the [Form Helpers and Showing Errors](https://wheels.dev/3.0.0/guides/displaying-views-to-users/form-helpers-and-showing-errors) chapter.
 
 ### JSON as part of the request body
 
@@ -240,4 +240,4 @@ The mapping of a json array to params.\_json was introduced in Wheels 2.1
 ### Routing
 
 For more advanced URL-to-code mappings, you are encourage to use a concept called _routing_.\
-It allows for you to fully customize every URL in your application, including which HTTP verb can be used. You can read more about this in the chapter called [Routing](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing).
+It allows for you to fully customize every URL in your application, including which HTTP verb can be used. You can read more about this in the chapter called [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing).

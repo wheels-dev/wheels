@@ -16,7 +16,7 @@ Let's start by looking at the simplest of the finder methods, [findByKey()](http
 
 If the record exists, it is returned to you as an object. If not, Wheels will return the boolean value `false`.
 
-In the following example, we assume that the `params.key` variable has been created from the URL (for example a URL such as `http://localhost/blog/viewauthor/7`.)
+In the following example, we assume that the `params.key` variable has been created from the URL (for example a URL such as `http://localhost:8080/blog/viewauthor/7`.)
 
 In your controller:
 
@@ -172,8 +172,8 @@ If you have a specific index setup on a table that you'd like the `findAll()` ca
 model("author").findAll(
     include="posts",
     useIndex={
-        author="idx_authors_123",
-        post="idx_posts_123"
+      author="idx_authors_123",
+      post="idx_posts_123"
 		}
 );
 ```
