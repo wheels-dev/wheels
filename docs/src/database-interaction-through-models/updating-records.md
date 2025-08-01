@@ -6,7 +6,7 @@ description: Updating records in your database tables.
 
 When you have created or retrieved an object, you can save it to the database by calling its [save()](https://wheels.dev/api/v3.0.0/model.save.html) method. This method returns `true` if the object passes all validations and the object was saved to the database. Otherwise, it returns `false`.
 
-This chapter will focus on how to update records. Read the [Creating Records](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/creating-records) chapter for more information about how to create new records.
+This chapter will focus on how to update records. Read the [Creating Records](https://wheels.dev/3.0.0/guides/database-interaction-through-models/creating-records) chapter for more information about how to create new records.
 
 ### A Practical Example
 

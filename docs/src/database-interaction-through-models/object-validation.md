@@ -11,9 +11,9 @@ description: >-
 
 In order to establish the full cycle of validation, 3 elements need to be in place:
 
-* **Model** file containing business logic for the database table. Example: `app/models/User.cfc`
-* **Controller** file for creating, saving or updating a model instance. Example: `app/controllers/Users.cfc`
-* **View** file for displaying the original data inputs and an error list. Example: `app/views/users/index.cfm`
+* **Model** file containing business logic for the database table. Example: `templates/base/src/app/models/User.cfc`
+* **Controller** file for creating, saving or updating a model instance. Example: `templates/base/src/app/controllers/Users.cfc`
+* **View** file for displaying the original data inputs and an error list. Example: `templates/base/src/app/views/users/index.cfm`
 
 **Note**: Saving, creating, and updating model objects can also be done from the model file itself (or even in the view file if you want to veer completely off into the wild). But to keep things simple, all examples in this chapter will revolve around code in the controller files.
 
@@ -76,11 +76,11 @@ By default, these validations will run without your needing to set up anything i
 
 Note these extra behaviors as well:
 
-* Automatic validations will not run for [Automatic Time Stamps](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/automatic-time-stamps).
+* Automatic validations will not run for [Automatic Time Stamps](https://wheels.dev/3.0.0/guides/database-interaction-through-models/automatic-time-stamps).
 * If you've already set a validation on a particular property in your model, the automatic validations will be overridden by your settings.
 * If your database column provides a default value for a given field, Wheels will not enforce a [validatesPresenceOf()](https://wheels.dev/api/v3.0.0/model.validatespresenceof.html)rule on that property.
 
-To disable automatic validations in your Wheels application, change this setting in `/config/settings.cfm:`
+To disable automatic validations in your Wheels application, change this setting in `/templates/base/src/config/settings.cfm:`
 
 ```javascript
 set(automaticValidations=false);
@@ -88,7 +88,7 @@ set(automaticValidations=false);
 
 You can also turn on or off the automatic validations on a per model basis by calling the [automaticValidations()](https://wheels.dev/api/v3.0.0/v2.2/model.automaticValidations.html) method from a model's `config()` method.
 
-See the chapter on [Configuration and Defaults](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults) for more information on available Wheels ORM settings.
+See the chapter on [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults) for more information on available Wheels ORM settings.
 
 ### Use when, condition, or unless to Limit the Scope of Validation
 
@@ -230,7 +230,7 @@ Wheels factors out much of the error display code that you'll ever need. As you 
 
 The biggest thing to note in this example is that a field called `passwordConfirmation` was provided so that the [validatesConfirmationOf()](https://wheels.dev/api/v3.0.0/model.validatesConfirmationOf.html) validation in the model can be properly tested.
 
-For more information on how this code behaves when there is an error, refer to the [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) chapter.
+For more information on how this code behaves when there is an error, refer to the [Form Helpers and Showing Errors](https://wheels.dev/3.0.0/guides/displaying-views-to-users/form-helpers-and-showing-errors) chapter.
 
 ### Error Messages
 
@@ -255,7 +255,7 @@ There are 2 ways to accomplish this: through global defaults in your config file
 
 ### Setting Global Defaults for Error Messages
 
-Using basic global defaults for the validation functions, you can set error messages in your config file at `/config/settings.cfm`.
+Using basic global defaults for the validation functions, you can set error messages in your config file at `/templates/base/src/config/settings.cfm`.
 
 ```javascript
 set(functionName="validatesPresenceOf", message="Please provide a value for [property]");
