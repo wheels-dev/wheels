@@ -41,13 +41,13 @@ Besides the 2 environments mentioned above, there are 2 more. Let's go through t
 
 **Maintenance**
 
-* Shows your custom maintenance page unless the requesting IP address or user agent is in the exception list (set by calling `set(ipExceptions="127.0.0.1")` in `/config/settings.cfm` or passed along in the URL as `except=127.0.0.1`, or as `except=myuseragentstring` to match against the user agent instead. Please note that if passing an exception on the URL using the `except` parameter, you must also provide the `password` parameter if a reload password has been defined. This eliminates the possibility of a rogue actor breaking out of maintenance mode by simply adding an `except` to the URL.
+* Shows your custom maintenance page unless the requesting IP address or user agent is in the exception list (set by calling `set(ipExceptions="127.0.0.1")` in `/templates/base/src/config/settings.cfm` or passed along in the URL as `except=127.0.0.1`, or as `except=myuseragentstring` to match against the user agent instead. Please note that if passing an exception on the URL using the `except` parameter, you must also provide the `password` parameter if a reload password has been defined. This eliminates the possibility of a rogue actor breaking out of maintenance mode by simply adding an `except` to the URL.
 
 This environment mode comes in handy when you want to briefly take your website offline to upload changes or modify databases on production servers.
 
 ### How to Switch Modes
 
-You can change the current environment by modifying the `/config/environment.cfm` file. After you've modified it, you need to either restart the ColdFusion service or issue a `reload` request. (See below for more info.)
+You can change the current environment by modifying the `/templates/base/src/config/environment.cfm` file. After you've modified it, you need to either restart the ColdFusion service or issue a `reload` request. (See below for more info.)
 
 **The reload Request**&#x20;
 
@@ -59,7 +59,7 @@ http://www.mysite.com/?reload=true
 ```
 {% endcode %}
 
-This tells Wheels to reload the entire framework (it will also run your code in the `app/events/onapplicationstart.cfm`file), thus picking up any changes made in the `/config/environment.cfm` file.
+This tells Wheels to reload the entire framework (it will also run your code in the `templates/base/src/app/events/onapplicationstart.cfm`file), thus picking up any changes made in the `/templates/base/src/config/environment.cfm` file.
 
 **Lazy Reloading**&#x20;
 
@@ -71,11 +71,11 @@ http://www.mysite.com/?reload=testing
 ```
 {% endcode %}
 
-This will make Wheels skip your `/config/environment.cfm` file and just use the URL value instead (`testing`, in this case).
+This will make Wheels skip your `/templates/base/src/config/environment.cfm` file and just use the URL value instead (`testing`, in this case).
 
 **Password-Protected Reloads**&#x20;
 
-For added protection, you can set the `reloadPassword` variable in `/config/settings.cfm`. When set, a reload request will only be honored when the correct password is also supplied, like this:
+For added protection, you can set the `reloadPassword` variable in `/templates/base/src/config/settings.cfm`. When set, a reload request will only be honored when the correct password is also supplied, like this:
 
 {% code title="HTTP" %}
 ```
@@ -104,7 +104,7 @@ Wheels provides IP-based access control for the debug GUI and debug information 
 
 ### Configuration Settings
 
-Add these settings to your environment-specific configuration files (e.g., `/config/production/settings.cfm`):
+Add these settings to your environment-specific configuration files (e.g., `/templates/base/src/config/production/settings.cfm`):
 
 ```cfml
 // Define allowed IP addresses that can access debug features
@@ -126,18 +126,18 @@ When these settings are configured:
 
 Here's a typical setup for different environments:
 
-**Development** (`/config/development/settings.cfm`):
+**Development** (`/templates/base/src/config/development/settings.cfm`):
 ```cfml
 // Debug GUI is enabled by default in development, no additional settings needed
 ```
 
-**Testing** (`/config/testing/settings.cfm`):
+**Testing** (`/templates/base/src/config/testing/settings.cfm`):
 ```cfml
 set(debugAccessIPs = ["127.0.0.1", "192.168.1.100"]);
 set(allowIPBasedDebugAccess = true);
 ```
 
-**Production** (`/config/production/settings.cfm`):
+**Production** (`/templates/base/src/config/production/settings.cfm`):
 ```cfml
 set(debugAccessIPs = ["10.0.0.5"]); // Only specific admin IPs
 set(allowIPBasedDebugAccess = true);

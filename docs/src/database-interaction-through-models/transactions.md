@@ -46,13 +46,13 @@ model("author").create(name="John", transaction=false);
 
 Another option is to disable transactions across your entire application using the `transactionMode` configuration:
 
-{% code title="/config/settings.cfm" %}
+{% code title="/templates/base/src/config/settings.cfm" %}
 ```javascript
 set(transactionMode=false);
 ```
 {% endcode %}
 
-See the chapter about [Configuration and Defaults](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults) for more details.
+See the chapter about [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults) for more details.
 
 ### Using Rollbacks
 
@@ -64,7 +64,7 @@ model("author").create(name="John", transaction="rollback");
 
 Again, to configure your entire application to rollback _all_ transactions, you can set the `transactionMode` configuration to `rollback`.
 
-{% code title="/config/settings.cfm" %}
+{% code title="/templates/base/src/config/settings.cfm" %}
 ```javascript
 set(transactionMode="rollback");
 ```

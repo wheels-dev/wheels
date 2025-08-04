@@ -24,7 +24,7 @@ The routing system may match the request to a route like this, which tells Wheel
 
 ### Configuring Routes
 
-To configure routes, open the file at `/config/routes.cfm`.
+To configure routes, open the file at `/templates/base/src/config/routes.cfm`.
 
 The Wheels router begins with a call to [mapper()](https://wheels.dev/api/v3.0.0/controller.mapper.html), various methods chained from that, and lastly ends with a call to `end()`.
 
@@ -38,7 +38,7 @@ The terminology goes like this:
 
 #### Name
 
-A route _name_ is set up for reference in your CFML code for building [links](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/linking-pages), [forms](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors), and such. To build URLs, you'll use this name along with helpers like [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html), [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html), [urlFor()](https://wheels.dev/api/v3.0.0/controller.urlfor.html), and so on.
+A route _name_ is set up for reference in your CFML code for building [links](https://wheels.dev/3.0.0/guides/displaying-views-to-users/linking-pages), [forms](https://wheels.dev/3.0.0/guides/displaying-views-to-users/form-helpers-and-showing-errors), and such. To build URLs, you'll use this name along with helpers like [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html), [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html), [urlFor()](https://wheels.dev/api/v3.0.0/controller.urlfor.html), and so on.
 
 #### Method
 
@@ -71,7 +71,7 @@ In this example, `key` and `slug` are parameters that must be present in the URL
 When a request is made to Wheels, the router will look for the first route that matches the requested URL. As an example, this means that if `key` is present in the URL but not `slug`, then it's the second route above that will match.
 
 {% hint style="warning" %}
-Please note that `.` is treated as a special characters in patterns and should generally not be used (one exception being when you are [responding with multiple formats](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/responding-with-multiple-formats)). If your parameters may have `.` in their value, please use the long form URL format: `/?controller=[controller_name]&action=[action_name]&[parameter_name]=[parameter_value]`
+Please note that `.` is treated as a special characters in patterns and should generally not be used (one exception being when you are [responding with multiple formats](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/responding-with-multiple-formats)). If your parameters may have `.` in their value, please use the long form URL format: `/?controller=[controller_name]&action=[action_name]&[parameter_name]=[parameter_value]`
 {% endhint %}
 
 ### Viewing a List of Routes
@@ -80,9 +80,9 @@ In the debugging footer, you'll see a **Routes** link:
 
 > \[info, **View Routes**, Docs, Tests, Migrator, Plugins]
 
-Clicking that will load a filterable list of routes drawn in the `config/routes.cfm` file, including name, method, pattern, controller, and action.
+Clicking that will load a filterable list of routes drawn in the `templates/base/src/config/routes.cfm` file, including name, method, pattern, controller, and action.
 
-If you don't see debugging information at the bottom of the page, see the docs for the `showDebugInformation` setting in the [Configuration and Defaults](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/working-with-wheels/configuration-and-defaults) chapter.
+If you don't see debugging information at the bottom of the page, see the docs for the `showDebugInformation` setting in the [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults) chapter.
 
 ### Resource Routing
 
@@ -94,9 +94,9 @@ Many parts of your application will likely be CRUD-based (create, read, update, 
 You'll want to pay close attention to how resource-based routing works because this is considered an important convention in Wheels applications.
 {% endhint %}
 
-If we have a `products` table and want to have a section of our application for managing the products, we can set up the routes using the [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) method like this in `config/routes.cfm`:
+If we have a `products` table and want to have a section of our application for managing the products, we can set up the routes using the [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) method like this in `templates/base/src/config/routes.cfm`:
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
     .resources("products")
@@ -176,7 +176,7 @@ We strongly recommend that you not allow any `GET` requests to modify resources 
 
 Consider a few examples:
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
     .patch(name="heartbeat", to="sessions##update")
@@ -201,7 +201,7 @@ Notice that you can use the `to="controller##action"` or use separate `controlle
 
 In fact, you could mock a `users` resource using these methods like so (though obviously there is little practical reason for doing so):
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
     // The following is roughly equivalent to .resources("users")
@@ -219,7 +219,7 @@ mapper()
 
 If you need to limit the actions that are exposed by [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) and [resource()](https://wheels.dev/api/v3.0.0/mapper.resource.html), you can also pass in `only` or `except`arguments:
 
-{% code title="/config/routes.cfm" %}
+{% code title="/templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
     // Only offer endpoints for cart show, update, and delete:
@@ -249,7 +249,7 @@ To get around this, the Wheels router recognizes the specialized verbs from brow
 * Via a `POST` request with a
 * `POST` variable named `_method` specifying the specific HTTP verb (e.g., `_method=delete`)
 
-See the chapter on [Linking Pages](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/linking-pages) for strategies for working with this constraint.
+See the chapter on [Linking Pages](https://wheels.dev/3.0.0/guides/displaying-views-to-users/linking-pages) for strategies for working with this constraint.
 
 Note that using Wheels to write a REST API doesn't typically have this constraint. You should confidently require API clients to use the specific verbs like `PATCH` and `DELETE`.
 
@@ -269,7 +269,7 @@ mapper()
 .end();
 ```
 
-In this example, we have an admin section that will allow the user to manage products. The URL would expose the products section at `/admin/products`, and the controller would be stored at `app/controllers/admin/Products.cfc`.
+In this example, we have an admin section that will allow the user to manage products. The URL would expose the products section at `/admin/products`, and the controller would be stored at `templates/base/src/app/controllers/admin/Products.cfc`.
 
 ### Packages
 
@@ -284,7 +284,7 @@ mapper()
 .end();
 ```
 
-With this setup, end users will see `/articles` and `/profile` in the URL, but the controllers will be located at `app/controllers/public/Articles.cfc` and `controllers/public/Profiles.cfc`, respectively.
+With this setup, end users will see `/articles` and `/profile` in the URL, but the controllers will be located at `templates/base/src/app/controllers/public/Articles.cfc` and `templates/base/src/app/controllers/public/Profiles.cfc`, respectively.
 
 ### Nested Resources
 
@@ -300,7 +300,7 @@ GET /customers/489/appointments/1909/edit
 ```
 {% endcode %}
 
-To code up this nested resource, we'd write this code in `config/routes.cfm`:
+To code up this nested resource, we'd write this code in `templates/base/src/config/routes.cfm`:
 
 ```javascript
 mapper()
@@ -404,7 +404,7 @@ Specifying a `method` argument to `wildcard` with anything other than `get` give
 
 ### Order of Precedence
 
-Wheels gives precedence to the first listed custom route in your `config/routes.cfm` file.
+Wheels gives precedence to the first listed custom route in your `templates/base/src/config/routes.cfm` file.
 
 Consider this example to demonstrate when this can create unexpected issues:
 
@@ -442,7 +442,7 @@ Sometimes you need a catch-all route in Wheels to support highly dynamic website
 
 Let's say you want to have both `/welcome-to-the-site` and `/terms-of-use` handled by the same controller and action. Here's what you can do to achieve this.
 
-First, add a new route to `config/routes.cfm` that catches all pages like this:
+First, add a new route to `templates/base/src/config/routes.cfm` that catches all pages like this:
 
 ```javascript
 mapper()
@@ -454,7 +454,7 @@ Now when you access `/welcome-to-the-site`, this route will be triggered and the
 
 The problem with this is that this will break any of your normal controllers though, so you'll need to add them specifically _before_ this route. (Remember the order of precedence explained above.)
 
-You'll end up with a `config/routes.cfm` file looking something like this:
+You'll end up with a `templates/base/src/config/routes.cfm` file looking something like this:
 
 ```javascript
 mapper()

@@ -10,7 +10,7 @@ When we separate our systems in such a manner, we need to consider CORS (Cross O
 
 ### The "Quick and Dirty" approach
 
-If you just need to satisfy your CORS requirement quickly, you can do so from Wheels 2.0 onwards with a simple configuration switch in your `/config/settings.cfm` file: `set(allowCorsRequests=true);`.
+If you just need to satisfy your CORS requirement quickly, you can do so from Wheels 2.0 onwards with a simple configuration switch in your `/templates/base/src/config/settings.cfm` file: `set(allowCorsRequests=true);`.
 
 By default, this will enable the following CORS headers:
 
@@ -35,7 +35,7 @@ This will satisfy most requirements to get going quickly, but is more of a blank
 The options below were introduced in Wheels 2.1
 {% endhint %}
 
-From Wheels 2.1, we can be more specific. We still need to specify `set(allowCorsRequests=true);` in our `/config/settings.cfm` to turn on the main CORS functionality, but we can now provide some additional configuration options to fine tune our responses.
+From Wheels 2.1, we can be more specific. We still need to specify `set(allowCorsRequests=true);` in our `/templates/base/src/config/settings.cfm` to turn on the main CORS functionality, but we can now provide some additional configuration options to fine tune our responses.
 
 ### Access Control Allow Origin
 
@@ -54,7 +54,7 @@ set(accessControlAllowOrigin="https://app.domain.com");
 set(accessControlAllowOrigin="https://app.domain.com,https://staging-app.domain.com");
 ```
 
-You can also take advantage of the environment specific configurations, such as only allowing access to `localhost:8080` in `/config/development/settings.cfm` for example.
+You can also take advantage of the environment specific configurations, such as only allowing access to `localhost:8080` in `/templates/base/src/config/development/settings.cfm` for example.
 
 **Wheels 2.2** allows for subdomain wildcard matching for CORS permitted origins:
 

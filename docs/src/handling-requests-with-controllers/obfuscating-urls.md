@@ -12,7 +12,7 @@ When URL obfuscation is turned off (which is the default setting in Wheels), thi
 
 {% code title="HTTP" %}
 ```
-http://localhost/user/profile/99
+http://localhost:8080/user/profile/99
 ```
 {% endcode %}
 
@@ -22,7 +22,7 @@ After enabling URL obfuscation, this is how those URLs will look instead:
 
 {% code title="HTTP" %}
 ```
-http://localhost/user/profile/b7ab9a50
+http://localhost:8080/user/profile/b7ab9a50
 ```
 {% endcode %}
 
@@ -30,7 +30,7 @@ The value `99` has now been obfuscated by Wheels to `b7ab9a50`. This makes it ha
 
 ### How to Use It
 
-To turn on URL obfuscation, all you have to do is call `set(obfuscateURLs=true)` in the `/config/settings.cfm` file.
+To turn on URL obfuscation, all you have to do is call `set(obfuscateURLs=true)` in the `/templates/base/src/config/settings.cfm` file.
 
 Once you do that, Wheels will handle everything else. Obviously, the main things Wheels does is obfuscate the primary key value when using the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function and deobfuscate it on the receiving end. Wheels will also obfuscate all other params sent in to [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) as well as any value in a form sent using a get request.
 
@@ -40,7 +40,7 @@ In some circumstances, you will need to obfuscate and deobfuscate values yoursel
 
 No, this is not meant to add a high level of security to your application. It just obfuscates the values, making casual observation harder. It does not encrypt values, so keep that in mind when using this approach.
 
-For instance, unless you specify it in your `/config/routes.cfm` file, you can still directly access numeric keys in the URL, e.g. `/users/view/99`; However, there is a small work around you can implement to prevent this at least, using the routes `constraints` argument.
+For instance, unless you specify it in your `/templates/base/src/config/routes.cfm` file, you can still directly access numeric keys in the URL, e.g. `/users/view/99`; However, there is a small work around you can implement to prevent this at least, using the routes `constraints` argument.
 
 ```javascript
 mapper()

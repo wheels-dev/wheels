@@ -20,7 +20,7 @@ In this example, we'll wire up some simple JavaScript code that calls a Wheels a
 First, let's make sure we've got an appropriate route setup. It might be you're still using the default `wildcard()` route which will create some default `GET` routes for the `controller/action` pattern, but we'll add a new route here just for practice. We are going to create a route named `sayHello` and direct it to the `hello` action of the `say` controller. There are two ways you could write this code a long hand method specifying the controller and action separately as well as a short hand method that combines the two into a single parameter.
 
 The longhand way would look like:
-{% code title="/config/routes.cfm" %}
+{% code title="templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
   .get(name="sayHello", controller="say", action="hello")
@@ -29,7 +29,7 @@ mapper()
 {% endcode %}
 
 The shorthand method would look like:
-{% code title="/config/routes.cfm" %}
+{% code title="templates/base/src/config/routes.cfm" %}
 ```javascript
 mapper()
   .get(name="sayHello", to="say##hello")
@@ -41,7 +41,7 @@ You can decide which method you prefer. Both sets of code above are equivalent.
 
 Then, let's create a link to a controller's action in a view file, like so:
 
-{% code title="app/views/say/hello.cfm" %}
+{% code title="templates/base/src/app/views/say/hello.cfm" %}
 ```html
 <cfoutput>
 
@@ -87,7 +87,7 @@ Note that the `success` block inserts keys from the response into the empty `h1`
 
 The last thing that we need to do is implement the `say/hello` action. Note that the request expects a `dataType` of `JSON`. By default, Wheels controllers only generate HTML responses, but there is an easy way to generate JSON instead using Wheels's [provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) and [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderWith.html) functions:
 
-{% code title="app/controllers/Say.cfc" %}
+{% code title="templates/base/src/app/controllers/Say.cfc" %}
 ```javascript
 component extends="Controller" {
     function config() {
@@ -109,7 +109,7 @@ component extends="Controller" {
 
 In this controller's `config()` method, we use the [provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) function to indicate that we want all actions in the controller to be able to respond with the data in HTML or JSON formats. Note that the client calling the action can request the type by passing a URL parameter named format or by sending the `format` in the request header.
 
-The call to [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderWith.html) in the `hello` action takes care of the translation to the requested format. Our JavaScript is requesting JSON, so Wheels will format the `greeting` struct as JSON automatically and send it back to the client. If the client requested HTML or the default of none, Wheels will process and serve the view template at `app/views/say/hello.cfm`. For more information about  [provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) and  [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderWith.html), reference the chapter on [Responding with Multiple Formats](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/responding-with-multiple-formats).
+The call to [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderWith.html) in the `hello` action takes care of the translation to the requested format. Our JavaScript is requesting JSON, so Wheels will format the `greeting` struct as JSON automatically and send it back to the client. If the client requested HTML or the default of none, Wheels will process and serve the view template at `templates/base/src/app/views/say/hello.cfm`. For more information about  [provides()](https://wheels.dev/api/v3.0.0/controller.provides.html) and  [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderWith.html), reference the chapter on [Responding with Multiple Formats](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/responding-with-multiple-formats).
 
 Lastly, notice the lines where we're setting `greeting["message"]` and `greeting["time"]`. Due to the case-insensitive nature of ColdFusion, we recommend setting variables to be consumed by JavaScript using bracket notation like that. If you do not use that notation (i.e., `greetings.message` and `greetings.time` instead), your JavaScript will need to reference those keys from the JSON as `MESSAGE` and `TIME` (all caps). Unless you like turning caps lock on and off, you can see how that would get annoying after some time.
 
