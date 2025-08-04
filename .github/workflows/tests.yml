@@ -76,6 +76,14 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2023
             dbengine: oracle
+          - cfengine: adobe2025
+            dbengine: mysql
+          - cfengine: adobe2025
+            dbengine: postgres
+          - cfengine: adobe2025
+            dbengine: sqlserver
+          - cfengine: adobe2025
+            dbengine: oracle
         exclude:
           - cfengine: adobe2018
             dbengine: h2
@@ -85,14 +93,6 @@ jobs:
             dbengine: h2
           - cfengine: adobe2025
             dbengine: h2
-          - cfengine: adobe2025
-            dbengine: oracle
-          - cfengine: adobe2025
-            dbengine: mysql
-          - cfengine: adobe2025
-            dbengine: postgres
-          - cfengine: adobe2025
-            dbengine: sqlserver
     env:
       # Port mappings for each CF engine
       PORT_lucee5: 60005
