@@ -32,51 +32,51 @@ jobs:
             dbengine: h2
           - cfengine: lucee7
             dbengine: oracle
+          - cfengine: lucee5
+            dbengine: mysql
+          - cfengine: lucee5
+            dbengine: postgres
+          - cfengine: lucee5
+            dbengine: sqlserver
+          - cfengine: lucee5
+            dbengine: h2
+          - cfengine: lucee5
+            dbengine: oracle
+          - cfengine: lucee6
+            dbengine: mysql
+          - cfengine: lucee6
+            dbengine: postgres
+          - cfengine: lucee6
+            dbengine: sqlserver
+          - cfengine: lucee6
+            dbengine: h2
+          - cfengine: lucee6
+            dbengine: oracle
+          - cfengine: adobe2018
+            dbengine: mysql
+          - cfengine: adobe2018
+            dbengine: postgres
+          - cfengine: adobe2018
+            dbengine: sqlserver
+          - cfengine: adobe2018
+            dbengine: oracle
+          - cfengine: adobe2021
+            dbengine: mysql
+          - cfengine: adobe2021
+            dbengine: postgres
+          - cfengine: adobe2021
+            dbengine: sqlserver
+          - cfengine: adobe2021
+            dbengine: oracle
+          - cfengine: adobe2023
+            dbengine: mysql
+          - cfengine: adobe2023
+            dbengine: postgres
+          - cfengine: adobe2023
+            dbengine: sqlserver
+          - cfengine: adobe2023
+            dbengine: oracle
         exclude:
-          - cfengine: lucee5
-            dbengine: mysql
-          - cfengine: lucee5
-            dbengine: postgres
-          - cfengine: lucee5
-            dbengine: sqlserver
-          - cfengine: lucee5
-            dbengine: h2
-          - cfengine: lucee5
-            dbengine: oracle
-          - cfengine: lucee6
-            dbengine: mysql
-          - cfengine: lucee6
-            dbengine: postgres
-          - cfengine: lucee6
-            dbengine: sqlserver
-          - cfengine: lucee6
-            dbengine: h2
-          - cfengine: lucee6
-            dbengine: oracle
-          - cfengine: adobe2018
-            dbengine: mysql
-          - cfengine: adobe2018
-            dbengine: postgres
-          - cfengine: adobe2018
-            dbengine: sqlserver
-          - cfengine: adobe2018
-            dbengine: oracle
-          - cfengine: adobe2021
-            dbengine: mysql
-          - cfengine: adobe2021
-            dbengine: postgres
-          - cfengine: adobe2021
-            dbengine: sqlserver
-          - cfengine: adobe2021
-            dbengine: oracle
-          - cfengine: adobe2023
-            dbengine: mysql
-          - cfengine: adobe2023
-            dbengine: postgres
-          - cfengine: adobe2023
-            dbengine: sqlserver
-          - cfengine: adobe2023
-            dbengine: oracle
           - cfengine: adobe2018
             dbengine: h2
           - cfengine: adobe2021
