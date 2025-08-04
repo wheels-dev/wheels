@@ -30,8 +30,14 @@ component aliases='wheels g api-resource' extends="../base" {
         // Process resource name using getNameVariants
         local.obj = helpers.getNameVariants(arguments.name);
 
+        // Set API controller path (namespace: api)
+        local.apiDir = fileSystemUtil.resolvePath("app/controllers/api");
+        if (!directoryExists(local.apiDir)) {
+            directoryCreate(local.apiDir);
+        }
+        local.controllerPath = "#local.apiDir#/#local.obj.objectNamePluralC#.cfc";
+
         // Check if controller already exists
-        local.controllerPath = fileSystemUtil.resolvePath("app/controllers/#local.obj.objectNamePlural#controller.cfc");
         if (fileExists(local.controllerPath)) {
             if (!confirm("Controller already exists. Do you want to overwrite it? [y/n]")) {
                 print.line("Aborted");
@@ -49,10 +55,6 @@ component aliases='wheels g api-resource' extends="../base" {
 
         // Create API controller
         print.line("Generating API controller #local.obj.objectNamePluralC#...");
-
-        // Template variables are already prepared in local.obj from getNameVariants()
-
-        // Read API controller template
         local.template = fileRead(expandPath("/wheels-cli/templates/ApiControllerContent.txt"));
         if (!isNull(local.template)) {
             // Replace placeholders
@@ -92,6 +94,28 @@ component aliases='wheels g api-resource' extends="../base" {
         } else {
             // If template doesn't exist, create basic controller
             error("API controller template not found. Create one at /wheels-cli/templates/ApiControllerContent.txt");
+        }
+
+        // Add RESTful routes to config/routes.cfm
+        local.routesPath = fileSystemUtil.resolvePath("config/routes.cfm");
+        if (fileExists(local.routesPath)) {
+            local.routesContent = fileRead(local.routesPath);
+            local.routePrefix = "/api/#local.obj.objectNamePlural#";
+            if (!findNoCase(local.routePrefix, local.routesContent)) {
+                local.newRoutes = '
+addRoute(pattern="/api/#local.obj.objectNamePlural#", controller="api/#local.obj.objectNamePluralC#", action="index", method="get");
+addRoute(pattern="/api/#local.obj.objectNamePlural#/[key]", controller="api/#local.obj.objectNamePluralC#", action="show", method="get");
+addRoute(pattern="/api/#local.obj.objectNamePlural#", controller="api/#local.obj.objectNamePluralC#", action="create", method="post");
+addRoute(pattern="/api/#local.obj.objectNamePlural#/[key]", controller="api/#local.obj.objectNamePluralC#", action="update", method="put");
+addRoute(pattern="/api/#local.obj.objectNamePlural#/[key]", controller="api/#local.obj.objectNamePluralC#", action="delete", method="delete");
+';
+                fileWrite(local.routesPath, trim(local.routesContent) & chr(10) & local.newRoutes);
+                print.greenLine("Added RESTful routes to config/routes.cfm");
+            } else {
+                print.yellowLine("Routes for /api/#local.obj.objectNamePlural# already exist in config/routes.cfm");
+            }
+        } else {
+            print.redLine("Could not find config/routes.cfm to add routes.");
         }
 
         // Generate API documentation if requested
@@ -202,11 +226,11 @@ Status 204 No Content
         print.greenLine("API resource '#local.obj.objectNamePlural#' generated successfully.");
         print.line();
         print.yellowLine("You can access your API at:");
-        print.line("GET /#local.obj.objectNamePlural#");
-        print.line("GET /#local.obj.objectNamePlural#/:id");
-        print.line("POST /#local.obj.objectNamePlural#");
-        print.line("PUT /#local.obj.objectNamePlural#/:id");
-        print.line("DELETE /#local.obj.objectNamePlural#/:id");
+        print.line("GET /api/#local.obj.objectNamePlural#");
+        print.line("GET /api/#local.obj.objectNamePlural#/:id");
+        print.line("POST /api/#local.obj.objectNamePlural#");
+        print.line("PUT /api/#local.obj.objectNamePlural#/:id");
+        print.line("DELETE /api/#local.obj.objectNamePlural#/:id");
         print.line();
     }
 }
