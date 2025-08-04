@@ -314,15 +314,15 @@ component excludeFromHelp=true {
  				error("We really need a server.json with a port number and a servername. We can't seem to find it.");
  			}
 
-			 // Wheels folder in expected place? (just a good check to see if the user has actually installed wheels...)
+		// Wheels folder in expected place? (just a good check to see if the user has actually installed wheels...)
  		var wheelsFolder=fileSystemUtil.resolvePath("core/src/wheels");
- 			if(!directoryExists(wheelsFolder)){
+ 			if(!isWheelsApp()){
  				error("We can't find your wheels folder. Check you have installed Wheels, and you're running this from the site root: If you've not started an app yet, try wheels new myApp");
  			}
 
 			 // Plugins in place?
- 		var pluginsFolder=fileSystemUtil.resolvePath("plugins");
- 			if(!directoryExists(wheelsFolder)){
+ 		var pluginsFolder=fileSystemUtil.resolvePath("app/plugins");
+ 			if(!directoryExists(pluginsFolder)){
  				error("We can't find your plugins folder. Check you have installed Wheels, and you're running this from the site root.");
  			}
 
@@ -661,5 +661,347 @@ component excludeFromHelp=true {
 
         return local.result;
     }
+
+	// Copy helper functions from create.cfc
+	private struct function getDatasourceInfo(required string datasourceName) {
+		try {
+			// Try to get datasource info from application.cfc
+			local.appPath = getCWD();
+			local.appCfcPath = local.appPath & "/config/app.cfm";
+			
+			if (fileExists(local.appCfcPath)) {
+				local.content = fileRead(local.appCfcPath);
+				
+				// Look for datasource definition in this.datasources['name']
+				local.pattern = "this\.datasources\[['""]#arguments.datasourceName#['""]]\s*=\s*\{([^}]+)\}";
+				local.match = reFindNoCase(local.pattern, local.content, 1, true);
+
+
+				if (local.match.pos[1] > 0) {
+					local.dsDefinition = mid(local.content, local.match.pos[1], local.match.len[1]);
+					local.dsInfo = {
+						"datasource": arguments.datasourceName,
+						"database": "",
+						"driver": "",
+						"host": "localhost",
+						"port": "",
+						"username": "",
+						"password": ""
+					};
+					
+					// Extract driver class - handle both single and double quotes
+					local.classMatch = reFindNoCase("class\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
+					if (local.classMatch.pos[2] > 0) {
+						local.className = mid(local.dsDefinition, local.classMatch.pos[2], local.classMatch.len[2]);
+						print.greenLine(local.className);
+						switch(local.className) {
+							case "org.h2.Driver":
+								local.dsInfo.driver = "H2";
+								break;
+							case "com.mysql.cj.jdbc.Driver":
+							case "com.mysql.jdbc.Driver":
+								local.dsInfo.driver = "MySQL";
+								break;
+							case "org.postgresql.Driver":
+								local.dsInfo.driver = "PostgreSQL";
+								break;
+							case "com.microsoft.sqlserver.jdbc.SQLServerDriver":
+								local.dsInfo.driver = "MSSQL";
+								break;
+						}
+					}
+					
+					// Extract connection string - handle both single and double quotes
+					local.connMatch = reFindNoCase("connectionString\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
+					if (local.connMatch.pos[2] > 0) {
+						local.connString = mid(local.dsDefinition, local.connMatch.pos[2], local.connMatch.len[2]);
+						
+						// Parse H2 database path
+						if (local.dsInfo.driver == "H2") {
+							if (find("jdbc:h2:file:", local.connString)) {
+								local.dbPath = replaceNoCase(local.connString, "jdbc:h2:file:", "");
+								local.dbPath = listFirst(local.dbPath, ";");
+								local.dsInfo.database = local.dbPath;
+							}
+						}
+						
+						// Parse database name from connection string for other drivers
+						if (local.dsInfo.driver == "MySQL") {
+							// jdbc:mysql://host:port/database
+							local.dbMatch = reFindNoCase("jdbc:mysql://[^/]+/([^?;]+)", local.connString, 1, true);
+							if (local.dbMatch.pos[2] > 0) {
+								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
+							}
+						} else if (local.dsInfo.driver == "PostgreSQL") {
+							// jdbc:postgresql://host:port/database
+							local.dbMatch = reFindNoCase("jdbc:postgresql://[^/]+/([^?;]+)", local.connString, 1, true);
+							if (local.dbMatch.pos[2] > 0) {
+								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
+							}
+						} else if (local.dsInfo.driver == "MSSQL") {
+							// jdbc:sqlserver://host:port;databaseName=database
+							// or jdbc:sqlserver://host:port;database=database
+							// First try databaseName=
+							local.dbMatch = reFindNoCase("databaseName=([^;]+)", local.connString, 1, true);
+							if (arrayLen(local.dbMatch.pos) >= 2 && local.dbMatch.pos[2] > 0) {
+								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
+							} else {
+								// Try database=
+								local.dbMatch = reFindNoCase("database=([^;]+)", local.connString, 1, true);
+								if (arrayLen(local.dbMatch.pos) >= 2 && local.dbMatch.pos[2] > 0) {
+									local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
+								}
+							}
+						}
+						
+						// Extract host and port from connection string
+						local.hostPortMatch = reFindNoCase("jdbc:[^:]+://([^:/]+)(?::(\d+))?", local.connString, 1, true);
+						if (local.hostPortMatch.pos[2] > 0) {
+							local.dsInfo.host = mid(local.connString, local.hostPortMatch.pos[2], local.hostPortMatch.len[2]);
+							if (local.hostPortMatch.pos[3] > 0) {
+								local.dsInfo.port = mid(local.connString, local.hostPortMatch.pos[3], local.hostPortMatch.len[3]);
+							}
+						}
+					}
+					
+					// Extract username - handle both single and double quotes
+					local.userMatch = reFindNoCase("username\s*[:=]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
+					if (local.userMatch.pos[2] > 0) {
+						local.dsInfo.username = mid(local.dsDefinition, local.userMatch.pos[2], local.userMatch.len[2]);
+					}
+					// Extract password - handle both single and double quotes
+					local.passwordMatch = reFindNoCase("password\s*[:=]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
+					if (local.passwordMatch.pos[2] > 0) {
+						local.dsInfo.password = mid(local.dsDefinition, local.passwordMatch.pos[2], local.passwordMatch.len[2]);
+					}
+					return local.dsInfo;
+				}
+			}
+			
+			// If not found in app.cfm, return empty struct
+			return {};
+		} catch (any e) {
+			// Server might not be running or file read error
+			return e;
+		}
+	}
+
+	private string function getEnvironment(required string appPath) {
+		// Same logic as get environment command
+		local.environment = "";
+		
+		// Check .env file
+		local.envFile = arguments.appPath & "/.env";
+		if (FileExists(local.envFile)) {
+			local.envContent = FileRead(local.envFile);
+			local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*(.+)$", local.envContent, 1, true);
+			if (local.envMatch.pos[1] > 0) {
+				local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
+			}
+		}
+		
+		// Check environment variable
+		if (!Len(local.environment)) {
+			local.sysEnv = CreateObject("java", "java.lang.System");
+			local.wheelsEnv = local.sysEnv.getenv("WHEELS_ENV");
+			if (!IsNull(local.wheelsEnv) && Len(local.wheelsEnv)) {
+				local.environment = local.wheelsEnv;
+			}
+		}
+		
+		// Default to development
+		if (!Len(local.environment)) {
+			local.environment = "development";
+		}
+		
+		return local.environment;
+	}
+
+	private string function getDataSourceName(required string appPath, required string environment) {
+		// Check environment-specific settings first
+		local.envSettingsFile = arguments.appPath & "/config/" & arguments.environment & "/settings.cfm";
+		if (FileExists(local.envSettingsFile)) {
+			local.dsName = extractDataSourceName(FileRead(local.envSettingsFile));
+			if (Len(local.dsName)) return local.dsName;
+		}
+		
+		// Check general settings
+		local.settingsFile = arguments.appPath & "/config/settings.cfm";
+		if (FileExists(local.settingsFile)) {
+			local.dsName = extractDataSourceName(FileRead(local.settingsFile));
+			if (Len(local.dsName)) return local.dsName;
+		}
+		
+		return "";
+	}
+
+	private string function extractDataSourceName(required string content) {
+		// Step 1: Remove multi-line block comments: /* ... */
+		local.cleaned = REReplace(arguments.content, "/\*[\s\S]*?\*/", "", "all");
+
+		// Step 2: Remove single-line comments: // ... until end of line
+		local.cleaned = REReplace(local.cleaned, "//.*", "", "all");
+
+		// Step 3: Match set(dataSourceName="...")
+		local.pattern = "set\s*\(\s*dataSourceName\s*=\s*[""']([^""']+)[""']";
+		local.match = REFind(local.pattern, local.cleaned, 1, true);
+
+		if (arrayLen(local.match.pos) >= 2 && local.match.pos[2] > 0) {
+			return Mid(local.cleaned, local.match.pos[2], local.match.len[2]);
+		}
+		return "";
+	}
+
+	private string function buildJDBCUrl(required struct dsInfo) {
+		local.driver = arguments.dsInfo.driver;
+		local.host = arguments.dsInfo.host ?: "localhost";
+		local.port = arguments.dsInfo.port ?: "";
+		local.database = arguments.dsInfo.database ?: "";
+		
+		switch (local.driver) {
+			case "MySQL":
+			case "MySQL5":
+				if (!Len(local.port)) local.port = "3306";
+				return "jdbc:mysql://#local.host#:#local.port#/#local.database#";
+			case "PostgreSQL":
+				if (!Len(local.port)) local.port = "5432";
+				return "jdbc:postgresql://#local.host#:#local.port#/#local.database#";
+			case "MSSQLServer":
+			case "MSSQL":
+				if (!Len(local.port)) local.port = "1433";
+				local.database = "master";
+				return "jdbc:sqlserver://#local.host#:#local.port#;databaseName=#local.database#;encrypt=false;trustServerCertificate=true";
+			case "H2":
+				return "jdbc:h2:#local.database#";
+			default:
+				return "";
+		}
+	}
+
+	/**
+	 * Print formatted output helpers
+	 */
+	private void function printHeader(required string text) {
+		systemOutput("", true, true);
+		systemOutput("==================================================================", true, true);
+		systemOutput("  " & arguments.text, true, true);
+		systemOutput("==================================================================", true, true);
+		systemOutput("", true, true);
+	}
+
+	private void function printDivider() {
+		systemOutput("------------------------------------------------------------------", true, true);
+	}
+
+	private void function printInfo(required string label, required string value) {
+		systemOutput("  " & PadRight(arguments.label & ":", 20) & arguments.value, true, true);
+	}
+
+	private void function printStep(required string message) {
+		systemOutput("", true, true);
+		systemOutput(">> " & arguments.message, true, true);
+	}
+
+	private void function printSuccess(required string message, boolean bold = false) {
+		if (arguments.bold) {
+			print.boldGreenLine(arguments.message);
+		} else {
+			print.greenLine("  [OK] " & arguments.message);
+		}
+		systemOutput("", true, false); // Force flush
+	}
+
+	private void function printWarning(required string message) {
+		print.yellowLine("  [WARN] " & arguments.message);
+		systemOutput("", true, false); // Force flush
+	}
+
+	private void function printError(required string message) {
+		print.redLine("  [ERROR] " & arguments.message);
+		systemOutput("", true, false); // Force flush
+	}
+
+	private string function PadRight(required string text, required numeric length) {
+		if (Len(arguments.text) >= arguments.length) {
+			return Left(arguments.text, arguments.length);
+		}
+		return arguments.text & RepeatString(" ", arguments.length - Len(arguments.text));
+	}
+
+	/**
+	 * Check if database exists
+	 */
+	private boolean function checkDatabaseExists(required any conn, required string dbName, required string dbType) {
+		local.exists = false;
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+				
+			case "PostgreSQL":
+				local.stmt = arguments.conn.prepareStatement("SELECT 1 FROM pg_database WHERE datname = ?");
+				local.stmt.setString(1, arguments.dbName);
+				local.rs = local.stmt.executeQuery();
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+				
+			case "SQLServer":
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT name FROM sys.databases WHERE name = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+		}
+		
+		return local.exists;
+	}
+
+	/**
+	 * Get database-specific configuration
+	 */
+	private struct function getDatabaseConfig(required string dbType, required struct dsInfo) {
+		local.config = {
+			tempDS: Duplicate(arguments.dsInfo),
+			driverClasses: []
+		};
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.config.tempDS.database = "information_schema"; // Connect to system database
+				local.config.driverClasses = [
+					"com.mysql.cj.jdbc.Driver",      // MySQL 8.0+
+					"com.mysql.jdbc.Driver",         // MySQL 5.x
+					"org.mariadb.jdbc.Driver"        // MariaDB
+				];
+				break;
+				
+			case "PostgreSQL":
+				local.config.tempDS.database = "postgres"; // Connect to system database
+				local.config.driverClasses = [
+					"org.postgresql.Driver",         // Standard PostgreSQL driver
+					"postgresql.Driver"              // Alternative name
+				];
+				break;
+				
+			case "SQLServer":
+				local.config.tempDS.database = "master"; // Connect to system database
+				local.config.driverClasses = [
+					"com.microsoft.sqlserver.jdbc.SQLServerDriver"
+				];
+				break;
+		}
+		
+		return local.config;
+	}
 
 }
