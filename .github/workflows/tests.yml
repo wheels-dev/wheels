@@ -16,83 +16,67 @@ jobs:
       fail-fast: false
       matrix:
         cfengine:
-          ["lucee5", "lucee6", "adobe2018", "adobe2021", "adobe2023"]
+          ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023"]
         dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
         experimental: [false]
         include:
-          - cfengine: lucee5
+          - cfengine: lucee7
             dbengine: mysql
-          - cfengine: lucee5
+          - cfengine: lucee7
             dbengine: postgres
-          - cfengine: lucee5
+          - cfengine: lucee7
             dbengine: sqlserver
-          - cfengine: lucee5
+          - cfengine: lucee7
             dbengine: h2
-          - cfengine: lucee5
+          - cfengine: lucee7
             dbengine: oracle
-          - cfengine: lucee6
-            dbengine: mysql
-          - cfengine: lucee6
-            dbengine: postgres
-          - cfengine: lucee6
-            dbengine: sqlserver
-          - cfengine: lucee6
-            dbengine: h2
-          - cfengine: lucee6
-            dbengine: oracle
-          - cfengine: adobe2018
-            dbengine: mysql
-          - cfengine: adobe2018
-            dbengine: postgres
-          - cfengine: adobe2018
-            dbengine: sqlserver
-          - cfengine: adobe2018
-            dbengine: oracle
-          - cfengine: adobe2021
-            dbengine: mysql
-          - cfengine: adobe2021
-            dbengine: postgres
-          - cfengine: adobe2021
-            dbengine: sqlserver
-          - cfengine: adobe2021
-            dbengine: oracle
-          - cfengine: adobe2023
-            dbengine: mysql
-          - cfengine: adobe2023
-            dbengine: postgres
-          - cfengine: adobe2023
-            dbengine: sqlserver
-          - cfengine: adobe2023
-            dbengine: oracle
-          # Lucee 7 experimental tests (non-blocking)
-          # - cfengine: "lucee7"
-          #   dbengine: "h2"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee7"
-          #   dbengine: "mysql"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee7"
-          #   dbengine: "postgres"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee7"
-          #   dbengine: "sqlserver"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
-          # - cfengine: "lucee7"
-          #   dbengine: "oracle"
-          #   commandbox_version: "6.2.1"
-          #   jdkVersion: "21"
-          #   experimental: true
         exclude:
+          - cfengine: lucee5
+            dbengine: mysql
+          - cfengine: lucee5
+            dbengine: postgres
+          - cfengine: lucee5
+            dbengine: sqlserver
+          - cfengine: lucee5
+            dbengine: h2
+          - cfengine: lucee5
+            dbengine: oracle
+          - cfengine: lucee6
+            dbengine: mysql
+          - cfengine: lucee6
+            dbengine: postgres
+          - cfengine: lucee6
+            dbengine: sqlserver
+          - cfengine: lucee6
+            dbengine: h2
+          - cfengine: lucee6
+            dbengine: oracle
+          - cfengine: adobe2018
+            dbengine: mysql
+          - cfengine: adobe2018
+            dbengine: postgres
+          - cfengine: adobe2018
+            dbengine: sqlserver
+          - cfengine: adobe2018
+            dbengine: oracle
+          - cfengine: adobe2021
+            dbengine: mysql
+          - cfengine: adobe2021
+            dbengine: postgres
+          - cfengine: adobe2021
+            dbengine: sqlserver
+          - cfengine: adobe2021
+            dbengine: oracle
+          - cfengine: adobe2023
+            dbengine: mysql
+          - cfengine: adobe2023
+            dbengine: postgres
+          - cfengine: adobe2023
+            dbengine: sqlserver
+          - cfengine: adobe2023
+            dbengine: oracle
           - cfengine: adobe2018
             dbengine: h2
           - cfengine: adobe2021
