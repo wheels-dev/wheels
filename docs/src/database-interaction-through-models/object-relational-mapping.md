@@ -22,7 +22,7 @@ The built-in Wheels [model()](https://wheels.dev/api/v3.0.0/controller.model.htm
 
 Once you have the `author` object, you can start calling class methods on it, like [findByKey()](https://wheels.dev/api/v3.0.0/model.findbykey.html), for example. [findByKey()](https://wheels.dev/api/v3.0.0/model.findbykey.html) returns an instance of the object with data from the database record defined by the key value that you pass.
 
-Obviously, `author` is just an example here, and you'll use the names of the `.cfc` files you have created in the `app/models` folder.
+Obviously, `author` is just an example here, and you'll use the names of the `.cfc` files you have created in the `templates/base/src/app/models` folder.
 
 ```javascript
 authorClass = model("author");
@@ -55,14 +55,14 @@ What's best, Wheels will introspect the database to see what choices you have ma
 
 Wheels comes with a custom built ORM. ORM stands for "Object-Relational Mapping" and means that tables in your relational database map to classes in your application. The records in your tables map to objects of your classes, and the columns in these tables map to properties on the objects.
 
-To create a class in your application that maps to a table in your database, all you need to do is create a new class file in your `app/models` folder and make it extend the `Model.cfc` file.
+To create a class in your application that maps to a table in your database, all you need to do is create a new class file in your `templates/base/src/app/models` folder and make it extend the `Model.cfc` file.
 
 ```javascript
 component extends="Model" {
 }
 ```
 
-If you don't intend to create any custom methods in your class, you can actually skip this step and just call methods without having a file created. It will work just as well. As your application grows, you'll probably want to have your own methods though, so remember the `app/models` folder. That's where they'll go.
+If you don't intend to create any custom methods in your class, you can actually skip this step and just call methods without having a file created. It will work just as well. As your application grows, you'll probably want to have your own methods though, so remember the `templates/base/src/app/models` folder. That's where they'll go.
 
 Once you have created the file (or deliberately chosen not to for now), you will have a bunch of methods available handle reading and writing to the `authors` table. (For the purpose of showing some examples, we will assume that you have created a file named `Author.cfc`, which will then be mapped to the `authors` table in the database).
 

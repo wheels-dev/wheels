@@ -18,8 +18,10 @@ component extends="../base" {
 	public void function run(
 		string datasource = "",
 		string environment = "",
+		string database = "",
 		boolean force = false
 	) {
+		arguments = reconstructArgs(arguments);
 		local.appPath = getCWD();
 		
 		if (!isWheelsApp(local.appPath)) {
@@ -43,34 +45,35 @@ component extends="../base" {
 				return;
 			}
 			
-			print.line();
-			print.boldRedLine("⚠️  WARNING: This will permanently drop the database!");
-			print.line("Datasource: " & arguments.datasource);
-			print.line("Environment: " & arguments.environment);
-			print.line();
+			printHeader("Database Drop Process");
+			printWarning("WARNING: This will permanently drop the database!");
+			systemOutput("", true, true);
+			printInfo("Datasource", arguments.datasource);
+			printInfo("Environment", arguments.environment);
+			printDivider();
 			
 			// Get datasource configuration
 			local.dsInfo = getDatasourceInfo(arguments.datasource);
 			
 			if (StructIsEmpty(local.dsInfo)) {
 				error("Datasource '" & arguments.datasource & "' not found in server configuration");
-				print.line("Please check your datasource configuration.");
+				systemOutput("Please check your datasource configuration.", true, true);
 				return;
 			}
 			
 			// Extract database name
-			local.dbName = local.dsInfo.database;
+			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels-dev";
 			local.dbType = local.dsInfo.driver;
 			
-			print.line("Database Type: " & local.dbType);
-			print.line("Database Name: " & local.dbName);
-			print.line();
+			printInfo("Database Type", local.dbType);
+			printInfo("Database Name", local.dbName);
+			printDivider();
 			
 			// Confirm unless forced
 			if (!arguments.force) {
-				local.confirm = ask("Are you sure you want to drop the database '#local.dbName#'? Type 'yes' to confirm: ");
+				local.confirm = ask("Are you sure you want to drop the database '" & local.dbName & "'? Type 'yes' to confirm: ");
 				if (local.confirm != "yes") {
-					print.yellowLine("Database drop cancelled.");
+					printWarning("Database drop cancelled.");
 					return;
 				}
 			}
@@ -79,153 +82,136 @@ component extends="../base" {
 			switch (local.dbType) {
 				case "MySQL":
 				case "MySQL5":
-					dropMySQLDatabase(local.dsInfo, local.dbName);
+					dropDatabase(local.dsInfo, local.dbName, "MySQL");
 					break;
 				case "PostgreSQL":
-					dropPostgreSQLDatabase(local.dsInfo, local.dbName);
+					dropDatabase(local.dsInfo, local.dbName, "PostgreSQL");
 					break;
 				case "MSSQLServer":
 				case "MSSQL":
-					dropSQLServerDatabase(local.dsInfo, local.dbName);
+					dropDatabase(local.dsInfo, local.dbName, "SQLServer");
 					break;
 				case "H2":
 					dropH2Database(local.dsInfo, local.dbName);
 					break;
 				default:
 					error("Database drop not supported for driver: " & local.dbType);
-					print.line("Please drop the database manually using your database management tools.");
+					systemOutput("Please drop the database manually using your database management tools.", true, true);
 			}
 			
 		} catch (any e) {
-			error("Error dropping database: " & e.message);
+			printError("Error dropping database: " & e.message);
 			if (StructKeyExists(e, "detail") && Len(e.detail)) {
-				error("Details: " & e.detail);
+				printError("Details: " & e.detail);
 			}
 		}
 	}
 
-	private struct function getDatasourceInfo(required string datasourceName) {
+	/**
+	 * Unified database drop function
+	 */
+	private void function dropDatabase(required struct dsInfo, required string dbName, required string dbType) {
 		try {
-			// Note: This is a placeholder - in a real implementation we would need to
-			// query the server configuration or read from a datasource configuration file
-			// For now, return empty struct which will prompt user to create datasource manually
-			return {};
-		} catch (any e) {
-			// Server might not be running
-		}
-		return {};
-	}
-
-	private void function dropMySQLDatabase(required struct dsInfo, required string dbName) {
-		try {
-			// Create a temporary datasource without database specification
-			local.tempDS = Duplicate(arguments.dsInfo);
-			local.tempDS.database = "information_schema"; // Connect to system database
+			printStep("Initializing " & arguments.dbType & " database drop...");
 			
-			// Create connection
-			local.conn = CreateObject("java", "java.sql.DriverManager").getConnection(
-				buildJDBCUrl(local.tempDS),
-				local.tempDS.username ?: "",
-				local.tempDS.password ?: ""
-			);
+			// Get database-specific configuration
+			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo);
 			
-			try {
-				local.stmt = local.conn.createStatement();
-				local.sql = "DROP DATABASE IF EXISTS `#arguments.dbName#`";
-				local.stmt.executeUpdate(local.sql);
-				
-				print.greenLine("Database dropped successfully: " & arguments.dbName);
-				
-			} finally {
-				if (IsDefined("local.stmt")) local.stmt.close();
-				if (IsDefined("local.conn")) local.conn.close();
+			// Build connection URL
+			local.url = buildJDBCUrl(local.dbConfig.tempDS);
+			local.username = local.dbConfig.tempDS.username ?: "";
+			local.password = local.dbConfig.tempDS.password ?: "";
+			
+			printStep("Connecting to " & arguments.dbType & " server...");
+			
+			// Create driver instance
+			local.driver = "";
+			local.driverFound = false;
+			
+			for (local.driverClass in local.dbConfig.driverClasses) {
+				try {
+					local.driver = createObject("java", local.driverClass);
+					printSuccess("Driver found: " & local.driverClass);
+					local.driverFound = true;
+					break;
+				} catch (any driverError) {
+					printWarning("Driver not available: " & local.driverClass);
+				}
 			}
 			
-		} catch (any e) {
-			rethrow;
-		}
-	}
-
-	private void function dropPostgreSQLDatabase(required struct dsInfo, required string dbName) {
-		try {
-			// Create a temporary datasource without database specification
-			local.tempDS = Duplicate(arguments.dsInfo);
-			local.tempDS.database = "postgres"; // Connect to system database
-			
-			// Create connection
-			local.conn = CreateObject("java", "java.sql.DriverManager").getConnection(
-				buildJDBCUrl(local.tempDS),
-				local.tempDS.username ?: "",
-				local.tempDS.password ?: ""
-			);
-			
-			try {
-				// Terminate existing connections to the database
-				local.terminateStmt = local.conn.prepareStatement(
-					"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ? AND pid <> pg_backend_pid()"
-				);
-				local.terminateStmt.setString(1, arguments.dbName);
-				local.terminateStmt.executeQuery();
-				
-				// Drop database
-				local.stmt = local.conn.createStatement();
-				local.sql = 'DROP DATABASE IF EXISTS "#arguments.dbName#"';
-				local.stmt.executeUpdate(local.sql);
-				
-				print.greenLine("Database dropped successfully: " & arguments.dbName);
-				
-			} finally {
-				if (IsDefined("local.terminateStmt")) local.terminateStmt.close();
-				if (IsDefined("local.stmt")) local.stmt.close();
-				if (IsDefined("local.conn")) local.conn.close();
+			if (!local.driverFound) {
+				throw(message="No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.");
 			}
 			
-		} catch (any e) {
-			rethrow;
-		}
-	}
-
-	private void function dropSQLServerDatabase(required struct dsInfo, required string dbName) {
-		try {
-			// Create a temporary datasource without database specification
-			local.tempDS = Duplicate(arguments.dsInfo);
-			local.tempDS.database = "master"; // Connect to system database
+			// Create properties for connection
+			local.props = createObject("java", "java.util.Properties");
+			local.props.setProperty("user", local.username);
+			local.props.setProperty("password", local.password);
 			
-			// Create connection
-			local.conn = CreateObject("java", "java.sql.DriverManager").getConnection(
-				buildJDBCUrl(local.tempDS),
-				local.tempDS.username ?: "",
-				local.tempDS.password ?: ""
-			);
-			
-			try {
-				// Set database to single user mode to close connections
-				local.singleUserStmt = local.conn.createStatement();
-				local.singleUserStmt.executeUpdate(
-					"IF EXISTS (SELECT 1 FROM sys.databases WHERE name = '#arguments.dbName#') " &
-					"ALTER DATABASE [#arguments.dbName#] SET SINGLE_USER WITH ROLLBACK IMMEDIATE"
-				);
-				
-				// Drop database
-				local.stmt = local.conn.createStatement();
-				local.sql = "DROP DATABASE IF EXISTS [#arguments.dbName#]";
-				local.stmt.executeUpdate(local.sql);
-				
-				print.greenLine("Database dropped successfully: " & arguments.dbName);
-				
-			} finally {
-				if (IsDefined("local.singleUserStmt")) local.singleUserStmt.close();
-				if (IsDefined("local.stmt")) local.stmt.close();
-				if (IsDefined("local.conn")) local.conn.close();
+			// Test if driver accepts the URL
+			if (!local.driver.acceptsURL(local.url)) {
+				throw(message=arguments.dbType & " driver does not accept the URL format");
 			}
 			
+			// Connect using driver directly
+			local.conn = local.driver.connect(local.url, local.props);
+			
+			if (isNull(local.conn)) {
+				printError("Driver returned null connection. Common causes:");
+				printError("1. " & arguments.dbType & " server is not running");
+				printError("2. Wrong server/port configuration");
+				printError("3. Invalid credentials");
+				printError("4. Network/firewall issues");
+				if (arguments.dbType == "PostgreSQL") {
+					printError("5. pg_hba.conf authentication issues");
+				}
+				throw(message="Connection failed");
+			}
+			
+			printSuccess("Connected successfully to " & arguments.dbType & " server!");
+			
+			// Check if database exists before attempting to drop
+			printStep("Checking if database exists...");
+			local.exists = checkDatabaseExists(local.conn, arguments.dbName, arguments.dbType);
+			
+			if (!local.exists) {
+				printWarning("Database '" & arguments.dbName & "' does not exist.");
+				local.conn.close();
+				return;
+			}
+			
+			// Handle database-specific pre-drop operations
+			if (arguments.dbType == "PostgreSQL") {
+				printStep("Terminating active connections...");
+				terminatePostgreSQLConnections(local.conn, arguments.dbName);
+			} else if (arguments.dbType == "SQLServer") {
+				printStep("Setting database to single-user mode...");
+				setSQLServerSingleUserMode(local.conn, arguments.dbName);
+			}
+			
+			// Drop the database
+			printStep("Dropping " & arguments.dbType & " database '" & arguments.dbName & "'...");
+			executeDropDatabase(local.conn, arguments.dbName, arguments.dbType);
+			printSuccess("Database '" & arguments.dbName & "' dropped successfully!");
+			
+			// Clean up
+			local.conn.close();
+			
+			printDivider();
+			printSuccess(arguments.dbType & " database drop completed successfully!", true);
+			
 		} catch (any e) {
-			rethrow;
+			handleDatabaseError(e, arguments.dbType, arguments.dbName);
 		}
 	}
 
+	/**
+	 * Drop H2 database (file-based)
+	 */
 	private void function dropH2Database(required struct dsInfo, required string dbName) {
 		try {
+			printStep("Dropping H2 database files...");
+			
 			// For H2, we need to delete the database files
 			local.dbPath = arguments.dsInfo.database;
 			
@@ -239,119 +225,163 @@ component extends="../base" {
 			if (FileExists(local.dbFile)) {
 				FileDelete(local.dbFile);
 				local.filesDeleted = true;
-				print.line("Deleted database file: " & local.dbFile);
+				printSuccess("Deleted database file: " & local.dbFile);
 			}
 			
 			if (FileExists(local.lockFile)) {
 				FileDelete(local.lockFile);
-				print.line("Deleted lock file: " & local.lockFile);
+				printSuccess("Deleted lock file: " & local.lockFile);
 			}
 			
 			if (FileExists(local.traceFile)) {
 				FileDelete(local.traceFile);
-				print.line("Deleted trace file: " & local.traceFile);
+				printSuccess("Deleted trace file: " & local.traceFile);
 			}
 			
 			if (local.filesDeleted) {
-				print.greenLine("H2 database dropped successfully: " & arguments.dbName);
+				printDivider();
+				printSuccess("H2 database dropped successfully!", true);
 			} else {
-				print.yellowLine("No H2 database files found for: " & arguments.dbName);
+				printWarning("No H2 database files found for: " & arguments.dbName);
 			}
 			
 		} catch (any e) {
-			rethrow;
+			printError("Error dropping H2 database: " & e.message);
+			throw(message=e.message);
 		}
 	}
 
-	private string function buildJDBCUrl(required struct dsInfo) {
-		local.driver = arguments.dsInfo.driver;
-		local.host = arguments.dsInfo.host ?: "localhost";
-		local.port = arguments.dsInfo.port ?: "";
-		local.database = arguments.dsInfo.database ?: "";
+	/**
+	 * Check if database exists
+	 */
+	private boolean function checkDatabaseExists(required any conn, required string dbName, required string dbType) {
+		local.exists = false;
 		
-		switch (local.driver) {
+		switch (arguments.dbType) {
 			case "MySQL":
-			case "MySQL5":
-				if (!Len(local.port)) local.port = "3306";
-				return "jdbc:mysql://#local.host#:#local.port#/#local.database#";
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+				
 			case "PostgreSQL":
-				if (!Len(local.port)) local.port = "5432";
-				return "jdbc:postgresql://#local.host#:#local.port#/#local.database#";
-			case "MSSQLServer":
-			case "MSSQL":
-				if (!Len(local.port)) local.port = "1433";
-				return "jdbc:sqlserver://#local.host#:#local.port#;databaseName=#local.database#";
-			case "H2":
-				return "jdbc:h2:#local.database#";
-			default:
-				return "";
+				local.stmt = arguments.conn.prepareStatement("SELECT 1 FROM pg_database WHERE datname = ?");
+				local.stmt.setString(1, arguments.dbName);
+				local.rs = local.stmt.executeQuery();
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+				
+			case "SQLServer":
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT name FROM sys.databases WHERE name = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
 		}
+		
+		return local.exists;
 	}
 
-	private string function getEnvironment(required string appPath) {
-		// Same logic as get environment command
-		local.environment = "";
+	/**
+	 * Execute database drop
+	 */
+	private void function executeDropDatabase(required any conn, required string dbName, required string dbType) {
+		local.stmt = arguments.conn.createStatement();
 		
-		// Check .env file
-		local.envFile = arguments.appPath & "/.env";
-		if (FileExists(local.envFile)) {
-			local.envContent = FileRead(local.envFile);
-			local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*(.+)$", local.envContent, 1, true);
-			if (local.envMatch.pos[1] > 0) {
-				local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.stmt.executeUpdate("DROP DATABASE IF EXISTS `" & arguments.dbName & "`");
+				break;
+			case "PostgreSQL":
+				local.stmt.executeUpdate('DROP DATABASE IF EXISTS "' & arguments.dbName & '"');
+				break;
+			case "SQLServer":
+				local.stmt.executeUpdate("DROP DATABASE IF EXISTS [" & arguments.dbName & "]");
+				break;
+		}
+		
+		local.stmt.close();
+	}
+
+	/**
+	 * Terminate PostgreSQL connections
+	 */
+	private void function terminatePostgreSQLConnections(required any conn, required string dbName) {
+		local.stmt = arguments.conn.prepareStatement(
+			"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ? AND pid <> pg_backend_pid()"
+		);
+		local.stmt.setString(1, arguments.dbName);
+		local.stmt.executeQuery();
+		local.stmt.close();
+	}
+
+	/**
+	 * Set SQL Server database to single-user mode
+	 */
+	private void function setSQLServerSingleUserMode(required any conn, required string dbName) {
+		local.stmt = arguments.conn.createStatement();
+		local.stmt.executeUpdate(
+			"IF EXISTS (SELECT 1 FROM sys.databases WHERE name = '" & arguments.dbName & "') " &
+			"ALTER DATABASE [" & arguments.dbName & "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE"
+		);
+		local.stmt.close();
+	}
+
+	/**
+	 * Handle database-specific errors
+	 */
+	private void function handleDatabaseError(required any e, required string dbType, required string dbName) {
+		local.errorHandled = false;
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				if (FindNoCase("Access denied", arguments.e.message)) {
+					printError("Access denied - check MySQL credentials and DROP privileges");
+					local.errorHandled = true;
+				} else if (FindNoCase("Communications link failure", arguments.e.message)) {
+					printError("Cannot connect to MySQL server - check if MySQL is running and accessible");
+					local.errorHandled = true;
+				}
+				break;
+				
+			case "PostgreSQL":
+				if (FindNoCase("does not exist", arguments.e.message)) {
+					printError("Database does not exist: " & arguments.dbName);
+					local.errorHandled = true;
+				} else if (FindNoCase("authentication failed", arguments.e.message)) {
+					printError("Authentication failed - check PostgreSQL credentials");
+					local.errorHandled = true;
+				} else if (FindNoCase("Connection refused", arguments.e.message)) {
+					printError("Connection refused - check if PostgreSQL is running and accessible");
+					local.errorHandled = true;
+				} else if (FindNoCase("database is being accessed by other users", arguments.e.message)) {
+					printError("Cannot drop database - other users are connected");
+					local.errorHandled = true;
+				}
+				break;
+				
+			case "SQLServer":
+				if (FindNoCase("Login failed", arguments.e.message)) {
+					printError("Login failed - check SQL Server credentials");
+					local.errorHandled = true;
+				}
+				break;
+		}
+		
+		if (!local.errorHandled) {
+			printError(arguments.dbType & " Error: " & arguments.e.message);
+			if (isDefined("arguments.e.detail")) {
+				printError("Detail: " & arguments.e.detail);
 			}
+			throw(message=arguments.e.message, detail=(isDefined("arguments.e.detail") ? arguments.e.detail : ""));
 		}
-		
-		// Check environment variable
-		if (!Len(local.environment)) {
-			local.sysEnv = CreateObject("java", "java.lang.System");
-			local.wheelsEnv = local.sysEnv.getenv("WHEELS_ENV");
-			if (!IsNull(local.wheelsEnv) && Len(local.wheelsEnv)) {
-				local.environment = local.wheelsEnv;
-			}
-		}
-		
-		// Default to development
-		if (!Len(local.environment)) {
-			local.environment = "development";
-		}
-		
-		return local.environment;
-	}
-
-	private string function getDataSourceName(required string appPath, required string environment) {
-		// Check environment-specific settings first
-		local.envSettingsFile = arguments.appPath & "/config/" & arguments.environment & "/settings.cfm";
-		if (FileExists(local.envSettingsFile)) {
-			local.dsName = extractDataSourceName(FileRead(local.envSettingsFile));
-			if (Len(local.dsName)) return local.dsName;
-		}
-		
-		// Check general settings
-		local.settingsFile = arguments.appPath & "/config/settings.cfm";
-		if (FileExists(local.settingsFile)) {
-			local.dsName = extractDataSourceName(FileRead(local.settingsFile));
-			if (Len(local.dsName)) return local.dsName;
-		}
-		
-		return "";
-	}
-
-	private string function extractDataSourceName(required string content) {
-		// Step 1: Remove multi-line block comments: /* ... */
-		local.cleaned = REReplace(arguments.content, "/\*[\s\S]*?\*/", "", "all");
-
-		// Step 2: Remove single-line comments: // ... until end of line
-		local.cleaned = REReplace(local.cleaned, "//.*", "", "all");
-
-		// Step 3: Match set(dataSourceName="...")
-		local.pattern = "set\s*\(\s*dataSourceName\s*=\s*[""']([^""']+)[""']";
-		local.match = REFind(local.pattern, local.cleaned, 1, true);
-
-		if (arrayLen(local.match.pos) >= 2 && local.match.pos[2] > 0) {
-			return Mid(local.cleaned, local.match.pos[2], local.match.len[2]);
-		}
-		return "";
 	}
 
 }

@@ -4,18 +4,18 @@ The intention of this section is to document the various pieces of the tooling t
 
 ## Wheels Guides
 
-The guides are hosted by [GitBooks.com](https://www.gitbook.com) and are accessible at [https://guides.wheels.dev](https://guides.wheels.dev) they are however driven by the [guides](https://github.com/wheels-dev/wheels/tree/develop/guides) folder in the
+The guides are accessible at [https://wheels.dev](https://wheels.dev) and they are driven by the [docs](https://github.com/wheels-dev/wheels/tree/develop/docs) folder in the
 Wheels repository on GitHub. This means that making changes to the guides can be accomplished via a Pull Request and code changes and changes to the guides can be submitted in the same PR.
 
 ### Making changes to the Guides
 
-Start by cloning the [Wheels](https://github.com/wheels-dev/wheels) repository. The guides are contained in the `guides` folder of the repo. Make your proposed changes and submit a PR. Once the PR is reviewed and merged, the changes will automatically be synced up to GitBook and the changes will be live on the site.
+Start by cloning the [Wheels](https://github.com/wheels-dev/wheels) repository. The guides are contained in the `docs` folder of the repo. Make your proposed changes and submit a PR. Once the PR is reviewed and merged, the changes will automatically be synced up to GitBook and the changes will be live on the site.
 
 ## API Documentation
 
 The API Documentation is comprised of two parts. The first is a json file that contains the data for a particular version of the framework and the second is a small Wheels App that reads that json file and displays the UI you see when you visit [https://wheels.dev/api/v3.0.0](https://wheels.dev/api/v3.0.0).
 
-We use a javadoc style of notation to document all the public functions of the framework. This system is actually available to you to document your own functions and is documented at [Documenting your Code](https://guides.wheels.dev/wheels-guides/working-with-wheels/documenting-your-code). Additionally the sample code is driven off text files that are located in [wheels/public/docs/reference](https://github.com/wheels-dev/wheels/tree/develop/wheels/public/docs/reference).
+We use a javadoc style of notation to document all the public functions of the framework. This system is actually available to you to document your own functions and is documented at [Documenting your Code](https://wheels.dev/3.0.0/guides/working-with-cfwheels/documenting-your-code). Additionally the sample code is driven off text files that are located in [core/src/wheels/public/docs/reference](https://github.com/wheels-dev/wheels/tree/develop/core/src/wheels/public/docs/reference).
 
 So the first step in submitting changes to the API Documentation is similar to the Wheels Guides and starts with cloning the repository, making the changes, and submitting a PR.
 
@@ -23,9 +23,7 @@ Once approved and merged in, then the json file is generated using a utility emb
 
 ```wheels generate app name=json template=wheels-base-template@be cfmlEngine=lucee5```
 
-This will install the Bleeding Edge version of the framework with the Lucee v5 CFML Engine. Once the installation completes start your server.
-
-```server start```
+This will install the Bleeding Edge version of the framework with the Lucee v5 CFML Engine. Once the installation completes start your server with docker as explained in the [Testing your application](https://wheels.dev/3.0.0/guides/working-with-wheels/testing-your-application) section of the guides.
 
 When the Congratulations screen is displayed, click on the Info Tab on the top menu and then the Utils tab from the sub menu.
 

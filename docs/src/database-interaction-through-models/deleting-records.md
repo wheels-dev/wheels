@@ -16,7 +16,7 @@ If these return `true`, Wheels will proceed and delete the record from the table
 
 If the record was deleted, the [afterDelete()](https://wheels.dev/api/v3.0.0/model.afterdelete.html) callback code is executed, and whatever that code returns will be returned to you. (You should make all your callbacks return `true` or `false`.)
 
-If you're unfamiliar with the concept of callbacks, you can read about them in the [Object Callbacks](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/object-callbacks) chapter.
+If you're unfamiliar with the concept of callbacks, you can read about them in the [Object Callbacks](https://wheels.dev/3.0.0/guides/database-interaction-through-models/object-callbacks) chapter.
 
 ### Example of Deleting a Record
 
@@ -27,4 +27,4 @@ aPost = model("post").findByKey(33);
 aPost.delete();
 ```
 
-There are also 3 class-level delete methods available: [deleteByKey()](https://wheels.dev/api/v3.0.0/model.deletebykey.html), [deleteOne()](https://wheels.dev/api/v3.0.0/model.deleteone.html), and [deleteAll()](https://wheels.dev/api/v3.0.0/model.deleteall.html). These work similarly to the class level methods for updating, which you can read more about in [Updating Records](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/database-interaction-through-models/updating-records).
+There are also 3 class-level delete methods available: [deleteByKey()](https://wheels.dev/api/v3.0.0/model.deletebykey.html), [deleteOne()](https://wheels.dev/api/v3.0.0/model.deleteone.html), and [deleteAll()](https://wheels.dev/api/v3.0.0/model.deleteall.html). These work similarly to the class level methods for updating, which you can read more about in [Updating Records](https://wheels.dev/3.0.0/guides/database-interaction-through-models/updating-records).

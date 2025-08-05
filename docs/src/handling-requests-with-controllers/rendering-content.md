@@ -17,7 +17,7 @@ assume that you want to show the view for the current controller and action and\
 do it for you.
 
 This chapter covers the first method listed above—displaying content. The\
-chapters about [Redirecting Users](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/redirecting-users) and [Sending Files](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/sending-files) cover the other two\
+chapters about [Redirecting Users](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/redirecting-users) and [Sending Files](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/sending-files) cover the other two\
 response methods.
 
 ### Rendering a Page
@@ -41,7 +41,7 @@ or use a different layout than the default one.
 If the `controller` and `action` arguments do not give you enough flexibility,\
 you can use the `template` argument that is available for [renderView()](https://wheels.dev/api/v3.0.0/controller.renderview.html).
 
-Refer to the [Pages](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/pages) chapter for more details about rendering content. More\
+Refer to the [Pages](https://wheels.dev/3.0.0/guides/displaying-views-to-users/pages) chapter for more details about rendering content. More\
 specifically, that chapter describes where to place those files and what goes in\
 them.
 
@@ -80,16 +80,16 @@ it in the internal Wheels variable.
 
 Two of the functions listed above are capable of caching the content for you;\
 [renderView()](https://wheels.dev/api/v3.0.0/controller.renderView.html) and [renderPartial()](https://wheels.dev/api/v3.0.0/controller.renderpartial.html). Just pass in `cache=true` (to use\
-the default cache time set in `/config/settings.cfm`) or `cache=x` where `x` is\
+the default cache time set in `templates/base/src/config/settings.cfm`) or `cache=x` where `x` is\
 the number of minutes you want to cache the content for. Keep in mind that this\
 caching respects the global setting set for it in your configuration files so\
 normally no pages will be cached when in Design or Development mode.
 
-We cover caching in greater detail in the [Caching](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/caching) chapter.
+We cover caching in greater detail in the [Caching](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/caching) chapter.
 
 ### Using a Layout
 
 The [renderView()](https://wheels.dev/api/v3.0.0/controller.renderView.html) function accepts an argument named `layout`. Using this\
 you can wrap your content with common header/footer style code. This is such an\
 important concept though so we'll cover all the details of it in the chapter\
-called [Using Layouts](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/layouts).
+called [Using Layouts](https://wheels.dev/3.0.0/guides/displaying-views-to-users/layouts).

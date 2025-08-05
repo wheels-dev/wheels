@@ -12,7 +12,7 @@ Wheels's included view helper functions can help you out in those tricky little 
 * Media Helpers
 * Text Helpers
 
-We also have separate chapters about Wheels form helpers in [Form Helpers and Showing Errors](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/form-helpers-and-showing-errors) and creating your own helpers in [Creating Custom View Helpers](https://guides.wheels.dev/2.5.0/v/3.0.0-snapshot/displaying-views-to-users/creating-custom-view-helpers).
+We also have separate chapters about Wheels form helpers in [Form Helpers and Showing Errors](https://wheels.dev/3.0.0/guides/displaying-views-to-users/form-helpers-and-showing-errors) and creating your own helpers in [Creating Custom View Helpers](https://wheels.dev/3.0.0/guides/displaying-views-to-users/creating-custom-view-helpers).
 
 ### Date Helpers
 

@@ -76,6 +76,6 @@ Whilst the core has additional code samples which can be loaded from text files,
 
 ### Roadmap
 
-Whilst this API/function explorer is a great first step, you’ll notice your controller and model specific functions aren’t included (only those shared amongst controllers, or in the `/app/global/functions.cfm` file. This is because we’re only looking at the main `Model.cfc` and `Controller.cfc` and what it can access.
+Whilst this API/function explorer is a great first step, you’ll notice your controller and model specific functions aren’t included (only those shared amongst controllers, or in the `/templates/base/src/app/global/functions.cfm` file. This is because we’re only looking at the main `Model.cfc` and `Controller.cfc` and what it can access.
 
 In Wheels 2.1, we’ll look at adding a full Controller and Model metadata explorer using the same techniques, and map functions like `show()` to their respective routes too.

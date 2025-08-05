@@ -5,6 +5,11 @@
         "wirebox": "^7.0.0",
         "testbox": "^5.0.0"
     },
+    "devDependencies": {
+        "commandbox-cfformat": "*",
+        "commandbox-dotenv": "*",
+        "commandbox-cfconfig": "*"
+    },
     "installPaths": {
         "wirebox": "core/wirebox/",
         "testbox": "core/testbox/"
