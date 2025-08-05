@@ -23,7 +23,6 @@ jobs:
         include:
           - cfengine: lucee7
             dbengine: mysql
-        exclude:
           - cfengine: lucee7
             dbengine: postgres
           - cfengine: lucee7
