@@ -98,6 +98,9 @@ component output="false" extends="wheels.Global"{
 			local.temp.file = $fullPathToPlugin(local.files["name"][i]);
 			local.temp.name = local.files["name"][i];
 			local.temp.folderPath = $fullPathToPlugin(LCase(local.name));
+			if (StructKeyExists(server, "boxlang") && !local.temp.folderPath.startsWith("/")) {
+				local.temp.folderPath = "/" & local.temp.folderPath;
+			}
 			local.temp.folderExists = DirectoryExists(local.temp.folderPath);
 			local.plugins[local.name] = local.temp;
 		};
@@ -132,6 +135,9 @@ component output="false" extends="wheels.Global"{
 			local.folder = local.folders[local.iFolder];
 			// see if a folder is in the list of plugin files
 			if (!ListContainsNoCase(local.files, local.folder.name)) {
+				if (StructKeyExists(server, "boxlang") && !local.folder.folderPath.startsWith("/")) {
+					local.folder.folderPath = "/" & local.folder.folderPath;
+				}
 				DirectoryDelete(local.folder.folderPath, true);
 			}
 		};

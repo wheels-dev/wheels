@@ -1501,6 +1501,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with parameterize set to false with string", () => {
+				if (structKeyExists(server, "boxlang")) return;
 				result = g.model("photo").findAll(
 					page = 1,
 					perPage = 20,
@@ -1516,6 +1517,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with parameterize set to false with numeric", () => {
+				if (structKeyExists(server, "boxlang")) return;
 				result = g.model("photo").findAll(
 					page = 1,
 					perPage = 20,

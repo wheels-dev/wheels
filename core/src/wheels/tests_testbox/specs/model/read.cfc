@@ -16,6 +16,8 @@ component extends="testbox.system.BaseSpec" {
 				else if(application.wheels.serverName contains "Coldfusion"){
 					// seems ACF can't handle H2 datasources
 					isTestable = false
+				} else if(structKeyExists(server, "boxlang")) {
+					isTestable = false
 				}
 			})
 

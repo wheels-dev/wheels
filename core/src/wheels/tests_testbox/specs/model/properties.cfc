@@ -6,22 +6,30 @@ component extends="testbox.system.BaseSpec" {
 
 		describe("Tests that accessibleproperties", () => {
 
+			beforeEach(() => {
+				// BoxLang compatibility: Force model reinitialization since Duplicate() doesn't work
+				g.$clearModelInitializationCache()
+				_authorModel = g.model("author")
+				_postModel = g.model("post")
+			})
+
+			afterEach(() => {
+				// Clear model cache to prevent cross-test contamination
+				g.$clearModelInitializationCache()
+			})
+
 			it("can be set by default", () => {
-				_model = g.model("author")
-				_model = Duplicate(_model)
 				properties = {firstName = "James", lastName = "Gibson"}
-				_model = _model.new(properties = properties)
+				_model = _authorModel.new(properties = properties)
 
 				expect(_model).toHaveKey("firstName")
 				expect(_model).toHaveKey("lastName")
 			})
 
 			it("can not set other properties", () => {
-				_model = g.model("post")
-				_model = Duplicate(_model)
-				_model.accessibleProperties(properties = "views")
+				_postModel.accessibleProperties(properties = "views")
 				properties = {views = "2000", averageRating = 4.9, body = "This is the body", title = "this is the title"}
-				_model = _model.new(properties = properties)
+				_model = _postModel.new(properties = properties)
 
 				expect(_model).notToHaveKey("averageRating")
 				expect(_model).notToHaveKey("body")
@@ -30,10 +38,8 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("can be set directly", () => {
-				_model = g.model("post")
-				_model = Duplicate(_model)
-				_model.accessibleProperties(properties = "views")
-				_model = _model.new()
+				_postModel.accessibleProperties(properties = "views")
+				_model = _postModel.new()
 				_model.averageRating = 4.9
 				_model.body = "This is the body"
 				_model.title = "this is the title"
