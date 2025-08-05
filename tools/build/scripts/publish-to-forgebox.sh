@@ -159,7 +159,7 @@ main() {
     publish_package "Wheels Core" "$ROOT_DIR/build-wheels-core/wheels" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
     
     # Publish Wheels CLI
-    publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
+    #publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
     
     # Log out of ForgeBox
     echo "Logging out of ForgeBox..."
