@@ -15,7 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cfengine:["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023"]
+        cfengine:
+          ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023"]
         dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
