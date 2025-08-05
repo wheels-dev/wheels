@@ -30,7 +30,7 @@ echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 echo "Copying base template files..."
 cp -r templates/base/src/app "${BUILD_DIR}/"
 cp -r templates/base/src/public "${BUILD_DIR}/"
-cp -r templates/base/src/tests "${BUILD_DIR}/"
+cp -r tests "${BUILD_DIR}/"
 
 # Copy AI documentation files
 echo "Copying AI documentation..."
