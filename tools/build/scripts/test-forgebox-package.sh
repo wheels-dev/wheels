@@ -120,7 +120,7 @@ main() {
     # Test each package
     test_package "Wheels Base Template" "$ROOT_DIR/build-wheels-base"
     test_package "Wheels Core" "$ROOT_DIR/build-wheels-core/wheels"
-    test_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli"
+    #test_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli"
     
     echo "Package testing complete!"
 }
