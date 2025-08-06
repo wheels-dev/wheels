@@ -11,7 +11,7 @@
         "commandbox-cfconfig": "*"
     },
     "installPaths": {
-        "wirebox": "core/wirebox/",
-        "testbox": "core/testbox/"
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/"
     }
 }
