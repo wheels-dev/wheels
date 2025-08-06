@@ -103,9 +103,9 @@ test_package() {
 
 # Main script
 main() {
-    # Get the root directory (two levels up from build/scripts)
+    # Get the root directory (three levels up from tools/build/scripts)
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
     
     echo "Testing ForgeBox packaging from: $ROOT_DIR"
     echo ""
@@ -120,7 +120,7 @@ main() {
     # Test each package
     test_package "Wheels Base Template" "$ROOT_DIR/build-wheels-base"
     test_package "Wheels Core" "$ROOT_DIR/build-wheels-core/wheels"
-    test_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli"
+    #test_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli"
     
     echo "Package testing complete!"
 }

@@ -18,6 +18,10 @@ BUILD_DIR="build-wheels-core"
 # Cleanup and create directories
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/wheels"
+echo "Current Working Directory"
+pwd
+echo "Contents of current directory"
+ls -la
 
 # Create build label file
 BUILD_LABEL="wheels-core-${VERSION}-$(date +%Y%m%d%H%M%S)"
@@ -25,11 +29,17 @@ echo "Built on $(date)" > "${BUILD_DIR}/wheels/${BUILD_LABEL}"
 
 # Copy core files
 echo "Copying core files..."
-cp -r vendor/wheels/* "${BUILD_DIR}/wheels/"
+cp -r core/src/wheels/* "${BUILD_DIR}/wheels/"
+
+# Copy docs
+echo "Copying docs..."
+rm -rf "${BUILD_DIR}/wheels/docs"
+mkdir -p "${BUILD_DIR}/wheels/docs"
+cp -r docs/* "${BUILD_DIR}/wheels/docs/"
 
 # Copy template files
-cp build/core/box.json "${BUILD_DIR}/wheels/box.json"
-cp build/core/README.md "${BUILD_DIR}/wheels/README.md"
+cp tools/build/core/box.json "${BUILD_DIR}/wheels/box.json"
+cp tools/build/core/README.md "${BUILD_DIR}/wheels/README.md"
 
 # Update box.json for ForgeBox publishing
 echo "Adjusting box.json for ForgeBox..."

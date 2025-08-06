@@ -145,9 +145,9 @@ main() {
     FORGEBOX_PASS=$2
     FORCE=${3:-false}
     
-    # Get the root directory (two levels up from build/scripts)
+    # Get the root directory (three levels up from tools/build/scripts)
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
     
     echo "Publishing packages from: $ROOT_DIR"
     echo ""
@@ -159,7 +159,7 @@ main() {
     publish_package "Wheels Core" "$ROOT_DIR/build-wheels-core/wheels" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
     
     # Publish Wheels CLI
-    publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
+    #publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
     
     # Log out of ForgeBox
     echo "Logging out of ForgeBox..."

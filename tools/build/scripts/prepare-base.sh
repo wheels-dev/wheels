@@ -18,6 +18,10 @@ BUILD_DIR="build-wheels-base"
 # Cleanup and create directories
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}"
+echo "Current Working Directory"
+pwd
+echo "Contents of current directory"
+ls -la
 
 # Create build label file
 BUILD_LABEL="wheels-base-template-${VERSION}-$(date +%Y%m%d%H%M%S)"
@@ -25,15 +29,15 @@ echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 
 # Copy base template files
 echo "Copying base template files..."
-cp -r app "${BUILD_DIR}/"
-cp -r public "${BUILD_DIR}/"
+cp -r templates/base/src/app "${BUILD_DIR}/"
+cp -r templates/base/src/config "${BUILD_DIR}/"
+cp -r templates/base/src/public "${BUILD_DIR}/"
 cp -r tests "${BUILD_DIR}/"
 
 # Copy AI documentation files
 echo "Copying AI documentation..."
 cp CLAUDE.md "${BUILD_DIR}/"
 cp .ai-config.json "${BUILD_DIR}/"
-cp AI-*.md "${BUILD_DIR}/"
 
 # Copy VS Code snippets
 echo "Copying VS Code snippets..."
@@ -41,17 +45,17 @@ mkdir -p "${BUILD_DIR}/.vscode"
 cp .vscode/wheels.code-snippets "${BUILD_DIR}/.vscode/"
 cp .vscode/wheels-test.code-snippets "${BUILD_DIR}/.vscode/"
 
-# Copy vendor directory from build/base if it exists
-if [ -d "build/base/vendor" ]; then
-    cp -r build/base/vendor "${BUILD_DIR}/"
+# Copy vendor directory from tools/build/base if it exists
+if [ -d "tools/build/base/vendor" ]; then
+    cp -r tools/build/base/vendor "${BUILD_DIR}/"
 fi
 
 # Copy template files, overwriting defaults
-cp build/base/box.json "${BUILD_DIR}/box.json"
-cp build/base/README.md "${BUILD_DIR}/README.md"
-cp build/base/server.json "${BUILD_DIR}/server.json"
-cp build/base/config/app.cfm "${BUILD_DIR}/config/app.cfm"
-cp build/base/config/settings.cfm "${BUILD_DIR}/config/settings.cfm"
+cp tools/build/base/box.json "${BUILD_DIR}/box.json"
+cp tools/build/base/README.md "${BUILD_DIR}/README.md"
+cp tools/build/base/server.json "${BUILD_DIR}/server.json"
+cp tools/build/base/config/app.cfm "${BUILD_DIR}/config/app.cfm"
+cp tools/build/base/config/settings.cfm "${BUILD_DIR}/config/settings.cfm"
 
 # Replace version placeholders
 echo "Replacing version placeholders..."
