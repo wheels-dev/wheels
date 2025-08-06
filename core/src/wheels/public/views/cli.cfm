@@ -3,6 +3,7 @@
 baseCfc = createObject("wheels.migrator.Base");
 setting showDebugOutput="no";
 migrator = application.wheels.migrator;
+
 try {
 	"data" = {};
 	data["success"] = true;
@@ -15,12 +16,13 @@ try {
 	data["message"] = "";
 	data["messages"] = "";
 	data["command"] = "";
-
+	
 	if (ArrayLen(data.migrations)) {
 		data.lastVersion = data.migrations[ArrayLen(data.migrations)].version;
 	}
 
 	if (StructKeyExists(request.wheels.params, "command")) {
+
 		data.command = request.wheels.params.command;
 		switch (request.wheels.params.command) {
 			case "createMigration":
@@ -141,58 +143,250 @@ try {
 				data.schema = {};
 				
 				try {
-					// Use database adapter to get schema information
-					local.adapter = application.wheels.dataAdapter;
+					// Get database type from the baseCfc which was already created at the top
 					data.schema.databaseType = data.databaseType;
 					data.schema.tables = [];
 					
 					// Get all tables
 					local.tables = [];
-					if (data.databaseType == "H2") {
+					
+					// SQL Server specific query
+					if (data.databaseType == "MicrosoftSQLServer" || data.databaseType == "SQLServer") {
+						local.tablesQuery = new Query();
+						local.tablesQuery.setDatasource(application.wheels.dataSourceName);
+						local.tablesQuery.setSQL("
+							SELECT 
+								TABLE_NAME 
+							FROM INFORMATION_SCHEMA.TABLES 
+							WHERE TABLE_TYPE = 'BASE TABLE' 
+								AND TABLE_CATALOG = DB_NAME()
+								AND TABLE_SCHEMA = 'dbo'
+							ORDER BY TABLE_NAME
+						");
+						local.tables = local.tablesQuery.execute().getResult();
+					} else if (data.databaseType == "H2") {
 						// H2 specific query
 						local.tablesQuery = new Query();
 						local.tablesQuery.setDatasource(application.wheels.dataSourceName);
 						local.tablesQuery.setSQL("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'TABLE' AND TABLE_SCHEMA = 'PUBLIC'");
 						local.tables = local.tablesQuery.execute().getResult();
+					} else if (data.databaseType == "MySQL") {
+						// MySQL specific query
+						local.tablesQuery = new Query();
+						local.tablesQuery.setDatasource(application.wheels.dataSourceName);
+						local.tablesQuery.setSQL("
+							SELECT 
+								TABLE_NAME 
+							FROM INFORMATION_SCHEMA.TABLES 
+							WHERE TABLE_TYPE = 'BASE TABLE' 
+								AND TABLE_SCHEMA = DATABASE()
+							ORDER BY TABLE_NAME
+						");
+						local.tables = local.tablesQuery.execute().getResult();
+					} else if (data.databaseType == "PostgreSQL") {
+						// PostgreSQL specific query
+						local.tablesQuery = new Query();
+						local.tablesQuery.setDatasource(application.wheels.dataSourceName);
+						local.tablesQuery.setSQL("
+							SELECT 
+								tablename AS TABLE_NAME 
+							FROM pg_tables 
+							WHERE schemaname = 'public'
+							ORDER BY tablename
+						");
+						local.tables = local.tablesQuery.execute().getResult();
 					} else {
 						// Generic INFORMATION_SCHEMA query
 						local.tablesQuery = new Query();
 						local.tablesQuery.setDatasource(application.wheels.dataSourceName);
-						local.tablesQuery.setSQL("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'");
+						local.tablesQuery.setSQL("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME");
 						local.tables = local.tablesQuery.execute().getResult();
 					}
 					
+					// Process each table
 					for (local.table in local.tables) {
 						local.tableInfo = {
 							name = local.table.TABLE_NAME,
-							columns = []
+							columns = [],
+							indexes = [],
+							primaryKey = []
 						};
 						
 						// Get columns for each table
 						local.columns = new Query();
 						local.columns.setDatasource(application.wheels.dataSourceName);
-						if (data.databaseType == "H2") {
-							local.columns.setSQL("SELECT COLUMN_NAME, TYPE_NAME as DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = :tableName AND TABLE_SCHEMA = 'PUBLIC'");
+						
+						if (data.databaseType == "MicrosoftSQLServer" || data.databaseType == "SQLServer") {
+							local.columns.setSQL("
+								SELECT 
+									c.COLUMN_NAME,
+									c.DATA_TYPE,
+									c.CHARACTER_MAXIMUM_LENGTH,
+									c.NUMERIC_PRECISION,
+									c.NUMERIC_SCALE,
+									c.IS_NULLABLE,
+									c.COLUMN_DEFAULT,
+									c.ORDINAL_POSITION
+								FROM INFORMATION_SCHEMA.COLUMNS c
+								WHERE c.TABLE_NAME = :tableName 
+									AND c.TABLE_SCHEMA = 'dbo'
+								ORDER BY c.ORDINAL_POSITION
+							");
+						} else if (data.databaseType == "H2") {
+							local.columns.setSQL("
+								SELECT 
+									COLUMN_NAME, 
+									TYPE_NAME as DATA_TYPE, 
+									IS_NULLABLE, 
+									COLUMN_DEFAULT,
+									ORDINAL_POSITION
+								FROM INFORMATION_SCHEMA.COLUMNS 
+								WHERE TABLE_NAME = :tableName 
+									AND TABLE_SCHEMA = 'PUBLIC'
+								ORDER BY ORDINAL_POSITION
+							");
+						} else if (data.databaseType == "MySQL") {
+							local.columns.setSQL("
+								SELECT 
+									COLUMN_NAME,
+									DATA_TYPE,
+									CHARACTER_MAXIMUM_LENGTH,
+									NUMERIC_PRECISION,
+									NUMERIC_SCALE,
+									IS_NULLABLE,
+									COLUMN_DEFAULT,
+									ORDINAL_POSITION,
+									COLUMN_KEY,
+									EXTRA
+								FROM INFORMATION_SCHEMA.COLUMNS 
+								WHERE TABLE_NAME = :tableName 
+									AND TABLE_SCHEMA = DATABASE()
+								ORDER BY ORDINAL_POSITION
+							");
+						} else if (data.databaseType == "PostgreSQL") {
+							local.columns.setSQL("
+								SELECT 
+									column_name AS COLUMN_NAME,
+									data_type AS DATA_TYPE,
+									character_maximum_length AS CHARACTER_MAXIMUM_LENGTH,
+									numeric_precision AS NUMERIC_PRECISION,
+									numeric_scale AS NUMERIC_SCALE,
+									is_nullable AS IS_NULLABLE,
+									column_default AS COLUMN_DEFAULT,
+									ordinal_position AS ORDINAL_POSITION
+								FROM information_schema.columns 
+								WHERE table_name = :tableName 
+									AND table_schema = 'public'
+								ORDER BY ordinal_position
+							");
 						} else {
-							local.columns.setSQL("SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = :tableName");
+							local.columns.setSQL("
+								SELECT 
+									COLUMN_NAME, 
+									DATA_TYPE, 
+									IS_NULLABLE, 
+									COLUMN_DEFAULT 
+								FROM INFORMATION_SCHEMA.COLUMNS 
+								WHERE TABLE_NAME = :tableName
+								ORDER BY ORDINAL_POSITION
+							");
 						}
+						
 						local.columns.addParam(name="tableName", value=local.table.TABLE_NAME, cfsqltype="cf_sql_varchar");
 						local.columnResult = local.columns.execute().getResult();
 						
+						// Process column information
 						for (local.column in local.columnResult) {
-							arrayAppend(local.tableInfo.columns, {
+							local.columnInfo = {
 								name = local.column.COLUMN_NAME,
 								type = local.column.DATA_TYPE,
 								nullable = local.column.IS_NULLABLE,
-								default = local.column.COLUMN_DEFAULT ?: ""
-							});
+								default = structKeyExists(local.column, "COLUMN_DEFAULT") ? (local.column.COLUMN_DEFAULT ?: "") : ""
+							};
+							
+							// Add additional details if available
+							if (structKeyExists(local.column, "CHARACTER_MAXIMUM_LENGTH") && len(local.column.CHARACTER_MAXIMUM_LENGTH)) {
+								local.columnInfo.length = local.column.CHARACTER_MAXIMUM_LENGTH;
+							}
+							if (structKeyExists(local.column, "NUMERIC_PRECISION") && len(local.column.NUMERIC_PRECISION)) {
+								local.columnInfo.precision = local.column.NUMERIC_PRECISION;
+							}
+							if (structKeyExists(local.column, "NUMERIC_SCALE") && len(local.column.NUMERIC_SCALE)) {
+								local.columnInfo.scale = local.column.NUMERIC_SCALE;
+							}
+							if (structKeyExists(local.column, "EXTRA") && len(local.column.EXTRA)) {
+								local.columnInfo.extra = local.column.EXTRA;
+							}
+							
+							arrayAppend(local.tableInfo.columns, local.columnInfo);
+						}
+						
+						// Try to get primary key information
+						try {
+							local.pkQuery = new Query();
+							local.pkQuery.setDatasource(application.wheels.dataSourceName);
+							
+							if (data.databaseType == "MicrosoftSQLServer" || data.databaseType == "SQLServer") {
+								local.pkQuery.setSQL("
+									SELECT 
+										c.COLUMN_NAME
+									FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+									JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE c 
+										ON c.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+										AND c.TABLE_NAME = tc.TABLE_NAME
+										AND c.TABLE_SCHEMA = tc.TABLE_SCHEMA
+									WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY' 
+										AND tc.TABLE_NAME = :tableName
+										AND tc.TABLE_SCHEMA = 'dbo'
+									ORDER BY c.ORDINAL_POSITION
+								");
+							} else if (data.databaseType == "MySQL") {
+								local.pkQuery.setSQL("
+									SELECT 
+										COLUMN_NAME
+									FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+									WHERE CONSTRAINT_NAME = 'PRIMARY'
+										AND TABLE_NAME = :tableName
+										AND TABLE_SCHEMA = DATABASE()
+									ORDER BY ORDINAL_POSITION
+								");
+							} else {
+								// Generic query for primary keys
+								local.pkQuery.setSQL("
+									SELECT 
+										c.COLUMN_NAME
+									FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+									JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE c 
+										ON c.CONSTRAINT_NAME = tc.CONSTRAINT_NAME
+										AND c.TABLE_NAME = tc.TABLE_NAME
+									WHERE tc.CONSTRAINT_TYPE = 'PRIMARY KEY' 
+										AND tc.TABLE_NAME = :tableName
+								");
+							}
+							
+							local.pkQuery.addParam(name="tableName", value=local.table.TABLE_NAME, cfsqltype="cf_sql_varchar");
+							local.pkResult = local.pkQuery.execute().getResult();
+							
+							for (local.pk in local.pkResult) {
+								arrayAppend(local.tableInfo.primaryKey, local.pk.COLUMN_NAME);
+							}
+						} catch (any pkError) {
+							// Ignore primary key errors - not all databases support this query
 						}
 						
 						arrayAppend(data.schema.tables, local.tableInfo);
 					}
+					
+					// Add summary information
+					data.schema.tableCount = arrayLen(data.schema.tables);
+					data.message = "Schema exported successfully. Found " & data.schema.tableCount & " tables.";
+					
 				} catch (any e) {
 					data.success = false;
 					data.message = "Error retrieving schema: " & e.message;
+					if (structKeyExists(e, "detail")) {
+						data.detail = e.detail;
+					}
 				}
 				break;
 				
@@ -565,6 +759,206 @@ try {
 					}
 				}
 				break;
+			case "configSet":
+				data.success = false;
+				
+				// Validate required parameters
+				if (!structKeyExists(request.wheels.params, "key") || !len(trim(request.wheels.params.key))) {
+					data.message = "Configuration key is required";
+					break;
+				}
+				
+				if (!structKeyExists(request.wheels.params, "value")) {
+					data.message = "Configuration value is required";
+					break;
+				}
+				
+				local.key = trim(request.wheels.params.key);
+				local.value = request.wheels.params.value;
+				local.environment = structKeyExists(request.wheels.params, "environment") ? request.wheels.params.environment : "development";
+				local.encrypt = structKeyExists(request.wheels.params, "encrypt") && request.wheels.params.encrypt;
+				
+				try {
+					switch(local.environment) {
+						case "all":
+							// Update base settings.cfm
+							local.settingsPath = expandPath("/config/");
+							break;
+						default:
+							local.settingsPath = expandPath("/config/#local.environment#/");
+							break;
+					}
+					
+					local.settingsFile = local.settingsPath & "settings.cfm";
+					
+					if (!len(local.settingsFile)) {
+						break;
+					}
+					
+					// Check if file exists
+					if (!fileExists(local.settingsFile)) {
+						data.message = "Settings file not found: " & local.settingsFile;
+						break;
+					}
+					
+					// Read the current settings file
+					local.fileContent = fileRead(local.settingsFile);
+					
+					// Handle encryption if requested
+					if (local.encrypt) {
+						// For now, we'll use a simple base64 encoding as a placeholder
+						// In production, you'd want to use proper encryption
+						local.value = "encrypted:" & toBase64(local.value);
+					}
+					
+					// Check if the setting already exists in the file
+					local.settingPattern = 'set\s*\(\s*#local.key#\s*=';
+					local.settingExists = reFindNoCase(local.settingPattern, local.fileContent);
+					
+					if (local.settingExists) {
+						// Update existing setting
+						// Find the line with this setting
+						local.lines = listToArray(local.fileContent, chr(10));
+						local.updated = false;
+						
+						for (local.i = 1; local.i <= arrayLen(local.lines); local.i++) {
+							if (reFindNoCase(local.settingPattern, local.lines[local.i])) {
+								// Determine the value format (string vs boolean vs numeric)
+								if (isBoolean(local.value) && (local.value == "true" || local.value == "false")) {
+									local.newLine = chr(9) & 'set(' & local.key & '=' & local.value & ');';
+								} else if (isNumeric(local.value) && !local.encrypt) {
+									local.newLine = chr(9) & 'set(' & local.key & '=' & local.value & ');';
+								} else {
+									// String value - need quotes
+									local.newLine = chr(9) & 'set(' & local.key & '="' & local.value & '");';
+								}
+								local.lines[local.i] = local.newLine;
+								local.updated = true;
+								break;
+							}
+						}
+						
+						if (local.updated) {
+							// Write the updated content back to the file
+							local.newContent = arrayToList(local.lines, chr(10));
+							fileWrite(local.settingsFile, local.newContent);
+							
+							data.success = true;
+							data.message = "Configuration updated successfully. Key: " & local.key & " in " & local.environment & " environment.";
+							data.updatedKey = local.key;
+							data.environment = local.environment;
+							data.encrypted = local.encrypt;
+							
+							// Check if reload is needed
+							if (application.wheels.environment == local.environment || local.environment == "all") {
+								data.reloadRequired = true;
+								
+								// Try to trigger reload if possible
+								if (structKeyExists(application.wheels, "reloadPassword") && len(application.wheels.reloadPassword)) {
+									data.message &= " Application reload required. Use ?reload=true&password=[reloadPassword] to reload.";
+									data.reloadUrl = "?reload=true&password=[reloadPassword]";
+								} else {
+									data.message &= " Application reload required. Restart your application server or use the reload mechanism.";
+								}
+							}
+						} else {
+							data.message = "Could not update the setting in the file.";
+						}
+					} else {
+						// Add new setting
+						// Find the closing </cfscript> tag
+						local.closeTagPos = findNoCase("</cfscript>", local.fileContent);
+						
+						if (local.closeTagPos > 0) {
+							// Determine the value format
+							if (isBoolean(local.value) && (local.value == "true" || local.value == "false")) {
+								local.newSetting = chr(9) & 'set(' & local.key & '=' & local.value & ');' & chr(10);
+							} else if (isNumeric(local.value) && !local.encrypt) {
+								local.newSetting = chr(9) & 'set(' & local.key & '=' & local.value & ');' & chr(10);
+							} else {
+								// String value - need quotes
+								local.newSetting = chr(9) & 'set(' & local.key & '="' & local.value & '");' & chr(10);
+							}
+							
+							// Insert before the closing tag
+							local.beforeTag = left(local.fileContent, local.closeTagPos - 1);
+							local.afterTag = mid(local.fileContent, local.closeTagPos, len(local.fileContent));
+							
+							// Add a comment for new settings
+							local.comment = chr(10) & chr(9) & '// Added by CLI on ' & dateFormat(now(), "yyyy-mm-dd") & ' ' & timeFormat(now(), "HH:mm:ss") & chr(10);
+							
+							local.newContent = local.beforeTag & local.comment & local.newSetting & local.afterTag;
+							
+							fileWrite(local.settingsFile, local.newContent);
+							
+							data.success = true;
+							data.message = "New configuration added successfully. Key: " & local.key & " in " & local.environment & " environment.";
+							data.addedKey = local.key;
+							data.environment = local.environment;
+							data.encrypted = local.encrypt;
+							
+							// Check if reload is needed
+							if (application.wheels.environment == local.environment || local.environment == "all") {
+								data.reloadRequired = true;
+								
+								// Try to trigger reload if possible
+								if (structKeyExists(application.wheels, "reloadPassword") && len(application.wheels.reloadPassword)) {
+									data.message &= " Application reload required. Use ?reload=true&password=[reloadPassword] to reload.";
+									data.reloadUrl = "?reload=true&password=[reloadPassword]";
+								} else {
+									data.message &= " Application reload required. Restart your application server or use the reload mechanism.";
+								}
+							}
+						} else {
+							data.message = "Could not find proper location to add the setting in the file.";
+						}
+					}
+					
+					// Alternative: Try to clear specific caches if available
+					if (data.success && structKeyExists(data, "reloadRequired") && data.reloadRequired) {
+						try {
+							// Clear any caches that might exist
+							if (structKeyExists(application, "wheels") && structKeyExists(application.wheels, "cache")) {
+								// Clear various caches
+								if (structKeyExists(application.wheels.cache, "sql")) {
+									structClear(application.wheels.cache.sql);
+								}
+								if (structKeyExists(application.wheels.cache, "image")) {
+									structClear(application.wheels.cache.image);
+								}
+								if (structKeyExists(application.wheels.cache, "main")) {
+									structClear(application.wheels.cache.main);
+								}
+								if (structKeyExists(application.wheels.cache, "action")) {
+									structClear(application.wheels.cache.action);
+								}
+								if (structKeyExists(application.wheels.cache, "page")) {
+									structClear(application.wheels.cache.page);
+								}
+								if (structKeyExists(application.wheels.cache, "partial")) {
+									structClear(application.wheels.cache.partial);
+								}
+								if (structKeyExists(application.wheels.cache, "query")) {
+									structClear(application.wheels.cache.query);
+								}
+								if (structKeyExists(application.wheels.cache, "sql")) {
+									structClear(application.wheels.cache.sql);
+								}
+								
+								data.message &= " Caches cleared.";
+							}
+						} catch (any cacheError) {
+							// Ignore cache clearing errors
+						}
+					}
+					
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error updating configuration: " & e.message;
+					data.detail = e.detail;
+				}
+			break;
+
 		}
 	}
 } catch (any e) {
