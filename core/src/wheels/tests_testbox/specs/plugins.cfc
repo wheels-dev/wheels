@@ -388,6 +388,9 @@ component extends="testbox.system.BaseSpec" {
 		var q = DirectoryList(ExpandPath('/wheels/tests_testbox/_assets/plugins/unpacking'), false, "query")
 		for (row in q) {
 			dir = ListChangeDelims(ListAppend(row.directory, row.name, "/"), "/", "\")
+			if (StructKeyExists(server, "boxlang") && !dir.startsWith("/")) {
+				dir = "/" & dir;
+			}
 			if (DirectoryExists(dir)) {
 				DirectoryDelete(dir, true)
 			}
