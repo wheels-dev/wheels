@@ -139,7 +139,7 @@ jobs:
         run: |
           echo "Waiting for ${{ matrix.cfengine }} to be ready..."
           
-          # First, wait for container to be running
+          # First, wait for the container to be running
           timeout 150 bash -c 'until docker ps --filter "name=${{ matrix.cfengine }}" | grep -q "${{ matrix.cfengine }}"; do
             echo "Waiting for container to start..."
             sleep 2
