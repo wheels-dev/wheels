@@ -44,7 +44,7 @@ mkdir -p "${BUILD_DIR}/.vscode"
 cp .vscode/wheels.code-snippets "${BUILD_DIR}/.vscode/"
 cp .vscode/wheels-test.code-snippets "${BUILD_DIR}/.vscode/"
 
-# Copy vendor directory from build/base if it exists
+# Copy vendor directory from tools/build/base if it exists
 if [ -d "tools/build/base/vendor" ]; then
     cp -r tools/build/base/vendor "${BUILD_DIR}/"
 fi
