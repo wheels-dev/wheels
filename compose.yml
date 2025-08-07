@@ -262,7 +262,7 @@ services:
     stdin_open: true
     volumes:
       - ./templates/base/src:/cfwheels-test-suite
-      - ./core/src/wheels:/cfwheels-test-suite/core/wheels
+      - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
       - ./tests:/cfwheels-test-suite/tests
       - type: bind
         source: ./tools/docker/boxlang/server.json
