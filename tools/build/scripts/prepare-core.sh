@@ -18,10 +18,6 @@ BUILD_DIR="build-wheels-core"
 # Cleanup and create directories
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BUILD_DIR}/wheels"
-echo "Current Working Directory"
-pwd
-echo "Contents of current directory"
-ls -la
 
 # Create build label file
 BUILD_LABEL="wheels-core-${VERSION}-$(date +%Y%m%d%H%M%S)"
