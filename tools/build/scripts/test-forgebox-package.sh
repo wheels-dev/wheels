@@ -103,9 +103,9 @@ test_package() {
 
 # Main script
 main() {
-    # Get the root directory (two levels up from build/scripts)
+    # Get the root directory (three levels up from tools/build/scripts)
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
     
     echo "Testing ForgeBox packaging from: $ROOT_DIR"
     echo ""

@@ -175,8 +175,8 @@ services:
 #local.dbEnvironment#
     volumes:
       - .:/app
-      - ../../../core/src/wheels:/app/core/wheels
-      - ../../../docs:/app/core/wheels/docs
+      - ../../../core/src/wheels:/app/vendor/wheels
+      - ../../../docs:/app/vendor/wheels/docs
       - ../../../tests:/app/tests
     command: sh -c "box install && box server start --console --force"';
 

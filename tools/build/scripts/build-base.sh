@@ -29,6 +29,7 @@ echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 # Copy base template files
 echo "Copying base template files..."
 cp -r templates/base/src/app "${BUILD_DIR}/"
+cp -r templates/base/src/config "${BUILD_DIR}/"
 cp -r templates/base/src/public "${BUILD_DIR}/"
 cp -r tests "${BUILD_DIR}/"
 
@@ -36,7 +37,6 @@ cp -r tests "${BUILD_DIR}/"
 echo "Copying AI documentation..."
 cp CLAUDE.md "${BUILD_DIR}/"
 cp .ai-config.json "${BUILD_DIR}/"
-cp AI-*.md "${BUILD_DIR}/"
 
 # Copy VS Code snippets
 echo "Copying VS Code snippets..."
@@ -44,7 +44,7 @@ mkdir -p "${BUILD_DIR}/.vscode"
 cp .vscode/wheels.code-snippets "${BUILD_DIR}/.vscode/"
 cp .vscode/wheels-test.code-snippets "${BUILD_DIR}/.vscode/"
 
-# Copy vendor directory from build/base if it exists
+# Copy vendor directory from tools/build/base if it exists
 if [ -d "tools/build/base/vendor" ]; then
     cp -r tools/build/base/vendor "${BUILD_DIR}/"
 fi

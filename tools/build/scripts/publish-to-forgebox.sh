@@ -145,9 +145,9 @@ main() {
     FORGEBOX_PASS=$2
     FORCE=${3:-false}
     
-    # Get the root directory (two levels up from build/scripts)
+    # Get the root directory (three levels up from tools/build/scripts)
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    ROOT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
     
     echo "Publishing packages from: $ROOT_DIR"
     echo ""
