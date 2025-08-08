@@ -78,8 +78,6 @@ jobs:
             dbengine: oracle
           - cfengine: boxlang
             dbengine: mysql
-          - cfengine: boxlang
-            dbengine: sqlserver
         exclude:
           - cfengine: adobe2018
             dbengine: h2
@@ -89,6 +87,8 @@ jobs:
             dbengine: h2
           - cfengine: adobe2025
             dbengine: h2
+          - cfengine: boxlang
+            dbengine: sqlserver
           - cfengine: boxlang
             dbengine: h2
           - cfengine: boxlang
