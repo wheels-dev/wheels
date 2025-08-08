@@ -266,7 +266,12 @@ component extends="testbox.system.BaseSpec" {
 
 			it("function hasChanged is working with date compare", () => {
 				user = g.model("user").findOne(where = "username = 'tonyp'")
-				user.birthday = "11/01/1975 12:00 AM"
+				if (structKeyExists(server, "boxlang")) {
+					user.birthday = createDateTime("1975", "11", "01", "00", "00", "00")
+				} else {
+					user.birthday = "11/01/1975 12:00 AM"
+				}
+				
 				e = user.hasChanged("birthday")
 
 				expect(e).toBeFalse()

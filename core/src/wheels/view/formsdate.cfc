@@ -126,11 +126,20 @@ component {
 		}
 		if (structKeyExists(server, "boxlang") && IsSimpleValue(local.value) && Len(local.value)) {
 			// BoxLang compatibility: Fix date parsing issues
-			// Handle ISO format YYYY-MM-DDTHH:MM where day/month are swapped
+			// Handle SQL Server format YYYY-MM-DD HH:MM:SS
 			if (ReFindNoCase("^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", local.value)) {
 				local.parts = ListToArray(Left(local.value, 10), "-");
 				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
-					local.value = CreateDateTime(local.parts[1], local.parts[3], local.parts[2], 0, 0, 0);
+					local.value = CreateDateTime(local.parts[1], local.parts[2], local.parts[3], 0, 0, 0);
+				}
+			}
+			// Handle SQL Server format YYYY-MM-DD HH:MM:SS.s
+			else if (ReFindNoCase("^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$", local.value)) {
+				local.dateTimeParts = ListToArray(local.value, " ");
+				local.datePart = local.dateTimeParts[1]; // "1975-11-01"
+				local.dateParts = ListToArray(local.datePart, "-");
+				if (ArrayLen(local.dateParts) == 3 && IsNumeric(local.dateParts[1]) && IsNumeric(local.dateParts[2]) && IsNumeric(local.dateParts[3])) {
+					local.value = CreateDateTime(local.dateParts[1], local.dateParts[2], local.dateParts[3], 0, 0, 0);
 				}
 			}
 			// Handle MM/DD/YYYY format parsing inconsistencies
