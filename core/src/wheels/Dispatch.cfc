@@ -51,8 +51,21 @@ component output="false" extends="wheels.Global"{
 				// Object form field.
 				local.name = SpanExcluding(local.key, "[");
 
-				// We split the key into an array so the developer can have unlimited levels of params passed in.
-				local.nested = ListToArray(ReplaceList(local.key, local.name & "[,]", ""), "[", true);
+				// BoxLang compatibility: Check if we're running on BoxLang and handle differently
+				if (StructKeyExists(server, "boxlang")) {
+					// BoxLang specific parsing to handle the bracket parsing differences
+					local.keyWithoutName = ReplaceNoCase(local.key, local.name & "[", "", "one");
+					local.keyWithoutEndBracket = Left(local.keyWithoutName, Len(local.keyWithoutName) - 1);
+					local.nested = [];
+					local.segments = ListToArray(local.keyWithoutEndBracket, "][", false);
+					for (local.segment in local.segments) {
+						local.cleanSegment = Replace(Replace(local.segment, "[", "", "all"), "]", "", "all");
+						ArrayAppend(local.nested, local.cleanSegment);
+					}
+				} else {
+					// Standard behavior for Lucee/Adobe CF
+					local.nested = ListToArray(ReplaceList(local.key, local.name & "[,]", ""), "[", true);
+				}
 				if (!StructKeyExists(local.rv, local.name)) {
 					local.rv[local.name] = {};
 				}
@@ -205,12 +218,24 @@ component output="false" extends="wheels.Global"{
 				// Hard abort if GUI turned off
 				cfabort;
 			} else {
-				// Debug log the controller and action being called
-				writeLog(file="application", text="Wheels dispatch - controller: #local.params.controller#, action: #local.params.action#");
-				
-				// Call the action method directly on the component to preserve context
-				// Use 'object' and 'methodname' for older Adobe CF versions compatibility
-				invoke(object=application.wheels.public, methodname=local.params.action);
+				// BoxLang compatibility: Check for null action parameter
+				if (IsNull(local.params.action) || !Len(local.params.action)) {
+					throw(
+						type="Wheels.ActionParameterMissing", 
+						message="The action parameter is missing or null. Controller: #local.params.controller#");
+				}
+
+				if (structKeyExists(server, "boxlang")) {
+					local.method = application.wheels.public[local.params.action];
+					local.method();
+				} else {
+					// Debug log the controller and action being called
+					writeLog(file="application", text="Wheels dispatch - controller: #local.params.controller#, action: #local.params.action#");
+
+					// Call the action method directly on the component to preserve context
+					// Use 'object' and 'methodname' for older Adobe CF versions compatibility
+					invoke(object=application.wheels.public, methodname=local.params.action);
+				}
 				// The wheels controller methods handle their own output and abort
 				// So we need to ensure we don't continue processing
 				return "";
@@ -450,11 +475,27 @@ component output="false" extends="wheels.Global"{
 		local.rv.action = ReReplace(local.rv.action, "[^0-9A-Za-z-_\.]", "", "all");
 
 		// Convert controller to upperCamelCase.
-		local.cName = ListLast(local.rv.controller, ".");
-		local.cName = ReReplace(local.cName, "(^|-)([a-z])", "\u\2", "all");
-		local.cLen = ListLen(local.rv.controller, ".");
-		if (local.cLen) {
-			local.rv.controller = ListSetAt(local.rv.controller, local.cLen, local.cName, ".");
+		// BoxLang compatibility: Handle consecutive dots differently
+		if (StructKeyExists(server, "boxlang")) {
+			// For BoxLang, manually handle the leading dots issue
+			local.dotPrefix = "";
+			local.cleanName = local.rv.controller;
+
+			while (Left(local.cleanName, 1) == ".") {
+				local.dotPrefix &= ".";
+				local.cleanName = Right(local.cleanName, Len(local.cleanName) - 1);
+			}
+
+			local.cleanName = ReReplace(local.cleanName, "(^|-)([a-z])", "\u\2", "all");
+			local.rv.controller = local.dotPrefix & local.cleanName;
+		} else {
+			// Standard behavior for Lucee/Adobe CF
+			local.cName = ListLast(local.rv.controller, ".");
+			local.cName = ReReplace(local.cName, "(^|-)([a-z])", "\u\2", "all");
+			local.cLen = ListLen(local.rv.controller, ".");
+			if (local.cLen) {
+				local.rv.controller = ListSetAt(local.rv.controller, local.cLen, local.cName, ".");
+			}
 		}
 
 		// Action to normal camelCase.
@@ -503,6 +544,9 @@ component output="false" extends="wheels.Global"{
 	}
 
 	function onDIComplete(){
+		if (structKeyExists(server, "boxlang")) {
+			variables.this = this;
+		}
 		Mixins.$initializeMixins(variables);
 	}
 }

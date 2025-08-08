@@ -110,7 +110,7 @@ component {
 	/**
 	 * Internal function.
 	 */
-	public string function $renderLayout(required string $content, required $layout) {
+	public string function $renderLayout(required string $content, required any $layout) {
 		if (
 			(IsBoolean(arguments.$layout) && arguments.$layout)
 			|| (!IsBoolean(arguments.$layout) && Len(arguments.$layout))

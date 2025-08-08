@@ -692,6 +692,7 @@ component extends="testbox.system.BaseSpec" {
 				isACF2016 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2016
 				isPostgres = migration.adapter.adapterName() == "PostgreSQL"
 				isLucee = application.wheels.serverName == "Lucee"
+				isBoxLang = application.wheels.serverName == "BoxLang"
 			})
 
 			it("creates an index", () => {
@@ -739,8 +740,8 @@ component extends="testbox.system.BaseSpec" {
 				actual = g.$query(query = info, dbtype = "query", sql = sql)
 
 				// Added the ListLen check here for CF2018 because its cfdbinfo behaves a little differently.
-				// It returns the index for multiple columns in one record where as Lucee returns multiple.
-				if(isLucee) {
+				// It returns the index for multiple columns in one record where as Lucee or Boxlang returns multiple.
+				if(isLucee || isBoxLang) {
 					expect(actual.recordCount).toBe(2)
 				} else {
 					expect(ListLen(actual['column_name'][1])).toBe(2)
@@ -822,6 +823,8 @@ component extends="testbox.system.BaseSpec" {
 				}
 				if (ListFindNoCase(actual.columnList, "default_value")) {
 					expect(actual.default_value).toInclude("bar")
+				} else if (structKeyExists(server, "boxlang")) {
+					expect(actual.COLUMN_DEF).toInclude("foo")
 				} else {
 					expect(actual.column_default_value).toInclude("foo")
 				}
@@ -1036,6 +1039,7 @@ component extends="testbox.system.BaseSpec" {
 				isACF2016 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2016
 				isPostgres = migration.adapter.adapterName() == "PostgreSQL"
 				isLucee = application.wheels.serverName == "Lucee"
+				isBoxLang = application.wheels.serverName == "BoxLang"
 			})
 
 			it("removes an index", () => {

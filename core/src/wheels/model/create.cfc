@@ -249,10 +249,16 @@ component {
 		local.uuidBasedKeys = [];
 		local.columnMeta = {};
 		local.key = "";
+		local.primaryKeyExplicitlySet = false; // Track if primary key was explicitly provided
 
 		for (local.key in local.pks) {
 			local.key = trim(local.key);
 			local.columnMeta = this.columnDataForProperty(local.key);
+
+			// Check if the primary key was explicitly set by the user
+			if (structKeyExists(this, local.key) && len(this[local.key])) {
+				local.primaryKeyExplicitlySet = true;
+			}
 
 			if ($isUUIDColumn(local.columnMeta)) {
 				arrayAppend(local.uuidBasedKeys, local.key);
@@ -337,7 +343,13 @@ component {
 		$clearRequestCache();
 		local.generatedKey = variables.wheels.class.adapter.$generatedKey();
 		if (StructKeyExists(local.inserted.result, local.generatedKey)) {
-			this[primaryKeys(1)] = local.inserted.result[local.generatedKey];
+			if (StructKeyExists(server, "boxlang")) {
+				if (!local.primaryKeyExplicitlySet) {
+					this[primaryKeys(1)] = local.inserted.result[local.generatedKey];
+				}
+			} else {
+				this[primaryKeys(1)] = local.inserted.result[local.generatedKey];
+			}
 		}
 
 		return true;

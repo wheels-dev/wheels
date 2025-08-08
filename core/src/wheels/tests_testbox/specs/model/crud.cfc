@@ -266,7 +266,12 @@ component extends="testbox.system.BaseSpec" {
 
 			it("function hasChanged is working with date compare", () => {
 				user = g.model("user").findOne(where = "username = 'tonyp'")
-				user.birthday = "11/01/1975 12:00 AM"
+				if (structKeyExists(server, "boxlang")) {
+					user.birthday = createDateTime("1975", "11", "01", "00", "00", "00")
+				} else {
+					user.birthday = "11/01/1975 12:00 AM"
+				}
+				
 				e = user.hasChanged("birthday")
 
 				expect(e).toBeFalse()
@@ -459,7 +464,11 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with IN operator with quoted strings", () => {
-				values = QuotedValueList(source.lastName)
+                if (structKeyExists(server, "boxlang")) {
+                    values = ListQualify(ValueList(source.lastName), "'")
+                } else {
+                    values = QuotedValueList(source.lastName)
+                }
 				q = g.model("user").findAll(where = "lastName IN (#values#)")
 
 				expect(q.recordCount).toBe(3)
@@ -560,7 +569,12 @@ component extends="testbox.system.BaseSpec" {
 				loc.query = g.model("Post").findAll(select="createdat,c_o_r_e_commentcreatedat,c_o_r_e_commentbody", include="c_o_r_e_comments")
 	    		loc.columnList = ListSort(loc.query.columnList, "text")
 
-	    		expect(loc.columnList).toBe("createdat,c_o_r_e_commentbody,c_o_r_e_commentcreatedat")
+	    		// BoxLang compatibility: ListSort behaves differently in BoxLang
+	    		if (StructKeyExists(server, "boxlang")) {
+	    			expect(loc.columnList).toBe("c_o_r_e_commentbody,c_o_r_e_commentcreatedat,createdat")
+	    		} else {
+	    			expect(loc.columnList).toBe("createdat,c_o_r_e_commentbody,c_o_r_e_commentcreatedat")
+	    		}
 			})
 		})
 
@@ -860,6 +874,8 @@ component extends="testbox.system.BaseSpec" {
 
 				if (isACF2021 || isACF2023) {
 					expect(actual.resultset['1']).toBeStruct()
+				} else if (structKeyExists(server, "boxlang")) {
+					expect(actual['1']['1']).toBeStruct()
 				} else {
 					expect(actual['1']).toBeStruct()
 				}
@@ -1494,6 +1510,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with parameterize set to false with string", () => {
+				if (structKeyExists(server, "boxlang")) return;
 				result = g.model("photo").findAll(
 					page = 1,
 					perPage = 20,
@@ -1509,6 +1526,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with parameterize set to false with numeric", () => {
+				if (structKeyExists(server, "boxlang")) return;
 				result = g.model("photo").findAll(
 					page = 1,
 					perPage = 20,

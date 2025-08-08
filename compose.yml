@@ -253,6 +253,37 @@ services:
     networks:
       - cfwheels-network
 
+  boxlang:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/boxlang/Dockerfile
+    image: cfwheels-test-boxlang:v1.0.0
+    tty: true
+    stdin_open: true
+    # volumes:
+    #   - ./templates/base/src:/cfwheels-test-suite
+    #   - ./core/src/wheels:/cfwheels-test-suite/vendor/wheels
+    #   - ./tests:/cfwheels-test-suite/tests
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/server.json
+    #     target: /cfwheels-test-suite/server.json
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/settings.cfm
+    #     target: /cfwheels-test-suite/config/settings.cfm
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/box.json
+    #     target: /cfwheels-test-suite/box.json
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/CFConfig.json
+    #     target: /cfwheels-test-suite/CFConfig.json
+    #   # Named volumes to prevent dependency pollution
+    #   - wirebox-boxlang:/cfwheels-test-suite/vendor/wirebox
+    #   - testbox-boxlang:/cfwheels-test-suite/vendor/testbox
+    ports:
+      - "60001:60001"
+    networks:
+      - cfwheels-network
+
   mysql:
     image: mysql:8.0
     restart: always
@@ -371,3 +402,5 @@ volumes:
   testbox-adobe2023:
   wirebox-adobe2025:
   testbox-adobe2025:
+  # wirebox-boxlang:
+  # testbox-boxlang:

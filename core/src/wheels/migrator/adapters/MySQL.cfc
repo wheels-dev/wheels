@@ -69,7 +69,7 @@ component extends="Abstract" {
 	/**
 	 * MySQL text fields can't have default
 	 */
-	public boolean function optionsIncludeDefault(string type, string default = "", boolean null = true) {
+	public boolean function optionsIncludeDefault(string type, string default = "", boolean allowNull = true) {
 		if (ListFindNoCase("text,mediumtext,longtext,float", arguments.type)) {
 			return false;
 		} else {

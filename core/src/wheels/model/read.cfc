@@ -321,7 +321,12 @@ component {
 				// optional arguments
 				for (local.argumentName in ["returnType","keyColumn"]) {
 					if (StructKeyExists(arguments, local.argumentName)) {
-						local.finderArgs[local.argumentName] = arguments[local.argumentName];
+						// BoxLang compatibility: Map keyColumn to columnKey
+						if (StructKeyExists(server, "boxlang") && local.argumentName == "keyColumn") {
+							local.finderArgs["columnKey"] = arguments[local.argumentName];
+						} else {
+							local.finderArgs[local.argumentName] = arguments[local.argumentName];
+						}
 					}
 				}
 				local.findAll = variables.wheels.class.adapter.$querySetup(argumentCollection = local.finderArgs);
@@ -406,6 +411,8 @@ component {
 		arguments.include = $listClean(arguments.include);
 		if (Len(arguments.key)) {
 			$keyLengthCheck(arguments.key);
+		} else if (structKeyExists(server, "boxlang")) {
+			return false;
 		}
 
 		// Convert primary key column name(s) / value(s) to a WHERE clause.

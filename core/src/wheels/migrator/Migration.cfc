@@ -154,7 +154,7 @@ component extends="Base" {
 	 * @columnName THe name of the new column
 	 * @referenceName Name for new reference column, see documentation for references function, required if columnType is 'reference'
 	 * @default Default value for this column
-	 * @null Whether to allow NULL values
+	 * @allowNull Whether to allow NULL values
 	 * @limit Character or integer size limit for column
 	 * @precision precision value for decimal columns, i.e. number of digits the column can hold
 	 * @scale scale value for decimal columns, i.e. number of digits that can be placed to the right of the decimal point (must be less than or equal to precision)
@@ -166,7 +166,7 @@ component extends="Base" {
 		string afterColumn = "",
 		string referenceName = "",
 		string default,
-		boolean null,
+		boolean allowNull,
 		numeric limit,
 		numeric precision,
 		numeric scale
@@ -188,7 +188,7 @@ component extends="Base" {
 	 * @afterColumn The name of the column which this column should be inserted after
 	 * @referenceName Name for reference column, see documentation for references function, required if columnType is 'reference'
 	 * @default Default value for this column
-	 * @null Whether to allow NULL values
+	 * @allowNull Whether to allow NULL values
 	 * @limit Character or integer size limit for column
 	 * @precision (For decimal type) the maximum number of digits allow
 	 * @scale (For decimal type) the number of digits to the right of the decimal point
@@ -201,7 +201,7 @@ component extends="Base" {
 		string afterColumn = "",
 		string referenceName = "",
 		string default,
-		boolean null,
+		boolean allowNull,
 		numeric limit,
 		numeric precision,
 		numeric scale,

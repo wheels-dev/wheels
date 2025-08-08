@@ -311,7 +311,7 @@ component output="false" {
 		location(url = local.redirectUrl, addToken = false);
 	}
 
-	private string function $buildRedirectUrl() {
+	public string function $buildRedirectUrl() {
 		// Determine the base URL
 		if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
 			local.url = cgi.path_info;

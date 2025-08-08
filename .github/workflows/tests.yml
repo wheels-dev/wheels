@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         cfengine:
-          ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023"]
+          ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023", "boxlang"]
         dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
@@ -76,6 +76,8 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2023
             dbengine: oracle
+          - cfengine: boxlang
+            dbengine: mysql
         exclude:
           - cfengine: adobe2018
             dbengine: h2
@@ -85,6 +87,14 @@ jobs:
             dbengine: h2
           - cfengine: adobe2025
             dbengine: h2
+          - cfengine: boxlang
+            dbengine: sqlserver
+          - cfengine: boxlang
+            dbengine: h2
+          - cfengine: boxlang
+            dbengine: postgres
+          - cfengine: boxlang
+            dbengine: oracle
           - cfengine: adobe2025
             dbengine: oracle
           - cfengine: adobe2025
@@ -102,6 +112,7 @@ jobs:
       PORT_adobe2021: 62021
       PORT_adobe2023: 62023
       PORT_adobe2025: 62025
+      PORT_boxlang: 60001
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -128,8 +139,8 @@ jobs:
         run: |
           echo "Waiting for ${{ matrix.cfengine }} to be ready..."
           
-          # First, wait for container to be running
-          timeout 120 bash -c 'until docker ps --filter "name=${{ matrix.cfengine }}" | grep -q "${{ matrix.cfengine }}"; do
+          # First, wait for the container to be running
+          timeout 150 bash -c 'until docker ps --filter "name=${{ matrix.cfengine }}" | grep -q "${{ matrix.cfengine }}"; do
             echo "Waiting for container to start..."
             sleep 2
           done'

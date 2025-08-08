@@ -207,6 +207,9 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 	}
 
 	function onDIcomplete(){
+		if (structKeyExists(server, "boxlang")) {
+			variables.this = this;
+		}
 		Mixins.$initializeMixins(variables);
 	}
 }
