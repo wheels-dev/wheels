@@ -22,10 +22,10 @@ component excludeFromHelp=true {
 		local.wheelsPath = "";
 		local.boxJsonPath = "";
 		
-		// Check if we're in a running wheels app (core/wheels structure)
+		// Check if we're in a running wheels app (vendor/wheels structure)
 		if(isWheelsApp(getCWD())) {
-			local.wheelsPath = fileSystemUtil.resolvePath("core/wheels");
-			local.boxJsonPath = fileSystemUtil.resolvePath("core/wheels/box.json");
+			local.wheelsPath = fileSystemUtil.resolvePath("vendor/wheels");
+			local.boxJsonPath = fileSystemUtil.resolvePath("vendor/wheels/box.json");
 			local.rootJson = fileSystemUtil.resolvePath("box.json");
 		}
 		// Check if we're in wheels source structure (core/src/wheels)
@@ -94,8 +94,8 @@ component excludeFromHelp=true {
 
 	//Use this function for commands that should work Only if the application is running
 	boolean function isWheelsApp(string path = getCWD()) {
-		// Check for core/wheels folder
-		if (!directoryExists(arguments.path & "/core/wheels")) {
+		// Check for vendor/wheels folder
+		if (!directoryExists(arguments.path & "/vendor/wheels")) {
 			return false;
 		}
 		// Check for config folder
