@@ -1,4 +1,4 @@
-FROM ortussolutions/commandbox:jdk17
+FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
@@ -13,12 +13,15 @@ ENV BOX_INSTALL             TRUE
 # Set working directory
 WORKDIR ${APP_DIR}
 
-# Copy box.json for dependency management
+# Copy files
+COPY templates/base/src ${APP_DIR}
+COPY core/src/wheels ${APP_DIR}/vendor/wheels
+COPY tests ${APP_DIR}/tests
 COPY tools/docker/boxlang/box.json ${APP_DIR}/box.json
-
-# Copy CFConfig
 COPY tools/docker/boxlang/CFConfig.json ${APP_DIR}/CFConfig.json
 
+COPY tools/docker/boxlang/server.json ${APP_DIR}/server.json
+COPY tools/docker/boxlang/settings.cfm ${APP_DIR}/config/settings.cfm
 # Install dependencies
 RUN box install
 
