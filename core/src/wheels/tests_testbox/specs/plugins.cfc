@@ -148,11 +148,10 @@ component extends="testbox.system.BaseSpec" {
 				// Set pluginComponentPath to match the test plugin path
 				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/removing"
 				
-				dir = ExpandPath(config.pluginPath)
-				dir = ListChangeDelims(dir, "/", "\")
+				dir = ExpandPath("/wheels/tests_testbox/_assets/plugins/removing")
+				badDir = dir & "/testing"
+				goodDir = dir & "/testglobalmixins"
 
-				badDir = ListAppend(dir, "testing", "/")
-				goodDir = ListAppend(dir, "testglobalmixins", "/")
 				$deleteDirs()
 				$createDir()
 
@@ -389,6 +388,9 @@ component extends="testbox.system.BaseSpec" {
 		var q = DirectoryList(ExpandPath('/wheels/tests_testbox/_assets/plugins/unpacking'), false, "query")
 		for (row in q) {
 			dir = ListChangeDelims(ListAppend(row.directory, row.name, "/"), "/", "\")
+			if (StructKeyExists(server, "boxlang") && !dir.startsWith("/")) {
+				dir = "/" & dir;
+			}
 			if (DirectoryExists(dir)) {
 				DirectoryDelete(dir, true)
 			}

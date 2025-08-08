@@ -48,8 +48,20 @@ component extends="testbox.system.BaseSpec" {
 
 		describe("Tests that primaryKeys", () => {
 
-			it("returns key", () => {
+			beforeEach(() => {
+				// Store original keys for restoration
 				author = g.model("author")
+				originalKeys = author.$classData().keys
+			})
+
+			afterEach(() => {
+				// Restore original keys to prevent cross-test contamination
+				if (StructKeyExists(author, "$classData")) {
+					author.$classData().keys = originalKeys
+				}
+			})
+
+			it("returns key", () => {
 				e = author.$classData().keys
 				r = "id"
 
@@ -65,8 +77,6 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("function setPrimaryKey appends keys", () => {
-				author = g.model("author")
-				author = Duplicate(author)
 				e = author.$classData().keys
 				r = "id"
 
@@ -80,8 +90,6 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("function setPrimaryKey does not append duplicate keys", () => {
-				author = g.model("author")
-				author = Duplicate(author)
 				e = author.$classData().keys
 				r = "id"
 
@@ -96,8 +104,6 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("retrieve primary key by position", () => {
-				author = g.model("author")
-				author = Duplicate(author)
 				author.setprimaryKeys("id2,id3")
 				e = author.primaryKeys(1)
 

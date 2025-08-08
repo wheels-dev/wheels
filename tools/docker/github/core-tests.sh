@@ -34,6 +34,9 @@ case $1 in
   adobe2025)
     port="62025"
     ;;
+  boxlang)
+    port="60001"
+    ;;
   mysql56)
     port="3306"
     ;;

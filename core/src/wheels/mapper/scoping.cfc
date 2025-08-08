@@ -62,7 +62,15 @@ component {
 		}
 
 		// Put scope arguments on the stack.
-		StructAppend(arguments, variables.scopeStack[1], false);
+		if (structKeyExists(server, "boxlang")) {
+			for (local.k in variables.scopeStack[1]) {
+				if (!StructKeyExists(arguments, local.k) || isNull(arguments[local.k])) {
+					arguments[local.k] = variables.scopeStack[1][local.k];
+				}
+			}
+		} else {
+			StructAppend(arguments, variables.scopeStack[1], false);
+		}
 		ArrayPrepend(variables.scopeStack, arguments);
 
 		return this;

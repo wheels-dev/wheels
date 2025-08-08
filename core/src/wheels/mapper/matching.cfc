@@ -166,7 +166,7 @@ component {
 			local.pattern = "/";
 		}
 
-	  // If arguments.to is not passed in, we check for the existance of app/views/home/index.cfm if found we set that as the root
+	  // If arguments.to is not passed in, we check for the existence of app/views/home/index.cfm if found we set that as the root
 	  // else we set wheels##wheels as the root.
 	  if (!structKeyExists(arguments, "to")) {
 	    if (fileExists(application.AppDir & "views/home/index.cfm")) {
@@ -340,10 +340,17 @@ component {
 		}
 
 		// See if we have any globing in the pattern and if so add a constraint for each glob.
-		if (ReFindNoCase("\*([^\/]+)", arguments.pattern)) {
-			local.globs = ReMatch("\*([^\/]+)", arguments.pattern);
+		// BoxLang compatibility: Use different regex pattern to match globs
+		local.globRegex = StructKeyExists(server, "boxlang") ? "\*\[([^\]]+)\]" : "\*([^\/]+)";
+		if (ReFindNoCase(local.globRegex, arguments.pattern)) {
+			local.globs = ReMatch(local.globRegex, arguments.pattern);
 			for (local.glob in local.globs) {
-				local.var = ReplaceList(local.glob, "*,[,]", "");
+				// For BoxLang: extract variable name from *[varname] pattern
+				if (StructKeyExists(server, "boxlang")) {
+					local.var = ReReplace(local.glob, "\*\[([^\]]+)\]", "\1");
+				} else {
+					local.var = ReplaceList(local.glob, "*,[,]", "");
+				}
 				arguments.pattern = Replace(arguments.pattern, local.glob, "[#local.var#]");
 				arguments.constraints[local.var] = ".*";
 			}
