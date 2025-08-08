@@ -459,7 +459,11 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("works with IN operator with quoted strings", () => {
-				values = QuotedValueList(source.lastName)
+                if (structKeyExists(server, "boxlang")) {
+                    values = ListQualify(ValueList(source.lastName), "'")
+                } else {
+                    values = QuotedValueList(source.lastName)
+                }
 				q = g.model("user").findAll(where = "lastName IN (#values#)")
 
 				expect(q.recordCount).toBe(3)
