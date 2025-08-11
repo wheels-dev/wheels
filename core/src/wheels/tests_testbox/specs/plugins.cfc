@@ -148,7 +148,7 @@ component extends="testbox.system.BaseSpec" {
 				// Set pluginComponentPath to match the test plugin path
 				application.wheels.pluginComponentPath = "/wheels/tests_testbox/_assets/plugins/removing"
 				
-				dir = ExpandPath("/wheels/tests_testbox/_assets/plugins/removing")
+				dir = ExpandPath(config.pluginPath)
 				badDir = dir & "/testing"
 				goodDir = dir & "/testglobalmixins"
 
