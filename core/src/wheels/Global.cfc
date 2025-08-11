@@ -207,16 +207,23 @@ component output="false" {
 			// Use direct SQL query instead of cfdbinfo for BoxLang + SQL Server index queries
 			local.sql = "
 			SELECT 
-				t.name AS table_name,
-				i.name AS index_name,
-				CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS non_unique,
-				c.name AS column_name,
-				CAST(ic.key_ordinal AS INT) AS ordinal_position,
-				CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS asc_or_desc,
-				CAST(i.type AS INT) AS type,
-				CAST(0 AS INT) AS cardinality,
-				CAST(0 AS INT) AS pages,
-				'' AS filter_condition
+				DB_NAME() AS TABLE_CAT,
+				SCHEMA_NAME(t.schema_id) AS TABLE_SCHEM,
+				t.name AS TABLE_NAME,
+				CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS NON_UNIQUE,
+				t.name AS INDEX_QUALIFIER,
+				i.name AS INDEX_NAME,
+				CASE 
+					WHEN i.type = 1 THEN 'Clustered Index'
+					WHEN i.type = 2 THEN 'Other Index'
+					ELSE 'Other Index'
+				END AS TYPE,
+				CAST(ic.key_ordinal AS INT) AS ORDINAL_POSITION,
+				c.name AS COLUMN_NAME,
+				CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS ASC_OR_DESC,
+				CAST(0 AS INT) AS CARDINALITY,
+				CAST(0 AS INT) AS PAGES,
+				'' AS FILTER_CONDITION
 			FROM sys.indexes i
 			INNER JOIN sys.objects t ON i.object_id = t.object_id
 			INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
