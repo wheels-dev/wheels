@@ -196,6 +196,42 @@ component output="false" {
       StructDelete(arguments, "password");
     }
 
+	// BoxLang + SQL Server specific fix for index queries to avoid casting error
+    if (StructKeyExists(server, "boxlang") && 
+        StructKeyExists(arguments, "type") && arguments.type == "index" &&
+        StructKeyExists(arguments, "table")) {
+      
+		// Get database adapter to check if it's SQL Server
+		local.adapter = $get("adapterName");
+		if (local.adapter == "SQLServer") {
+			// Use direct SQL query instead of cfdbinfo for BoxLang + SQL Server index queries
+			local.sql = "
+			SELECT 
+				t.name AS table_name,
+				i.name AS index_name,
+				CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS non_unique,
+				c.name AS column_name,
+				CAST(ic.key_ordinal AS INT) AS ordinal_position,
+				CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS asc_or_desc,
+				CAST(i.type AS INT) AS type,
+				CAST(0 AS INT) AS cardinality,
+				CAST(0 AS INT) AS pages,
+				'' AS filter_condition
+			FROM sys.indexes i
+			INNER JOIN sys.objects t ON i.object_id = t.object_id
+			INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+			INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+			WHERE t.name = '#arguments.table#' 
+				AND t.type = 'U'
+				AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
+			ORDER BY i.name, ic.key_ordinal
+			";
+			
+			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+			return local.rv;
+		}
+    }
+
     // If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
 		// Sometimes the call fails when using a custom database connection string.
 		// In that case the database name is not known by the CF server and it will just use any of the databases that the data source has access to.
