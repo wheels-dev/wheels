@@ -1,0 +1,37 @@
+name: Sync Docs to Repo B
+
+on:
+  push:
+    branches:
+      - docs-sync-with-wheels.dev
+    paths:
+      - 'docs/src/**'
+      - '.github/workflows/docs-sync.yml'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Wheels Repo
+        uses: actions/checkout@v3
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone wheels.dev
+        run: |
+          git clone https://x-access-token:${{ secrets.PATWHEELSDEV }}@github.com/paiindustries/wheels.dev.git
+          cd wheels.dev
+          git checkout docs-sync-from-wheels
+          cd ..
+          rsync -av --delete docs/src/ wheels.dev/docs/3.0.0/guides/
+
+      - name: Commit & Push to wheels.dev
+        run: |
+          cd wheels.dev
+          git add docs/3.0.0/guides/
+          git commit -m "Sync docs from Wheels-FW" || echo "No changes to commit"
+          git push origin docs-sync-from-wheels
