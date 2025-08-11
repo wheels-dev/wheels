@@ -154,7 +154,7 @@ component {
 			// 2. The content type is in the acceptable formats AND a format-specific template exists
 			local.shouldRenderView = true;
 			
-			if (local.contentType != "html") {
+			if (local.contentType != "html" && local.contentType !="json") {
 				// For non-HTML formats, check if we should skip view rendering
 				if (!ListFindNoCase(local.acceptableFormats, local.contentType)) {
 					// Format not acceptable for this action
