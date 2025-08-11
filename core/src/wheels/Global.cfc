@@ -196,6 +196,49 @@ component output="false" {
       StructDelete(arguments, "password");
     }
 
+	// BoxLang + SQL Server specific fix for index queries to avoid casting error
+    if (StructKeyExists(server, "boxlang") && 
+        StructKeyExists(arguments, "type") && arguments.type == "index" &&
+        StructKeyExists(arguments, "table")) {
+      
+		// Get database adapter to check if it's SQL Server
+		local.adapter = $get("adapterName");
+		if (local.adapter == "SQLServer") {
+			// Use direct SQL query instead of cfdbinfo for BoxLang + SQL Server index queries
+			local.sql = "
+			SELECT 
+				DB_NAME() AS TABLE_CAT,
+				SCHEMA_NAME(t.schema_id) AS TABLE_SCHEM,
+				t.name AS TABLE_NAME,
+				CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS NON_UNIQUE,
+				t.name AS INDEX_QUALIFIER,
+				i.name AS INDEX_NAME,
+				CASE 
+					WHEN i.type = 1 THEN 'Clustered Index'
+					WHEN i.type = 2 THEN 'Other Index'
+					ELSE 'Other Index'
+				END AS TYPE,
+				CAST(ic.key_ordinal AS INT) AS ORDINAL_POSITION,
+				c.name AS COLUMN_NAME,
+				CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS ASC_OR_DESC,
+				CAST(0 AS INT) AS CARDINALITY,
+				CAST(0 AS INT) AS PAGES,
+				'' AS FILTER_CONDITION
+			FROM sys.indexes i
+			INNER JOIN sys.objects t ON i.object_id = t.object_id
+			INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+			INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+			WHERE t.name = '#arguments.table#' 
+				AND t.type = 'U'
+				AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
+			ORDER BY i.name, ic.key_ordinal
+			";
+			
+			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+			return local.rv;
+		}
+    }
+
     // If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
 		// Sometimes the call fails when using a custom database connection string.
 		// In that case the database name is not known by the CF server and it will just use any of the databases that the data source has access to.
