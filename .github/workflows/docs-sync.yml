@@ -3,7 +3,7 @@ name: Sync Docs to Shared Folder
 on:
   push:
     branches:
-      - docs-sync-with-wheels.dev
+      - develop
     paths:
       - 'docs/src/**'
       - '.github/workflows/docs-sync.yml'
