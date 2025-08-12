@@ -3,8 +3,7 @@ FROM ortussolutions/commandbox:latest
 LABEL maintainer "Wheels Core Team"
 
 #Add the H2 extension
-ADD https://ext.lucee.org/org.h2-1.3.172.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.h2-1.3.172.lex
-# ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
+ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
 
 #Add the Oracle extension
 ADD https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex

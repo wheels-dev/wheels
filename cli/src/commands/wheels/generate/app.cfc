@@ -215,7 +215,7 @@ component aliases="wheels g app" extends="../base" {
 
     // Add the H2 Lucee extension to the dependencies
     command( 'package set' )
-      .params( Dependencies = '{ "orgh213172lex":"lex:https://ext.lucee.org/org.h2-1.3.172.lex" }' )
+      .params( Dependencies = '{ "orgluceeh2214":"lex:https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex" }' )
       .flags( 'append' )
       .run();
 
