@@ -45,6 +45,10 @@ component output="false" extends="wheels.Global"{
 					if (local.migration.status == "migrated" && application[local.appKey].allowMigrationDown) {
 						transaction action="begin" {
 							try {
+								// Test query to establish datasource for BoxLang compatibility
+								if (structKeyExists(server, "boxlang")) {
+									$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
+								}
 								local.rv = local.rv & "#Chr(13)#------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
 								request.$wheelsMigrationOutput = "";
 								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_down.sql";
@@ -74,6 +78,10 @@ component output="false" extends="wheels.Global"{
 					if (local.migration.version <= arguments.version && local.migration.status != "migrated") {
 						transaction {
 							try {
+								// Test query to establish datasource for BoxLang compatibility
+								if (structKeyExists(server, "boxlang")) {
+									$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
+								}
 								local.rv = local.rv & "#Chr(13)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
 								request.$wheelsMigrationOutput = "";
 								request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_up.sql";

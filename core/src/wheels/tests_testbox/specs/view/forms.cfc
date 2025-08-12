@@ -402,6 +402,8 @@ component extends="testbox.system.BaseSpec" {
 				g.set(functionName = "checkBoxTag", encode = false)
 				g.set(functionName = "textField", encode = false)
 				g.set(functionName = "textFieldTag", encode = false)
+				// Reset tag model for BoxLang compatibility
+				tagModel = g.model("tag")
 			})
 
 			afterEach(() => {
@@ -505,8 +507,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("adds automatic label in error message", () => {
-				tag = Duplicate(g.model("tag").new())
-				/* use a deep copy so as not to affect the cached model */
+				tag = tagModel.new()
 				tag.validatesPresenceOf(property = "name")
 				tag.valid()
 				errors = tag.errorsOn(property = "name")
@@ -516,7 +517,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("adds automatic label in error message with non persisted property", () => {
-				tag = Duplicate(g.model("tag").new())
+				tag = tagModel.new()
 				tag.validatesPresenceOf(property = "virtual")
 				tag.valid()
 				errors = tag.errorsOn(property = "virtual")

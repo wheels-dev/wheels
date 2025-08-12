@@ -42,3 +42,12 @@ jobs:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       FORGEBOX_API_TOKEN: ${{ secrets.FORGEBOX_API_TOKEN }}
       FORGEBOX_PASS: ${{ secrets.FORGEBOX_PASS }}
+
+
+#############################################
+# Sync Docs in Wheels.dev
+#############################################
+
+  sync-docs:
+    needs: build
+    uses: ./.github/workflows/docs-sync.yml

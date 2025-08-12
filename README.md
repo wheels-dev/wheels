@@ -88,6 +88,14 @@ Please check out our [Contributing Guide][3] for detailed guidelines on how to g
 
 ### Docker Testing
 
+ 1. Create a database on a supported database server named `wheelstestdb`. At this time the supported
+    database servers are H2, Microsoft SQL Server, PostgreSQL, MySQL, and Oracle.
+ 2. Create a datasource in your CFML engine's administrator named `wheelstestdb` pointing to the
+    `wheelstestdb` database and make sure to give it CLOB and BLOB support.
+ 3. Open your browser to the Wheels Welcome Page.
+ 4. In the gray debug area at the bottom of the page, click the `Run Tests` link next to the version number
+    on the `Framework` line.
+    
 For multi-engine testing, use our [Docker setup](https://wheels.dev/3.0.0/guides/working-with-wheels/testing-your-application#running-tests-with-docker)
 
 ### Reporting Issues
@@ -105,6 +113,13 @@ Please report any errors you encounter on our [issue tracker][4]. When reporting
 - **Community:** [GitHub Discussions](https://github.com/wheels-dev/wheels/discussions)
 - **Issues:** [GitHub Issues][4]
 - **Guides:** [Framework Guides](https://wheels.dev/guides)
+
+## Supported CFML Engines
+
+CFWheels supports the following CFML engines:
+- **Adobe ColdFusion**: 2018, 2021, 2023
+- **Lucee**: 5.x, 6.x, 7.x
+- **BoxLang**: 1.3.x
 
 ## License
 

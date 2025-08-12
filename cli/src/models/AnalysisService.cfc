@@ -74,7 +74,7 @@ component {
     private function analyzeDirectory(required string path, required struct results, required string severity) {
         try {
             // First get a count to show progress
-            print.text("Scanning for files... ").toConsole();
+            print.line("Scanning for files... ");
             
             var files = directoryList(
                 arguments.path, 
@@ -94,7 +94,7 @@ component {
                 if (!isExcluded(file)) {
                     fileCount++;
                     if (fileCount % 10 == 0) {
-                        print.text(".").toConsole();
+                        print.line(".");
                     }
                     if (fileCount % 100 == 0) {
                         print.line(" (#fileCount#/#totalFiles#)");
@@ -108,6 +108,7 @@ component {
             }
             
         } catch (any e) {
+            rethrow
             // If directory listing fails or takes too long
             print.redLine("Error scanning directory: #e.message#");
             print.yellowLine("Try analyzing a more specific path or subdirectory");
@@ -136,7 +137,9 @@ component {
             
             // Update summary
             for (var issue in issues) {
-                arguments.results.summary[issue.severity]++;
+                if(structKeyExists(arguments.results.summary, issue.severity)){
+                    arguments.results.summary[issue.severity]++;
+                }
             }
         }
     }
@@ -295,15 +298,28 @@ component {
         var content = arrayToList(arguments.lines, chr(10));
         
         // Check for var scoping in functions
-        if (reFindNoCase("function\s+\w+.*?{[^}]*(?<!var\s+)\w+\s*=", content)) {
-            arrayAppend(issues, {
-                line = 1,
-                column = 1,
-                severity = "warning",
-                message = "Variable may not be properly scoped with 'var' or 'local'",
-                rule = "var-scoping",
-                fixable = false
-            });
+        // Using a different approach to detect unscoped variables
+        // Look for function declarations and check for assignments without var/local
+        var functionMatches = reFindAll("function\s+\w+[^{]*\{", content, true);
+        
+        for (var funcMatch in functionMatches) {
+            // Extract function body (simplified - gets content after the function declaration)
+            var startPos = funcMatch.pos + funcMatch.len;
+            var functionContent = mid(content, startPos, min(1000, len(content) - startPos));
+            
+            // Look for variable assignments that don't have var or local prefix
+            // This is a simplified check - looks for simple assignment patterns
+            if (reFindNoCase("^\s*[a-z_][a-z0-9_]*\s*=", functionContent) && 
+                !reFindNoCase("^\s*(var|local\.|arguments\.|variables\.|this\.)", functionContent)) {
+                arrayAppend(issues, {
+                    line = getLineNumber(content, funcMatch.pos),
+                    column = 1,
+                    severity = "warning",
+                    message = "Variable may not be properly scoped with 'var' or 'local'",
+                    rule = "var-scoping",
+                    fixable = false
+                });
+            }
         }
         
         // Check for missing output attribute on components

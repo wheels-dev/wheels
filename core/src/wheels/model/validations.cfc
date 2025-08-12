@@ -666,8 +666,16 @@ component {
 	 * Adds an error if the object property fail to pass the validation setup in the validatesNumericalityOf method.
 	 */
 	public void function $validatesNumericalityOf() {
+		local.propertyValue = this[arguments.property];
+		local.isValidNumber = IsNumeric(local.propertyValue);
+		
+		// Additional check for BoxLang compatibility - reject numbers with commas
+		if (structKeyExists(server, "boxlang") && local.isValidNumber && Find(",", local.propertyValue)) {
+			local.isValidNumber = false;
+		}
+		
 		if (
-			!IsNumeric(this[arguments.property]) || (
+			!local.isValidNumber || (
 				arguments.onlyInteger && Round(this[arguments.property]) != this[arguments.property]
 			) || (IsNumeric(arguments.greaterThan) && this[arguments.property] <= arguments.greaterThan) || (
 				IsNumeric(arguments.greaterThanOrEqualTo) && this[arguments.property] < arguments.greaterThanOrEqualTo
@@ -824,14 +832,25 @@ component {
 				if(structKeyExists(this, local.beforeParenthesis)){
 
 					if (IsCustomFunction(this[local.beforeParenthesis])) {
-						for (argString in local.afterParenthesis) {
-							// Split the string on "="
-							local.splitArg = ListToArray(argString, "=");
-							local.variableName = Trim(local.splitArg[1]); // Left-hand side (variable name)
-							local.variableValue = Replace(local.splitArg[2], "'", "", "all"); // Right-hand side (value without quotes)
-
-							// Add to the arguments collection
-							local.argumentsCollection[local.variableName] = local.variableValue;
+						local.argumentsCollection = {};
+						// Parse parameters properly - split on comma first, then on equals
+						local.paramList = ListToArray(local.afterParenthesis, ",");
+						for (local.param in local.paramList) {
+							local.param = Trim(local.param);
+							if (Find("=", local.param)) {
+								// Split the parameter on "="
+								local.splitArg = ListToArray(local.param, "=");
+								if (ArrayLen(local.splitArg) >= 2) {
+									local.variableName = Trim(local.splitArg[1]); // Left-hand side (variable name)
+									local.variableValue = Trim(local.splitArg[2]); // Right-hand side (value)
+									// Remove quotes from the value
+									local.variableValue = Replace(local.variableValue, "'", "", "all");
+									local.variableValue = Replace(local.variableValue, '"', "", "all");
+									
+									// Add to the arguments collection
+									local.argumentsCollection[local.variableName] = local.variableValue;
+								}
+							}
 						}
 						local.rv = invoke(this, local.beforeParenthesis, local.argumentsCollection); // Call the function
 					} else {

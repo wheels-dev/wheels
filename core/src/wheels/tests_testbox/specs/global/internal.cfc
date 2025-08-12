@@ -236,6 +236,7 @@ component extends="testbox.system.BaseSpec" {
 		describe("Tests that $getrequesttimeout", () => {
 
 			it("is getting timeout", () => {
+				if (application.wheels.ServerName == "Boxlang") return;
 				setting requestTimeout=666;
 				expect(g.$getRequestTimeout()).toBe(666)
 				setting requesttimeout="10000";

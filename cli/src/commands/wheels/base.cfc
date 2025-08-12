@@ -22,10 +22,10 @@ component excludeFromHelp=true {
 		local.wheelsPath = "";
 		local.boxJsonPath = "";
 		
-		// Check if we're in a running wheels app (core/wheels structure)
+		// Check if we're in a running wheels app (vendor/wheels structure)
 		if(isWheelsApp(getCWD())) {
-			local.wheelsPath = fileSystemUtil.resolvePath("core/wheels");
-			local.boxJsonPath = fileSystemUtil.resolvePath("core/wheels/box.json");
+			local.wheelsPath = fileSystemUtil.resolvePath("vendor/wheels");
+			local.boxJsonPath = fileSystemUtil.resolvePath("vendor/wheels/box.json");
 			local.rootJson = fileSystemUtil.resolvePath("box.json");
 		}
 		// Check if we're in wheels source structure (core/src/wheels)
@@ -94,8 +94,8 @@ component excludeFromHelp=true {
 
 	//Use this function for commands that should work Only if the application is running
 	boolean function isWheelsApp(string path = getCWD()) {
-		// Check for core/wheels folder
-		if (!directoryExists(arguments.path & "/core/wheels")) {
+		// Check for vendor/wheels folder
+		if (!directoryExists(arguments.path & "/vendor/wheels")) {
 			return false;
 		}
 		// Check for config folder
@@ -665,19 +665,30 @@ component excludeFromHelp=true {
 	// Copy helper functions from create.cfc
 	private struct function getDatasourceInfo(required string datasourceName) {
 		try {
-			// Try to get datasource info from application.cfc
+			// Try to get datasource info from app.cfm
 			local.appPath = getCWD();
 			local.appCfcPath = local.appPath & "/config/app.cfm";
 			
 			if (fileExists(local.appCfcPath)) {
 				local.content = fileRead(local.appCfcPath);
 				
+				// Remove all types of comments before parsing
+				// 1. Remove CFML multi-line comments: <!--- ... --->
+				local.content = REReplace(local.content, "<!---[\s\S]*?--->", "", "all");
+				
+				// 2. Remove JavaScript/CFScript multi-line comments: /* ... */
+				local.content = REReplace(local.content, "/\*[\s\S]*?\*/", "", "all");
+				
+				// 3. Remove JavaScript/CFScript single-line comments: // ...
+				// BUT we need to be careful not to remove // from URLs (http://, jdbc:mysql://, etc.)
+				// Only remove // that appears at the beginning of a line or after whitespace
+				local.content = REReplace(local.content, "(^|\s)//[^\r\n]*", "\1", "all");
+				
 				// Look for datasource definition in this.datasources['name']
 				local.pattern = "this\.datasources\[['""]#arguments.datasourceName#['""]]\s*=\s*\{([^}]+)\}";
 				local.match = reFindNoCase(local.pattern, local.content, 1, true);
 
-
-				if (local.match.pos[1] > 0) {
+				if (arrayLen(local.match.pos) > 0 && local.match.pos[1] > 0) {
 					local.dsDefinition = mid(local.content, local.match.pos[1], local.match.len[1]);
 					local.dsInfo = {
 						"datasource": arguments.datasourceName,
@@ -691,9 +702,8 @@ component excludeFromHelp=true {
 					
 					// Extract driver class - handle both single and double quotes
 					local.classMatch = reFindNoCase("class\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
-					if (local.classMatch.pos[2] > 0) {
+					if (arrayLen(local.classMatch.pos) >= 2 && local.classMatch.pos[2] > 0) {
 						local.className = mid(local.dsDefinition, local.classMatch.pos[2], local.classMatch.len[2]);
-						print.greenLine(local.className);
 						switch(local.className) {
 							case "org.h2.Driver":
 								local.dsInfo.driver = "H2";
@@ -713,7 +723,7 @@ component excludeFromHelp=true {
 					
 					// Extract connection string - handle both single and double quotes
 					local.connMatch = reFindNoCase("connectionString\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
-					if (local.connMatch.pos[2] > 0) {
+					if (arrayLen(local.connMatch.pos) >= 2 && local.connMatch.pos[2] > 0) {
 						local.connString = mid(local.dsDefinition, local.connMatch.pos[2], local.connMatch.len[2]);
 						
 						// Parse H2 database path
@@ -727,20 +737,49 @@ component excludeFromHelp=true {
 						
 						// Parse database name from connection string for other drivers
 						if (local.dsInfo.driver == "MySQL") {
-							// jdbc:mysql://host:port/database
+							// jdbc:mysql://host:port/database?parameters
+							// Extract host and port first
+							local.hostPortMatch = reFindNoCase("jdbc:mysql://([^:/]+)(?::(\d+))?/", local.connString, 1, true);
+							if (arrayLen(local.hostPortMatch.pos) >= 2 && local.hostPortMatch.pos[2] > 0) {
+								local.dsInfo.host = mid(local.connString, local.hostPortMatch.pos[2], local.hostPortMatch.len[2]);
+								if (arrayLen(local.hostPortMatch.pos) >= 3 && local.hostPortMatch.pos[3] > 0) {
+									local.dsInfo.port = mid(local.connString, local.hostPortMatch.pos[3], local.hostPortMatch.len[3]);
+								}
+							}
+							
+							// Extract database name
 							local.dbMatch = reFindNoCase("jdbc:mysql://[^/]+/([^?;]+)", local.connString, 1, true);
-							if (local.dbMatch.pos[2] > 0) {
+							if (arrayLen(local.dbMatch.pos) >= 2 && local.dbMatch.pos[2] > 0) {
 								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
 							}
 						} else if (local.dsInfo.driver == "PostgreSQL") {
 							// jdbc:postgresql://host:port/database
+							// Extract host and port first
+							local.hostPortMatch = reFindNoCase("jdbc:postgresql://([^:/]+)(?::(\d+))?/", local.connString, 1, true);
+							if (arrayLen(local.hostPortMatch.pos) >= 2 && local.hostPortMatch.pos[2] > 0) {
+								local.dsInfo.host = mid(local.connString, local.hostPortMatch.pos[2], local.hostPortMatch.len[2]);
+								if (arrayLen(local.hostPortMatch.pos) >= 3 && local.hostPortMatch.pos[3] > 0) {
+									local.dsInfo.port = mid(local.connString, local.hostPortMatch.pos[3], local.hostPortMatch.len[3]);
+								}
+							}
+							
+							// Extract database name
 							local.dbMatch = reFindNoCase("jdbc:postgresql://[^/]+/([^?;]+)", local.connString, 1, true);
-							if (local.dbMatch.pos[2] > 0) {
+							if (arrayLen(local.dbMatch.pos) >= 2 && local.dbMatch.pos[2] > 0) {
 								local.dsInfo.database = mid(local.connString, local.dbMatch.pos[2], local.dbMatch.len[2]);
 							}
 						} else if (local.dsInfo.driver == "MSSQL") {
 							// jdbc:sqlserver://host:port;databaseName=database
-							// or jdbc:sqlserver://host:port;database=database
+							// Extract host and port first
+							local.hostPortMatch = reFindNoCase("jdbc:sqlserver://([^:/]+)(?::(\d+))?", local.connString, 1, true);
+							if (arrayLen(local.hostPortMatch.pos) >= 2 && local.hostPortMatch.pos[2] > 0) {
+								local.dsInfo.host = mid(local.connString, local.hostPortMatch.pos[2], local.hostPortMatch.len[2]);
+								if (arrayLen(local.hostPortMatch.pos) >= 3 && local.hostPortMatch.pos[3] > 0) {
+									local.dsInfo.port = mid(local.connString, local.hostPortMatch.pos[3], local.hostPortMatch.len[3]);
+								}
+							}
+							
+							// Extract database name
 							// First try databaseName=
 							local.dbMatch = reFindNoCase("databaseName=([^;]+)", local.connString, 1, true);
 							if (arrayLen(local.dbMatch.pos) >= 2 && local.dbMatch.pos[2] > 0) {
@@ -753,25 +792,16 @@ component excludeFromHelp=true {
 								}
 							}
 						}
-						
-						// Extract host and port from connection string
-						local.hostPortMatch = reFindNoCase("jdbc:[^:]+://([^:/]+)(?::(\d+))?", local.connString, 1, true);
-						if (local.hostPortMatch.pos[2] > 0) {
-							local.dsInfo.host = mid(local.connString, local.hostPortMatch.pos[2], local.hostPortMatch.len[2]);
-							if (local.hostPortMatch.pos[3] > 0) {
-								local.dsInfo.port = mid(local.connString, local.hostPortMatch.pos[3], local.hostPortMatch.len[3]);
-							}
-						}
 					}
 					
 					// Extract username - handle both single and double quotes
 					local.userMatch = reFindNoCase("username\s*[:=]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
-					if (local.userMatch.pos[2] > 0) {
+					if (arrayLen(local.userMatch.pos) >= 2 && local.userMatch.pos[2] > 0) {
 						local.dsInfo.username = mid(local.dsDefinition, local.userMatch.pos[2], local.userMatch.len[2]);
 					}
 					// Extract password - handle both single and double quotes
 					local.passwordMatch = reFindNoCase("password\s*[:=]\s*['""]([^'""]*)['""]", local.dsDefinition, 1, true);
-					if (local.passwordMatch.pos[2] > 0) {
+					if (arrayLen(local.passwordMatch.pos) >= 2 && local.passwordMatch.pos[2] > 0) {
 						local.dsInfo.password = mid(local.dsDefinition, local.passwordMatch.pos[2], local.passwordMatch.len[2]);
 					}
 					return local.dsInfo;
@@ -782,7 +812,7 @@ component excludeFromHelp=true {
 			return {};
 		} catch (any e) {
 			// Server might not be running or file read error
-			return e;
+			return {};
 		}
 	}
 
@@ -1002,6 +1032,368 @@ component excludeFromHelp=true {
 		}
 		
 		return local.config;
+	}
+
+
+		/**
+	 * Get list of available databases
+	 */
+	private array function getAvailableDatabases(required struct dsInfo) {
+		local.databases = [];
+		
+		try {
+			switch(arguments.dsInfo.driver) {
+				case "MySQL":
+				case "MySQL5":
+					local.databases = getMySQLDatabases(arguments.dsInfo);
+					break;
+				case "PostgreSQL":
+					local.databases = getPostgreSQLDatabases(arguments.dsInfo);
+					break;
+				case "MSSQLServer":
+				case "MSSQL":
+					local.databases = getSQLServerDatabases(arguments.dsInfo);
+					break;
+			}
+		} catch (any e) {
+			printError("Error fetching databases: " & e.message);
+		}
+		
+		return local.databases;
+	}
+
+	/**
+	* Enhanced getMySQLDatabases with better error handling
+	* Add this to base.cfc to replace the existing function
+	*/
+	private array function getMySQLDatabases(required struct dsInfo) {
+		local.databases = [];
+		
+		try {
+			// Build temporary connection without specific database
+			local.tempDS = Duplicate(arguments.dsInfo);
+			local.tempDS.database = "information_schema";
+			
+			printStep("Attempting to connect to MySQL server...");
+			printInfo("Host", local.tempDS.host ?: "localhost");
+			printInfo("Port", (StructKeyExists(local.tempDS, "port") && Len(local.tempDS.port)) ? local.tempDS.port : "3306");
+			printInfo("User", local.tempDS.username ?: "");
+			
+			// Get connection
+			local.connResult = getDatabaseConnection(local.tempDS, "MySQL");
+			
+			if (!local.connResult.success) {
+				printError("Failed to connect to MySQL server");
+				printError("Error: " & local.connResult.error);
+				
+				// Try command line as fallback
+				printStep("Trying command line fallback...");
+				local.cmd = "mysql";
+				local.cmd &= " -h " & (arguments.dsInfo.host ?: "localhost");
+				local.cmd &= " -P " & (arguments.dsInfo.port ?: "3307");
+				local.cmd &= " -u " & (arguments.dsInfo.username ?: "");
+				if (Len(arguments.dsInfo.password ?: "")) {
+					local.envVars = {"MYSQL_PWD": arguments.dsInfo.password};
+				} else {
+					local.envVars = {};
+				}
+				local.cmd &= " -e ""SHOW DATABASES"" -s -N";
+				
+				local.result = runCommand(local.cmd, local.envVars);
+				if (local.result.success && Len(local.result.output)) {
+					local.dbList = ListToArray(local.result.output, Chr(10));
+					for (local.db in local.dbList) {
+						local.dbName = Trim(local.db);
+						if (Len(local.dbName) && !ListFindNoCase("information_schema,mysql,performance_schema,sys", local.dbName)) {
+							ArrayAppend(local.databases, local.dbName);
+						}
+					}
+					printSuccess("Retrieved databases via command line");
+				} else {
+					printError("Command line fallback also failed");
+					if (Len(local.result.error)) {
+						printError("Error: " & local.result.error);
+					}
+				}
+				
+				return local.databases;
+			}
+			
+			local.conn = local.connResult.connection;
+			
+			try {
+				local.stmt = local.conn.createStatement();
+				local.rs = local.stmt.executeQuery("SHOW DATABASES");
+				
+				while (local.rs.next()) {
+					local.dbName = local.rs.getString(1);
+					// Exclude system databases
+					if (!ListFindNoCase("information_schema,mysql,performance_schema,sys", local.dbName)) {
+						ArrayAppend(local.databases, local.dbName);
+					}
+				}
+				
+				local.rs.close();
+				local.stmt.close();
+				printSuccess("Retrieved " & ArrayLen(local.databases) & " databases");
+			} finally {
+				local.conn.close();
+			}
+			
+		} catch (any e) {
+
+			// Provide specific troubleshooting based on error
+			if (FindNoCase("Communications link failure", e.message)) {
+				print.line();
+				printWarning("Connection failed. Please check:");
+				print.line("1. MySQL server is running on port " & (arguments.dsInfo.port ?: "3306"));
+				print.line("2. Firewall is not blocking the connection");
+				print.line("3. MySQL is configured to accept connections from " & (arguments.dsInfo.host ?: "localhost"));
+				print.line();
+				print.line("To verify MySQL is running:");
+				print.line("- Windows: Check Services for MySQL");
+				print.line("- Command: netstat -an | findstr :" & (arguments.dsInfo.port ?: "3306"));
+			} else if (FindNoCase("Access denied", e.message)) {
+				printWarning("Authentication failed. Check username and password.");
+			}
+		}
+		
+		return local.databases;
+	}
+
+
+	/**
+	 * Get PostgreSQL databases
+	 */
+	private array function getPostgreSQLDatabases(required struct dsInfo) {
+		local.databases = [];
+		
+		try {
+			// Build temporary connection to postgres database
+			local.tempDS = Duplicate(arguments.dsInfo);
+			local.tempDS.database = "postgres";
+			
+			// Get connection
+			local.connResult = getDatabaseConnection(local.tempDS, "PostgreSQL");
+			
+			if (!local.connResult.success) {
+				return local.databases;
+			}
+			
+			local.conn = local.connResult.connection;
+			
+			try {
+				local.stmt = local.conn.createStatement();
+				local.rs = local.stmt.executeQuery(
+					"SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres')"
+				);
+				
+				while (local.rs.next()) {
+					ArrayAppend(local.databases, local.rs.getString(1));
+				}
+				
+				local.rs.close();
+				local.stmt.close();
+			} finally {
+				local.conn.close();
+			}
+			
+		} catch (any e) {
+			// Fallback approach if direct connection fails
+		}
+		
+		return local.databases;
+	}
+
+	/**
+	 * Get SQL Server databases
+	 */
+	private array function getSQLServerDatabases(required struct dsInfo) {
+		local.databases = [];
+		
+		try {
+			// Build temporary connection to master database
+			local.tempDS = Duplicate(arguments.dsInfo);
+			local.tempDS.database = "master";
+			
+			// Get connection
+			local.connResult = getDatabaseConnection(local.tempDS, "SQLServer");
+			
+			if (!local.connResult.success) {
+				return local.databases;
+			}
+			
+			local.conn = local.connResult.connection;
+			
+			try {
+				local.stmt = local.conn.createStatement();
+				local.rs = local.stmt.executeQuery(
+					"SELECT name FROM sys.databases WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb')"
+				);
+				
+				while (local.rs.next()) {
+					ArrayAppend(local.databases, local.rs.getString(1));
+				}
+				
+				local.rs.close();
+				local.stmt.close();
+			} finally {
+				local.conn.close();
+			}
+			
+		} catch (any e) {
+			// Fallback approach if direct connection fails
+		}
+		
+		return local.databases;
+	}
+
+		/**
+	* Get database connection
+	* This function should be added to base.cfc
+	*/
+	private struct function getDatabaseConnection(required struct dsInfo, required string dbType, string systemDatabase = "") {
+		local.result = {
+			success: false,
+			connection: "",
+			error: "",
+			driverClass: ""
+		};
+		
+		try {
+			// Get database-specific configuration
+			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo, arguments.systemDatabase);
+			
+			// Build connection URL
+			local.url = buildJDBCUrl(local.dbConfig.tempDS);
+			local.username = local.dbConfig.tempDS.username ?: "";
+			local.password = local.dbConfig.tempDS.password ?: "";
+			
+			printStep("Connecting to " & arguments.dbType & " database...");
+			
+			// Try to load driver
+			local.driver = "";
+			local.driverFound = false;
+			
+			for (local.driverClass in local.dbConfig.driverClasses) {
+				try {
+					local.driver = createObject("java", local.driverClass);
+					local.result.driverClass = local.driverClass;
+					local.driverFound = true;
+					printSuccess("Driver found: " & local.driverClass);
+					break;
+				} catch (any driverError) {
+					// Continue trying other drivers
+				}
+			}
+			
+			if (!local.driverFound) {
+				local.result.error = "No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.";
+				return local.result;
+			}
+			
+			// Create properties for connection
+			local.props = createObject("java", "java.util.Properties");
+			local.props.setProperty("user", local.username);
+			local.props.setProperty("password", local.password);
+			
+			// Test if driver accepts the URL
+			if (!local.driver.acceptsURL(local.url)) {
+				local.result.error = arguments.dbType & " driver does not accept the URL format";
+				return local.result;
+			}
+			
+			// Connect using driver directly
+			print.line(local.url);
+			print.redLine(local.props);
+			local.conn = local.driver.connect(local.url, local.props);
+			
+			if (isNull(local.conn)) {
+				local.result.error = "Failed to establish connection to " & arguments.dbType;
+				return local.result;
+			}
+			
+			local.result.success = true;
+			local.result.connection = local.conn;
+			printSuccess("Connected successfully to " & arguments.dbType & " database!");
+			return local.result;
+			
+		} catch (any e) {
+			local.result.error = e.message;
+			if (StructKeyExists(e, "detail")) {
+				local.result.error &= " - " & e.detail;
+			}
+			return local.result;
+		}
+	}
+
+	/**
+	* Get database-specific configuration
+	* This function should also be in base.cfc
+	*/
+	private struct function getDatabaseConfig(required string dbType, required struct dsInfo, string systemDatabase = "") {
+		local.config = {
+			tempDS: Duplicate(arguments.dsInfo),
+			driverClasses: []
+		};
+		
+		switch (arguments.dbType) {
+			case "MySQL":
+				if (Len(arguments.systemDatabase)) {
+					local.config.tempDS.database = arguments.systemDatabase;
+				} else if (!Len(local.config.tempDS.database)) {
+					local.config.tempDS.database = "information_schema"; // Default system DB
+				}
+				local.config.driverClasses = [
+					"com.mysql.cj.jdbc.Driver",
+					"com.mysql.jdbc.Driver",
+					"org.mariadb.jdbc.Driver"
+				];
+				break;
+				
+			case "PostgreSQL":
+				if (Len(arguments.systemDatabase)) {
+					local.config.tempDS.database = arguments.systemDatabase;
+				} else if (!Len(local.config.tempDS.database)) {
+					local.config.tempDS.database = "postgres"; // Default system DB
+				}
+				local.config.driverClasses = [
+					"org.postgresql.Driver",
+					"postgresql.Driver"
+				];
+				break;
+				
+			case "SQLServer":
+			case "MSSQL":
+				if (Len(arguments.systemDatabase)) {
+					local.config.tempDS.database = arguments.systemDatabase;
+				} else if (!Len(local.config.tempDS.database)) {
+					local.config.tempDS.database = "master"; // Default system DB
+				}
+				local.config.driverClasses = [
+					"com.microsoft.sqlserver.jdbc.SQLServerDriver"
+				];
+				break;
+				
+			case "H2":
+				// H2 doesn't need a system database
+				local.config.driverClasses = [
+					"org.h2.Driver"
+				];
+				break;
+		}
+		
+		return local.config;
+	}
+
+	/**
+	* Add this FileAppend helper function to base.cfc
+	* ColdFusion doesn't have FileAppend built-in, so we create one
+	*/
+	private void function FileAppend(required string filepath, required string content) {
+		local.file = FileOpen(arguments.filepath, "append");
+		FileWrite(local.file, arguments.content);
+		FileClose(local.file);
 	}
 
 }

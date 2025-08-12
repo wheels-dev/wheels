@@ -782,6 +782,9 @@ component output="false" displayName="Test" extends="wheels.Global"{
 	}
 
 	function onDIcomplete(){
+		if (structKeyExists(server, "boxlang")) {
+			variables.this = this;
+		}
 		Mixins.$initializeMixins(variables);
 	}
 

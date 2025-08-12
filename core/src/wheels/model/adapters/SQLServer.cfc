@@ -235,7 +235,16 @@ component extends="Base" output=false {
 			);
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
-				query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
+				
+				// Use @@IDENTITY instead of SCOPE_IDENTITY() for BoxLang compatibility
+				// SCOPE_IDENTITY() returns empty values in BoxLang with SQL Server
+				query = $query(sql = "SELECT @@IDENTITY AS lastId", argumentCollection = arguments.queryAttributes);
+				
+				// Fallback to SCOPE_IDENTITY() if @@IDENTITY fails (for other CFML engines)
+				if (!len(query.lastId)) {
+					query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
+				}
+				
 				local.rv[$generatedKey()] = query.lastId;
 				return local.rv;
 			}

@@ -104,9 +104,26 @@ component {
 		arguments.returnAs = "query";
 		arguments.callbacks = false;
 		if (StructKeyExists(arguments, "key")) {
-			local.rv = findByKey(argumentCollection = arguments).recordCount;
+			// BoxLang compatibility: Handle null key values
+			if (StructKeyExists(server, "boxlang") && (!StructKeyExists(arguments, "key") || arguments.key == "" || arguments.key == "null" || !Len(arguments.key))) {
+				local.rv = 0;
+			} else {
+				local.result = findByKey(argumentCollection = arguments);
+				// BoxLang compatibility: Handle case where findByKey returns boolean false for null keys  
+				if (StructKeyExists(server, "boxlang") && IsBoolean(local.result)) {
+					local.rv = 0;
+				} else {
+					local.rv = local.result.recordCount;
+				}
+			}
 		} else {
-			local.rv = findOne(argumentCollection = arguments).recordCount;
+			local.result = findOne(argumentCollection = arguments);
+			// BoxLang compatibility: Handle case where findOne returns boolean false
+			if (StructKeyExists(server, "boxlang") && IsBoolean(local.result)) {
+				local.rv = 0;
+			} else {
+				local.rv = local.result.recordCount;
+			}
 		}
 		return local.rv;
 	}

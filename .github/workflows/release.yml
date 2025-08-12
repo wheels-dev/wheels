@@ -64,9 +64,9 @@ jobs:
         run: |
           ./tools/build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
-      #- name: Prepare Wheels CLI for ForgeBox
-      #  run: |
-      #    ./tools/build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+      - name: Prepare Wheels CLI for ForgeBox
+        run: |
+         ./tools/build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Install CommandBox
         run: |
@@ -86,7 +86,7 @@ jobs:
         run: |
           ./tools/build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-        #  ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
@@ -108,15 +108,15 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
             artifacts/wheels/wheels-core-be.zip
 
-      # - name: Upload Wheels CLI Artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: build-artifacts-cli
-      #     path: |
-      #       artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
-      #       artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
-      #       artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
-      #       artifacts/wheels/wheels-cli-be.zip
+      - name: Upload Wheels CLI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-cli
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/wheels/wheels-cli-be.zip
 
       - name: Upload All Wheels Artifacts (Combined)
         uses: actions/upload-artifact@v4
