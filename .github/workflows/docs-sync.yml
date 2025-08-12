@@ -1,4 +1,4 @@
-name: Sync Docs to Repo B
+name: Sync Docs to Remote Server
 
 on:
   push:
@@ -16,22 +16,13 @@ jobs:
       - name: Checkout Wheels Repo
         uses: actions/checkout@v3
 
-      - name: Set up Git
+      - name: Set up SSH
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SWARM_1_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SWARM_1_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Clone wheels.dev
+      - name: Sync docs to remote server
         run: |
-          git clone https://x-access-token:${{ secrets.PATWHEELSDEV }}@github.com/paiindustries/wheels.dev.git
-          cd wheels.dev
-          git checkout docs-sync-from-wheels
-          cd ..
-          rsync -av --delete docs/src/ wheels.dev/docs/3.0.0/guides/
-
-      - name: Commit & Push to wheels.dev
-        run: |
-          cd wheels.dev
-          git add docs/3.0.0/guides/
-          git commit -m "Sync docs from Wheels-FW" || echo "No changes to commit"
-          git push origin docs-sync-from-wheels
+          rsync -av docs/src/ ${{ secrets.SWARM_1_USER }}@${{ secrets.SWARM_1_HOST }}:/mnt/shared/docs/3.0.0/guides/
