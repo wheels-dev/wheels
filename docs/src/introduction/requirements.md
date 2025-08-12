@@ -62,8 +62,9 @@ MVC is how Wheels structures your code for you. As you start working with Wheels
 
 Wheels requires that you use one of these CFML engines:
 
-* [Adobe ColdFusion](http://www.adobe.com/products/coldfusion/) 2018 / 2021 / 2023 
-* [Lucee](http://lucee.org) 5.2.1.9+ / 6
+* [Adobe ColdFusion](http://www.adobe.com/products/coldfusion/) 2018 / 2021 / 2023
+* [Lucee](http://lucee.org) 5.2.1.9+ / 6 / 7
+* [BoxLang](https://boxlang.ortussolutions.com/) 1.3.x
 
 #### Operating Systems
 
