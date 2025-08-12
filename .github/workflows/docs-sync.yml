@@ -19,4 +19,4 @@ jobs:
 
       - name: Sync to shared docs folder
         run: |
-          rsync -av --delete docs/src/ /home/swarm-1/test/docs/3.0.0/
+          rsync -av --delete docs/src/ /mnt/shared/docs/3.0.0/guides
