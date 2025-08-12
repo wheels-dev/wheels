@@ -31,19 +31,6 @@ rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --ex
 cp tools/build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
 cp tools/build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
 
-# Update box.json for ForgeBox publishing
-echo "Adjusting box.json for ForgeBox..."
-if command -v jq >/dev/null 2>&1; then
-    # Update directory settings for proper packaging
-    # Keep directory as empty string (it's already empty in CLI)
-    jq 'del(.packageDirectory) | .createPackageDirectory = false' "${BUILD_DIR}/wheels-cli/box.json" > "${BUILD_DIR}/wheels-cli/box.json.tmp" && mv "${BUILD_DIR}/wheels-cli/box.json.tmp" "${BUILD_DIR}/wheels-cli/box.json"
-else
-    # Fallback to sed if jq is not available
-    sed -i.bak 's/"createPackageDirectory"[[:space:]]*:[[:space:]]*true/"createPackageDirectory":false/' "${BUILD_DIR}/wheels-cli/box.json"
-    sed -i.bak '/"packageDirectory":/d' "${BUILD_DIR}/wheels-cli/box.json"
-    rm -f "${BUILD_DIR}/wheels-cli/box.json.bak"
-fi
-
 # Replace version placeholders
 echo "Replacing version placeholders..."
 find "${BUILD_DIR}/wheels-cli" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) | while read file; do
