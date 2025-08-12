@@ -37,7 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run unit tests only: `box run-script test:unit`
 - Run integration tests: `box run-script test:integration`
 - Run tests for specific engine with Docker: `docker compose --profile lucee up -d`
-- Available Docker profiles: `lucee`, `lucee6`, `lucee7`, `adobe2018`, `adobe2021`, `adobe2023`, `adobe2025`
+- Available Docker profiles: `lucee`, `lucee6`, `lucee7`, `adobe2018`, `adobe2021`, `adobe2023`, `adobe2025`, `boxlang`
 
 ### Advanced Testing (TestBox CLI)
 - Install TestBox CLI: `box install commandbox-testbox-cli`
@@ -207,6 +207,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Access Adobe CF instances: http://localhost:62018, http://localhost:62021, http://localhost:62023
 - All Adobe versions must pass tests before PR submission
 - Check compilation errors first, then runtime errors
+
+## BoxLang Support
+
+### Testing with BoxLang
+- Local Docker testing: `docker compose --profile boxlang up -d`
+- Access BoxLang instance: http://localhost:60001
+- BoxLang version support: 1.0.0 - 1.3.x
 
 ## Repository Structure
 

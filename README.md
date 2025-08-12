@@ -28,7 +28,7 @@ about how to proceed. Join us!
 of time for the tests to complete and may cause your engine to become unresponsive.
 
  1. Create a database on a supported database server named `wheelstestdb`. At this time the supported
-    database servers are H2, Microsoft SQL Server, PostgreSQL and MySQL.
+    database servers are H2, Microsoft SQL Server, PostgreSQL, MySQL, and Oracle.
  2. Create a datasource in your CFML engine's administrator named `wheelstestdb` pointing to the
     `wheelstestdb` database and make sure to give it CLOB and BLOB support.
  3. Open your browser to the Wheels Welcome Page.
@@ -38,6 +38,13 @@ of time for the tests to complete and may cause your engine to become unresponsi
 Please report any errors that you may encounter on our [issue tracker][4]. Please be sure to report the
 database engine (including version), CFML engine (including version), and HTTP server (including
 version).
+
+## Supported CFML Engines
+
+CFWheels supports the following CFML engines:
+- **Adobe ColdFusion**: 2018, 2021, 2023, 2025
+- **Lucee**: 5.x, 6.x, 7.x
+- **BoxLang**: 1.0.0 - 1.3.x
 
 ## License
 
