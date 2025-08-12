@@ -11,7 +11,7 @@ In the Wheels core, we've adopted javadoc-style syntax (with a few twists of our
 The first thing to notice is the new ‘\[Docs]’ link in the debug section in the footer:\
 Following that link leads you to the main internal documentation.&#x20;
 
-![](..//wheels/guides-assets/29a95a8-docs1.jpg)
+![](/wheels/guides-assets/29a95a8-docs1.jpg)
 
 The three-column layout is designed to allow for quick filtering by section or function name. On the right are the main Wheels core categories, such as Controller and Model functions. These categories are further divided into subcategories, such as Flash and Pagination functions. Clicking on a link in the right column will filter the list in the left and middle columns to show all matching functions, including child functions of that category.
 
@@ -45,7 +45,7 @@ public string function stripTags(required string html) {
 
 The `[section]` and `[category]` tags categorise the function as appropriate, and the `@html` part describes the function’s parameter. The additional parameter data, such as whether it’s required, type and any defaults are automatically parsed too. This results in a display like:
 
-![](..//wheels/guides-assets/2102d2c-striptags.jpg)
+![](/wheels/guides-assets/2102d2c-striptags.jpg)
 
 ### Documenting your own functions
 

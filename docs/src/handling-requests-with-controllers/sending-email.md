@@ -62,7 +62,7 @@ Consider this example scenario:
 
 | Controller:  | Email Template:                                                |
 | ------------ | -------------------------------------------------------------- |
-| `Membership` | `/app/views/membership/myemailtemplate.cfm` |
+| `Membership` | `app/views/membership/myemailtemplate.cfm` |
 
 Multiple templates may be stored within this directory should there be a need.
 
@@ -122,10 +122,10 @@ Like the `template` argument, the logic for which file to include follows the sa
 
 ### Attaching Files
 
-You can attach files to your emails as well by using the `file` argument (or `files` argument if you want multiple attachments). Simply pass in the name of a file that exists in the `/public/files` folder (or a subfolder of it) of your application.
+You can attach files to your emails as well by using the `file` argument (or `files` argument if you want multiple attachments). Simply pass in the name of a file that exists in the `public/files` folder (or a subfolder of it) of your application.
 
 ```javascript
-// Send /public/files/termsAndConditions.pdf
+// Send public/files/termsAndConditions.pdf
 sendEmail(
     to="tom@domain.com",
     from="tom@domain.com",
@@ -206,7 +206,7 @@ sendEmail(
 
 Wheels also lets you set up layouts for the HTML and plain text parts in a multipart email.
 
-If we set up generic email layouts at `/app/views/plainemaillayout.cfm` and `/app/views/htmlemaillayout.cfm`, we would call [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html) like so:
+If we set up generic email layouts at `app/views/plainemaillayout.cfm` and `app/views/htmlemaillayout.cfm`, we would call [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html) like so:
 
 {% code title="Example" %}
 ```javascript

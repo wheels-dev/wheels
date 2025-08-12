@@ -11,9 +11,9 @@ description: >-
 
 In order to establish the full cycle of validation, 3 elements need to be in place:
 
-* **Model** file containing business logic for the database table. Example: `/app/models/User.cfc`
-* **Controller** file for creating, saving or updating a model instance. Example: `/app/controllers/Users.cfc`
-* **View** file for displaying the original data inputs and an error list. Example: `/app/views/users/index.cfm`
+* **Model** file containing business logic for the database table. Example: `app/models/User.cfc`
+* **Controller** file for creating, saving or updating a model instance. Example: `app/controllers/Users.cfc`
+* **View** file for displaying the original data inputs and an error list. Example: `app/views/users/index.cfm`
 
 **Note**: Saving, creating, and updating model objects can also be done from the model file itself (or even in the view file if you want to veer completely off into the wild). But to keep things simple, all examples in this chapter will revolve around code in the controller files.
 
@@ -80,7 +80,7 @@ Note these extra behaviors as well:
 * If you've already set a validation on a particular property in your model, the automatic validations will be overridden by your settings.
 * If your database column provides a default value for a given field, Wheels will not enforce a [validatesPresenceOf()](https://wheels.dev/api/v3.0.0/model.validatespresenceof.html)rule on that property.
 
-To disable automatic validations in your Wheels application, change this setting in `//config/settings.cfm:`
+To disable automatic validations in your Wheels application, change this setting in `/config/settings.cfm:`
 
 ```javascript
 set(automaticValidations=false);
@@ -255,7 +255,7 @@ There are 2 ways to accomplish this: through global defaults in your config file
 
 ### Setting Global Defaults for Error Messages
 
-Using basic global defaults for the validation functions, you can set error messages in your config file at `//config/settings.cfm`.
+Using basic global defaults for the validation functions, you can set error messages in your config file at `/config/settings.cfm`.
 
 ```javascript
 set(functionName="validatesPresenceOf", message="Please provide a value for [property]");
