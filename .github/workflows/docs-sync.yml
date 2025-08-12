@@ -19,3 +19,5 @@ jobs:
       - name: Sync to shared docs folder
         run: |
           rsync -av --no-perms --no-owner --no-group --del docs/src/ /mnt/shared/docs/3.0.0/guides
+          rsync -av --no-perms --no-owner --no-group --del docs/src/.gitbook/assets/ /mnt/shared/public/images
+
