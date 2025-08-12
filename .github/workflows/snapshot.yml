@@ -51,3 +51,5 @@ jobs:
   sync-docs:
     needs: build
     uses: ./.github/workflows/docs-sync.yml
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
