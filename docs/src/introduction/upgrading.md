@@ -2,48 +2,250 @@
 description: Instructions for upgrading Wheels applications
 ---
 
-# Upgrading
+# Upgrading Wheels Applications
 
+Wheels follows Semantic Versioning ([semver.org](http://semver.org/)):
 
+* **Major releases** (e.g., `2.x.x → 3.x.x`) may include breaking changes and require code adjustments.
+* **Minor releases** (e.g., `3.0.x → 3.1.x`) may add new features in a backwards-compatible way.
+* **Patch releases** (e.g., `3.0.1 → 3.0.2`) focus on bug fixes.
 
-Wheels follows Semantic Versioning ([http://semver.org/](http://semver.org)) so large version changes (e.g, `1.x.x -> 2.x.x`) will most likely contain breaking changes which will require evaluation of your codebase. Minor version changes (e.g, `1.3.x->1.4.x`) will often contain new functionality, but in a backwards-compatible manner, and maintenance releases (e.g `1.4.4 -> 1.4.5`) will just be trying to fix bugs.
+Upgrading an existing application involves more than swapping the `wheels` folder — it often requires project restructuring, dependency updates, and code modifications.
 
-Generally speaking, upgrading Wheels is as easy as replacing the `wheels` folder, especially for those small maintenance releases: however, there are usually exceptions in minor point releases (i.e, `1.1` to `1.3` required replacing other files outside the `wheels` folder). The notes below detail those changes.
+---
 
-### Upgrading to 3.0.0
+## General Upgrade Process for Existing Applications
 
-#### Compatibility Changes
+**1. Backup First**
 
-Adobe Coldfusion 2016 and below are no longer compatible with Wheels going forward. Consequently, these versions have been removed from the Wheels Internal Test Suites.
+* Create a full backup of your application code and database.
+* Commit all changes if using version control.
 
-#### Code changes
+**2. Read All Relevant Upgrade Notes**
 
-* Migrate your tests from the `tests` directory which are written with rocketUnit and rewrite them into [Testbox](https://www.ortussolutions.com/products/testbox) in the `tests/Testbox` directory. Starting with Wheels 3.x, [Testbox](https://www.ortussolutions.com/products/testbox) will replace RocketUnit as the default testing framework.
-* Starting with Wheels 3.x, [Wirebox](https://www.ortussolutions.com/products/wireboxhttps://www.ortussolutions.com/products/wirebox) will be used as the default dependency injector.
-* After installing Wheels 3.x, you'll have to run `box install` to intall testbox and wirebox in your application as they are not shipped with Wheels but are rather listed in `box.json` file as dependencies to be installed.
-* Added Mappings for the `app`, `vendor`, `wheels`, `wirebox`, `testbox` and `tests` directories.
-* `root.cfm` and `rewrite.cfm` have been removed. All the requests are now being redirected only through `public/index.cfm`.
-* A `.env` file has been added in the root of the application which adds the H2 database extension for lucee and sets the cfadmin password to `commandbox` for both [Lucee](http://lucee.org) and [Adobe ColdFusion](http://www.adobe.com/products/coldfusion/).
+* If skipping versions, review the upgrade notes for *every* version in between.
+* Some changes require manual adjustments outside the `wheels` folder.
 
-#### Changes to the wheels folder
+**3. Use a Safe Environment**
 
-* Replace the `wheels` folder with the new one from the 3.0.0 download.
-* Move the `wheels` folder inside the `vendor` folder.
+* Test upgrades in a local or staging environment before production.
 
-#### Changes outside the wheels folder
+**4. Upgrade Steps**
 
-* Moved the `config`, `controllers`, `events`, `global`, `lib`, `migrator`, `models`, `plugins`, `snippets` and `views` directories inside the `app` directory.
-* Moved the `files`, `images`, `javascripts`, `miscellaneous`, `stylesheets` directories and `Application.cfc`, `index.cfm` and `urlrewrite.xml` files into the `public` folder.
+1. Follow the *version-specific* changes listed below.
+2. Replace/update the `wheels` folder with the version you are upgrading to.
+3. Apply all required file moves, renames, and deletions.
+4. Install new dependencies (`box install` if using CommandBox).
+5. Update code for removed or renamed functions.
+6. Check plugins for compatibility.
 
-### Upgrading to 2.3.x
+**5. Test Thoroughly**
+
+* Run your test suite.
+* Fix routing, mappings, or missing dependency issues.
+
+**6. Deploy to Production**
+
+* Clear caches and restart the CFML engine after deployment.
+
+---
+
+## Upgrading to Wheels 3.0.0
+
+This guide walks you through upgrading an existing Wheels application to version 3.0.0.
+It covers compatibility changes, the new folder structure, and the **CommandBox (`box.json`)** dependency management process for the `vendor/` folder.
+
+### 1. Compatibility Changes
+
+* **No longer supported:** Adobe ColdFusion 2016 and earlier.
+* **Supported engines:**
+
+  * Adobe ColdFusion 2018+ (except Adobe ColdFusion 2025)
+  * Lucee 5+
+  * BoxLang
+
+### 2. New Folder Structure
+
+Wheels 3.x adopts a more modern and organized structure. Update your application as follows:
+
+#### 2.1 Application Code
+
+Move your app code into a new `app/` directory at the root:
+
+```
+app/controllers/
+app/global/
+app/migrator/
+app/models/
+app/plugins/
+app/views/
+```
+
+#### 2.2 Configurations
+
+Keep the `config/` folder at the root.
+
+#### 2.3 Database Migrations
+
+Keep the `db/` folder at the root.
+
+#### 2.4 Public Assets
+
+Keep the `public/` folder at the root.
+Move all static assets into `public/`:
+
+```
+public/images/
+public/files/
+public/javascripts/
+public/miscellaneous/
+public/stylesheets/
+```
+
+#### 2.5 Updated Core Files
+
+Inside `public/`, replace the following with the latest versions from Wheels 3.x:
+
+```
+Application.cfc
+index.cfm
+urlrewrite.xml
+```
+
+---
+
+### 3. Vendor Folder Changes — Managed with CommandBox
+
+Wheels 3.x manages its core files and related libraries via **CommandBox**.
+This means **no manually downloading or replacing vendor files**.
+
+#### 3.1 Create or Update `box.json`
+
+At your project root, define dependencies and where they should be installed:
+
+```json
+{
+    "name": "wheels-app",
+    "version": "1.0.0",
+    "dependencies": {
+        "wirebox": "^7.0.0",
+        "testbox": "^5.0.0",
+        "wheels-core": "^3.0.0-SNAPSHOT"
+    },
+    "installPaths": {
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/",
+        "wheels-core": "vendor/wheels/"
+    }
+}
+```
+
+**Explanation:**
+
+* **`dependencies`**: Lists the packages your app needs, with version ranges.
+* **`installPaths`**: Ensures each dependency installs into a specific folder inside `vendor/`.
+
+#### 3.2 Install Dependencies
+
+Run:
+
+```bash
+box install
+```
+
+This will:
+
+* Download `wheels-core`, `wirebox`, and `testbox`
+* Place them into the correct `vendor/` subfolders based on `installPaths`
+
+#### 3.3 Check Application Mappings
+
+Ensure `Application.cfc` includes mappings for the new locations:
+
+```
+/app
+/config
+/db
+/public
+/vendor
+  /wheels
+  /wirebox
+  /testbox
+/tests
+```
+
+Mappings must point to the correct folders inside `vendor/` so Wheels can find its core files and libraries.
+
+### 4. Before & After Folder Layout
+
+**Before (Wheels 2.x)**
+
+```
+/controllers
+/global
+/migrator
+/models
+/plugins
+/views
+/config
+/db
+/public
+/vendor (manual files)
+Application.cfc
+index.cfm
+urlrewrite.xml
+```
+
+**After (Wheels 3.x)**
+
+```
+/app
+    /controllers
+    /global
+    /migrator
+    /models
+    /plugins
+    /views
+/config
+/db
+/public
+    Application.cfc
+    index.cfm
+    urlrewrite.xml
+/vendor
+    /wheels
+    /wirebox
+    /testbox
+.env
+box.json
+server.json
+```
+
+### 5. Final Steps After Upgrade
+
+1. Run `box install` to ensure all dependencies are fetched.
+2. Review and update `Application.cfc` mappings.
+3. Test your application thoroughly.
+4. Check the **Wheels 3.x release notes** for any breaking changes affecting your code.
+5. Commit the new structure and `box.json` so the setup is reproducible for all team members.
+
+### 6. Benefits of the New Approach
+
+* **No manual vendor updates** — dependencies are versioned and reproducible.
+* **Easier upgrades** — `box update` replaces manual downloads.
+* **Consistent environments** — the same `box.json` ensures all developers run the same versions.
+
+---
+
+## Upgrading to 2.3.x
 
 Replace the `wheels` folder with the new one from the 2.3.0 download.
 
-### Upgrading to 2.2.x
+## Upgrading to 2.2.x
 
 Replace the `wheels` folder with the new one from the 2.2.0 download.
 
-### Upgrading to 2.1.x
+## Upgrading to 2.1.x
 
 Replace the `wheels` folder with the new one from the 2.1.0 download.
 
@@ -55,7 +257,7 @@ Replace the `wheels` folder with the new one from the 2.1.0 download.
 
 * Create `/events/onabort.cfm` to support the `onAbort` method
 
-### Upgrading to 2.0.x
+## Upgrading to 2.0.x
 
 As always, the first step is to replace the `wheels` folder with the new one from the 2.0 download.
 
@@ -87,7 +289,7 @@ We've updated our minimum requirements to match officially supported versions fr
 
 #### Routing
 
-The [addRoute()](https://wheels.dev/api/v3.0.0/v1.4.5/addroute.html) function has been removed in Wheels 2.0 in favor of a new routing API. See the [Routing](https://guides.wheels.dev/docs/routing) chapter for information about the new RESTful routing system.
+The [addRoute()](https://wheels.dev/api/v1.4.5) function has been removed in Wheels 2.0 in favor of a new routing API. See the [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter for information about the new RESTful routing system.
 
 A limited version of the "wildcard" route (`[controller]/[action]/[key]`) is available as `[controller]/[action]`) if you use the new [wildcard()](https://wheels.dev/api/v3.0.0/mapper.wildcard.html) mapper method:
 
@@ -107,7 +309,7 @@ It is strongly recommended that you enable Wheels 2.0's built-in CSRF protection
 
 For many applications, you need to follow these steps:
 
-1. In `controllers/Controller.cfc`, add a call to [protectsFromForgery()](https://guides.wheels.dev/docs/protectsfromforgery) to the `config` method.
+1. In `controllers/Controller.cfc`, add a call to [protectsFromForgery()](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/request-handling) to the `config` method.
 2. Add a call to the [csrfMetaTags()](https://wheels.dev/api/v3.0.0/controller.csrfMetaTags.html) helper in your layouts' `<head>` sections.
 3. Configure any AJAX calls that `POST` data to your application to pass the `authenticityToken` from the `<meta>`tags generated by [csrfMetaTags()](https://wheels.dev/api/v3.0.0/controller.csrfMetaTags.html) as an `X-CSRF-TOKEN` HTTP header.
 4. Update your route definitions to enforce HTTP verbs on actions that manipulate data (`get`, `post`, `patch`, `delete`, etc.)

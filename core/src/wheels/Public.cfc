@@ -173,4 +173,27 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 
+	function guideImage() {
+		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
+		var assetPath = expandPath("/wheels/docs/src/.gitbook/assets/" & file);
+
+		if (fileExists(assetPath)) {
+			var ext = lcase(listLast(file, "."));
+			var mime = "application/octet-stream";
+			switch (ext) {
+				case "png": mime = "image/png"; break;
+				case "jpg":
+				case "jpeg": mime = "image/jpeg"; break;
+				case "gif": mime = "image/gif"; break;
+				case "svg": mime = "image/svg+xml"; break;
+				case "webp": mime = "image/webp"; break;
+			}
+			cfheader(name="Content-Type", value=mime);
+			cffile(action="readBinary", file=assetPath, variable="imgData");
+			cfcontent(type=mime, variable=imgData);
+		} else {
+			cfheader(statusCode=404, statusText="Not Found");
+			writeOutput("Image not found");
+		}
+	}
 }

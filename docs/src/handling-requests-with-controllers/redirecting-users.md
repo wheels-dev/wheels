@@ -23,7 +23,7 @@ You can redirect the user to another action in your application simply by passin
 
 ### 2. Redirection Using Routes
 
-If you have configured any routes in `templates/base/src/config/routes.cfm`, you can use them when redirecting as well. Just pass in the route's name to the route argument together with any additional arguments needed for the route in question. You can read more about routing in the [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter.
+If you have configured any routes in `/config/routes.cfm`, you can use them when redirecting as well. Just pass in the route's name to the route argument together with any additional arguments needed for the route in question. You can read more about routing in the [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter.
 
 ### 3. Redirecting to the Referring URL
 

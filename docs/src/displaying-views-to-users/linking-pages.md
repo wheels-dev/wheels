@@ -12,9 +12,9 @@ As you'll soon realize, the [linkTo()](https://wheels.dev/api/v3.0.0/controller.
 
 ### Default Wildcard Linking
 
-When installing Wheels, if you open the file at `/templates/base/src/config/routes.cfm`, you'll see something like this:
+When installing Wheels, if you open the file at `/config/routes.cfm`, you'll see something like this:
 
-{% code title="/templates/base/src/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .wildcard()
@@ -45,7 +45,7 @@ When you're using [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.htm
 
 Let's work with a set of sample routes to practice creating links:
 
-{% code title="/templates/base/src/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .get(name="newWidget", pattern="widgets/new", to="widgets##new")
@@ -96,7 +96,7 @@ If you have a route with multiple parameters, you must pass all of the placehold
 
 {% code title="Example" %}
 ```html
-<!--- /templates/base/src/config/routes.cfm --->
+<!--- /config/routes.cfm --->
 <cfscript>
 mapper()
     .get(
@@ -127,11 +127,11 @@ mapper()
 
 Resources are the encouraged routing pattern in Wheels, and you will likely find yourself using this type of route most often.
 
-Once you setup a resource in `/templates/base/src/config/routes.cfm`, the key is to inspect the routes generated and get a feel for the names and parameters that are expected.
+Once you setup a resource in `/config/routes.cfm`, the key is to inspect the routes generated and get a feel for the names and parameters that are expected.
 
 Consider this sample `posts` resource:
 
-{% code title="/templates/base/src/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .resources("posts")
@@ -150,7 +150,7 @@ We would see these linkable routes generated related to the posts. (See the chap
 
 If we wanted to link to the various pages within that resource, we may write something like this on the index:
 
-{% code title="templates/base/src/app/views/posts/index.cfm" %}
+{% code title="/app/views/posts/index.cfm" %}
 ```html
 <nav class="global-nav">
     #linkTo(text="All Posts", route="posts")#

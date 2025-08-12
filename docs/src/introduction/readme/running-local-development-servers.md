@@ -12,11 +12,7 @@ Wheels uses a Docker-based development environment that provides consistent, con
 
 ### Setting up Docker Development Environment
 
-Navigate to the Wheels framework directory and go to the application template:
-
-```bash
-cd templates/base/src
-```
+Ensure you are in the application root directory.
 
 Initialize your Docker development environment:
 
@@ -82,7 +78,7 @@ docker-compose up -d --build
 
 ### Custom Ports
 
-The default port is 8080, but you can customize this by modifying the `server.json` file in `templates/base/src`:
+The default port is 8080, but you can customize this by modifying the `server.json`:
 
 ```json
 {
@@ -111,7 +107,7 @@ The generated `CFConfig.json` file automatically configures a datasource for you
 
 ### Development Workflow
 
-1. **Make code changes** in your `templates/base/src` directory
+1. **Make code changes** in your directory
 2. **Changes are reflected immediately** due to Docker volume mounting
 3. **Database changes persist** between container restarts
 4. **Use standard Wheels commands** like migrations, generators, etc.
