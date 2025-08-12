@@ -53,7 +53,7 @@ Additionally, we recommend that any applications written using the Wheels framew
 
 ## Supported CFML Engines
 
-All code for Wheels should be written for use with Adobe ColdFusion 2018 upwards, Lucee 5 upwards, and BoxLang 1.3.0 upwards.
+All code for Wheels should be written for use with both Adobe ColdFusion 2018 upwards, and Lucee 5 upwards.
 
 ## Naming Conventions
 
