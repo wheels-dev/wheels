@@ -1,4 +1,5 @@
-# wheels security
+# wheels security (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Base command for security management and vulnerability scanning.
 

@@ -16,6 +16,9 @@ wheels analyze code [path] [--fix] [--format=<format>] [--severity=<severity>] [
 - `--severity` - (Optional) Minimum severity level: `info`, `warning`, `error`. Default: `warning`
 - `--report` - (Optional) Generate HTML report
 
+*Parameters are **coming soon**. Currently, this command works without parameters*.
+
+
 ## Description
 
 The `analyze code` command performs comprehensive code quality analysis on your Wheels application. It checks for:

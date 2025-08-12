@@ -1,4 +1,5 @@
-# wheels test coverage
+# wheels test coverage (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Generate code coverage reports for your test suite.
 

@@ -1,4 +1,5 @@
-# wheels console
+# wheels console (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Start an interactive REPL console with Wheels application context loaded.
 

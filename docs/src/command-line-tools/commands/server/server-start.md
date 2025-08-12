@@ -1,4 +1,5 @@
-# wheels server start
+# wheels server start (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Start the Wheels development server with enhanced checks and features.
 

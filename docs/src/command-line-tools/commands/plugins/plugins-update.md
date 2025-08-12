@@ -1,4 +1,5 @@
-# wheels plugin update
+# wheels plugin update (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Update a Wheels plugin to the latest or specified version.
 

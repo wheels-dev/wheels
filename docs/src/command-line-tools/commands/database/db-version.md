@@ -1,4 +1,5 @@
-# wheels db version
+# wheels db version (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Show the current database schema version.
 

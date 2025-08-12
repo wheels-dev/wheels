@@ -1,4 +1,5 @@
-# wheels config env
+# wheels config env (Coming Soon) 
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Manage environment-specific configuration for your Wheels application.
 

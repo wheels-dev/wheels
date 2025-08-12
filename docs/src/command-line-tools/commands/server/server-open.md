@@ -1,4 +1,5 @@
-# wheels server open
+# wheels server open (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Open the Wheels application in a web browser.
 

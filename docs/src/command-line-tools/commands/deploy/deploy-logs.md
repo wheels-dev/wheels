@@ -1,4 +1,5 @@
-# deploy logs
+# deploy logs (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 View deployment logs from servers.
 

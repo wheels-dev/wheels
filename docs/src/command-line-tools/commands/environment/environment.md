@@ -1,4 +1,5 @@
-# wheels environment
+# wheels environment (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Display or switch the current Wheels environment.
 

@@ -53,7 +53,7 @@ Get up and running with Wheels CLI in minutes. Learn how to:
 
 ## Key Features
 
-### 🛠️ Code Generation
+### 🛠️ Code Generation (Coming Soon)
 
 Generate complete applications or individual components:
 
@@ -70,7 +70,7 @@ wheels generate controller users --rest
 wheels generate view users index
 ```
 
-### 🗄️ Database Management
+### 🗄️ Database Management (Coming Soon)
 
 Complete database lifecycle management:
 
@@ -90,7 +90,7 @@ wheels db status            # Check migration status
 wheels db rollback          # Rollback migrations
 ```
 
-### 🧪 Testing
+### 🧪 Testing (Coming Soon)
 
 Comprehensive testing support:
 

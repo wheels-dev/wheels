@@ -1,4 +1,5 @@
-# analyze performance
+# analyze performance (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Analyzes application performance, identifying bottlenecks and optimization opportunities in your Wheels application.
 
@@ -15,6 +16,9 @@ wheels analyze performance [--target=<target>] [--duration=<seconds>] [--report]
 - `--report` - (Optional) Generate HTML performance report
 - `--threshold` - (Optional) Performance threshold in milliseconds. Default: `100`
 - `--profile` - (Optional) Enable profiling mode
+
+*Parameters are **coming soon**. Currently, this command works without parameters*.
+
 
 ## Description
 

@@ -1,4 +1,5 @@
-# wheels deploy exec
+# wheels deploy exec (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Execute commands in deployed containers.
 

@@ -1,4 +1,5 @@
-# wheels test debug
+# wheels test debug (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Debug test execution with detailed diagnostics and troubleshooting tools.
 

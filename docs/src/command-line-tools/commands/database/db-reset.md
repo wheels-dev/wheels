@@ -1,4 +1,5 @@
-# wheels db reset
+# wheels db reset (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Reset the database by dropping it and recreating it from scratch.
 

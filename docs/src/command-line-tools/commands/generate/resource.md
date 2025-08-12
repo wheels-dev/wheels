@@ -1,4 +1,5 @@
-# wheels generate resource
+# wheels generate resource (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Generate a complete RESTful resource with model, controller, views, and routes.
 

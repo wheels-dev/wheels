@@ -1,5 +1,5 @@
-# Cleanup Commands
-
+# Cleanup Commands (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 ## Overview
 
 The cleanup commands help maintain your application by removing old log files, temporary files, and expired sessions. Regular cleanup improves performance, frees disk space, and keeps your application directory organized.
@@ -11,7 +11,7 @@ The cleanup commands help maintain your application by removing old log files, t
 Remove old log files from your application.
 
 ```bash
-wheels cleanup:logs [days] [pattern] [directory] [--dryRun] [--force]
+wheels cleanup logs [days] [pattern] [directory] [--dryRun] [--force]
 ```
 
 #### Parameters
@@ -26,22 +26,22 @@ wheels cleanup:logs [days] [pattern] [directory] [--dryRun] [--force]
 
 ```bash
 # Remove logs older than 7 days (default)
-wheels cleanup:logs
+wheels cleanup logs
 
 # Keep last 30 days of logs
-wheels cleanup:logs days=30
+wheels cleanup logs days=30
 
 # Clean specific directory
-wheels cleanup:logs directory="logs/custom"
+wheels cleanup logs directory="logs/custom"
 
 # Match multiple patterns
-wheels cleanup:logs pattern="*.log,*.txt"
+wheels cleanup logs pattern="*.log,*.txt"
 
 # Preview without deleting
-wheels cleanup:logs --dryRun
+wheels cleanup logs --dryRun
 
 # Clean all logs immediately without confirmation
-wheels cleanup:logs days=0 --force
+wheels cleanup logs days=0 --force
 ```
 
 #### Features
@@ -56,7 +56,7 @@ wheels cleanup:logs days=0 --force
 Remove old temporary files from your application.
 
 ```bash
-wheels cleanup:tmp [days] [directories] [patterns] [excludePatterns] [--dryRun] [--force]
+wheels cleanup tmp [days] [directories] [patterns] [excludePatterns] [--dryRun] [--force]
 ```
 
 #### Parameters
@@ -72,25 +72,25 @@ wheels cleanup:tmp [days] [directories] [patterns] [excludePatterns] [--dryRun] 
 
 ```bash
 # Remove temp files older than 1 day (default)
-wheels cleanup:tmp
+wheels cleanup tmp
 
 # Keep last 3 days
-wheels cleanup:tmp days=3
+wheels cleanup tmp days=3
 
 # Clean specific directories
-wheels cleanup:tmp directories="tmp,temp,cache,uploads/temp"
+wheels cleanup tmp directories="tmp,temp,cache,uploads/temp"
 
 # Custom file patterns
-wheels cleanup:tmp patterns="*.tmp,*.cache,~*"
+wheels cleanup tmp patterns="*.tmp,*.cache,~*"
 
 # Exclude important files
-wheels cleanup:tmp excludePatterns=".gitkeep,important.tmp,*.lock"
+wheels cleanup tmp excludePatterns=".gitkeep,important.tmp,*.lock"
 
 # Preview cleanup
-wheels cleanup:tmp --dryRun
+wheels cleanup tmp --dryRun
 
 # Force immediate cleanup
-wheels cleanup:tmp days=0 --force
+wheels cleanup tmp days=0 --force
 ```
 
 #### Features
@@ -101,12 +101,12 @@ wheels cleanup:tmp days=0 --force
 - Groups files by directory in output
 - Removes empty directories after cleanup
 
-### wheels cleanup:sessions
+### wheels cleanup sessions
 
 Remove expired session files from your application.
 
 ```bash
-wheels cleanup:sessions [storage] [directory] [datasource] [table] [expiredOnly] [--dryRun] [--force]
+wheels cleanup sessions [storage] [directory] [datasource] [table] [expiredOnly] [--dryRun] [--force]
 ```
 
 #### Parameters
@@ -123,25 +123,25 @@ wheels cleanup:sessions [storage] [directory] [datasource] [table] [expiredOnly]
 
 ```bash
 # Clean file-based sessions
-wheels cleanup:sessions
+wheels cleanup sessions
 
 # Clean database sessions
-wheels cleanup:sessions storage=database datasource=mydb
+wheels cleanup sessions storage=database datasource=mydb
 
 # Custom session directory
-wheels cleanup:sessions directory="WEB-INF/lucee/sessions"
+wheels cleanup sessions directory="WEB-INF/lucee/sessions"
 
 # Database with custom table
-wheels cleanup:sessions \
+wheels cleanup sessions \
   storage=database \
   datasource=mydb \
   table=user_sessions
 
 # Delete all sessions (not just expired)
-wheels cleanup:sessions expiredOnly=false --force
+wheels cleanup sessions expiredOnly=false --force
 
 # Preview session cleanup
-wheels cleanup:sessions --dryRun
+wheels cleanup sessions --dryRun
 ```
 
 #### Features
@@ -174,14 +174,14 @@ Always preview what will be deleted:
 
 ```bash
 # Check what will be deleted
-wheels cleanup:logs --dryRun
-wheels cleanup:tmp --dryRun
-wheels cleanup:sessions --dryRun
+wheels cleanup logs --dryRun
+wheels cleanup tmp --dryRun
+wheels cleanup sessions --dryRun
 
 # If looks good, run the actual cleanup
-wheels cleanup:logs --force
-wheels cleanup:tmp --force
-wheels cleanup:sessions --force
+wheels cleanup logs --force
+wheels cleanup tmp --force
+wheels cleanup sessions --force
 ```
 
 ### 3. Monitor Disk Usage
@@ -191,9 +191,9 @@ wheels cleanup:sessions --force
 df -h
 
 # Run cleanup commands
-wheels cleanup:logs days=30 --force
-wheels cleanup:tmp --force
-wheels cleanup:sessions --force
+wheels cleanup logs days=30 --force
+wheels cleanup tmp --force
+wheels cleanup sessions --force
 
 # Check disk usage after cleanup
 df -h
@@ -208,15 +208,15 @@ Include in your deployment script:
 # deployment.sh
 
 # Clean up before deployment
-wheels cleanup:tmp --force
-wheels cleanup:sessions expiredOnly=false --force
+wheels cleanup tmp --force
+wheels cleanup sessions expiredOnly=false --force
 
 # Deploy new code
 git pull
 wheels dbmigrate latest
 
 # Clean up old logs after deployment
-wheels cleanup:logs days=30 --force
+wheels cleanup logs days=30 --force
 ```
 
 ### 5. Different Retention Policies
@@ -225,14 +225,14 @@ Set different retention periods based on file type:
 
 ```bash
 # Keep error logs longer
-wheels cleanup:logs pattern="error*.log" days=90
-wheels cleanup:logs pattern="access*.log" days=7
-wheels cleanup:logs pattern="debug*.log" days=1
+wheels cleanup logs pattern="error*.log" days=90
+wheels cleanup logs pattern="access*.log" days=7
+wheels cleanup logs pattern="debug*.log" days=1
 
 # Clean different temp directories with different policies
-wheels cleanup:tmp directories="cache" days=7
-wheels cleanup:tmp directories="uploads/temp" days=1
-wheels cleanup:tmp directories="tmp" days=0
+wheels cleanup tmp directories="cache" days=7
+wheels cleanup tmp directories="uploads/temp" days=1
+wheels cleanup tmp directories="tmp" days=0
 ```
 
 ## Output Examples
@@ -295,7 +295,7 @@ If you get permission errors:
 
 ```bash
 # Run with appropriate user
-sudo -u www-data wheels cleanup:logs --force
+sudo -u www-data wheels cleanup logs --force
 
 # Or fix permissions
 chmod -R 755 logs/

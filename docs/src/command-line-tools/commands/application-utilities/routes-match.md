@@ -1,4 +1,5 @@
-# wheels routes:match
+# wheels routes:match (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Find which route matches a given URL and HTTP method.
 

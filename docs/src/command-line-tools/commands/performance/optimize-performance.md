@@ -1,4 +1,5 @@
-# optimize performance
+# optimize performance (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Automatically applies performance optimizations to your Wheels application based on analysis results.
 

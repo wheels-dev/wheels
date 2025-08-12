@@ -1,4 +1,5 @@
-# wheels deploy
+# wheels deploy (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Base command for deployment operations in Wheels applications.
 

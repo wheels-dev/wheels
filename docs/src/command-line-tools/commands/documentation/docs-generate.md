@@ -1,4 +1,5 @@
-# docs generate
+# docs generate (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Generates documentation for your Wheels application from code comments and annotations.
 

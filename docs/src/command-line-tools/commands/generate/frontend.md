@@ -1,4 +1,5 @@
-# wheels generate frontend
+# wheels generate frontend (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Generate frontend code including JavaScript, CSS, and interactive components.
 

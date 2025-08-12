@@ -1,4 +1,5 @@
-# docs serve
+# docs serve (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Serves generated documentation locally for development and review.
 

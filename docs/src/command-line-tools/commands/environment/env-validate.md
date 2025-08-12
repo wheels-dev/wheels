@@ -1,4 +1,5 @@
-# Wheels env validate
+# Wheels env validate (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 ## Overview
 

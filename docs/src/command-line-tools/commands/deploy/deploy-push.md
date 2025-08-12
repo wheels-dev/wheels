@@ -1,4 +1,5 @@
-# deploy push
+# deploy push (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Deploy your Wheels application to configured servers.
 

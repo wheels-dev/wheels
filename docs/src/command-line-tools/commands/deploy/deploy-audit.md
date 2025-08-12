@@ -1,4 +1,5 @@
-# deploy audit
+# deploy audit (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Audit deployment configuration and security settings to ensure compliance and best practices.
 

@@ -1,4 +1,5 @@
-# Database Management
+# Database Management (Coming Soon)
+*These commands may not work as expected. A complete and stable version is **coming soon**.*
 
 The Wheels CLI provides comprehensive database management commands that make it easy to create, manage, and maintain your application's database throughout the development lifecycle.
 

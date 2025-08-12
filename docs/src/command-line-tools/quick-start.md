@@ -57,7 +57,7 @@ Or use H2 embedded database:
 wheels new blog --setupH2
 ```
 
-Create the database:
+Create the database: (Coming Soon)
 
 ```bash
 # If using external database (MySQL, PostgreSQL, etc.)
@@ -79,7 +79,7 @@ Let's create a blog post feature:
 ### 1. Generate Scaffold
 
 ```bash
-wheels scaffold name=post properties=title:string,content:text,published:boolean
+wheels generate scaffold name=post properties=title:string,content:text,published:boolean
 ```
 
 This generates:

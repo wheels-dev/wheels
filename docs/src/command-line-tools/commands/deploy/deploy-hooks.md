@@ -1,4 +1,5 @@
-# deploy hooks
+# deploy hooks (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Manage deployment hooks for custom actions during the deployment lifecycle.
 

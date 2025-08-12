@@ -1,4 +1,5 @@
-# db seed
+# db seed (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Generate and populate test data.
 

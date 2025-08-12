@@ -1,4 +1,5 @@
-# wheels db restore
+# wheels db restore (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Restore a database from a dump file.
 

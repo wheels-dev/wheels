@@ -1,4 +1,5 @@
-# wheels server stop
+# wheels server stop (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Stop the Wheels development server.
 

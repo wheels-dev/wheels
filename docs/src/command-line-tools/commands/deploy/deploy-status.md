@@ -1,4 +1,5 @@
-# deploy status
+# deploy status (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Check deployment status across all servers.
 

@@ -1,4 +1,5 @@
-# wheels env switch
+# wheels env switch (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Switch to a different environment in your Wheels application.
 

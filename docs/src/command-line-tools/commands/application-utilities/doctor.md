@@ -1,4 +1,5 @@
-# wheels doctor
+# wheels doctor (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Run comprehensive health checks on your Wheels application.
 

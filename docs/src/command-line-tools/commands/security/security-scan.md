@@ -1,4 +1,5 @@
-# security scan
+# security scan (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Scans your Wheels application for security vulnerabilities and provides remediation recommendations.
 

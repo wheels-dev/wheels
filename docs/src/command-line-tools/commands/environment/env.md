@@ -1,4 +1,5 @@
-# wheels env
+# wheels env (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Base command for environment management in Wheels applications.
 

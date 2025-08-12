@@ -1,4 +1,5 @@
-# wheels deploy init
+# wheels deploy init (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Initialize deployment configuration for your Wheels application.
 
