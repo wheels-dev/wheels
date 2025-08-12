@@ -10,7 +10,7 @@ on:
 
 jobs:
   sync:
-    runs-on: runs-on: [self-hosted, wheels-FW]
+    runs-on: [self-hosted, wheels-FW]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
