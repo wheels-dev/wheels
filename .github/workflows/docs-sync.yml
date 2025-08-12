@@ -6,7 +6,7 @@ on:
       - docs-sync-with-wheels.dev
     paths:
       - 'docs/src/**'
-      - '.github/workflows/sync-docs.yml'
+      - '.github/workflows/docs-sync.yml'
 
 jobs:
   sync:
