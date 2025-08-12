@@ -1,4 +1,4 @@
-name: Sync Docs to Remote Server
+name: Sync Docs to Shared Folder
 
 on:
   push:
@@ -6,23 +6,17 @@ on:
       - docs-sync-with-wheels.dev
     paths:
       - 'docs/src/**'
-      - '.github/workflows/docs-sync.yml'
+      - '.github/workflows/sync-docs.yml'
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
-
+    runs-on: runs-on: [self-hosted, wheels-FW]
     steps:
-      - name: Checkout Wheels Repo
+      - name: Checkout Repo
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      - name: Set up SSH
+      - name: Sync to shared docs folder
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SWARM_1_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SWARM_1_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Sync docs to remote server
-        run: |
-          rsync -av docs/src/ ${{ secrets.SWARM_1_USER }}@${{ secrets.SWARM_1_HOST }}:/mnt/shared/docs/3.0.0/guides/
+          rsync -av --delete docs/src/ /home/swarm-1/test/docs/3.0.0/
