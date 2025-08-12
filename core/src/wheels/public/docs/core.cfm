@@ -49,10 +49,20 @@ if (StructKeyExists(application.wheels, "docs")) {
 		As Example.cfc extends tests.Test so we are checking the Example.cfc first as that will include both component's functions.
 	*/
 	try{
-		ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "tests.functions.Example")});
+		// BoxLang compatibility: Use correct component path
+		if (StructKeyExists(server, "boxlang")) {
+			ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "wheels.tests.functions.Example")});
+		} else {
+			ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "tests.functions.Example")});
+		}
 	}
 	catch (any exception){
-		ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "tests.Test")});
+		// BoxLang compatibility: Use correct component path
+		if (StructKeyExists(server, "boxlang")) {
+			ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "wheels.tests.Test")});
+		} else {
+			ArrayAppend(documentScope, {"name" = "test", "scope" = CreateObject("component", "tests.Test")});
+		}
 	}
 
 	ArrayAppend(documentScope, {"name" = "mapper", "scope" = application.wheels.mapper});

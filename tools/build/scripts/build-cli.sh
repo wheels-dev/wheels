@@ -28,11 +28,11 @@ echo "Built on $(date)" > "${BUILD_DIR}/wheels-cli/${BUILD_LABEL}"
 
 # Copy CLI files, excluding specific directories and files
 echo "Copying CLI files..."
-rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --exclude='.git' --exclude='.gitignore' cli/ "${BUILD_DIR}/wheels-cli/"
+rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --exclude='.git' --exclude='.gitignore' cli/src/ "${BUILD_DIR}/wheels-cli/"
 
 # Copy template files
-cp build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
-cp build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
+cp tools/build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
+cp tools/build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
 
 # Replace version placeholders
 echo "Replacing version placeholders..."

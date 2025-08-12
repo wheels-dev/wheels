@@ -119,11 +119,21 @@ component {
 
 			// construct where clause
 			local.addToWhere = ArrayToList(local.addToWhere, " AND ");
-			arguments.missingMethodArguments.where = IIf(
-				StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where),
-				"'(' & arguments.missingMethodArguments.where & ') AND (' & local.addToWhere & ')'",
-				"local.addToWhere"
-			);
+			
+			// BoxLang compatibility: Use explicit if/else instead of IIf for string concatenation
+			if (StructKeyExists(server, "boxlang")) {
+				if (StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where)) {
+					arguments.missingMethodArguments.where = "(" & arguments.missingMethodArguments.where & ") AND (" & local.addToWhere & ")";
+				} else {
+					arguments.missingMethodArguments.where = local.addToWhere;
+				}
+			} else {
+				arguments.missingMethodArguments.where = IIf(
+					StructKeyExists(arguments.missingMethodArguments, "where") && Len(arguments.missingMethodArguments.where),
+					"'(' & arguments.missingMethodArguments.where & ') AND (' & local.addToWhere & ')'",
+					"local.addToWhere"
+				);
+			}
 
 			// remove unneeded arguments
 			StructDelete(arguments.missingMethodArguments, "delimiter");
@@ -132,11 +142,21 @@ component {
 			StructDelete(arguments.missingMethodArguments, "values");
 
 			// call finder method
-			local.rv = IIf(
-				Left(arguments.missingMethodName, 9) == "findOneBy",
-				"findOne(argumentCollection=arguments.missingMethodArguments)",
-				"findAll(argumentCollection=arguments.missingMethodArguments)"
-			);
+			if (StructKeyExists(server, "boxlang")) {
+				// BoxLang-specific handling to avoid argumentCollection parsing issues
+				if (Left(arguments.missingMethodName, 9) == "findOneBy") {
+					local.rv = findOne(argumentCollection = arguments.missingMethodArguments);
+				} else {
+					local.rv = findAll(argumentCollection = arguments.missingMethodArguments);
+				}
+			} else {
+				// Adobe ColdFusion and Lucee compatibility
+				local.rv = IIf(
+					Left(arguments.missingMethodName, 9) == "findOneBy",
+					"findOne(argumentCollection=arguments.missingMethodArguments)",
+					"findAll(argumentCollection=arguments.missingMethodArguments)"
+				);
+			}
 		} else if (Left(arguments.missingMethodName, 14) == "findOrCreateBy") {
 			local.rv = $findOrCreateBy(argumentCollection = arguments);
 		} else {

@@ -328,7 +328,7 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("validates format of time valid", () => {
-				user.birthTime = "6:15 PM"
+				user.birthTime = structKeyExists(server, "boxlang") ? "18:15" : "6:15 PM";
 
 				expect(user.valid()).toBeTrue()
 			})

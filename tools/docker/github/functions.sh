@@ -29,6 +29,9 @@ get_port () {
     adobe2025)
       echo -n "62025"
       ;;
+    boxlang)
+      echo -n "60001"
+      ;;
     mysql56)
       echo -n "3306"
       ;;

@@ -94,7 +94,9 @@ component {
 				}
 			}
 
-			local.content = arguments.prependText & local.error[1].message & arguments.appendText;
+			local.prepend = Len(arguments.prependText) ? arguments.prependText & (Right(arguments.prependText, 1) != " " ? " " : "") : "";
+			local.append  = Len(arguments.appendText)  ? (Left(arguments.appendText, 1) != " " ? " " : "") & arguments.appendText : "";
+			local.content = local.prepend & local.error[1].message & local.append;
 			local.rv = $element(
 				attributes = arguments,
 				content = local.content,

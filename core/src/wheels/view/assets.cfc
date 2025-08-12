@@ -215,11 +215,19 @@ component {
 						extendedInfo = "Pass in a correct relative path from the `images` folder to an image."
 					);
 				} else if (!IsImageFile(local.file)) {
-					Throw(
-						type = "Wheels.ImageFormatNotSupported",
-						message = "CFWheels can't read image files with that format.",
-						extendedInfo = "Use one of these image types instead: #GetReadableImageFormats()#."
-					);
+					if (structKeyExists(server, "boxlang")) {
+						Throw(
+							type = "Wheels.ImageFormatNotSupported",
+							message = "CFWheels can't read image files with that format.",
+							extendedInfo = "Use one of these image types instead: #ArrayToList(GetReadableImageFormats(), ', ')#."
+						);
+					} else {
+						Throw(
+							type = "Wheels.ImageFormatNotSupported",
+							message = "CFWheels can't read image files with that format.",
+							extendedInfo = "Use one of these image types instead: #GetReadableImageFormats()#."
+						);
+					}	
 				}
 			}
 			if (!StructKeyExists(arguments, "width") || !StructKeyExists(arguments, "height")) {

@@ -235,10 +235,10 @@ component extends="testbox.system.BaseSpec" {
 			})
 
 			it("rollback when error raised", () => {
-				tag = Duplicate(g.model("tagWithDataCallbacks").new(name = "Kermit", description = "The Frog"))
-				tag.afterSave(methods = "crashMe")
+				tagModel = g.model("tagWithDataCallbacks").new(name = "Kermit", description = "The Frog")
+				tagModel.afterSave(methods = "crashMe")
 				try {
-					tag.save()
+					tagModel.save()
 				} catch (any e) {
 					results = g.model("tag").findAll(where = "name = 'Kermit'")
 				}

@@ -1,4 +1,4 @@
-<cfparam name="docs">
+<cfparam name="docs" default="#{}#">
 <cfoutput>
 	<!--- cfformat-ignore-start --->
 	<!--- Function AZ --->
@@ -84,7 +84,7 @@
 									<td class='code'>#_param.name#</td>
 									<td class='code'><cfif StructkeyExists(_param, "type")>#_param.type#</cfif></td>
 									<td class='code'><cfif StructkeyExists(_param, "required")>#YesNoFormat(_param.required)#</cfif></td>
-									<td class='code'><cfif StructkeyExists(_param, "default")>#_param.default#</cfif></td>
+									<td class='code'><cfif StructkeyExists(_param, "default")><cfif IsArray(_param.default)>[]<cfelseif IsStruct(_param.default)>{}<cfelse>#_param.default#</cfif></cfif></td>
 									<td><cfif StructkeyExists(_param, "hint")>#$backTickReplace(_param.hint)#</cfif></td>
 								</tr>
 							</cfif>
