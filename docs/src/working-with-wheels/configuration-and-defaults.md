@@ -10,7 +10,7 @@ We all love the "Convention over Configuration" motto of Wheels, but what about 
 
 ### Where Configurations Happen
 
-You will find configuration files in the `config` folder at the root of your Wheels application. In general, most of your settings will go in `templates/base/src/config/settings.cfm`.
+You will find configuration files in the `config` folder at the root of your Wheels application. In general, most of your settings will go in `/config/settings.cfm`.
 
 You can also set values based on what environment you have set. For example, you can have different values for your settings depending on whether you're in `development` mode or `production` mode. See the chapter on [Switching Environments](switching-environments.md) for more details.
 
@@ -34,11 +34,11 @@ if (get("environment") == "production") {
 
 ### Setting CFML Application Configurations
 
-In CFML's standard `Application.cfc`, you can normally set values for your application's properties in the `this`scope. Wheels still provides these options to you in the file at `/templates/base/src/config/app.cfm`.
+In CFML's standard `Application.cfc`, you can normally set values for your application's properties in the `this`scope. Wheels still provides these options to you in the file at `/
 
-Here is an example of what can go in `/templates/base/src/config/app.cfm`:
+Here is an example of what can go in `/
 
-{% code title="/templates/base/src/config/app.cfm" %}
+{% code title="/
 ```javascript
 this.name = "TheNextSiteToBeatTwitter";
 this.sessionManagement = false;
@@ -75,9 +75,9 @@ Let's take a closer look at each of these options.
 
 Not only are the environments useful for separating your production settings from your "under development" settings, but they are also opportunities for you to override settings that will only take effect in a specified environment.
 
-The setting for the current environment can be found in `/templates/base/src/config/environment.cfm` and should look something like this:
+The setting for the current environment can be found in `/cfm` and should look something like this:
 
-{% code title="/templates/base/src/config/environment.cfm" %}
+{% code title="/cfm" %}
 ```javascript
 set(environment="development");
 ```
@@ -87,10 +87,10 @@ set(environment="development");
 
 | Name                         | Type    | Default                               | Description                                                                                                                                                                                                                                                     |
 | ---------------------------- | ------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| environment                  | string  | development                           | Environment to load. Set this value in /templates/base/src/config/environment.cfm. Valid values are development, testing, maintenance, and production.                                                                                                          |
+| environment                  | string  | development                           | Environment to load. Set this value in /cfm. Valid values are development, testing, maintenance, and production.                                                                                                          |
 | reloadPassword               | string  | \[empty string]                       | Password to require when reloading the Wheels application from the URL. Leave empty to require no password.                                                                                                                                                     |
 | redirectAfterReload          | boolean | Enabled in maintenance and production | Whether or not to redirect away from the current URL when it includes a reload request. This hinders accidentally exposing your application's reload URL and password in web analytics software, screenshots of the browser, etc.                               |
-| ipExceptions                 | string  | \[empty string]                       | IP addresses that Wheels will ignore when the environment is set to maintenance. That way administrators can test the site while in maintenance mode, while the rest of users will see the message loaded in templates/base/src/app/events/onmaintenance.cfm.   |
+| ipExceptions                 | string  | \[empty string]                       | IP addresses that Wheels will ignore when the environment is set to maintenance. That way administrators can test the site while in maintenance mode, while the rest of users will see the message loaded in /app/events/onmaintenance.cfm.   |
 | allowEnvironmentSwitchViaUrl | boolean | true                                  | Set to false to disable switching of environment configurations via URL. You can still reload the application, but switching environments themselves will be disabled.                                                                                          |
 
 ### URL Rewriting Settings
@@ -145,7 +145,7 @@ For example, let's say that we want to enable debugging information in our "deve
 
 {% code title="CFScript" %}
 ```javascript
-// /templates/base/src/config/development/settings.cfm
+// /settings.cfm
 set(showDebugInformation=false);
 ```
 {% endcode %}
@@ -160,7 +160,7 @@ set(showDebugInformation=false);
 | excludeFromErrorEmail | string  | \[empty string]                                                          | List of variables available in the scopes to exclude from the scope dumps included in error emails. Use this to keep sensitive information from being sent in plain text over email.|
 | sendEmailOnError      | boolean | Enabled in production environments that have a TLD like .com, .org, etc. | When set to true, Wheels will send an email to administrators whenever Wheels throws an error.                                                                                      |
 | showDebugInformation  | boolean | Enabled in development mode.                                             | When set to true, Wheels will show debugging information in the footers of your pages.                                                                                              |
-| showErrorInformation  | boolean | Enabled in development, maintenance, and testing mode.                   | When set to false, Wheels will run and display code stored at templates/base/src/app/events/onerror.cfm instead of revealing CFML errors.                                           |
+| showErrorInformation  | boolean | Enabled in development, maintenance, and testing mode.                   | When set to false, Wheels will run and display code stored at /app/events/onerror.cfm instead of revealing CFML errors.                                           |
 
 For more information, refer to the chapter about [Switching Environments](switching-environments.md).
 
@@ -231,7 +231,7 @@ Now your `post` model will map to the `blog_posts` table, `comment` model will m
 
 There are several settings that make plugin development more convenient. We recommend only changing these settings in `development` mode so there aren't any deployment issues in `production`, `testing`, and `maintenance`modes. (At that point, your plugin should be properly packaged in a zip file.)
 
-If you want to keep what's stored in a plugin's zip file from overwriting changes that you made in its expanded folder, set this in `/templates/base/src/config/development/settings.cfm`:
+If you want to keep what's stored in a plugin's zip file from overwriting changes that you made in its expanded folder, set this in `/settings.cfm`:
 
 {% code title="CFScript" %}
 ```javascript
@@ -326,6 +326,6 @@ In this first version, the user can enable this feature, which will allow reques
 | autoMigrateDatabase   | Boolean | false                            | Automatically runs available migration on applicationstart.                                                                    |
 | migratorTableName     | String  | migratorversions                 | The name of the table that stores the versions migrated.                                                                       |
 | createMigratorTable   | Boolean | true                             | Create the migratorversions database table.                                                                                    |
-| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the templates/base/src/app/migrator/sql directory.                                   |
+| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the /app/migrator/sql directory.                                   |
 | migratorObjectCase    | String  | lower                            | Specifies the case of created database object. Options are 'lower', 'upper' and 'none' (which uses the given value unmodified) |
 | allowMigrationDown    | Boolean | false (true in development mode) | Prevents 'down' migrations (rollbacks)                                                                                         |

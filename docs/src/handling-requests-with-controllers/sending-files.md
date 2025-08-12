@@ -12,7 +12,7 @@ However, if you want a little more control over the way the user's browser handl
 
 ### Sending Files with the sendFile() Function
 
-The convention in Wheels is to place all files you want users to be able to download in the `templates/base/src/public/files` folder.
+The convention in Wheels is to place all files you want users to be able to download in the `/public/files` folder.
 
 Assuming you've placed a file named `wheels_tutorial_20081028_J657D6HX.pdf` in that folder, here is a quick example of how you can deliver that file to the user. Let's start with creating a link to the action that will handle the sending of the file first.
 

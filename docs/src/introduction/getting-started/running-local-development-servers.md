@@ -6,17 +6,14 @@ Wheels uses a Docker-based development environment that provides consistent, con
 
 1. **Docker**: Install Docker Desktop from [docker.com](https://www.docker.com/products/docker-desktop)
 2. **Wheels CLI**: Install the Wheels CommandBox module:
+
    ```bash
    box install wheels-cli
    ```
 
 ### Setting up Docker Development Environment
 
-Navigate to the Wheels framework directory and go to the application template:
-
-```bash
-cd templates/base/src
-```
+Ensure you are in the application root directory.
 
 Initialize your Docker development environment:
 
@@ -27,14 +24,17 @@ wheels docker init cfengine=adobe cfversion=2018 db=mysql
 #### Command Options
 
 **cfengine** options:
+
 - `lucee` - Lucee CFML engine
 - `adobe` - Adobe ColdFusion
 
 **cfversion** options:
+
 - Major versions for Adobe ColdFusion: `2018`, `2021`, `2023`, `2025`
-- Major versions for Lucee: `5`, `6`
+- Major versions for Lucee: `5`, `6` , `7`
 
 **db** options:
+
 - `mysql` - MySQL database
 - `postgres` - PostgreSQL database  
 - `mssql` - Microsoft SQL Server
@@ -82,7 +82,7 @@ docker-compose up -d --build
 
 ### Custom Ports
 
-The default port is 8080, but you can customize this by modifying the `server.json` file in `templates/base/src`:
+The default port is 8080, but you can customize this by modifying the `server.json`:
 
 ```json
 {
@@ -111,7 +111,7 @@ The generated `CFConfig.json` file automatically configures a datasource for you
 
 ### Development Workflow
 
-1. **Make code changes** in your `templates/base/src` directory
+1. **Make code changes** in your root directory
 2. **Changes are reflected immediately** due to Docker volume mounting
 3. **Database changes persist** between container restarts
 4. **Use standard Wheels commands** like migrations, generators, etc.

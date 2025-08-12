@@ -27,6 +27,7 @@ mapper()
 		.get(name = "legacy", pattern = "wheels/[view]", to = "public##legacy")
 		.get(name = "guides", pattern = "guides", to = "public##guides")
 		.get(name = "guidesWildCard", pattern = "guides/*[path]", to = "public##guides")
+		.get(name = "guideImage", pattern = "guides-assets/*[file]", to = "public##guideImage")
 		.root(method = "get", to = "public##index", mapFormat = false)
 	.end()
 	// Add route for tests controller outside the wheels namespace

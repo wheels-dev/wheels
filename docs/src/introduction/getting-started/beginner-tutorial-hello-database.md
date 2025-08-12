@@ -14,14 +14,14 @@ We'll learn by building part of a sample user management application. This tutor
 
 ### Setting up the Data Source
 
-By default, Wheels will connect to a data source `wheels-dev`. To change this default behavior, open the file at `/templates/base/src/config/settings.cfm`. In a fresh install of Wheels, you'll see the follwing code:
+By default, Wheels will connect to a data source `wheels-dev`. To change this default behavior, open the file at `/config/settings.cfm`. In a fresh install of Wheels, you'll see the follwing code:
 
-{% code title="templates/base/src/config/settings.cfm" %}
+{% code title="/config/settings.cfm" %}
 ```html
 <cfscript>
 	/*
 		Use this file to configure your application.
-		You can also use the environment specific files (e.g. templates/base/src/config/production/settings.cfm) to override settings set here.
+		You can also use the environment specific files (e.g. /config/production/settings.cfm) to override settings set here.
 		Don't forget to issue a reload request (e.g. reload=true) after making changes.
 		See https://wheels.dev/3.0.0/guides/working-with-cfwheels/configuration-and-defaults for more info.
 	*/
@@ -56,7 +56,7 @@ By default, Wheels will connect to a data source `wheels-dev`. To change this de
 
 These lines provide Wheels with the necessary information about the data source, URL rewriting, and reload password for your application, and include the appropriate values. This may include values for `dataSourceName`, `dataSourceUserName`, and `dataSourcePassword`. More on URL rewriting and reload password later.
 
-{% code title="templates/base/src/config/settings.cfm" %}
+{% code title="/config/settings.cfm" %}
 ```warpscript
 set(dataSourceName="back2thefuture");
 // set(dataSourceUserName="marty");
@@ -88,9 +88,9 @@ Fortunately, there are ways of going outside of these conventions when you reall
 
 ### Creating Routes for the users Resource
 
-Next, open the file at `templates/base/src/config/routes.cfm`. You will see contents similar to this:
+Next, open the file at `/config/routes.cfm`. You will see contents similar to this:
 
-{% code title="templates/base/src/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .wildcard()
@@ -103,7 +103,7 @@ We are going to create a section of our application for listing, creating, updat
 
 Because a `users` resource is more specific than the "generic" routes provided by Wheels, we'll list it first in the chain of mapper method calls:
 
-{% code title="templates/base/src/config/routes.cfm" %}
+{% code title="/config/routes.cfm" %}
 ```javascript
 mapper()
     .resources("users")
@@ -140,11 +140,11 @@ First, let's create a simple form for adding a new user to the `users` table. To
 
 #### Creating the Form
 
-Now create a new file in `templates/base/src/app/views/users` called `new.cfm`. This will contain the view code for our simple form.
+Now create a new file in `/app/views/users` called `new.cfm`. This will contain the view code for our simple form.
 
 Next, add these lines of code to the new file:
 
-{% code title="templates/base/src/app/views/users/new.cfm" %}
+{% code title="/app/views/users/new.cfm" %}
 ```markup
 <cfoutput>
 
@@ -190,13 +190,13 @@ One thing you'll notice is the [textField()](https://wheels.dev/api/v3.0.0/contr
 
 All of the form helper calls in our view specify an `objectName` argument with a reference to a variable named `user`. That means that we need to supply our view code with an object called `user`. Because the controller is responsible for providing the views with data, we'll set it there.
 
-Create a new ColdFusion component at `templates/base/src/app/controllers/Users.cfc`.
+Create a new ColdFusion component at `/app/controllers/Users.cfc`.
 
 As it turns out, our controller needs to provide the view with a blank `user` object (whose instance variable will also be called `user` in this case). In our new action, we will use the [model()](https://wheels.dev/api/v3.0.0/controller.model.html) function to generate a new instance of the user model.
 
 To get a blank set of properties in the model, we'll also call the generated model's [new()](https://wheels.dev/api/v3.0.0/model.new.html) method.
 
-{% code title="templates/base/src/app/controllers/Users.cfc" %}
+{% code title="/app/controllers/Users.cfc" %}
 ```javascript
 component extends="Controller" {
     function config(){}
@@ -257,7 +257,7 @@ Next, we'll code the `create` action in the controller to handle the form submis
 
 A basic way of doing this is using the model object's [create()](https://wheels.dev/api/v3.0.0/model.create.html) method:
 
-{% code title="templates/base/src/app/controllers/Users.cfc" %}
+{% code title="/app/controllers/Users.cfc" %}
 ```javascript
 function create() {
     user = model("user").create(params.user);
@@ -280,7 +280,7 @@ Notice that our `create` action above redirects the user to the `users` index ro
 
 First, let's get the data that the listing needs. Create an action named `index` in the `users` controller like so:
 
-{% code title="templates/base/src/app/controllers/Users.cfc" %}
+{% code title="/app/controllers/Users.cfc" %}
 ```javascript
 function index() {
     users = model("user").findAll(order="username");
@@ -290,9 +290,9 @@ function index() {
 
 This call to the model's [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) method will return a query object of all users in the system. By using the method's `order` argument, we're also telling the database to order the records by `username`.
 
-In the view at `templates/base/src/app/views/users/index.cfm`, it's as simple as looping through the query and outputting the data
+In the view at `/app/views/users/index.cfm`, it's as simple as looping through the query and outputting the data
 
-{% code title="templates/base/src/app/views/users/index.cfm" %}
+{% code title="/app/views/users/index.cfm" %}
 ```html
 <cfoutput>
 
@@ -365,7 +365,7 @@ Wheels will automatically add the provided 'key' from the URL to the params stru
 
 Given the provided `key`, we'll have the action load the appropriate `user` object to pass on to the view:
 
-{% code title="templates/base/src/app/controllers/Users.cfc" %}
+{% code title="/app/controllers/Users.cfc" %}
 ```javascript
 function edit() {
     user = model("user").findByKey(params.key);
@@ -373,9 +373,9 @@ function edit() {
 ```
 {% endcode %}
 
-The view at `templates/base/src/app/views/users/edit.cfm` looks almost exactly the same as the view for creating a user:
+The view at `/app/views/users/edit.cfm` looks almost exactly the same as the view for creating a user:
 
-{% code title="templates/base/src/app/views/users/edit.cfm" %}
+{% code title="/app/views/users/edit.cfm" %}
 ```html
 <cfoutput>
 
@@ -409,7 +409,7 @@ But an interesting thing happens. Because the form fields are bound to the `user
 
 With the `user` model populated, we'll end up seeing code similar to this:
 
-{% code title="templates/base/src/app/views/users/edit.cfm" %}
+{% code title="/app/views/users/edit.cfm" %}
 ```html
 <h1>Edit User Homer Simpson</h1>
 
@@ -468,7 +468,7 @@ There's a lot of repetition in the `new` and `edit` forms. You'd imagine that we
 
 Now we'll create the `update` action. This will be similar to the `create` action, except it will be updating the user object:
 
-{% code title="templates/base/src/app/controllers/Users.cfc" %}
+{% code title="/app/controllers/Users.cfc" %}
 ```javascript
 function update() {
     user = model("user").findByKey(params.key);
@@ -491,7 +491,7 @@ After the update, we'll add a success message [using the Flash](https://wheels.d
 
 Notice in our listing above that we have a `delete` action. Here's what it would look like:
 
-{% code title="templates/base/src/app/controllers/Users.cfc" %}
+{% code title="/app/controllers/Users.cfc" %}
 ```javascript
 function delete() {
     user = model("user").findByKey(params.key);

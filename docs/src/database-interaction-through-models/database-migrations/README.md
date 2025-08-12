@@ -12,7 +12,7 @@ With Wheels 2.x, you can now create, alter and populate your database via cfscri
 
 If you're new to this concept, the best way to get going is by following the `[Migrator]` link in the debug footer to load the built in GUI. Naturally, you will need your application's datasource setup and ready to go to get started.
 
-![](../../.gitbook/assets/cc70cb0-dbmigrate\_1.png)
+![](/wheels/guides-assets/cc70cb0-dbmigrate\_1.png)
 
 You can go to the `info` tab in the navbar and you will see a `Database` section, just so you can check you're running against the correct datasource. We're going to start by creating a simple template.
 
@@ -20,13 +20,13 @@ You can go to the `info` tab in the navbar and you will see a `Database` section
 
 The Templating tab allows for creation of either a blank CFC file, or from a selection of pre-populated templates. Whilst none of these templates will provide all the information required for a complete database migration, they are a good starting point and fairly heavily commented.
 
-![](../../.gitbook/assets/a70878e-dbmigrate\_2.png)
+![](/wheels/guides-assets/a70878e-dbmigrate\_2.png)
 
 As we've not setup any migrations before, the system needs to know what prefix we want to use for our migration files. Each approach - `Timestamp` and `Numeric` is perfectly valid, but we recommend the `Timestamp` prefix if you're just starting out. Once you have a migration file, this section will disappear as it will get that info from the existing files.
 
 For this tutorial, we're going to create the `users` table. So under `Create a Template`, we will select `Create table` and add a description of `Create User Table`.
 
-Clicking on `Create Migration File` will then create a CFC at `/templates/base/src/app/migrator/migrations/20170420100502_Create_User_Table.cfc`. The system will also display all messages at the bottom of the GUI whenever it does something - so for this command, we see `The migration 20170420100502_Create_User_Table.cfc file was created`
+Clicking on `Create Migration File` will then create a CFC at `/app/migrator/migrations/20170420100502_Create_User_Table.cfc`. The system will also display all messages at the bottom of the GUI whenever it does something - so for this command, we see `The migration 20170420100502_Create_User_Table.cfc file was created`
 
 ### Populating the Create User Table Template
 
@@ -142,11 +142,11 @@ This would be a typical setup for a join table where you have a many to many rel
 
 Returning to our migration GUI, we can now see some options under the Migrations tab.
 
-![](../../.gitbook/assets/aa84665-dbmigrate\_3.png)
+![](/wheels/guides-assets/aa84665-dbmigrate\_3.png)
 
 Simply click the button to migrate the database to our new version. From this screen we can also roll back to previous schema versions, or even reset the database back to `0`.
 
-![](../../.gitbook/assets/eb3836d-dbmigrate\_4.png)
+![](/wheels/guides-assets/eb3836d-dbmigrate\_4.png)
 
 ### Migrator Configuration Settings
 
@@ -155,7 +155,7 @@ Simply click the button to migrate the database to our new version. From this sc
 | autoMigrateDatabase   | Boolean | false                            | Automatically runs available migration on applicationstart.                                                                    	 |
 | migratorTableName     | String  | migratorversions                 | The name of the table that stores the versions migrated.                                                                       	 |
 | createMigratorTable   | Boolean | true                             | Create the migratorversions database table.                                                                                    	 |
-| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the templates/base/src/app/migrator/sql directory.                                      |
+| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the /app/migrator/sql directory.                                      |
 | migratorObjectCase    | String  | lower                            | Specifies the case of created database object. Options are 'lower', 'upper' and 'none' (which uses the given value unmodified) 	 |
 | allowMigrationDown    | Boolean | false (true in development mode) | Prevents 'down' migrations (rollbacks)                                                                                         	 |
 

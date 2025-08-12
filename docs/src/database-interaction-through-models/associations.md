@@ -20,7 +20,7 @@ If your database table contains a field that is a foreign key to another table, 
 
 If we had a comments table that contains a foreign key to the posts table called `postid`, then we would have this `config()` method within our comment model:
 
-{% code title="templates/base/src/app/models/comment.cfc" %}
+{% code title="/app/models/comment.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -42,7 +42,7 @@ At this time, you need to be a little eccentric and talk to yourself. Your assoc
 
 So let's consider the `post / comment` relationship mentioned above for `belongsTo()`. If we were to talk to ourselves, we would say, "A post has many comments." And that's how you should construct your post model:
 
-{% code title="templates/base/src/app/models/Post.cfc" %}
+{% code title="/app/models/Post.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -66,7 +66,7 @@ Let's consider an association between `user` and `profile`. A lot of websites al
 
 In this case, our `profile` model would look like this:
 
-{% code title="templates/base/src/app/models/profile.cfc" %}
+{% code title="/app/models/profile.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -80,7 +80,7 @@ component extends="Model" {
 
 And our user model would look like this:
 
-{% code title="templates/base/src/app/models/user.cfc" %}
+{% code title="/app/models/user.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -126,7 +126,7 @@ You can create dependencies on `hasOne()` and `hasMany()` associations, but not 
 
 It's possible for a model to be associated to itself. Take a look at the below setup where an employee belongs to a manager for example:
 
-{% code title="templates/base/src/app/models/employee.cfc" %}
+{% code title="/app/models/employee.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -146,7 +146,7 @@ This is important to remember because if you, for example, want to select the ma
 
 Here's an example of how to select both the name of the employee and their manager:
 
-{% code title="templates/base/src/app/controllers/employees.cfc" %}
+{% code title="/app/controllers/employees.cfc" %}
 ```javascript
 component extends="Controller" {
  function index() {
@@ -178,7 +178,7 @@ Let's pretend that you have a relationship between `author` and `post`, but you 
 
 Your post's `config()` method would then need to look like this:
 
-{% code title="templates/base/src/app/models/post.cfc" %}
+{% code title="/app/models/post.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -204,7 +204,7 @@ To join data from related tables in our [findAll()](https://wheels.dev/api/v3.0.
 
 Here's what that call would look like:
 
-{% code title="templates/base/src/app/controllers/posts.cfc" %}
+{% code title="/app/controllers/posts.cfc" %}
 ```javascript
 component extends="Controller" {
  function index() {
@@ -220,7 +220,7 @@ It's that simple. Wheels will then join the `authors` table automatically so tha
 
 Note that if you switch the above statement around like this:
 
-{% code title="templates/base/src/app/controllers/authors.cfc" %}
+{% code title="/app/controllers/authors.cfc" %}
 ```javascript
 component extends="Controller" {
  function index() {
@@ -238,7 +238,7 @@ If you look at the two examples above, you'll see that in example #1, you're ask
 
 You're not limited to specifying just one association in the `include` argument. You can for example return data for `authors`, `posts`, and `bios` in one call like this:
 
-{% code title="templates/base/src/app/controllers/authors.cfc" %}
+{% code title="/app/controllers/authors.cfc" %}
 ```javascript
 component extends="Controller" {
  function index() {
@@ -256,7 +256,7 @@ To include several tables, simply delimit the names of the models with a comma. 
 
 When you need to include tables more than one step away in a chain of joins, you will need to start using parenthesis. Look at the following example:
 
-{% code title="templates/base/src/app/controllers/comments.cfc" %}
+{% code title="/app/controllers/comments.cfc" %}
 ```javascript
 component extends="Controller" {
  function index() {
@@ -278,7 +278,7 @@ In order to include both columns, you can override this behavior with the `selec
 
 For example, if we had a column named `name` in both your `posts` and `authors` tables, then you could use the `select` argument like so:
 
-{% code title="templates/base/src/app/controllers/posts.cfc" %}
+{% code title="/app/controllers/posts.cfc" %}
 ```javascript
 component extends="Controller" {
     function index() {
@@ -387,7 +387,7 @@ Let's say that we wanted to set up a relationship between `customers` and `publi
 
 Here are the representative models:
 
-{% code title="templates/base/src/app/models/Customer.cfc" %}
+{% code title="/app/models/Customer.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -399,7 +399,7 @@ component extends="Model" {
 ```
 {% endcode %}
 
-{% code title="templates/base/src/app/models/Publication.cfc" %}
+{% code title="/app/models/Publication.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -411,7 +411,7 @@ component extends="Model" {
 ```
 {% endcode %}
 
-{% code title="templates/base/src/app/models/Subscription.cfc" %}
+{% code title="/app/models/Subscription.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -432,7 +432,7 @@ At this point, it's still fairly easy to get data from the many-to-many associat
 
 We can include the related tables from the `subscription` bridge entity to get the same effect:
 
-{% code title="templates/base/src/app/controllers/subscriptions.cfc" %}
+{% code title="/app/controllers/subscriptions.cfc" %}
 ```javascript
 component extends="Controller" {
  function index() {
@@ -450,7 +450,7 @@ With the `shortcut` argument to [hasMany()](https://wheels.dev/api/v3.0.0/model.
 
 For our example above, you can alter the [hasMany()](https://wheels.dev/api/v3.0.0/model.hasmany.html) call on the `customer` model to look like this instead:
 
-{% code title="templates/base/src/app/models/customer.cfc" %}
+{% code title="/app/models/customer.cfc" %}
 ```javascript
 component extends="Model" {
 
@@ -463,7 +463,7 @@ component extends="Model" {
 
 Now you can get a customer's publications directly by using code like this:
 
-{% code title="templates/base/src/app/controllers/customers.cfc" %}
+{% code title="/app/controllers/customers.cfc" %}
 ```javascript
 component extends="Controller" {
  function edit() {

@@ -173,4 +173,17 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 
+	function guideImage() {
+		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
+    	var assetPath = expandPath("/wheels/docs/src/.gitbook/assets/" & file);
+
+		if (fileExists(assetPath)) {
+			cfheader(name="Content-Type", value="image/" & listLast(file, "."));
+			cffile(action="readBinary", file=assetPath, variable="imgData");
+			cfcontent(type="", variable=imgData);
+		} else {
+			cfheader(statusCode=404, statusText="Not Found");
+			writeOutput("Image not found");
+		}
+	}
 }
