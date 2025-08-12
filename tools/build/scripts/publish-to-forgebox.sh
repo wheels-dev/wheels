@@ -31,17 +31,17 @@ verify_package_contents() {
     return 0
 }
 
-# Function to create a package ZIP manually if needed
+# Function to create a package ZIP manually with a top-level folder if needed 
 create_package_zip() {
-    local PACKAGE_DIR=$1
-    local PACKAGE_NAME=$2
+    local PACKAGE_PARENT_DIR=$1   # parent directory containing the folder
+    local PACKAGE_FOLDER_NAME=$2  # folder name to include as root
     local ZIP_NAME=$3
     
     echo "Creating package ZIP manually: $ZIP_NAME"
     
     # Create the ZIP file
-    cd "$PACKAGE_DIR"
-    zip -r "$ZIP_NAME" . -x "*.git*" -x "*.DS_Store" -x "node_modules/*" -x "workspace/*"
+    cd "$PACKAGE_PARENT_DIR"
+    zip -r "$ZIP_NAME" "$PACKAGE_FOLDER_NAME" -x "*.git*" -x "*.DS_Store" -x "node_modules/*" -x "workspace/*"
     
     # Show ZIP contents
     echo "ZIP contents:"
@@ -57,6 +57,7 @@ publish_package() {
     local FORGEBOX_USER=$3
     local FORGEBOX_PASS=$4
     local FORCE=$5
+    local FORCE_MANUAL_ZIP=${6:-false}
     
     echo "=========================================="
     echo "Publishing $PACKAGE_NAME to ForgeBox"
@@ -82,7 +83,16 @@ publish_package() {
     fi
     
     # Change to the package directory
-    cd "$PACKAGE_DIR"
+    # Manual zip if requested (for wheels-cli)
+    if [ "$FORCE_MANUAL_ZIP" == "true" ]; then
+        PACKAGE_PARENT_DIR="$(dirname "$PACKAGE_DIR")"
+        PACKAGE_FOLDER_NAME="$(basename "$PACKAGE_DIR")"
+        ZIP_NAME="${PACKAGE_FOLDER_NAME}.zip"
+        create_package_zip "$PACKAGE_PARENT_DIR" "$PACKAGE_FOLDER_NAME" "$ZIP_NAME"
+        cd "$PACKAGE_PARENT_DIR"
+    else
+        cd "$PACKAGE_DIR"
+    fi
     
     # Display box.json for verification
     echo ""
@@ -113,6 +123,10 @@ publish_package() {
         PUBLISH_CMD="$PUBLISH_CMD --force"
     fi
     
+    # If manual zip was created, publish that file instead
+    if [ "$FORCE_MANUAL_ZIP" == "true" ]; then
+        PUBLISH_CMD="$PUBLISH_CMD zipFile=$ZIP_NAME"
+    fi
     # Execute the publish command
     echo "Executing: $PUBLISH_CMD"
     $PUBLISH_CMD
@@ -158,8 +172,8 @@ main() {
     # Publish Wheels Core
     publish_package "Wheels Core" "$ROOT_DIR/build-wheels-core/wheels" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
     
-    # Publish Wheels CLI
-    publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
+    # Wheels CLI -> manual zip to keep wheels-cli/ as root folder
+    publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE" "true"
     
     # Log out of ForgeBox
     echo "Logging out of ForgeBox..."
