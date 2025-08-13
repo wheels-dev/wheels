@@ -68,6 +68,10 @@ jobs:
         run: |
          ./tools/build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
+      - name: Prepare Wheels Starter App for ForgeBox
+        run: |
+         ./tools/build/scripts/prepare-starterApp.sh "${{ env.WHEELS_VERSION }}"
+
       - name: Install CommandBox
         run: |
           curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
@@ -87,6 +91,7 @@ jobs:
           ./tools/build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}"
 
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
@@ -117,7 +122,17 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
             artifacts/wheels/wheels-cli-be.zip
-
+      
+      - name: Upload Wheels Starter App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-cli
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+            artifacts/wheels/wheels-starter-app-be.zip
+      
       - name: Upload All Wheels Artifacts (Combined)
         uses: actions/upload-artifact@v4
         with:
