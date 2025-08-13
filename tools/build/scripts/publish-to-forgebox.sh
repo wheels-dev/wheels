@@ -161,6 +161,8 @@ main() {
     # Publish Wheels CLI
     publish_package "Wheels CLI" "$ROOT_DIR/build-wheels-cli/wheels-cli" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
     
+    publish_package "Wheels Starter App" "$ROOT_DIR/build-wheels-starterApp" "$FORGEBOX_USER" "$FORGEBOX_PASS" "$FORCE"
+
     # Log out of ForgeBox
     echo "Logging out of ForgeBox..."
     box forgebox logout
