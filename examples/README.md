@@ -1,57 +1,51 @@
-# Wheels Framework Examples
+# Wheels Examples
 
-This directory contains example applications demonstrating common patterns and best practices for building applications with the Wheels framework.
+This directory contains example applications that demonstrate how to use the Wheels framework effectively.
 
-## Examples
+## Available Examples
 
-### 1. Blog Application (`/blog-app`)
-A complete blog application demonstrating:
-- User authentication and authorization
-- CRUD operations for posts and comments
-- Model associations (User hasMany Posts, Post hasMany Comments)
+### Starter App (`starter-app/`)
+
+A complete, production-ready starter application that showcases best practices for building applications with Wheels. This example includes:
+
+- **Modern Architecture**: Clean separation of concerns with MVC pattern
+- **Database Integration**: Complete model setup with migrations
+- **RESTful API**: Example endpoints following REST conventions
+- **Testing Suite**: Comprehensive test coverage with TestBox
+
+#### Getting Started with Starter App
+
+1. **Prerequisites**: Ensure you have CommandBox CLI installed
+2. **Install Dependencies**:
+
+   ```bash
+   cd starter-app
+   box install
+   ```
+
+3. **Start the Server**:
+
+   ```bash
+   box server start
+   ```
+
+4. **Access the Application**: Open <http://localhost:8081> in your browser
+
+#### Key Features Demonstrateds
+
+- Database migrations and seeding
+- RESTful API endpoints
 - Form handling and validation
-- Pagination and search functionality
-- File uploads for featured images
+- Authentication and authorization
+- Asset pipeline (CSS/JS compilation)
+- Error handling and logging
+- Environment configuration
+- Testing patterns and best practices
 
-### 2. API Example (`/api-example`)
-A RESTful API implementation showing:
-- Token-based authentication
-- JSON request/response handling
-- API versioning
-- Rate limiting
-- Error handling and status codes
-- OpenAPI/Swagger documentation
+### Additional Examples
 
-### 3. Authentication System (`/authentication`)
-A complete authentication system featuring:
-- User registration with email confirmation
-- Login/logout functionality
-- Password reset via email
-- Remember me functionality
-- OAuth integration examples
-- Two-factor authentication
-
-## Running the Examples
-
-Each example includes its own README with specific setup instructions. Generally:
-
-1. Navigate to the example directory
-2. Copy the example to your workspace: `cp -r examples/blog-app ../workspace/`
-3. Install dependencies: `box install`
-4. Configure your database in `config/settings.cfm`
-5. Run migrations: `wheels dbmigrate latest`
-6. Start the server: `server start`
-
-## Learning Path
-
-1. **Start with Authentication**: Learn the basics of user management
-2. **Move to Blog App**: Understand CRUD operations and associations
-3. **Explore the API**: Learn about building RESTful services
+Looking for more examples? Check out our [documentation](https://wheels.dev/docs) for additional tutorials and guides.
 
 ## Contributing
 
-Feel free to submit additional examples via pull requests. Examples should:
-- Demonstrate best practices
-- Include comprehensive comments
-- Have complete test coverage
-- Include setup documentation
+Have an example you'd like to share? We welcome contributions! Please see our [contributing guidelines](../CONTRIBUTING.md) for details on how to submit your examples.
