@@ -1,5 +1,6 @@
-# Wheels env set (coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# Wheels env set
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
 
 ## Overview
 

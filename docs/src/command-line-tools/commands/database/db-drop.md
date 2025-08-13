@@ -1,5 +1,5 @@
-# wheels db drop (Coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# wheels db drop
+> **⚠️ Note:** This command depends on configuration values. Please verify your database configuration before executing it.
 
 Drop an existing database.
 

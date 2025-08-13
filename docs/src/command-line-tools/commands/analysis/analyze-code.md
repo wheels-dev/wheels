@@ -1,5 +1,10 @@
-# analyze code (Coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# analyze code
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
+## ⚠️ Known Issues
+
+1. This command may not display real-time processing details.  
+2. Options (parameters) are not yet fully functional.
 
 
 Analyzes code quality in your Wheels application, checking for best practices, potential issues, and code standards compliance.

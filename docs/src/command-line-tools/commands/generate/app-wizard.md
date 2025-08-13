@@ -1,5 +1,5 @@
 # wheels generate app-wizard
-*This command may not work with options as expected. A complete and stable version with fully functional options is **coming soon**.*
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Interactive wizard for creating a new Wheels application.
 

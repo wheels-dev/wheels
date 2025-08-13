@@ -1,5 +1,5 @@
 # wheels ci init
-*This command may not work with options as expected. A complete and stable version with fully functional options is **coming soon**.*
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Initialize continuous integration configuration for your Wheels application.
 

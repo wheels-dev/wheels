@@ -1,5 +1,12 @@
-# wheels db dump (Coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# wheels db dump
+> **⚠️ Note:** This command depends on configuration values. Please verify your database configuration before executing it.
+## ⚠️ Known Issues
+
+1. This command currently works only with **MySQL and H2**.  
+2. Support for **MSSQL** and **PostgreSQL** will be added in future releases.
+3. Options (parameters) for this command may not work
+
+
 
 Export database schema and data to a file.
 
