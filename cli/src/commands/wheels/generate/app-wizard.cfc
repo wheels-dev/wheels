@@ -148,7 +148,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
         {value: 'wheels-base-template@BE', display: '3.0.x - Wheels Base Template - Bleeding Edge', selected: true},
         {value: 'cfwheels-base-template', display: '2.5.x - Wheels Base Template - Stable Release'},
         {value: 'cfwheels-template-htmx-alpine-simple', display: 'Wheels Template - HTMX - Alpine.js - Simple.css'},
-        {value: 'cfwheels-template-example-app', display: 'Wheels Example App'},
+        {value: 'wheels-starter-app', display: 'Wheels Starter App'},
         {value: 'cfwheels-todomvc-htmx', display: 'Wheels - TodoMVC - HTMX - Demo App'},
         {value: 'custom', display: 'Enter a custom template endpoint'}
       ] )
