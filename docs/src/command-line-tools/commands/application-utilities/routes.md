@@ -1,4 +1,5 @@
-# wheels routes
+# wheels routes (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Display all defined routes in your Wheels application with filtering and format options.
 

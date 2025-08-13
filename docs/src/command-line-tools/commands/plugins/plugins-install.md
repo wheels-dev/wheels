@@ -1,4 +1,5 @@
-# plugins install
+# plugins install (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Installs a Wheels CLI plugin from various sources including ForgeBox, GitHub, or local files.
 

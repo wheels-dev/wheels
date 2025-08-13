@@ -1,4 +1,5 @@
-# wheels db create
+# wheels db create (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Create a new database based on your datasource configuration.
 

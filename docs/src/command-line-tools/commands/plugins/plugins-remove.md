@@ -1,4 +1,5 @@
-# plugins remove
+# plugins remove (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Removes an installed Wheels CLI plugin.
 

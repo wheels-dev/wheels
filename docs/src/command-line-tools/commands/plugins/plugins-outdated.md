@@ -1,4 +1,5 @@
-# wheels plugin outdated
+# wheels plugin outdated (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 List installed plugins that have newer versions available.
 

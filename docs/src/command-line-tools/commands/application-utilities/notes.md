@@ -1,4 +1,5 @@
-# wheels notes
+# wheels notes (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Extract and display code annotations like TODO, FIXME, and OPTIMIZE from your application.
 

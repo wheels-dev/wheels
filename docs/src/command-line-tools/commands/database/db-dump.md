@@ -1,4 +1,5 @@
-# wheels db dump
+# wheels db dump (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Export database schema and data to a file.
 

@@ -1,4 +1,5 @@
-# wheels generate api-resource
+# wheels generate api-resource (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Generate a complete API resource with model, API controller, and routes.
 

@@ -1,4 +1,5 @@
-# wheels analyze
+# wheels analyze (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Base command for code analysis and quality checks.
 
@@ -20,7 +21,7 @@ The `wheels analyze` command provides comprehensive code analysis tools for Whee
 | `performance` | Analyze performance characteristics |
 | `security` | Security vulnerability analysis (deprecated) |
 
-## Options
+## Options (Coming Soon)
 
 | Option | Description |
 |--------|-------------|

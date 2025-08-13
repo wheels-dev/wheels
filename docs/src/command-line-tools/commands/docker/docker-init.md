@@ -1,4 +1,5 @@
 # wheels docker init
+*This command may not work with options as expected. A complete and stable version with fully functional options is **coming soon**.*
 
 Initialize Docker configuration for your Wheels application.
 

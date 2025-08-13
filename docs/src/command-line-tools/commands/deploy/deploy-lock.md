@@ -1,4 +1,5 @@
-# deploy lock
+# deploy lock (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Lock deployment state to prevent concurrent deployments and maintain deployment integrity.
 

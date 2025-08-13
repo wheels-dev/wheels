@@ -1,4 +1,5 @@
-# deploy setup
+# deploy setup (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Setup and configure deployment environment for your Wheels application.
 

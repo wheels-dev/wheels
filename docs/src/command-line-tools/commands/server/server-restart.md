@@ -1,4 +1,5 @@
-# wheels server restart
+# wheels server restart (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Restart the Wheels development server and reload the application.
 

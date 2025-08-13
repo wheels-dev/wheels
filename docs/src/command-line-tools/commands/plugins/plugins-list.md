@@ -1,4 +1,5 @@
-# plugins list
+# plugins list (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Lists installed Wheels CLI plugins or shows available plugins from ForgeBox.
 

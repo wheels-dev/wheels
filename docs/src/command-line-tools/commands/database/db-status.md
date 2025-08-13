@@ -1,4 +1,5 @@
-# wheels db status
+# wheels db status (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Show the status of database migrations.
 

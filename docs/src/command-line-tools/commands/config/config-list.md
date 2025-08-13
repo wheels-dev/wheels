@@ -1,4 +1,5 @@
-# wheels config list
+# wheels config list (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 List all configuration settings for your Wheels application.
 

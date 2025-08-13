@@ -1,4 +1,5 @@
-# wheels server
+# wheels server (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Manage the Wheels development server with enhanced functionality.
 

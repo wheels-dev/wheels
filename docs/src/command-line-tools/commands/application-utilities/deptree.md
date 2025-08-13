@@ -1,4 +1,5 @@
-# wheels deptree
+# wheels deptree (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Display the dependency tree for your Wheels application.
 

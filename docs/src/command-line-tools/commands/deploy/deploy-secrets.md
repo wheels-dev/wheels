@@ -1,4 +1,5 @@
-# wheels deploy secrets
+# wheels deploy secrets (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Manage deployment secrets and sensitive configuration.
 

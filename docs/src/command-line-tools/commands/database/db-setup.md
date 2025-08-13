@@ -1,4 +1,5 @@
-# wheels db setup
+# wheels db setup (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Setup a complete database by creating it, running migrations, and seeding data.
 

@@ -1,4 +1,6 @@
-# Asset & Cache Management
+# Asset & Cache Management (Coming Soon)
+*These commands may not work as expected. A complete and stable version is **coming soon**.*
+
 
 The Wheels CLI provides comprehensive commands for managing assets, caches, logs, and temporary files in your application. These commands help optimize performance, clean up disk space, and maintain your application.
 
@@ -6,16 +8,16 @@ The Wheels CLI provides comprehensive commands for managing assets, caches, logs
 
 Asset and cache management commands are organized into four categories:
 
-- **Asset Commands** (`wheels assets:*`) - Compile, clean, and manage static assets
-- **Cache Commands** (`wheels cache:*`) - Clear various application caches
-- **Log Commands** (`wheels log:*`) - Manage and view log files
-- **Temp Commands** (`wheels tmp:*`) - Clean temporary files and directories
+- **Asset Commands** (`wheels assets*`) - Compile, clean, and manage static assets
+- **Cache Commands** (`wheels cache*`) - Clear various application caches
+- **Log Commands** (`wheels log*`) - Manage and view log files
+- **Temp Commands** (`wheels tmp*`) - Clean temporary files and directories
 
 ## Asset Management
 
 ### Precompiling Assets
 
-The `wheels assets:precompile` command prepares your assets for production deployment by minifying and optimizing them.
+The `wheels assets precompile` command prepares your assets for production deployment by minifying and optimizing them.
 
 ```bash
 # Basic precompilation
@@ -47,7 +49,7 @@ wheels assets precompile --environment=staging
 
 ### Cleaning Old Assets
 
-The `wheels assets:clean` command removes old compiled assets while keeping recent versions.
+The `wheels assets clean` command removes old compiled assets while keeping recent versions.
 
 ```bash
 # Clean old assets (keeps 3 versions by default)
@@ -77,7 +79,7 @@ wheels assets clobber
 wheels assets clobber --force
 ```
 
-**Warning:** This command deletes all compiled assets and the manifest file. You'll need to run `wheels assets:precompile` again before deploying.
+**Warning:** This command deletes all compiled assets and the manifest file. You'll need to run `wheels assets precompile` again before deploying.
 
 ## Cache Management
 
@@ -134,7 +136,7 @@ wheels log clear --environment=production --days=7 --force
 
 ### Tailing Log Files
 
-The `wheels log:tail` command displays log content in real-time:
+The `wheels log tail` command displays log content in real-time:
 
 ```bash
 # Tail development log (default)
@@ -305,7 +307,7 @@ To free up disk space:
 du -sh tmp/ logs/ public/assets/compiled/
 
 # Clean everything
-wheels assets:clean --keep=1
+wheels assets clean --keep=1
 wheels log clear --days=7 --force
 wheels tmp clear --force
 wheels cache clear all --force

@@ -1,4 +1,5 @@
-# wheels plugins
+# wheels plugins (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Base command for plugin management in Wheels applications.
 

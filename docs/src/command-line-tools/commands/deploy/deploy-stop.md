@@ -1,4 +1,5 @@
-# deploy stop
+# deploy stop (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Stop deployed containers on servers.
 

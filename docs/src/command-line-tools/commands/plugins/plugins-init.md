@@ -1,4 +1,5 @@
-# wheels plugin init
+# wheels plugin init (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Initialize a new Wheels plugin project with scaffolding.
 

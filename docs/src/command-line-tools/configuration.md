@@ -187,7 +187,7 @@ set(sendEmailOnError = true);
 set(errorEmailAddress = application.env['ERROR_EMAIL']);
 ```
 
-## CLI Configuration Commands
+## CLI Configuration Commands (Coming Soon)
 
 ### Dumping Configuration
 
@@ -263,7 +263,7 @@ wheels secret --save-to-env=CSRF_TOKEN
 wheels secret --save-to-env=ENCRYPTION_KEY
 ```
 
-### Environment Variable Management
+### Environment Variable Management (Coming Soon)
 
 #### Setting Variables
 ```bash

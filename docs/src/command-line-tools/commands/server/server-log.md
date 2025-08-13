@@ -1,4 +1,5 @@
-# wheels server log
+# wheels server log (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Tail the Wheels development server logs.
 

@@ -1,5 +1,5 @@
-# wheels config set
-
+# wheels config set (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 Set configuration values for your Wheels application.
 
 ## Usage

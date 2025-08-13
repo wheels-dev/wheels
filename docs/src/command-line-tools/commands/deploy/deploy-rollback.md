@@ -1,4 +1,5 @@
-# wheels deploy rollback
+# wheels deploy rollback (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Rollback to a previous deployment.
 

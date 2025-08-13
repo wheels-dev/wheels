@@ -1,4 +1,6 @@
-# analyze code
+# analyze code (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
+
 
 Analyzes code quality in your Wheels application, checking for best practices, potential issues, and code standards compliance.
 
@@ -15,6 +17,9 @@ wheels analyze code [path] [--fix] [--format=<format>] [--severity=<severity>] [
 - `--format` - (Optional) Output format: `console`, `json`, `junit`. Default: `console`
 - `--severity` - (Optional) Minimum severity level: `info`, `warning`, `error`. Default: `warning`
 - `--report` - (Optional) Generate HTML report
+
+*Parameters are **coming soon**. Currently, this command works without parameters*.
+
 
 ## Description
 

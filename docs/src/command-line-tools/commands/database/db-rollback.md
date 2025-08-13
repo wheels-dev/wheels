@@ -1,4 +1,5 @@
-# wheels db rollback
+# wheels db rollback (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Rollback database migrations to a previous state.
 

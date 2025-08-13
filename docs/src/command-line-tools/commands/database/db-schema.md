@@ -1,4 +1,5 @@
-# wheels db schema
+# wheels db schema (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Visualize the current database schema.
 

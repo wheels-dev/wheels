@@ -1,4 +1,5 @@
-# wheels plugin info
+# wheels plugin info (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Show detailed information about a Wheels plugin.
 

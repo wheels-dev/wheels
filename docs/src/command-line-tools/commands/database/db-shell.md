@@ -1,4 +1,5 @@
-# wheels db shell
+# wheels db shell (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Launch an interactive database shell for direct SQL access to your database.
 

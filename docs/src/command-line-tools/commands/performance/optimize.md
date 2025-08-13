@@ -1,4 +1,5 @@
-# wheels optimize
+# wheels optimize (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Base command for application optimization.
 

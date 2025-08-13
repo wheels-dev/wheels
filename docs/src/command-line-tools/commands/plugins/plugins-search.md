@@ -1,4 +1,5 @@
-# wheels plugin search
+# wheels plugin search (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Search for Wheels plugins on ForgeBox.
 

@@ -1,4 +1,5 @@
-# deploy proxy
+# deploy proxy (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 Configure and manage deployment proxy settings for routing traffic during deployments.
 
