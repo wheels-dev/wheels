@@ -1,0 +1,14 @@
+{
+    "name": "|appName|",
+    "app": {
+        "cfengine": "|setEngine|",
+        "serverHomeDirectory": ".wheels/server"
+    },
+    "web": {
+        "webroot": "public",
+        "rewrites": {
+            "enable": true,
+            "config": "public/urlrewrite.xml"
+        }
+    }
+}
