@@ -1,0 +1,74 @@
+component extends="Controller" {
+
+	function config() {
+		verifies(except="index,new,create", params="key", paramsTypes="integer", handler="objectNotFound");
+	}
+
+	/**
+	* View all |ObjectNamePluralC|
+	**/
+	function index() {
+		|ObjectNamePlural|=model("|ObjectNameSingular|").findAll();
+	}
+
+	/**
+	* View |ObjectNameSingularC|
+	**/
+	function show() {
+		|ObjectNameSingular|=model("|ObjectNameSingular|").findByKey(params.key);
+	}
+
+	/**
+	* Add New |ObjectNameSingularC|
+	**/
+	function new() {
+		|ObjectNameSingular|=model("|ObjectNameSingular|").new();
+	}
+
+	/**
+	* Create |ObjectNameSingularC|
+	**/
+	function create() {
+		|ObjectNameSingular|=model("|ObjectNameSingular|").create(params.|ObjectNameSingular|);
+		if(|ObjectNameSingular|.hasErrors()){
+			renderView(action="new");
+		} else {
+			redirectTo(action="index", success="|ObjectNameSingularC| successfully created");
+		}
+	}
+
+	/**
+	* Edit |ObjectNameSingularC|
+	**/
+	function edit() {
+		|ObjectNameSingular|=model("|ObjectNameSingular|").findByKey(params.key);
+	}
+
+	/**
+	* Update |ObjectNameSingularC|
+	**/
+	function update() {
+		|ObjectNameSingular|=model("|ObjectNameSingular|").findByKey(params.key);
+		if(|ObjectNameSingular|.update(params.|ObjectNameSingular|)){
+			redirectTo(action="index", success="|ObjectNameSingularC| successfully updated");
+		} else {
+			renderView(action="edit");
+		}
+	}
+
+	/**
+	* Delete |ObjectNameSingularC|
+	**/
+	function delete() {
+		|ObjectNameSingular|=model("|ObjectNameSingular|").deleteByKey(params.key);
+		redirectTo(action="index", success="|ObjectNameSingularC| successfully deleted");
+	}
+
+	/**
+	* Redirect away if verifies fails, or if an object can't be found
+	**/
+	function objectNotFound() {
+		redirectTo(action="index", error="That |ObjectNameSingularC| wasn't found");
+	}
+
+}

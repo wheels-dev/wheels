@@ -1,0 +1,57 @@
+/* form Fields */
+.btn-pushdown {
+	margin-top: 25px;
+}
+/* Errors */
+ul.alert.alert-danger  {
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid;
+    border-radius: 4px;
+	color: #a94442;
+    background-color: #f2dede;
+    border-color: #ebccd1;
+}
+ul.alert.alert-danger li {
+	margin-left:26px;
+}
+.field-with-errors .control-label {color: #a94442;}
+.field-with-errors .form-control {border-color: #a94442;}
+
+dl {
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  margin: 0
+}
+dt {
+  float: left;
+  width: 50%;
+  padding: 0;
+  margin: 0
+}
+dd {
+  float: left;
+  width: 50%;
+  /* adjust the width; make sure the total of both is 100% */
+  background: #dd0;
+  padding: 0;
+  margin: 0
+}
+
+/* Log Code Formatting */
+.modal-body .string {     color: green; }
+.modal-body .number {     color: darkorange; }
+.modal-body .boolean {    color: blue; }
+.modal-body .null {     color: magenta; }
+.modal-body .key {      color: red; }
+
+/* Report Range Picker */
+#reportrange {
+  cursor: pointer;
+  padding: 5px 10px;
+}
+
+.form-group{
+  margin-bottom: 1rem;
+}

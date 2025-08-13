@@ -1,0 +1,14 @@
+{
+    "name": "wheels-starter-app",
+    "version": "1.0.0",
+    "dependencies": {
+        "wirebox": "^7.0.0",
+        "testbox": "^5.0.0",
+        "wheels-core": "^3.0.0-SNAPSHOT"
+    },
+    "installPaths": {
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/",
+        "wheels-core": "vendor/wheels/"
+    }
+}

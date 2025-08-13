@@ -1,0 +1,65 @@
+{
+    "name":"CFWheels FlashMessages Bootstrap",
+    "version":"1.0.4",
+    "author":"Peter Amiri",
+    "location":"bpamiri/cfwheels-flashmessages-bootstrap#v1.0.4",
+    "homepage":"https://github.com/bpamiri/cfwheels-flashmessages-bootstrap",
+    "documentation":"",
+    "repository":{
+        "type":"",
+        "URL":""
+    },
+    "bugs":"",
+    "slug":"cfwheels-flashmessages-bootstrap",
+    "shortDescription":"CFWheels 2.0 plugin to add Bootstrap tags to flashMessages",
+    "description":"",
+    "instructions":"",
+    "changelog":"",
+    "type":"cfwheels-plugins",
+    "keywords":"FlashMessages Bootstrap",
+    "private":false,
+    "projectURL":"",
+    "license":[
+        {
+            "type":"",
+            "URL":""
+        }
+    ],
+    "contributors":[],
+    "dependencies":{},
+    "devDependencies":{},
+    "installPaths":{},
+    "scripts":{
+        "postVersion":"package set location='bpamiri/cfwheels-flashmessages-bootstrap#v`package version`'",
+        "postPublish":"!git push --follow-tags",
+        "patch-release":"bump --patch && publish",
+        "minor-release":"bump --minor && publish",
+        "major-release":"bump --major && publish"
+    },
+    "ignore":[
+        "**/.*",
+        "test",
+        "tests"
+    ],
+    "testbox":{
+        "runner":[
+            {
+                "default":""
+            }
+        ],
+        "labels":"",
+        "reporter":"",
+        "bundles":"",
+        "recurse":true,
+        "directory":"tests.specs",
+        "testBundles":"",
+        "testSuites":"",
+        "testSpecs":"",
+        "verbose":true,
+        "watchDelay":500,
+        "watchPaths":"**.cfc"
+    },
+    "directory":"app/plugins/",
+    "createPackageDirectory":true,
+    "packageDirectory":"FlashMessagesBootstrap"
+}
