@@ -1,4 +1,6 @@
 # wheels generate model
+*This command may not work with options as expected. A complete and stable version with fully functional options is **coming soon**.*
+
 
 Generate a model with properties, validations, and associations.
 

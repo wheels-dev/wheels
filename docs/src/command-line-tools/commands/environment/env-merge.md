@@ -1,4 +1,5 @@
-# Wheels env merge (Commnig Soon)
+# Wheels env merge (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
 
 ## Overview
 

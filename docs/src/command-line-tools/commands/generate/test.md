@@ -1,4 +1,6 @@
 # wheels generate test
+*This command may not work with options as expected. A complete and stable version with fully functional options is **coming soon**.*
+
 
 Generate test files for models, controllers, views, and other components.
 

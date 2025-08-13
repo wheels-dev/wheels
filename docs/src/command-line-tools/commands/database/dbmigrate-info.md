@@ -99,28 +99,6 @@ SELECT * FROM schema_migrations;
    - Identify pending migrations
    - Confirm database version
 
-## Common Scenarios
-
-### All Migrations Complete
-```
-Current Version: 20240125160000
-Status: 6 completed, 0 pending
-✓ Database is up to date
-```
-
-### Fresh Database
-```
-Current Version: 0
-Status: 0 completed, 6 pending
-⚠ No migrations have been run
-```
-
-### Partial Migration
-```
-Current Version: 20240110090000
-Status: 3 completed, 3 pending
-⚠ Database needs migration
-```
 
 ## Troubleshooting
 

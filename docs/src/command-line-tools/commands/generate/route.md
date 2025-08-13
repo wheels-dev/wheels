@@ -1,4 +1,6 @@
 # wheels generate route
+*This command may not work with options as expected. A complete and stable version with fully functional options is **coming soon**.*
+
 
 Generate route definitions for your application.
 

@@ -1,4 +1,6 @@
-# analyze code
+# analyze code (Coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
+
 
 Analyzes code quality in your Wheels application, checking for best practices, potential issues, and code standards compliance.
 

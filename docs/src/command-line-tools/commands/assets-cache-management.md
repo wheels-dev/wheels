@@ -1,5 +1,5 @@
 # Asset & Cache Management (Coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+*These commands may not work as expected. A complete and stable version is **coming soon**.*
 
 
 The Wheels CLI provides comprehensive commands for managing assets, caches, logs, and temporary files in your application. These commands help optimize performance, clean up disk space, and maintain your application.

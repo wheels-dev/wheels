@@ -1,4 +1,6 @@
-# Wheels env Show (Commnig Soon)
+# Wheels env Show (coming Soon)
+*This command may not work as expected. A complete and stable version is **coming soon**.*
+
 
 ## Overview
 

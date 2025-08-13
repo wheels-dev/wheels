@@ -1,4 +1,6 @@
 # wheels generate app
+*This command may not work with options as expected. A complete and stable version with fully functional options is **coming soon**.*
+
 
 Create a new Wheels application from templates.
 
