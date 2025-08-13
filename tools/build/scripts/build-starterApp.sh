@@ -25,7 +25,7 @@ echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 
 # Copy Starter App files
 echo "Copying Starter App files..."
-cp -r examples/starter-app "${BUILD_DIR}/"
+cp -r examples/starter-app/* "${BUILD_DIR}/"
 
 # Create ZIP file
 echo "Creating ZIP package..."
