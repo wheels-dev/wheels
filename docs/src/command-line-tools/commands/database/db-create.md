@@ -1,5 +1,6 @@
-# wheels db create (Coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# wheels db create
+
+
 
 Create a new database based on your datasource configuration.
 
@@ -131,6 +132,7 @@ The command provides real-time, formatted output showing each step:
 ```
 
 ## Prerequisites
+> **⚠️ Note:** This command depends on configuration values. Please verify your database configuration before executing it.
 
 1. **Datasource Configuration**: The datasource must be configured in `/config/app.cfm`
 2. **Database Privileges**: The database user must have CREATE DATABASE privileges

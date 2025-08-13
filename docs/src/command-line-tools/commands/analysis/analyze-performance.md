@@ -1,5 +1,5 @@
-# analyze performance (coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# analyze performance
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Analyzes application performance, identifying bottlenecks and optimization opportunities in your Wheels application.
 

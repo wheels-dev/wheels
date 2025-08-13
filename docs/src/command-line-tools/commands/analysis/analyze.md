@@ -1,5 +1,5 @@
-# wheels analyze (coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# wheels analyze
+*These commands works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Base command for code analysis and quality checks.
 

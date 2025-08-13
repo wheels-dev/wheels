@@ -1,5 +1,5 @@
-# Wheels env merge (coming Soon)
-*This command may not work as expected. A complete and stable version is **coming soon**.*
+# Wheels env merge
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 ## Overview
 
@@ -8,7 +8,7 @@ The `wheels env merge` command allows you to merge multiple environment configur
 ## Command Syntax
 
 ```bash
-wheels env merge <source1> <source2> [additional_sources...] [options]
+wheels env merge <source1> <source2> [options]
 ```
 
 ## Parameters
@@ -32,19 +32,19 @@ This merges `.env.defaults` and `.env.local` into `.env.merged`
 
 ### Custom Output File
 ```bash
-wheels env merge .env.defaults .env.local --output=.env
+wheels env merge .env.defaults .env.local output=.env
 ```
 This merges the files and saves the result as `.env`
 
 ### Production Environment Merge
 ```bash
-wheels env merge .env .env.production --output=.env.merged
+wheels env merge .env .env.production output=.env.merged
 ```
 Combines base configuration with production-specific settings
 
 ### Multiple File Merge
 ```bash
-wheels env merge base.env common.env dev.env local.env --output=.env.development
+wheels env merge base.env common.env dev.env local.env output=.env.development
 ```
 Merges multiple files in the specified order
 
