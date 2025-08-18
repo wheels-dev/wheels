@@ -213,7 +213,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Testing with BoxLang
 - Local Docker testing: `docker compose up boxlang -d`
 - Access BoxLang instance: http://localhost:60001
-- BoxLang version support: 1.0.0 - 1.3.x
+- BoxLang version support: 1.3.x
 
 ## Repository Structure
 
