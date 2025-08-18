@@ -1,7 +1,7 @@
-![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/cfwheels/cfwheels/snapshot.yml?style=flat-square&logo=github&label=Wheels%20Snapshots)
+![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/wheels-dev/wheels/snapshot.yml?style=flat-square&logo=github&label=Wheels%20Snapshots)
 <img src="https://www.forgebox.io/api/v1/entry/cfwheels/badges/version" />
-<img src="https://www.forgebox.io/api/v1/entry/cfwheels/badges/downloads" />
-![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.forgebox.io%2Fapi%2Fv1%2Fentry%2Fcfwheels%2Fbadges%2F&query=%24.data.versions.0.version&style=flat-square&label=Bleeding%20Edge%20Release)
+<img src="https://www.forgebox.io/api/v1/entry/wheels-core/badges/downloads" />
+![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.forgebox.io%2Fapi%2Fv1%2Fentry%2Fwheels-core%2Fbadges%2F&query=%24.data.versions.0.version&style=flat-square&label=Bleeding%20Edge%20Release)
 
 # Wheels
 
@@ -29,6 +29,7 @@ In this [Beginner Tutorial: Hello World][2], we'll be writing a simple applicati
 
 - Adobe ColdFusion 2018/2021/2023
 - Lucee 5/6/7
+- Boxlang 1.3
 
 **Supported Databases:**
 
