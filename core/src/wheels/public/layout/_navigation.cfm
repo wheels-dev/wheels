@@ -25,7 +25,7 @@
 				navArgs['type'] = item['type'];
 			</cfscript>
 			<cfif item.title eq "Tests">
-				<a href="/wheels/testbox" class="#navArgs['class']#">#navArgs.Text#</a>
+				<a href="#urlFor(route = "testbox")#" class="#navArgs['class']#">#navArgs.Text#</a>
 			<cfelse>
 				<a href="#urlFor(argumentCollection = navArgs)#" class="#navArgs['class']#">#navArgs.Text#</a>
 			</cfif>

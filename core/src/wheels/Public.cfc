@@ -40,6 +40,10 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		include "/wheels/public/views/runner.cfm";
 		return "";
 	}
+
+	function testbox(){
+		include "/tests/Testbox/runner.cfm";
+	}
 	
 	public function tests_testbox(){
 		// Set proper HTTP status first
