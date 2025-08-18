@@ -105,7 +105,7 @@
 						<a href="#urlFor(route = "wheelsGuides")#" class="btn" target="_blank">Guides</a>
 					</td>
 					<td>
-						<a href="#urlFor(route = "wheelsPackages", type = "app")#" class="btn" target="_blank">Tests</a>
+						<a href="#urlFor(route = "testbox")#" class="btn" target="_blank">Tests</a>
 					</td>
 					<cfif $get("enableMigratorComponent")>
 						<td>

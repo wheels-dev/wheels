@@ -89,14 +89,12 @@ component extends="base" {
 	  		// Always force JSON as return format
 			if(loc.type eq 'app'){
 				loc.testurl = "http://" & loc.host & ":" & loc.port
-							   & "/" & "?controller=tests&action=runner&view=runner"
-							   & "&type=#loc.type#"
+							   & "/" & "?controller=wheels.public&action=testbox&view=runner"
 							   & "&format=#loc.format#"
 							   & "&reload=#loc.reload#";
 			} else if(loc.type eq 'core'){
 				loc.testurl = "http://" & loc.host & ":" & loc.port
-							   & "/" & "?controller=wheels.tests_testbox&action=runner&view=runner"
-							   & "&type=#loc.type#"
+							   & "/" & "?controller=wheels.public&action=tests_testbox&view=runner"
 							   & "&format=#loc.format#"
 							   & "&reload=#loc.reload#";
 			} else {
