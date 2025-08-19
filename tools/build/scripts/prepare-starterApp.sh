@@ -28,5 +28,9 @@ echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 echo "Copying Starter App files..."
 cp -r examples/starter-app/* "${BUILD_DIR}/"
 
+# Check Copied files
+echo "These files were copied"
+ls -la "${BUILD_DIR}/"
+
 echo "Wheels Starter App prepared for ForgeBox publishing!"
 echo "Directory: ${BUILD_DIR}/"

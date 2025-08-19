@@ -28,7 +28,7 @@ meta = $get("pluginMeta")[request.wheels.params.name];
 		</cfif>
 
 		<div class="ui segment">
-			<cfinclude template="/app/plugins/#LCase(request.wheels.params.name)#/index.cfm">
+			<cfinclude template="/plugins/#LCase(request.wheels.params.name)#/index.cfm">
 		</div>
 	</div>
 </cfoutput>

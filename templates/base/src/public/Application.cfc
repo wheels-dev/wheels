@@ -24,12 +24,13 @@ component output="false" {
 	this.mappings["/testbox"] = this.testboxDir;
 	this.mappings["/tests"] = expandPath("../tests");
 	this.mappings["/config"] = expandPath("../config");
+	this.mappings["/plugins"] = expandPath("../plugins");
 
 	// We turn on "sessionManagement" by default since the Flash uses it.
 	this.sessionManagement = true;
 
 	// If a plugin has a jar or class file, automatically add the mapping to this.javasettings.
-	this.wheels.pluginDir = this.appDir & "plugins";
+	this.wheels.pluginDir = this.appDir & "../plugins";
 	this.wheels.pluginFolders = DirectoryList(
 		this.wheels.pluginDir,
 		"true",
