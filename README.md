@@ -29,7 +29,7 @@ In this [Beginner Tutorial: Hello World][2], we'll be writing a simple applicati
 
 - Adobe ColdFusion 2018/2021/2023
 - Lucee 5/6/7
-- Boxlang 1.3
+- Boxlang 1.1 - 1.4
 
 **Supported Databases:**
 
@@ -120,7 +120,7 @@ Please report any errors you encounter on our [issue tracker][4]. When reporting
 CFWheels supports the following CFML engines:
 - **Adobe ColdFusion**: 2018, 2021, 2023
 - **Lucee**: 5.x, 6.x, 7.x
-- **BoxLang**: 1.3.x
+- **BoxLang**: 1.1.x - 1.4.x
 
 ## License
 
