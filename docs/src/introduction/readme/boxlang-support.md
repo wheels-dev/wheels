@@ -68,6 +68,7 @@ box install bx-mysql
 For other databases supported by CFWheels, install the corresponding BoxLang modules:
 
 - **Microsoft SQL Server**: `box install bx-mssql`
+- **PostGreSQL Server**: `box install bx-postgresql`
 
 #### Finding Additional Modules
 
