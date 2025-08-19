@@ -136,7 +136,7 @@ component extends="Base" output=false {
 				local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
 				
 				// BoxLang compatibility fix - ReplaceList behaves differently
-				if (StructKeyExists(server, "boxlang") || StructKeyExists(server, "coldfusion") && server.coldfusion.productname == "BoxLang") {
+				if (StructKeyExists(server, "boxlang")) {
 					// For BoxLang, use regex to properly parse column names
 					local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
 					local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
