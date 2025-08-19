@@ -283,8 +283,8 @@ component {
 		application.$wheels.imagePath = "images";
 		application.$wheels.javascriptPath = "javascripts";
 		application.$wheels.modelPath = "/app/models";
-		application.$wheels.pluginPath = "/app/plugins";
-		application.$wheels.pluginComponentPath = "/app/plugins";
+		application.$wheels.pluginPath = "/plugins";
+		application.$wheels.pluginComponentPath = "/plugins";
 		application.$wheels.stylesheetPath = "stylesheets";
 		application.$wheels.viewPath = "/app/views";
 		application.$wheels.controllerPath = "/app/controllers";
