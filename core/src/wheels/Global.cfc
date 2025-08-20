@@ -74,12 +74,12 @@ component output="false" {
           local.innerTagContent = local.i.tagContent;
 			    StructDelete(local.i, "tagContent");
           cfmailpart(attributeCollection="#local.i#"){
-            #local.innerTagContent#
+            writeOutput(local.innerTagContent)
 					}
         }
       }
       if(StructKeyExists(local, "tagContent")){
-        #local.tagContent#
+        writeOutput(local.tagContent)
       }
     }
 	}
