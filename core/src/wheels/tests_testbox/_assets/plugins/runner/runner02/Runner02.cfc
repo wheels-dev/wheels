@@ -1,16 +1,16 @@
-<cfcomponent>
-	<cffunction name="init">
-		<cfset this.version = "99.9.9">
-		<cfreturn this>
-	</cffunction>
+component {
+	function init() {
+		this.version = "99.9.9";
+		return this;
+	}
 
-	<cffunction name="URLFor" returntype="string">
-		<cfset local.result = core.URLFor(argumentCollection = arguments)/>
-		<cfset local.result &= Find("?", local.result) ? "&urlfor02" : "?urlfor02"/>
-		<cfreturn local.result/>
-	</cffunction>
+	public string function URLFor() {
+		local.result = core.URLFor(argumentCollection = arguments);
+		local.result &= Find("?", local.result) ? "&urlfor02" : "?urlfor02";
+		return local.result;
+	}
 
-	<cffunction name="onMissingMethod" returntype="any">
-		<cfreturn core.onMissingMethod(argumentCollection = arguments)/>
-	</cffunction>
-</cfcomponent>
+	public any function onMissingMethod() {
+		return core.onMissingMethod(argumentCollection = arguments);
+	}
+}
