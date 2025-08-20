@@ -312,30 +312,6 @@ component extends="../base" {
         }
     }
     
-    private function runWithWatch(argumentCollection) {
-        print.yellowLine("Watching for file changes... (Press Ctrl+C to stop)")
-             .line();
-        
-        var fileWatcher = getInstance("FileWatcher@commandbox-core");
-        var watchPaths = ["models/**", "controllers/**", "tests/**", "views/**"];
-        
-        // Run tests initially
-        var suite = buildTestSuite(argumentCollection = arguments);
-        outputSuiteVariables(suite);
-        runTestSuite(suite);
-        
-        fileWatcher.watch(
-            paths = watchPaths,
-            callback = function() {
-                print.line()
-                     .cyanLine("Files changed, running tests...")
-                     .line();
-                var suite = buildTestSuite(argumentCollection = arguments);
-                runTestSuite(suite);
-            }
-        );
-    }
-    
     private function displayCoverageReport(coverage) {
         print.line()
              .yellowBoldLine("================ Coverage Report: =======================")
