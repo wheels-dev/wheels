@@ -2,336 +2,252 @@
  * Run Wheels application tests
  * Examples:
  * wheels test run
- * wheels test run UserTest
- * wheels test run filter=UserTest --coverage
+ * wheels test run filter=UserTest coverage=true
  * wheels test run group=integration reporter=junit
  */
 component extends="../base" {
     
     /**
-     * @spec.hint Specific test spec/bundle to run
      * @filter.hint Filter tests by name pattern
      * @group.hint Run specific test group (unit, integration, models, controllers)
-     * @bundles.hint Comma-separated list of test bundles to run
-     * @labels.hint Comma-separated list of test labels to include
-     * @excludes.hint Comma-separated list of patterns to exclude
      * @coverage.hint Generate coverage report
-     * @coverageOutputDir.hint Directory for coverage output
-     * @reporter.hint Test reporter format (simple, text, json, junit, tap)
-     * @reporter.options simple,text,json,junit,tap
-     * @outputFile.hint Output file for test results (for junit/json reporters)
+     * @reporter.hint Test reporter format (console, junit, json, tap)
+     * @reporter.options console,junit,json,tap
      * @watch.hint Watch for file changes and rerun tests
      * @verbose.hint Verbose output
      * @failFast.hint Stop on first test failure
-     * @threads.hint Number of parallel threads for test execution
-     * @type.hint Type of tests to run: app, core, or plugin
-     * @servername.hint Name of server to reload
-     * @reload.hint Force a reload of wheels
-     * @debug.hint Show debug info and passing tests
      */
     function run(
-        string spec = "",
         string filter = "",
         string group = "",
-        string bundles = "",
-        string labels = "",
-        string excludes = "",
         boolean coverage = false,
-        string coverageOutputDir = "coverage",
-        string reporter = "simple",
-        string outputFile = "",
+        string reporter = "console",
         boolean watch = false,
         boolean verbose = false,
-        boolean failFast = false,
-        numeric threads = 1,
-        string type = "app",
-        string servername = "",
-        boolean reload = false,
-        boolean debug = false
+        boolean failFast = false
     ) {
-        arguments = reconstructArgs(arguments);
-        
         // Validate we're in a Wheels project
-        if (!isWheelsApp()) {
+        if (!isWheelsProject()) {
             error("This command must be run from the root of a Wheels application.");
+            return;
         }
         
         if (arguments.watch) {
             return runWithWatch(argumentCollection = arguments);
         }
         
-        // Build test suite configuration
-        var suite = buildTestSuite(argumentCollection = arguments);
+        var result = runTests(argumentCollection = arguments);
         
-        // Output suite variables
-        outputSuiteVariables(suite);
-        
-        // Run the test suite
-        runTestSuite(suite);
-    }
-    
-    private function buildTestSuite(argumentCollection) {
-        // Get server configuration
-        var serverConfig = getServerConfig(arguments.servername);
-        var serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments.servername } );
-        
-        // Build configuration
-        var config = {
-            type = arguments.type,
-            servername = arguments.servername,
-            serverdefaultName = serverDetails.defaultName,
-            configFile = serverDetails.defaultServerConfigFile,
-            host = serverConfig.host,
-            port = serverConfig.port,
-            format = "json", // Always use JSON for parsing
-            debug = arguments.debug,
-            reload = arguments.reload,
-            reporter = arguments.reporter,
-            coverage = arguments.coverage,
-            verbose = arguments.verbose,
-            failFast = arguments.failFast,
-            threads = arguments.threads
-        };
-        
-        // Build URL parameters
-        var params = {
-            format = "json",
-            coverage = false,
-
-        };
-        
-        // Handle spec/filter parameters
-        if (len(arguments.spec)) {
-            params.testBundles = arguments.spec;
-        } else if (len(arguments.filter)) {
-            params.testBundles = arguments.filter;
-        } else if (len(arguments.bundles)) {
-            params.testBundles = arguments.bundles;
-        }
-        
-        if (len(arguments.group)) {
-            params.testSuites = arguments.group;
-        }
-        
-        if (len(arguments.labels)) {
-            params.labels = arguments.labels;
-        }
-        
-        if (len(arguments.excludes)) {
-            params.excludes = arguments.excludes;
-        }
-        
-        if (arguments.reload) {
-            params.reload = "true";
-        }
-        
-        if (arguments.failFast) {
-            params.options = "failFast:true";
-        }
-        
-        if (arguments.threads > 1) {
-            params.options = (structKeyExists(params, "options") ? params.options & ";" : "") & "threads:#arguments.threads#";
-        }
-        
-        // Build test URL
-        config.testurl = buildTestUrl(
-            type = config.type,
-            servername = config.servername,
-            params = params
-        );
-        
-        return config;
-    }
-    
-    private function outputSuiteVariables(suite) {
-        print.line("Type:       #suite.type#");
-        print.line("Server:     #suite.servername#");
-        print.line("Name:       #suite.serverdefaultName#");
-        print.line("Config:     #suite.configFile#");
-        print.line("Host:       #suite.host#");
-        print.line("Port:       #suite.port#");
-        print.line("URL:        #suite.testurl#");
-        print.line("Debug:      #suite.debug#");
-        print.line("Reload:     #suite.reload#");
-        print.line("Format:     #suite.format#");
-        if (suite.coverage) {
-            print.line("Coverage:   #suite.coverage#");
-        }
-    }
-    
-    private function runTestSuite(suite) {
-        print.greenBoldLine( "================#ucase(suite.type)# Tests =======================" ).toConsole();
-        
-        // Advice we are running
-        print.boldCyanLine( "Executing tests, please wait..." )
-            .blinkingRed( "Please wait...")
-            .printLine()
-            .toConsole();
-        
-        try {
-            // Execute HTTP request
-            var httpResult = executeTestRequest(
-                url = suite.testurl,
-                timeout = 300,
-                debug = suite.verbose
-            );
-            
-            if (!httpResult.success) {
-                return error( 'Error executing tests: #CR# #httpResult.error#' );
-            }
-            
-            if (isJson(httpResult.content)) {
-                outputTestResults(deserializeJSON(httpResult.content), suite.debug, suite.coverage);
-            } else {
-                // Try to parse HTML or display raw content
-                print.line(httpResult.content);
-            }
-            
-        } catch (any e) {
-            return error( 'Error executing tests: #CR# #e.message##CR##e.detail#' );
-        }
-    }
-    
-    private function outputTestResults(result, debug, coverage = false) {
-        var hiddenCount = 0;
-        
-        // Normalize result structure - handle different response formats
-        if (!structKeyExists(result, "totalError")) {
-            result.totalError = structKeyExists(result, "totalErrors") ? result.totalErrors : 0;
-        }
-        if (!structKeyExists(result, "totalFail")) {
-            result.totalFail = structKeyExists(result, "totalFailures") ? result.totalFailures : 0;
-        }
-        if (!structKeyExists(result, "totalPass")) {
-            result.totalPass = structKeyExists(result, "totalPassed") ? result.totalPassed : 
-                            (structKeyExists(result, "totalSpecs") ? result.totalSpecs - result.totalFail - result.totalError : 0);
-        }
-        if (!structKeyExists(result, "totalSkipped")) {
-            result.totalSkipped = structKeyExists(result, "totalSkip") ? result.totalSkip : 0;
-        }
-        if (!structKeyExists(result, "totalBundles")) {
-            result.totalBundles = structKeyExists(result, "bundleStats") ? arrayLen(result.bundleStats) : 0;
-        }
-        if (!structKeyExists(result, "totalSuites")) {
-            result.totalSuites = 0;
-            if (structKeyExists(result, "bundleStats")) {
-                for (var bundle in result.bundleStats) {
-                    if (structKeyExists(bundle, "suiteStats")) {
-                        result.totalSuites += arrayLen(bundle.suiteStats);
-                    }
-                }
-            }
-        }
-        if (!structKeyExists(result, "totalSpecs")) {
-            result.totalSpecs = result.totalPass + result.totalFail + result.totalError + result.totalSkipped;
-        }
-        
-        // Test completion status
-        if (result.totalError == 0 && result.totalFail == 0) {
-            print.greenBoldLine( "================ Tests Complete: All Good! =============" );
+        // Display results
+        if (result.success) {
+            print.greenBoldLine("✓ All tests passed!");
+            print.line("#result.totalTests# tests, #result.totalPassed# passed, #result.totalFailed# failed");
         } else {
-            print.redBoldLine( "================ Tests Complete: Failures! =============" );
+            print.redBoldLine("✗ Some tests failed");
+            print.line("#result.totalTests# tests, #result.totalPassed# passed, #result.totalFailed# failed");
+            setExitCode(1);
         }
         
-        print.boldLine( "================ Results: =======================" );
-        
-        // Display detailed results if there are failures or debug is on
-        if (structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
-            for (var bundle in result.bundleStats) {
-                if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
-                    for (var suite in bundle.suiteStats) {
-                        if (structKeyExists(suite, "specStats") && isArray(suite.specStats)) {
-                            for (var spec in suite.specStats) {
-                                var status = structKeyExists(spec, "status") ? spec.status : "Unknown";
-                                
-                                if (status != "Passed" && status != "Skipped") {
-                                    print.boldLine("Test Bundle:")
-                                         .boldRedLine("       #structKeyExists(bundle, 'name') ? bundle.name : 'Unknown'#:")
-                                         .boldLine("Test Suite:")
-                                         .boldRedLine("       #structKeyExists(suite, 'name') ? suite.name : 'Unknown'#:")
-                                         .boldLine("Test Name:")
-                                         .boldRedLine("       #structKeyExists(spec, 'name') ? spec.name : 'Unknown'#:");
-                                    
-                                    if (structKeyExists(spec, "failMessage") && len(spec.failMessage)) {
-                                        print.boldLine("Message:");
-                                        // Try to format HTML messages if present
-                                        try {
-                                            if (structKeyExists(variables, "Formatter")) {
-                                                print.line("#Formatter.HTML2ANSI(spec.failMessage)#");
-                                            } else {
-                                                print.line("#spec.failMessage#");
-                                            }
-                                        } catch (any e) {
-                                            print.line("#spec.failMessage#");
-                                        }
-                                    }
-                                    
-                                    print.line("----------------------------------------------------")
-                                         .line();
-                                } else {
-                                    if (debug) {
-                                        var bundleName = structKeyExists(bundle, "name") ? bundle.name : "";
-                                        var suiteName = structKeyExists(suite, "name") ? suite.name : "";
-                                        var specName = structKeyExists(spec, "name") ? spec.name : "";
-                                        var duration = structKeyExists(spec, "totalDuration") ? spec.totalDuration : 0;
-                                        print.greenline("#bundleName# #suiteName#: #specName# :#duration#ms");
-                                    } else {
-                                        hiddenCount++;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        if (hiddenCount > 0) {
-            print.boldLine( "Output from #hiddenCount# tests hidden");
-        }
-        
-        // Summary
-        print.Line("================ Summary: =======================" )
-             .line("= Bundles: #result.totalBundles#")
-             .line("= Suites: #result.totalSuites#")
-             .line("= Specs: #result.totalSpecs#")
-             .line("= Skipped: #result.totalSkipped#")
-             .line("= Errors: #result.totalError#")
-             .line("= Failures: #result.totalFail#")
-             .line("= Successes: #result.totalPass#");
-        
-        if (structKeyExists(result, "totalDuration")) {
-            print.line("= Duration: #numberFormat(result.totalDuration / 1000, '0.00')#s");
-        }
-        
-        print.Line("==================================================" );
-        
-        // Display coverage if available
-        if (coverage && structKeyExists(result, "coverage")) {
+        if (arguments.coverage && structKeyExists(result, "coverage")) {
             displayCoverageReport(result.coverage);
         }
     }
     
+    private function runTests(argumentCollection) {
+        print.yellowLine("🧪 Running tests...")
+             .line();
+        
+        var testboxPath = fileSystemUtil.resolvePath("tests/runner.cfm");
+        if (!fileExists(testboxPath)) {
+            // Create a basic runner if it doesn't exist
+            createTestRunner();
+        }
+        
+        // Build test URL
+        var serverInfo = $getServerInfo();
+        var testURL = serverInfo.serverURL & "/tests/runner.cfm?";
+        
+        // Add parameters
+        var params = [];
+        if (len(arguments.filter)) {
+            arrayAppend(params, "testBundles=#arguments.filter#");
+        }
+        if (len(arguments.group)) {
+            arrayAppend(params, "testSuites=#arguments.group#");
+        }
+        if (arguments.reporter != "console") {
+            arrayAppend(params, "reporter=#arguments.reporter#");
+        }
+        if (arguments.coverage) {
+            arrayAppend(params, "coverage=true");
+        }
+        
+        testURL &= arrayToList(params, "&");
+        
+        // Run tests
+        try {
+            var httpResult = new Http(url=testURL, timeout=300).send().getPrefix();
+            
+            if (isJSON(httpResult.filecontent)) {
+                return deserializeJSON(httpResult.filecontent);
+            } else {
+                // Parse HTML output for console reporter
+                return parseConsoleOutput(httpResult.filecontent);
+            }
+        } catch (any e) {
+            print.redLine("Error running tests: #e.message#");
+            return {
+                success = false,
+                totalTests = 0,
+                totalPassed = 0,
+                totalFailed = 0,
+                error = e.message
+            };
+        }
+    }
+    
+    private function runWithWatch(argumentCollection) {
+        print.yellowLine("👀 Watching for file changes... (Press Ctrl+C to stop)")
+             .line();
+        
+        var fileWatcher = getInstance("FileWatcher@commandbox-core");
+        var watchPaths = ["models/**", "controllers/**", "tests/**", "views/**"];
+        
+        // Run tests initially
+        runTests(argumentCollection = arguments);
+        
+        fileWatcher.watch(
+            paths = watchPaths,
+            callback = function() {
+                print.line()
+                     .cyanLine("📝 Files changed, running tests...")
+                     .line();
+                runTests(argumentCollection = arguments);
+            }
+        );
+    }
+    
     private function displayCoverageReport(coverage) {
         print.line()
-             .yellowBoldLine("================ Coverage Report: =======================")
+             .yellowBoldLine("📊 Coverage Report:")
              .line();
         
         if (isStruct(arguments.coverage)) {
-            if (structKeyExists(arguments.coverage, "percentage")) {
-                var percent = numberFormat(arguments.coverage.percentage, '0.0');
-                print.line("= Overall Coverage: #percent#%");
-            }
+            print.line("Overall Coverage: #arguments.coverage.percentage#%");
             
-            if (structKeyExists(arguments.coverage, "lines")) {
-                print.line("= Lines:     #numberFormat(arguments.coverage.lines.percent, '0.0')#% (#arguments.coverage.lines.covered#/#arguments.coverage.lines.total#)");
+            if (structKeyExists(arguments.coverage, "files")) {
+                print.line()
+                     .line("File Coverage:");
+                for (var file in arguments.coverage.files) {
+                    var fileCoverage = arguments.coverage.files[file];
+                    var indicator = fileCoverage.percentage >= 80 ? "✓" : "⚠";
+                    print.line("  #indicator# #file#: #fileCoverage.percentage#%");
+                }
             }
-            
-            if (structKeyExists(arguments.coverage, "functions")) {
-                print.line("= Functions: #numberFormat(arguments.coverage.functions.percent, '0.0')#% (#arguments.coverage.functions.covered#/#arguments.coverage.functions.total#)");
-            }
-            
-            print.Line("==========================================================");
         }
+    }
+    
+    private function parseConsoleOutput(html) {
+        // Basic parsing of HTML test output
+        var result = {
+            success = true,
+            totalTests = 0,
+            totalPassed = 0,
+            totalFailed = 0
+        };
+        
+        // Look for test summary in HTML
+        if (findNoCase("failed", arguments.html)) {
+            result.success = false;
+        }
+        
+        // Extract numbers from common test output patterns
+        var testPattern = "(\d+)\s+test[s]?";
+        var passPattern = "(\d+)\s+pass(ed)?";
+        var failPattern = "(\d+)\s+fail(ed)?";
+        
+        var testMatch = reFind(testPattern, arguments.html, 1, true);
+        if (arrayLen(testMatch.match) > 1) {
+            result.totalTests = val(testMatch.match[2]);
+        }
+        
+        var passMatch = reFind(passPattern, arguments.html, 1, true);
+        if (arrayLen(passMatch.match) > 1) {
+            result.totalPassed = val(passMatch.match[2]);
+        }
+        
+        var failMatch = reFind(failPattern, arguments.html, 1, true);
+        if (arrayLen(failMatch.match) > 1) {
+            result.totalFailed = val(failMatch.match[2]);
+        }
+        
+        return result;
+    }
+    
+    private function createTestRunner() {
+        var runnerContent = '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Test Runner</title>
+</head>
+<body>
+    <cfscript>
+        // Create TestBox instance
+        testbox = new testbox.system.TestBox();
+        
+        // Run tests
+        param name="url.testBundles" default="";
+        param name="url.testSuites" default="";
+        param name="url.reporter" default="simple";
+        param name="url.coverage" default="false";
+        
+        options = {
+            reporter = url.reporter
+        };
+        
+        if (len(url.testBundles)) {
+            options.bundles = url.testBundles;
+        }
+        
+        if (len(url.testSuites)) {
+            options.testSuites = url.testSuites;
+        }
+        
+        if (url.coverage) {
+            options.coverage = {
+                enabled = true,
+                pathToCapture = "/models,/controllers"
+            };
+        }
+        
+        results = testbox.run(argumentCollection = options);
+        
+        // Output results
+        if (url.reporter == "json") {
+            content type="application/json";
+            writeOutput(serializeJSON({
+                success = results.getTotalFail() == 0,
+                totalTests = results.getTotalSpecs(),
+                totalPassed = results.getTotalPass(),
+                totalFailed = results.getTotalFail(),
+                coverage = isBoolean(url.coverage) && url.coverage ? results.getCoverageData() : {}
+            }));
+        } else {
+            writeOutput(results.getResultsOutput());
+        }
+    </cfscript>
+</body>
+</html>';
+        
+        var runnerPath = fileSystemUtil.resolvePath("tests/runner.cfm");
+        var runnerDir = getDirectoryFromPath(runnerPath);
+        
+        if (!directoryExists(runnerDir)) {
+            directoryCreate(runnerDir, true);
+        }
+        
+        fileWrite(runnerPath, runnerContent);
+        print.yellowLine("Created test runner at: #runnerPath#");
     }
 }
