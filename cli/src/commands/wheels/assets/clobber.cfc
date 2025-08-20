@@ -32,8 +32,7 @@ component extends="../base" {
 			error("This command must be run from a Wheels application root directory.");
 		}
 		
-		// var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
-		var compiledDir = fileSystemUtil.resolvePath("templates/base/src/public/assets/compiled");
+		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 		
 		if (!directoryExists(compiledDir)) {
 			print.yellowLine("No compiled assets directory found. Nothing to clobber.");
@@ -88,8 +87,8 @@ component extends="../base" {
 			
 			print.line();
 			print.boldGreenLine("==> Asset clobber complete!");
-			print.greenLine("    Deleted #fileCount# files");
-			print.greenLine("    Freed #formatFileSize(totalSize)# of disk space");
+			print.greenLine("Deleted #fileCount# files");
+			print.greenLine("Freed #formatFileSize(totalSize)# of disk space");
 			print.line();
 			print.yellowLine("Remember to run 'wheels assets:precompile' before deploying to production.");
 		} catch (any e) {
