@@ -6,7 +6,7 @@
 };
 
 for (r in application.wheels.routes){
-	if ((StructKeyExists(r, "controller") && r.controller EQ "wheels.public") || (StructKeyExists(r, "pattern") && find("/testbox", r.pattern))) {
+	if ((StructKeyExists(r, "controller") && r.controller EQ "wheels.public") || (StructKeyExists(r, "pattern") && r.pattern eq "/wheels/app/tests")) {
 		ArrayAppend(routes.internalRoutes, r);
 	} else {
 		ArrayAppend(routes.appRoutes, r);
