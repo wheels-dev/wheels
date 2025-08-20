@@ -46,7 +46,7 @@ component extends="../base" {
 		
 		// Define asset directories
 		// var publicDir = fileSystemUtil.resolvePath("public");		
-		var publicDir = fileSystemUtil.resolvePath("templates\base\src\public");
+		var publicDir = fileSystemUtil.resolvePath("\public");
 
 		print.line(publicDir);
 		var assetsDir = publicDir & "/assets";
@@ -126,8 +126,7 @@ component extends="../base" {
 		// Provide instructions for production
 		print.line();
 		print.yellowLine("To use precompiled assets in production:");
-		// print.line("1. Configure your web server to serve static files from /public/assets/compiled");
-		print.line("1. Configure your web server to serve static files from templates/base/src/public/assets/compiled");
+		print.line("1. Configure your web server to serve static files from /public/assets/compiled");
 		print.line("2. Update your application to use the asset manifest for cache-busted URLs");
 		print.line("3. Set wheels.assetManifest = true in your production environment");
 	}
@@ -149,7 +148,7 @@ component extends="../base" {
 		
 		// Check if file already exists and hasn't changed
 		if (!arguments.force && fileExists(targetPath)) {
-			print.line("  ✓ #fileName# (unchanged)");
+			print.line("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
@@ -166,7 +165,7 @@ component extends="../base" {
 		fileWrite(targetPath, content);
 		arguments.manifest[fileName] = targetFileName;
 		
-		print.greenLine("  ✓ #fileName# → #targetFileName#");
+		print.greenLine("#fileName# → #targetFileName#");
 		return 1;
 	}
 	
@@ -187,7 +186,7 @@ component extends="../base" {
 		
 		// Check if file already exists and hasn't changed
 		if (!arguments.force && fileExists(targetPath)) {
-			print.line("  ✓ #fileName# (unchanged)");
+			print.line("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
@@ -207,7 +206,7 @@ component extends="../base" {
 		fileWrite(targetPath, content);
 		arguments.manifest[fileName] = targetFileName;
 		
-		print.greenLine("  ✓ #fileName# → #targetFileName#");
+		print.greenLine("#fileName# → #targetFileName#");
 		return 1;
 	}
 	
@@ -230,7 +229,7 @@ component extends="../base" {
 		
 		// Check if file already exists
 		if (!arguments.force && fileExists(targetPath)) {
-			print.line("  ✓ #fileName# (unchanged)");
+			print.line("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
@@ -239,7 +238,7 @@ component extends="../base" {
 		fileCopy(arguments.source, targetPath);
 		arguments.manifest[fileName] = targetFileName;
 		
-		print.greenLine("  ✓ #fileName# → #targetFileName#");
+		print.greenLine("#fileName# → #targetFileName#");
 		return 1;
 	}
 	

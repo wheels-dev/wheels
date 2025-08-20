@@ -11,7 +11,7 @@ wheels test run [spec] [options]
 
 ## Description
 
-The `wheels test run` command executes your application's TestBox test suite with support for watching, filtering, and various output formats. This is the primary command for running your application tests (as opposed to framework tests).
+The `wheels test run` command executes your application's TestBox test suite with support, filtering, and various output formats. This is the primary command for running your application tests (as opposed to framework tests).
 
 ## Options
 
@@ -21,7 +21,6 @@ The `wheels test run` command executes your application's TestBox test suite wit
 | `group` | Run specific test group | |
 | `--coverage` | Generate coverage report (boolean flag) | `false` |
 | `reporter` | Test reporter format: console, junit, json, tap | `console` |
-| `--watch` | Watch for file changes and rerun tests (boolean flag) | `false` |
 | `--verbose` | Verbose output (boolean flag) | `false` |
 | `--fail-fast` | Stop on first test failure (boolean flag) | `false` |
 
@@ -36,11 +35,6 @@ wheels test run
 ```bash
 wheels test run filter="User"
 wheels test run filter="test_user_validation"
-```
-
-### Watch mode
-```bash
-wheels test run --watch
 ```
 
 ### Run specific test group
@@ -199,32 +193,6 @@ component {
         options = {}
     };
 }
-```
-
-## Watch Mode
-
-Watch mode reruns tests on file changes:
-
-```bash
-wheels test run --watch
-```
-
-Output:
-```
-[TestBox Watch] Monitoring for changes...
-[TestBox Watch] Watching: /tests, /models, /controllers
-
-[14:23:45] Change detected: models/User.cfc
-[14:23:45] Running tests...
-
-✓ User Model > validates required fields (12ms)
-✓ User Model > saves with valid data (45ms)
-✓ User Model > prevents duplicate emails (23ms)
-
-Tests: 3 passed, 0 failed
-Time: 80ms
-
-[TestBox Watch] Waiting for changes...
 ```
 
 ## Reporters
@@ -442,10 +410,6 @@ fi
    wheels test run threads=4
    ```
 
-3. **Watch specific directories**
-   ```bash
-   wheels test run tests/models --watch
-   ```
 
 4. **Skip slow tests during development**
    ```bash
