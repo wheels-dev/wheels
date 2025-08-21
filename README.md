@@ -120,7 +120,7 @@ Please report any errors you encounter on our [issue tracker][4]. When reporting
 CFWheels supports the following CFML engines:
 - **Adobe ColdFusion**: 2018, 2021, 2023
 - **Lucee**: 5.x, 6.x, 7.x
-- **BoxLang**: 1
+- **BoxLang**: 1.x
 
 ## License
 
