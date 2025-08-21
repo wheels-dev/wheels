@@ -269,6 +269,24 @@ component {
 		local.rv.dataType = variables.wheels.class.properties[arguments.property].dataType;
 		local.rv.scale = variables.wheels.class.properties[arguments.property].scale;
 		local.rv.null = (!Len(this[arguments.property]) && variables.wheels.class.properties[arguments.property].nullable);
+		
+		// BoxLang/JDK compatibility: Convert date strings to proper date objects for datetime types
+		if (structKeyExists(server, "boxlang") && (Len(local.rv.value) && !local.rv.null && 
+		    (local.rv.type == "CF_SQL_DATE" || local.rv.type == "CF_SQL_TIME" || local.rv.type == "CF_SQL_TIMESTAMP") &&
+		    IsSimpleValue(local.rv.value) && !IsDate(local.rv.value))) {
+			
+			// Handle DD/MM/YYYY and DD-MM-YYYY formats common in European locales
+			if (REFind("^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$", local.rv.value)) {
+				local.parts = ListToArray(local.rv.value, "/-");
+				if (ArrayLen(local.parts) == 3 && IsNumeric(local.parts[1]) && IsNumeric(local.parts[2]) && IsNumeric(local.parts[3])) {
+					try {
+						local.rv.value = CreateDate(local.parts[3], local.parts[2], local.parts[1]);
+					} catch (any e) {
+						local.rv.value = CreateDate(local.parts[3], local.parts[1], local.parts[2]);
+					}
+				}
+			}
+		}
 		if(local.rv.datatype eq 'geography'){
 			local.sqlQuery = "select type from geography_columns where f_table_name = '#tableName()#' and f_geography_column = '#arguments.property#'";
 			local.result = queryExecute(local.sqlQuery,[],{datasource: "#variables.wheels.class.datasource#"});
