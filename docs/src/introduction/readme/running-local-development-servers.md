@@ -30,7 +30,7 @@ wheels docker init cfengine=adobe cfversion=2018 db=mysql
 **cfversion** options:
 - Major versions for Adobe ColdFusion: `2018`, `2021`, `2023`, `2025`
 - Major versions for Lucee: `5`, `6`, `7`
-- Major versions for BoxLang: `1.3.x`
+- Major versions for BoxLang: `1`
 
 **db** options:
 - `mysql` - MySQL database

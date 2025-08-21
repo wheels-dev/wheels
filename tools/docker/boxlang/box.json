@@ -9,7 +9,8 @@
         "bx-esapi":"^1.6.0+9",
         "bx-image":"^1.0.1",
         "bx-mssql":"^1.4.0+11",
-        "bx-mysql":"^1.0.1+7"
+        "bx-mysql":"^1.0.1+7",
+        "bx-postgresql":"^1.0.0+2"
     },
     "installPaths": {
         "wirebox": "vendor/wirebox/",
