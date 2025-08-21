@@ -143,7 +143,7 @@ curl -LO https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/bo
 
    ```bash
    # Download complete package with additional files
-   curl -LO https://github.com/ortus-solutions/boxlang/releases/latest/download/boxlang-miniserver.zip
+   curl -LO https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/boxlang-miniserver/boxlang-miniserver-latest.zip
    unzip boxlang-miniserver.zip
    ```
 
