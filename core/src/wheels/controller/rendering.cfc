@@ -507,7 +507,26 @@ component {
 			local.fileName = Replace("_" & local.fileName, "__", "_", "one");
 		}
 
-		local.folderName = Reverse(ListRest(Reverse(arguments.$name), "/"));
+		// BoxLang compatibility: Extract folder name more reliably
+		if (structKeyExists(server, "boxlang")) {
+			// For BoxLang, extract folder path manually to handle version differences
+			local.tempName = arguments.$name;
+			if (Find("/", local.tempName)) {
+				local.folderName = Left(local.tempName, Len(local.tempName) - Len(ListLast(local.tempName, "/")));
+				// Remove trailing slash if present, but only if there's more than just "/"
+				if (Right(local.folderName, 1) == "/" AND Len(local.folderName) > 1) {
+					local.folderName = Left(local.folderName, Len(local.folderName) - 1);
+				}
+				// If we end up with just "/", it means the file is at root level
+				if (local.folderName == "/") {
+					local.folderName = "";
+				}
+			} else {
+				local.folderName = "";
+			}
+		} else {
+			local.folderName = Reverse(ListRest(Reverse(arguments.$name), "/"));
+		}
 
 		if (Left(arguments.$name, 1) == "/") {
 			// Include a file in a sub folder to views.

@@ -6,7 +6,7 @@ Wheels includes a comprehensive test environment specifically designed for testi
 
 The Wheels test environment uses Docker containers to provide a standardized setup for testing core framework functionality across:
 
-- Multiple CFML engines (Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023, BoxLang 1.3.x)
+- Multiple CFML engines (Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023, BoxLang 1.x)
 - Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2)
 - A modern test user interface (TestUI)
 - Automated test execution capabilities
@@ -103,7 +103,7 @@ The test environment includes several profiles you can use with `docker compose 
 | `ui-legacy` | The legacy TestUI interface |
 | `lucee` | Lucee 5, 6 and 7 engines |
 | `adobe` | Adobe ColdFusion 2018, 2021, 2023 engines |
-| `boxlang` | BoxLang 1.3.x engine |
+| `boxlang` | BoxLang 1 engine |
 | `db` | All database platforms |
 | `mysql` | MySQL database only |
 | `postgres` | PostgreSQL database only |
