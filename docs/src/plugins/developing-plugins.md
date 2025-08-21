@@ -81,7 +81,7 @@ Finally, there is a way to specify that your plugin needs another plugin install
 
 ### Making Plugin Development More Convenient with Wheels Settings
 
-When your Wheels application first initializes, it will unzip and cache the zip files in the `/app/plugins` folder. Each plugin then has its own expanded subfolder. If a subfolder exists but has no corresponding zip file, Wheels will delete the folder and its contents.
+When your Wheels application first initializes, it will unzip and cache the zip files in the `/plugins` folder. Each plugin then has its own expanded subfolder. If a subfolder exists but has no corresponding zip file, Wheels will delete the folder and its contents.
 
 This is convenient when you're deploying plugins but can be annoying when you're developing your own plugins. By default, every time you make a change to your plugin, you need to rezip your plugin files and reload the Wheels application by adding `?reload=true` to the URL.
 

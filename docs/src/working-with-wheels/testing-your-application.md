@@ -655,14 +655,14 @@ app/
                   └─ Dummy.cfc
 ```
 
-The `/app/plugins/timeago/tests/assets/controllers/Dummy.cfc` controller contains the bare minimum for a controller.
+The `/plugins/timeago/tests/assets/controllers/Dummy.cfc` controller contains the bare minimum for a controller.
 
 ```java
 component extends="wheels.Controller" {
 }
 ```
 
-Firstly, in our `/app/plugins/timeago/tests/TestTimeAgo.cfc` we'll need to copy the application scope so that we can change some of Wheels' internal paths. Fear not, we'll reinstate any changes after the tests have finished executing using the `AfterEach()` function. so that if you're running your tests on your local development machine, your application will continue to function as expected after you're done testing.
+Firstly, in our `/plugins/timeago/tests/TestTimeAgo.cfc` we'll need to copy the application scope so that we can change some of Wheels' internal paths. Fear not, we'll reinstate any changes after the tests have finished executing using the `AfterEach()` function. so that if you're running your tests on your local development machine, your application will continue to function as expected after you're done testing.
 
 Once the setup is done, we simply execute the plugin functions and check using `expect()` function that the return values are what we expect.&#x20;
 
@@ -676,7 +676,7 @@ component extends="testbox.system.BaseSpec" {
 				// save the original environment
 				applicationScope = Duplicate(application)
 				// a relative path to our plugin's assets folder where we will store any plugin specific components and files
-				assetsPath = "/app/plugins/timeAgo/tests/assets/"
+				assetsPath = "/plugins/timeAgo/tests/assets/"
 				// override wheels' path with our plugin's assets directory
 				application.wheels.controllerPath = assetsPath & "controllers"
 				// clear any plugin default values that may have been set

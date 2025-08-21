@@ -21,7 +21,7 @@
     "dependencies": {
         "wirebox": "^7.0.0",
         "testbox": "^5.0.0",
-        "wheels-core": "*"
+        "wheels-core": "^3.0.0-SNAPSHOT"
     },
     "installPaths": {
         "wirebox": "vendor/wirebox/",
@@ -44,7 +44,7 @@
     "license":[
         {
             "type":"Apache License 2.0",
-            "URL":"https://github.com/cfwheels/cfwheels/blob/master/LICENSE"
+            "URL":"https://github.com/wheels-dev/wheels/blob/master/LICENSE"
         }
     ],
     "scripts":{

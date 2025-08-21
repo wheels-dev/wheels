@@ -58,7 +58,7 @@ vendor
 
 **app/global/** - Holds globally accessible functions available throughout your application.
 
-**app/plugins/** - Contains downloaded Wheels plugins that extend your application's functionality.
+**plugins/** - Contains downloaded Wheels plugins that extend your application's functionality.
 
 **Database Management** - Use the migration system (`wheels db migrate`) rather than manual SQL scripts for database schema changes.
 
@@ -160,7 +160,7 @@ When working on applications, your primary focus areas are:
 - **Configuration:** `config/` directory for all settings
 - **Application Logic:** `app/controllers/`, `app/models/`, `app/migrator/migrations`, `app/views/`, and `app/events/`
 - **Static Assets:** `public/files/`, `public/images/`, `public/javascripts/`, and `public/stylesheets/`
-- **Extensions:** `app/plugins/` for third-party functionality
+- **Extensions:** `plugins/` for third-party functionality
 
 ### Framework Context
 
@@ -209,7 +209,7 @@ You can add additional directories to your application structure. When doing so:
 
 **Asset Organization** - Use the conventional `public/` subdirectories for different asset types. This ensures Wheels functions work as expected and maintains project organization.
 
-**Plugin Integration** - Evaluate existing plugins in `app/plugins/` before developing custom solutions.
+**Plugin Integration** - Evaluate existing plugins in `plugins/` before developing custom solutions.
 
 **Database Management** - Use the migration system (`wheels db migrate`) rather than manual SQL scripts for database schema changes.
 

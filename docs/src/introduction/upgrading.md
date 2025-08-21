@@ -77,8 +77,8 @@ app/controllers/
 app/global/
 app/migrator/
 app/models/
-app/plugins/
 app/views/
+plugins/
 ```
 
 #### 2.2 Configurations
