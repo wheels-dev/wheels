@@ -41,8 +41,7 @@ component extends="../base" {
 		print.boldGreenLine("==> Cleaning old compiled assets...");
 		print.line();
 		
-		// var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
-		var compiledDir = fileSystemUtil.resolvePath("templates/base/src/public/assets/compiled");
+		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 		
 		if (!directoryExists(compiledDir)) {
 			print.yellowLine("No compiled assets directory found. Nothing to clean.");
@@ -101,15 +100,15 @@ component extends="../base" {
 					var fileSize = getFileInfo(fileInfo.path).size;
 					
 					if (arguments.dryRun) {
-						print.line("  Would delete: #fileInfo.name# (#formatFileSize(fileSize)#)");
+						print.line("Would delete: #fileInfo.name# (#formatFileSize(fileSize)#)");
 					} else {
 						try {
 							fileDelete(fileInfo.path);
-							print.redLine("  ✗ Deleted: #fileInfo.name# (#formatFileSize(fileSize)#)");
+							print.redLine("Deleted: #fileInfo.name# (#formatFileSize(fileSize)#)");
 							deletedCount++;
 							freedSpace += fileSize;
 						} catch (any e) {
-							print.redLine("  Error deleting #fileInfo.name#: #e.message#");
+							print.redLine("Error deleting #fileInfo.name#: #e.message#");
 						}
 					}
 				}
@@ -120,12 +119,12 @@ component extends="../base" {
 		
 		if (arguments.dryRun) {
 			print.yellowLine("==> Dry run complete. No files were deleted.");
-			print.line("    Would delete #deletedCount# files");
-			print.line("    Would free #formatFileSize(freedSpace)# of disk space");
+			print.line("Would delete #deletedCount# files");
+			print.line("Would free #formatFileSize(freedSpace)# of disk space");
 		} else if (deletedCount > 0) {
 			print.boldGreenLine("==> Asset cleaning complete!");
-			print.greenLine("    Deleted #deletedCount# old asset files");
-			print.greenLine("    Freed #formatFileSize(freedSpace)# of disk space");
+			print.greenLine("Deleted #deletedCount# old asset files");
+			print.greenLine("Freed #formatFileSize(freedSpace)# of disk space");
 		} else {
 			print.yellowLine("No old assets found to clean.");
 		}
