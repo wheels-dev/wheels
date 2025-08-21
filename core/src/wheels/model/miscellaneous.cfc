@@ -270,7 +270,7 @@ component {
 		local.rv.scale = variables.wheels.class.properties[arguments.property].scale;
 		local.rv.null = (!Len(this[arguments.property]) && variables.wheels.class.properties[arguments.property].nullable);
 		
-		// BoxLang/JDK compatibility: Convert date strings to proper date objects for datetime types
+		// BoxLang/JDK compatibility: Convert date strings to proper date for datetime types
 		if (structKeyExists(server, "boxlang") && (Len(local.rv.value) && !local.rv.null && 
 		    (local.rv.type == "CF_SQL_DATE" || local.rv.type == "CF_SQL_TIME" || local.rv.type == "CF_SQL_TIMESTAMP") &&
 		    IsSimpleValue(local.rv.value) && !IsDate(local.rv.value))) {
