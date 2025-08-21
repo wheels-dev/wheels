@@ -1,11 +1,12 @@
-<cfcomponent>
+component {
 
-	<cffunction name="init">
-		<cfset this.version = "99.9.9">
-		<cfreturn this>
-	</cffunction>
+	function init() {
+		this.version = "99.9.9";
+		return this;
+	}
 
-	<cffunction name="$GobalTestMixin" returntype="void">
-	</cffunction>
+	public void function $GobalTestMixin() {
+		
+	}
 
-</cfcomponent>
+}

@@ -43,7 +43,7 @@ The TestUI communicates with CFML engines via HTTP:
 
 - NGINX proxies requests to host machine ports where engines are running
 - Each engine has a dedicated proxy location in the NGINX configuration
-- Example URL format: `http://localhost:3000/api/lucee6/wheels/testbox?format=json`
+- Example URL format: `http://localhost:3000/api/lucee6/wheels/core/tests?format=json`
 
 ### Host Network Access
 

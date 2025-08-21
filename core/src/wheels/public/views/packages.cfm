@@ -11,13 +11,17 @@ packages = $createObjectFromRoot(
 	options = request.wheels.params
 );
 
+// Stop building preTest when we reach the correct test directory
+// (RocketUnit for app tests, otherwise use tests directory)
+stopAt = ( request.wheels.params.type eq "app" ? "RocketUnit" : "tests" );
+
 // ignore packages before the "tests directory"
 if (packages.recordCount) {
 	allPackages = ListToArray(packages.package, ".");
 	preTest = "";
 	for (i in allPackages) {
 		preTest = ListAppend(preTest, i, ".");
-		if (i eq "tests") {
+		if (i eq stopAt) {
 			break;
 		}
 	}
