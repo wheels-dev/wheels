@@ -2,9 +2,15 @@ component extends="testbox.system.BaseSpec" {
 
 	function run() {
 
-		g = application.wo
-
 		describe("Tests that DummyTest", () => {
+
+			beforeEach(() => {
+				
+			})
+
+			afterEach(() => {
+				
+			})
 
 			it("is Returning True", () => {
 				assert("true")
