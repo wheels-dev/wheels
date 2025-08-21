@@ -108,7 +108,7 @@ Use the Provided UI at `localhost:3000` for ease. The TestUI provides:
 
 You can also access each CF Engine directly on it's respective port, i.e, to access ACF2018, you just go to `localhost:62018`
 
-A sample task runner URL is `http://localhost:60005/wheels/testbox?format=json&sort=directory%20asc&db=mysql`. You can change the port to hit a different engine and change the db name to test a different database.
+A sample task runner URL is `http://localhost:60005/wheels/core/tests?format=json&sort=directory%20asc&db=mysql`. You can change the port to hit a different engine and change the db name to test a different database.
 
 ### Other useful commands
 

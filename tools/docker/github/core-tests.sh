@@ -79,7 +79,7 @@ fi
 
 echo "Using host: ${host}"
 
-test_url="http://${host}:${port}/wheels/testbox?db=${dbengine}&format=json&only=failure,error"
+test_url="http://${host}:${port}/wheels/core/tests?db=${dbengine}&format=json&only=failure,error"
 # test_url="http://${host}:${port}/"
 result_file="/tmp/${cfengine}-${dbengine}-result.txt"
 

@@ -183,7 +183,7 @@ jobs:
           echo "port=${PORT}" >> $GITHUB_OUTPUT
           
           # Construct test URL
-          TEST_URL="http://localhost:${PORT}/wheels/testbox?db=${{ matrix.dbengine }}&format=json&only=failure,error"
+          TEST_URL="http://localhost:${PORT}/wheels/core/tests?db=${{ matrix.dbengine }}&format=json&only=failure,error"
           echo "test_url=${TEST_URL}" >> $GITHUB_OUTPUT
           
           # Result file path
