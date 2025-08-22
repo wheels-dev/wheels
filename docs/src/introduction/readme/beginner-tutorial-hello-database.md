@@ -66,65 +66,44 @@ set(dataSourceName="back2thefuture");
 
 ### Datasource Configuration Methods
 
-While configuring datasources names in `/config/settings.cfm` is the approach for Wheels applications, you have add your database configuration in the `/config/app.cfm` depending on your CFML engine and database:
+In Wheels applications, you typically configure **which datasource to use** in `/config/settings.cfm`.  
+The **actual datasource definitions** should be added in `/config/app.cfm`.
 
-#### Adobe ColdFusion Administrator
-If you're using Adobe ColdFusion, you can create and manage datasources through the ColdFusion Administrator:
-1. Access the administrator at `{SITE_URL}/CFIDE/administrator/index.cfm` (or your configured URL and port)
-2. Navigate to Data & Services > Data Sources
-3. Add a new datasource with the same name specified in your `dataSourceName` setting in `settings.cfm`
-4. Configure connection details, pooling, and advanced settings through the web interface
+Wheels will look for the datasource defined in `settings.cfm` and match it against what you’ve defined in `app.cfm` or through your CFML engine’s administrator.
 
-#### Lucee Server/Web Administrator  
-For Lucee installations, you can manage datasources via the Lucee Administrator:
-1. Access the Server Administrator at `{SITE_URL}/lucee/admin/server.cfm`
-3. Navigate to Services > Datasource
-4. Create a new datasource matching your `dataSourceName` configuration
-5. Set up connection pooling, validation queries, and other database-specific settings
+---
 
-#### BoxLang Configuration
-BoxLang only supports datasource configuration through its configuration files, following patterns to create datasources that match your Wheels application settings in the `/config/app.cfm` files.
+#### Option 1: Datasource Configuration via Administrator (Adobe & Lucee)
 
-#### Datasource Configuration via app.cfm
-You can define datasources in your `/config/app.cfm` file using the `this.datasources` struct. This approach works across all CFML engines (Adobe ColdFusion, Lucee, and BoxLang):
+You can manage datasources through the Administrator interface of your CFML engine:
+
+1. Access your CFML administrator (Adobe ColdFusion Administrator or Lucee Server/Web Administrator).  
+2. Navigate to the **Datasource** section.  
+3. Create a new datasource with the **exact same name** as the one you’ve set in `settings.cfm` (`dataSourceName`).  
+4. Provide connection details (JDBC driver, connection string, username, password).  
+5. Configure optional features like connection pooling and validation queries.
+
+This method lets you manage database connectivity centrally in the engine’s admin console.
+
+---
+
+#### Option 2: Datasource Configuration via `/config/app.cfm` (Lucee & BoxLang)
+
+You can also define datasources programmatically in your Wheels application using the `this.datasources` struct inside `/config/app.cfm`.  
+This approach works in **Lucee** and **BoxLang** without needing Administrator access.
 
 {% code title="/config/app.cfm" %}
 ```javascript
 component {
     this.name = "WheelsApp";
     
-    // Define datasources programmatically
+    // Define a datasource for use in settings.cfm
     this.datasources["wheels-dev"] = {
         class: "com.mysql.cj.jdbc.Driver",
-        connectionString: "jdbc:mysql://localhost:3306/wheels-dev?useSSL=false",
-        username: "mysql",
-        password: "yourpassword"
+        connectionString: "yourConnectionString",
+        username: "yourUsername",
+        password: "yourPassword"
     };
-    
-    // For SQLServer
-    // this.datasources["wheels-dev"] = {
-	// 	class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-	// 	connectionString: "jdbc:sqlserver://localhost:1434;databaseName=wheels-dev;encrypt=false",
-	// 	username: "sqlserver",
-	// 	password: "yourpassword"
-	// };
-
-    // For PostgreSQL
-    // this.datasources["wheels-dev"] = {
-    //     class: "org.postgresql.Driver",
-    //     connectionString: "jdbc:postgresql://localhost:5432/wheels-dev",
-    //     username: "postgres",
-    //     password: "yourpassword"
-    // };
-    
-    // For H2 (embedded database)
-    // this.datasources['wheels-dev'] = {
-	// 	class: 'org.h2.Driver', 
-	// 	connectionString: 'jdbc:h2:file:./db/h2/wheels-dev;MODE=MySQL', 
-	// 	username: 'sa'
-	// };
-
-    // you can check and define your configuration according to your settings.
 }
 ```
 {% endcode %}
