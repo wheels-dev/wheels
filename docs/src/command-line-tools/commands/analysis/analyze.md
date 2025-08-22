@@ -21,12 +21,6 @@ The `wheels analyze` command provides comprehensive code analysis tools for Whee
 | `performance` | Analyze performance characteristics |
 | `security` | Security vulnerability analysis (deprecated) |
 
-## Options (Coming Soon)
-
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
-| `--version` | Show version information |
 
 ## Direct Usage
 
