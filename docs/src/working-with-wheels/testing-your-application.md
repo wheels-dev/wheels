@@ -43,11 +43,12 @@ your-app/
 │       │   └── functions/
 │       │       └── ExampleSpec.cfc
 │       ├── _assets/
-│       ├── runner.cfm
-│       └── populate.cfm
+│       ├── populate.cfm
+│       ├── routes.cfm
+│       └── runner.cfm
 ```
 
-**Note**: The directory uses `tests/Testbox/` (capital T) as shown in real implementations, not the lowercase `testbox`.
+**Note**: By default, TestBox runs tests located in the `tests/testbox/specs/` directory, unless configured otherwise.
 
 ## TestBox Test Runner Configuration
 
@@ -59,79 +60,186 @@ For detailed information on TestBox runners and configuration options, refer to 
 
 ```cfscript
 <!--- TestBox Test Runner for Wheels 3.0 --->
+<cfsetting requestTimeOut="1800">
 <cfscript>
-    // Environment backup and configuration
-    backupApplicationScope = duplicate(application);
-    
-    // URL parameters for test configuration
-    param name="url.format" default="html";          // json, txt, junit, html
-    param name="url.db" default="";                  // mysql, sqlserver, postgres, h2
-    param name="url.populate" default="false";       // populate test data
-    param name="url.reporter" default="simple";
-    param name="url.directory" default="tests.Testbox.specs";
-    param name="url.recurse" default="true";
-    param name="url.bundles" default="";
-    param name="url.labels" default="";
-    param name="url.excludes" default="";
-    
-    // Database configuration for testing
-    if (len(url.db)) {
-        switch(url.db) {
-            case "mysql":
-                application.wheels.dataSourceName = "wheelstestdb_mysql";
-                break;
-            case "sqlserver":
-                application.wheels.dataSourceName = "wheelstestdb_sqlserver"; 
-                break;
-            case "postgres":
-                application.wheels.dataSourceName = "wheelstestdb_postgres";
-                break;
-            case "h2":
-                application.wheels.dataSourceName = "wheelstestdb_h2";
-                break;
+    testBox = new testbox.system.TestBox(directory="tests.Testbox.specs")
+
+    setTestboxEnvironment()
+
+    if (!structKeyExists(url, "format") || url.format eq "html") {
+        result = testBox.run(
+            reporter = "testbox.system.reports.JSONReporter"
+        );
+    }
+    else if(url.format eq "json"){
+        result = testBox.run(
+            reporter = "testbox.system.reports.JSONReporter"
+        );
+        cfcontent(type="application/json");
+        cfheader(name="Access-Control-Allow-Origin", value="*");
+        DeJsonResult = DeserializeJSON(result);
+        if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
+            cfheader(statustext="Expectation Failed", statuscode=417);
+        } else {
+            cfheader(statustext="OK", statuscode=200);
+        }
+        // Check if 'only' parameter is provided in the URL
+        if (structKeyExists(url, "only") && url.only eq "failure,error") {
+            allBundles = DeJsonResult.bundleStats;
+            if(DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0){  
+
+                // Filter test results
+                filteredBundles = [];
+                
+                for (bundle in DeJsonResult.bundleStats) {
+                    if (bundle.totalError > 0 || bundle.totalFail > 0) {
+                        filteredSuites = [];
+                
+                        for (suite in bundle.suiteStats) {
+                            if (suite.totalError > 0 || suite.totalFail > 0) {
+                                filteredSpecs = [];
+                
+                                for (spec in suite.specStats) {
+                                    if (spec.status eq "Error" || spec.status eq "Failed") {
+                                        arrayAppend(filteredSpecs, spec);
+                                    }
+                                }
+                
+                                if (arrayLen(filteredSpecs) > 0) {
+                                    suite.specStats = filteredSpecs;
+                                    arrayAppend(filteredSuites, suite);
+                                }
+                            }
+                        }
+                
+                        if (arrayLen(filteredSuites) > 0) {
+                            bundle.suiteStats = filteredSuites;
+                            arrayAppend(filteredBundles, bundle);
+                        }
+                    }
+                }
+            
+                DeJsonResult.bundleStats = filteredBundles;
+                // Update the result with filtered data
+
+                count = 1;
+                for(bundle in allBundles){
+                    writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
+                    writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
+                    writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
+                    writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
+                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                    if(bundle.totalFail > 0 || bundle.totalError > 0){
+                        for(suite in DeJsonResult.bundleStats[count].suiteStats){
+                            writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                            for(spec in suite.specStats){
+                                writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
+                                writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
+                                writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                            }
+                        }
+                        count += 1;
+                    }
+                    writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                }
+                
+            }else{
+                for(bundle in DeJsonResult.bundleStats){
+                    writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
+                    writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
+                    writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
+                    writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
+                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                }
+            }
+        }else{
+            writeOutput(result)
         }
     }
-    
-    // Populate test database if requested
-    if (url.populate) {
-        include "populate.cfm";
+    else if (url.format eq "txt") {
+        result = testBox.run(
+            reporter = "testbox.system.reports.TextReporter"
+        )        
+        cfcontent(type="text/plain");
+        writeOutput(result)
     }
-    
-    // CSRF token handling for security testing
-    if (!structKeyExists(session, "csrf_token")) {
-        session.csrf_token = createUUID();
+    else if(url.format eq "junit"){
+        result = testBox.run(
+            reporter = "testbox.system.reports.ANTJUnitReporter"
+        )
+        cfcontent(type="text/xml");
+        writeOutput(result)
     }
-    
-    // Configure test paths
-    request.wheels.testControllerPath = "/app/controllers/";
-    request.wheels.testViewPath = "/app/views/";
-    request.wheels.testModelPath = "/app/models/";
-    request.wheels.testAssetPath = "/tests/Testbox/_assets/";
-</cfscript>
+    // reset the original environment
+    application.wheels = application.$$$wheels
+    structDelete(application, "$$$wheels")
+    if(!structKeyExists(url, "format") || url.format eq "html"){
+        // Use our html template
+        type = "App";
+        include "/wheels/tests_testbox/html.cfm";
+    }
 
-<!--- Output format handling --->
-<cfswitch expression="#url.format#">
-    <cfcase value="json">
-        <cfheader name="Content-Type" value="application/json">
-        <cfinclude template="/testbox/system/runners/JSONRunner.cfm">
-    </cfcase>
-    <cfcase value="txt">
-        <cfheader name="Content-Type" value="text/plain">
-        <cfinclude template="/testbox/system/runners/TextRunner.cfm">
-    </cfcase>
-    <cfcase value="junit">
-        <cfheader name="Content-Type" value="application/xml">
-        <cfinclude template="/testbox/system/runners/JUnitRunner.cfm">
-    </cfcase>
-    <cfdefaultcase>
-        <!--- HTML Runner (default) --->
-        <cfinclude template="/testbox/system/runners/HTMLRunner.cfm">
-    </cfdefaultcase>
-</cfswitch>
+    private function setTestboxEnvironment() {
+        // creating backup for original environment
+        application.$$$wheels = Duplicate(application.wheels)
 
-<cfscript>
-    // Restore original application state after tests
-    application = backupApplicationScope;
+        // load testbox routes
+        application.wo.$include(template = "/tests/testbox/routes.cfm")
+        application.wo.$setNamedRoutePositions()
+
+        local.AssetPath = "/tests/testbox/_assets/"
+        
+        application.wo.set(rewriteFile = "index.cfm")
+        application.wo.set(controllerPath = local.AssetPath & "controllers")
+        application.wo.set(viewPath = local.AssetPath & "views")
+        application.wo.set(modelPath = local.AssetPath & "models")
+        application.wo.set(wheelsComponentPath = "/wheels")
+
+        /* turn off default validations for testing */
+        application.wheels.automaticValidations = false
+        application.wheels.assetQueryString = false
+        application.wheels.assetPaths = false
+
+        /* redirections should always delay when testing */
+        application.wheels.functions.redirectTo.delay = true
+
+        /* turn off transactions by default */
+        application.wheels.transactionMode = "none"
+
+        /* turn off request query caching */
+        application.wheels.cacheQueriesDuringRequest = false
+
+        // CSRF
+        application.wheels.csrfCookieName = "_wheels_test_authenticity"
+        application.wheels.csrfCookieEncryptionAlgorithm = "AES"
+        application.wheels.csrfCookieEncryptionSecretKey = GenerateSecretKey("AES")
+        application.wheels.csrfCookieEncryptionEncoding = "Base64"
+
+        // Setup CSRF token and cookie. The cookie can always be in place, even when the session-based CSRF storage is being
+        // tested.
+        dummyController = application.wo.controller("dummy")
+        csrfToken = dummyController.$generateCookieAuthenticityToken()
+
+        cookie[application.wheels.csrfCookieName] = Encrypt(
+            SerializeJSON({authenticityToken = csrfToken}),
+            application.wheels.csrfCookieEncryptionSecretKey,
+            application.wheels.csrfCookieEncryptionAlgorithm,
+            application.wheels.csrfCookieEncryptionEncoding
+        )
+        if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2", url.db)){
+            application.wheels.dataSourceName = "wheelstestdb_" & url.db;
+        } else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
+            application.wheels.dataSourceName = "wheelstestdb"; 
+        } else {
+            application.wheels.dataSourceName = application.wheels.coreTestDataSourceName;
+        }
+        application.testenv.db = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+
+        local.populate = StructKeyExists(url, "populate") ? url.populate : true
+        if (local.populate) {
+            include "populate.cfm"
+        }
+    }
 </cfscript>
 ```
 
@@ -194,21 +302,21 @@ component extends="testbox.system.BaseSpec" {
     }
     
     function run() {
-        describe("Front Page Functions Tests", function() {
+        describe("Front Page Functions Tests", () => {
             
-            it("should return 200 status code for home page", function() {
+            it("should return 200 status code for home page", () => {
                 cfhttp(url=variables.home, method="GET", result="response");
                 expect(response.status_code).toBe(200);
                 expect(response.responseheader.status_code).toBe(200);
             });
             
-            it("should contain expected home page content", function() {
+            it("should contain expected home page content", () => {
                 cfhttp(url=variables.home, method="GET", result="response");
                 expect(response.filecontent).toInclude("<title>");
                 expect(response.filecontent).toInclude("html");
             });
             
-            it("should have proper content type", function() {
+            it("should have proper content type", () => {
                 cfhttp(url=variables.home, method="GET", result="response");
                 expect(response.responseheader["Content-Type"]).toInclude("text/html");
             });
@@ -231,9 +339,10 @@ component extends="testbox.system.BaseSpec" {
     }
     
     function run() {
-        describe("API Controller Tests", function() {
             
-            beforeEach(function() {
+        describe("GET /api/users", () => {
+
+            beforeEach(() => {
                 // Set up API authentication if needed
                 variables.headers = {
                     "Content-Type": "application/json",
@@ -241,52 +350,48 @@ component extends="testbox.system.BaseSpec" {
                 };
             });
             
-            describe("GET /api/users", function() {
+            it("should return JSON response with 200 status", () => {
+                cfhttp(
+                    url=variables.apiUrl & "/users",
+                    method="GET",
+                    result="response"
+                ) {
+                    cfhttpparam(type="header", name="Content-Type", value="application/json");
+                    cfhttpparam(type="header", name="Accept", value="application/json");
+                }
                 
-                it("should return JSON response with 200 status", function() {
-                    cfhttp(
-                        url=variables.apiUrl & "/users",
-                        method="GET",
-                        result="response"
-                    ) {
-                        cfhttpparam(type="header", name="Content-Type", value="application/json");
-                        cfhttpparam(type="header", name="Accept", value="application/json");
-                    }
-                    
-                    expect(response.status_code).toBe(200);
-                    
-                    // Parse JSON response
-                    var jsonResponse = deserializeJSON(response.filecontent);
-                    expect(jsonResponse).toBeStruct();
-                    expect(jsonResponse).toHaveKey("data");
-                });
+                expect(response.status_code).toBe(200);
                 
+                // Parse JSON response
+                var jsonResponse = deserializeJSON(response.filecontent);
+                expect(jsonResponse).toBeStruct();
+                expect(jsonResponse).toHaveKey("data");
             });
             
-            describe("POST /api/users", function() {
+        });
+        
+        describe("POST /api/users", () => {
+            
+            it("should create new user with valid data", () => {
+                var userData = {
+                    username: "apitest_#createUUID()#",
+                    email: "apitest@example.com",
+                    password: "password123"
+                };
                 
-                it("should create new user with valid data", function() {
-                    var userData = {
-                        username: "apitest_#createUUID()#",
-                        email: "apitest@example.com",
-                        password: "password123"
-                    };
-                    
-                    cfhttp(
-                        url=variables.apiUrl & "/users",
-                        method="POST",
-                        result="response"
-                    ) {
-                        cfhttpparam(type="header", name="Content-Type", value="application/json");
-                        cfhttpparam(type="body", value=serializeJSON(userData));
-                    }
-                    
-                    expect(response.status_code).toBe(201);
-                    
-                    var jsonResponse = deserializeJSON(response.filecontent);
-                    expect(jsonResponse.data.username).toBe(userData.username);
-                });
+                cfhttp(
+                    url=variables.apiUrl & "/users",
+                    method="POST",
+                    result="response"
+                ) {
+                    cfhttpparam(type="header", name="Content-Type", value="application/json");
+                    cfhttpparam(type="body", value=serializeJSON(userData));
+                }
                 
+                expect(response.status_code).toBe(201);
+                
+                var jsonResponse = deserializeJSON(response.filecontent);
+                expect(jsonResponse.data.username).toBe(userData.username);
             });
             
         });
@@ -307,71 +412,68 @@ component extends="testbox.system.BaseSpec" {
     }
     
     function run() {
-        describe("Authentication Controller Tests", function() {
+
+		describe("Login Flow", () => {
+
+			beforeEach(() => {
+				// Create test user for authentication tests
+				variables.testUser = {
+					username: "authtest",
+					email: "authtest@example.com",
+					password: "password123"
+				};
+			});
+			
+			it("should display login page", () => {
+				cfhttp(url=variables.authUrl & "/login", method="GET", result="response");
+				expect(response.status_code).toBe(200);
+				expect(response.filecontent).toInclude("login");
+			});
+			
+			it("should authenticate valid user", () => {
+				cfhttp(
+					url=variables.authUrl & "/login",
+					method="POST",
+					result="response"
+				) {
+					cfhttpparam(type="formfield", name="username", value=variables.testUser.username);
+					cfhttpparam(type="formfield", name="password", value=variables.testUser.password);
+					cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+				}
+				
+				// Should redirect after successful login
+				expect(response.status_code).toBe(302);
+				expect(response.responseheader).toHaveKey("Location");
+			});
+			
+			it("should reject invalid credentials", () => {
+				cfhttp(
+					url=variables.authUrl & "/login", 
+					method="POST",
+					result="response"
+				) {
+					cfhttpparam(type="formfield", name="username", value="invalid");
+					cfhttpparam(type="formfield", name="password", value="invalid");
+					cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+				}
+				
+				expect(response.status_code).toBe(200);
+				expect(response.filecontent).toInclude("error");
+			});
+			
+		});
             
-            beforeEach(function() {
-                // Create test user for authentication tests
-                variables.testUser = {
-                    username: "authtest",
-                    email: "authtest@example.com",
-                    password: "password123"
-                };
-            });
-            
-            describe("Login Flow", function() {
-                
-                it("should display login page", function() {
-                    cfhttp(url=variables.authUrl & "/login", method="GET", result="response");
-                    expect(response.status_code).toBe(200);
-                    expect(response.filecontent).toInclude("login");
-                });
-                
-                it("should authenticate valid user", function() {
-                    cfhttp(
-                        url=variables.authUrl & "/login",
-                        method="POST",
-                        result="response"
-                    ) {
-                        cfhttpparam(type="formfield", name="username", value=variables.testUser.username);
-                        cfhttpparam(type="formfield", name="password", value=variables.testUser.password);
-                        cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
-                    }
-                    
-                    // Should redirect after successful login
-                    expect(response.status_code).toBe(302);
-                    expect(response.responseheader).toHaveKey("Location");
-                });
-                
-                it("should reject invalid credentials", function() {
-                    cfhttp(
-                        url=variables.authUrl & "/login", 
-                        method="POST",
-                        result="response"
-                    ) {
-                        cfhttpparam(type="formfield", name="username", value="invalid");
-                        cfhttpparam(type="formfield", name="password", value="invalid");
-                        cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
-                    }
-                    
-                    expect(response.status_code).toBe(200);
-                    expect(response.filecontent).toInclude("error");
-                });
-                
-            });
-            
-            describe("Logout Flow", function() {
-                
-                it("should logout user successfully", function() {
-                    cfhttp(url=variables.authUrl & "/logout", method="POST", result="response") {
-                        cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
-                    }
-                    
-                    expect(response.status_code).toBe(302);
-                });
-                
-            });
-            
-        });
+		describe("Logout Flow", () => {
+			
+			it("should logout user successfully", () => {
+				cfhttp(url=variables.authUrl & "/logout", method="POST", result="response") {
+					cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+				}
+				
+				expect(response.status_code).toBe(302);
+			});
+			
+		});
     }
 }
 ```
@@ -389,55 +491,53 @@ component extends="testbox.system.BaseSpec" {
     }
     
     function run() {
-        describe("Post Controller Tests", function() {
             
-            describe("Blog Index", function() {
-                
-                it("should display blog posts list", function() {
-                    cfhttp(url=variables.blogUrl, method="GET", result="response");
-                    expect(response.status_code).toBe(200);
-                    expect(response.filecontent).toInclude("blog");
-                });
-                
-            });
+        describe("Blog Index", () => {
             
-            describe("Individual Blog Post", function() {
-                
-                it("should display specific blog post", function() {
-                    cfhttp(url=variables.blogUrl & "/1", method="GET", result="response");
-                    // Either 200 (post exists) or 404 (post doesn't exist)
-                    expect([200, 404]).toInclude(response.status_code);
-                });
-                
-            });
-            
-            describe("Blog Post Creation", function() {
-                
-                it("should create new blog post with valid data", function() {
-                    var postData = {
-                        title: "Test Blog Post",
-                        content: "This is test content for the blog post.",
-                        published: true
-                    };
-                    
-                    cfhttp(
-                        url=variables.blogUrl & "/create",
-                        method="POST",
-                        result="response"
-                    ) {
-                        cfhttpparam(type="formfield", name="title", value=postData.title);
-                        cfhttpparam(type="formfield", name="content", value=postData.content);
-                        cfhttpparam(type="formfield", name="published", value=postData.published);
-                        cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
-                    }
-                    
-                    // Should redirect after successful creation
-                    expect([201, 302]).toInclude(response.status_code);
-                });
-                
+            it("should display blog posts list", () => {
+                cfhttp(url=variables.blogUrl, method="GET", result="response");
+                expect(response.status_code).toBe(200);
+                expect(response.filecontent).toInclude("blog");
             });
             
         });
+        
+        describe("Individual Blog Post", () => {
+            
+            it("should display specific blog post", () => {
+                cfhttp(url=variables.blogUrl & "/1", method="GET", result="response");
+                // Either 200 (post exists) or 404 (post doesn't exist)
+                expect([200, 404]).toInclude(response.status_code);
+            });
+            
+        });
+        
+        describe("Blog Post Creation", () => {
+            
+            it("should create new blog post with valid data", () => {
+                var postData = {
+                    title: "Test Blog Post",
+                    content: "This is test content for the blog post.",
+                    published: true
+                };
+                
+                cfhttp(
+                    url=variables.blogUrl & "/create",
+                    method="POST",
+                    result="response"
+                ) {
+                    cfhttpparam(type="formfield", name="title", value=postData.title);
+                    cfhttpparam(type="formfield", name="content", value=postData.content);
+                    cfhttpparam(type="formfield", name="published", value=postData.published);
+                    cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+                }
+                
+                // Should redirect after successful creation
+                expect([201, 302]).toInclude(response.status_code);
+            });
+            
+        });
+        
     }
 }
 ```
@@ -454,52 +554,50 @@ Create `tests/Testbox/specs/functions/ExampleSpec.cfc`:
 component extends="testbox.system.BaseSpec" {
     
     function run() {
-        describe("Utility Functions Tests", function() {
             
-            describe("String Helper Functions", function() {
-                
-                it("should strip spaces correctly", function() {
-                    var result = stripSpaces(" hello world ");
-                    expect(result).toBe("helloworld");
-                });
-                
-                it("should format currency properly", function() {
-                    var result = formatCurrency(1234.56);
-                    expect(result).toInclude("$");
-                    expect(result).toInclude("1,234.56");
-                });
-                
+        describe("String Helper Functions", () => {
+            
+            it("should strip spaces correctly", () => {
+                var result = stripSpaces(" hello world ");
+                expect(result).toBe("helloworld");
             });
             
-            describe("Date Helper Functions", function() {
-                
-                it("should format date correctly", function() {
-                    var testDate = createDate(2024, 1, 15);
-                    var result = formatDisplayDate(testDate);
-                    expect(result).toInclude("Jan");
-                    expect(result).toInclude("15");
-                    expect(result).toInclude("2024");
-                });
-                
-            });
-            
-            describe("Validation Functions", function() {
-                
-                it("should validate email addresses", function() {
-                    expect(isValidEmail("test@example.com")).toBeTrue();
-                    expect(isValidEmail("invalid-email")).toBeFalse();
-                    expect(isValidEmail("")).toBeFalse();
-                });
-                
-                it("should validate phone numbers", function() {
-                    expect(isValidPhone("(555) 123-4567")).toBeTrue();
-                    expect(isValidPhone("555-123-4567")).toBeTrue();
-                    expect(isValidPhone("invalid")).toBeFalse();
-                });
-                
+            it("should format currency properly", () => {
+                var result = formatCurrency(1234.56);
+                expect(result).toInclude("$");
+                expect(result).toInclude("1,234.56");
             });
             
         });
+        
+        describe("Date Helper Functions", () => {
+            
+            it("should format date correctly", () => {
+                var testDate = createDate(2024, 1, 15);
+                var result = formatDisplayDate(testDate);
+                expect(result).toInclude("Jan");
+                expect(result).toInclude("15");
+                expect(result).toInclude("2024");
+            });
+            
+        });
+        
+        describe("Validation Functions", () => {
+            
+            it("should validate email addresses", () => {
+                expect(isValidEmail("test@example.com")).toBeTrue();
+                expect(isValidEmail("invalid-email")).toBeFalse();
+                expect(isValidEmail("")).toBeFalse();
+            });
+            
+            it("should validate phone numbers", () => {
+                expect(isValidPhone("(555) 123-4567")).toBeTrue();
+                expect(isValidPhone("555-123-4567")).toBeTrue();
+                expect(isValidPhone("invalid")).toBeFalse();
+            });
+            
+        });
+        
     }
 }
 ```
