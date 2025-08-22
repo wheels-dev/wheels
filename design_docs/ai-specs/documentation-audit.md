@@ -19,7 +19,7 @@ Conduct a comprehensive audit of CFWheels 3.0 documentation while simultaneously
 
 **Tasks**:
 
-- Clone and scan the `cfwheels/cfwheels` repository (focus on 3.0 branch if available)
+- Clone and scan the `wheels-dev/wheels` repository (focus on 3.0 branch if available)
 - Identify all documentation files (.md, .cfm, .html, README files, etc.)
 - Create a comprehensive directory structure map
 - Catalog different documentation types:
@@ -100,7 +100,7 @@ Conduct a comprehensive audit of CFWheels 3.0 documentation while simultaneously
 - Find all instances of “CFWheels” and determine appropriate replacement with “Wheels”
 - Locate all “cfwheels.org” references for replacement with “wheels.dev”
 - Handle edge cases and context-sensitive replacements:
-  - Repository names (cfwheels/cfwheels)
+  - Repository names (wheels-dev/wheels)
   - Package names and namespaces
   - Historical references that should remain unchanged
   - Code examples and variable names
@@ -155,7 +155,7 @@ Conduct a comprehensive audit of CFWheels 3.0 documentation while simultaneously
 
 ### Repository Structure
 
-- Primary focus: `cfwheels/cfwheels` main repository
+- Primary focus: `wheels-dev/wheels` main repository
 - Special attention to 3.0 branch/version if separate
 - Include `/guides` folder if present in repository
 - Check for documentation in `/docs`, `/readme`, `/examples` folders

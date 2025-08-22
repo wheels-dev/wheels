@@ -892,7 +892,7 @@ component extends="testbox.system.BaseSpec" {
 				user.validatesUniquenessOf(property = "firstName")
 				expect(user.valid()).toBeTrue()
 				// Special case for testing when we already have duplicates in the database:
-				// https://github.com/cfwheels/cfwheels/issues/480
+				// https://github.com/wheels-dev/wheels/issues/480
 				transaction action="begin" {
 					user.create(firstName = "Tony", username = "xxxx", password = "xxxx", lastname = "xxxx", validate = false)
 					firstUser = g.model("user").findOne(where = "firstName = 'Tony'", order = "id ASC")
