@@ -1,16 +1,16 @@
 # BoxLang Server Setup
 
-CFWheels supports BoxLang 1.3.x, providing developers with a modern, high-performance CFML runtime. You can run BoxLang applications using either CommandBox or BoxLang Mini-Server.
+Wheels supports BoxLang 1.3.x, providing developers with a modern, high-performance CFML runtime. You can run BoxLang applications using either CommandBox or BoxLang Mini-Server.
 
 ## Prerequisites
 
 - **Java 21 or higher** installed on your system
-- **CFWheels application** (generated or existing)
+- **Wheels application** (generated or existing)
 - **BoxLang runtime** (see installation options below)
 
 ## Method 1: Using CommandBox (Recommended)
 
-CommandBox provides the easiest and most feature-rich way to run BoxLang applications with CFWheels.
+CommandBox provides the easiest and most feature-rich way to run BoxLang applications with Wheels.
 
 ### Installation and Setup
 
@@ -27,7 +27,7 @@ box server start cfengine=boxlang@1.3.0
 
 ### BoxLang Module Dependencies
 
-BoxLang requires specific modules for full CFWheels compatibility. These dependencies should be added to your `box.json` file:
+BoxLang requires specific modules for full Wheels compatibility. These dependencies should be added to your `box.json` file:
 
 ```json
 {
@@ -121,7 +121,7 @@ BoxLang Mini-Server provides a lightweight, standalone option perfect for minima
 
 ### Version Compatibility Warning
 
-⚠️ **Important**: CFWheels currently supports BoxLang 1.3.x. The latest BoxLang Mini-Server downloads include version 1.4.x, which may not be fully compatible with CFWheels.
+⚠️ **Important**: Wheels currently supports BoxLang 1.3.x. The latest BoxLang Mini-Server downloads include version 1.4.x, which may not be fully compatible with Wheels.
 
 **Download the specific 1.3.0 version:**
 
@@ -151,7 +151,7 @@ curl -O https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/box
    │   ├── stylesheets/
    │   ├── javascripts/
    │   └── images/
-   └── vendor/wheels/   # CFWheels framework files
+   └── vendor/wheels/   # Wheels framework files
    ```
 
 3. **Setup BoxLang Entry Point**
@@ -160,7 +160,7 @@ curl -O https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/box
 
    ```boxlang
    <bx:script>
-   // BoxLang rewrite handler for CFWheels
+   // BoxLang rewrite handler for Wheels
    // This file handles URL rewriting for BoxLang compatibility
 
    // Get the requested URI
@@ -249,11 +249,11 @@ curl -O https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/box
    }
    </bx:script>
 
-   <!--- Include the main CFWheels bootstrap file --->
+   <!--- Include the main Wheels bootstrap file --->
    <bx:include template="index.cfm" />
    ```
 
-   This file serves as the BoxLang-specific entry point that handles URL rewriting and bootstraps your CFWheels application.
+   This file serves as the BoxLang-specific entry point that handles URL rewriting and bootstraps your Wheels application.
 
 ### Starting BoxLang Mini-Server
 
@@ -276,9 +276,9 @@ java -jar /path/to/boxlang-miniserver-1.3.0.jar \
   --debug
 ```
 
-#### For CFWheels Template Structure
+#### For Wheels Template Structure
 
-If using the CFWheels base template structure:
+If using the Wheels base template structure:
 
 ```bash
 java -jar /path/to/boxlang-miniserver-1.3.0.jar \
@@ -294,7 +294,7 @@ java -jar /path/to/boxlang-miniserver-1.3.0.jar \
 | `--webroot` | Document root directory (required) | None |
 | `--host` | IP address to bind to | 0.0.0.0 |
 | `--port` | Port number | 8080 |
-| `--rewrite` | Enable URL rewriting (recommended for CFWheels) | false |
+| `--rewrite` | Enable URL rewriting (recommended for Wheels) | false |
 | `--debug` | Enable debug mode | false |
 | `--config` | Path to configuration file | None |
 | `--libs` | Additional library paths | None |
@@ -332,7 +332,7 @@ You can read the further details from the boxlang mini-server documentation
 # Verify server is responding
 curl http://localhost:8080
 
-# Test CFWheels is loading
+# Test Wheels is loading
 curl http://localhost:8080/wheels
 
 # Check specific routes

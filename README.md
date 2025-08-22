@@ -117,7 +117,8 @@ Please report any errors you encounter on our [issue tracker][4]. When reporting
 
 ## Supported CFML Engines
 
-CFWheels supports the following CFML engines:
+Wheels supports the following CFML engines:
+
 - **Adobe ColdFusion**: 2018, 2021, 2023
 - **Lucee**: 5.x, 6.x, 7.x
 - **BoxLang**: 1.3.x
@@ -140,5 +141,5 @@ Made with [contrib.rocks](https://contrib.rocks).
 
 [1]: https://wheels.dev/
 [2]: https://wheels.dev/3.0.0/guides/introduction/readme/beginner-tutorial-hello-world
-[3]: https://github.com/wheels-dev/wheels/blob/main/CONTRIBUTING.md
+[3]: ./CONTRIBUTING.md
 [4]: https://github.com/wheels-dev/wheels/issues
