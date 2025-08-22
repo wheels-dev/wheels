@@ -1,12 +1,56 @@
 {
-    "name": "cfwheels-test-suite",
-    "version": "1.0.0",
+    "name":"Wheels.fw",
+    "version":"3.0.0-SNAPSHOT",
+    "author":"Wheels Core Team and Community",
+    "shortDescription":"Wheels MVC Framework Core Directory",
+    "location":"ForgeboxStorage",
+    "slug":"wheels",
+    "createPackageDirectory":true,
+    "packageDirectory":"wheels",
+    "homepage":"https://wheels.dev/",
+    "documentation":"https://wheels.dev/guides/",
+    "changelog":"https://github.com/wheels-dev/wheels/blob/master/CHANGELOG.md",
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
+        "contributors":[
+            "Peter Amiri <peter@alurium.com>"
+        ],
+    "repository":{
+        "type":"git",
+        "URL":"https://github.com/wheels-dev/wheels"
+    },
     "dependencies": {
         "wirebox": "^7.0.0",
-        "testbox": "^5.0.0"
+        "testbox": "^5.0.0",
+        "wheels-core": "^3.0.0-SNAPSHOT"
     },
     "installPaths": {
-        "wirebox": "core/wirebox/",
-        "testbox": "core/testbox/"
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/",
+        "wheels-core": "vendor/wheels"
+    },
+    "keywords":[
+        "mvc",
+        "rails",
+        "wheels",
+        "cfwheels",
+        "core"
+    ],
+    "ignore":[
+        "box.json",
+        "readme.md"
+    ],
+    "type":"mvc",
+    "private":false,
+    "license":[
+        {
+            "type":"Apache License 2.0",
+            "URL":"https://github.com/wheels-dev/wheels/blob/master/LICENSE"
+        }
+    ],
+    "scripts":{
+        "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver",
+       "format":"cfformat run --overwrite",
+       "format:watch":"cfformat watch ./.cfformat.json",
+       "format:check":"cfformat check"
     }
 }

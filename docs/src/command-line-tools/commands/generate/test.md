@@ -1,4 +1,6 @@
 # wheels generate test
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
 
 Generate test files for models, controllers, views, and other components.
 

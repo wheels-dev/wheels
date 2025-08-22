@@ -1,4 +1,6 @@
 # wheels generate snippets
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
 
 Generate code snippets and boilerplate code for common patterns.
 

@@ -28,7 +28,7 @@ component extends="testbox.system.BaseSpec" {
 				expect(method).toBe("GET")
 			})
 
-			// https://github.com/cfwheels/cfwheels/issues/886
+			// https://github.com/wheels-dev/wheels/issues/886
 			it("should not override in GET request", () => {
 				request.cgi["request_method"] = "GET"
 				url._method = "delete"

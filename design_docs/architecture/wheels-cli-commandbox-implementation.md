@@ -97,7 +97,7 @@ wheels-cli/
     "version": "3.0.0",
     "author": "CFWheels Team",
     "homepage": "https://cfwheels.org",
-    "documentation": "https://guides.cfwheels.org/cli",
+    "documentation": "https://wheels.dev/3.0.0/guides/command-line-tools/commands/README",
     "repository": {
         "type": "git",
         "url": "https://github.com/cfwheels/wheels-cli"

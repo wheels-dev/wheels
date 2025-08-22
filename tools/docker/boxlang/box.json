@@ -1,0 +1,19 @@
+{
+    "name": "cfwheels-test-suite-boxlang",
+    "version": "1.0.0",
+    "dependencies": {
+        "wirebox": "^7.0.0",
+        "testbox": "^5.0.0",
+        "bx-compat-cfml":"^1.27.0+35",
+        "bx-csrf":"^1.2.0+3",
+        "bx-esapi":"^1.6.0+9",
+        "bx-image":"^1.0.1",
+        "bx-mssql":"^1.4.0+11",
+        "bx-mysql":"^1.0.1+7",
+        "bx-postgresql":"^1.0.0+2"
+    },
+    "installPaths": {
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/"
+    }
+}

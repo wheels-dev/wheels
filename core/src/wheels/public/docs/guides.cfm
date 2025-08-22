@@ -44,7 +44,7 @@ function parseSummary(summaryPath) {
             }
 
             // Subsection title (not a link)
-            else if (reFind("^\*\s+[^[]+$", local.trimmedLine)) {
+            else if (reFind("^\*\s+[^\[]+$", local.trimmedLine)) {
                 // If previous subsection exists, push it
                 if (len(local.currentSubsection) && arrayLen(local.currentSubItems)) {
                     arrayAppend(local.currentItems, {

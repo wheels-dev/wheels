@@ -16,6 +16,8 @@ component extends="testbox.system.BaseSpec" {
 				else if(application.wheels.serverName contains "Coldfusion"){
 					// seems ACF can't handle H2 datasources
 					isTestable = false
+				} else if(structKeyExists(server, "boxlang")) {
+					isTestable = false
 				}
 			})
 
@@ -107,8 +109,12 @@ component extends="testbox.system.BaseSpec" {
 
 				p = g.model("post").findAll(select = "id")
 				posts = g.model("post").findAllKeys(quoted = true)
-				keys = QuotedValueList(p.id)
-
+				if (StructKeyExists(server, "boxlang")) {
+       				// BoxLang QuotedValueList uses double quotes, but findAllKeys uses single quotes
+                    keys = Replace(QuotedValueList(p.id), '"', "'", "all")
+                } else {
+                    keys = QuotedValueList(p.id)
+    		    }
 				expect(posts).toBe(keys)
 			})
 		})

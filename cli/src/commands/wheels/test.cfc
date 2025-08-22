@@ -31,21 +31,21 @@ component extends="base" {
 		string adapter=""
 	) {
 		// Show deprecation notice
-		print.yellowLine("⚠️  DEPRECATION WARNING: 'wheels test' is deprecated.");
-		print.yellowLine("   Please use 'wheels test run' for the modern TestBox runner.");
-		print.line();
+		// print.yellowLine("⚠️  DEPRECATION WARNING: 'wheels test' is deprecated.");
+		// print.yellowLine("   Please use 'wheels test run' for the modern TestBox runner.");
+		// print.line();
 
 		// For backward compatibility, continue with old behavior
 	 	var suite=$buildTestSuite(argumentCollection=arguments);
 		$outputSuiteVariables(suite);
 		$runTestSuite(suite);
 
-		print.line();
-		print.boldLine("Tip: For better test experience, try:");
-		print.line("  wheels test run                    ## Run all tests");
-		print.line("  wheels test run watch=true         ## Watch mode");
-		print.line("  wheels test run coverage=true      ## With coverage");
-		print.line("  wheels test migrate tests          ## Migrate to TestBox");
+		// print.line();
+		// print.boldLine("Tip: For better test experience, try:");
+		// print.line("  wheels test run                    ## Run all tests");
+		// print.line("  wheels test run watch=true         ## Watch mode");
+		// print.line("  wheels test run coverage=true      ## With coverage");
+		// print.line("  wheels test migrate tests          ## Migrate to TestBox");
 	}
 
 
@@ -89,14 +89,12 @@ component extends="base" {
 	  		// Always force JSON as return format
 			if(loc.type eq 'app'){
 				loc.testurl = "http://" & loc.host & ":" & loc.port
-							   & "/" & "?controller=tests&action=runner&view=runner"
-							   & "&type=#loc.type#"
+							   & "/" & "?controller=wheels.public&action=testbox&view=runner"
 							   & "&format=#loc.format#"
 							   & "&reload=#loc.reload#";
 			} else if(loc.type eq 'core'){
 				loc.testurl = "http://" & loc.host & ":" & loc.port
-							   & "/" & "?controller=wheels.tests_testbox&action=runner&view=runner"
-							   & "&type=#loc.type#"
+							   & "/" & "?controller=wheels.public&action=tests_testbox&view=runner"
 							   & "&format=#loc.format#"
 							   & "&reload=#loc.reload#";
 			} else {

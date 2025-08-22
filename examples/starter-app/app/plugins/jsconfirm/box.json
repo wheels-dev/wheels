@@ -1,0 +1,87 @@
+{
+    "name":"CFWheels JS Confirm",
+    "version":"1.0.5",
+    "author":"Per Djurner",
+    "location":"perdjurner/cfwheels-js-confirm#v1.0.5",
+    "directory":"/plugins/",
+    "createPackageDirectory":true,
+    "packageDirectory":"jsconfirm",
+    "homepage":"https://github.com/perdjurner/cfwheels-js-confirm",
+    "documentation":"",
+    "repository":{
+        "type":"",
+        "URL":""
+    },
+    "bugs":"",
+    "slug":"cfwheels-js-confirm",
+    "shortDescription":"JS Confirm - CFWheels Plugin",
+    "description":"",
+    "instructions":"",
+    "changelog":"",
+    "type":"cfwheels-plugins",
+    "keywords":[
+        
+    ],
+    "private":false,
+    "engines":[
+        {
+            "type":"",
+            "version":""
+        }
+    ],
+    "defaultEngine":"",
+    "defaultPort":0,
+    "projectURL":"",
+    "license":[
+        {
+            "type":"",
+            "URL":""
+        }
+    ],
+    "contributors":[
+        
+    ],
+    "dependencies":{
+        
+    },
+    "devDependencies":{
+        
+    },
+    "installPaths":{
+        
+    },
+    "ignore":[
+        "**/.*",
+        "test",
+        "tests"
+    ],
+    "testbox":{
+        "runner":[
+            {
+                "default":""
+            }
+        ],
+        "labels":[
+            
+        ],
+        "reporter":"",
+        "reporterResults":"",
+        "bundles":[
+            ""
+        ],
+        "directory":{
+            "mapping":"",
+            "recurse":true
+        },
+        "watchers":[
+            
+        ],
+        "notify":{
+            "emails":[
+                
+            ],
+            "growl":"",
+            "URL":""
+        }
+    }
+}

@@ -21,6 +21,7 @@ component aliases="wheels plugin list" extends="../base" {
         string format = "table",
         boolean available = false
     ) {
+        arguments = reconstructArgs(arguments);
         if (arguments.available) {
             // Show available plugins from ForgeBox
             print.greenBoldLine("================ Available Wheels Plugins From ForgeBox ======================");
@@ -42,19 +43,19 @@ component aliases="wheels plugin list" extends="../base" {
         if (arguments.format == "json") {
             print.line(serializeJSON(plugins, true));
         } else {
-            print.greenBoldLine("🔌 Installed Wheels CLI Plugins" & (arguments.global ? " (Global)" : ""))
+            print.greenBoldLine(" Installed Wheels CLI Plugins" & (arguments.global ? " (Global)" : ""))
                  .line();
             
             // Display plugins in a formatted way
             for (var plugin in plugins) {
-                print.line("📦 #plugin.name# (#plugin.version#)");
+                print.line(" #plugin.name# (#plugin.version#)");
                 
                 if (plugin.keyExists("dev") && plugin.dev) {
-                    print.text("   📌 Dev Dependency");
+                    print.text("    Dev Dependency");
                 }
                 
                 if (plugin.keyExists("description") && len(plugin.description)) {
-                    print.line("   📝 #plugin.description#");
+                    print.line("    #plugin.description#");
                 }
                 
                 print.line();

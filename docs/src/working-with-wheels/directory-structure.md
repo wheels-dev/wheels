@@ -1,129 +1,224 @@
+# Wheels Directory Structure Guide
+
+Understanding the Wheels directory structure is essential whether you're building applications or [contributing](https://github.com/wheels-dev/wheels) to the framework itself.
+
+## Two Structures for Different Workflows
+
+Wheels uses different directory layouts depending on your role:
+
+**Application Development:** A streamlined structure optimized for building applications, available through ForgeBox or the CLI.
+
+**Framework Development:** A comprehensive monorepo structure that includes development tools, tests, and documentation for framework contributors.
+
+Both structures serve specific purposes, and understanding each will help you work more effectively with Wheels.
+
 ---
-description: Finding your way around a Wheels application.
+
+## Application Development Structure
+
+When you create a new Wheels application using `wheels new` or download from [ForgeBox](https://forgebox.io/view/wheels-core), you'll work with this focused project structure:
+
+```
+app/
+  controllers/
+    Controller.cfc
+  events/
+  global/
+  migrator/
+    migrations/
+  models/
+    Model.cfc
+  plugins/
+  views/
+config/
+public/
+  files/
+  images/
+  javascripts/
+  stylesheets/
+  miscellaneous/
+    Application.cfc
+  urlrewrite.xml
+  Application.cfc
+  index.cfm
+tests/
+  TestBox/
+vendor
+```
+
+### Core Application Directories
+
+**app/controllers/** - Contains your controller files with a base `Controller.cfc` file already present. Place shared controller methods in `Controller.cfc` since all controllers inherit from this base class.
+
+**app/models/** - Houses your model files, typically one per database table. The existing `Model.cfc` file serves as the base class for all models and should contain shared model functionality.
+
+**app/views/** - Stores your view templates, organized by controller (e.g., views for the `Users` controller go in `app/views/users/`). This is where you prepare content for your users.
+
+**app/events/** - Contains event handlers that respond to ColdFusion application events, providing a cleaner alternative to placing code directly in `Application.cfc`.
+
+**app/global/** - Holds globally accessible functions available throughout your application.
+
+**plugins/** - Contains downloaded Wheels plugins that extend your application's functionality.
+
+**Database Management** - Use the migration system (`wheels db migrate`) rather than manual SQL scripts for database schema changes.
+
+**Package Management** - Use CommandBox and the `box.json` file to manage dependencies. The `vendor/` directory contains installed packages and should be excluded from version control.
+
+**Local Development** - Configure your development environment using `server.json` for server settings and `.env` for environment variables. Never commit sensitive data in `.env` files to version control.
+
+### Configuration and Assets
+
+**config/** - All configuration changes should be made here. Set environments, routes, and other application settings. Individual setting files in subdirectories can override main configuration.
+
+**public/files/** - Files intended for delivery to users via the `sendFile()` function should be placed here. Also serves as general file storage.
+
+**public/images/** - Recommended location for image assets. While not required, Wheels functions involving images assume this conventional location.
+
+**public/javascripts/** - Recommended location for JavaScript files.
+
+**public/stylesheets/** - Recommended location for CSS files.
+
+**public/miscellaneous/** - Special directory for code that must run completely outside the framework. Contains an empty `Application.cfc` that prevents Wheels involvement. Ideal for Flash AMF binding or `<cfajaxproxy>` connections to CFCs.
+
+### System Files and Testing
+
+**app/migrator/migrations** - Database [migration](https://wheels.dev/3.0.0/guides/command-line-tools/cli-guides/migrations) CFC files.
+
+**tests/TestBox/** - Location for your application's unit tests.
+
+**public/urlrewrite.xml** - Required for Tomcat/Tuckey or CommandBox URL rewriting.
+
+**public/Application.cfc** and **public/index.cfm** - Framework bootstrap files. Do not modify these files.
+
 ---
 
-# Directory Structure
+## Framework Development Structure
 
-After downloading and unzipping Wheels, here's the directory structure that you will see:
+Contributors working on the Wheels framework itself will encounter this comprehensive repository structure:
 
-{% tabs %}
-{% tab title="Directory Structure" %}
-cli/\
-core/ \
-design_docs/ \
-docs/ \
-examples/ \
-lib/ \
-templates/ \
-test-artifacts/ \
-tests/ \
-tools/ \
-.cfformat.json \
-.editorconfig \
-.env \
-CFConfig.json \
-CHANGELOG.md \
-compose.yml \
-server.json
-{% endtab %}
-{% endtabs %}
+```
+cli/
+core/
+  src/
+    wheels/
+design_docs/
+docs/
+examples/
+templates/
+  base/
+    src/
+      app/
+      config/
+      public/
+      tests/
+      vendor/
+      .env
+      box.json
+      server.json
+test-artifacts/
+tests/
+tools/
+.cfformat.json
+.editorconfig
+CFConfig.json
+CHANGELOG.md
+compose.yml
+```
 
-#### Quick Summary
+### Framework Development Components
 
-Your configuration settings will be done in the _**/templates/base/src/config**_ directory.
+**cli/** - Source code for command-line interface tools including generators and database migration utilities.
 
-Your application code will end up in four of the folders, namely _**templates/base/src/app/controllers**_, _**templates/base/src/app/events**_, _**templates/base/src/app/models**_, and _**templates/base/src/app/views**_.
+**core/src/wheels/** - The core Wheels framework code. This is the actual framework that gets distributed. When new versions are released, this directory often contains all necessary updates.
 
-Static media files should be placed in the _**templates/base/src/public/files**_, _**templates/base/src/public/images**_, _**templates/base/src/public/javascripts**_ and _**templates/base/src/public/stylesheets**_ folders.
+**design_docs/** - Architecture documentation, design decisions, and planning materials explaining the framework's structural choices.
 
-Place anything that need to be executed outside of the framework in the _**templates/base/src/public/miscellaneous**_ folder. The framework does not get involved when executing `.cfm` files in this folder. (The empty `Application.cfc` takes care of that.) Also, no URL rewriting will be performed in this folder, so it's a good fit for placing CFCs that need to be accessed remotely via `<cfajaxproxy>` and Flash AMF binding, for example.
+**docs/** - Official documentation in Markdown format, synchronized with the public website at [wheels.dev](https://wheels.dev/).
 
-Place Wheels plugins in the _**templates/base/src/app/plugins**_ folder.
+**examples/** - Sample applications demonstrating various Wheels features, useful for testing framework changes in realistic scenarios.
 
-The framework itself is in the _**core/src/wheels**_ directory. Please go in there and have a look around. If you find anything you can improve or new features that you want to add, let us know!
+**/** - The exact application template structure that developers receive when creating new projects. This mirrors the application development structure described above and includes essential configuration files like `box.json`, `server.json`, and `.env`.
 
-### Detailed Overview
+**vendor/** - Third-party dependencies and packages used by the framework development environment. Contains libraries managed through CommandBox/ForgeBox package management.
 
-Let's go through all the files and directories now, starting with the ones you'll spend most of your time in: the code directories.
+**test-artifacts/** - Files generated during test suite execution, typically excluded from version control.
 
-#### templates/base/src/app/controllers
+**tests/** - Complete TestBox test suite for framework validation and regression testing.
 
-This is where you create your controllers. You'll see a file in here already: `Controller.cfc`. You can place functions inside this `Controller.cfc` to have those functions shared between all the controllers you create(This works because all your controllers will extend `Controller`.).
+**tools/** - Build scripts, Docker configurations, and development utilities for maintaining the framework.
 
-#### templates/base/src/app/models
+Configuration files (`.cfformat.json`, `.editorconfig`, `CFConfig.json`) maintain consistent development standards across contributor environments.
 
-This is where you create your model files (or classes if you prefer that term). Each model file you create should map to one table in the database.
+---
 
-The setup in this directory is similar to the one for controllers, to share methods you can place them in the existing `Model.cfc` file.
+## Key Directory Relationships
 
-#### templates/base/src/app/views
+### Application Context
 
-This is where you prepare the views for your users. As you work on your website, you will create one view directory for each controller.
+When working on applications, your primary focus areas are:
 
-#### templates/base/src/app/events
+- **Configuration:** `config/` directory for all settings
+- **Application Logic:** `app/controllers/`, `app/models/`, `app/migrator/migrations`, `app/views/`, and `app/events/`
+- **Static Assets:** `public/files/`, `public/images/`, `public/javascripts/`, and `public/stylesheets/`
+- **Extensions:** `plugins/` for third-party functionality
 
-If you want code executed when ColdFusion triggers an event, you can place it here (rather than directly in `Application.cfc`).
+### Framework Context
 
-#### templates/base/src/config
+The `/` folder in the framework repository becomes the root directory of every new Wheels application. When contributing to the framework:
 
-Make all your configuration changes here. You can set the environment, routes, and other settings here. You can also override settings by making changes in the individual settings files that you see in the subdirectories.
+- Work primarily in `core/src/wheels/` for framework code
+- Update `docs/` for documentation changes
+- Test changes using applications in `/` or `examples/`
+- Use `tests/` for framework testing
 
-#### templates/base/src/public/files
+---
 
-Any files that you intend to deliver to the user using the `sendFile()` function should be placed here. Even if you don't use that function to deliver files, this folder can still serve as file storage if you like.
+## Directory Customization
 
-#### templates/base/src/app/global
+You can add additional directories to your application structure. When doing so:
 
-For application-wide globally accessible functions
+- Include a blank `Application.cfc` file in custom directories to prevent Wheels from processing requests in those locations
+- Follow the established naming conventions for consistency
+- Consider whether new directories belong in `public/` (web-accessible) or `app/` (application logic)
 
-#### templates/base/src/public/images
+---
 
-This is a good place to put your images. It's not required to have them here, but all Wheels functions that involve images will, by convention, assume they are stored here.
+## Guidelines for Contributors
 
-#### templates/base/src/public/javascripts
+**Environment Setup** - Use the provided `compose.yml` file to test changes across multiple CFML engines, ensuring broad compatibility.
 
-This is a good place to put your JavaScript files.
+**Testing Requirements** - Execute the complete test suite located in `/tests` before submitting pull requests to prevent regressions.
 
-#### templates/base/src/public/stylesheets
+**Code Standards** - Follow the formatting rules defined in `.cfformat.json`. Most development environments can automatically apply these standards.
 
-This is a good place to put your CSS files.
+**Documentation Updates** - Update relevant documentation in `/docs` when adding features or modifying existing behavior.
 
-#### tests/Testbox
+**CLI Development** - When working on command-line tools, ensure corresponding documentation updates in `/docs/command-line-tools`.
 
-This is where unit tests for your application should go
+---
 
-#### templates/base/src/public/miscellaneous
+## Guidelines for Application Developers
 
-Use this folder for code that you need to run completely outside of the framework. (There is an empty `Application.cfc` file in here, which will prevent Wheels from taking part in the execution.)
+**Configuration First** - Begin development by setting up routes, environments, and database connections in the `config/` directory.
 
-This is most useful if you're using Flash to connect directly to a CFC via AMF binding or if you're using `<cfajaxproxy>`in your views to bind directly to a CFC as well.
+**MVC Architecture** - Organize code according to the Model-View-Controller pattern that the directory structure supports:
+  
+- Controllers handle requests and coordinate between models and views
+- Models manage data and business logic
+- Views present information to users
 
-#### templates/base/src/app/plugins
+**Asset Organization** - Use the conventional `public/` subdirectories for different asset types. This ensures Wheels functions work as expected and maintains project organization.
 
-Place any plugins you have downloaded and want installed here.
+**Plugin Integration** - Evaluate existing plugins in `plugins/` before developing custom solutions.
 
-#### templates/base/src/app/migrator \*
+**Database Management** - Use the migration system (`wheels db migrate`) rather than manual SQL scripts for database schema changes.
 
-Database Migration CFC files and generated SQL files\
-(This directory will only visible once you start using the migrator)
+**Package Management** - Use CommandBox and the `box.json` file to manage dependencies. The `vendor/` directory contains installed packages and should be excluded from version control.
 
-#### core/src/wheels
+**Local Development** - Configure your development environment using `server.json` for server settings and `.env` for environment variables. Never commit sensitive data in `.env` files to version control.
 
-This is the framework itself. When a new version of Wheels is released it is often enough to just drop it in here (unless there has been changes to the general folder structure).
+**Testing Strategy** - Implement unit tests in `tests/TestBox/` to ensure application reliability.
 
-#### templates/base/src/.htaccess
+---
 
-This file is used by Apache, and you specifically need it for URL rewriting to work properly. If you're not using Apache, then you can safely delete it.
-
-#### templates/base/src/public/urlrewrite.xml
-
-If you use Tomcat and Tuckey, or CommandBox [URL Rewriting](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/url-rewriting/README), you'll need this file. Otherwise, you can safely delete it.
-
-#### templates/base/src/public/Application.cfc and templates/base/src/public/index.cfm
-
-These are needed for the framework to run. No changes should be done to these files.
-
-You can add more directories if you want to, of course. Just remember to include a blank `Application.cfc` in those directories. Otherwise, Wheels will try to get itself involved with those requests as well.
-
-\
-\
+This directory structure reflects years of framework development and community feedback. Each directory serves a specific purpose that supports either application development or framework contribution. The clear separation between public assets, application logic, and configuration ensures maintainable and scalable Wheels applications.

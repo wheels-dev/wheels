@@ -110,7 +110,7 @@ class TestService {
     }
     
     // The actual URL we'll use for tests (old format)
-    const testRunnerUrl = `${oldFormatHost}/wheels/testbox?`;
+    const testRunnerUrl = `${oldFormatHost}/wheels/core/tests?`;
     const params = oldFormatParams;
     
     // Store the full test URL for later assignment

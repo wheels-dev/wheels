@@ -28,37 +28,18 @@ None.
 ## Example Output
 
 ```
-╔═══════════════════════════════════════════════╗
-║          Running Pending Migrations           ║
-╚═══════════════════════════════════════════════╝
-
-Current Version: 20240110090000
-Target Version: 20240125160000
-
-Migrating...
-
-→ Running 20240115120000_create_orders_table.cfc
-  Creating table: orders
-  Adding indexes...
-  ✓ Success (0.125s)
-
-→ Running 20240120140000_add_status_to_orders.cfc
-  Adding column: status to orders
-  ✓ Success (0.089s)
-
-→ Running 20240125160000_create_categories_table.cfc
-  Creating table: categories
-  Adding foreign keys...
-  ✓ Success (0.143s)
-
-╔═══════════════════════════════════════════════╗
-║            Migration Complete                 ║
-╚═══════════════════════════════════════════════╝
-
-Previous Version: 20240110090000
-Current Version:  20240125160000
-Migrations Run:   3
-Total Time:       0.357s
++-----------------------------------------+-----------------------------------------+
+| Datasource:                       myApp | Total Migrations:                     4 |
+| Database Type:                       H2 | Available Migrations:                 0 |
+|                                         | Current Version:         20250812161449 |
+|                                         | Latest Version:          20250812161449 |
++-----------------------------------------+-----------------------------------------+
++----------+------------------------------------------------------------------------+
+| migrated | 20250812161449_cli__create_reporting_procedures                        |
+| migrated | 20250812161302_cli__example_1                                          |
+| migrated | 20250812161250_cli__example_2                                          |
+| migrated | 20250812154338_cli__example_3                                          |
++----------+------------------------------------------------------------------------+
 ```
 
 ## Migration Execution
@@ -134,21 +115,6 @@ function up() {
 }
 ```
 
-## Error Handling
-
-If a migration fails:
-
-```
-→ Running 20240120140000_add_status_to_orders.cfc
-  Adding column: status to orders
-  ✗ ERROR: Column 'status' already exists
-
-Migration failed at version 20240115120000
-Error: Column 'status' already exists in table 'orders'
-
-To retry: Fix the migration file and run 'wheels dbmigrate latest' again
-To skip: Run 'wheels dbmigrate up' to run one at a time
-```
 
 ## Best Practices
 

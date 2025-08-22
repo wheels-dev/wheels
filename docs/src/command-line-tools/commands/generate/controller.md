@@ -1,4 +1,6 @@
 # wheels generate controller
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
 
 Generate a controller with actions and optional views.
 

@@ -1,4 +1,5 @@
 # wheels docker deploy
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Deploy your Wheels application using Docker containers.
 

@@ -28,11 +28,17 @@ echo "Built on $(date)" > "${BUILD_DIR}/wheels/${BUILD_LABEL}"
 
 # Copy core files
 echo "Copying core files..."
-cp -r vendor/wheels/* "${BUILD_DIR}/wheels/"
+cp -r core/src/wheels/* "${BUILD_DIR}/wheels/"
+
+# Copy docs
+echo "Copying docs..."
+rm -rf "${BUILD_DIR}/wheels/docs"
+mkdir -p "${BUILD_DIR}/wheels/docs"
+cp -r docs/* "${BUILD_DIR}/wheels/docs/"
 
 # Copy template files
-cp build/core/box.json "${BUILD_DIR}/wheels/box.json"
-cp build/core/README.md "${BUILD_DIR}/wheels/README.md"
+cp tools/build/core/box.json "${BUILD_DIR}/wheels/box.json"
+cp tools/build/core/README.md "${BUILD_DIR}/wheels/README.md"
 
 # Replace version placeholders
 echo "Replacing version placeholders..."

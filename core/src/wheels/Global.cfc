@@ -30,9 +30,23 @@ component output="false" {
 	}
 
 	public struct function $image(){
-    local.rv = {};
-		arguments.structName = "rv";
-    cfimage(attributeCollection="#arguments#");
+    	local.rv = {};
+		if (structKeyExists(server, "boxlang")) {
+			if (arguments.action == "info") {
+				var img = ImageRead(arguments.source);
+				local.rv = ImageInfo(img);
+			} else {
+				throw(
+					type = "Wheels.Image.UnsupportedAction",
+					message = "The `$image()` function in BoxLang currently supports only the 'info' action."
+				);
+			}
+		} else {
+			// Adobe or Lucee: use cfimage
+			arguments.structName = "rv";
+			cfimage(attributeCollection = arguments);
+			local.rv = local.rv;
+		}
 		return local.rv;
 	}
 
@@ -60,12 +74,12 @@ component output="false" {
           local.innerTagContent = local.i.tagContent;
 			    StructDelete(local.i, "tagContent");
           cfmailpart(attributeCollection="#local.i#"){
-            #local.innerTagContent#
+            writeOutput(local.innerTagContent)
 					}
         }
       }
       if(StructKeyExists(local, "tagContent")){
-        #local.tagContent#
+        writeOutput(local.tagContent)
       }
     }
 	}
@@ -182,6 +196,49 @@ component output="false" {
       StructDelete(arguments, "password");
     }
 
+	// BoxLang + SQL Server specific fix for index queries to avoid casting error
+    if (StructKeyExists(server, "boxlang") && 
+        StructKeyExists(arguments, "type") && arguments.type == "index" &&
+        StructKeyExists(arguments, "table")) {
+      
+		// Get database adapter to check if it's SQL Server
+		local.adapter = $get("adapterName");
+		if (local.adapter == "SQLServer") {
+			// Use direct SQL query instead of cfdbinfo for BoxLang + SQL Server index queries
+			local.sql = "
+			SELECT 
+				DB_NAME() AS TABLE_CAT,
+				SCHEMA_NAME(t.schema_id) AS TABLE_SCHEM,
+				t.name AS TABLE_NAME,
+				CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS NON_UNIQUE,
+				t.name AS INDEX_QUALIFIER,
+				i.name AS INDEX_NAME,
+				CASE 
+					WHEN i.type = 1 THEN 'Clustered Index'
+					WHEN i.type = 2 THEN 'Other Index'
+					ELSE 'Other Index'
+				END AS TYPE,
+				CAST(ic.key_ordinal AS INT) AS ORDINAL_POSITION,
+				c.name AS COLUMN_NAME,
+				CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS ASC_OR_DESC,
+				CAST(0 AS INT) AS CARDINALITY,
+				CAST(0 AS INT) AS PAGES,
+				'' AS FILTER_CONDITION
+			FROM sys.indexes i
+			INNER JOIN sys.objects t ON i.object_id = t.object_id
+			INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+			INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+			WHERE t.name = '#arguments.table#' 
+				AND t.type = 'U'
+				AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
+			ORDER BY i.name, ic.key_ordinal
+			";
+			
+			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+			return local.rv;
+		}
+    }
+
     // If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
 		// Sometimes the call fails when using a custom database connection string.
 		// In that case the database name is not known by the CF server and it will just use any of the databases that the data source has access to.
@@ -228,7 +285,15 @@ component output="false" {
 	}
 
 	public any function $zip(){
-    cfzip(attributeCollection="#arguments#");
+		if (structKeyExists(server, "boxlang")) {
+			if (!left(arguments.file, 1) == "/") {
+				arguments.file = "/" & arguments.file;
+			}
+			if (!left(arguments.destination, 1) == "/") {
+				arguments.destination = "/" & arguments.destination;
+			}
+		}
+ 		cfzip(attributeCollection="#arguments#");
 	}
 
 	public any function $query(required string sql){
@@ -274,15 +339,29 @@ component output="false" {
 	 */
 	public string function $contentType() {
 		local.rv = "";
-		if (StructKeyExists(server, "lucee")) {
-			local.response = GetPageContext().getResponse();
+		local.pageContext = getPageContext();
+		if (structKeyExists(server, "boxlang")) {
+			local.response = local.pageContext;
+		} else if (structKeyExists(server, "lucee")) {
+			local.response = local.pageContext.getResponse();
 		} else {
-			local.response = GetPageContext().getFusionContext().getResponse();
+			local.response = local.pageContext.getFusionContext().getResponse();
 		}
-		if (local.response.containsHeader("Content-Type")) {
-			local.header = local.response.getHeader("Content-Type");
-			if (!IsNull(local.header)) {
-				local.rv = local.header;
+
+		if (structKeyExists(server, "boxlang")) {
+			local.headerMap = local.response.getResponseHeaderMap();
+			if (structKeyExists(local.headerMap, "Content-Type")) {
+				local.headerArray = local.headerMap["Content-Type"];
+				if (arrayLen(local.headerArray) > 0 && !isNull(local.headerArray[1])) {
+					local.rv = local.headerArray[1];
+				}
+			}
+		} else {
+			if (local.response.containsHeader("Content-Type")) {
+				local.header = local.response.getHeader("Content-Type");
+				if (!isNull(local.header)) {
+					local.rv = local.header;
+				}
 			}
 		}
 		return local.rv;
@@ -333,6 +412,31 @@ component output="false" {
 	 * Internal function.
 	 */
 	public string function $convertToString(required any value, string type = "") {
+		// BoxLang compatibility: Pre-process problematic date strings before type detection
+		if (StructKeyExists(server, "boxlang") && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
+			// Manually parse DD/MM/YYYY format to avoid BoxLang's MM/DD/YYYY interpretation
+			local.parts = ListToArray(arguments.value, " ");
+			local.datePart = local.parts[1];
+			local.timePart = local.parts[2];
+			local.amPm = local.parts[3];
+			
+			local.dateComponents = ListToArray(local.datePart, "/");
+			local.timeComponents = ListToArray(local.timePart, ":");
+			
+			local.day = Val(local.dateComponents[1]);    // First = day (DD/MM/YYYY)
+			local.month = Val(local.dateComponents[2]);  // Second = month
+			local.year = Val(local.dateComponents[3]);
+			local.hour = Val(local.timeComponents[1]);
+			local.minute = Val(local.timeComponents[2]);
+			
+			if (local.amPm == "PM" && local.hour != 12) {
+				local.hour += 12;
+			} else if (local.amPm == "AM" && local.hour == 12) {
+				local.hour = 0;
+			}
+			arguments.value = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+		}
+
 		if (!Len(arguments.type)) {
 			if (IsArray(arguments.value)) {
 				arguments.type = "array";
@@ -464,9 +568,18 @@ component output="false" {
 			// this might fail if a query contains binary data so in those rare cases we fall back on using cfwddx (which is a little bit slower which is why we don't use it all the time)
 			try {
 				local.rv = SerializeJSON(local.values);
-				// remove the characters that indicate array or struct so that we can sort it as a list below
-				local.rv = ReplaceList(local.rv, "{,},[,],/", ",,,,");
-				local.rv = ListSort(local.rv, "text");
+				// BoxLang compatibility: For consistent hashing, normalize array representations
+				if (structKeyExists(server, "boxlang")) {
+					// Convert to a more predictable format by removing structural chars and sorting
+					local.normalized = REReplace(local.rv, '[\[\]{}"]', "", "all");
+					local.parts = listToArray(local.normalized, ",");
+					arraySort(local.parts, "textnocase");
+					local.rv = arrayToList(local.parts, ",");
+				} else {
+					// remove the characters that indicate array or struct so that we can sort it as a list below
+					local.rv = ReplaceList(local.rv, "{,},[,],/", ",,,,");
+					local.rv = ListSort(local.rv, "text");
+				}
 			} catch (any e) {
 				local.rv = $wddx(input = local.values);
 			}
@@ -596,7 +709,7 @@ component output="false" {
 				"/"
 			);
 		}
-		if (StructKeyExists(local, "requestUrl") && ReFind("[^\0-\x80]", local.requestUrl)) {
+		if (StructKeyExists(local, "requestUrl") && ReFind("[^\x00-\x80]", local.requestUrl)) {
 			// strip out the script_name and query_string leaving us with only the part of the string that should go in path_info
 			local.rv.path_info = Replace(
 				Replace(local.requestUrl, arguments.scope.script_name, ""),
@@ -834,7 +947,16 @@ component output="false" {
 			}
 		}
 		if (StructKeyExists(application.wheels.functions, arguments.name)) {
-			StructAppend(arguments.args, application.wheels.functions[arguments.name], false);
+			if (structKeyExists(server, "boxlang")) {
+				// Manual implementation for BoxLang
+				for (local.key in application.wheels.functions[arguments.name]) {
+					if (!StructKeyExists(arguments.args, local.key)) {
+						arguments.args[local.key] = application.wheels.functions[arguments.name][local.key];
+					}
+				}
+			} else {
+				StructAppend(arguments.args, application.wheels.functions[arguments.name], false);
+			}
 		}
 
 		// make sure that the arguments marked as required exist
@@ -1213,7 +1335,32 @@ component output="false" {
 		if (ListLen(local.version) > 3) {
 			local.build = Val(ListGetAt(local.version, 4));
 		}
-		if (arguments.engine == "Lucee") {
+		if (arguments.engine == "BoxLang") {
+			local.minimumMajor = "1";
+			local.minimumMinor = "0";
+			local.minimumPatch = "0";
+			local.maximumMajor = "1";
+			local.maximumMinor = "4";
+			local.maximumPatch = "999";
+			
+			// Check minimum version
+			if (
+				local.major < local.minimumMajor
+				|| (local.major == local.minimumMajor && local.minor < local.minimumMinor)
+				|| (local.major == local.minimumMajor && local.minor == local.minimumMinor && local.patch < local.minimumPatch)
+			) {
+				local.rv = "The CFWheels framework requires BoxLang version #local.minimumMajor#.#local.minimumMinor#.#local.minimumPatch# or higher. You are currently running version #arguments.version#.";
+			}
+			
+			// Check maximum version (optional - for major version compatibility)
+			if (
+				local.major > local.maximumMajor
+				|| (local.major == local.maximumMajor && local.minor > local.maximumMinor)
+				|| (local.major == local.maximumMajor && local.minor == local.maximumMinor && local.patch > local.maximumPatch)
+			) {
+				local.rv = "The CFWheels framework has been tested up to BoxLang version #local.maximumMajor#.#local.maximumMinor#.#local.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
+			}
+		} else if (arguments.engine == "Lucee") {
 			local.minimumMajor = "5";
 			local.minimumMinor = "3";
 			local.minimumPatch = "2";
@@ -1394,7 +1541,12 @@ component output="false" {
 	/**
 	 * Internal function.
 	 */
-	public string function $prependUrl(required string path) {
+	public string function $prependUrl(
+		required string path,
+		string host = "",
+		string protocol = "",
+		numeric port = 0
+	) {
 		local.rv = arguments.path;
 		if (arguments.port != 0) {
 			// use the port that was passed in by the developer
@@ -1686,7 +1838,10 @@ component output="false" {
 	 * Returns the request timeout value in seconds
 	 */
 	public numeric function $getRequestTimeout() {
-		if (StructKeyExists(server, "lucee")) {
+		// Check for BoxLang first using unique BoxLang identifier
+		if (StructKeyExists(server, "boxlang")) {
+			return 10000;
+		} else if (StructKeyExists(server, "lucee") && StructKeyExists(server.lucee, "version")) {
 			return (GetPageContext().getRequestTimeout() / 1000);
 		} else {
 			return CreateObject("java", "coldfusion.runtime.RequestMonitor").GetRequestTimeout();

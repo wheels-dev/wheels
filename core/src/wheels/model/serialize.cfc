@@ -156,7 +156,7 @@ component {
 				}
 
 				/* To fix the bug below:
-					https://github.com/cfwheels/cfwheels/issues/605
+					https://github.com/wheels-dev/wheels/issues/605
 
 					Added callback for Afterfind in function. The afterFind hook was not being called when findAll(returnAs = 'struct') is used on the model.
 					Called the afterFind hook, the hook adds the arguments defined in the hook to the object so get the properties using properties() function and then append the property struct to the individual record struct

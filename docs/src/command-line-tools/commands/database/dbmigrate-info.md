@@ -34,18 +34,16 @@ The command displays:
 
 ```
 +-----------------------------------------+-----------------------------------------+
-| Datasource: myapp_development           | Total Migrations: 6                     |
-| Database Type: MySQL                    | Available Migrations: 2                 |
-|                                         | Current Version: 20240115120000         |
-|                                         | Latest Version: 20240125160000          |
+| Datasource:                       myApp | Total Migrations:                     4 |
+| Database Type:                       H2 | Available Migrations:                 4 |
+|                                         | Current Version:                      0 |
+|                                         | Latest Version:          20250812161449 |
 +-----------------------------------------+-----------------------------------------+
 +----------+------------------------------------------------------------------------+
-| migrated | 20240101100000_create_users_table.cfc                                 |
-| migrated | 20240105150000_create_products_table.cfc                              |
-| migrated | 20240110090000_add_email_to_users.cfc                                 |
-| migrated | 20240115120000_create_orders_table.cfc                                |
-|          | 20240120140000_add_status_to_orders.cfc                               |
-|          | 20240125160000_create_categories_table.cfc                            |
+|          | 20250812161449_cli__create_reporting_procedures                        |
+|          | 20250812161302_cli__blacnk                                             |
+|          | 20250812161250_cli__name                                               |
+|          | 20250812154338_cli__0                                                  |
 +----------+------------------------------------------------------------------------+
 ```
 
@@ -101,28 +99,6 @@ SELECT * FROM schema_migrations;
    - Identify pending migrations
    - Confirm database version
 
-## Common Scenarios
-
-### All Migrations Complete
-```
-Current Version: 20240125160000
-Status: 6 completed, 0 pending
-✓ Database is up to date
-```
-
-### Fresh Database
-```
-Current Version: 0
-Status: 0 completed, 6 pending
-⚠ No migrations have been run
-```
-
-### Partial Migration
-```
-Current Version: 20240110090000
-Status: 3 completed, 3 pending
-⚠ Database needs migration
-```
 
 ## Troubleshooting
 

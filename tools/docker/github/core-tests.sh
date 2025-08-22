@@ -34,6 +34,9 @@ case $1 in
   adobe2025)
     port="62025"
     ;;
+  boxlang)
+    port="60001"
+    ;;
   mysql56)
     port="3306"
     ;;
@@ -76,7 +79,7 @@ fi
 
 echo "Using host: ${host}"
 
-test_url="http://${host}:${port}/wheels/testbox?db=${dbengine}&format=json&only=failure,error"
+test_url="http://${host}:${port}/wheels/core/tests?db=${dbengine}&format=json&only=failure,error"
 # test_url="http://${host}:${port}/"
 result_file="/tmp/${cfengine}-${dbengine}-result.txt"
 

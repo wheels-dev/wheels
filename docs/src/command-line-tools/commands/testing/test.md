@@ -1,8 +1,7 @@
 # wheels test
 
-**⚠️ DEPRECATED**: This command is deprecated. Use `wheels test run` or the advanced testing commands (`wheels test:all`, `wheels test:unit`, etc.) instead.
 
-Run Wheels framework tests (core, app, or plugin tests).
+Run Wheels framework tests (core, app).
 
 ## Synopsis
 
@@ -12,13 +11,13 @@ wheels test [type] [servername] [options]
 
 ## Description
 
-The `wheels test` command runs the built-in Wheels framework test suite. This is different from `wheels test run` which runs your application's TestBox tests. Use this command to verify framework integrity or test Wheels plugins.
+The `wheels test` command runs the built-in Wheels framework test suite. This is different from `wheels test run` which runs your application's TestBox tests. Use this command to verify framework integrity.
 
 ## Arguments
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `type` | Test type: `core`, `app`, or `plugin` | `app` |
+| `type` | Test type: `core`, `app`, | `app` |
 | `serverName` | CommandBox server name | Current server |
 
 ## Options
@@ -49,13 +48,7 @@ wheels test app
 - Tests Wheels configuration
 - Verifies app-specific framework features
 
-### Plugin Tests
-```bash
-wheels test plugin
-```
-- Tests installed Wheels plugins
-- Verifies plugin compatibility
-- Checks plugin functionality
+
 
 ## Examples
 
@@ -82,14 +75,6 @@ wheels test debug=true
 ### Skip reload
 ```bash
 wheels test reload=false
-```
-
-## Deprecation Notice
-
-```
-⚠️  WARNING: The 'wheels test' command is deprecated.
-   Please use 'wheels test run' instead.
-   See: wheels help test run
 ```
 
 ## Output Example
@@ -122,10 +107,6 @@ View Tests
   ✓ helpers render correctly (18ms)
   ✓ partials include properly (9ms)
   ✓ layouts apply correctly (11ms)
-
-Plugin Tests
-  ✓ DBMigrate plugin loads (7ms)
-  ✓ Scaffold plugin works (22ms)
 
 ╔═══════════════════════════════════════════════╗
 ║              Test Summary                     ║
@@ -203,7 +184,6 @@ Actual: false
 ### Common issues
 1. **Database not configured**: Check test datasource
 2. **Reload password wrong**: Verify settings
-3. **Plugin conflicts**: Disable plugins and retest
 4. **Cache issues**: Clear cache and retry
 
 ## Continuous Integration
@@ -295,7 +275,6 @@ box server restart
 
 1. Run before deployment
 2. Test after framework updates
-3. Verify plugin compatibility
 4. Use CI/CD integration
 5. Keep test database clean
 

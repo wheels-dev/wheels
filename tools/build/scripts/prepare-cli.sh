@@ -25,24 +25,11 @@ echo "Built on $(date)" > "${BUILD_DIR}/wheels-cli/${BUILD_LABEL}"
 
 # Copy CLI files, excluding specific directories and files
 echo "Copying CLI files..."
-rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --exclude='.git' --exclude='.gitignore' cli/ "${BUILD_DIR}/wheels-cli/"
+rsync -av --exclude='workspace' --exclude='simpletestapp' --exclude='*.log' --exclude='.git' --exclude='.gitignore' cli/src/ "${BUILD_DIR}/wheels-cli/"
 
 # Copy template files
-cp build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
-cp build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
-
-# Update box.json for ForgeBox publishing
-echo "Adjusting box.json for ForgeBox..."
-if command -v jq >/dev/null 2>&1; then
-    # Update directory settings for proper packaging
-    # Keep directory as empty string (it's already empty in CLI)
-    jq 'del(.packageDirectory) | .createPackageDirectory = false' "${BUILD_DIR}/wheels-cli/box.json" > "${BUILD_DIR}/wheels-cli/box.json.tmp" && mv "${BUILD_DIR}/wheels-cli/box.json.tmp" "${BUILD_DIR}/wheels-cli/box.json"
-else
-    # Fallback to sed if jq is not available
-    sed -i.bak 's/"createPackageDirectory"[[:space:]]*:[[:space:]]*true/"createPackageDirectory":false/' "${BUILD_DIR}/wheels-cli/box.json"
-    sed -i.bak '/"packageDirectory":/d' "${BUILD_DIR}/wheels-cli/box.json"
-    rm -f "${BUILD_DIR}/wheels-cli/box.json.bak"
-fi
+cp tools/build/cli/box.json "${BUILD_DIR}/wheels-cli/box.json"
+cp tools/build/cli/README.md "${BUILD_DIR}/wheels-cli/README.md"
 
 # Replace version placeholders
 echo "Replacing version placeholders..."

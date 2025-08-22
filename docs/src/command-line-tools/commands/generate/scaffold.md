@@ -1,11 +1,18 @@
 # wheels scaffold
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
 
 Generate complete CRUD scaffolding for a resource.
 
 ## Synopsis
 
 ```bash
-wheels scaffold name=[resourceName] [options]
+wheels generate scaffold name=[resourceName] [options]
+```
+## Alias
+
+```bash
+wheels g scaffold name=[resourceName] [options]
 ```
 
 ## Description
@@ -34,12 +41,12 @@ The `wheels scaffold` command generates a complete CRUD (Create, Read, Update, D
 
 ### Basic scaffold
 ```bash
-wheels scaffold name=product
+wheels generate scaffold name=product
 ```
 
 ### Scaffold with properties
 ```bash
-wheels scaffold name=product properties=name:string,price:decimal,stock:integer
+wheels generate scaffold name=product properties=name:string,price:decimal,stock:integer
 ```
 
 ### Scaffold with associations
@@ -50,12 +57,12 @@ wheels scaffold name=order properties=total:decimal,status:string \
 
 ### API scaffold
 ```bash
-wheels scaffold name=product api=true properties=name:string,price:decimal
+wheels generate scaffold name=product api=true properties=name:string,price:decimal
 ```
 
 ### Scaffold with auto-migration
 ```bash
-wheels scaffold name=category properties=name:string migrate=true
+wheels generate scaffold name=category properties=name:string migrate=true
 ```
 
 ## What Gets Generated

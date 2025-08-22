@@ -1,4 +1,5 @@
 # wheels db drop
+> **⚠️ Note:** This command depends on configuration values. Please verify your database configuration before executing it.
 
 Drop an existing database.
 

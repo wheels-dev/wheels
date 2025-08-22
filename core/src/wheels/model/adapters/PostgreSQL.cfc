@@ -133,11 +133,22 @@ component extends="Base" output=false {
 			local.endPar = Find(")", local.sql);
 			local.columnList = "";
 			if (local.endPar) {
-				local.columnList = ReplaceList(
-					Mid(local.sql, local.startPar, (local.endPar - local.startPar)),
-					"#Chr(10)#,#Chr(13)#, ",
-					",,"
-				);
+				local.rawColumns = Mid(local.sql, local.startPar, (local.endPar - local.startPar));
+
+				// BoxLang compatibility fix - ReplaceList behaves differently
+				if (StructKeyExists(server, "boxlang")) {
+					// For BoxLang, use regex to properly parse column names
+					local.columnList = REReplace(local.rawColumns, "\s*,\s*", ",", "all");
+					local.columnList = REReplace(local.columnList, "[\r\n]", "", "all");
+					local.columnList = Trim(local.columnList);
+				} else {
+					// Original Lucee/ACF behavior
+					local.columnList = ReplaceList(
+						local.rawColumns,
+						"#Chr(10)#,#Chr(13)#, ",
+						",,"
+					);
+				}
 			}
 
 			// Lucee/ACF doesn't support PostgreSQL natively when it comes to returning the primary key value of the last inserted record so we have to do it manually by using the sequence.

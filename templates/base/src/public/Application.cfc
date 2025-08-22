@@ -12,24 +12,25 @@ component output="false" {
 
 	// Set up the application paths.
 	this.appDir     = expandPath("../app/");
-	this.coreDir  = expandPath("../core/");
-	this.wheelsDir  = this.coreDir & "wheels/";
-	this.wireboxDir = this.coreDir & "wirebox/";
-	this.testboxDir = this.coreDir & "testbox/";
+	this.vendorDir  = expandPath("../vendor/");
+	this.wheelsDir  = this.vendorDir & "wheels/";
+	this.wireboxDir = this.vendorDir & "wirebox/";
+	this.testboxDir = this.vendorDir & "testbox/";
 	// Set up the mappings for the application.
 	this.mappings["/app"]     = this.appDir;
-	this.mappings["/vendor"]  = this.coreDir;
+	this.mappings["/vendor"]  = this.vendorDir;
 	this.mappings["/wheels"]  = this.wheelsDir;
 	this.mappings["/wirebox"] = this.wireboxDir;
 	this.mappings["/testbox"] = this.testboxDir;
 	this.mappings["/tests"] = expandPath("../tests");
 	this.mappings["/config"] = expandPath("../config");
+	this.mappings["/plugins"] = expandPath("../plugins");
 
 	// We turn on "sessionManagement" by default since the Flash uses it.
 	this.sessionManagement = true;
 
 	// If a plugin has a jar or class file, automatically add the mapping to this.javasettings.
-	this.wheels.pluginDir = this.appDir & "plugins";
+	this.wheels.pluginDir = this.appDir & "../plugins";
 	this.wheels.pluginFolders = DirectoryList(
 		this.wheels.pluginDir,
 		"true",
@@ -311,7 +312,7 @@ component output="false" {
 		location(url = local.redirectUrl, addToken = false);
 	}
 
-	private string function $buildRedirectUrl() {
+	public string function $buildRedirectUrl() {
 		// Determine the base URL
 		if (StructKeyExists(cgi, "path_info") && Len(cgi.path_info)) {
 			local.url = cgi.path_info;

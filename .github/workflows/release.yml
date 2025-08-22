@@ -35,6 +35,7 @@ jobs:
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
         run: |
+          cd ./templates/base/src
           pwd
           cat box.json
           echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
@@ -47,9 +48,9 @@ jobs:
 
       - name: Make build scripts executable
         run: |
-          chmod +x build/scripts/*.sh
+          chmod +x tools/build/scripts/*.sh
           # List scripts for verification
-          ls -la build/scripts/
+          ls -la tools/build/scripts/
 
       #############################################
       # Prepare and Publish to ForgeBox
@@ -57,15 +58,19 @@ jobs:
 
       - name: Prepare Wheels Base Template for ForgeBox
         run: |
-          ./build/scripts/prepare-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/prepare-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Prepare Wheels Core for ForgeBox
         run: |
-          ./build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
 
       - name: Prepare Wheels CLI for ForgeBox
         run: |
-          ./build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+         ./tools/build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Prepare Wheels Starter App for ForgeBox
+        run: |
+         ./tools/build/scripts/prepare-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
       - name: Install CommandBox
         run: |
@@ -75,7 +80,7 @@ jobs:
 
       - name: Publish All Packages to ForgeBox
         run: |
-          ./build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true"
+          ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true"
 
       #############################################
       # Build Artifacts for GitHub
@@ -83,9 +88,10 @@ jobs:
 
       - name: Build All Wheels Artifacts
         run: |
-          ./build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-          ./build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-          ./build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}"
 
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
@@ -116,7 +122,17 @@ jobs:
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
             artifacts/wheels/wheels-cli-be.zip
-
+      
+      - name: Upload Wheels Starter App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-cli
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+            artifacts/wheels/wheels-starter-app-be.zip
+      
       - name: Upload All Wheels Artifacts (Combined)
         uses: actions/upload-artifact@v4
         with:

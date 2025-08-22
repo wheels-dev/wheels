@@ -495,7 +495,7 @@ docs/
 ```yaml
 # mkdocs.yml
 site_name: Wheels Documentation
-site_url: https://docs.wheels.org
+site_url: https://wheels.dev/docs
 repo_url: https://github.com/wheels/wheels
 
 theme:

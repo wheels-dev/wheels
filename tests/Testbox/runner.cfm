@@ -122,10 +122,10 @@
         application.$$$wheels = Duplicate(application.wheels)
 
         // load testbox routes
-        application.wo.$include(template = "/tests/testbox/routes.cfm")
+        application.wo.$include(template = "/tests/Testbox/routes.cfm")
         application.wo.$setNamedRoutePositions()
 
-        local.AssetPath = "/tests/testbox/_assets/"
+        local.AssetPath = "/tests/Testbox/_assets/"
         
         application.wo.set(rewriteFile = "index.cfm")
         application.wo.set(controllerPath = local.AssetPath & "controllers")
@@ -173,6 +173,9 @@
         }
         application.testenv.db = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
 
-        
+        local.populate = StructKeyExists(url, "populate") ? url.populate : true
+        if (local.populate) {
+            include "populate.cfm"
+        }
     }
 </cfscript>

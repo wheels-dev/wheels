@@ -1,0 +1,37 @@
+<!--- |ObjectNameSingularC| Index --->
+<cfparam name="|ObjectNamePlural|">
+<cfoutput>
+	<h1>|ObjectNamePluralC| index</h1>
+	<p>#linkTo(route="new|ObjectNameSingularC|", text="Create New |ObjectNameSingularC|", class="btn btn-default")#</p>
+
+	<cfif |ObjectNamePlural|.recordcount>
+		<table class="table">
+			<thead>
+				<tr>
+					<th>ID</th>
+                    <!--- CLI-Appends-thead-Here --->
+					<th>Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				<cfloop query="|ObjectNamePlural|">
+				<tr>
+					<td>
+						#id#
+					</td>
+                    <!--- CLI-Appends-tbody-Here --->
+					<td>
+						<div class="btn-group">
+							#linkTo(route="|ObjectNameSingularC|", key=id, text="View", class="btn btn-xs btn-info", encode=false)#
+							#linkTo(route="edit|ObjectNameSingularC|", key=id, text="Edit", class="btn btn-xs btn-primary", encode=false)#
+						</div>
+						#buttonTo(route="|ObjectNameSingularC|", method="delete", key=id, text="Delete", class="pull-right", inputClass="btn btn-danger btn-xs", encode=false)#
+					</td>
+				</tr>
+				</cfloop>
+			</tbody>
+		</table>
+	<cfelse>
+		<p>Sorry, there are no |ObjectNamePluralC| yet</p>
+	</cfif>
+</cfoutput>

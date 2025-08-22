@@ -46,7 +46,7 @@ model("author").create(name="John", transaction=false);
 
 Another option is to disable transactions across your entire application using the `transactionMode` configuration:
 
-{% code title="/templates/base/src/config/settings.cfm" %}
+{% code title="/config/settings.cfm" %}
 ```javascript
 set(transactionMode=false);
 ```
@@ -64,7 +64,7 @@ model("author").create(name="John", transaction="rollback");
 
 Again, to configure your entire application to rollback _all_ transactions, you can set the `transactionMode` configuration to `rollback`.
 
-{% code title="/templates/base/src/config/settings.cfm" %}
+{% code title="/config/settings.cfm" %}
 ```javascript
 set(transactionMode="rollback");
 ```

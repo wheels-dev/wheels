@@ -1,4 +1,5 @@
 # wheels analyze
+*These commands works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Base command for code analysis and quality checks.
 
@@ -20,12 +21,6 @@ The `wheels analyze` command provides comprehensive code analysis tools for Whee
 | `performance` | Analyze performance characteristics |
 | `security` | Security vulnerability analysis (deprecated) |
 
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
-| `--version` | Show version information |
 
 ## Direct Usage
 

@@ -8,7 +8,7 @@
     "directory":"vendor/wheels",
     "createPackageDirectory":true,
     "packageDirectory":"vendor/wheels",
-		"homepage":"https://wheels.dev/",
+    "homepage":"https://wheels.dev/",
     "documentation":"https://wheels.dev/docs",
     "changelog":"https://github.com/wheels-dev/wheels/blob/master/CHANGELOG.md",
     "bugs":"https://github.com/wheels-dev/wheels/issues",
@@ -26,10 +26,7 @@
         "wheels.dev",
         "core"
     ],
-    "ignore":[
-        "box.json",
-        "readme.md"
-    ],
+    "ignore":[],
     "type":"mvc",
     "private":false,
     "license":[

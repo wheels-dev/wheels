@@ -26,13 +26,13 @@ component  aliases='wheels db latest,wheels db migrate'  extends="../base"  {
 				var DBMigrateInfo = $sendToCliCommand("&command=info");
 				
 				// Check if we got a valid response
-				if (!isStruct(DBMigrateInfo) || !structKeyExists(DBMigrateInfo, "result") || !structKeyExists(DBMigrateInfo.result, "lastVersion")) {
+				if (!DBMigrateInfo.success  || !structKeyExists(DBMigrateInfo, "lastVersion")) {
 					error("Unable to retrieve migration information from the application. Please ensure your server is running and the application is properly configured.");
 				}
 				
 				print.line("Updating Database Schema to Latest Version")
-					.line("Latest Version is #DBMigrateInfo.result.lastVersion#");
-				command('wheels dbmigrate exec').params(version=DBMigrateInfo.result.lastVersion).run();
+					.line("Latest Version is #DBMigrateInfo.lastVersion#");
+				command('wheels dbmigrate exec').params(version=DBMigrateInfo.lastVersion).run();
 			} catch (any e) {
 				error("Failed to get migration information: #e.message#");
 			}

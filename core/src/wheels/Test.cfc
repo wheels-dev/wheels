@@ -628,7 +628,14 @@ component output="false" displayName="Test" extends="wheels.Global"{
 			);
 		}
 
-		TESTING_FRAMEWORK_VARS.ROOT_TEST_PATH = ListAppend(TESTING_FRAMEWORK_VARS.ROOT_TEST_PATH, "tests", ".");
+		// set test directory for tests
+		if(local.type eq "app") {
+			TESTING_FRAMEWORK_VARS.TEST_DIRECTORY = "tests.RocketUnit";
+		} else {
+			TESTING_FRAMEWORK_VARS.TEST_DIRECTORY = "tests";
+		}
+
+		TESTING_FRAMEWORK_VARS.ROOT_TEST_PATH = ListAppend(TESTING_FRAMEWORK_VARS.ROOT_TEST_PATH, TESTING_FRAMEWORK_VARS.TEST_DIRECTORY, ".");
 
 		// add the package if specified
 		local.rv.test_path = ListAppend("#TESTING_FRAMEWORK_VARS.ROOT_TEST_PATH#", local.package, ".");
@@ -782,6 +789,9 @@ component output="false" displayName="Test" extends="wheels.Global"{
 	}
 
 	function onDIcomplete(){
+		if (structKeyExists(server, "boxlang")) {
+			variables.this = this;
+		}
 		Mixins.$initializeMixins(variables);
 	}
 

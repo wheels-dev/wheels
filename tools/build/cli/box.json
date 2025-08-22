@@ -7,7 +7,7 @@
 	"createPackageDirectory":true,
 	"packageDirectory":"wheels-cli",
 	"homepage":"https://wheels.dev/",
-	"documentation":"https://guides.wheels.org/docs/command-line-tools/cli-commands",
+	"documentation":"https://wheels.dev/3.0.0/guides/command-line-tools/commands/README",
 	"repository":{
 			"type":"GIT",
 			"URL":"https://github.com/wheels-dev/wheels"

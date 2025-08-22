@@ -398,7 +398,7 @@ component {
 		// go through the properties and map them to the database unless the developer passed in a table name or an alias in which case we assume they know what they're doing and leave the select clause as is
 
 		/* To fix the issue below:
-			https://github.com/cfwheels/cfwheels/issues/1048
+			https://github.com/wheels-dev/wheels/issues/1048
 
 			The original issue was due to the alias not being passed in to identify the same columns in multiple tables. When we pass in the alias/dot notation in the select clause, it does not add the calculated properties due to the below condition which causes the original name of calculated property to be passed in the final query instead of the definition of calculated property, and that gives an invalid column when executed. Commented the below if and else condition and made fixes in case "." and " AS " is passed in.
 		*/
@@ -416,7 +416,7 @@ component {
 				local.addedProperties = ListAppend(local.addedProperties, local.iItem);
 
 				/* To fix the issue below:
-					https://github.com/cfwheels/cfwheels/issues/1048
+					https://github.com/wheels-dev/wheels/issues/1048
 
 					In case "." or " AS " is passed in the column name item, append that as it is in the select query and then move onto the next iteration.
 				*/
@@ -455,7 +455,7 @@ component {
 
 						/*
 							To fix the issue below:
-							https://github.com/cfwheels/cfwheels/issues/580
+							https://github.com/wheels-dev/wheels/issues/580
 
 							Get the column passed in the select argument with the included table's name prepended to it and replace table name to get the original name.
 
@@ -515,7 +515,7 @@ component {
 
 				/*
 					To fix the bug below:
-					https://github.com/cfwheels/cfwheels/issues/591
+					https://github.com/wheels-dev/wheels/issues/591
 
 					Added an exception in case the column specified in the select or group argument does not exist in the database.
 					This will only be in case when not using "table.column" or "column AS something" since in those cases Wheels passes through the select clause unchanged.
@@ -838,14 +838,37 @@ component {
 				local.temp = ReFind(variables.wheels.class.RESQLWhere, arguments.where, local.start, true);
 				if (ArrayLen(local.temp.len) > 1) {
 					local.start = local.temp.pos[4] + local.temp.len[4];
-					ArrayAppend(
-						local.originalValues,
-						ReplaceList(
-							Chr(7) & Mid(arguments.where, local.temp.pos[4], local.temp.len[4]) & Chr(7),
-							"#Chr(7)#(,)#Chr(7)#,#Chr(7)#','#Chr(7)#,#Chr(7)#"",""#Chr(7)#,#Chr(7)#",
-							",,,,,,"
-						)
-					);
+					local.extractedValue = Mid(arguments.where, local.temp.pos[4], local.temp.len[4]);
+
+					// BoxLang compatibility: Handle comma-separated values in IN clauses differently
+					if (StructKeyExists(server, "boxlang")) {
+						local.processedValue = local.extractedValue;
+						// Remove outer parentheses if present (e.g., "(1,2,3)" -> "1,2,3")
+						if (Left(local.processedValue, 1) == "(" && Right(local.processedValue, 1) == ")") {
+							local.processedValue = Mid(local.processedValue, 2, Len(local.processedValue) - 2);
+						}
+						
+						// BoxLang: Only apply quote cleanup if the value contains quotes
+						if (Find("'", local.processedValue) > 0 || Find(Chr(34), local.processedValue) > 0) {
+							local.cleanedValue = local.processedValue;							
+							local.cleanedValue = ReReplace(local.cleanedValue, "'([^']*)'", "\1", "ALL");
+							local.doubleQuote = Chr(34);
+							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#([^#local.doubleQuote#]*)#local.doubleQuote#", "\1", "ALL");
+							
+							ArrayAppend(local.originalValues, local.cleanedValue);
+						} else {
+							ArrayAppend(local.originalValues, local.processedValue);
+						}
+					} else {
+						ArrayAppend(
+							local.originalValues,
+							ReplaceList(
+								Chr(7) & local.extractedValue & Chr(7),
+								"#Chr(7)#(,)#Chr(7)#,#Chr(7)#','#Chr(7)#,#Chr(7)#"",""#Chr(7)#,#Chr(7)#",
+								",,,,,,"
+							)
+						);
+					}
 				}
 			}
 			if (
@@ -1061,7 +1084,7 @@ component {
 
 			/*
 				To fix the issue below:
-				https://github.com/cfwheels/cfwheels/issues/580
+				https://github.com/wheels-dev/wheels/issues/580
 
 				Add aliasedPropertyList in the associated class that will be used to check the duplicate column
 			*/

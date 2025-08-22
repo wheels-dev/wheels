@@ -1,4 +1,6 @@
 # wheels generate app
+*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
 
 Create a new Wheels application from templates.
 
@@ -28,7 +30,7 @@ The `wheels generate app` command creates a new Wheels application with a comple
 |--------|-------------|---------|
 | `reloadPassword` | Set reload password | `''` (empty) |
 | `datasourceName` | Database datasource name | App name |
-| `cfmlEngine` | CFML engine (lucee/adobe) | `lucee` |
+| `cfmlEngine` | CFML engine (lucee/adobe/boxlang) | `lucee` |
 | `--useBootstrap` | Include Bootstrap CSS | `false` |
 | `--setupH2` | Setup H2 embedded database | `true` |
 | `--init` | Initialize as CommandBox package | `false` |
