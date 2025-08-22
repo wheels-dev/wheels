@@ -20,19 +20,24 @@ component extends="wheels-cli.models.BaseCommand" {
      * @verbose.hint Show detailed progress
      */
     function run(
-        string path = ".",
+        string path = "app",
         boolean fix = false,
         string format = "console",
         string severity = "warning",
         boolean report = false,
         boolean verbose = false
     ) {
+        //reconstructArgs() is defined in the same file, this file is not extented from base.cfc
         arguments = reconstructArgs(arguments);
         // Set verbose mode if requested
         if (arguments.verbose) {
             print.setVerbose(true);
         }
-        
+
+        //isWheelsApp() is defined in the same file, this file is not extented from base.cfc
+        if(!isWheelsApp(resolvePath("."))){
+           error("This command must be run from a Wheels application root directory.");
+        }
         print.yellowLine("Analyzing code quality...")
              .line();
         // Pass the print object to the service
@@ -69,7 +74,42 @@ component extends="wheels-cli.models.BaseCommand" {
         }
     }
     
-    // ... rest of your existing methods remain the same ...
+    function reconstructArgs(required struct argStruct) {
+        local.result = {};
+
+        for (local.key in arguments.argStruct) {
+            if (find("=", local.key)) {
+                local.parts = listToArray(local.key, "=");
+                if (arrayLen(local.parts) == 2 && arguments.argStruct[local.key] == true) {
+                    local.result[local.parts[1]] = local.parts[2];
+                } else {
+                    local.result[local.parts[1]] = local.parts[2] ?: true;
+                }
+            } else {
+                local.result[local.key] = arguments.argStruct[local.key];
+            }
+        }
+
+        return local.result;
+    }
+
+    //Use this function for commands that should work Only if the application is running
+	boolean function isWheelsApp(string path = getCWD()) {
+		// Check for vendor/wheels folder
+		if (!directoryExists(arguments.path & "/vendor/wheels")) {
+			return false;
+		}
+		// Check for config folder
+		if (!directoryExists(arguments.path & "/config")) {
+			return false;
+		}
+		// Check for app folder
+		if (!directoryExists(arguments.path & "/app")) {
+			return false;
+		}
+		return true;
+	}
+
     
     private function displayResults(results, format) {
         switch (format) {
@@ -90,7 +130,7 @@ component extends="wheels-cli.models.BaseCommand" {
         displayCodeHealthHeader(results);
         
         if (results.totalIssues == 0 && results.metrics.duplicateBlocks == 0) {
-            print.greenBoldLine("✅ Excellent! No issues found. Your code is pristine!");
+            print.greenBoldLine("Excellent! No issues found. Your code is pristine!");
             displayMetricsSummary(results);
             return;
         }
@@ -99,17 +139,17 @@ component extends="wheels-cli.models.BaseCommand" {
         displayMetricsSummary(results);
         
         // Display issue summary
-        print.boldLine("📊 Issue Summary");
+        print.boldLine("Issue Summary");
         print.line(repeatString("-", 50));
         
         if (results.summary.errors > 0) {
-            print.redLine("🔴 Errors:   #padString(results.summary.errors, 5)# (Critical issues requiring immediate attention)");
+            print.redLine("Errors:   #padString(results.summary.errors, 5)# (Critical issues requiring immediate attention)");
         }
         if (results.summary.warnings > 0) {
-            print.yellowLine("🟡 Warnings: #padString(results.summary.warnings, 5)# (Issues that should be addressed)");
+            print.yellowLine("Warnings: #padString(results.summary.warnings, 5)# (Issues that should be addressed)");
         }
         if (results.summary.info > 0) {
-            print.blueLine("🔵 Info:     #padString(results.summary.info, 5)# (Suggestions for improvement)");
+            print.blueLine("Info:     #padString(results.summary.info, 5)# (Suggestions for improvement)");
         }
         
         print.line();
@@ -126,7 +166,7 @@ component extends="wheels-cli.models.BaseCommand" {
         
         // Display issues by file
         if (structCount(results.files) > 0) {
-            print.boldLine("📁 Issues by File");
+            print.boldLine("Issues by File");
             print.line(repeatString("-", 50));
             
             for (var filePath in results.files) {
@@ -159,7 +199,7 @@ component extends="wheels-cli.models.BaseCommand" {
         
         // Display execution time
         print.line();
-        print.grayLine("⏱️  Analysis completed in #numberFormat(results.executionTime, '0.00')# seconds");
+        print.grayLine("Analysis completed in #numberFormat(results.executionTime, '0.00')# seconds");
     }
     
     private function displayCodeHealthHeader(results) {
@@ -183,7 +223,7 @@ component extends="wheels-cli.models.BaseCommand" {
     }
     
     private function displayMetricsSummary(results) {
-        print.boldLine("📈 Code Metrics");
+        print.boldLine("Code Metrics");
         print.line(repeatString("-", 50));
         print.line("Files Analyzed:       #padString(results.metrics.totalFiles, 5)#");
         print.line("Total Lines:          #padString(results.metrics.totalLines, 5)#");
@@ -196,7 +236,7 @@ component extends="wheels-cli.models.BaseCommand" {
     }
     
     private function displayComplexityAnalysis(results) {
-        print.boldLine("⚠️  High Complexity Functions");
+        print.boldLine("High Complexity Functions");
         print.line(repeatString("-", 50));
         
         // Sort by complexity
@@ -210,7 +250,7 @@ component extends="wheels-cli.models.BaseCommand" {
         for (var i = 1; i <= count; i++) {
             var func = sorted[i];
             var relativePath = replace(func.file, getCWD(), "");
-            print.yellowLine("  • #func.function#() in #relativePath#");
+            print.yellowLine("  * #func.function#() in #relativePath#");
             // Use a default threshold of 10 if not available in results
             var threshold = structKeyExists(results, "config") && structKeyExists(results.config, "rules") 
                 ? results.config.rules["max-function-complexity"] 
@@ -225,7 +265,7 @@ component extends="wheels-cli.models.BaseCommand" {
     }
     
     private function displayDuplicateCode(results) {
-        print.boldLine("🔁 Duplicate Code Detection");
+        print.boldLine("Duplicate Code Detection");
         print.line(repeatString("-", 50));
         print.yellowLine("Found #results.metrics.duplicateBlocks# duplicate code blocks");
         
@@ -249,7 +289,7 @@ component extends="wheels-cli.models.BaseCommand" {
     }
     
     private function displayRecommendations(results) {
-        print.yellowBoldLine("💡 Recommendations");
+        print.yellowBoldLine("Recommendations");
         print.line(repeatString("-", 50));
         
         var recommendations = [];
@@ -281,7 +321,7 @@ component extends="wheels-cli.models.BaseCommand" {
         arrayAppend(recommendations, "Integrate this check into your CI/CD pipeline");
         
         for (var rec in recommendations) {
-            print.line("  • #rec#");
+            print.line("  * #rec#");
         }
     }
     
@@ -352,23 +392,37 @@ component extends="wheels-cli.models.BaseCommand" {
     }
     
     private function generateReport(results) {
-        var reportPath = fileSystemUtil.resolvePath("reports/code-analysis-#dateFormat(now(), 'yyyymmdd-HHmmss')#.html");
+        var reportPath = fileSystemUtil.resolvePath("reports/code-analysis-#dateFormat(now(), 'yyyymmdd')##timeFormat(now(), 'HHmmss')#.html");
         var reportDir = getDirectoryFromPath(reportPath);
         
         if (!directoryExists(reportDir)) {
             directoryCreate(reportDir, true);
         }
         
-        var html = generateReportHTML(results);
+        // Start progress indication
+        print.yellow("Generating HTML report... ").toConsole();
+        
+        // Calculate total items to process for progress tracking
+        var totalItems = structCount(results.files) + 
+                        arrayLen(results.complexFunctions) + 
+                        arrayLen(results.duplicates);
+        
+        var html = generateReportHTML(results, totalItems);
         fileWrite(reportPath, html);
         
-        print.greenLine("📊 HTML report generated: #reportPath#");
+        print.line().greenLine("HTML report generated: #reportPath#");
     }
     
-    private function generateReportHTML(results) {
+    private function generateReportHTML(results, totalItems = 0) {
         var gradeColor = getGradeColorHex(results.metrics.grade);
+        var processedItems = 0;
         
-        return '<!DOCTYPE html>
+        // Show initial progress
+        if (totalItems > 0) {
+            print.text("[0%]").toConsole();
+        }
+        
+        var html = '<!DOCTYPE html>
 <html>
 <head>
     <title>Wheels Code Analysis Report</title>
@@ -412,7 +466,7 @@ component extends="wheels-cli.models.BaseCommand" {
 </head>
 <body>
     <div class="container">
-        <h1>🔍 Wheels Code Analysis Report</h1>
+        <h1>Wheels Code Analysis Report</h1>
         <p>Generated on ' & dateTimeFormat(now(), "full") & ' • Execution time: ' & numberFormat(results.executionTime, '0.00') & ' seconds</p>
         
         <div class="grade-header">
@@ -444,7 +498,7 @@ component extends="wheels-cli.models.BaseCommand" {
             </div>
         </div>
         
-        <h2>📊 Code Metrics</h2>
+        <h2>Code Metrics</h2>
         <div class="metrics-grid">
             <div class="metric-item">
                 <div class="metric-label">Files Analyzed</div>
@@ -471,26 +525,35 @@ component extends="wheels-cli.models.BaseCommand" {
                 <div class="metric-value">' & results.metrics.deprecatedCalls & '</div>
             </div>
         </div>
+        ';
         
-        ' & generateComplexFunctionsHTML(results) & '
-        ' & generateDuplicateCodeHTML(results) & '
-        ' & generateFileIssuesHTML(results) & '
+        // Generate complex functions HTML with progress
+        html &= generateComplexFunctionsHTML(results, processedItems, totalItems);
         
+        // Generate duplicate code HTML with progress  
+        html &= generateDuplicateCodeHTML(results, processedItems, totalItems);
+        
+        // Generate file issues HTML with progress
+        html &= generateFileIssuesHTML(results, processedItems, totalItems);
+        
+        html &= '
         <div class="footer">
-            <p>Wheels Code Analyzer v1.0 • <a href="##">View Documentation</a></p>
+            <p>Wheels Code Analyzer v1.0 • <a href="https://wheels.dev/3.0.0/guides/command-line-tools/commands/analysis/analyze-code" target="blank">View Documentation</a></p>
         </div>
     </div>
 </body>
 </html>';
+        
+        return html;
     }
     
-    private function generateComplexFunctionsHTML(results) {
+    private function generateComplexFunctionsHTML(results, processedItems = 0, totalItems = 0) {
         if (arrayLen(results.complexFunctions) == 0) {
             return "";
         }
         
         var html = '<div class="section">';
-        html &= '<h2>⚠️ Complex Functions</h2>';
+        html &= '<h2>Complex Functions</h2>';
         
         // Sort by complexity
         var sorted = duplicate(results.complexFunctions);
@@ -504,19 +567,25 @@ component extends="wheels-cli.models.BaseCommand" {
             html &= '<strong>' & func.function & '()</strong> in ' & relativePath;
             html &= ' - Complexity: <strong>' & func.complexity & '</strong>';
             html &= '</div>';
+            
+            // Update progress
+            if (totalItems > 0) {
+                processedItems++;
+                updateProgress(processedItems, totalItems);
+            }
         }
         
         html &= '</div>';
         return html;
     }
     
-    private function generateDuplicateCodeHTML(results) {
+    private function generateDuplicateCodeHTML(results, processedItems = 0, totalItems = 0) {
         if (results.metrics.duplicateBlocks == 0) {
             return "";
         }
         
         var html = '<div class="section">';
-        html &= '<h2>🔁 Duplicate Code Blocks</h2>';
+        html &= '<h2>Duplicate Code Blocks</h2>';
         html &= '<p>Found ' & results.metrics.duplicateBlocks & ' duplicate code blocks across your codebase.</p>';
         
         var count = min(10, arrayLen(results.duplicates));
@@ -531,6 +600,12 @@ component extends="wheels-cli.models.BaseCommand" {
             }
             html &= '</ul>';
             html &= '</div>';
+            
+            // Update progress
+            if (totalItems > 0) {
+                processedItems++;
+                updateProgress(processedItems, totalItems);
+            }
         }
         
         html &= '</div>';
@@ -548,15 +623,18 @@ component extends="wheels-cli.models.BaseCommand" {
         }
     }
     
-    private function generateFileIssuesHTML(results) {
+    private function generateFileIssuesHTML(results, processedItems = 0, totalItems = 0) {
         var html = "";
+        var fileCount = 0;
+        var totalFiles = structCount(results.files);
         
         for (var filePath in results.files) {
+            fileCount++;
             var fileIssues = results.files[filePath];
             var relativePath = replace(filePath, getCWD(), "");
             
             html &= '<div class="file-section">';
-            html &= '<div class="file-header">📄 ' & relativePath & ' (' & arrayLen(fileIssues) & ' issues)</div>';
+            html &= '<div class="file-header">' & relativePath & ' (' & arrayLen(fileIssues) & ' issues)</div>';
             
             for (var issue in fileIssues) {
                 html &= '<div class="issue ' & issue.severity & '">';
@@ -566,23 +644,36 @@ component extends="wheels-cli.models.BaseCommand" {
                 html &= '</div>';
                 html &= '<div class="issue-rule">Rule: ' & issue.rule & '</div>';
                 if (issue.fixable) {
-                    html &= '<div class="fixable">✅ Auto-fixable</div>';
+                    html &= '<div class="fixable">Auto-fixable</div>';
                 }
                 html &= '</div>';
             }
             
             html &= '</div>';
+            
+            // Update progress every 10 files or on last file
+            if (totalItems > 0 && (fileCount % 10 == 0 || fileCount == totalFiles)) {
+                processedItems = processedItems + min(10, totalFiles - fileCount + 10);
+                updateProgress(processedItems, totalItems);
+            }
         }
         
         return html;
     }
     
+    private function updateProgress(current, total) {
+        var percentage = round((current / total) * 100);
+        // Clear previous progress text and show new one
+        print.text(repeatString(chr(8), 5)).toConsole(); // Backspace to clear previous percentage
+        print.text("[#percentage#%]").toConsole();
+    }
+    
     private function getSeverityIcon(severity) {
         switch (arguments.severity) {
-            case "error": return "🔴";
-            case "warning": return "🟡";
-            case "info": return "🔵";
-            default: return "⚪";
+            case "error": return "[ERROR]";
+            case "warning": return "[WARN]";
+            case "info": return "[INFO]";
+            default: return "[-]";
         }
     }
     

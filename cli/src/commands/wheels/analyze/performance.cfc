@@ -5,7 +5,7 @@
  * wheels analyze performance --duration=60 --target=query
  * wheels analyze performance --profile --report
  */
-component extends="wheels-cli.commands.wheels.base" {
+component extends="wheels-cli.models.BaseCommand" {
     
     /**
      * @target.hint Analysis target (all, controller, view, query, memory)
@@ -22,14 +22,13 @@ component extends="wheels-cli.commands.wheels.base" {
         numeric threshold = 100,
         boolean profile = false
     ) {
+        arguments = reconstructArgs(arguments);
         print.yellowLine("Analyzing application performance...")
              .line();
         
         // Validate we're in a Wheels project
-        // if (!directoryExists(fileSystemUtil.resolvePath("vendor/wheels"))) {
-        if (!isWheelsApp() && !isWheelsInstall) { 
+        if (!isWheelsApp(resolvePath("."))) { 
             error("This command must be run from the root of a Wheels application.");
-            return;
         }
         
         var results = {
@@ -52,7 +51,10 @@ component extends="wheels-cli.commands.wheels.base" {
                 totalQueries = 0,
                 avgQueryTime = 0,
                 slowQueries = 0,
-                memoryUsage = []
+                memoryUsage = {
+                    avg = 0,
+                    max = 0
+                }
             }
         };
         
@@ -68,12 +70,8 @@ component extends="wheels-cli.commands.wheels.base" {
 
         // Monitor performance
         var progress = 0;
-        var spinner = ["|", "/", "-", "\\"];
+        var spinner = ["|", "/", "-", "\"];
         var spinIndex = 1;
-
-        // ANSI escape code for green text
-        var greenStart = chr(27) & "[32m";
-        var reset = chr(27) & "[0m";
 
         while (now() < results.endTime) {
             var currentProgress = int((dateDiff("s", results.startTime, now()) / arguments.duration) * 100);
@@ -85,12 +83,12 @@ component extends="wheels-cli.commands.wheels.base" {
                 spinIndex = spinIndex == arrayLen(spinner) ? 1 : spinIndex + 1;
 
                 var bar = repeatString("=", int(progress / 5)) & repeatString(" ", 20 - int(progress / 5));
-                var progressStr = "[#bar#] #progress#% #spinChar#";
+                var progressStr = "[#bar#] #progress#% #spinChar# Monitoring...";
 
-                // Print with green color using ANSI and inline update
-                systemOutput(chr(13) & greenStart & progressStr & reset);
+                // Print progress on same line
+                print.text(chr(13) & progressStr).toConsole();
 
-                // Collect metrics
+                // Collect metrics based on target
                 if (arguments.target == "all" || arguments.target == "controller") {
                     collectControllerMetrics(results);
                 }
@@ -108,6 +106,9 @@ component extends="wheels-cli.commands.wheels.base" {
             sleep(1000); // Check every second
         }
 
+        // Clear the progress line and show completion
+        print.line(chr(13) & "[" & repeatString("=", 20) & "] 100% Complete!     ");
+        
         if (arguments.profile) {
             disableProfiling();
         }
@@ -127,72 +128,204 @@ component extends="wheels-cli.commands.wheels.base" {
             setExitCode(1);
         }
     }
+
+    function reconstructArgs(required struct argStruct) {
+        local.result = {};
+
+        for (local.key in arguments.argStruct) {
+            if (find("=", local.key)) {
+                local.parts = listToArray(local.key, "=");
+                if (arrayLen(local.parts) == 2 && arguments.argStruct[local.key] == true) {
+                    local.result[local.parts[1]] = local.parts[2];
+                } else {
+                    local.result[local.parts[1]] = local.parts[2] ?: true;
+                }
+            } else {
+                local.result[local.key] = arguments.argStruct[local.key];
+            }
+        }
+
+        return local.result;
+    }
+
+    //Use this function for commands that should work Only if the application is running
+	boolean function isWheelsApp(string path = getCWD()) {
+		// Check for vendor/wheels folder
+		if (!directoryExists(arguments.path & "/vendor/wheels")) {
+			return false;
+		}
+		// Check for config folder
+		if (!directoryExists(arguments.path & "/config")) {
+			return false;
+		}
+		// Check for app folder
+		if (!directoryExists(arguments.path & "/app")) {
+			return false;
+		}
+		return true;
+	}
     
     private function enableProfiling() {
-        // Enable CF debugging/profiling
         try {
-            // This would enable server-side profiling
-            print.greenLine("Profiling enabled");
+            // Store original settings
+            request.performanceProfiling = {
+                enabled = true,
+                startTime = getTickCount(),
+                originalDebugMode = isDefined("application.wheels.showDebugInformation") ? application.wheels.showDebugInformation : false,
+                originalCaching = isDefined("application.wheels.cacheQueries") ? application.wheels.cacheQueries : true
+            };
+            
+            // Enable Wheels debug mode if available
+            if (isDefined("application.wheels")) {
+                application.wheels.showDebugInformation = true;
+                application.wheels.cacheQueries = false; // Disable caching for accurate measurements
+            }
+            
+            // Enable CF metrics collection
+            createObject("java", "coldfusion.server.ServiceFactory")
+                .getMetricsService()
+                .setEnabled(true);
+            
+            print.greenLine("Profiling mode enabled - Collecting real metrics");
         } catch (any e) {
-            print.yellowLine("Could not enable profiling: #e.message#");
+            print.yellowLine("Limited profiling enabled: #e.message#");
+            request.performanceProfiling.enabled = true;
         }
     }
     
     private function disableProfiling() {
-        // Disable CF debugging/profiling
         try {
-            print.greenLine("Profiling disabled");
+            if (structKeyExists(request, "performanceProfiling")) {
+                // Restore original settings
+                if (isDefined("application.wheels")) {
+                    application.wheels.showDebugInformation = request.performanceProfiling.originalDebugMode;
+                    application.wheels.cacheQueries = request.performanceProfiling.originalCaching;
+                }
+                
+                print.greenLine("Profiling mode disabled");
+            }
         } catch (any e) {
-            print.yellowLine("Could not disable profiling: #e.message#");
+            // Silent fail
         }
     }
     
     private function collectControllerMetrics(results) {
-        // In a real implementation, this would hook into the application
-        // to collect actual metrics. For now, we'll simulate some data.
+        var requestData = {};
         
-        // Simulate request data
-        var requestData = {
-            controller = "users",
-            action = "index",
-            responseTime = randRange(50, 500),
-            timestamp = now(),
-            memory = randRange(10, 100)
-        };
+        // If profiling is enabled, try to get real data
+        if (structKeyExists(request, "performanceProfiling") && request.performanceProfiling.enabled) {
+            try {
+                // Get actual request metrics from CF
+                var metricService = createObject("java", "coldfusion.server.ServiceFactory").getMetricsService();
+                var requestMetrics = metricService.getRequestMetrics();
+                
+                // Try to get Wheels-specific data
+                if (isDefined("request.wheels")) {
+                    requestData = {
+                        controller = structKeyExists(request.wheels, "controller") ? request.wheels.controller : "unknown",
+                        action = structKeyExists(request.wheels, "action") ? request.wheels.action : "unknown",
+                        responseTime = getTickCount() - request.performanceProfiling.startTime,
+                        timestamp = now(),
+                        memory = getMemoryUsage(),
+                        real = true // Flag to indicate this is real data
+                    };
+                } else {
+                    // Get HTTP request data
+                    var cgiData = cgi;
+                    requestData = {
+                        controller = listLast(cgiData.script_name, "/"),
+                        action = cgiData.request_method,
+                        responseTime = structKeyExists(requestMetrics, "avgTime") ? requestMetrics.avgTime : randRange(50, 500),
+                        timestamp = now(),
+                        memory = getMemoryUsage(),
+                        real = structKeyExists(requestMetrics, "avgTime")
+                    };
+                }
+            } catch (any e) {
+                // Fall back to simulation
+                requestData = getSimulatedRequestData();
+            }
+        } else {
+            // Use simulated data when not profiling
+            requestData = getSimulatedRequestData();
+        }
+        
         arrayAppend(arguments.results.metrics.requests, requestData);
-
-        if (requestData.responseTime > arguments.results.summary.maxResponseTime) {
-            arguments.results.summary.maxResponseTime = requestData.responseTime;
-        }
-        if (requestData.responseTime < arguments.results.summary.minResponseTime) {
-            arguments.results.summary.minResponseTime = requestData.responseTime;
-        }
-        if (requestData.responseTime > 100) { // threshold
-            arguments.results.summary.slowRequests++;
-        }
+        updateRequestStatistics(arguments.results, requestData);
     }
     
     private function collectQueryMetrics(results) {
-        // Simulate query metrics
-        var query = {
-            sql = "SELECT * FROM users WHERE active = ?",
-            executionTime = randRange(1, 200),
-            recordCount = randRange(0, 1000),
-            timestamp = now()
-        };
+        var queryData = {};
         
-        arrayAppend(arguments.results.metrics.queries, query);
-        
-        if (query.executionTime > 50) { // query threshold
-            arguments.results.summary.slowQueries++;
+        if (structKeyExists(request, "performanceProfiling") && request.performanceProfiling.enabled) {
+            try {
+                // Try to get real query metrics
+                var debugging = createObject("java", "coldfusion.runtime.Debugging");
+                var queries = debugging.getQueries();
+                
+                if (arrayLen(queries) > 0) {
+                    for (var q in queries) {
+                        queryData = {
+                            sql = left(q.sql, 200),
+                            executionTime = q.executionTime,
+                            recordCount = q.recordCount,
+                            timestamp = now(),
+                            datasource = q.datasource,
+                            real = true
+                        };
+                        arrayAppend(arguments.results.metrics.queries, queryData);
+                        arguments.results.summary.totalQueries++;
+                        
+                        if (queryData.executionTime > 50) {
+                            arguments.results.summary.slowQueries++;
+                        }
+                    }
+                    return; // Exit since we got real data
+                }
+            } catch (any e) {
+                // Fall back to simulation
+            }
+            
+            // Try alternative method - check request scope for query info
+            if (isDefined("request.wheels.queries")) {
+                for (var query in request.wheels.queries) {
+                    queryData = {
+                        sql = query.sql,
+                        executionTime = query.time,
+                        recordCount = query.recordCount,
+                        timestamp = now(),
+                        real = true
+                    };
+                    arrayAppend(arguments.results.metrics.queries, queryData);
+                    arguments.results.summary.totalQueries++;
+                    
+                    if (queryData.executionTime > 50) {
+                        arguments.results.summary.slowQueries++;
+                    }
+                }
+                return;
+            }
         }
+        
+        // Use simulated data as fallback
+        queryData = getSimulatedQueryData();
+        arrayAppend(arguments.results.metrics.queries, queryData);
+        updateQueryStatistics(arguments.results, queryData);
     }
     
     private function collectViewMetrics(results) {
         // Simulate view rendering metrics
+        var templates = [
+            "users/index.cfm",
+            "products/show.cfm",
+            "layouts/main.cfm",
+            "shared/_header.cfm",
+            "dashboard/index.cfm"
+        ];
+        
         var view = {
-            template = "users/index.cfm",
-            renderTime = randRange(10, 100),
+            template = templates[randRange(1, arrayLen(templates))],
+            renderTime = randRange(5, 80),
             timestamp = now()
         };
         
@@ -200,38 +333,70 @@ component extends="wheels-cli.commands.wheels.base" {
     }
     
     private function collectMemoryMetrics(results) {
-        // Get current memory usage
+        // Get actual memory usage
         var runtime = createObject("java", "java.lang.Runtime").getRuntime();
-        var memoryUsed = (runtime.totalMemory() - runtime.freeMemory()) / 1048576; // Convert to MB
+        var memoryUsed = round((runtime.totalMemory() - runtime.freeMemory()) / 1048576); // Convert to MB
+        var maxMemory = round(runtime.maxMemory() / 1048576);
         
         arrayAppend(arguments.results.metrics.memory, {
             used = memoryUsed,
-            max = runtime.maxMemory() / 1048576,
+            max = maxMemory,
+            free = round(runtime.freeMemory() / 1048576),
             timestamp = now()
         });
+    }
+    
+    private function getRealisticResponseTime() {
+        // Generate realistic response times with occasional spikes
+        var random = randRange(1, 100);
+        if (random <= 70) {
+            // 70% fast responses
+            return randRange(20, 100);
+        } else if (random <= 90) {
+            // 20% moderate responses
+            return randRange(100, 300);
+        } else {
+            // 10% slow responses
+            return randRange(300, 1000);
+        }
+    }
+    
+    private function getRealisticQueryTime() {
+        // Generate realistic query times
+        var random = randRange(1, 100);
+        if (random <= 80) {
+            // 80% fast queries
+            return randRange(1, 30);
+        } else if (random <= 95) {
+            // 15% moderate queries
+            return randRange(30, 100);
+        } else {
+            // 5% slow queries
+            return randRange(100, 500);
+        }
     }
     
     private function calculateSummary(results) {
         // Calculate request statistics
         if (arrayLen(arguments.results.metrics.requests)) {
-            arguments.results.summary.totalRequests = arrayLen(arguments.results.metrics.requests);
-            
             var totalTime = 0;
             for (var req in arguments.results.metrics.requests) {
                 totalTime += req.responseTime;
             }
-            arguments.results.summary.avgResponseTime = int(totalTime / arguments.results.summary.totalRequests);
+            if (arguments.results.summary.totalRequests > 0) {
+                arguments.results.summary.avgResponseTime = round(totalTime / arguments.results.summary.totalRequests);
+            }
         }
         
         // Calculate query statistics
         if (arrayLen(arguments.results.metrics.queries)) {
-            arguments.results.summary.totalQueries = arrayLen(arguments.results.metrics.queries);
-            
             var totalQueryTime = 0;
             for (var qry in arguments.results.metrics.queries) {
                 totalQueryTime += qry.executionTime;
             }
-            arguments.results.summary.avgQueryTime = int(totalQueryTime / arguments.results.summary.totalQueries);
+            if (arguments.results.summary.totalQueries > 0) {
+                arguments.results.summary.avgQueryTime = round(totalQueryTime / arguments.results.summary.totalQueries);
+            }
         }
         
         // Calculate memory statistics
@@ -247,7 +412,7 @@ component extends="wheels-cli.commands.wheels.base" {
             }
             
             arguments.results.summary.memoryUsage = {
-                avg = int(totalMemory / arrayLen(arguments.results.metrics.memory)),
+                avg = round(totalMemory / arrayLen(arguments.results.metrics.memory)),
                 max = maxMemory
             };
         }
@@ -255,97 +420,271 @@ component extends="wheels-cli.commands.wheels.base" {
     
     private function displayResults(results) {
         print.line();
-        print.boldGreenLine("Performance Analysis Complete!");
+        print.line(repeatString("=", 50));
+        print.boldLine("       PERFORMANCE ANALYSIS COMPLETE");
+        print.line(repeatString("=", 50));
         print.line();
         
-        // Summary
-        print.yellowBoldLine("Summary:");
-        print.line("-----------------------------------------");
+        // Check if we have real data
+        var hasRealData = false;
+        for (var req in arguments.results.metrics.requests) {
+            if (structKeyExists(req, "real") && req.real) {
+                hasRealData = true;
+                break;
+            }
+        }
         
+        if (hasRealData) {
+            print.greenLine("Data Source: REAL APPLICATION METRICS");
+        } else {
+            print.yellowLine("Data Source: SIMULATED (Enable --profile for real data)");
+        }
+        print.line();
+        
+        // Request metrics
         if (arguments.results.summary.totalRequests > 0) {
-            print.line("Requests Analyzed: #arguments.results.summary.totalRequests#");
-            print.line("Average Response Time: #arguments.results.summary.avgResponseTime#ms");
-            print.line("Slowest Request: #arguments.results.summary.maxResponseTime#ms");
-            print.line("Fastest Request: #arguments.results.summary.minResponseTime#ms");
+            print.boldLine("Request Performance");
+            print.line(repeatString("-", 50));
+            print.line("Requests Analyzed:     #padString(arguments.results.summary.totalRequests, 8)#");
+            print.line("Average Response Time: #padString(arguments.results.summary.avgResponseTime & 'ms', 8)#");
+            print.line("Slowest Request:       #padString(arguments.results.summary.maxResponseTime & 'ms', 8)#");
+            print.line("Fastest Request:       #padString(arguments.results.summary.minResponseTime & 'ms', 8)#");
 
             if (arguments.results.summary.slowRequests > 0) {
-                print.redLine("Slow Requests (>#arguments.results.threshold#ms): #arguments.results.summary.slowRequests#");
+                print.redLine("Slow Requests (>#arguments.results.threshold#ms): #padString(arguments.results.summary.slowRequests, 8)#");
+            } else {
+                print.greenLine("Slow Requests:         #padString('None', 8)#");
             }
+            print.line();
         }
         
+        // Query metrics
         if (arguments.results.summary.totalQueries > 0) {
-            print.line();
-            print.line("Queries Executed: #arguments.results.summary.totalQueries#");
-            print.line("Average Query Time: #arguments.results.summary.avgQueryTime#ms");
+            print.boldLine("Database Performance");
+            print.line(repeatString("-", 50));
+            print.line("Queries Executed:      #padString(arguments.results.summary.totalQueries, 8)#");
+            print.line("Average Query Time:    #padString(arguments.results.summary.avgQueryTime & 'ms', 8)#");
 
             if (arguments.results.summary.slowQueries > 0) {
-                print.redLine("Slow Queries (>50ms): #arguments.results.summary.slowQueries#");
+                print.redLine("Slow Queries (>50ms):  #padString(arguments.results.summary.slowQueries, 8)#");
+            } else {
+                print.greenLine("Slow Queries:          #padString('None', 8)#");
             }
-        }
-        
-        if (structKeyExists(arguments.results.summary, "memoryUsage") && isStruct(arguments.results.summary.memoryUsage)) {
             print.line();
-            print.line("Average Memory Usage: #arguments.results.summary.memoryUsage.avg#MB");
-            print.line("Peak Memory Usage: #arguments.results.summary.memoryUsage.max#MB");
         }
         
-        print.line();
+        // Memory metrics
+        if (structCount(arguments.results.summary.memoryUsage) > 0) {
+            print.boldLine("Memory Usage");
+            print.line(repeatString("-", 50));
+            print.line("Average Memory:        #padString(arguments.results.summary.memoryUsage.avg & 'MB', 8)#");
+            print.line("Peak Memory:           #padString(arguments.results.summary.memoryUsage.max & 'MB', 8)#");
+            print.line();
+        }
         
-        // Detailed results
+        // Show slow requests if any
         if (arrayLen(arguments.results.metrics.requests) && arguments.results.summary.slowRequests > 0) {
-            print.yellowBoldLine("Slow Requests:");
-            print.line("-----------------------------------------");
+            print.yellowBoldLine("Top Slow Requests:");
+            print.line(repeatString("-", 50));
             
+            var threshold = arguments.results.threshold;
             var slowRequests = arguments.results.metrics.requests.filter(function(req) {
-                return req.responseTime > 100;
+                return req.responseTime > threshold;
             });
             
-            for (var req in slowRequests) {
-                print.line("   #req.controller#.#req.action#() - #req.responseTime#ms");
+            // Sort by response time
+            arraySort(slowRequests, function(a, b) {
+                return b.responseTime - a.responseTime;
+            });
+            
+            // Show top 5 slow requests
+            var count = min(5, arrayLen(slowRequests));
+            for (var i = 1; i <= count; i++) {
+                var req = slowRequests[i];
+                print.line("  #i#. #req.controller#.#req.action#() - #req.responseTime#ms");
             }
             print.line();
         }
         
+        // Show slow queries if any
         if (arrayLen(arguments.results.metrics.queries) && arguments.results.summary.slowQueries > 0) {
-            print.yellowBoldLine("Slow Queries:");
-            print.line("-----------------------------------------");
+            print.yellowBoldLine("Top Slow Queries:");
+            print.line(repeatString("-", 50));
             
             var slowQueries = arguments.results.metrics.queries.filter(function(qry) {
                 return qry.executionTime > 50;
             });
             
-            for (var qry in slowQueries) {
-                print.line("  #left(qry.sql, 50)#... - #qry.executionTime#ms");
+            // Sort by execution time
+            arraySort(slowQueries, function(a, b) {
+                return b.executionTime - a.executionTime;
+            });
+            
+            // Show top 5 slow queries
+            var count = min(5, arrayLen(slowQueries));
+            for (var i = 1; i <= count; i++) {
+                var qry = slowQueries[i];
+                var sqlPreview = len(qry.sql) > 50 ? left(qry.sql, 47) & "..." : qry.sql;
+                print.line("  #i#. #sqlPreview# - #qry.executionTime#ms");
             }
             print.line();
         }
         
+        // Performance score
+        var score = calculatePerformanceScore(arguments.results);
+        var grade = getPerformanceGrade(score);
+        
+        print.line(repeatString("=", 50));
+        print.boldLine("Performance Grade: #grade# (#score#/100)");
+        print.line(repeatString("=", 50));
+        print.line();
+        
         // Recommendations
+        displayRecommendations(arguments.results);
+    }
+    
+    private function calculatePerformanceScore(results) {
+        var score = 100;
+        
+        // Deduct points for slow responses
+        if (arguments.results.summary.avgResponseTime > 200) {
+            score -= 10;
+        }
+        if (arguments.results.summary.avgResponseTime > 500) {
+            score -= 20;
+        }
+        
+        // Deduct points for slow requests
+        if (arguments.results.summary.totalRequests > 0) {
+            var slowRequestRatio = arguments.results.summary.slowRequests / arguments.results.summary.totalRequests;
+            score -= round(slowRequestRatio * 30);
+        }
+        
+        // Deduct points for slow queries
+        if (arguments.results.summary.totalQueries > 0) {
+            var slowQueryRatio = arguments.results.summary.slowQueries / arguments.results.summary.totalQueries;
+            score -= round(slowQueryRatio * 20);
+        }
+        
+        // Deduct points for high memory usage
+        if (arguments.results.summary.memoryUsage.max > 500) {
+            score -= 10;
+        }
+        
+        return max(0, score);
+    }
+    
+    private function getPerformanceGrade(score) {
+        if (arguments.score >= 90) return "A";
+        if (arguments.score >= 80) return "B";
+        if (arguments.score >= 70) return "C";
+        if (arguments.score >= 60) return "D";
+        return "F";
+    }
+    
+    private function displayRecommendations(results) {
         print.yellowBoldLine("Performance Recommendations:");
-        print.line("-----------------------------------------");
+        print.line(repeatString("-", 50));
+        
+        var recommendations = [];
         
         if (arguments.results.summary.avgResponseTime > 200) {
-            print.line("   Consider implementing caching for frequently accessed data");
+            arrayAppend(recommendations, "Implement caching for frequently accessed data");
+            arrayAppend(recommendations, "Consider using a CDN for static assets");
         }
+        
         if (arguments.results.summary.slowQueries > 0) {
-            print.line("   Add indexes to improve query performance");
-            print.line("   Use query caching for repetitive queries");
+            arrayAppend(recommendations, "Add database indexes to improve query performance");
+            arrayAppend(recommendations, "Use query result caching for repetitive queries");
+            arrayAppend(recommendations, "Review and optimize slow SQL queries");
         }
-        if (structKeyExists(arguments.results.summary, "memoryUsage") && arguments.results.summary.memoryUsage.max > 500) {
-            print.line("   Monitor memory usage and optimize object creation");
+        
+        if (arguments.results.summary.memoryUsage.max > 500) {
+            arrayAppend(recommendations, "Monitor memory usage and optimize object creation");
+            arrayAppend(recommendations, "Review application for memory leaks");
         }
-        print.line("   Enable query result caching in production");
-        print.line("   Use CDN for static assets");
-        print.line("   Implement lazy loading for heavy operations");
+        
+        if (arguments.results.summary.slowRequests > 5) {
+            arrayAppend(recommendations, "Implement lazy loading for heavy operations");
+            arrayAppend(recommendations, "Consider async processing for long-running tasks");
+        }
+        
+        // Always add general recommendations
+        arrayAppend(recommendations, "Enable query result caching in production");
+        arrayAppend(recommendations, "Minimize database round trips");
+        arrayAppend(recommendations, "Use connection pooling for database connections");
+        
+        for (var i = 1; i <= min(5, arrayLen(recommendations)); i++) {
+            print.line("  * #recommendations[i]#");
+        }
+        
+        print.line();
+    }
+
+    private function getSimulatedRequestData() {
+    var controllers = ["users", "products", "orders", "dashboard", "reports"];
+    var actions = ["index", "show", "create", "update", "delete"];
+    
+    return {
+        controller = controllers[randRange(1, arrayLen(controllers))],
+        action = actions[randRange(1, arrayLen(actions))],
+        responseTime = getRealisticResponseTime(),
+        timestamp = now(),
+        memory = randRange(10, 100),
+        real = false // Flag to indicate simulated data
+    };
+}
+
+    private function getSimulatedQueryData() {
+        var tables = ["users", "products", "orders", "categories", "sessions"];
+        var operations = ["SELECT", "INSERT", "UPDATE", "DELETE"];
+        
+        return {
+            sql = "#operations[randRange(1, arrayLen(operations))]# * FROM #tables[randRange(1, arrayLen(tables))]# WHERE id = ?",
+            executionTime = getRealisticQueryTime(),
+            recordCount = randRange(0, 1000),
+            timestamp = now(),
+            real = false
+        };
+    }
+
+    private function updateRequestStatistics(results, requestData) {
+        arguments.results.summary.totalRequests++;
+        
+        if (arguments.requestData.responseTime > arguments.results.summary.maxResponseTime) {
+            arguments.results.summary.maxResponseTime = arguments.requestData.responseTime;
+        }
+        if (arguments.requestData.responseTime < arguments.results.summary.minResponseTime) {
+            arguments.results.summary.minResponseTime = arguments.requestData.responseTime;
+        }
+        if (arguments.requestData.responseTime > arguments.results.threshold) {
+            arguments.results.summary.slowRequests++;
+        }
+    }
+
+    private function updateQueryStatistics(results, queryData) {
+        arguments.results.summary.totalQueries++;
+        
+        if (arguments.queryData.executionTime > 50) {
+            arguments.results.summary.slowQueries++;
+        }
+    }
+
+    private function getMemoryUsage() {
+        var runtime = createObject("java", "java.lang.Runtime").getRuntime();
+        return round((runtime.totalMemory() - runtime.freeMemory()) / 1048576);
     }
     
     private function generatePerformanceReport(results) {
-        var reportPath = fileSystemUtil.resolvePath("reports/performance-#dateFormat(now(), 'yyyymmdd-HHmmss')#.html");
+        var reportPath = fileSystemUtil.resolvePath("reports/performance-#dateFormat(now(), 'yyyymmdd')##timeFormat(now(), 'HHmmss')#.html");
         var reportDir = getDirectoryFromPath(reportPath);
         
         if (!directoryExists(reportDir)) {
             directoryCreate(reportDir, true);
         }
+        
+        var score = calculatePerformanceScore(arguments.results);
+        var grade = getPerformanceGrade(score);
         
         var html = '<!DOCTYPE html>
 <html>
@@ -355,43 +694,71 @@ component extends="wheels-cli.commands.wheels.base" {
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: ##f5f5f5; }
         .container { max-width: 1200px; margin: 0 auto; }
-        .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .metric { display: inline-block; margin: 10px 20px; }
-        .metric-value { font-size: 36px; font-weight: bold; color: ##333; }
-        .metric-label { font-size: 14px; color: ##666; }
+        .header { background: linear-gradient(135deg, ##667eea 0%, ##764ba2 100%); color: white; padding: 40px; border-radius: 10px; margin-bottom: 30px; }
+        .header h1 { margin: 0; font-size: 36px; }
+        .header p { margin: 10px 0 0 0; opacity: 0.9; }
+        .card { background: white; padding: 30px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .metric { text-align: center; padding: 20px; background: ##f8f9fa; border-radius: 8px; }
+        .metric-value { font-size: 36px; font-weight: bold; color: ##333; margin: 10px 0; }
+        .metric-label { font-size: 14px; color: ##666; text-transform: uppercase; letter-spacing: 1px; }
         .chart-container { position: relative; height: 300px; margin: 20px 0; }
-        h1, h2 { color: ##333; }
+        h2 { color: ##333; margin-top: 0; }
         .warning { color: ##ff6b6b; }
         .success { color: ##51cf66; }
+        .grade { text-align: center; font-size: 72px; font-weight: bold; color: ' & getGradeColor(grade) & '; }
+        .grade-label { text-align: center; font-size: 18px; color: ##666; margin-bottom: 20px; }
+        .recommendations { background: ##fff3cd; border-left: 4px solid ##ffc107; padding: 15px; margin: 20px 0; }
+        .recommendations h3 { margin-top: 0; color: ##856404; }
+        .recommendations ul { margin: 10px 0; padding-left: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background: ##f8f9fa; padding: 12px; text-align: left; font-weight: 600; }
+        td { padding: 12px; border-bottom: 1px solid ##dee2e6; }
+        tr:hover { background: ##f8f9fa; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>⚡ Wheels Performance Report</h1>
-        <p>Generated on ' & dateTimeFormat(now(), "full") & '</p>
+        <div class="header">
+            <h1>Performance Analysis Report</h1>
+            <p>Generated on ' & dateTimeFormat(now(), "full") & '</p>
+            <p>Target: ' & arguments.results.target & ' | Threshold: ' & arguments.results.threshold & 'ms</p>
+        </div>
         
         <div class="card">
-            <h2>Performance Summary</h2>
-            <div class="metric">
-                <div class="metric-value">' & arguments.results.summary.totalRequests & '</div>
-                <div class="metric-label">Total Requests</div>
-            </div>
-            <div class="metric">
-                <div class="metric-value ' & (arguments.results.summary.avgResponseTime > 200 ? 'warning' : 'success') & '">' & arguments.results.summary.avgResponseTime & 'ms</div>
-                <div class="metric-label">Avg Response Time</div>
-            </div>
-            <div class="metric">
-                <div class="metric-value">' & arguments.results.summary.totalQueries & '</div>
-                <div class="metric-label">Total Queries</div>
-            </div>
-            <div class="metric">
-                <div class="metric-value ' & (arguments.results.summary.slowRequests > 0 ? 'warning' : 'success') & '">' & arguments.results.summary.slowRequests & '</div>
-                <div class="metric-label">Slow Requests</div>
+            <div class="grade">' & grade & '</div>
+            <div class="grade-label">Performance Score: ' & score & '/100</div>
+            
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-label">Total Requests</div>
+                    <div class="metric-value">' & arguments.results.summary.totalRequests & '</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Avg Response Time</div>
+                    <div class="metric-value ' & (arguments.results.summary.avgResponseTime > 200 ? 'warning' : 'success') & '">' & arguments.results.summary.avgResponseTime & 'ms</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Slow Requests</div>
+                    <div class="metric-value ' & (arguments.results.summary.slowRequests > 0 ? 'warning' : 'success') & '">' & arguments.results.summary.slowRequests & '</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Total Queries</div>
+                    <div class="metric-value">' & arguments.results.summary.totalQueries & '</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Avg Query Time</div>
+                    <div class="metric-value ' & (arguments.results.summary.avgQueryTime > 30 ? 'warning' : 'success') & '">' & arguments.results.summary.avgQueryTime & 'ms</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Peak Memory</div>
+                    <div class="metric-value">' & arguments.results.summary.memoryUsage.max & 'MB</div>
+                </div>
             </div>
         </div>
         
         <div class="card">
-            <h2>Response Time Distribution</h2>
+            <h2>Response Time Trend</h2>
             <div class="chart-container">
                 <canvas id="responseTimeChart"></canvas>
             </div>
@@ -404,10 +771,9 @@ component extends="wheels-cli.commands.wheels.base" {
             </div>
         </div>
         
-        <div class="card">
-            <h2>Detailed Metrics</h2>
-            <pre>' & serializeJSON(arguments.results, true) & '</pre>
-        </div>
+        ' & generateSlowRequestsTable(arguments.results) & '
+        ' & generateSlowQueriesTable(arguments.results) & '
+        ' & generateRecommendationsHTML(arguments.results) & '
     </div>
     
     <script>
@@ -420,12 +786,16 @@ component extends="wheels-cli.commands.wheels.base" {
                     label: "Response Time (ms)",
                     data: [' & generateChartData(arguments.results.metrics.requests, "responseTime") & '],
                     borderColor: "rgb(75, 192, 192)",
-                    tension: 0.1
+                    backgroundColor: "rgba(75, 192, 192, 0.1)",
+                    tension: 0.4
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true }
+                }
             }
         });
         
@@ -438,12 +808,16 @@ component extends="wheels-cli.commands.wheels.base" {
                     label: "Memory Usage (MB)",
                     data: [' & generateChartData(arguments.results.metrics.memory, "used") & '],
                     borderColor: "rgb(255, 99, 132)",
-                    tension: 0.1
+                    backgroundColor: "rgba(255, 99, 132, 0.1)",
+                    tension: 0.4
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true }
+                }
             }
         });
     </script>
@@ -451,7 +825,95 @@ component extends="wheels-cli.commands.wheels.base" {
 </html>';
         
         fileWrite(reportPath, html);
-        print.greenLine("📊 Performance report generated: #reportPath#");
+        print.line();
+        print.greenLine("Performance report generated: #reportPath#");
+    }
+    
+    private function generateSlowRequestsTable(results) {
+        var threshold = arguments.results.threshold;
+        var slowRequests = arguments.results.metrics.requests.filter(function(req) {
+            return req.responseTime > threshold;
+        });
+        
+        if (arrayLen(slowRequests) == 0) {
+            return "";
+        }
+        
+        arraySort(slowRequests, function(a, b) {
+            return b.responseTime - a.responseTime;
+        });
+        
+        var html = '<div class="card"><h2>Slow Requests</h2><table><thead><tr><th>Controller</th><th>Action</th><th>Response Time</th></tr></thead><tbody>';
+        
+        for (var i = 1; i <= min(10, arrayLen(slowRequests)); i++) {
+            var req = slowRequests[i];
+            html &= '<tr><td>' & req.controller & '</td><td>' & req.action & '</td><td class="warning">' & req.responseTime & 'ms</td></tr>';
+        }
+        
+        html &= '</tbody></table></div>';
+        return html;
+    }
+    
+    private function generateSlowQueriesTable(results) {
+        var slowQueries = arguments.results.metrics.queries.filter(function(qry) {
+            return qry.executionTime > 50;
+        });
+        
+        if (arrayLen(slowQueries) == 0) {
+            return "";
+        }
+        
+        arraySort(slowQueries, function(a, b) {
+            return b.executionTime - a.executionTime;
+        });
+        
+        var html = '<div class="card"><h2>Slow Queries</h2><table><thead><tr><th>Query</th><th>Execution Time</th><th>Records</th></tr></thead><tbody>';
+        
+        for (var i = 1; i <= min(10, arrayLen(slowQueries)); i++) {
+            var qry = slowQueries[i];
+            var sqlPreview = len(qry.sql) > 60 ? left(qry.sql, 57) & "..." : qry.sql;
+            html &= '<tr><td>' & htmlEditFormat(sqlPreview) & '</td><td class="warning">' & qry.executionTime & 'ms</td><td>' & qry.recordCount & '</td></tr>';
+        }
+        
+        html &= '</tbody></table></div>';
+        return html;
+    }
+    
+    private function generateRecommendationsHTML(results) {
+        var recommendations = [];
+        
+        if (arguments.results.summary.avgResponseTime > 200) {
+            arrayAppend(recommendations, "Implement caching strategies for frequently accessed data");
+        }
+        if (arguments.results.summary.slowQueries > 0) {
+            arrayAppend(recommendations, "Optimize database queries and add appropriate indexes");
+        }
+        if (arguments.results.summary.memoryUsage.max > 500) {
+            arrayAppend(recommendations, "Review memory usage patterns and optimize object lifecycle");
+        }
+        
+        if (arrayLen(recommendations) == 0) {
+            return "";
+        }
+        
+        var html = '<div class="recommendations"><h3>Recommendations</h3><ul>';
+        for (var rec in recommendations) {
+            html &= '<li>' & rec & '</li>';
+        }
+        html &= '</ul></div>';
+        
+        return html;
+    }
+    
+    private function getGradeColor(grade) {
+        switch(arguments.grade) {
+            case "A": return "##51cf66";
+            case "B": return "##4dabf7";
+            case "C": return "##ffd43b";
+            case "D": return "##ff8787";
+            case "F": return "##ff6b6b";
+            default: return "##868e96";
+        }
     }
     
     private function generateChartLabels(data) {
@@ -472,5 +934,13 @@ component extends="wheels-cli.commands.wheels.base" {
             }
         }
         return arrayToList(values);
+    }
+    
+    private function padString(value, length) {
+        var str = toString(arguments.value);
+        while (len(str) < arguments.length) {
+            str = " " & str;
+        }
+        return str;
     }
 }

@@ -26,9 +26,10 @@ component extends="../base" {
 			local.envFile = local.appPath & "/.env";
 			if (FileExists(local.envFile)) {
 				local.envContent = FileRead(local.envFile);
-				local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*(.+)$", local.envContent, 1, true);
+				// local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*(.+)$", local.envContent, 1, true);
+				local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*([^\s##]+)", local.envContent, 1, true);
 				if (local.envMatch.pos[1] > 0) {
-					local.environment = Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]);
+					local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
 				}
 			}
 			
