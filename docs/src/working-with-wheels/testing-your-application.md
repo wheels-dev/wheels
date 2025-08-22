@@ -609,6 +609,7 @@ component extends="testbox.system.BaseSpec" {
 Wheels 3.0 provides convenient URL routing for both TestBox and legacy testing:
 
 **TestBox Testing URLs:**
+
 ```
 # Run your application TestBox tests
 http://localhost:8080/wheels/app/tests
@@ -618,6 +619,7 @@ http://localhost:8080/wheels/core/tests
 ```
 
 **Legacy Testing URLs (RocketUnit):**
+
 ```
 # Run your application legacy tests
 http://localhost:8080/wheels/legacy/app/tests
@@ -680,12 +682,14 @@ http://localhost:8080/wheels/app/tests?format=json&db=mysql&populate=true&bundle
 Your test suite should provide comprehensive coverage for:
 
 ### HTTP Response Testing
+
 - Status codes (200, 404, 500, 302, etc.)
 - Response headers (Content-Type, Location, etc.)
 - Response content validation
 - Redirect behavior
 
 ### Controller Functionality
+
 - Page rendering and templates
 - Form processing and validation
 - Authentication and authorization
@@ -694,6 +698,7 @@ Your test suite should provide comprehensive coverage for:
 - Error handling
 
 ### Database Operations
+
 - Model creation and updates
 - Data validation and constraints
 - Relationships and associations
@@ -701,6 +706,7 @@ Your test suite should provide comprehensive coverage for:
 - Data integrity
 
 ### Security Features
+
 - CSRF token validation
 - Authentication flows
 - Authorization checks
@@ -708,6 +714,7 @@ Your test suite should provide comprehensive coverage for:
 - SQL injection prevention
 
 ### Business Logic
+
 - Utility functions
 - Helper methods
 - Date and string formatting
@@ -722,217 +729,409 @@ For comprehensive testing best practices and advanced techniques, refer to the [
 
 ---
 
-## Legacy Testing Documentation
+## Legacy RocketUnit Testing Framework
 
-> **Note**: This section contains legacy testing information from previous Wheels versions. For new Wheels 3.0 applications, use the TestBox approach documented above.
+> **Note**: This section documents the legacy RocketUnit testing framework used in earlier Wheels versions. For new Wheels 3.0 applications, use the TestBox approach documented above. This information is maintained for reference and migration purposes.
 
-## Legacy Testing Overview
+## Legacy RocketUnit Overview
+
+Prior to Wheels 3.0, the framework used RocketUnit as its testing infrastructure. RocketUnit was a comprehensive testing framework that provided both unit testing and integration testing capabilities specifically tailored for CFML applications.
 
 At some point, your code is going to break. Upgrades, feature enhancements, and bug fixes are all part of the development lifecycle. Quite often with deadlines, you don't have the time to test the functionality of your entire application with every change you make.
 
 The problem is that today's fix could be tomorrow's bug. What if there were an automated way of checking if that change you're making is going to break something? That's where writing tests for your application can be invaluable.
 
-For testing your application in previous Wheels versions, we used TestBox as the testing framework. TestBox comes bundled with Wheels and provides a modern BDD (Behavior Driven Development) testing experience.
+### Legacy RocketUnit Features
 
-### Legacy Test Framework Features
+RocketUnit provided a complete testing solution with the following features:
 
-TestBox is a powerful testing framework that provides:
-
-- BDD and xUnit style testing syntax
-- Built-in assertions and expectations library
-- MockBox for mocking and stubbing
-- Code coverage reporting
-- Parallel test execution
-- Multiple output formats (HTML, JSON, JUnit, TAP)
-
-Wheels extends TestBox with framework-specific features through the `BaseSpec.cfc` class, providing helpers for testing models, controllers, and views.
+- **Unit Testing**: Testing individual functions and methods in isolation
+- **Integration Testing**: Testing complete request flows and component interactions
+- **Assertion Library**: Comprehensive set of assertion methods for validation
+- **Test Lifecycle Management**: Setup and teardown methods for test preparation
+- **Package Organization**: Hierarchical test organization and execution
+- **Multiple Output Formats**: HTML, text, and custom reporting formats
+- **Database Testing Support**: Built-in database seeding and cleanup capabilities
 
 ### Legacy Directory Structure
 
-In legacy Wheels testing, tests resided in the `tests/` directory off the root of your application. The recommended directory structure was:
+The legacy RocketUnit testing framework used a specific directory structure within your Wheels application:
 
 ```
-tests/
-├── BaseSpec.cfc          # Base test class with Wheels helpers
-├── runner.cfm            # Web-based test runner
-├── specs/                # Test specifications
-│   ├── unit/            # Isolated unit tests
-│   ├── integration/     # Integration tests
-│   └── functional/      # End-to-end tests
-├── fixtures/            # Test data and fixtures
-└── support/             # Test utilities
-    └── factories/       # Test data factories
+your-app/
+├── tests/
+│   ├── Test.cfc                 # Parent test component (extends wheels.Test)
+│   ├── functions/               # Function-level unit tests
+│   │   └── Example.cfc         # Example function tests
+│   └── requests/               # Integration tests for request flows
+│       └── Example.cfc         # Example request tests
+└── wheels/
+    ├── Test.cfc                # Core testing framework component
+    └── test/
+        └── functions.cfm       # Testing framework implementation
 ```
 
-### Legacy Test Writing Syntax
+### Legacy Test Components
 
-All test components should extend the `tests.BaseSpec` component (which extends TestBox's BaseSpec):
+#### 1. tests/Test.cfc - Parent Test Component
 
-```java
-component extends="tests.BaseSpec" {
-    // your tests here
+This was the base component that all test components should extend:
+
+```cfscript
+component extends="wheels.Test" hint="I am the parent test." {
+    
+    function beforeAll() {
+        // Executes once before the test suite runs
+    }
+    
+    function setup() {
+        // Executes before every test case
+    }
+    
+    function teardown() {
+        // Executes after every test case
+    }
+    
+    function afterAll() {
+        // Executes once after the test suite runs
+    }
 }
 ```
 
-The Wheels BaseSpec provided additional helpers for testing:
-- **Transaction rollback**: All tests run in transactions that automatically roll back
-- **Model helpers**: `model()`, `create()`, `build()`, `createList()`
-- **Controller helpers**: `controller()`, `processRequest()`, `apiRequest()`
-- **Authentication helpers**: `loginAs()`, `logout()`, `isLoggedIn()`
-- **Assertion helpers**: `assertHasErrors()`, `assertFieldValueEquals()`
+**Key Features:**
 
-You could write a test method with the following syntax:
+- **Lifecycle Methods**: Provided complete test lifecycle management
+- **Framework Integration**: Extended wheels.Test for full framework integration
+- **Documentation Support**: Included section and category metadata
 
-```java
-it("Result is True", () => {
-  result = true
-	expect(result).toBeTrue()
-})
-```
+#### 2. tests/functions/Example.cfc - Function Testing
 
-You also had to write your test methods inside the describe method like the following:
+Example test file for testing controller, model, and global functions:
 
-```java
-describe("Tests that return True", () => {
-  it("Result is True", () => {
-    result = true
-    expect(result).toBeTrue()
-  })
-})
-```
-
-### Legacy Setup & Teardown
-
-When writing a group of tests, it was common for there to be some duplicate code, global configuration, and/or cleanup needs that needed to be run before or after each test. In order to keep things DRY (Don't Repeat Yourself), the TestBox offered 2 special methods that you could optionally use to handle such configuration.
-
-`beforeEach(() => {})`: Used to initialize or override any variables or execute any code that needs to be run _before each_ test.
-
-`afterEach(() => {})`: Used to clean up any variables or execute any code that needs to be ran _after each_ test.
-
-### Legacy Model Testing
-
-The first part of your application that you would test against were your models because this is where all the business logic of your application lives. Here's an example of testing a model:
-
-```java
-component extends="Model" {
-  public void function config() {
-    validate("checkUsernameDoesNotStartWithNumber")
-    beforeSave("sanitizeEmail");
-  }
-
-  private void function checkUsernameDoesNotStartWithNumber() {
-    if (IsNumeric(Left(this.username, 1))) {
-        addError(
-        property="username",
-        message="Username cannot start with a number."
-      );
+```cfscript
+component extends="app.tests.Test" hint="I am an example test for functions." {
+    
+    function packageSetup() {
+        // Executes once before this package's first test case
     }
-  }
-
-  private void function sanitizeEmail() {
-      this.email = Trim(LCase(this.email));
-  }
+    
+    function packageTeardown() {
+        // Executes once after this package's last test case
+    }
+    
+    function testExample() {
+        // Example test with simple assertion
+        assert('true');
+    }
 }
 ```
 
-### Legacy Controller Testing
+**Key Features:**
 
-Legacy controller testing involved using the `processRequest()` function to simulate HTTP requests and examine the response. Controllers needed special handling for redirects:
+- **Package-level Lifecycle**: Setup and teardown for entire test packages
+- **Unit Testing Focus**: Designed for testing individual functions in isolation
+- **Simple Assertions**: Used basic assert() statements for validation
 
-```javascript
-component extends="Controller" {
-  public void function index() {
-    users = model("user").findAll()
-  }
+#### 3. tests/requests/Example.cfc - Integration Testing
 
-  public any function create() {
-    user = model("user").new(params.user)
-    if (user.save()) {
-      flashInsert(success="The user was created successfully.")
-      return redirectTo(action="index")  // Notice the return here
+Example test file for integration testing where controllers, models, and other components work together:
+
+```cfscript
+component extends="app.tests.Test" hint="I am an example test for requests." {
+    
+    function packageSetup() {
+        // Setup for integration test package
     }
-    else {
-      flashInsert(error="There was a problem creating the user.")
-      renderView(action="new")
+    
+    function packageTeardown() {
+        // Cleanup for integration test package
     }
-  }
+    
+    function testRequestFlow() {
+        // Test complete request processing
+        assert('true');
+    }
 }
 ```
 
-### Legacy Command Line Testing
+**Key Features:**
 
-Earlier versions provided command line testing through various methods:
+- **Integration Testing**: Tested complete request flows and component interactions
+- **Request Context**: Simulated full HTTP request/response cycles
+- **Component Interaction**: Validated how controllers, models, and views worked together
 
-```bash
-# Run all tests
-wheels test run
+### Legacy Core Testing Framework
 
-# Run specific directory
-wheels test run --directory=tests/specs/unit
+#### wheels/Test.cfc - Core Testing Component
 
-# Watch mode for TDD
-wheels test run --watch
+The core testing framework component provided all testing functionality:
 
-# Run with coverage
-wheels test run --coverage
+```cfscript
+component hint="I am the testing framework for Wheels applications." {
+    
+    public any function $runTest() {
+        // Main test execution method
+    }
+    
+    public void function assert(required any expression) {
+        // Basic assertion method
+    }
+    
+    public void function fail(string message = "") {
+        // Explicit test failure
+    }
+    
+    public any function debug(required any expression) {
+        // Debug expression evaluation
+    }
+    
+    public string function raised(required any expression) {
+        // Error catching and type return
+    }
+}
 ```
 
-### Legacy TestBox CLI
+#### wheels/test/functions.cfm - Framework Implementation
 
-```bash
-# Run all tests
-box testbox run
+The comprehensive testing framework implementation included:
 
-# Run specific directory
-box testbox run --directory=tests/specs/unit
+**Assertion Functions:**
 
-# Watch mode
-box testbox watch
+- `assert(expression)` - Evaluated expressions and recorded failures
+- `fail(message)` - Explicitly failed tests with custom messages
+- `debug(expression)` - Examined expressions during testing
+- `raised(expression)` - Caught and returned error types
 
-# With coverage
-box testbox run --coverage --coverageReporter=html
+### Legacy Testing Philosophy and Structure
+
+The RocketUnit framework followed these organizational principles:
+
+#### Test Packages
+
+Collections of test cases organized in directories, allowing for:
+
+- Logical grouping of related tests
+- Package-level setup and teardown
+- Hierarchical test execution
+- Modular test organization
+
+#### Test Cases
+
+Components containing multiple tests for specific functionality:
+
+- Focused on single areas of functionality
+- Contained multiple related test methods
+- Provided component-level lifecycle management
+- Extended the base Test component
+
+#### Tests
+
+Methods starting with "test" that contained assertions:
+
+- Named with descriptive test names (e.g., `testUserValidation()`)
+- Contained one or more assertion statements
+- Focused on specific behaviors or outcomes
+- Used simple assertion syntax
+
+#### Assertions
+
+Statements that should evaluate to true for tests to pass:
+
+- `assert(expression)` - Basic true/false validation
+- `fail(message)` - Explicit test failure with custom message
+- `debug(expression)` - Expression evaluation for debugging
+- `raised(expression)` - Error handling and type checking
+
+### Legacy Test Execution and Management
+
+#### Running Tests
+
+The RocketUnit framework supported multiple execution patterns:
+
+**Entire Test Packages:**
+
+```
+# Run all tests in functions package
+http://localhost:8080/wheels/legacy/app/tests?package=functions
+
+# Run all tests in requests package  
+http://localhost:8080/wheels/legacy/app/tests?package=requests
 ```
 
-### Legacy Migration Tools
+**Specific Test Cases:**
 
-If you had existing RocketUnit tests, there were migration tools available:
+```
+# Run specific test component
+http://localhost:8080/wheels/legacy/app/tests?package=functions&test=Example
 
-```bash
-# Migrate a single file
-wheels test migrate path/to/test.cfc
-
-# Migrate all tests
-wheels test migrate tests --recursive
-
-# Preview changes without modifying files
-wheels test migrate tests --dry-run
+# Run individual test method
+http://localhost:8080/wheels/legacy/app/tests?package=functions&test=Example&method=testExample
 ```
 
-### Legacy Docker Testing
+**With Filtering Options:**
 
-Legacy versions provided Docker-based testing environments that allowed running tests across multiple CFML engines and databases simultaneously.
+```
+# Run tests with specific labels
+http://localhost:8080/wheels/legacy/app/tests?labels=unit,fast
 
-#### Legacy TestUI
-
-```bash
-# From the Wheels root directory
-docker compose --profile ui up -d
+# Exclude slow tests
+http://localhost:8080/wheels/legacy/app/tests?exclude=slow,integration
 ```
 
-Then navigate to http://localhost:3000 to access the TestUI.
+#### Test Types Supported
 
-### Legacy Additional Techniques
+The framework supported different categories of tests:
 
-Legacy testing included various helper techniques:
+**Core Tests**: Framework-level tests for Wheels components
+**App Tests**: Application-specific tests for your code
+**Plugin Tests**: Tests for Wheels plugins and extensions
 
-1. Put your helper functions in your `/tests/Testbox/Test.cfc`.
-2. Create `helpers.cfm` files in test directories.
-3. Put package-specific helper functions in the same package as the tests.
+#### Advanced Legacy Features
 
-### Legacy Learn By Example
+**Database Seeding Capabilities:**
 
-The Wheels core used TestBox for its unit test suite and contained a wealth of useful examples in the [`tests` folder](https://github.com/wheels-dev/wheels/tree/develop/tests) of the Wheels git repo.
+- Automatic test database population
+- Data cleanup between tests
+- Transaction-based test isolation
+- Custom seeding scripts
+
+**Test Environment Initialization:**
+
+- Isolated test environment setup
+- Configuration override capabilities
+- Mock service integration
+- Resource allocation and cleanup
+
+**Debugging and Output Formatting:**
+
+- Detailed test execution reports
+- Error stack traces and debugging info
+- Performance timing information
+- Custom output formatters
+
+**Error Handling and Reporting:**
+
+- Comprehensive error capture
+- Test failure analysis
+- Exception type categorization
+- Detailed failure reporting
+
+### Legacy Usage Patterns
+
+#### Test Organization Structure
+
+```
+tests/functions/     # Unit testing individual functions
+tests/requests/     # Integration testing request flows
+tests/models/       # Model-specific testing (optional)
+tests/controllers/  # Controller-specific testing (optional)
+```
+
+#### Lifecycle Management Hierarchy
+
+1. **Suite Level**: `beforeAll()` and `afterAll()` for entire test suite
+2. **Package Level**: `packageSetup()` and `packageTeardown()` for test packages  
+3. **Test Case Level**: `setup()` and `teardown()` for individual test cases
+
+#### Example Legacy Test Structure
+
+```cfscript
+component extends="app.tests.Test" {
+    
+    function packageSetup() {
+        variables.testData = {
+            user: { username: "testuser", email: "test@example.com" }
+        };
+    }
+    
+    function setup() {
+        variables.testUser = model("User").create(variables.testData.user);
+    }
+    
+    function testUserCreation() {
+        assert('StructKeyExists(variables, "testUser")');
+        assert('variables.testUser.persisted()');
+        assert('variables.testUser.username eq "testuser"');
+    }
+    
+    function testUserValidation() {
+        invalidUser = model("User").new({username: "", email: "invalid"});
+        assert('NOT invalidUser.valid()');
+        assert('invalidUser.hasErrors()');
+    }
+    
+    function teardown() {
+        if (StructKeyExists(variables, "testUser")) {
+            variables.testUser.delete();
+        }
+    }
+    
+    function packageTeardown() {
+        // Cleanup package-level resources
+    }
+}
+```
+
+### Legacy Framework Integration
+
+The RocketUnit framework was tightly integrated with the Wheels framework, providing:
+
+**Model Testing Integration:**
+
+- Automatic database transaction management
+- Model validation testing helpers
+- Relationship testing utilities
+- Database seeding and cleanup
+
+**Controller Testing Integration:**
+
+- Request simulation capabilities
+- Response validation helpers
+- Session and cookie management
+- Route testing functionality
+
+**View Testing Integration:**
+
+- Template rendering validation
+- Output content verification
+- Helper function testing
+- Layout and partial testing
+
+### Migration from Legacy RocketUnit to TestBox
+
+When migrating from the legacy RocketUnit system to TestBox 5, consider the following mapping:
+
+#### Syntax Migration
+
+- `assert(expression)` → `expect(result).toBeTrue()`
+- `fail(message)` → `fail(message)` (same syntax)
+- `debug(expression)` → `debug(expression)` (same syntax)
+- Test methods → Wrapped in `describe()` and `it()` blocks
+
+#### Structure Migration
+
+- `tests/functions/` → `tests/testbox/specs/functions/`
+- `tests/requests/` → `tests/testbox/specs/controllers/`
+- Component extensions change from `app.tests.Test` to `testbox.system.BaseSpec`
+
+#### Lifecycle Migration
+
+- `packageSetup()` → `beforeAll()` in describe block
+- `packageTeardown()` → `afterAll()` in describe block
+- `setup()` → `beforeEach()` in describe block  
+- `teardown()` → `afterEach()` in describe block
+
+### Legacy Reference and Historical Context
+
+The RocketUnit framework served the Wheels community well for many years, providing a solid foundation for test-driven development in CFML applications. While TestBox now provides more modern BDD/TDD capabilities, understanding the legacy system helps with:
+
+- **Migration Planning**: Understanding existing test structures for conversion
+- **Historical Context**: Appreciating the evolution of CFML testing frameworks
+- **Legacy Maintenance**: Supporting older Wheels applications still using RocketUnit
+- **Framework Archaeology**: Understanding the testing heritage of the Wheels framework
+
+The comprehensive testing infrastructure provided by RocketUnit established many of the testing patterns and practices that continue in the modern TestBox implementation, ensuring continuity and familiarity for developers transitioning between the frameworks.
 
 ---
 
-This comprehensive testing approach ensures your Wheels 3.0 application is thoroughly validated across all components, provides multi-format output for different environments, and supports various database configurations for complete coverage.
+This comprehensive testing approach ensures your Wheels 3.0 application is thoroughly validated across all components, provides multi-format output for different environments, and supports various database configurations for complete coverage while maintaining reference information for legacy RocketUnit systems.
