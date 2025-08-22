@@ -23,7 +23,7 @@ component extends="wheels.tests.Test" {
 		assert('method eq "GET"');
 	}
 
-	// https://github.com/cfwheels/cfwheels/issues/886
+	// https://github.com/wheels-dev/wheels/issues/886
 	function test_get_disallow_override() {
 		request.cgi["request_method"] = "GET";
 		url._method = "delete";

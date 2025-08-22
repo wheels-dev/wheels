@@ -41,7 +41,7 @@ if (StructKeyExists(application.wheels, "docs")) {
 	
 	/* 
 		To fix the issue below:
-		https://github.com/cfwheels/cfwheels/issues/1132
+		https://github.com/wheels-dev/wheels/issues/1132
 		
 		To add the test framework functions in the documentation. Added the Test componenet in the documentscope.
 

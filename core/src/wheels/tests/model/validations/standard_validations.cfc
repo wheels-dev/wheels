@@ -440,7 +440,7 @@ component extends="wheels.tests.Test" {
 		user.validatesUniquenessOf(property = "firstName");
 		assert('user.valid()');
 		// Special case for testing when we already have duplicates in the database:
-		// https://github.com/cfwheels/cfwheels/issues/480
+		// https://github.com/wheels-dev/wheels/issues/480
 		transaction action="begin" {
 			user.create(firstName = "Tony", username = "xxxx", password = "xxxx", lastname = "xxxx", validate = false);
 			firstUser = model("user").findOne(where = "firstName = 'Tony'", order = "id ASC");

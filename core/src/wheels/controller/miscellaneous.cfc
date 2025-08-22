@@ -187,7 +187,7 @@ component {
 			}
 			local.fullPath = Replace(local.folder, "\", "/", "all");
 			local.fullPath = ListAppend(local.fullPath, arguments.file, "/");
-			// https://github.com/cfwheels/cfwheels/issues/873 Don't expand path if already contains root
+			// https://github.com/wheels-dev/wheels/issues/873 Don't expand path if already contains root
 			if (local.fullPath DOES NOT CONTAIN Replace(local.root, "\", "/", "all")) {
 				//added this section for the "/wheels" mapping to work correctly
 				if (local.fullPath CONTAINS "/wheels") {
