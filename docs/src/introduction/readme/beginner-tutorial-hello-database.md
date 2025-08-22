@@ -64,6 +64,73 @@ set(dataSourceName="back2thefuture");
 ```
 {% endcode %}
 
+### Datasource Configuration Methods
+
+While configuring datasources names in `/config/settings.cfm` is the approach for Wheels applications, you have add your database configuration in the `/config/app.cfm` depending on your CFML engine and database:
+
+#### Adobe ColdFusion Administrator
+If you're using Adobe ColdFusion, you can create and manage datasources through the ColdFusion Administrator:
+1. Access the administrator at `{SITE_URL}/CFIDE/administrator/index.cfm` (or your configured URL and port)
+2. Navigate to Data & Services > Data Sources
+3. Add a new datasource with the same name specified in your `dataSourceName` setting in `settings.cfm`
+4. Configure connection details, pooling, and advanced settings through the web interface
+
+#### Lucee Server/Web Administrator  
+For Lucee installations, you can manage datasources via the Lucee Administrator:
+1. Access the Server Administrator at `{SITE_URL}/lucee/admin/server.cfm`
+3. Navigate to Services > Datasource
+4. Create a new datasource matching your `dataSourceName` configuration
+5. Set up connection pooling, validation queries, and other database-specific settings
+
+#### BoxLang Configuration
+BoxLang only supports datasource configuration through its configuration files, following patterns to create datasources that match your Wheels application settings in the `/config/app.cfm` files.
+
+#### Datasource Configuration via app.cfm
+You can define datasources in your `/config/app.cfm` file using the `this.datasources` struct. This approach works across all CFML engines (Adobe ColdFusion, Lucee, and BoxLang):
+
+{% code title="/config/app.cfm" %}
+```javascript
+component {
+    this.name = "WheelsApp";
+    
+    // Define datasources programmatically
+    this.datasources["wheels-dev"] = {
+        class: "com.mysql.cj.jdbc.Driver",
+        connectionString: "jdbc:mysql://localhost:3306/wheels-dev?useSSL=false",
+        username: "mysql",
+        password: "yourpassword"
+    };
+    
+    // For SQLServer
+    // this.datasources["wheels-dev"] = {
+	// 	class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+	// 	connectionString: "jdbc:sqlserver://localhost:1434;databaseName=wheels-dev;encrypt=false",
+	// 	username: "sqlserver",
+	// 	password: "yourpassword"
+	// };
+
+    // For PostgreSQL
+    // this.datasources["wheels-dev"] = {
+    //     class: "org.postgresql.Driver",
+    //     connectionString: "jdbc:postgresql://localhost:5432/wheels-dev",
+    //     username: "postgres",
+    //     password: "yourpassword"
+    // };
+    
+    // For H2 (embedded database)
+    // this.datasources['wheels-dev'] = {
+	// 	class: 'org.h2.Driver', 
+	// 	connectionString: 'jdbc:h2:file:./db/h2/wheels-dev;MODE=MySQL', 
+	// 	username: 'sa'
+	// };
+
+    // you can check and define your configuration according to your settings.
+}
+```
+{% endcode %}
+
+Regardless of which method you choose, ensure that the datasource name and configuration in your Wheels configuration matches exactly with the datasource created in your CFML engine.
+
 ### Our Sample Data Structure
 
 Wheels supports MySQL, SQL Server, PostgreSQL, Oracle and H2. It doesn't matter which DBMS you use for this tutorial; we will all be writing the same CFML code to interact with the database. Wheels does everything behind the scenes that needs to be done to work with each DBMS.
