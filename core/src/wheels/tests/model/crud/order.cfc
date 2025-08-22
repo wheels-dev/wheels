@@ -53,7 +53,7 @@ component extends="wheels.tests.Test" {
 			assert("result['title'][1] IS 'Title for first test post'");
 		} else {
 			// Skipping on MySQL, see issue for details:
-			// https://github.com/cfwheels/cfwheels/issues/666
+			// https://github.com/wheels-dev/wheels/issues/666
 			assert(true);
 		}
 	}
@@ -69,7 +69,7 @@ component extends="wheels.tests.Test" {
 			assert("result['title'][1] IS 'Title for fifth test post'");
 		} else {
 			// Skipping on MySQL, see issue for details:
-			// https://github.com/cfwheels/cfwheels/issues/666
+			// https://github.com/wheels-dev/wheels/issues/666
 			assert(true);
 		}
 	}

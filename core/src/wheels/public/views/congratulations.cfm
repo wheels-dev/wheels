@@ -20,14 +20,14 @@
 
 	<div class="row">
 		<div class="column">
-			<a class="" href="https://guides.cfwheels.org/cfwheels-guides/3.0.0-snapshot/introduction/readme/beginner-tutorial-hello-world" target="_blank">View and code along with our
+			<a class="" href="https://wheels.dev/3.0.0/guides/introduction/readme/beginner-tutorial-hello-world" target="_blank">View and code along with our
 		&quot;Hello World&quot; tutorial.</a>
 		</div>
 		<div class="column">
-			<a class="" href="https://guides.cfwheels.org/cfwheels-guides/3.0.0-snapshot" target="_blank">Have a look at the rest of our documentation.</a>
+			<a class="" href="https://wheels.dev/3.0.0/guides" target="_blank">Have a look at the rest of our documentation.</a>
 		</div>
 		<div class="column">
-			<a class="" href="https://github.com/cfwheels/cfwheels/discussions" target="_blank">Say &quot;Hello!&quot; to everyone in the Wheels community.</a>
+			<a class="" href="https://github.com/wheels-dev/wheels/discussions" target="_blank">Say &quot;Hello!&quot; to everyone in the Wheels community.</a>
 		</div>
 		<div class="column">Build the next killer website on the World Wide Web...</div>
 	</div>

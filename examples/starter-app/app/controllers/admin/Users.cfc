@@ -161,7 +161,7 @@ component extends="app.controllers.Controller" {
 	/**
 	 * Reset a user's password. Generates a new one and emails it to them. Forces them to change it on login
 	 * NB Due to current bug in 2.x, we can't name this action resetPassword as it clashes with the plugin method
-	 * See https://github.com/cfwheels/cfwheels/issues/841
+	 * See https://github.com/wheels-dev/wheels/issues/841
 	 */
 	function reset() {
 		try{

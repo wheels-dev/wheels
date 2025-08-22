@@ -233,7 +233,7 @@ component {
 		any encode
 	) {
 		/* To fix the bug below:
-			https://github.com/cfwheels/cfwheels/issues/942
+			https://github.com/wheels-dev/wheels/issues/942
 
 			The paginationLinks() function does not set the correct URL on the anchor tag if route is not passed in. Added condition to default the route, if it is not passed in, to the route defined in the request.wheels.params, if the action is index.
 		*/
@@ -341,7 +341,7 @@ component {
 
 						/*
 							To fix the bug below:
-							https://github.com/cfwheels/cfwheels/issues/908
+							https://github.com/wheels-dev/wheels/issues/908
 
 							We need the paginationLinks() function to set the active class to the parent of the current page item.
 							The changes made here set the active class to the immediate parent of the current page element in case nested elements are passed in.

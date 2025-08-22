@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ----
 
-# [3.0.0-SNAPSHOT](https://github.com/cfwheels/cfwheels/tree/develop) => TBD
+# [3.0.0-SNAPSHOT](https://github.com/wheels-dev/wheels/tree/develop) => TBD
 
 ### Controller Enhancements
 

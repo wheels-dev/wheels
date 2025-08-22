@@ -116,7 +116,7 @@ Application Statistics
 Resources
   Documentation: https://guides.wheels.dev
   API Reference: https://api.wheels.dev
-  GitHub: https://github.com/cfwheels/cfwheels
+  GitHub: https://github.com/wheels-dev/wheels
   Community: https://community.wheels.dev
 ```
 **Notes**: Comprehensive information about the framework, CLI, and environment. Shows correct statistics even from framework root.

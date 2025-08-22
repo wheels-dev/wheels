@@ -64,6 +64,52 @@ set(dataSourceName="back2thefuture");
 ```
 {% endcode %}
 
+### Datasource Configuration Methods
+
+In Wheels applications, you typically configure **which datasource to use** in `/config/settings.cfm`.  
+The **actual datasource definitions** should be added in `/config/app.cfm`.
+
+Wheels will look for the datasource defined in `settings.cfm` and match it against what you’ve defined in `app.cfm` or through your CFML engine’s administrator.
+
+---
+
+#### Option 1: Datasource Configuration via Administrator (Adobe & Lucee)
+
+You can manage datasources through the Administrator interface of your CFML engine:
+
+1. Access your CFML administrator (Adobe ColdFusion Administrator or Lucee Server/Web Administrator).  
+2. Navigate to the **Datasource** section.  
+3. Create a new datasource with the **exact same name** as the one you’ve set in `settings.cfm` (`dataSourceName`).  
+4. Provide connection details (JDBC driver, connection string, username, password).  
+5. Configure optional features like connection pooling and validation queries.
+
+This method lets you manage database connectivity centrally in the engine’s admin console.
+
+---
+
+#### Option 2: Datasource Configuration via `/config/app.cfm` (Lucee & BoxLang)
+
+You can also define datasources programmatically in your Wheels application using the `this.datasources` struct inside `/config/app.cfm`.  
+This approach works in **Lucee** and **BoxLang** without needing Administrator access.
+
+{% code title="/config/app.cfm" %}
+```javascript
+component {
+    this.name = "WheelsApp";
+    
+    // Define a datasource for use in settings.cfm
+    this.datasources["wheels-dev"] = {
+        class: "com.mysql.cj.jdbc.Driver",
+        connectionString: "yourConnectionString",
+        username: "yourUsername",
+        password: "yourPassword"
+    };
+}
+```
+{% endcode %}
+
+Regardless of which method you choose, ensure that the datasource name and configuration in your Wheels configuration matches exactly with the datasource created in your CFML engine.
+
 ### Our Sample Data Structure
 
 Wheels supports MySQL, SQL Server, PostgreSQL, Oracle and H2. It doesn't matter which DBMS you use for this tutorial; we will all be writing the same CFML code to interact with the database. Wheels does everything behind the scenes that needs to be done to work with each DBMS.

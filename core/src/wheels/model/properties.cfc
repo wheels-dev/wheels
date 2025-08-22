@@ -220,7 +220,7 @@ component {
 		}
 
 		/* To fix the bug below:
-			https://github.com/cfwheels/cfwheels/issues/1029
+			https://github.com/wheels-dev/wheels/issues/1029
 
 			This will return a numeric value if the primary key is Numeric and a String otherwise.
 		*/
