@@ -113,10 +113,10 @@ Application Statistics
   Migrations: 0
 
 Resources
-  Documentation: https://guides.cfwheels.org
-  API Reference: https://api.cfwheels.org
-  GitHub: https://github.com/cfwheels/cfwheels
-  Community: https://community.cfwheels.org
+  Documentation: https://wheels.dev/guides
+  API Reference: https://wheels.dev/api/v3.0.0
+  GitHub: https://github.com/wheels-dev/wheels
+  Community: https://wheels.dev/community
 ```
 
 **Validation**:

@@ -386,7 +386,7 @@ component {
 		}
 
 		/* To fix the bug below:
-		   https://github.com/cfwheels/cfwheels/issues/1115
+		   https://github.com/wheels-dev/wheels/issues/1115
 
 		   Checked if "addClass" attribute is present then add that attribute's value to class so that it does not overwrite the default class value present in config/settings.cfm
 		*/

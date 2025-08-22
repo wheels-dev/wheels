@@ -74,12 +74,12 @@ component output="false" {
           local.innerTagContent = local.i.tagContent;
 			    StructDelete(local.i, "tagContent");
           cfmailpart(attributeCollection="#local.i#"){
-            #local.innerTagContent#
+            writeOutput(local.innerTagContent)
 					}
         }
       }
       if(StructKeyExists(local, "tagContent")){
-        #local.tagContent#
+        writeOutput(local.tagContent)
       }
     }
 	}
@@ -1340,7 +1340,7 @@ component output="false" {
 			local.minimumMinor = "0";
 			local.minimumPatch = "0";
 			local.maximumMajor = "1";
-			local.maximumMinor = "3";
+			local.maximumMinor = "4";
 			local.maximumPatch = "999";
 			
 			// Check minimum version

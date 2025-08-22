@@ -24,6 +24,10 @@
         "Zain Ul Abideen <zain.shared@gmail.com>"
     ],
     "ignore":[],
+    "include": [
+        ".gitignore",
+        ".env.example"
+    ],
     "dependencies": {
         "wirebox": "^7.0.0",
         "testbox": "^5.0.0",

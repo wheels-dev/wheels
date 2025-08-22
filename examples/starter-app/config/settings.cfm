@@ -37,7 +37,7 @@
 
 	// Turn on URL rewriting by default.
 	// Commandbox urlrewrite.xml is provided.
-	// See https://guides.cfwheels.org/docs/url-rewriting for Apache/IIS etc
+	// See https://wheels.dev/guides/handling-requests-with-controllers/url-rewriting/README for Apache/IIS etc
 	set(URLRewriting="On");
 
 	// Don't include potentially sensitive data in error handling emails

@@ -1,14 +1,22 @@
-<cfcomponent>
-	<cffunction name="init">
-		<cfset this.version = "99.9.9">
-		<cfreturn this>
-	</cffunction>
+component {
+	function init() {
+		this.version = "99.9.9";
+		return this;
+	}
 
-	<cffunction name="$MixinForControllers" mixin="controller" returntype="void"></cffunction>
+	public void function $MixinForControllers() mixin="controller"{
 
-	<cffunction name="$MixinForModels" mixin="model" returntype="void"></cffunction>
+	}
 
-	<cffunction name="$MixinForModelsAndContollers" mixin="model,controller" returntype="void"></cffunction>
+	public void function $MixinForModels() mixin="model" {
 
-	<cffunction name="$MixinForDispatch" mixin="dispatch" returntype="void"></cffunction>
-</cfcomponent>
+	}
+
+	public void function $MixinForModelsAndContollers() mixin="model,controller" {
+
+	}
+
+	public void function $MixinForDispatch() mixin="dispatch" {
+
+	}
+}

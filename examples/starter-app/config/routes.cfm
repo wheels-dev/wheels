@@ -2,7 +2,7 @@
 
 	// Use this file to add routes to your application and point the root route to a controller action.
 	// Don't forget to issue a reload request (e.g. reload=true) after making changes.
-	// See https://guides.cfwheels.org/2.5.0/v/3.0.0-snapshot/handling-requests-with-controllers/routing for more info.
+	// See https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing for more info.
 
 	mapper()
 		// CLI-Appends-Here

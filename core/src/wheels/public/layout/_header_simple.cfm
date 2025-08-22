@@ -42,10 +42,10 @@ Static simple version of the header/navigation for output on error screens
 							<div class="item">
 								<span class="text">App Tests</span>
 								<div class="menu">
-									<a href="/testbox" class="item" target="_blank">HTML</a>
-									<a href="/testbox?format=json" class="item" target="_blank">JSON</a>
-									<a href="/testbox?format=txt" class="item" target="_blank">TXT</a>
-									<a href="/testbox?format=junit" class="item" target="_blank">JUnit</a>
+									<a href="#urlFor(route='testbox')#" class="item" target="_blank">HTML</a>
+									<a href="#urlFor(route='testbox')#?format=json" class="item" target="_blank">JSON</a>
+									<a href="#urlFor(route='testbox')#?format=txt" class="item" target="_blank">TXT</a>
+									<a href="#urlFor(route='testbox')#?format=junit" class="item" target="_blank">JUnit</a>
 								</div>
 							</div>
 							<div class="item">

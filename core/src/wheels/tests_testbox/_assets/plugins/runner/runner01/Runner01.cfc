@@ -1,45 +1,45 @@
-<cfcomponent>
-	<cffunction name="init">
-		<cfset this.version = "99.9.9">
-		<cfreturn this>
-	</cffunction>
+component {
+	function init() {
+		this.version = "99.9.9";
+		return this;
+	}
 
-	<cffunction name="URLFor" returntype="string">
-		<cfset local.result = core.URLFor(argumentCollection = arguments)/>
-		<cfset local.result &= Find("?", local.result) ? "&urlfor01" : "?urlfor01"/>
-		<cfreturn local.result/>
-	</cffunction>
+	public string function URLFor() {
+		local.result = core.URLFor(argumentCollection = arguments);
+		local.result &= Find("?", local.result) ? "&urlfor01" : "?urlfor01";
+		return local.result;
+	}
 
-	<cffunction name="onMissingMethod" returntype="any">
-		<cfreturn core.onMissingMethod(argumentCollection = arguments)/>
-	</cffunction>
+	public any function onMissingMethod() {
+		return core.onMissingMethod(argumentCollection = arguments);
+	}
 
-	<cffunction name="$$pluginOnlyMethod" returntype="string">
-		<cfreturn "$$returnValue"/>
-	</cffunction>
+	public string function $$pluginOnlyMethod() {
+		return "$$returnValue";
+	}
 
-	<cffunction name="singularize" returntype="string">
-		<cfreturn "$$completelyOverridden"/>
-	</cffunction>
+	public string function singularize() {
+		return "$$completelyOverridden";
+	}
 
-	<cffunction name="pluralize" returntype="string">
-		<cfset corePluralize = core.pluralize/>
-		<cfreturn corePluralize(argumentCollection = arguments)/>
-	</cffunction>
+	public string function pluralize() {
+		corePluralize = core.pluralize;
+		return corePluralize(argumentCollection = arguments);
+	}
 
-	<cffunction name="$helper01">
-		<cfreturn $helper011()/>
-	</cffunction>
+	function $helper01() {
+		return $helper011();
+	}
 
-	<cffunction name="$helper01ConditionalCheck">
-		<cfreturn false/>
-	</cffunction>
+	function $helper01ConditionalCheck() {
+		return false;
+	}
 
-	<cffunction name="$helper011">
-		<cfreturn "$helper011Responding"/>
-	</cffunction>
+	function $helper011() {
+		return "$helper011Responding";
+	}
 
-	<cffunction name="includePartial">
-		<cfreturn core.includePartial(argumentCollection = arguments)/>
-	</cffunction>
-</cfcomponent>
+	function includePartial() {
+		return core.includePartial(argumentCollection = arguments);
+	}
+}

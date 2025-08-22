@@ -285,7 +285,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 
 					/*
 						To fix the issue below:
-						https://github.com/cfwheels/cfwheels/issues/580
+						https://github.com/wheels-dev/wheels/issues/580
 
 						Added a new property called aliasedPropertyList in model class that will contain column names list that are prepended with the tablename.
 						For example, if there is a "user" table then the columns "id,createdat,updatedat,deletedat" will be added in the list with "user" prepended to it.

@@ -1,6 +1,6 @@
 # BoxLang Server Setup
 
-Wheels supports BoxLang 1.3.x, providing developers with a modern, high-performance CFML runtime. You can run BoxLang applications using either CommandBox or BoxLang Mini-Server.
+Wheels supports BoxLang 1.x, providing developers with a modern, high-performance CFML runtime. You can run BoxLang applications using either CommandBox or BoxLang Mini-Server.
 
 ## Prerequisites
 
@@ -21,8 +21,8 @@ box install boxlang
 # Start server with BoxLang
 box server start cfengine=boxlang
 
-# Or specify specific BoxLang version
-box server start cfengine=boxlang@1.3.0
+# Or specify specific BoxLang version (optional)
+box server start cfengine=boxlang@1.4.0+40
 ```
 
 ### BoxLang Module Dependencies
@@ -36,7 +36,6 @@ BoxLang requires specific modules for full Wheels compatibility. These dependenc
     "bx-csrf": "^1.2.0+3", 
     "bx-esapi": "^1.6.0+9",
     "bx-image": "^1.0.1",
-    "bx-mssql": "^1.4.0+11",
     "bx-mysql": "^1.0.1+7"
   }
 }
@@ -53,7 +52,6 @@ box install bx-compat-cfml
 box install bx-csrf
 box install bx-esapi
 box install bx-image
-box install bx-mssql
 box install bx-mysql
 ```
 
@@ -63,15 +61,24 @@ box install bx-mysql
 - **`bx-csrf`** - Cross-Site Request Forgery protection
 - **`bx-esapi`** - Enterprise Security API for input validation  
 - **`bx-image`** - Image manipulation functionality
-- **`bx-mssql`** - Microsoft SQL Server database driver
 - **`bx-mysql`** - MySQL database driver
+
+#### Additional Database Support
+
+For other databases supported by Wheels, install the corresponding BoxLang modules:
+
+- **Microsoft SQL Server**: `box install bx-mssql`
+- **PostGreSQL Server**: `box install bx-postgresql`
 
 #### Finding Additional Modules
 
-Browse available BoxLang modules on ForgeBox:
-- Visit [forgebox.io](https://www.forgebox.io)
-- Search for modules with `bx-` prefix
-- Install specific modules: `box install module-name`
+For any additional functionality or database drivers not included in the core dependencies:
+- **Browse ForgeBox**: Visit [forgebox.io](https://www.forgebox.io)
+- **Search for BoxLang modules**: Look for modules with `bx-` prefix
+- **Copy install command**: Each module page provides the exact `box install` command
+- **Install the module**: Run the command in your project directory
+
+Example: For Microsoft SQL Server support, visit the `bx-mssql` module page on ForgeBox and copy the installation command.
 
 ### Server Configuration
 
@@ -92,7 +99,7 @@ Create a `server.json` file in your application root to persist BoxLang settings
         }
     },
     "app": {
-        "cfengine": "boxlang@1.3.0"
+        "cfengine": "boxlang"
     }
 }
 ```
@@ -119,25 +126,25 @@ server start cfengine=boxlang
 
 BoxLang Mini-Server provides a lightweight, standalone option perfect for minimal setups or specific deployment scenarios.
 
-### Version Compatibility Warning
+### Installation
 
-⚠️ **Important**: Wheels currently supports BoxLang 1.3.x. The latest BoxLang Mini-Server downloads include version 1.4.x, which may not be fully compatible with Wheels.
+BoxLang Mini-Server can be downloaded directly from the official BoxLang releases. The latest version is fully compatible with Wheels.
 
-**Download the specific 1.3.0 version:**
+**Download the latest BoxLang Mini-Server:**
 
 ```bash
-# Download BoxLang Mini-Server 1.3.0 JAR file
-curl -O https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/boxlang-miniserver/1.3.0/boxlang-miniserver-1.3.0.jar
+# Download the latest BoxLang Mini-Server JAR file
+curl -LO https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/boxlang-miniserver/boxlang-miniserver-latest.jar
 ```
 
 ### Installation Steps
 
-1. **Download BoxLang Mini-Server Package**
+1. **Download BoxLang Mini-Server Package** (optional, for additional files)
 
    ```bash
-   # Download complete package (optional, for additional files)
-   wget https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/boxlang-miniserver/1.3.0/boxlang-miniserver-1.3.0.zip
-   unzip boxlang-miniserver-1.3.0.zip
+   # Download complete package with additional files
+   curl -LO https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/boxlang-miniserver/boxlang-miniserver-latest.zip
+   unzip boxlang-miniserver.zip
    ```
 
 2. **Prepare Your Application Structure**
@@ -260,7 +267,7 @@ curl -O https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/box
 #### Basic Command
 
 ```bash
-java -jar /path/to/boxlang-miniserver-1.3.0.jar \
+java -jar /path/to/boxlang-miniserver-1.4.0.jar \
   --webroot /path/to/your/app/public \
   --rewrite
 ```
@@ -268,7 +275,7 @@ java -jar /path/to/boxlang-miniserver-1.3.0.jar \
 #### Full Configuration Example
 
 ```bash
-java -jar /path/to/boxlang-miniserver-1.3.0.jar \
+java -jar /path/to/boxlang-miniserver-1.4.0.jar \
   --webroot /path/to/your/app/public \
   --host 127.0.0.1 \
   --port 8080 \
@@ -281,7 +288,7 @@ java -jar /path/to/boxlang-miniserver-1.3.0.jar \
 If using the Wheels base template structure:
 
 ```bash
-java -jar /path/to/boxlang-miniserver-1.3.0.jar \
+java -jar /path/to/boxlang-miniserver-1.4.0.jar \
   --webroot /path/to/your/app/templates/base/src/public \
   --rewrite \
   --port 8080
@@ -320,7 +327,7 @@ You can read the further details from the boxlang mini-server documentation
 
 4. **Version Compatibility Issues**
    - **Problem**: Unexpected errors or features not working
-   - **Solution**: Verify you're using BoxLang 1.3.0, not 1.4.x
+   - **Solution**: Verify you're using a recent version of BoxLang 1.x
 
 5. **Path Resolution Problems**
    - **Problem**: Files not found or incorrect paths
