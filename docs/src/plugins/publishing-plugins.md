@@ -73,8 +73,8 @@ In order for other Wheels users to quickly identify and install your plugin via 
  "author":"YOURNAME",
   // Required: GitHub Repository stub
  "location":"GITHUBUSERNAME/GITHUB-REPONAME#v0.0.1",
-  // Required: Should always be /app/plugins/
- "directory":"/app/plugins/",
+  // Required: Should always be /plugins/
+ "directory":"/plugins/",
   // Required: Should always be true
  "createPackageDirectory":true,
   // Required: Must be the name of your primary CFC File
@@ -110,8 +110,8 @@ Your completed `box.json` might look something like this:
  "author":"Tom King",
   // Required: GitHub Repository stub, including version hash
  "location":"neokoenig/wheels-shortcodes#v0.0.4",
-  // Required: Should always be /app/plugins/
- "directory":"/app/plugins/",
+  // Required: Should always be /plugins/
+ "directory":"/plugins/",
   // Required: Should always be true
  "createPackageDirectory":true,
   // Required: Must be the name of your primary CFC File
@@ -159,7 +159,7 @@ Both Wheels CLI and Forgebox are expecting a tagged release with the plugin cont
 1. Navigate into the plugin directory
 2. Ensure that directory is authorized to publish the repo (e.g. `git remote -v` should list your fetch/push endpoints)
 
-> Note: Git dislikes nested repos, so it's best to setup a test wheels site specifically for plugin development/deployment. Then `git init` within each plugin directory itself, but not at the root. (e.g. `/app/plugins/PluginName/`)
+> Note: Git dislikes nested repos, so it's best to setup a test wheels site specifically for plugin development/deployment. Then `git init` within each plugin directory itself, but not at the root. (e.g. `/plugins/PluginName/`)
 
 {% code title="CommandBox" %}
 ```shell

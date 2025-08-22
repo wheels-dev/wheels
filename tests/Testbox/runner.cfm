@@ -173,6 +173,9 @@
         }
         application.testenv.db = application.wo.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
 
-        
+        local.populate = StructKeyExists(url, "populate") ? url.populate : true
+        if (local.populate) {
+            include "populate.cfm"
+        }
     }
 </cfscript>
