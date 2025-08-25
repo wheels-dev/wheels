@@ -11,7 +11,7 @@
         package = "wheels.tests_testbox.specs";
         route = "wheelstestbox";
     } else if(type eq "App") {
-        package = "tests.Testbox.specs";
+        package = "tests.specs";
         route = "testbox";
     }
     // Convert TestBox results to a format similar to RocketUnit
