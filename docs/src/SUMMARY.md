@@ -7,6 +7,7 @@
   * [Beginner Tutorial: Hello World](introduction/readme/beginner-tutorial-hello-world.md)
   * [Beginner Tutorial: Hello Database](introduction/readme/beginner-tutorial-hello-database.md)
   * [Tutorial: Wheels, AJAX, and You](introduction/readme/tutorial-wheels-ajax-and-you.md)
+  * [Boxlang Support](introduction/readme/boxlang-support.md)
 * [Frameworks and Wheels](introduction/frameworks-and-wheels.md)
 * [Requirements](introduction/requirements.md)
 * [Manual Installation](introduction/manual-installation.md)
@@ -155,3 +156,9 @@
 * [Issue Tracker](https://github.com/wheels-dev/wheels/issues)
 * [Sponsor Us](https://opencollective.com/wheels)
 * [Community](https://github.com/wheels-dev/wheels/discussions)
+
+## Plugins
+
+* [Installing and Using Plugins](plugins/installing-and-using-plugins.md)
+* [Developing Plugins](plugins/developing-plugins.md)
+* [Publishing Plugins](plugins/publishing-plugins.md)
