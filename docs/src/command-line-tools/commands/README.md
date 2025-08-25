@@ -9,12 +9,9 @@ Complete reference for all Wheels CLI commands organized by category.
 | Command | Description |
 |---------|-------------|
 | `wheels generate app [name]` | Create new application |
-| `wheels scaffold [name]` | Generate complete CRUD |
+| `wheels generate scaffold [name]` | Generate complete CRUD |
 | `wheels dbmigrate latest` | Run database migrations |
-| `wheels test run` | Run application tests |
-| `wheels server start` | Start development server |
-| `wheels server status` | Check server status |
-| `wheels watch` | Watch files for changes |
+| `wheels test` | Run application tests |
 | `wheels reload` | Reload application |
 
 ## Core Commands
@@ -25,30 +22,9 @@ Essential commands for managing your Wheels application.
 |---------|-------------|---------------|
 | `wheels init` | Bootstrap existing app for CLI | [Details](core/init.md) |
 | `wheels info` | Display version information | [Details](core/info.md) |
-| `wheels reload [mode]` | Reload application | [Details](core/reload.md) |
+| `wheels reload` | Reload application | [Details](core/reload.md) |
 | `wheels deps` | Manage dependencies | [Details](core/deps.md) |
 | `wheels destroy [type] [name]` | Remove generated code | [Details](core/destroy.md) |
-| `wheels watch` | Watch for file changes | [Details](core/watch.md) |
-
-## Server Management
-
-Enhanced server commands that wrap CommandBox's native functionality with Wheels-specific features.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels server` | Display server commands help | [Details](server/server.md) |
-| `wheels server start` | Start development server | [Details](server/server-start.md) |
-| `wheels server stop` | Stop development server | [Details](server/server-stop.md) |
-| `wheels server restart` | Restart server and reload app | [Details](server/server-restart.md) |
-| `wheels server status` | Show server status with Wheels info | [Details](server/server-status.md) |
-| `wheels server log` | Tail server logs | [Details](server/server-log.md) |
-| `wheels server open` | Open application in browser | [Details](server/server-open.md) |
-
-### Server Command Features
-- Validates Wheels application directory
-- Shows framework-specific information
-- Integrates with application reload
-- Provides helpful error messages
 
 ## Code Generation
 
@@ -63,12 +39,9 @@ Commands for generating application code and resources.
 | `wheels generate view` | `wheels g view` | Generate view | [Details](generate/view.md) |
 | `wheels generate property` | | Add model property | [Details](generate/property.md) |
 | `wheels generate route` | | Generate route | [Details](generate/route.md) |
-| `wheels generate resource` | | REST resource | [Details](generate/resource.md) |
-| `wheels generate api-resource` | | API resource (**Currently broken**) | [Details](generate/api-resource.md) |
-| `wheels generate frontend` | | Frontend code | [Details](generate/frontend.md) |
 | `wheels generate test` | | Generate tests | [Details](generate/test.md) |
 | `wheels generate snippets` | | Code snippets | [Details](generate/snippets.md) |
-| `wheels scaffold` | | Complete CRUD | [Details](generate/scaffold.md) |
+| `wheels generate scaffold` | | Complete CRUD | [Details](generate/scaffold.md) |
 
 ### Generator Options
 
@@ -79,6 +52,13 @@ Common options across generators:
 ## Database Commands
 
 Commands for managing database schema and migrations.
+
+### Database Operations
+
+| Command | Description | Documentation |
+|---------|-------------|---------------|
+| `wheels db create` | Create database | [Details](database/db-create.md) |
+| `wheels db drop` | Drop database | [Details](database/db-drop.md) |
 
 ### Migration Management
 
@@ -100,40 +80,13 @@ Commands for managing database schema and migrations.
 | `wheels dbmigrate create column [table] [column]` | Add column migration | [Details](database/dbmigrate-create-column.md) |
 | `wheels dbmigrate remove table [name]` | Drop table migration | [Details](database/dbmigrate-remove-table.md) |
 
-### Database Operations
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels db schema` | Export/import schema | [Details](database/db-schema.md) |
-| `wheels db seed` | Seed database | [Details](database/db-seed.md) |
-
 ## Testing Commands
 
 Commands for running and managing tests.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `wheels test [type]` | Run framework tests | [Details](testing/test.md) |
-| `wheels test run [spec]` | Run TestBox tests | [Details](testing/test-run.md) |
-| `wheels test coverage` | Generate coverage report | [Details](testing/test-coverage.md) |
-| `wheels test debug` | Debug test execution | [Details](testing/test-debug.md) |
-
-### Test Options
-
-- `--watch` - Auto-run on changes
-- `--reporter` - Output format (simple, json, junit)
-- `--bundles` - Specific test bundles
-- `--labels` - Filter by labels
-
-## Configuration Commands
-
-Commands for managing application configuration.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels config list` | List configuration | [Details](config/config-list.md) |
-| `wheels config set [key] [value]` | Set configuration | [Details](config/config-set.md) |
-| `wheels config env` | Environment config | [Details](config/config-env.md) |
+| `wheels test` | Run framework tests | [Details](testing/test.md) |
 
 ## Environment Management
 
@@ -141,35 +94,9 @@ Commands for managing development environments and application context.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `wheels environment` | Display/switch environment | [Details](environment/environment.md) |
-| `wheels environment set [env]` | Set environment with reload | [Details](environment/environment.md) |
-| `wheels environment list` | List available environments | [Details](environment/environment.md) |
-| `wheels console` | Interactive REPL console | [Details](environment/console.md) |
-| `wheels runner [script]` | Execute scripts with context | [Details](environment/runner.md) |
-
-### Legacy Environment Commands
-| Command | Description | Documentation |
-|---------|-------------|---------------|
 | `wheels env` | Environment base command | [Details](environment/env.md) |
 | `wheels env setup [name]` | Setup environment | [Details](environment/env-setup.md) |
 | `wheels env list` | List environments | [Details](environment/env-list.md) |
-| `wheels env switch [name]` | Switch environment | [Details](environment/env-switch.md) |
-
-## Plugin Management
-
-Commands for managing Wheels plugins.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels plugins` | Plugin management base command | [Details](plugins/plugins.md) |
-| `wheels plugins list` | List plugins | [Details](plugins/plugins-list.md) |
-| `wheels plugins install [name]` | Install plugin | [Details](plugins/plugins-install.md) |
-| `wheels plugins remove [name]` | Remove plugin | [Details](plugins/plugins-remove.md) |
-
-### Plugin Options
-
-- `--global` - Install/list globally
-- `--dev` - Development dependency
 
 ## Code Analysis
 
@@ -180,63 +107,7 @@ Commands for analyzing code quality and patterns.
 | `wheels analyze` | Code analysis base command | [Details](analysis/analyze.md) |
 | `wheels analyze code` | Analyze code quality | [Details](analysis/analyze-code.md) |
 | `wheels analyze performance` | Performance analysis | [Details](analysis/analyze-performance.md) |
-| `wheels analyze security` | Security analysis (deprecated) | [Details](analysis/analyze-security.md) |
-
-## Security Commands
-
-Commands for security scanning and hardening.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels security` | Security management base command | [Details](security/security.md) |
-| `wheels security scan` | Scan for vulnerabilities | [Details](security/security-scan.md) |
-
-### Security Options
-
-- `--fix` - Auto-fix issues
-- `--path` - Specific path to scan
-
-## Performance Commands
-
-Commands for optimizing application performance.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels optimize` | Optimization base command | [Details](performance/optimize.md) |
-| `wheels optimize performance` | Optimize application | [Details](performance/optimize-performance.md) |
-
-## Documentation Commands
-
-Commands for generating and serving documentation.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels docs` | Documentation base command (**Currently broken**) | [Details](documentation/docs.md) |
-| `wheels docs generate` | Generate documentation | [Details](documentation/docs-generate.md) |
-| `wheels docs serve` | Serve documentation | [Details](documentation/docs-serve.md) |
-
-### Documentation Options
-
-- `--format` - Output format (html, markdown)
-- `--output` - Output directory
-- `--port` - Server port
-
-## Maintenance Commands
-
-Commands for managing application maintenance mode and cleanup tasks.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels maintenance:on` | Enable maintenance mode | [Details](maintenance/maintenance-mode.md#wheels-maintenanceon) |
-| `wheels maintenance:off` | Disable maintenance mode | [Details](maintenance/maintenance-mode.md#wheels-maintenanceoff) |
-| `wheels cleanup:logs` | Remove old log files | [Details](maintenance/cleanup-commands.md#wheels-cleanuplogs) |
-| `wheels cleanup:tmp` | Remove temporary files | [Details](maintenance/cleanup-commands.md#wheels-cleanuptmp) |
-| `wheels cleanup:sessions` | Remove expired sessions | [Details](maintenance/cleanup-commands.md#wheels-cleanupsessions) |
-
-### Maintenance Options
-
-- `--force` - Skip confirmation prompts
-- `--dryRun` - Preview changes without executing
+| `wheels analyze security` | Security analysis | [Details](analysis/analyze-security.md) |
 
 ## CI/CD Commands
 
@@ -254,33 +125,6 @@ Commands for Docker container management and deployment.
 |---------|-------------|---------------|
 | `wheels docker init` | Initialize Docker configuration | [Details](docker/docker-init.md) |
 | `wheels docker deploy` | Deploy using Docker | [Details](docker/docker-deploy.md) |
-
-## Deployment Commands
-
-Commands for managing application deployments.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels deploy` | Deployment base command | [Details](deploy/deploy.md) |
-| `wheels deploy audit` | Audit deployment configuration | [Details](deploy/deploy-audit.md) |
-| `wheels deploy exec` | Execute deployment | [Details](deploy/deploy-exec.md) |
-| `wheels deploy hooks` | Manage deployment hooks | [Details](deploy/deploy-hooks.md) |
-| `wheels deploy init` | Initialize deployment | [Details](deploy/deploy-init.md) |
-| `wheels deploy lock` | Lock deployment state | [Details](deploy/deploy-lock.md) |
-| `wheels deploy logs` | View deployment logs | [Details](deploy/deploy-logs.md) |
-| `wheels deploy proxy` | Configure deployment proxy | [Details](deploy/deploy-proxy.md) |
-| `wheels deploy push` | Push deployment | [Details](deploy/deploy-push.md) |
-| `wheels deploy rollback` | Rollback deployment | [Details](deploy/deploy-rollback.md) |
-| `wheels deploy secrets` | Manage deployment secrets | [Details](deploy/deploy-secrets.md) |
-| `wheels deploy setup` | Setup deployment environment | [Details](deploy/deploy-setup.md) |
-| `wheels deploy status` | Check deployment status | [Details](deploy/deploy-status.md) |
-| `wheels deploy stop` | Stop deployment | [Details](deploy/deploy-stop.md) |
-
-### Deployment Options
-
-- `--environment` - Target environment
-- `--force` - Force deployment
-- `--dry-run` - Preview changes without deploying
 
 ## Command Patterns
 
@@ -308,40 +152,23 @@ wheels new myapp         # Same as: wheels generate app myapp
 
 **Creating a new feature:**
 ```bash
-wheels scaffold name=product properties=name:string,price:decimal
+wheels generate scaffold name=product properties=name:string,price:decimal
 wheels dbmigrate latest
-wheels test run
+wheels test
 ```
 
 **Starting development:**
 ```bash
-wheels server start      # Start the server
-wheels watch            # Terminal 1: Watch for file changes
-wheels server log       # Terminal 2: Monitor logs
-wheels test run --watch # Terminal 3: Run tests in watch mode
+wheels reload            # Reload the application
+wheels test             # Run tests
 ```
 
 **Deployment preparation:**
 ```bash
-wheels test run
-wheels security scan
-wheels optimize performance
+wheels test
+wheels analyze security
+wheels analyze performance
 wheels dbmigrate info
-wheels environment production
-```
-
-**Interactive debugging:**
-```bash
-wheels console                    # Start REPL
-wheels console environment=testing # Test in specific env
-wheels console execute="model('User').count()"  # Quick check
-```
-
-**Running maintenance scripts:**
-```bash
-wheels runner scripts/cleanup.cfm
-wheels runner scripts/migrate.cfm environment=production
-wheels runner scripts/report.cfm params='{"month":12}'
 ```
 
 ## Environment Variables
@@ -363,23 +190,10 @@ wheels runner scripts/report.cfm params='{"month":12}'
 | `4` | Permission denied |
 | `5` | Database error |
 
-## Command Status Notes
-
-Some commands in the Wheels CLI are currently in various states of development or maintenance:
-
-### Broken Commands
-- `wheels docs` - Base documentation command is currently broken
-- `wheels generate api-resource` - API resource generation is currently broken
-
-### Disabled Commands
-The following commands exist in the codebase but are currently disabled:
-- Some CI and Docker commands have disabled variants in the codebase
-
-These commands may be re-enabled in future versions of Wheels.
-
 ## See Also
 
-- [Installation Guide](../guides/installation.md)
-- [Quick Start Guide](../guides/quick-start.md)
-- [Creating Custom Commands](../guides/creating-commands.md)
-- [CLI Architecture](../guides/service-architecture.md)
+- [Quick Start Guide](../quick-start.md)
+- [CLI Development Guides](../cli-guides/creating-commands.md)
+- [Service Architecture](../cli-guides/service-architecture.md)
+- [Migrations Guide](../cli-guides/migrations.md)
+- [Testing Guide](../cli-guides/testing.md)
