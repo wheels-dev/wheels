@@ -84,7 +84,7 @@ vendor
 
 **app/migrator/migrations** - Database [migration](https://wheels.dev/3.0.0/guides/command-line-tools/cli-guides/migrations) CFC files.
 
-**tests/TestBox/** - Location for your application's unit tests.
+**tests/** - Location for your application's unit tests.
 
 **public/urlrewrite.xml** - Required for Tomcat/Tuckey or CommandBox URL rewriting.
 
@@ -217,7 +217,7 @@ You can add additional directories to your application structure. When doing so:
 
 **Local Development** - Configure your development environment using `server.json` for server settings and `.env` for environment variables. Never commit sensitive data in `.env` files to version control.
 
-**Testing Strategy** - Implement unit tests in `tests/TestBox/` to ensure application reliability.
+**Testing Strategy** - Implement unit tests in `tests/` to ensure application reliability.
 
 ---
 

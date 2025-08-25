@@ -29,9 +29,9 @@ When you destroy a resource, the following items are deleted:
 - Model file (`/app/models/[Name].cfc`)
 - Controller file (`/app/controllers/[Names].cfc`)
 - Views directory (`/app/views/[names]/`)
-- Model test file (`/tests/Testbox/specs/models/[Name].cfc`)
-- Controller test file (`/tests/Testbox/specs/controllers/[Names].cfc`)
-- View test directory (`/tests/Testbox/specs/views/[names]/`)
+- Model test file (`/tests/specs/models/[Name].cfc`)
+- Controller test file (`/tests/specs/controllers/[Names].cfc`)
+- View test directory (`/tests/specs/views/[names]/`)
 - Resource route entry in `/config/routes.cfm`
 - Database table (if confirmed)
 
@@ -53,9 +53,9 @@ the following files and directories:
 /app/models/User.cfc
 /app/controllers/Users.cfc
 /app/views/users/
-/tests/Testbox/specs/models/User.cfc
-/tests/Testbox/specs/controllers/Users.cfc
-/tests/Testbox/specs/views/users/
+/tests/specs/models/User.cfc
+/tests/specs/controllers/Users.cfc
+/tests/specs/views/users/
 /config/routes.cfm
 .resources("users")
 
@@ -81,9 +81,9 @@ the following files and directories:
 /app/models/User.cfc
 /app/controllers/Users.cfc
 /app/views/users/
-/tests/Testbox/specs/models/User.cfc
-/tests/Testbox/specs/controllers/Users.cfc
-/tests/Testbox/specs/views/users/
+/tests/specs/models/User.cfc
+/tests/specs/controllers/Users.cfc
+/tests/specs/views/users/
 /config/routes.cfm
 .resources("users")
 

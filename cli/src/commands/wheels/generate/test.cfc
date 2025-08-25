@@ -43,7 +43,7 @@ component aliases='wheels g test' extends="../base"  {
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
 		var obj = helpers.getNameVariants(listLast( arguments.target, '/\' ));
-		var testsdirectory = fileSystemUtil.resolvePath( "tests/Testbox/specs" );
+		var testsdirectory = fileSystemUtil.resolvePath( "tests/specs" );
 
 		// Validate directories
 		if( !directoryExists( testsdirectory ) ) {
@@ -129,17 +129,17 @@ component aliases='wheels g test' extends="../base"  {
 		switch(arguments.type) {
 			case "model":
 				info.className = obj.objectNameSingularC & "Spec";
-				info.path = fileSystemUtil.resolvePath("tests/Testbox/specs/unit/models/#info.className#.cfc");
+				info.path = fileSystemUtil.resolvePath("tests/specs/unit/models/#info.className#.cfc");
 				break;
 				
 			case "controller":
 				info.className = obj.objectNamePluralC & "ControllerSpec";
-				info.path = fileSystemUtil.resolvePath("tests/Testbox/specs/integration/controllers/#info.className#.cfc");
+				info.path = fileSystemUtil.resolvePath("tests/specs/integration/controllers/#info.className#.cfc");
 				break;
 				
 			case "view":
 				info.className = lCase(arguments.name) & "ViewSpec";
-				var viewDir = fileSystemUtil.resolvePath("tests/Testbox/specs/unit/views/#obj.objectNamePlural#");
+				var viewDir = fileSystemUtil.resolvePath("tests/specs/unit/views/#obj.objectNamePlural#");
 				if (!directoryExists(viewDir)) {
 					directoryCreate(viewDir);
 				}
@@ -148,17 +148,17 @@ component aliases='wheels g test' extends="../base"  {
 				
 			case "unit":
 				info.className = obj.objectNameSingularC & "Spec";
-				info.path = fileSystemUtil.resolvePath("tests/Testbox/specs/unit/helpers/#info.className#.cfc");
+				info.path = fileSystemUtil.resolvePath("tests/specs/unit/helpers/#info.className#.cfc");
 				break;
 				
 			case "integration":
 				info.className = obj.objectNameSingularC & "IntegrationSpec";
-				info.path = fileSystemUtil.resolvePath("tests/Testbox/specs/integration/workflows/#info.className#.cfc");
+				info.path = fileSystemUtil.resolvePath("tests/specs/integration/workflows/#info.className#.cfc");
 				break;
 				
 			case "api":
 				info.className = obj.objectNamePluralC & "APISpec";
-				var apiDir = fileSystemUtil.resolvePath("tests/Testbox/specs/integration/api");
+				var apiDir = fileSystemUtil.resolvePath("tests/specs/integration/api");
 				if (!directoryExists(apiDir)) {
 					directoryCreate(apiDir);
 				}
