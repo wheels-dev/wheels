@@ -168,7 +168,7 @@ Create a `.wheelscheck` file in your project root to customize rules:
 The analyzer automatically excludes:
 - CFWheels framework files (`vendor/wheels/`, `wheels/`)
 - Third-party dependencies (`vendor/`, `node_modules/`)
-- Test frameworks (`testbox/`, `tests/testbox/`)
+- Test frameworks (`testbox/`, `tests/`)
 - Build artifacts (`build/`, `dist/`)
 - Version control (`.git/`, `.svn/`)
 - System directories (`WEB-INF/`, `CFIDE/`)

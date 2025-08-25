@@ -42,7 +42,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	function testbox(){
-		include "/tests/Testbox/runner.cfm";
+		include "/tests/runner.cfm";
 	}
 	
 	public function tests_testbox(){

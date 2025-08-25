@@ -48,13 +48,13 @@ your-app/
 │       └── runner.cfm
 ```
 
-**Note**: By default, TestBox runs tests located in the `tests/testbox/specs/` directory, unless configured otherwise.
+**Note**: By default, TestBox runs tests located in the `tests/specs/` directory, unless configured otherwise.
 
 ## TestBox Test Runner Configuration
 
 ### Main Test Runner
 
-Update `tests/Testbox/runner.cfm`:
+Update `tests/runner.cfm`:
 
 For detailed information on TestBox runners and configuration options, refer to the [TestBox Runners documentation](https://testbox.ortusbooks.com/v5.x/getting-started/running-tests).
 
@@ -62,7 +62,7 @@ For detailed information on TestBox runners and configuration options, refer to 
 <!--- TestBox Test Runner for Wheels 3.0 --->
 <cfsetting requestTimeOut="1800">
 <cfscript>
-    testBox = new testbox.system.TestBox(directory="tests.Testbox.specs")
+    testBox = new testbox.system.TestBox(directory="tests.specs")
 
     setTestboxEnvironment()
 
@@ -184,10 +184,10 @@ For detailed information on TestBox runners and configuration options, refer to 
         application.$$$wheels = Duplicate(application.wheels)
 
         // load testbox routes
-        application.wo.$include(template = "/tests/testbox/routes.cfm")
+        application.wo.$include(template = "/tests/routes.cfm")
         application.wo.$setNamedRoutePositions()
 
-        local.AssetPath = "/tests/testbox/_assets/"
+        local.AssetPath = "/tests/_assets/"
         
         application.wo.set(rewriteFile = "index.cfm")
         application.wo.set(controllerPath = local.AssetPath & "controllers")
@@ -245,7 +245,7 @@ For detailed information on TestBox runners and configuration options, refer to 
 
 ### Test Data Population
 
-Update `tests/Testbox/populate.cfm` for test database setup:
+Update `tests/populate.cfm` for test database setup:
 
 ```cfscript
 <cfscript>
@@ -291,7 +291,7 @@ For comprehensive information on TestBox BDD syntax and expectations, see the [T
 
 ### Example Controller Testing
 
-Create `tests/Testbox/specs/controllers/ExampleControllerSpec.cfc`:
+Create `tests/specs/controllers/ExampleControllerSpec.cfc`:
 
 ```cfscript
 component extends="testbox.system.BaseSpec" {
@@ -328,7 +328,7 @@ component extends="testbox.system.BaseSpec" {
 
 ### API Controller Testing
 
-Create `tests/Testbox/specs/controllers/ApiControllerSpec.cfc`:
+Create `tests/specs/controllers/ApiControllerSpec.cfc`:
 
 ```cfscript
 component extends="testbox.system.BaseSpec" {
@@ -401,7 +401,7 @@ component extends="testbox.system.BaseSpec" {
 
 ### Authentication Controller Testing
 
-Create `tests/Testbox/specs/controllers/AuthenticationControllerSpec.cfc`:
+Create `tests/specs/controllers/AuthenticationControllerSpec.cfc`:
 
 ```cfscript
 component extends="testbox.system.BaseSpec" {
@@ -480,7 +480,7 @@ component extends="testbox.system.BaseSpec" {
 
 ### Post Controller Testing
 
-Create `tests/Testbox/specs/controllers/PostControllerSpec.cfc`:
+Create `tests/specs/controllers/PostControllerSpec.cfc`:
 
 ```cfscript
 component extends="testbox.system.BaseSpec" {
@@ -548,7 +548,7 @@ For detailed information on testing functions and utility methods, refer to the 
 
 ### Example Function Testing
 
-Create `tests/Testbox/specs/functions/ExampleSpec.cfc`:
+Create `tests/specs/functions/ExampleSpec.cfc`:
 
 ```cfscript
 component extends="testbox.system.BaseSpec" {
