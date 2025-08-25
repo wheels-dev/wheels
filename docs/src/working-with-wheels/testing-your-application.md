@@ -632,8 +632,6 @@ http://localhost:8080/wheels/legacy/core/tests
 
 Access your TestBox tests through multiple formats:
 
-For more information on running tests and available formats, see the [TestBox Web Runner documentation](https://testbox.ortusbooks.com/v5.x/getting-started/running-tests/test-runner).
-
 ```
 # HTML Interface (default)
 http://localhost:8080/wheels/app/tests
@@ -644,6 +642,8 @@ http://localhost:8080/wheels/app/tests?format=json
 # Plain Text Output
 http://localhost:8080/wheels/app/tests?format=txt
 ```
+
+For more information on running tests and available formats, see the [TestBox Web Runner documentation](https://testbox.ortusbooks.com/v5.x/getting-started/running-tests/test-runner).
 
 ### Framework Core Testing
 
@@ -660,8 +660,6 @@ http://localhost:8080/wheels/legacy/core/tests
 ### Advanced URL Parameters
 
 Customize your test runs using the convenient URLs:
-
-For a complete list of URL parameters and advanced configuration options, refer to the [TestBox Runner Configuration documentation](https://testbox.ortusbooks.com/v5.x/getting-started/running-tests/test-runner).
 
 ```
 # Run specific test bundles
@@ -735,7 +733,7 @@ For comprehensive testing best practices and advanced techniques, refer to the [
 
 ## Legacy RocketUnit Overview
 
-Prior to Wheels 3.0, the framework used RocketUnit as its testing infrastructure. RocketUnit was a comprehensive testing framework that provided both unit testing and integration testing capabilities specifically tailored for CFML applications.
+Prior to Wheels 3.0, the framework used RocketUnit as its testing infrastructure. RocketUnit was a comprehensive testing framework that provided both unit testing and integration testing capabilities specifically tailored for Wheels applications.
 
 At some point, your code is going to break. Upgrades, feature enhancements, and bug fixes are all part of the development lifecycle. Quite often with deadlines, you don't have the time to test the functionality of your entire application with every change you make.
 
@@ -952,30 +950,30 @@ The RocketUnit framework supported multiple execution patterns:
 
 ```
 # Run all tests in functions package
-http://localhost:8080/wheels/legacy/app/tests?package=functions
+http://localhost:8080/wheels/packages/app?package=functions
 
 # Run all tests in requests package  
-http://localhost:8080/wheels/legacy/app/tests?package=requests
+http://localhost:8080/wheels/packages/app?package=requests
 ```
 
 **Specific Test Cases:**
 
 ```
 # Run specific test component
-http://localhost:8080/wheels/legacy/app/tests?package=functions&test=Example
+http://localhost:8080/wheels/packages/app?package=functions&test=Example
 
 # Run individual test method
-http://localhost:8080/wheels/legacy/app/tests?package=functions&test=Example&method=testExample
+http://localhost:8080/wheels/packages/app?package=functions&test=Example&method=testExample
 ```
 
 **With Filtering Options:**
 
 ```
 # Run tests with specific labels
-http://localhost:8080/wheels/legacy/app/tests?labels=unit,fast
+http://localhost:8080/wheels/packages/app?labels=unit,fast
 
 # Exclude slow tests
-http://localhost:8080/wheels/legacy/app/tests?exclude=slow,integration
+http://localhost:8080/wheels/packages/app?exclude=slow,integration
 ```
 
 #### Test Types Supported
@@ -1110,8 +1108,8 @@ When migrating from the legacy RocketUnit system to TestBox 5, consider the foll
 
 #### Structure Migration
 
-- `tests/functions/` → `tests/testbox/specs/functions/`
-- `tests/requests/` → `tests/testbox/specs/controllers/`
+- `tests/functions/` → `tests/specs/functions/`
+- `tests/requests/` → `tests/specs/controllers/`
 - Component extensions change from `app.tests.Test` to `testbox.system.BaseSpec`
 
 #### Lifecycle Migration
@@ -1135,3 +1133,16 @@ The comprehensive testing infrastructure provided by RocketUnit established many
 ---
 
 This comprehensive testing approach ensures your Wheels 3.0 application is thoroughly validated across all components, provides multi-format output for different environments, and supports various database configurations for complete coverage while maintaining reference information for legacy RocketUnit systems.
+
+## Running Legacy RocketUnit Tests in Wheels 3.0
+
+If you already have application-level tests written with RocketUnit in a Wheels 2.x app, you don’t need to rewrite them immediately when upgrading to Wheels 3.0. Wheels 3.0 still provides backward compatibility for running RocketUnit tests alongside TestBox.
+To run your existing RocketUnit tests:
+
+1. Copy the entire contents of that `tests/` folder.
+2. Paste the copied folder into your Wheels 3.0 application under `tests/RocketUnit/`.
+3. Run the legacy tests by visiting the RocketUnit runner in your browser:
+http://localhost:8080/wheels/legacy/app/tests
+
+
+This approach lets you continue running your legacy RocketUnit test suite unchanged inside a Wheels 3.0 project while you gradually migrate to TestBox. It’s particularly useful for teams upgrading large applications where a complete migration cannot be done in one step.
