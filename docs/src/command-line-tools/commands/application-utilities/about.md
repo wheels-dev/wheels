@@ -38,7 +38,7 @@ Wheels Framework
 
 Wheels CLI
   Version: 1.0.0
-  Location: /commandbox/modules/cfwheels-cli/
+  Location: /commandbox/modules/wheels-cli/
 
 Application
   Path: /Users/developer/myapp
@@ -73,7 +73,7 @@ Resources
 ## Information Sections
 
 ### Wheels Framework
-- **Version**: The version of CFWheels framework installed
+- **Version**: The version of Wheels framework installed
 - Shows the core framework version your app is using
 
 ### Wheels CLI

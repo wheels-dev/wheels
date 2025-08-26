@@ -41,7 +41,7 @@ The command displays:
 '--'   '--'`--' `--' `----' `----'`--'`----'      `-----'`-----'`--' 
 ============================ Wheels CLI ============================
 Current Working Directory: /Users/username/myapp
-CommandBox Module Root: /Users/username/.CommandBox/cfml/modules/cfwheels-cli/
+CommandBox Module Root: /Users/username/.CommandBox/cfml/modules/wheels-cli/
 Current Wheels Version in this directory: 3.0.0-SNAPSHOT
 ====================================================================
 ```

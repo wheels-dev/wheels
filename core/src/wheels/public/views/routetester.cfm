@@ -28,7 +28,7 @@ result = $$findMatchingRoutes(path = request.wheels.params.path, requestMethod =
 			<div class="ui info message">
 				<div class="header">Multiple potential matches</div>
 					The path entered could possibly match multiple routes:
-					<strong>CFWheels uses the first match in this table</strong>
+					<strong>Wheels uses the first match in this table</strong>
 					- the other routes are shown here for information only to help in your debugging, i.e when you're trying to work out why a route is loading incorrectly.
 			</div>
 		</cfif>

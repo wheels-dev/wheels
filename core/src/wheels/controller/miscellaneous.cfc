@@ -1,7 +1,7 @@
 component {
 	/**
 	 * Sends an email using a template and an optional layout to wrap it in.
-	 * Besides the CFWheels-specific arguments documented here, you can also pass in any argument that is accepted by the `cfmail` tag as well as your own arguments to be used by the view.
+	 * Besides the Wheels-specific arguments documented here, you can also pass in any argument that is accepted by the `cfmail` tag as well as your own arguments to be used by the view.
 	 *
 	 * [section: Controller]
 	 * [category: Miscellaneous Functions]
@@ -12,7 +12,7 @@ component {
 	 * @subject The subject line of the email.
 	 * @layout Layout(s) to wrap the email template in. This argument is also aliased as `layouts`.
 	 * @file A list of the names of the files to attach to the email. This will reference files stored in the `files` folder (or a path relative to it). This argument is also aliased as `files`.
-	 * @detectMultipart When set to `true` and multiple values are provided for the `template` argument, CFWheels will detect which of the templates is text and which one is HTML (by counting the `<` characters).
+	 * @detectMultipart When set to `true` and multiple values are provided for the `template` argument, Wheels will detect which of the templates is text and which one is HTML (by counting the `<` characters).
 	 * @deliver When set to `false`, the email will not be sent.
 	 * @writeToFile The file to which the email contents will be written
 	 */
@@ -274,7 +274,7 @@ component {
 	}
 
 	/**
-	 * Returns whether CFWheels is communicating over a secure port.
+	 * Returns whether Wheels is communicating over a secure port.
 	 *
 	 * [section: Controller]
 	 * [category: Miscellaneous Functions]

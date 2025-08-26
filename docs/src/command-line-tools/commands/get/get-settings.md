@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `wheels get settings` command displays the current CFWheels application settings for your environment. It shows all configuration settings that are active, including defaults and any custom overrides from your configuration files. You can view all settings or filter to see specific ones.
+The `wheels get settings` command displays the current Wheels application settings for your environment. It shows all configuration settings that are active, including defaults and any custom overrides from your configuration files. You can view all settings or filter to see specific ones.
 
 ## Command Syntax
 
@@ -39,7 +39,7 @@ Shows all settings containing "cache" in their name (e.g., `cacheQueries`, `cach
 
 ### Settings Resolution Order
 
-The command resolves settings in the same order as CFWheels:
+The command resolves settings in the same order as Wheels:
 
 1. **Default Wheels Settings** - Built-in framework defaults
 2. **Application Settings** - From `/config/settings.cfm`

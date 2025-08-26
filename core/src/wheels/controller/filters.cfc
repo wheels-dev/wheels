@@ -1,14 +1,14 @@
 component {
 	/**
-	 * Tells CFWheels to run a function before an action is run or after an action has been run.
+	 * Tells Wheels to run a function before an action is run or after an action has been run.
 	 *
 	 * [section: Controller]
 	 * [category: Configuration Functions]
 	 *
 	 * @through Function(s) to execute before or after the action(s).
 	 * @type Whether to run the function(s) before or after the action(s).
-	 * @only Pass in a list of action names (or one action name) to tell CFWheels that the filter function(s) should only be run on these actions.
-	 * @except Pass in a list of action names (or one action name) to tell CFWheels that the filter function(s) should be run on all actions except the specified ones.
+	 * @only Pass in a list of action names (or one action name) to tell Wheels that the filter function(s) should only be run on these actions.
+	 * @except Pass in a list of action names (or one action name) to tell Wheels that the filter function(s) should be run on all actions except the specified ones.
 	 * @placement Pass in `prepend` to prepend the function(s) to the filter chain instead of appending.
 	 */
 	public void function filters(
@@ -115,7 +115,7 @@ component {
 				if (!StructKeyExists(variables, local.filter.through)) {
 					Throw(
 						type = "Wheels.FilterNotFound",
-						message = "CFWheels tried to run the `#local.filter.through#` function as a #arguments.type# filter but could not find it.",
+						message = "Wheels tried to run the `#local.filter.through#` function as a #arguments.type# filter but could not find it.",
 						extendedInfo = "Make sure there is a function named `#local.filter.through#` in the `#variables.$class.name#.cfc` file."
 					);
 				}

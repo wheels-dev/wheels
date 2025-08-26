@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Quick Start
 
 ### New to Wheels?
-1. **Install Wheels**: `box install cfwheels`
+1. **Install Wheels CLI**: `box install wheels-cli`
 2. **Generate an app**: `wheels g app myapp`
 3. **Start developing**: `server start`
 

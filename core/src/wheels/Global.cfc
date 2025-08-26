@@ -685,7 +685,7 @@ component output="false" {
 	}
 
 	/**
-	 * This copies all the variables CFWheels needs from the CGI scope to the request scope.
+	 * This copies all the variables Wheels needs from the CGI scope to the request scope.
 	 */
 	public struct function $cgiScope(
 		string keys = "request_method,http_x_requested_with,http_referer,server_name,path_info,script_name,query_string,remote_addr,server_port,server_port_secure,server_protocol,http_host,http_accept,content_type,http_x_rewrite_url,http_x_original_url,request_uri,redirect_url,http_x_forwarded_for,http_x_forwarded_proto",
@@ -1349,7 +1349,7 @@ component output="false" {
 				|| (local.major == local.minimumMajor && local.minor < local.minimumMinor)
 				|| (local.major == local.minimumMajor && local.minor == local.minimumMinor && local.patch < local.minimumPatch)
 			) {
-				local.rv = "The CFWheels framework requires BoxLang version #local.minimumMajor#.#local.minimumMinor#.#local.minimumPatch# or higher. You are currently running version #arguments.version#.";
+				local.rv = "The Wheels framework requires BoxLang version #local.minimumMajor#.#local.minimumMinor#.#local.minimumPatch# or higher. You are currently running version #arguments.version#.";
 			}
 			
 			// Check maximum version (optional - for major version compatibility)
@@ -1358,7 +1358,7 @@ component output="false" {
 				|| (local.major == local.maximumMajor && local.minor > local.maximumMinor)
 				|| (local.major == local.maximumMajor && local.minor == local.maximumMinor && local.patch > local.maximumPatch)
 			) {
-				local.rv = "The CFWheels framework has been tested up to BoxLang version #local.maximumMajor#.#local.maximumMinor#.#local.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
+				local.rv = "The Wheels framework has been tested up to BoxLang version #local.maximumMajor#.#local.maximumMinor#.#local.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
 			}
 		} else if (arguments.engine == "Lucee") {
 			local.minimumMajor = "5";
@@ -1574,7 +1574,7 @@ component output="false" {
 	 * NB: url rewriting files need to be removed from here.
 	 */
 	public string function $buildReleaseZip(string version = application.wheels.version, string directory = ExpandPath("/")) {
-		local.name = "cfwheels-" & LCase(Replace(arguments.version, " ", "-", "all"));
+		local.name = "wheels-" & LCase(Replace(arguments.version, " ", "-", "all"));
 		local.name = Replace(local.name, "alpha-", "alpha.");
 		local.name = Replace(local.name, "beta-", "beta.");
 		local.name = Replace(local.name, "rc-", "rc.");
@@ -1639,7 +1639,7 @@ component output="false" {
 	}
 
 	/**
-	 * Throw a developer friendly CFWheels error if set (typically in development mode).
+	 * Throw a developer friendly Wheels error if set (typically in development mode).
 	 * Otherwise show the 404 page for end users (typically in production mode).
 	 */
 	public void function $throwErrorOrShow404Page(required string type, required string message, string extendedInfo = "") {
@@ -2052,7 +2052,7 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the current setting for the supplied CFWheels setting or the current default for the supplied CFWheels function argument.
+	 * Returns the current setting for the supplied Wheels setting or the current default for the supplied Wheels function argument.
 	 *
 	 * [section: Configuration]
 	 * [category: Miscellaneous Functions]
@@ -2075,7 +2075,7 @@ component output="false" {
 	}
 
 	/**
-	 * Adds a new MIME type to your CFWheels application for use with responding to multiple formats.
+	 * Adds a new MIME type to your Wheels application for use with responding to multiple formats.
 	 *
 	 * [section: Configuration]
 	 * [category: Miscellaneous Functions]
@@ -2228,7 +2228,7 @@ component output="false" {
 			if (!StructKeyExists(request.wheels, arguments.handle)) {
 				Throw(
 					type = "Wheels.QueryHandleNotFound",
-					message = "CFWheels couldn't find a query with the handle of `#arguments.handle#`.",
+					message = "Wheels couldn't find a query with the handle of `#arguments.handle#`.",
 					extendedInfo = "Make sure your `findAll` call has the `page` argument specified and matching `handle` argument if specified."
 				);
 			}
@@ -2432,7 +2432,7 @@ component output="false" {
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.
-	 * @params Any additional parameters to be set in the query string (example: `wheels=cool&x=y`). Please note that CFWheels uses the `&` and `=` characters to split the parameters and encode them properly for you. However, if you need to pass in `&` or `=` as part of the value, then you need to encode them (and only them), example: `a=cats%26dogs%3Dtrouble!&b=1`.
+	 * @params Any additional parameters to be set in the query string (example: `wheels=cool&x=y`). Please note that Wheels uses the `&` and `=` characters to split the parameters and encode them properly for you. However, if you need to pass in `&` or `=` as part of the value, then you need to encode them (and only them), example: `a=cats%26dogs%3Dtrouble!&b=1`.
 	 * @anchor Sets an anchor name to be appended to the path.
 	 * @onlyPath If `true`, returns only the relative URL (no protocol, host name or port).
 	 * @host Set this to override the current host.
@@ -2707,7 +2707,7 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the `count` argument. CFWheels stores a list of words that are the same in both singular and plural form (e.g. "equipment", "information") and words that don't follow the regular pluralization rules (e.g. "child" / "children", "foot" / "feet"). Use `get("uncountables")` / `set("uncountables", newList)` and `get("irregulars")` / `set("irregulars", newList)` to modify them to suit your needs.
+	 * Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the `count` argument. Wheels stores a list of words that are the same in both singular and plural form (e.g. "equipment", "information") and words that don't follow the regular pluralization rules (e.g. "child" / "children", "foot" / "feet"). Use `get("uncountables")` / `set("uncountables", newList)` and `get("irregulars")` / `set("irregulars", newList)` to modify them to suit your needs.
 	 *
 	 * [section: Global Helpers]
 	 * [category: String Functions]

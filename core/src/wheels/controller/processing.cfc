@@ -133,7 +133,7 @@ component {
 			Throw(
 				type = "Wheels.ActionNotAllowed",
 				message = "You are not allowed to execute the `#arguments.action#` method as an action.",
-				extendedInfo = "Make sure your action does not have the same name as any of the built-in CFWheels functions."
+				extendedInfo = "Make sure your action does not have the same name as any of the built-in Wheels functions."
 			);
 		}
 		if (StructKeyExists(this, arguments.action) && IsCustomFunction(this[arguments.action])) {

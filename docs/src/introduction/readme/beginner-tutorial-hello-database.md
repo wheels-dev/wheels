@@ -23,7 +23,7 @@ By default, Wheels will connect to a data source `wheels-dev`. To change this de
 		Use this file to configure your application.
 		You can also use the environment specific files (e.g. /config/production/settings.cfm) to override settings set here.
 		Don't forget to issue a reload request (e.g. reload=true) after making changes.
-		See https://wheels.dev/3.0.0/guides/working-with-cfwheels/configuration-and-defaults for more info.
+		See https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults for more info.
 	*/
 
 	/*
