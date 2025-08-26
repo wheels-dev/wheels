@@ -191,7 +191,7 @@ class TestService {
       
       // Use the api.cfml method to make a request through the NGINX proxy
       // The path must NOT include the leading slash as the NGINX configuration will add it
-      const requestPath = `wheels/testbox?${params.toString()}`;
+      const requestPath = `wheels/core/tests?${params.toString()}`;
       console.log(`Making request to CFML engine: ${engineApiName}, path: ${requestPath}`);
       
       // Log the full URL that will be constructed
