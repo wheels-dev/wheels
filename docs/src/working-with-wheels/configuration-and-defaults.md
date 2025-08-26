@@ -324,8 +324,8 @@ In this first version, the user can enable this feature, which will allow reques
 | Setting               | Type    | Default                          | Description                                                                                                                    |
 | --------------------- | ------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | autoMigrateDatabase   | Boolean | false                            | Automatically runs available migration on applicationstart.                                                                    |
-| migratorTableName     | String  | migratorversions                 | The name of the table that stores the versions migrated.                                                                       |
-| createMigratorTable   | Boolean | true                             | Create the migratorversions database table.                                                                                    |
-| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the /app/migrator/sql directory.                                   |
+| migratorTableName     | String  | c_o_r_e_migrator_versions        | The name of the table that stores the versions migrated.                                                                       |
+| createMigratorTable   | Boolean | true                             | Create the c_o_r_e_migrator_versions database table.                                                                           |
+| writeMigratorSQLFiles | Boolean | false                            | Writes the executed SQL to a .sql file in the /app/migrator/sql directory.                                                     |
 | migratorObjectCase    | String  | lower                            | Specifies the case of created database object. Options are 'lower', 'upper' and 'none' (which uses the given value unmodified) |
 | allowMigrationDown    | Boolean | false (true in development mode) | Prevents 'down' migrations (rollbacks)                                                                                         |
