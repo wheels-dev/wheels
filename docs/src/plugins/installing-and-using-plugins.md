@@ -20,6 +20,12 @@ Reloading Wheels is required when installing/uninstalling. (Issue a `reload=true
 
 ### Installing via Commandbox
 
+{% hint style="info" %}
+**Installing Wheels CLI**
+
+Before working with plugins through CommandBox, make sure you have the Wheels CLI installed by running `box install wheels-cli`.
+{% endhint %}
+
 With the Wheels CLI installed, you can just do:
 
 {% code title="CommandBox" %}

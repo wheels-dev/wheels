@@ -12,7 +12,7 @@ component {
 		// Abort if called from incorrect file.
 		application.wo.$abortInvalidRequest();
 
-		// Setup the CFWheels storage struct for the current request.
+		// Setup the Wheels storage struct for the current request.
 		application.wo.$initializeRequestScope();
 
 		if (StructKeyExists(application, "wheels")) {
@@ -56,7 +56,7 @@ component {
 			&& !StructKeyExists(url, "disableEngineCheck")
 		) {
 			local.type = "Wheels.EngineNotSupported";
-			local.message = "#application.$wheels.serverName# #application.$wheels.serverVersion# is not supported by CFWheels.";
+			local.message = "#application.$wheels.serverName# #application.$wheels.serverVersion# is not supported by Wheels.";
 			if (IsBoolean(local.upgradeTo)) {
 				Throw(type = local.type, message = local.message, extendedInfo = "Please use Lucee or Adobe ColdFusion instead.");
 			} else {
@@ -961,7 +961,7 @@ component {
 		// Needs to be before $loadRoutes and after $loadPlugins.
 		application.$wheels.mapper = application.wo.$createObjectFromRoot(path = "wheels", fileName = "Mapper", method = "$init");
 
-		// Load developer routes and adds the default CFWheels routes (unless the developer has specified not to).
+		// Load developer routes and adds the default Wheels routes (unless the developer has specified not to).
 		application.wo.$loadRoutes();
 
 		// Create the dispatcher that will handle all incoming requests.

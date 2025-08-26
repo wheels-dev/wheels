@@ -6,7 +6,7 @@ Static simple version of the header/navigation for output on error screens
 <!DOCTYPE html>
 <html>
 <head>
-	<title>CFWheels</title>
+	<title>Wheels</title>
 	<meta charset="utf-8">
 	<meta name="robots" content="noindex,nofollow">
 	<style>

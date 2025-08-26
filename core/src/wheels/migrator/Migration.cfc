@@ -5,7 +5,7 @@ component extends="Base" {
 		if (dbType == '') {
 			Throw(
 				type = "wheels.model.migrate.DatabaseNotSupported",
-				message = "#dbType# is not supported by CFWheels.",
+				message = "#dbType# is not supported by Wheels.",
 				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL or H2."
 			);
 		} else {

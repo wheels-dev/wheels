@@ -319,7 +319,7 @@ component {
 
 	/**
 	 * Runs the validation on the object and returns `true` if it passes it.
-	 * CFWheels will run the validation process automatically whenever an object is saved to the database, but sometimes it's useful to be able to run this method to see if the object is valid without saving it to the database.
+	 * Wheels will run the validation process automatically whenever an object is saved to the database, but sometimes it's useful to be able to run this method to see if the object is valid without saving it to the database.
 	 *
 	 * [section: Model Object]
 	 * [category: Error Functions ]

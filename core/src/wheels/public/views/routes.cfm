@@ -36,7 +36,7 @@ for (r in application.wheels.routes){
 		<div class="header">
 			Note
 		</div>
-		These are here for reference only. They aren't loaded in production, and only used to render the CFWheels internal interface
+		These are here for reference only. They aren't loaded in production, and only used to render the Wheels internal interface
 	</div>
 
 <cfelse>

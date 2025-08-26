@@ -3,7 +3,7 @@
 		Use this file to configure your application.
 		You can also use the environment specific files (e.g. app/config/production/settings.cfm) to override settings set here.
 		Don't forget to issue a reload request (e.g. reload=true) after making changes.
-		See https://wheels.dev/3.0.0/guides/working-with-cfwheels/configuration-and-defaults for more info.	*/
+		See https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults for more info.	*/
 
 	/*
 		You can change the "wheels.dev" value from the two functions below to set your datasource.
@@ -16,7 +16,7 @@
 	// set(dataSourcePassword="");
 
 	/*
-		If you comment out the following line, CFWheels will try to determine the URL rewrite capabilities automatically.
+		If you comment out the following line, Wheels will try to determine the URL rewrite capabilities automatically.
 		The "URLRewriting" setting can bet set to "on", "partial" or "off".
 		To run with "partial" rewriting, the "cgi.path_info" variable needs to be supported by the web server.
 		To run with rewriting set to "on", you need to apply the necessary rewrite rules on the web server first.

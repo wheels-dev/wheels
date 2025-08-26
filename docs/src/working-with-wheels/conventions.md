@@ -82,7 +82,7 @@ By default, the names of Wheels models, model properties, database tables, and d
 
 By default, the datasource is set to `wheels-dev` in the `/config/settings.cfm` file. You can change the value in the `set(dataSourceName="wheels-dev")` function to whatever you want the name of the datasource to be.
 
-Refer to the [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-cfwheels/configuration-and-defaults) chapter for instructions on overriding data source information.
+Refer to the [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults) chapter for instructions on overriding data source information.
 
 ### Plural Database Table Names, Singular Model Names
 
@@ -108,4 +108,4 @@ For information on overriding column and property names, refer to documentation 
 
 There are many default values and settings that you can tweak in Wheels when you need to. Some of them are conventions and others are just configurations available for you to change. You can even change argument defaults for built-in Wheels functions to keep your code DRYer.
 
-For more details on what you can configure, read the [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-cfwheels/configuration-and-defaults) chapter.
+For more details on what you can configure, read the [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults) chapter.

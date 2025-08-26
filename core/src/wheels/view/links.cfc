@@ -12,13 +12,13 @@ component {
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.
-	 * @params Any additional parameters to be set in the query string (example: wheels=cool&x=y). Please note that CFWheels uses the & and = characters to split the parameters and encode them properly for you. However, if you need to pass in & or = as part of the value, then you need to encode them (and only them), example: a=cats%26dogs%3Dtrouble!&b=1.
+	 * @params Any additional parameters to be set in the query string (example: wheels=cool&x=y). Please note that Wheels uses the & and = characters to split the parameters and encode them properly for you. However, if you need to pass in & or = as part of the value, then you need to encode them (and only them), example: a=cats%26dogs%3Dtrouble!&b=1.
 	 * @anchor Sets an anchor name to be appended to the path.
 	 * @onlyPath If true, returns only the relative URL (no protocol, host name or port).
 	 * @host Set this to override the current host.
 	 * @protocol Set this to override the current protocol.
 	 * @port Set this to override the current port number.
-	 * @href Pass a link to an external site here if you want to bypass the CFWheels routing system altogether and link to an external URL.
+	 * @href Pass a link to an external site here if you want to bypass the Wheels routing system altogether and link to an external URL.
 	 * @encode [see:styleSheetLinkTag].
 	 */
 	public string function linkTo(

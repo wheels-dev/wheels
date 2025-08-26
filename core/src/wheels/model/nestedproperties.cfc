@@ -7,7 +7,7 @@ component {
 	 *
 	 * @association The association (or list of associations) you want to allow to be set through the params. This argument is also aliased as `associations`.
 	 * @autoSave Whether to save the association(s) when the parent object is saved.
-	 * @allowDelete Set this to `true` to tell CFWheels to look for the property `_delete` in your model. If present and set to a value that evaluates to true, the model will be deleted when saving the parent.
+	 * @allowDelete Set this to `true` to tell Wheels to look for the property `_delete` in your model. If present and set to a value that evaluates to true, the model will be deleted when saving the parent.
 	 * @sortProperty Set this to a property on the object that you would like to sort by. The property should be numeric, should start with 1, and should be consecutive. Only valid with `hasMany` associations.
 	 * @rejectIfBlank A list of properties that should not be blank. If any of the properties are blank, any CRUD operations will be rejected.
 	 */

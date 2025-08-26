@@ -182,7 +182,7 @@
 					<strong>Framework:</strong>
 				</td>
 				<td>
-					<a href="https://cfwheels.org/" target="_blank">CFWheels</a>
+					<a href="https://wheels.dev/" target="_blank">Wheels</a>
 					#$get("version")#
 				</td>
 			</tr>

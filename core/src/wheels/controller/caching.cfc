@@ -1,13 +1,13 @@
 component {
 	/**
-	 * Tells CFWheels to cache one or more actions.
+	 * Tells Wheels to cache one or more actions.
 	 *
 	 * [section: Controller]
 	 * [category: Configuration Functions]
 	 *
 	 * @action Action(s) to cache. This argument is also aliased as `actions`.
 	 * @time Minutes to cache the action(s) for.
-	 * @static Set to `true` to tell CFWheels that this is a static page and that it can skip running the controller filters (before and after filters set on actions). Please note that the `onSessionStart` and `onRequestStart` events still execute though.
+	 * @static Set to `true` to tell Wheels that this is a static page and that it can skip running the controller filters (before and after filters set on actions). Please note that the `onSessionStart` and `onRequestStart` events still execute though.
 	 * @appendToKey List of variables to be evaluated at runtime and included in the cache key so that content can be cached separately.
 	 */
 	public void function caches(string action = "", numeric time, boolean static, string appendToKey = "") {

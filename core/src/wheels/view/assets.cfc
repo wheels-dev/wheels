@@ -211,20 +211,20 @@ component {
 				if (local.localFile && !FileExists(local.file)) {
 					Throw(
 						type = "Wheels.ImageFileNotFound",
-						message = "CFWheels could not find `#local.file#` on the local file system.",
+						message = "Wheels could not find `#local.file#` on the local file system.",
 						extendedInfo = "Pass in a correct relative path from the `images` folder to an image."
 					);
 				} else if (!IsImageFile(local.file)) {
 					if (structKeyExists(server, "boxlang")) {
 						Throw(
 							type = "Wheels.ImageFormatNotSupported",
-							message = "CFWheels can't read image files with that format.",
+							message = "Wheels can't read image files with that format.",
 							extendedInfo = "Use one of these image types instead: #ArrayToList(GetReadableImageFormats(), ', ')#."
 						);
 					} else {
 						Throw(
 							type = "Wheels.ImageFormatNotSupported",
-							message = "CFWheels can't read image files with that format.",
+							message = "Wheels can't read image files with that format.",
 							extendedInfo = "Use one of these image types instead: #GetReadableImageFormats()#."
 						);
 					}	

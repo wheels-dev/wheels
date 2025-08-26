@@ -34,18 +34,17 @@ your-app/
 ├── config/
 ├── public/
 ├── tests/
-│   └── Testbox/
-│       ├── specs/
-│       │   ├── controllers/
-│       │   │   ├── ExampleControllerSpec.cfc
-│       │   │   ├── PostControllerSpec.cfc
-│       │   │   └── [Other Controller Tests]
-│       │   └── functions/
-│       │       └── ExampleSpec.cfc
-│       ├── _assets/
-│       ├── populate.cfm
-│       ├── routes.cfm
-│       └── runner.cfm
+│   ├── _assets/
+│   ├── specs/
+│   │   ├── controllers/
+│   │   │   ├── ExampleControllerSpec.cfc
+│   │   │   ├── PostControllerSpec.cfc
+│   │   │   └── [Other Controller Tests]
+│   │   └── functions/
+│   │       └── ExampleSpec.cfc
+│   ├── populate.cfm
+│   ├── routes.cfm
+│   └── runner.cfm
 ```
 
 **Note**: By default, TestBox runs tests located in the `tests/specs/` directory, unless configured otherwise.
