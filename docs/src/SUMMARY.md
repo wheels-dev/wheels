@@ -56,10 +56,16 @@
   * Environment Management
     * [wheels env setup](command-line-tools/commands/environment/env-setup.md)
     * [wheels env list](command-line-tools/commands/environment/env-list.md)
+    * [wheels env merge](command-line-tools/commands/environment/env-merge.md)
+    * [wheels env set](command-line-tools/commands/environment/env-set.md)
   * Code Analysis
     * [wheels analyze code](command-line-tools/commands/analysis/analyze-code.md)
     * [wheels analyze performance](command-line-tools/commands/analysis/analyze-performance.md)
     * [wheels analyze security](command-line-tools/commands/analysis/analyze-security.md)
+  * Config
+    * [wheels config check](command-line-tools/commands/config/config-check.md)
+    * [wheels config diff](command-line-tools/commands/config/config-diff.md)
+    * [wheels config dump](command-line-tools/commands/config/config-dump.md)
   * CI/CD Commands
     * [wheels ci init](command-line-tools/commands/ci/ci-init.md)
   * Docker Commands

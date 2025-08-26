@@ -5,38 +5,36 @@
  * {code:bash}
  * wheels env merge .env.defaults .env.local --output=.env
  * wheels env merge .env .env.production --output=.env.merged
- * wheels env merge base.env override.env --dry-run
+ * wheels env merge base.env override.env --dryRun
  * {code}
  */
 component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
 	/**
-	 * @source.hint Source .env files to merge (in order of precedence)
-	 * @output.hint Output file name (defaults to .env.merged)
-	 * @dry-run.hint Show what would be merged without writing
+	 * @source1.hint First source .env file to merge
+	 * @source2.hint Second source .env file to merge
+	 * @output.hint Output file name
+	 * @dryRun.hint Show what would be merged without writing
 	 **/
 	function run(
 		required string source1,
 		required string source2,
-		string output = ".env.merged",
+		string output = ".env.merge",
 		boolean dryRun = false
 	) {
-
-		// Collect all source files from arguments
+		// Reconstruct arguments to handle -- prefixed options
+		arguments = reconstructArgs(arguments);
 		local.sourceFiles = [arguments.source1, arguments.source2];
 		
-		
-		// Check for additional positional arguments
-		local.i = 2;
-		while (StructKeyExists(arguments, local.i)) {
-			if (!Find("--", arguments[local.i])) {
-				ArrayAppend(local.sourceFiles, arguments[local.i]);
-			}
+		// Check for additional positional arguments (source3, source4, etc.)
+		local.i = 3;
+		while (StructKeyExists(arguments, "source" & local.i)) {
+			ArrayAppend(local.sourceFiles, arguments["source" & local.i]);
 			local.i++;
 		}
 
 		if (ArrayLen(local.sourceFiles) < 2) {
-			error("At least two source files are required. Usage: wheels env merge file1 file2");
+			error("At least two source files are required. Usage: wheels env merge file1 file2 [--output=filename] [--dryRun]");
 		}
 
 		// Validate all source files exist
@@ -98,9 +96,14 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 				local.lines = ListToArray(local.content, Chr(10));
 				for (local.line in local.lines) {
 					local.trimmedLine = Trim(local.line);
+					// Skip empty lines and comments
 					if (Len(local.trimmedLine) && Left(local.trimmedLine, 1) != "##" && Find("=", local.trimmedLine)) {
 						local.key = Trim(ListFirst(local.trimmedLine, "="));
 						local.value = Trim(ListRest(local.trimmedLine, "="));
+						// Handle values that might contain = signs
+						if (local.value == "") {
+							local.value = ListRest(local.line, "=");
+						}
 						local.fileVars[local.key] = local.value;
 					}
 				}
@@ -154,9 +157,17 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			}
 		}
 
-		// Display grouped variables
-		for (local.prefix in local.grouped) {
+		// Sort and display grouped variables
+		local.prefixes = StructKeyArray(local.grouped);
+		ArraySort(local.prefixes, "textnocase");
+		
+		for (local.prefix in local.prefixes) {
 			print.boldLine("#local.prefix# Variables:");
+			// Sort variables within group
+			ArraySort(local.grouped[local.prefix], function(a, b) {
+				return CompareNoCase(a.key, b.key);
+			});
+			
 			for (local.var in local.grouped[local.prefix]) {
 				local.displayValue = local.var.value;
 				// Mask sensitive values
@@ -172,6 +183,11 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Display ungrouped variables
 		if (ArrayLen(local.ungrouped)) {
 			print.boldLine("Other Variables:");
+			// Sort ungrouped variables
+			ArraySort(local.ungrouped, function(a, b) {
+				return CompareNoCase(a.key, b.key);
+			});
+			
 			for (local.var in local.ungrouped) {
 				local.displayValue = local.var.value;
 				// Mask sensitive values

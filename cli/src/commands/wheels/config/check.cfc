@@ -21,12 +21,15 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		boolean verbose = false,
 		boolean fix = false
 	) {
-
+		arguments = reconstructArgs(arguments);
 		// Determine environment
 		local.env = Len(arguments.environment) ? arguments.environment : getEnvironment();
 		
 		print.line();
-		print.boldLine("Checking configuration for environment: #local.env#");
+		print.boldBlueLine("========================================");
+		print.boldLine("Configuration Validation");
+		print.boldLine("Environment: #local.env#");
+		print.boldBlueLine("========================================");
 		print.line();
 
 		local.issues = [];
@@ -34,16 +37,20 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		local.fixed = [];
 
 		// Check settings files exist
+		print.text("Checking configuration files... ");
 		local.configPath = ResolvePath("config");
 		local.settingsFile = local.configPath & "/settings.cfm";
 		local.envSettingsFile = local.configPath & "/" & local.env & "/settings.cfm";
 
 		if (!FileExists(local.settingsFile)) {
+			print.redLine("[FAILED]");
 			ArrayAppend(local.issues, {
 				type: "error",
 				message: "Missing config/settings.cfm file",
 				fix: "Create a settings.cfm file in the config directory"
 			});
+		} else {
+			print.greenLine("[OK]");
 		}
 
 		// Load configuration
@@ -53,20 +60,85 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		}
 
 		// Check for required settings
+		print.text("Checking required settings... ");
+		local.startCount = ArrayLen(local.issues);
 		checkRequiredSettings(local.config, local.issues, local.warnings);
+		if (ArrayLen(local.issues) > local.startCount) {
+			print.redLine("[FAILED]");
+		} else {
+			print.greenLine("[OK]");
+		}
 
 		// Check for security issues
+		print.text("Checking security configuration... ");
+		local.startCount = ArrayLen(local.issues);
+		local.startWarnings = ArrayLen(local.warnings);
 		checkSecuritySettings(local.config, local.issues, local.warnings, local.env);
+		if (ArrayLen(local.issues) > local.startCount) {
+			print.redLine("[FAILED]");
+		} else if (ArrayLen(local.warnings) > local.startWarnings) {
+			print.yellowLine("[WARNING]");
+		} else {
+			print.greenLine("[OK]");
+		}
 
 		// Check database configuration
+		print.text("Checking database configuration... ");
+		local.startCount = ArrayLen(local.issues);
+		local.startWarnings = ArrayLen(local.warnings);
 		checkDatabaseSettings(local.config, local.issues, local.warnings);
+		if (ArrayLen(local.issues) > local.startCount) {
+			print.redLine("[FAILED]");
+		} else if (ArrayLen(local.warnings) > local.startWarnings) {
+			print.yellowLine("[WARNING]");
+		} else {
+			print.greenLine("[OK]");
+		}
 
 		// Check environment configuration
+		print.text("Checking environment-specific settings... ");
+		local.startWarnings = ArrayLen(local.warnings);
 		checkEnvironmentSettings(local.config, local.issues, local.warnings, local.env);
+		if (ArrayLen(local.warnings) > local.startWarnings) {
+			print.yellowLine("[WARNING]");
+		} else {
+			print.greenLine("[OK]");
+		}
 
 		// Check .env file
+		print.text("Checking .env file configuration... ");
+		local.startCount = ArrayLen(local.issues);
+		local.startWarnings = ArrayLen(local.warnings);
+		local.startFixed = ArrayLen(local.fixed);
 		checkEnvFile(local.issues, local.warnings, arguments.fix, local.fixed);
+		if (ArrayLen(local.fixed) > local.startFixed) {
+			print.blueLine("[FIXED]");
+		} else if (ArrayLen(local.issues) > local.startCount) {
+			print.redLine("[FAILED]");
+		} else if (ArrayLen(local.warnings) > local.startWarnings) {
+			print.yellowLine("[WARNING]");
+		} else {
+			print.greenLine("[OK]");
+		}
 
+		// Additional checks for production environment
+		if (local.env == "production") {
+			print.text("Checking production-specific requirements... ");
+			local.startCount = ArrayLen(local.issues);
+			local.startWarnings = ArrayLen(local.warnings);
+			checkProductionSettings(local.config, local.issues, local.warnings);
+			if (ArrayLen(local.issues) > local.startCount) {
+				print.redLine("[FAILED]");
+			} else if (ArrayLen(local.warnings) > local.startWarnings) {
+				print.yellowLine("[WARNING]");
+			} else {
+				print.greenLine("[OK]");
+			}
+		}
+
+		print.line();
+		print.boldBlueLine("========================================");
+		
 		// Display results
 		displayResults(local.issues, local.warnings, local.fixed, arguments.verbose);
 
@@ -86,7 +158,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			ArrayAppend(arguments.issues, {
 				type: "error",
 				message: "No datasource configured",
-				fix: "Add set(dataSourceName = 'your_datasource') to templates/base/src/config/settings.cfm"
+				fix: "Add set(dataSourceName = 'your_datasource') to config/settings.cfm"
 			});
 		}
 	}
@@ -160,8 +232,8 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		if (StructKeyExists(arguments.config, "dataSourceName") && Len(arguments.config.dataSourceName)) {
 			try {
 				// Try to get datasource info
-				local.datasources = getApplicationSettings().datasources;
-				if (!StructKeyExists(local.datasources, arguments.config.dataSourceName)) {
+				local.datasources = getDatasourceInfo(arguments.config.dataSourceName);
+				if (!len(local.datasources.datasource)) {
 					ArrayAppend(arguments.issues, {
 						type: "error",
 						message: "Datasource '#arguments.config.dataSourceName#' not found",
@@ -215,6 +287,39 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					});
 				}
 			}
+		}
+	}
+
+	private void function checkProductionSettings(
+		required struct config,
+		required array issues,
+		required array warnings
+	) {
+		// Check SSL/HTTPS settings
+		if (!StructKeyExists(arguments.config, "forceSSL") || !arguments.config.forceSSL) {
+			ArrayAppend(arguments.warnings, {
+				type: "warning",
+				message: "SSL not enforced in production",
+				fix: "Set forceSSL = true in config/production/settings.cfm"
+			});
+		}
+
+		// Check session timeout
+		if (StructKeyExists(arguments.config, "sessionTimeout") && arguments.config.sessionTimeout > 30) {
+			ArrayAppend(arguments.warnings, {
+				type: "warning", 
+				message: "Long session timeout in production (#arguments.config.sessionTimeout# minutes)",
+				fix: "Consider reducing sessionTimeout for security"
+			});
+		}
+
+		// Check error handling
+		if (!StructKeyExists(arguments.config, "showErrorInformation") || arguments.config.showErrorInformation) {
+			ArrayAppend(arguments.issues, {
+				type: "error",
+				message: "Detailed error information exposed in production",
+				fix: "Set showErrorInformation = false in config/production/settings.cfm"
+			});
 		}
 	}
 
@@ -308,22 +413,24 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		required array fixed,
 		required boolean verbose
 	) {
+		print.line();
+		
 		// Display fixed items
 		if (ArrayLen(arguments.fixed)) {
-			print.boldGreenLine("Fixed:");
+			print.boldGreenLine("[FIXED] Issues:");
 			for (local.fix in arguments.fixed) {
-				print.greenLine("  ✓ #local.fix#");
+				print.greenLine("   - #local.fix#");
 			}
 			print.line();
 		}
 
 		// Display errors
 		if (ArrayLen(arguments.issues)) {
-			print.boldRedLine("Errors:");
+			print.boldRedLine("[ERRORS] (#ArrayLen(arguments.issues)#):");
 			for (local.issue in arguments.issues) {
-				print.redLine("  ✗ #local.issue.message#");
+				print.redLine("   - #local.issue.message#");
 				if (arguments.verbose) {
-					print.yellowLine("    Fix: #local.issue.fix#");
+					print.yellowLine("     --> Fix: #local.issue.fix#");
 				}
 			}
 			print.line();
@@ -331,22 +438,24 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
 		// Display warnings
 		if (ArrayLen(arguments.warnings)) {
-			print.boldYellowLine("Warnings:");
+			print.boldYellowLine("[WARNINGS] (#ArrayLen(arguments.warnings)#):");
 			for (local.warning in arguments.warnings) {
-				print.yellowLine("  ⚠ #local.warning.message#");
+				print.yellowLine("   - #local.warning.message#");
 				if (arguments.verbose) {
-					print.line("    Fix: #local.warning.fix#");
+					print.line("     --> Fix: #local.warning.fix#");
 				}
 			}
 			print.line();
 		}
 
 		// Summary
+		print.boldBlueLine("========================================");
 		local.errorCount = ArrayLen(arguments.issues);
 		local.warningCount = ArrayLen(arguments.warnings);
 		
 		if (local.errorCount == 0 && local.warningCount == 0) {
-			print.greenLine("✓ Configuration validation passed!");
+			print.boldGreenLine("[PASSED] Configuration validation successful!");
+			print.greenLine("  All checks completed successfully.");
 		} else {
 			local.summary = [];
 			if (local.errorCount > 0) {
@@ -355,13 +464,20 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			if (local.warningCount > 0) {
 				ArrayAppend(local.summary, "#local.warningCount# warning#local.warningCount != 1 ? 's' : ''#");
 			}
-			print.line("Configuration check complete: #ArrayToList(local.summary, ', ')#");
+			
+			if (local.errorCount > 0) {
+				print.boldRedLine("[FAILED] Configuration check failed");
+			} else {
+				print.boldYellowLine("[WARNING] Configuration check completed with warnings");
+			}
+			print.line("  Found: #ArrayToList(local.summary, ', ')#");
 			
 			if (!arguments.verbose && (local.errorCount > 0 || local.warningCount > 0)) {
 				print.line();
-				print.line("Run with --verbose flag for detailed fix suggestions");
+				print.line("  Tip: Run with --verbose flag for detailed fix suggestions");
 			}
 		}
+		print.boldBlueLine("========================================");
 	}
 
 	private struct function loadConfiguration(required string settingsFile, string envSettingsFile = "") {
@@ -451,47 +567,54 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 	}
 
 	private string function getEnvironment() {
-		// Try to detect from various sources
-		local.env = "";
+		// Same logic as get environment command
+		local.environment = "";
 		
-		// Check .env file
+		// Check .env file for WHEELS_ENV first, then Environment
 		local.envFile = ResolvePath(".env");
 		if (FileExists(local.envFile)) {
-			local.content = FileRead(local.envFile);
-			if (IsJSON(local.content)) {
-				local.envVars = DeserializeJSON(local.content);
-				if (StructKeyExists(local.envVars, "WHEELS_ENV")) {
-					local.env = local.envVars.WHEELS_ENV;
-				}
-			} else {
-				// Parse as properties file
-				local.lines = ListToArray(local.content, Chr(10));
-				for (local.line in local.lines) {
-					local.line = Trim(local.line);
-					if (Len(local.line) && Left(local.line, 1) != "##") {
-						if (Find("=", local.line) && FindNoCase("WHEELS_ENV", local.line)) {
-							local.env = Trim(ListRest(local.line, "="));
-							break;
-						}
-					}
+			local.envContent = FileRead(local.envFile);
+			
+			// First check for WHEELS_ENV
+			local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*([^\s##]+)", local.envContent, 1, true);
+			if (local.envMatch.pos[1] > 0) {
+				local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
+			}
+			
+			// If not found, check for Environment
+			if (!Len(local.environment)) {
+				local.envMatch = REFind("(?m)^Environment\s*=\s*([^\s##]+)", local.envContent, 1, true);
+				if (local.envMatch.pos[1] > 0) {
+					local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
 				}
 			}
 		}
-
-		// Check system environment
-		if (!Len(local.env)) {
-			local.env = CreateObject("java", "java.lang.System").getenv("WHEELS_ENV");
-			if (IsNull(local.env)) {
-				local.env = "";
+		
+		// Check system environment variables for WHEELS_ENV first, then Environment
+		if (!Len(local.environment)) {
+			local.sysEnv = CreateObject("java", "java.lang.System");
+			
+			// First check for WHEELS_ENV
+			local.wheelsEnv = local.sysEnv.getenv("WHEELS_ENV");
+			if (!IsNull(local.wheelsEnv) && Len(local.wheelsEnv)) {
+				local.environment = local.wheelsEnv;
+			}
+			
+			// If not found, check for Environment
+			if (!Len(local.environment)) {
+				local.env = local.sysEnv.getenv("Environment");
+				if (!IsNull(local.env) && Len(local.env)) {
+					local.environment = local.env;
+				}
 			}
 		}
-
+		
 		// Default to development
-		if (!Len(local.env)) {
-			local.env = "development";
+		if (!Len(local.environment)) {
+			local.environment = "development";
 		}
-
-		return local.env;
+		
+		return local.environment;
 	}
 
 }
