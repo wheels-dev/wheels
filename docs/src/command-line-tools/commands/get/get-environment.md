@@ -9,6 +9,11 @@ The `wheels get environment` command displays the current environment setting fo
 ```bash
 wheels get environment
 ```
+## Alias
+
+```bash
+wheels get env
+```
 
 ## Parameters
 
@@ -26,7 +31,7 @@ This will output something like:
 Current Environment:
 development
 
-Configured in: .env file
+Configured in: .env file (WHEELS_ENV)
 ```
 
 ## How It Works
@@ -35,75 +40,92 @@ Configured in: .env file
 
 The command checks for environment configuration in the following order of precedence:
 
-1. **`.env` file** - Looks for `WHEELS_ENV` variable in your `.env` file
-2. **System environment variable** - Checks the `WHEELS_ENV` system environment variable
-3. **`server.json`** - Looks for `env.WHEELS_ENV` in your CommandBox `server.json` file
-4. **Default** - Falls back to `development` if no configuration is found
+1. **`.env` file** - Looks for `WHEELS_ENV` variable first, then `Environment` variable
+2. **System environment variable** - Checks for `WHEELS_ENV` first, then `Environment` system variable
+3. **Default** - Falls back to `development` if no configuration is found
 
-The first valid configuration found is used and reported.
+The first valid configuration found is used and reported, along with which specific variable name was found.
 
 ### Configuration Sources
 
 #### 1. .env File
-The command looks for a `WHEELS_ENV` variable in your application's `.env` file:
+The command first looks for a `WHEELS_ENV` variable in your application's `.env` file:
 ```bash
-# .env file
+# .env file - Primary variable
 WHEELS_ENV=production
 DATABASE_HOST=localhost
 ```
 
+If `WHEELS_ENV` is not found, it then checks for `Environment`:
+```bash
+# .env file - Alternative variable
+Environment=staging
+DATABASE_HOST=localhost
+```
+
 The regex pattern used ensures it correctly reads the value while ignoring:
-- Comments after the value
+- Comments after the value (anything after `#`)
 - Trailing whitespace
 - Lines that are commented out
 
 #### 2. System Environment Variable
-If not found in `.env`, it checks for a system-level environment variable:
+If not found in `.env`, it checks for system-level environment variables in the same order:
 ```bash
-# Linux/Mac
+# Linux/Mac - Primary variable
 export WHEELS_ENV=staging
 
-# Windows
+# Windows - Primary variable
 set WHEELS_ENV=staging
+
+# Or using the alternative variable
+export Environment=production
 ```
 
-#### 3. server.json Configuration
-For CommandBox deployments, it checks the `server.json` file:
-```json
-{
-  "env": {
-    "WHEELS_ENV": "production"
-  }
-}
-```
-
-#### 4. Default Value
+#### 3. Default Value
 If no configuration is found anywhere, it defaults to `development`.
+
+## Variable Priority
+
+The command checks for two different variable names in this specific order:
+
+1. `WHEELS_ENV` in `.env` file
+2. `Environment` in `.env` file
+3. `WHEELS_ENV` system environment variable
+4. `Environment` system environment variable
+5. Default to `development`
 
 ## Output Examples
 
-### Configured in .env File
+### Configured with WHEELS_ENV in .env
 ```
 Current Environment:
 production
 
-Configured in: .env file
+Configured in: .env file (WHEELS_ENV)
 ```
 
-### Configured via System Variable
+### Configured with Environment in .env
 ```
 Current Environment:
 staging
 
-Configured in: System environment variable
+Configured in: .env file (Environment)
 ```
 
-### Configured in server.json
+### Configured via System Variable (WHEELS_ENV)
+```
+Current Environment:
+staging
+
+Configured in: System environment variable (WHEELS_ENV)
+```
+
+### Configured via System Variable (Environment)
 ```
 Current Environment:
 production
 
-Configured in: server.json
+Configured in: System environment variable (Environment)
 ```
 
 ### Using Default
@@ -111,7 +133,7 @@ Configured in: server.json
 Current Environment:
 development
 
-Using default: development
+Configured in: Using default
 ```
 
 ## Common Use Cases
@@ -125,13 +147,13 @@ commandbox server start
 
 ### Troubleshooting Configuration Issues
 ```bash
-# Verify which configuration source is being used
+# Verify which configuration source and variable is being used
 wheels get environment
 
-# If unexpected, check each source in order
-cat .env | grep WHEELS_ENV
+# Check each source manually
+cat .env | grep -E "WHEELS_ENV|Environment"
 echo $WHEELS_ENV
-cat server.json | grep WHEELS_ENV
+echo $Environment
 ```
 
 ### CI/CD Pipeline Verification
@@ -141,6 +163,15 @@ wheels get environment
 if [ $? -eq 0 ]; then
     echo "Environment configured successfully"
 fi
+```
+
+### Supporting Legacy Systems
+```bash
+# If migrating from a system that uses "Environment" variable
+# Both will work without changes:
+# Old: Environment=production
+# New: WHEELS_ENV=production
+wheels get environment
 ```
 
 ## Error Handling
@@ -162,31 +193,57 @@ Error reading environment: [specific error message]
 
 ## Best Practices
 
-1. **Consistent Configuration** - Use one primary method for setting environment across your team
+1. **Use WHEELS_ENV** - Prefer `WHEELS_ENV` over `Environment` for clarity and consistency
 
-2. **Environment-Specific Files** - Consider using `.env.production`, `.env.development` files with the merge command
+2. **Consistent Configuration** - Use one primary method for setting environment across your team
 
-3. **Don't Commit Production Settings** - Keep production `.env` files out of version control
+3. **Environment-Specific Files** - Consider using `.env.production`, `.env.development` files with the merge command
 
-4. **Document Your Setup** - Document which configuration method your team uses in your README
+4. **Don't Commit Production Settings** - Keep production `.env` files out of version control
 
-5. **Verify Before Deployment** - Always run this command to verify environment before deploying
+5. **Document Your Setup** - Document which configuration method and variable name your team uses
+
+6. **Verify Before Deployment** - Always run this command to verify environment before deploying
 
 ## Environment Precedence
 
 Understanding precedence is important when multiple configurations exist:
 
 ```
-.env file (highest priority)
+.env file - WHEELS_ENV (highest priority)
     ↓
-System environment variable
+.env file - Environment
     ↓
-server.json
+System variable - WHEELS_ENV
+    ↓
+System variable - Environment
     ↓
 Default: development (lowest priority)
 ```
 
-If `WHEELS_ENV` is set in both `.env` and as a system variable, the `.env` value takes precedence.
+If both `WHEELS_ENV` and `Environment` are set in `.env`, only `WHEELS_ENV` will be used.
+
+## Migration Guide
+
+If you're migrating from a system that uses different environment variable names:
+
+### From "Environment" to "WHEELS_ENV"
+```bash
+# Old configuration
+Environment=production
+
+# New configuration (both work)
+WHEELS_ENV=production
+
+# The command will detect either one
+wheels get environment
+```
+
+### Gradual Migration
+You can migrate gradually since the command checks both:
+1. Leave existing `Environment` variables in place
+2. Start using `WHEELS_ENV` for new deployments
+3. The command will prefer `WHEELS_ENV` when both exist
 
 ## Integration with Other Commands
 
@@ -209,29 +266,37 @@ commandbox server start
 ## Tips
 
 - The command must be run from your Wheels application root directory
-- The environment value is case-sensitive (`development` ≠ `Development`)
-- Comments in `.env` files are properly ignored
+- Environment values are case-sensitive (`development` ≠ `Development`)
+- Comments in `.env` files are properly ignored using `#`
 - Whitespace around values is automatically trimmed
-- The command provides clear feedback about where the configuration is coming from
+- The command clearly shows which variable name was found
+- `WHEELS_ENV` takes precedence over `Environment` when both exist
 
 ## Troubleshooting
 
 ### Environment Not Changing
-If changing `WHEELS_ENV` doesn't seem to work:
-1. Run `wheels get environment` to see which source is being used
+If changing environment variables doesn't seem to work:
+1. Run `wheels get environment` to see which source and variable is being used
 2. Remember `.env` file takes precedence over system variables
-3. Restart your CommandBox server after changes
-4. Check for typos in the variable name (`WHEELS_ENV` not `WHEEL_ENV`)
+3. Remember `WHEELS_ENV` takes precedence over `Environment`
+4. Restart your CommandBox server after changes
+5. Check for typos in variable names
+
+### Variable Priority Issues
+If the wrong environment is being detected:
+- Check if both `WHEELS_ENV` and `Environment` are set
+- Remember `WHEELS_ENV` has higher priority
+- Use the output to see exactly which variable is being read
 
 ### Permission Errors
 If you get permission errors:
-- Ensure you have read access to `.env` and `server.json` files
+- Ensure you have read access to `.env` files
 - Check that you're in the correct directory
 - Verify file ownership and permissions
 
 ### Unexpected Default
 If you're getting the default `development` when you expect a different value:
-- Check for typos in configuration files
+- Check for typos in configuration files (it's `WHEELS_ENV` not `WHEEL_ENV`)
 - Ensure `.env` file is in the application root
 - Verify system environment variables are properly exported
-- Check that `server.json` has the correct structure
+- Check that values don't have quotes unless intended
