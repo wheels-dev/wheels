@@ -87,7 +87,7 @@
 			"connectionLimit": "-1",
 			"connectionTimeout": "20",
 			"dbdriver": "Other",
-			"dsn": "jdbc:oracle:thin:@//localhost:1522/wheelstestdb",
+			"dsn": "jdbc:oracle:thin:@//oracle:1521/wheelstestdb",
 			"password": "wheelstestdb",
 			"username": "wheelstestdb",
 			"validate": "false"
