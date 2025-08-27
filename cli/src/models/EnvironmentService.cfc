@@ -217,30 +217,147 @@ component {
      */
     function switch(required string environment, required string rootPath) {
         var projectRoot = arguments.rootPath;
-        var envFile = "#projectRoot#.env.#arguments.environment#";
-
+        var envFile = "#projectRoot#/.env";
+        var envBackupFile = "#projectRoot#/.env.backup-#dateTimeFormat(now(), 'yyyymmdd-HHmmss')#";
+        
+        // Check if .env file exists
         if (!fileExists(envFile)) {
+            // Create new .env file with wheels_env variable
+            fileWrite(envFile, "wheels_env=#arguments.environment#");
             return {
-                success: false,
-                error: "Environment '#arguments.environment#' not found"
+                success: true,
+                message: "Created new .env file and set environment to '#arguments.environment#'",
+                database: "",
+                debug: false,
+                cache: "unknown"
             };
         }
-
-        // Copy environment file to .env
-        fileCopy(envFile, "#projectRoot#.env");
-
-        // Update server.json default environment
-        var serverJsonPath = "#projectRoot#server.json";
-        if (fileExists(serverJsonPath)) {
-            var serverJson = deserializeJSON(fileRead(serverJsonPath));
-            serverJson.profile = arguments.environment;
-            fileWrite(serverJsonPath, serializeJSON(serverJson, true));
+        
+        // Read current .env file
+        var envContent = fileRead(envFile);
+        var envLines = listToArray(envContent, chr(10));
+        var updatedLines = [];
+        var envVarFound = false;
+        var oldEnvironment = "";
+        
+        // Process each line to find and update environment variable
+        for (var line in envLines) {
+            var trimmedLine = trim(line);
+            
+            // Skip empty lines and comments
+            if (len(trimmedLine) == 0 || left(trimmedLine, 1) == "##") {
+                updatedLines.append(line);
+                continue;
+            }
+            
+            // Check for wheels_env or environment variable
+            if (findNoCase("wheels_env=", trimmedLine) == 1) {
+                oldEnvironment = listLast(trimmedLine, "=");
+                updatedLines.append("wheels_env=#arguments.environment#");
+                envVarFound = true;
+            } else if (!envVarFound && findNoCase("environment=", trimmedLine) == 1) {
+                oldEnvironment = listLast(trimmedLine, "=");
+                // Replace environment with wheels_env
+                updatedLines.append("wheels_env=#arguments.environment#");
+                envVarFound = true;
+            } else {
+                updatedLines.append(line);
+            }
         }
-
+        
+        // If no environment variable was found, add wheels_env
+        if (!envVarFound) {
+            updatedLines.append("wheels_env=#arguments.environment#");
+        }
+        
+        // Write updated content back to .env file
+        try {
+            fileWrite(envFile, arrayToList(updatedLines, chr(10)));
+        } catch (any e) {
+            // Restore backup if write fails
+            if (fileExists(envBackupFile)) {
+                fileCopy(envBackupFile, envFile);
+            }
+            return {
+                success: false,
+                error: "Failed to update .env file: #e.message#"
+            };
+        }
+        
+        // Update server.json if it exists
+        var serverJsonPath = "#projectRoot#/server.json";
+        if (fileExists(serverJsonPath)) {
+            try {
+                var serverJson = deserializeJSON(fileRead(serverJsonPath));
+                serverJson.profile = arguments.environment;
+                fileWrite(serverJsonPath, serializeJSON(serverJson, true));
+            } catch (any e) {
+                // Non-critical error, continue
+            }
+        }
+        
+        // Try to read additional environment-specific file if it exists
+        var specificEnvFile = "#projectRoot#/.env.#arguments.environment#";
+        var additionalConfig = {};
+        if (fileExists(specificEnvFile)) {
+            try {
+                var specificContent = fileRead(specificEnvFile);
+                var specificLines = listToArray(specificContent, chr(10));
+                for (var line in specificLines) {
+                    if (findNoCase("database=", line) == 1) {
+                        additionalConfig.database = listLast(line, "=");
+                    }
+                    if (findNoCase("debug=", line) == 1) {
+                        additionalConfig.debug = listLast(line, "=") == "true";
+                    }
+                    if (findNoCase("cache=", line) == 1) {
+                        additionalConfig.cache = listLast(line, "=");
+                    }
+                }
+            } catch (any e) {
+                // Non-critical, continue
+            }
+        }
+        
         return {
             success: true,
-            message: "Switched to '#arguments.environment#' environment"
+            message: "Successfully switched from '#oldEnvironment#' to '#arguments.environment#'",
+            oldEnvironment: oldEnvironment,
+            newEnvironment: arguments.environment,
+            backupFile: envBackupFile,
+            database: structKeyExists(additionalConfig, "database") ? additionalConfig.database : "default",
+            debug: structKeyExists(additionalConfig, "debug") ? additionalConfig.debug : false,
+            cache: structKeyExists(additionalConfig, "cache") ? additionalConfig.cache : "default"
         };
+    }
+
+    /**
+    * Get current environment from .env file
+    */
+    function getCurrent(required string rootPath) {
+        var envFile = "#arguments.rootPath#/.env";
+        
+        if (!fileExists(envFile)) {
+            return "none";
+        }
+        
+        var envContent = fileRead(envFile);
+        var envLines = listToArray(envContent, chr(10));
+        
+        for (var line in envLines) {
+            var trimmedLine = trim(line);
+            
+            // Check for wheels_env first
+            if (findNoCase("wheels_env=", trimmedLine) == 1) {
+                return trim(listLast(trimmedLine, "="));
+            }
+            // Fallback to environment
+            if (findNoCase("environment=", trimmedLine) == 1) {
+                return trim(listLast(trimmedLine, "="));
+            }
+        }
+        
+        return "none";
     }
 
     /**

@@ -58,6 +58,9 @@
     * [wheels env list](command-line-tools/commands/environment/env-list.md)
     * [wheels env merge](command-line-tools/commands/environment/env-merge.md)
     * [wheels env set](command-line-tools/commands/environment/env-set.md)
+    * [wheels env show](command-line-tools/commands/environment/env-show.md)
+    * [wheels env switch](command-line-tools/commands/environment/env-switch.md)
+    * [wheels env validate](command-line-tools/commands/environment/env-validate.md)
   * Code Analysis
     * [wheels analyze code](command-line-tools/commands/analysis/analyze-code.md)
     * [wheels analyze performance](command-line-tools/commands/analysis/analyze-performance.md)
