@@ -523,7 +523,17 @@ component {
 							|| (
 								StructKeyExists(this, local.thisValidation.args.property)
 								&& (
-									Len(this[local.thisValidation.args.property])
+									(
+										// Handle Oracle TIMESTAMP objects in BoxLang
+										structKeyExists(server, "boxlang") 
+										&& IsObject(this[local.thisValidation.args.property])
+										&& !IsStruct(this[local.thisValidation.args.property])
+										&& ListContains("oracle.sql.TIMESTAMP,oracle.sql.DATE", GetMetadata(this[local.thisValidation.args.property]).getName())
+									)
+									|| (
+										!IsObject(this[local.thisValidation.args.property])
+										&& Len(this[local.thisValidation.args.property])
+									)
 									|| local.thisValidation.method == "$validatesUniquenessOf"
 								)
 							)

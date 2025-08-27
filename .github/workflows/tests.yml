@@ -82,6 +82,8 @@ jobs:
             dbengine: sqlserver
           - cfengine: boxlang
             dbengine: postgres
+          - cfengine: boxlang
+            dbengine: oracle
         exclude:
           - cfengine: adobe2018
             dbengine: h2
@@ -93,8 +95,6 @@ jobs:
             dbengine: h2
           - cfengine: boxlang
             dbengine: h2
-          - cfengine: boxlang
-            dbengine: oracle
           - cfengine: adobe2025
             dbengine: oracle
           - cfengine: adobe2025

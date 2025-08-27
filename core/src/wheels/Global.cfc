@@ -237,6 +237,35 @@ component output="false" {
 			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
 			return local.rv;
 		}
+		
+		// Get database adapter to check if it's Oracle
+		if (local.adapter == "Oracle") {
+			// Use direct SQL query instead of cfdbinfo for BoxLang + Oracle index queries
+			local.sql = "
+			SELECT 
+				NULL AS TABLE_CAT,
+				ai.OWNER AS TABLE_SCHEM,
+				ai.TABLE_NAME,
+				CASE WHEN ai.UNIQUENESS = 'NONUNIQUE' THEN 1 ELSE 0 END AS NON_UNIQUE,
+				ai.OWNER AS INDEX_QUALIFIER,
+				ai.INDEX_NAME,
+				'Other Index' AS TYPE,
+				ac.COLUMN_POSITION AS ORDINAL_POSITION,
+				ac.COLUMN_NAME,
+				CASE WHEN ac.DESCEND = 'DESC' THEN 'D' ELSE 'A' END AS ASC_OR_DESC,
+				0 AS CARDINALITY,
+				0 AS PAGES,
+				'' AS FILTER_CONDITION
+			FROM ALL_INDEXES ai
+			JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
+			WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
+				AND ai.INDEX_TYPE != 'LOB'
+			ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
+			";
+			
+			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+			return local.rv;
+		}
     }
 
     // If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.

@@ -539,7 +539,23 @@ component {
 		struct associations = variables.wheels.class.associations
 	) {
 		if (IsObject(arguments.value)) {
-			this[arguments.property] = arguments.value;
+			// Handle Oracle BLOB objects in BoxLang
+			if (structKeyExists(server, "boxlang") && !IsStruct(arguments.value)) {
+				try {
+					local.className = GetMetadata(arguments.value).getName();
+					if (local.className == "oracle.sql.BLOB") {
+						// Convert Oracle BLOB to binary using getBytes() method
+						this[arguments.property] = arguments.value.getBytes();
+					} else {
+						this[arguments.property] = arguments.value;
+					}
+				} catch (any e) {
+					// If getMetadata fails, treat as regular object
+					this[arguments.property] = arguments.value;
+				}
+			} else {
+				this[arguments.property] = arguments.value;
+			}
 		} else if (
 			IsStruct(arguments.value)
 			&& StructKeyExists(arguments.associations, arguments.property)

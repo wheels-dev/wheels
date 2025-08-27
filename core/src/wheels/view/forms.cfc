@@ -316,6 +316,12 @@ component {
 				local.rv = "";
 			}
 		}
+		
+		// Handle Oracle TIMESTAMP objects in BoxLang by converting to string
+		if (IsObject(local.rv) && GetMetadata(local.rv).getName() == "oracle.sql.TIMESTAMP") {
+			local.rv = ToString(local.rv);
+		}
+		
 		return local.rv;
 	}
 
