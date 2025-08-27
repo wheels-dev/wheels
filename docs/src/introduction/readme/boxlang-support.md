@@ -36,6 +36,7 @@ BoxLang requires specific modules for full Wheels compatibility. These dependenc
     "bx-csrf": "^1.2.0+3", 
     "bx-esapi": "^1.6.0+9",
     "bx-image": "^1.0.1",
+    "bx-wddx":"^1.5.0+8",
     "bx-mysql": "^1.0.1+7"
   }
 }
@@ -52,6 +53,7 @@ box install bx-compat-cfml
 box install bx-csrf
 box install bx-esapi
 box install bx-image
+box install bx-wddx
 box install bx-mysql
 ```
 
@@ -61,6 +63,7 @@ box install bx-mysql
 - **`bx-csrf`** - Cross-Site Request Forgery protection
 - **`bx-esapi`** - Enterprise Security API for input validation  
 - **`bx-image`** - Image manipulation functionality
+- **`bx-wddx`** - Web Distributed Data eXchange (WDDX) conversion
 - **`bx-mysql`** - MySQL database driver
 
 #### Additional Database Support
@@ -69,6 +72,7 @@ For other databases supported by Wheels, install the corresponding BoxLang modul
 
 - **Microsoft SQL Server**: `box install bx-mssql`
 - **PostGreSQL Server**: `box install bx-postgresql`
+- **Oracle Server**: `box install bx-oracle`
 
 #### Finding Additional Modules
 
