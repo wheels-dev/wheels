@@ -48,7 +48,12 @@ loadedPlugins = application.wheels.plugins;
 						</cfif>
 					</td>
 					<td>
-						<a class="ui button tiny teal" href="#urlFor(route="wheelsPluginEntry", name=local.i)#"><i class="icon info"></i> More information</a>
+						<a class="ui button tiny teal" href="#urlFor(route='wheelsPluginEntry', name=local.i)#">
+							<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="8 6 8 12" fill="white" style="vertical-align: middle; margin-right: 4px;">
+								<path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6z"/>
+							</svg>
+							More information
+						</a>
 					<cfif DirectoryExists("#GetDirectoryFromPath(GetBaseTemplatePath())#plugins/#LCase(local.i)#/tests")>
 
 							<a class="ui button tiny" href="#$get('webPath')##ListLast(request.cgi.script_name, '/')#?controller=wheels&action=wheels&view=packages&type=#LCase(local.i)#">View Tests</a>
