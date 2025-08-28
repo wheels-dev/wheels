@@ -2,10 +2,13 @@
  * Generate API documentation
  * Examples:
  * wheels docs generate
- * wheels docs generate output=docs/api format=html
- * wheels docs generate include=models,controllers serve=true
+ * wheels docs generate --output=docs/api --format=html
+ * wheels docs generate --include=models,controllers --serve=true
  */
 component extends="../base" {
+    
+    property name="fileSystemUtil" inject="FileSystem";
+    property name="helpers" inject="Helpers@wheels-cli";
     
     /**
      * @output.hint Output directory for docs
@@ -25,10 +28,17 @@ component extends="../base" {
         boolean serve = false,
         boolean verbose = false
     ) {
-        print.yellowLine("Generating documentation...")
-             .line();
+        arguments = reconstructArgs(arguments);
         
-        var outputPath = fileSystemUtil.resolvePath(arguments.output);
+        print.line()
+            .boldBlueLine("Documentation Generator")
+            .line("=".repeatString(50))
+            .line();
+        
+        print.yellowLine("Generating documentation...")
+            .line();
+        
+        var outputPath = resolvePath(arguments.output);
         var componentsToDocument = listToArray(arguments.include);
         
         // Ensure output directory exists
@@ -44,10 +54,12 @@ component extends="../base" {
             total = 0
         };
         
+        print.boldLine("Scanning source files...");
+        
         // Document each component type
         for (var componentType in componentsToDocument) {
             if (arguments.verbose) {
-                print.line("Documenting #componentType#...");
+                print.text("  Documenting #componentType#... ");
             }
             
             var documented = documentComponents(
@@ -60,32 +72,60 @@ component extends="../base" {
             
             documentedComponents[componentType] = documented;
             documentedComponents.total += arrayLen(documented);
+            
+            if (arrayLen(documented) > 0) {
+                print.greenLine("[OK] Found #arrayLen(documented)# #componentType#");
+            } else if (arguments.verbose) {
+                print.yellowLine("[SKIP] No #componentType# found");
+            }
         }
         
         // Generate index/navigation
+        print.line()
+            .text("Writing documentation... ");
+        
         if (arguments.format == "html") {
             generateHTMLIndex(outputPath, documentedComponents, arguments.template);
+            print.greenLine("[OK] HTML files generated");
         } else if (arguments.format == "markdown") {
             generateMarkdownIndex(outputPath, documentedComponents);
+            print.greenLine("[OK] Markdown files generated");
+        } else if (arguments.format == "json") {
+            fileWrite(outputPath & "/documentation.json", serializeJSON(documentedComponents, true));
+            print.greenLine("[OK] JSON documentation generated");
         }
         
         // Display summary
-        print.line();
-        print.greenBoldLine("Documentation generated successfully!");
-        print.line();
-        print.line("Summary:");
+        print.line()
+            .line("=".repeatString(50))
+            .greenBoldLine("[SUCCESS] Documentation generated successfully!")
+            .line();
+        
+        print.boldLine("Summary:");
         for (var type in componentsToDocument) {
             if (arrayLen(documentedComponents[type])) {
-                print.line("  #helpers.capitalize(type)#: #arrayLen(documentedComponents[type])# files");
+                print.line("  - #uCase(left(type, 1)) & right(type, len(type)-1)#: #arrayLen(documentedComponents[type])# files");
             }
         }
-        print.line("  Total: #documentedComponents.total# components documented");
-        print.line();
-        print.greenLine("Output directory: #outputPath#");
+        print.line("  - Total: #documentedComponents.total# components documented")
+            .line()
+            .greenLine("Output directory: #outputPath#");
         
         if (arguments.serve) {
-            print.line();
-            command("wheels docs serve").params(root = outputPath).run();
+            print.line()
+                .yellowLine("Starting documentation server...")
+                .line();
+            
+            // Start server using CommandBox
+            command("wheels docs serve")
+                .params(
+                    directory = outputPath,
+                    port = 8585,
+                    browser = true
+                )
+                .run();
+            
+            print.greenLine("Documentation server started at http://localhost:8585");
         }
     }
     
@@ -97,11 +137,16 @@ component extends="../base" {
         boolean verbose = false
     ) {
         var documented = [];
-        var sourcePath = fileSystemUtil.resolvePath("app/#arguments.type#");
+        var sourcePath = resolvePath("app/#arguments.type#");
+        
+        // Also check alternative paths
+        if (!directoryExists(sourcePath)) {
+            sourcePath = resolvePath("#arguments.type#");
+        }
         
         if (!directoryExists(sourcePath)) {
             if (arguments.verbose) {
-                print.yellowLine("Directory not found: app/#arguments.type#");
+                print.yellowLine("  Directory not found: app/#arguments.type#");
             }
             return documented;
         }
@@ -112,7 +157,7 @@ component extends="../base" {
             try {
                 var componentInfo = parseComponent(file, arguments.type);
                 
-                if (structCount(componentInfo)) {
+                if (structCount(componentInfo) && len(componentInfo.name)) {
                     // Generate documentation
                     var docContent = generateDocumentation(
                         componentInfo,
@@ -138,12 +183,12 @@ component extends="../base" {
                     arrayAppend(documented, componentInfo);
                     
                     if (arguments.verbose) {
-                        print.greenLine("  ✓ #componentInfo.name#");
+                        print.greenLine("    [OK] #componentInfo.name#");
                     }
                 }
             } catch (any e) {
                 if (arguments.verbose) {
-                    print.redLine("Error documenting #getFileFromPath(file)#: #e.message#");
+                    print.redLine("    [ERROR] #getFileFromPath(file)#: #e.message#");
                 }
             }
         }
@@ -165,73 +210,92 @@ component extends="../base" {
         };
         
         try {
+            // Get component name from file path
+            info.name = reReplace(getFileFromPath(arguments.filePath), "\.cfc$", "");
+            
+            // Read file content for parsing
             var content = fileRead(arguments.filePath);
-            var metadata = getComponentMetadata(arguments.filePath);
             
-            info.name = listLast(metadata.name, ".");
-            info.extends = structKeyExists(metadata, "extends") ? metadata.extends : "";
-            info.implements = structKeyExists(metadata, "implements") ? listToArray(metadata.implements) : [];
-            
-            // Parse component attributes
-            if (structKeyExists(metadata, "hint")) {
-                info.description = metadata.hint;
-            }
-            
-            // Parse properties
-            if (structKeyExists(metadata, "properties")) {
-                for (var prop in metadata.properties) {
-                    arrayAppend(info.properties, parseProperty(prop));
+            // Parse component declaration
+            var componentMatch = reMatchNoCase("component[^{]*\{", content);
+            if (arrayLen(componentMatch)) {
+                var declaration = componentMatch[1];
+                
+                // Extract extends
+                var extendsMatch = reMatchNoCase('extends\s*=\s*"([^"]+)"', declaration);
+                if (arrayLen(extendsMatch)) {
+                    info.extends = reReplace(extendsMatch[1], 'extends\s*=\s*"([^"]+)"', "\1");
+                }
+                
+                // Extract hint/description from comments
+                var commentPattern = "/\*\*([^*]|\*(?!/))*\*/";
+                var comments = reMatchNoCase(commentPattern, content);
+                if (arrayLen(comments)) {
+                    var firstComment = comments[1];
+                    // Clean up comment
+                    firstComment = reReplace(firstComment, "^/\*\*\s*", "");
+                    firstComment = reReplace(firstComment, "\s*\*/$", "");
+                    firstComment = reReplace(firstComment, "\n\s*\*\s*", " ", "all");
+                    info.description = trim(firstComment);
                 }
             }
             
             // Parse functions
-            if (structKeyExists(metadata, "functions")) {
-                for (var func in metadata.functions) {
-                    if (!(func.name.startsWith("$")) && func.access != "private") {
-                        arrayAppend(info.functions, parseFunction(func));
+            var functionPattern = "(public|private|remote|package)?\s*(any|string|numeric|boolean|struct|array|query|void|component)?\s*function\s+(\w+)\s*\([^)]*\)";
+            var functionMatches = reFindNoCase(functionPattern, content, 1, true);
+            
+            if (structKeyExists(functionMatches, "pos") && arrayLen(functionMatches.pos)) {
+                for (var i = 1; i <= arrayLen(functionMatches.pos); i++) {
+                    if (functionMatches.pos[i] > 0) {
+                        var funcText = mid(content, functionMatches.pos[i], functionMatches.len[i]);
+                        var funcName = reReplace(funcText, functionPattern, "\3");
+                        var access = reReplace(funcText, functionPattern, "\1");
+                        var returnType = reReplace(funcText, functionPattern, "\2");
+                        
+                        if (!len(access)) access = "public";
+                        if (!len(returnType)) returnType = "any";
+                        
+                        // Skip private functions unless verbose
+                        if (access != "private" || arguments.verbose) {
+                            arrayAppend(info.functions, {
+                                name = funcName,
+                                access = access,
+                                returnType = returnType,
+                                hint = "",
+                                parameters = []
+                            });
+                        }
                     }
                 }
             }
             
+            // Parse properties
+            var propertyPattern = "property\s+[^;]+;";
+            var propertyMatches = reMatchNoCase(propertyPattern, content);
+            
+            for (var propMatch in propertyMatches) {
+                var propName = "";
+                var nameMatch = reMatchNoCase('name\s*=\s*"([^"]+)"', propMatch);
+                if (arrayLen(nameMatch)) {
+                    propName = reReplace(nameMatch[1], 'name\s*=\s*"([^"]+)"', "\1");
+                }
+                
+                if (len(propName)) {
+                    arrayAppend(info.properties, {
+                        name = propName,
+                        type = "any",
+                        required = false,
+                        default = "",
+                        hint = ""
+                    });
+                }
+            }
+            
         } catch (any e) {
-            // Return empty info if parsing fails
+            // Return info with at least the name populated
         }
         
         return info;
-    }
-    
-    private function parseProperty(prop) {
-        return {
-            name = prop.name,
-            type = structKeyExists(prop, "type") ? prop.type : "any",
-            required = structKeyExists(prop, "required") ? prop.required : false,
-            default = structKeyExists(prop, "default") ? prop.default : "",
-            hint = structKeyExists(prop, "hint") ? prop.hint : ""
-        };
-    }
-    
-    private function parseFunction(func) {
-        var funcInfo = {
-            name = func.name,
-            returnType = structKeyExists(func, "returntype") ? func.returntype : "any",
-            access = structKeyExists(func, "access") ? func.access : "public",
-            hint = structKeyExists(func, "hint") ? func.hint : "",
-            parameters = []
-        };
-        
-        if (structKeyExists(func, "parameters")) {
-            for (var param in func.parameters) {
-                arrayAppend(funcInfo.parameters, {
-                    name = param.name,
-                    type = structKeyExists(param, "type") ? param.type : "any",
-                    required = structKeyExists(param, "required") ? param.required : false,
-                    default = structKeyExists(param, "default") ? param.default : "",
-                    hint = structKeyExists(param, "hint") ? param.hint : ""
-                });
-            }
-        }
-        
-        return funcInfo;
     }
     
     private function generateDocumentation(componentInfo, format, template) {
@@ -252,8 +316,7 @@ component extends="../base" {
 <html>
 <head>
     <meta charset="utf-8">
-    <title>' & componentInfo.name & ' - Wheels API Documentation</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <title>' & arguments.componentInfo.name & ' - Wheels API Documentation</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: ##333; max-width: 1200px; margin: 0 auto; padding: 20px; }
         h1, h2, h3 { color: ##2c3e50; }
@@ -265,22 +328,23 @@ component extends="../base" {
         .type { color: ##007bff; font-family: monospace; }
         .parameter { margin: 10px 0; padding: 10px; background: white; border-radius: 4px; }
         .required { color: ##dc3545; }
+        .access { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 10px; }
+        .access.public { background: ##28a745; color: white; }
+        .access.private { background: ##6c757d; color: white; }
         pre { background: ##f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; }
         code { font-family: "Courier New", monospace; }
     </style>
 </head>
 <body>
     <div class="component-header">
-        <h1>' & componentInfo.name & '</h1>
-        <span class="component-type">' & componentInfo.type & '</span>
-        ' & (len(componentInfo.extends) ? '<p class="extends">extends ' & componentInfo.extends & '</p>' : '') & '
-        ' & (len(componentInfo.description) ? '<p>' & componentInfo.description & '</p>' : '') & '
+        <h1>' & arguments.componentInfo.name & '</h1>
+        <span class="component-type">' & arguments.componentInfo.type & '</span>
+        ' & (len(arguments.componentInfo.extends) ? '<p class="extends">extends ' & arguments.componentInfo.extends & '</p>' : '') & '
+        ' & (len(arguments.componentInfo.description) ? '<p>' & arguments.componentInfo.description & '</p>' : '') & '
     </div>
     
-    ' & generatePropertiesHTML(componentInfo.properties) & '
-    ' & generateMethodsHTML(componentInfo.functions) & '
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    ' & generatePropertiesHTML(arguments.componentInfo.properties) & '
+    ' & generateMethodsHTML(arguments.componentInfo.functions) & '
 </body>
 </html>';
         
@@ -315,7 +379,9 @@ component extends="../base" {
         
         for (var func in arguments.functions) {
             html &= '<div class="method">';
-            html &= '<div class="method-name">' & func.name & '()</div>';
+            html &= '<div class="method-name">' & func.name & '()';
+            html &= '<span class="access ' & func.access & '">' & func.access & '</span>';
+            html &= '</div>';
             html &= '<div class="type">Returns: ' & func.returnType & '</div>';
             
             if (len(func.hint)) {
@@ -345,21 +411,23 @@ component extends="../base" {
     }
     
     private function generateMarkdownDoc(componentInfo) {
-        var md = chr(35) & ' ' & componentInfo.name & chr(10) & chr(10);
+        var md = '## ' & arguments.componentInfo.name & chr(10) & chr(10);
         
-        if (len(componentInfo.description)) {
-            md &= componentInfo.description & chr(10) & chr(10);
+        md &= 'Type: ' & arguments.componentInfo.type & chr(10) & chr(10);
+        
+        if (len(arguments.componentInfo.description)) {
+            md &= arguments.componentInfo.description & chr(10) & chr(10);
         }
         
-        if (len(componentInfo.extends)) {
-            md &= '_Extends: ' & componentInfo.extends & '_' & chr(10) & chr(10);
+        if (len(arguments.componentInfo.extends)) {
+            md &= '_Extends: ' & arguments.componentInfo.extends & '_' & chr(10) & chr(10);
         }
         
         // Properties
-        if (arrayLen(componentInfo.properties)) {
-            md &= chr(35) & chr(35) & ' Properties' & chr(10) & chr(10);
-            for (var prop in componentInfo.properties) {
-                md &= chr(35) & chr(35) & chr(35) & ' ' & prop.name & chr(10);
+        if (arrayLen(arguments.componentInfo.properties)) {
+            md &= '## Properties' & chr(10) & chr(10);
+            for (var prop in arguments.componentInfo.properties) {
+                md &= '#### ' & prop.name & chr(10);
                 md &= '- Type: `' & prop.type & '`' & chr(10);
                 if (prop.required) md &= '- Required: Yes' & chr(10);
                 if (len(prop.hint)) md &= '- Description: ' & prop.hint & chr(10);
@@ -367,16 +435,17 @@ component extends="../base" {
             }
         }
         
-        // Methods
-        if (arrayLen(componentInfo.functions)) {
-            md &= chr(35) & chr(35) & ' Methods' & chr(10) & chr(10);
-            for (var func in componentInfo.functions) {
-                md &= chr(35) & chr(35) & chr(35) & ' ' & func.name & '()' & chr(10);
+        // Methods  
+        if (arrayLen(arguments.componentInfo.functions)) {
+            md &= '## Methods' & chr(10) & chr(10);
+            for (var func in arguments.componentInfo.functions) {
+                md &= '#### ' & func.name & '()' & chr(10);
+                md &= '- Access: ' & func.access & chr(10);
                 md &= '- Returns: `' & func.returnType & '`' & chr(10);
                 if (len(func.hint)) md &= '- Description: ' & func.hint & chr(10);
                 
                 if (arrayLen(func.parameters)) {
-                    md &= chr(10) & '**Parameters:**' & chr(10);
+                    md &= chr(10) & 'Parameters:' & chr(10);
                     for (var param in func.parameters) {
                         md &= '- `' & param.name & '` (' & param.type & ')';
                         if (param.required) md &= ' _required_';
@@ -392,19 +461,35 @@ component extends="../base" {
     }
     
     private function generateOutputPath(sourcePath, sourceRoot, outputPath, type, format) {
+        // Remove the source root from the path to get relative path
         var relativePath = replace(arguments.sourcePath, arguments.sourceRoot, "");
-        var outputFile = arguments.outputPath & "/" & arguments.type & relativePath;
+        // Remove leading slash if present
+        if (left(relativePath, 1) == "/" || left(relativePath, 1) == "\") {
+            relativePath = right(relativePath, len(relativePath) - 1);
+        }
         
-        // Change extension based on format
+        // Get just the filename without extension
+        var fileName = reReplace(getFileFromPath(relativePath), "\.cfc$", "");
+        
+        // Create subdirectory for component type
+        var typeDir = arguments.outputPath & "/" & arguments.type;
+        if (!directoryExists(typeDir)) {
+            directoryCreate(typeDir, true);
+        }
+        
+        // Build the output file path
+        var outputFile = typeDir & "/" & fileName;
+        
+        // Add appropriate extension based on format
         switch (arguments.format) {
             case "html":
-                outputFile = reReplace(outputFile, "\.cfc$", ".html");
+                outputFile &= ".html";
                 break;
             case "markdown":
-                outputFile = reReplace(outputFile, "\.cfc$", ".md");
+                outputFile &= ".md";
                 break;
             case "json":
-                outputFile = reReplace(outputFile, "\.cfc$", ".json");
+                outputFile &= ".json";
                 break;
         }
         
@@ -418,32 +503,69 @@ component extends="../base" {
     <meta charset="utf-8">
     <title>Wheels API Documentation</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; }
-        .sidebar { width: 300px; background: ##f8f9fa; padding: 20px; height: 100vh; overflow-y: auto; }
-        .content { flex: 1; padding: 20px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        .container { display: flex; height: 100vh; }
+        .sidebar { width: 300px; background: ##f8f9fa; padding: 20px; overflow-y: auto; border-right: 1px solid ##dee2e6; }
+        .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .navbar { background: white; padding: 15px 30px; border-bottom: 1px solid ##dee2e6; }
+        .content { flex: 1; padding: 40px; overflow-y: auto; }
         h1 { color: ##2c3e50; margin-bottom: 30px; }
-        h2 { color: ##34495e; margin-top: 30px; }
+        h2 { color: ##34495e; margin-top: 30px; font-size: 20px; }
+        h3 { color: ##34495e; font-size: 16px; margin: 20px 0 10px 0; }
         .component-list { list-style: none; padding: 0; }
-        .component-list li { margin: 5px 0; }
-        .component-list a { text-decoration: none; color: ##3498db; }
-        .component-list a:hover { text-decoration: underline; }
-        .stats { background: ##ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 30px; }
+        .component-list li { margin: 2px 0; }
+        .component-list a { text-decoration: none; color: ##3498db; display: block; padding: 8px 12px; border-radius: 4px; transition: all 0.2s; }
+        .component-list a:hover { background: ##e9ecef; color: ##2980b9; }
+        .component-list a.active { background: ##3498db; color: white; }
+        .stats { background: ##f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 30px; border: 1px solid ##dee2e6; }
+        .stats h3 { margin-top: 0; color: ##2c3e50; }
+        .logo { font-size: 24px; font-weight: bold; color: ##2c3e50; margin-bottom: 30px; }
+        iframe { width: 100%; height: 100%; border: none; }
+        .breadcrumb { color: ##6c757d; font-size: 14px; }
+        .error-msg { padding: 20px; background: ##f8d7da; border: 1px solid ##f5c6cb; color: ##721c24; border-radius: 5px; }
     </style>
+    <script>
+        function loadDoc(url, name, linkElement) {
+            var frame = document.getElementById("docFrame");
+            frame.src = url;
+            document.getElementById("breadcrumb").innerHTML = name;
+            
+            // Update active state
+            var links = document.querySelectorAll(".component-list a");
+            links.forEach(function(link) {
+                link.classList.remove("active");
+            });
+            if (linkElement) {
+                linkElement.classList.add("active");
+            }
+            
+            // Handle load errors
+            frame.onerror = function() {
+                frame.srcdoc = ''<html><body><div class="error-msg">Unable to load documentation for '' + name + ''</div></body></html>'';
+            };
+        }
+        
+        window.onload = function() {
+            // Load welcome page by default
+            document.getElementById("docFrame").src = "welcome.html";
+        }
+    </script>
 </head>
 <body>
-    <div class="sidebar">
-        <h2>📚 API Documentation</h2>
-        ';
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo">📚 Wheels API</div>';
         
         // Add navigation for each component type
         for (var type in ["models", "controllers", "services", "views"]) {
             if (structKeyExists(arguments.components, type) && arrayLen(arguments.components[type])) {
-                indexHTML &= '<h3>' & helpers.capitalize(type) & '</h3>';
+                indexHTML &= '<h3>' & uCase(left(type, 1)) & right(type, len(type)-1) & '</h3>';
                 indexHTML &= '<ul class="component-list">';
                 
                 for (var comp in arguments.components[type]) {
                     var link = type & '/' & comp.name & '.html';
-                    indexHTML &= '<li><a href="' & link & '" target="content">' & comp.name & '</a></li>';
+                    indexHTML &= '<li><a href="##" onclick="loadDoc(''' & link & ''', ''' & type & ' / ' & comp.name & ''', this); return false;">' & comp.name & '</a></li>';
                 }
                 
                 indexHTML &= '</ul>';
@@ -451,9 +573,15 @@ component extends="../base" {
         }
         
         indexHTML &= '
-    </div>
-    <div class="content">
-        <iframe name="content" src="welcome.html" style="width: 100%; height: 100vh; border: none;"></iframe>
+        </div>
+        <div class="main">
+            <div class="navbar">
+                <div class="breadcrumb">Home / <span id="breadcrumb">Welcome</span></div>
+            </div>
+            <div class="content">
+                <iframe id="docFrame"></iframe>
+            </div>
+        </div>
     </div>
 </body>
 </html>';
@@ -461,25 +589,83 @@ component extends="../base" {
         fileWrite(arguments.outputPath & "/index.html", indexHTML);
         
         // Generate welcome page
-        var welcomeHTML = '<h1>Welcome to Wheels API Documentation</h1>
-<div class="stats">
-    <h3>Documentation Summary</h3>
-    <p>Total components documented: ' & arguments.components.total & '</p>
-</div>
-<p>Select a component from the sidebar to view its documentation.</p>';
+        var welcomeHTML = '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Welcome - Wheels API Documentation</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; color: ##333; line-height: 1.6; }
+        h1 { color: ##2c3e50; }
+        h2 { color: ##34495e; margin-top: 30px; }
+        .stats { background: ##f8f9fa; padding: 20px; border-radius: 5px; border: 1px solid ##dee2e6; margin: 20px 0; }
+        .stats h3 { margin-top: 0; color: ##2c3e50; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
+        .stat-card { background: white; padding: 15px; border-radius: 5px; border: 1px solid ##e9ecef; }
+        .stat-label { font-size: 14px; color: ##6c757d; }
+        .stat-value { font-size: 24px; font-weight: bold; color: ##2c3e50; }
+    </style>
+</head>
+<body>
+    <h1>Welcome to Wheels API Documentation</h1>
+    <div class="stats">
+        <h3>Documentation Summary</h3>
+        <div class="stats-grid">';
+        
+        // Add individual counts for each type
+        for (var type in ["models", "controllers", "services", "views"]) {
+            if (structKeyExists(arguments.components, type)) {
+                welcomeHTML &= '
+            <div class="stat-card">
+                <div class="stat-label">' & uCase(left(type, 1)) & right(type, len(type)-1) & '</div>
+                <div class="stat-value">' & arrayLen(arguments.components[type]) & '</div>
+            </div>';
+            }
+        }
+        
+        welcomeHTML &= '
+            <div class="stat-card">
+                <div class="stat-label">Total Components</div>
+                <div class="stat-value">' & arguments.components.total & '</div>
+            </div>
+        </div>
+        <p style="margin-top: 15px; color: ##6c757d; font-size: 14px;">Generated on: ' & dateFormat(now(), "long") & ' ' & timeFormat(now(), "short") & '</p>
+    </div>
+    
+    <h2>Getting Started</h2>
+    <p>This documentation was automatically generated from your Wheels application source code. Use the sidebar on the left to navigate through your components.</p>
+    
+    <h2>Component Types</h2>
+    <ul>
+        <li><strong>Models:</strong> Data models representing your application''s business entities</li>
+        <li><strong>Controllers:</strong> Request handlers that manage application flow</li>
+        <li><strong>Services:</strong> Business logic and utility services</li>
+        <li><strong>Views:</strong> Presentation layer components</li>
+    </ul>
+    
+    <h2>Navigation</h2>
+    <p>Select any component from the sidebar to view its detailed documentation, including:</p>
+    <ul>
+        <li>Properties and their types</li>
+        <li>Available methods and functions</li>
+        <li>Method parameters and return types</li>
+        <li>Access modifiers (public, private, etc.)</li>
+    </ul>
+</body>
+</html>';
         
         fileWrite(arguments.outputPath & "/welcome.html", welcomeHTML);
     }
     
     private function generateMarkdownIndex(outputPath, components) {
-        var indexMD = chr(35) & ' Wheels API Documentation' & chr(10) & chr(10);
-        indexMD &= 'Generated on ' & dateFormat(now(), "long") & chr(10) & chr(10);
+        var indexMD = '## Wheels API Documentation' & chr(10) & chr(10);
+        indexMD &= 'Generated on ' & dateFormat(now(), "long") & ' at ' & timeFormat(now(), "short") & chr(10) & chr(10);
         
-        indexMD &= chr(35) & chr(35) & ' Table of Contents' & chr(10) & chr(10);
+        indexMD &= '## Table of Contents' & chr(10) & chr(10);
         
         for (var type in ["models", "controllers", "services", "views"]) {
             if (structKeyExists(arguments.components, type) && arrayLen(arguments.components[type])) {
-                indexMD &= chr(35) & chr(35) & chr(35) & ' ' & helpers.capitalize(type) & chr(10) & chr(10);
+                indexMD &= '#### ' & uCase(left(type, 1)) & right(type, len(type)-1) & chr(10) & chr(10);
                 
                 for (var comp in arguments.components[type]) {
                     var link = type & '/' & comp.name & '.md';
@@ -489,6 +675,9 @@ component extends="../base" {
                 indexMD &= chr(10);
             }
         }
+        
+        indexMD &= '## Summary' & chr(10) & chr(10);
+        indexMD &= 'Total components documented: ' & arguments.components.total & chr(10);
         
         fileWrite(arguments.outputPath & "/README.md", indexMD);
     }
