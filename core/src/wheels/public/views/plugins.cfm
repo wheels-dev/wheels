@@ -54,9 +54,9 @@ loadedPlugins = application.wheels.plugins;
 							</svg>
 							More information
 						</a>
-					<cfif DirectoryExists("#GetDirectoryFromPath(GetBaseTemplatePath())#plugins/#LCase(local.i)#/tests")>
+					<cfif DirectoryExists("#expandPath("/plugins/#LCase(local.i)#/tests")#")>
 
-							<a class="ui button tiny" href="#$get('webPath')##ListLast(request.cgi.script_name, '/')#?controller=wheels&action=wheels&view=packages&type=#LCase(local.i)#">View Tests</a>
+							<a class="ui button tiny" href="#urlFor(route = "wheelsPackages", type = "#local.i#")#">View Tests</a>
 						</cfif>
 					</td>
 				</tr>
