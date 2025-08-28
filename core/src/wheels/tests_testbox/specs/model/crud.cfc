@@ -569,8 +569,11 @@ component extends="testbox.system.BaseSpec" {
 				loc.query = g.model("Post").findAll(select="createdat,c_o_r_e_commentcreatedat,c_o_r_e_commentbody", include="c_o_r_e_comments")
 	    		loc.columnList = ListSort(loc.query.columnList, "text")
 
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+				db = LCase(Replace(info.database_productname, " ", "", "all"))
+
 	    		// BoxLang compatibility: ListSort behaves differently in BoxLang
-	    		if (StructKeyExists(server, "boxlang")) {
+	    		if (StructKeyExists(server, "boxlang") && db != "oracle") {
 	    			expect(loc.columnList).toBe("c_o_r_e_commentbody,c_o_r_e_commentcreatedat,createdat")
 	    		} else {
 	    			expect(loc.columnList).toBe("createdat,c_o_r_e_commentbody,c_o_r_e_commentcreatedat")

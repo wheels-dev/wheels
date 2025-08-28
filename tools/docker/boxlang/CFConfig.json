@@ -86,12 +86,9 @@
 			"clob": "false",
 			"connectionLimit": "-1",
 			"connectionTimeout": "20",
-			"database": "wheelstestdb",
 			"dbdriver": "Other",
-			"dsn": "jdbc:oracle:thin:@//{host}:{port}/{database}",
-			"host": "oracle",
+			"dsn": "jdbc:oracle:thin:@//oracle:1521/wheelstestdb",
 			"password": "wheelstestdb",
-			"port": "1521",
 			"username": "wheelstestdb",
 			"validate": "false"
 		}
