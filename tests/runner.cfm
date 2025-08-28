@@ -1,6 +1,6 @@
 <cfsetting requestTimeOut="1800">
 <cfscript>
-    testBox = new testbox.system.TestBox(directory="tests.Testbox.specs")
+    testBox = new testbox.system.TestBox(directory="tests.specs")
 
     setTestboxEnvironment()
 
@@ -122,10 +122,10 @@
         application.$$$wheels = Duplicate(application.wheels)
 
         // load testbox routes
-        application.wo.$include(template = "/tests/Testbox/routes.cfm")
+        application.wo.$include(template = "/tests/routes.cfm")
         application.wo.$setNamedRoutePositions()
 
-        local.AssetPath = "/tests/Testbox/_assets/"
+        local.AssetPath = "/tests/_assets/"
         
         application.wo.set(rewriteFile = "index.cfm")
         application.wo.set(controllerPath = local.AssetPath & "controllers")

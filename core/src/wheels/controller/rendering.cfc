@@ -147,7 +147,7 @@ component {
 
 	/**
 	 * Instructs the controller to render the data passed in to the format that is requested.
-	 * If the format requested is `json` or `xml`, CFWheels will transform the data into that format automatically.
+	 * If the format requested is `json` or `xml`, Wheels will transform the data into that format automatically.
 	 * For other formats (or to override the automatic formatting), you can also create a view template in this format: `nameofaction.xml.cfm`, `nameofaction.json.cfm`, `nameofaction.pdf.cfm`, etc.
 	 *
 	 * [section: Controller]
@@ -295,7 +295,7 @@ component {
 
 
 	/**
-	 * Returns content that CFWheels will send to the client in response to the request.
+	 * Returns content that Wheels will send to the client in response to the request.
 	 *
 	 * [section: Controller]
 	 * [category: Rendering Functions]
@@ -309,7 +309,7 @@ component {
 	}
 
 	/**
-	 * Sets content that CFWheels will send to the client in response to the request.
+	 * Sets content that Wheels will send to the client in response to the request.
 	 *
 	 * [section: Controller]
 	 * [category: Rendering Functions]
@@ -560,7 +560,7 @@ component {
 					if ($get("showErrorInformation") && !ListFindNoCase(local.query.columnList, arguments.$group)) {
 						Throw(
 							type = "Wheels.GroupColumnNotFound",
-							message = "CFWheels couldn't find a query column with the name of `#arguments.$group#`.",
+							message = "Wheels couldn't find a query column with the name of `#arguments.$group#`.",
 							extendedInfo = "Make sure your finder method has the column `#arguments.$group#` specified in the `select` argument. If the column does not exist, create it."
 						);
 					}

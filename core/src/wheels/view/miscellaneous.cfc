@@ -259,22 +259,22 @@ component {
 
 	/**
 	 * Includes the specified partial file in the view.
-	 * Similar to using `cfinclude` but with the ability to cache the result and use CFWheels-specific file look-up.
-	 * By default, CFWheels will look for the file in the current controller's view folder.
+	 * Similar to using `cfinclude` but with the ability to cache the result and use Wheels-specific file look-up.
+	 * By default, Wheels will look for the file in the current controller's view folder.
 	 * To include a file relative from the base `views` folder, you can start the path supplied to `partial` with a forward slash.
 	 *
 	 * [section: View Helpers]
 	 * [category: Miscellaneous Functions]
 	 *
-	 * @partial The name of the partial file to be used. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Do not include the partial filename's underscore and file extension. If you want to have CFWheels display the partial for a single model object, array of model objects, or a query, pass a variable containing that data into this argument.
+	 * @partial The name of the partial file to be used. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Do not include the partial filename's underscore and file extension. If you want to have Wheels display the partial for a single model object, array of model objects, or a query, pass a variable containing that data into this argument.
 	 * @group If passing a query result set for the partial argument, use this to specify the field to group the query by. A new query will be passed into the partial template for you to iterate over.
 	 * @cache Number of minutes to cache the content for.
 	 * @layout The layout to wrap the content in. Prefix with a leading slash (`/`) if you need to build a path from the root `views` folder. Pass `false` to not load a layout at all.
 	 * @spacer HTML or string to place between partials when called using a query.
 	 * @dataFunction Name of controller function to load data from.
-	 * @query If you want to have CFWheels display the partial for each record in a query record set but want to override the name of the file referenced, provide the template file name for partial and pass the query as a separate query argument.
-	 * @object If you want to have CFWheels display the partial for a model object but want to override the name of the file referenced, provide the template file name for partial and pass the model object as a separate object argument.
-	 * @objects If you want to have CFWheels display the partial for each model object in an array but want to override the name of the file referenced, provide the template name for partial and pass the query as a separate objects argument.
+	 * @query If you want to have Wheels display the partial for each record in a query record set but want to override the name of the file referenced, provide the template file name for partial and pass the query as a separate query argument.
+	 * @object If you want to have Wheels display the partial for a model object but want to override the name of the file referenced, provide the template file name for partial and pass the model object as a separate object argument.
+	 * @objects If you want to have Wheels display the partial for each model object in an array but want to override the name of the file referenced, provide the template name for partial and pass the query as a separate objects argument.
 	 */
 	public string function includePartial(
 		required any partial,
@@ -647,7 +647,7 @@ component {
 			if ($get("showErrorInformation")) {
 				Throw(
 					type = "Wheels.ObjectNotFound",
-					message = "CFWheels tried to find the model object `#arguments.objectName#` for the form helper, but it does not exist."
+					message = "Wheels tried to find the model object `#arguments.objectName#` for the form helper, but it does not exist."
 				);
 			} else {
 				Throw(object = e);

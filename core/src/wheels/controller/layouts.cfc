@@ -18,7 +18,7 @@ component {
 		string only,
 		boolean useDefault = true
 	) {
-		// Exit the function if we're on an internal CFWheels page (we don't want to allow overriding the layout there).
+		// Exit the function if we're on an internal Wheels page (we don't want to allow overriding the layout there).
 		if (variables.$class.name == "Wheels") {
 			return;
 		}

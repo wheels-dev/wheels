@@ -30,8 +30,6 @@ mapper()
 		.get(name = "guideImage", pattern = "guides-assets/*[file]", to = "public##guideImage")
 		.root(method = "get", to = "public##index", mapFormat = false)
 	.end()
-	// Add route for tests controller outside the wheels namespace
-	.get(name = "testsController", pattern = "tests", to = "tests##index")
 	.get(name = "testbox", pattern = "/wheels/app/tests", to = "wheels##public##testbox")
 .end();
 </cfscript>

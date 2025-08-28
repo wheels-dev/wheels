@@ -5,7 +5,7 @@
  * wheels get environment
  * {code}
  */
-component extends="../base" {
+component aliases="wheels get env" extends="../base" {
 
 	/**
 	 * @help Show the current environment setting
@@ -21,42 +21,55 @@ component extends="../base" {
 		try {
 			// Check for environment in multiple places
 			local.environment = "";
+			local.configSource = "";
 			
-			// 1. Check .env file
+			// 1. Check .env file for WHEELS_ENV first, then Environment
 			local.envFile = local.appPath & "/.env";
 			if (FileExists(local.envFile)) {
 				local.envContent = FileRead(local.envFile);
-				// local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*(.+)$", local.envContent, 1, true);
+				
+				// First check for WHEELS_ENV
 				local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*([^\s##]+)", local.envContent, 1, true);
 				if (local.envMatch.pos[1] > 0) {
 					local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
+					local.configSource = ".env file (WHEELS_ENV)";
 				}
-			}
-			
-			// 2. Check environment variable
-			if (!Len(local.environment)) {
-				local.sysEnv = CreateObject("java", "java.lang.System");
-				local.wheelsEnv = local.sysEnv.getenv("WHEELS_ENV");
-				if (!IsNull(local.wheelsEnv) && Len(local.wheelsEnv)) {
-					local.environment = local.wheelsEnv;
-				}
-			}
-			
-			// 3. Check server.json
-			if (!Len(local.environment)) {
-				local.serverJsonPath = local.appPath & "/server.json";
-				if (FileExists(local.serverJsonPath)) {
-					local.serverJson = DeserializeJSON(FileRead(local.serverJsonPath));
-					if (StructKeyExists(local.serverJson, "env") && 
-					    StructKeyExists(local.serverJson.env, "WHEELS_ENV")) {
-						local.environment = local.serverJson.env.WHEELS_ENV;
+				
+				// If not found, check for Environment
+				if (!Len(local.environment)) {
+					local.envMatch = REFind("(?m)^Environment\s*=\s*([^\s##]+)", local.envContent, 1, true);
+					if (local.envMatch.pos[1] > 0) {
+						local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
+						local.configSource = ".env file (Environment)";
 					}
 				}
 			}
 			
-			// 4. Default to development
+			// 2. Check system environment variables for WHEELS_ENV first, then Environment
+			if (!Len(local.environment)) {
+				local.sysEnv = CreateObject("java", "java.lang.System");
+				
+				// First check for WHEELS_ENV
+				local.wheelsEnv = local.sysEnv.getenv("WHEELS_ENV");
+				if (!IsNull(local.wheelsEnv) && Len(local.wheelsEnv)) {
+					local.environment = local.wheelsEnv;
+					local.configSource = "System environment variable (WHEELS_ENV)";
+				}
+				
+				// If not found, check for Environment
+				if (!Len(local.environment)) {
+					local.env = local.sysEnv.getenv("Environment");
+					if (!IsNull(local.env) && Len(local.env)) {
+						local.environment = local.env;
+						local.configSource = "System environment variable (Environment)";
+					}
+				}
+			}
+			
+			// 3. Default to development
 			if (!Len(local.environment)) {
 				local.environment = "development";
+				local.configSource = "Using default";
 			}
 			
 			print.line();
@@ -65,19 +78,10 @@ component extends="../base" {
 			print.line();
 			
 			// Show where it's configured
-			if (FileExists(local.envFile) && REFind("(?m)^WHEELS_ENV\s*=", FileRead(local.envFile))) {
-				print.line("Configured in: .env file");
-			} else if (!IsNull(local.sysEnv.getenv("WHEELS_ENV"))) {
-				print.line("Configured in: System environment variable");
-			} else if (FileExists(local.serverJsonPath)) {
-				print.line("Configured in: server.json");
-			} else {
-				print.line("Using default: development");
-			}
+			print.line("Configured in: " & local.configSource);
 			
 		} catch (any e) {
 			error("Error reading environment: " & e.message);
 		}
 	}
-
 }

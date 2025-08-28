@@ -43,7 +43,7 @@ component {
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.
-	 * @params Any additional parameters to be set in the query string (example: wheels=cool&x=y). Please note that CFWheels uses the & and = characters to split the parameters and encode them properly for you. However, if you need to pass in & or = as part of the value, then you need to encode them (and only them), example: a=cats%26dogs%3Dtrouble!&b=1.
+	 * @params Any additional parameters to be set in the query string (example: wheels=cool&x=y). Please note that Wheels uses the & and = characters to split the parameters and encode them properly for you. However, if you need to pass in & or = as part of the value, then you need to encode them (and only them), example: a=cats%26dogs%3Dtrouble!&b=1.
 	 * @anchor Sets an anchor name to be appended to the path.
 	 * @onlyPath If true, returns only the relative URL (no protocol, host name or port).
 	 * @host Set this to override the current host.
@@ -316,6 +316,12 @@ component {
 				local.rv = "";
 			}
 		}
+		
+		// Handle Oracle TIMESTAMP objects in BoxLang by converting to string
+		if (IsObject(local.rv) && GetMetadata(local.rv).getName() == "oracle.sql.TIMESTAMP") {
+			local.rv = ToString(local.rv);
+		}
+		
 		return local.rv;
 	}
 

@@ -319,7 +319,7 @@ component {
 
 	/**
 	 * Runs the validation on the object and returns `true` if it passes it.
-	 * CFWheels will run the validation process automatically whenever an object is saved to the database, but sometimes it's useful to be able to run this method to see if the object is valid without saving it to the database.
+	 * Wheels will run the validation process automatically whenever an object is saved to the database, but sometimes it's useful to be able to run this method to see if the object is valid without saving it to the database.
 	 *
 	 * [section: Model Object]
 	 * [category: Error Functions ]
@@ -523,7 +523,17 @@ component {
 							|| (
 								StructKeyExists(this, local.thisValidation.args.property)
 								&& (
-									Len(this[local.thisValidation.args.property])
+									(
+										// Handle Oracle TIMESTAMP objects in BoxLang
+										structKeyExists(server, "boxlang") 
+										&& IsObject(this[local.thisValidation.args.property])
+										&& !IsStruct(this[local.thisValidation.args.property])
+										&& ListContains("oracle.sql.TIMESTAMP,oracle.sql.DATE", GetMetadata(this[local.thisValidation.args.property]).getName())
+									)
+									|| (
+										!IsObject(this[local.thisValidation.args.property])
+										&& Len(this[local.thisValidation.args.property])
+									)
 									|| local.thisValidation.method == "$validatesUniquenessOf"
 								)
 							)

@@ -46,9 +46,9 @@ component aliases='wheels d'  extends="base"  {
 		var modelFile      		 = fileSystemUtil.resolvePath("app/models/#obj.objectNameSingularC#.cfc");
 		var controllerFile 		 = fileSystemUtil.resolvePath("app/controllers/#obj.objectNamePluralC#.cfc");
 		var viewFolder     		 = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/");
-		var testmodelFile  		 = fileSystemUtil.resolvePath("tests/Testbox/specs/models/#obj.objectNameSingularC#.cfc");
-		var testcontrollerFile = fileSystemUtil.resolvePath("tests/Testbox/specs/controllers/#obj.objectNamePluralC#.cfc");
-		var testviewFolder     = fileSystemUtil.resolvePath("tests/Testbox/specs/views/#obj.objectNamePlural#/");
+		var testmodelFile  		 = fileSystemUtil.resolvePath("tests/specs/models/#obj.objectNameSingularC#.cfc");
+		var testcontrollerFile = fileSystemUtil.resolvePath("tests/specs/controllers/#obj.objectNamePluralC#.cfc");
+		var testviewFolder     = fileSystemUtil.resolvePath("tests/specs/views/#obj.objectNamePlural#/");
 		var routeFile   			 = fileSystemUtil.resolvePath("config/routes.cfm");
 		var resourceName			 = '.resources("' & obj.objectNamePlural & '")';
 
@@ -96,7 +96,7 @@ component aliases='wheels d'  extends="base"  {
 	private function destroyController(required string name) {
 		var obj = helpers.getNameVariants(arguments.name);
 		var controllerFile = fileSystemUtil.resolvePath("app/controllers/#obj.objectNamePluralC#.cfc");
-		var testcontrollerFile = fileSystemUtil.resolvePath("tests/Testbox/specs/controllers/#obj.objectNamePluralC#.cfc");
+		var testcontrollerFile = fileSystemUtil.resolvePath("tests/specs/controllers/#obj.objectNamePluralC#.cfc");
 		
 		print.redBoldLine("================================================")
 			 .redBoldLine("= Watch Out!                                   =")
@@ -129,7 +129,7 @@ component aliases='wheels d'  extends="base"  {
 	private function destroyModel(required string name) {
 		var obj = helpers.getNameVariants(arguments.name);
 		var modelFile = fileSystemUtil.resolvePath("app/models/#obj.objectNameSingularC#.cfc");
-		var testmodelFile = fileSystemUtil.resolvePath("tests/Testbox/specs/models/#obj.objectNameSingularC#.cfc");
+		var testmodelFile = fileSystemUtil.resolvePath("tests/specs/models/#obj.objectNameSingularC#.cfc");
 		
 		print.redBoldLine("================================================")
 			 .redBoldLine("= Watch Out!                                   =")
@@ -193,7 +193,7 @@ component aliases='wheels d'  extends="base"  {
 			// Destroy all views for a controller
 			var obj = helpers.getNameVariants(arguments.name);
 			var viewFolder = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/");
-			var testviewFolder = fileSystemUtil.resolvePath("tests/Testbox/specs/views/#obj.objectNamePlural#/");
+			var testviewFolder = fileSystemUtil.resolvePath("tests/specs/views/#obj.objectNamePlural#/");
 			
 			print.redBoldLine("================================================")
 				 .redBoldLine("= Watch Out!                                   =")

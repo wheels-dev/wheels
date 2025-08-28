@@ -25,14 +25,14 @@ component extends="../base" {
         string format = "table",
         string file = ".env"
     ) {
+        arguments = reconstructArgs(arguments);
         try {
             // Check if we're in a Wheels project
             if (!directoryExists(resolvePath("app"))) {
-                return error("This command must be run from a Wheels project root directory");
+                error("This command must be run from a Wheels project root directory");
             }
             
-            print.greenBoldLine("Environment Variables Viewer")
-                 .line();
+            print.greenBoldLine("Environment Variables Viewer").line();
             
             // Read the .env file
             var envFile = resolvePath(arguments.file);
@@ -57,43 +57,46 @@ component extends="../base" {
             // Parse the .env file
             var envVars = parseEnvFile(envFile);
             
-            // Handle specific key request
-            if (len(arguments.key)) {
-                if (structKeyExists(envVars, arguments.key)) {
-                    if (arguments.format == "json") {
-                        print.line(serializeJSON({
-                            key: arguments.key,
-                            value: envVars[arguments.key],
-                            source: arguments.file
-                        }, true));
-                    } else {
-                        print.boldYellowLine("Environment Variable: #arguments.key#");
-                        var displayValue = envVars[arguments.key];
-                        if (findNoCase("password", arguments.key) || findNoCase("secret", arguments.key) || findNoCase("key", arguments.key)) {
-                            displayValue = repeatString("*", min(len(displayValue), 8));
-                        }
-                        print.line("Value: #displayValue#");
-                        print.line("Source: #arguments.file#");
-                    }
-                } else {
-                    print.yellowLine("Environment variable '#arguments.key#' not found");
-                    print.line();
-                    if (structCount(envVars)) {
-                        print.line("Available keys in #arguments.file#:");
-                        for (var availKey in structKeyArray(envVars).sort("text")) {
-                            print.line("  - #availKey#");
-                        }
-                    }
-                }
-                return;
-            }
-            
-            // Show all environment variables
             if (structIsEmpty(envVars)) {
                 print.yellowLine("No environment variables found in #arguments.file#");
                 return;
             }
             
+            // Handle specific key request
+            if (len(arguments.key)) {
+                if (!structKeyExists(envVars, arguments.key)) {
+                    print.yellowLine("Environment variable '#arguments.key#' not found in #arguments.file#");
+                    print.line();
+                    print.line("Available keys:");
+                    for (var availKey in structKeyArray(envVars).sort("text")) {
+                        print.line("  - #availKey#");
+                    }
+                    return;
+                }
+                
+                // Found the key
+                var displayValue = envVars[arguments.key];
+                if (findNoCase("password", arguments.key) || findNoCase("secret", arguments.key) || findNoCase("key", arguments.key)) {
+                    displayValue = repeatString("*", min(len(displayValue), 8));
+                }
+                
+                if (arguments.format == "json") {
+                    print.line(serializeJSON({
+                        key: arguments.key,
+                        value: displayValue,
+                        source: arguments.file
+                    }, true));
+                } else {
+                    var rows = [
+                        { "Variable" = arguments.key, "Value" = displayValue, "Source" = arguments.file }
+                    ];
+                    print.table(rows);
+                }
+                
+                return; // stop here, don’t print all vars
+            }
+            
+            // Show all environment variables
             if (arguments.format == "json") {
                 // Mask sensitive values in JSON output
                 var maskedVars = {};
@@ -103,60 +106,25 @@ component extends="../base" {
                         maskedVars[envKey] = repeatString("*", min(len(envVars[envKey]), 8));
                     }
                 }
-                print.line(serializeJSON(maskedVars, true));
-            } else {
+                print.line(maskedVars);
+            } else if (arguments.format == "table") {
+                // Build rows for table
+                var rows = [];
+                for (var envKey in envVars) {
+                    var displayValue = envVars[envKey];
+                    if (findNoCase("password", envKey) || findNoCase("secret", envKey) || findNoCase("key", envKey)) {
+                        displayValue = repeatString("*", min(len(displayValue), 8));
+                    }
+                    arrayAppend(rows, {
+                        "Variable" = envKey,
+                        "Value"    = displayValue,
+                        "Source"   = arguments.file
+                    });
+                }
+                
                 print.boldYellowLine("Environment Variables from #arguments.file#:");
                 print.line();
-                
-                // Group variables by prefix
-                var grouped = {};
-                var ungrouped = [];
-                
-                for (var envKey in envVars) {
-                    var prefix = listFirst(envKey, "_");
-                    if (listLen(envKey, "_") > 1 && len(prefix) <= 10) {
-                        if (!structKeyExists(grouped, prefix)) {
-                            grouped[prefix] = [];
-                        }
-                        arrayAppend(grouped[prefix], {
-                            key: envKey,
-                            value: envVars[envKey]
-                        });
-                    } else {
-                        arrayAppend(ungrouped, {
-                            key: envKey,
-                            value: envVars[envKey]
-                        });
-                    }
-                }
-                
-                // Display grouped variables
-                for (var group in structKeyArray(grouped).sort("text")) {
-                    print.boldLine("#group#_* Variables:");
-                    for (var item in grouped[group]) {
-                        // Mask sensitive values
-                        var displayValue = item.value;
-                        if (findNoCase("password", item.key) || findNoCase("secret", item.key) || findNoCase("key", item.key)) {
-                            displayValue = repeatString("*", min(len(item.value), 8));
-                        }
-                        print.line("  #item.key# = #displayValue#");
-                    }
-                    print.line();
-                }
-                
-                // Display ungrouped variables
-                if (arrayLen(ungrouped)) {
-                    print.boldLine("Other Variables:");
-                    for (var item in ungrouped) {
-                        var displayValue = item.value;
-                        if (findNoCase("password", item.key) || findNoCase("secret", item.key) || findNoCase("key", item.key)) {
-                            displayValue = repeatString("*", min(len(item.value), 8));
-                        }
-                        print.line("  #item.key# = #displayValue#");
-                    }
-                    print.line();
-                }
-                
+                print.table(rows);
                 print.line();
                 print.greyLine("Tip: Access these in your app with application.env['KEY_NAME']");
                 print.greyLine("Or use them in config files: set(dataSourceName=application.env['DB_NAME'])");
@@ -210,15 +178,5 @@ component extends="../base" {
         }
         
         return envVars;
-    }
-    
-    /**
-     * Resolve a file path
-     */
-    private function resolvePath(path) {
-        if (left(arguments.path, 1) == "/" || mid(arguments.path, 2, 1) == ":") {
-            return arguments.path;
-        }
-        return expandPath(arguments.path);
     }
 }

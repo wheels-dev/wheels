@@ -25,7 +25,6 @@
     * [wheels reload](command-line-tools/commands/core/reload.md)
     * [wheels deps](command-line-tools/commands/core/deps.md)
     * [wheels destroy](command-line-tools/commands/core/destroy.md)
-    * [wheels watch](command-line-tools/commands/core/watch.md)
   * Code Generation
     * [wheels generate app](command-line-tools/commands/generate/app.md)
     * [wheels generate app-wizard](command-line-tools/commands/generate/app-wizard.md)
@@ -34,27 +33,13 @@
     * [wheels generate view](command-line-tools/commands/generate/view.md)
     * [wheels generate property](command-line-tools/commands/generate/property.md)
     * [wheels generate route](command-line-tools/commands/generate/route.md)
-    * [wheels generate resource](command-line-tools/commands/generate/resource.md)
-    * [wheels generate api-resource](command-line-tools/commands/generate/api-resource.md)
-    * [wheels generate frontend](command-line-tools/commands/generate/frontend.md)
     * [wheels generate test](command-line-tools/commands/generate/test.md)
     * [wheels generate snippets](command-line-tools/commands/generate/snippets.md)
-    * [wheels scaffold](command-line-tools/commands/generate/scaffold.md)
+    * [wheels generate scaffold](command-line-tools/commands/generate/scaffold.md)
   * Database Commands
-    * [Database Management Overview](command-line-tools/commands/database/database-management.md)
     * Database Operations
       * [wheels db create](command-line-tools/commands/database/db-create.md)
       * [wheels db drop](command-line-tools/commands/database/db-drop.md)
-      * [wheels db setup](command-line-tools/commands/database/db-setup.md)
-      * [wheels db reset](command-line-tools/commands/database/db-reset.md)
-      * [wheels db status](command-line-tools/commands/database/db-status.md)
-      * [wheels db version](command-line-tools/commands/database/db-version.md)
-      * [wheels db rollback](command-line-tools/commands/database/db-rollback.md)
-      * [wheels db seed](command-line-tools/commands/database/db-seed.md)
-      * [wheels db dump](command-line-tools/commands/database/db-dump.md)
-      * [wheels db restore](command-line-tools/commands/database/db-restore.md)
-      * [wheels db shell](command-line-tools/commands/database/db-shell.md)
-      * [wheels db schema](command-line-tools/commands/database/db-schema.md)
     * Migration Commands
       * [wheels dbmigrate info](command-line-tools/commands/database/dbmigrate-info.md)
       * [wheels dbmigrate latest](command-line-tools/commands/database/dbmigrate-latest.md)
@@ -68,69 +53,30 @@
       * [wheels dbmigrate remove table](command-line-tools/commands/database/dbmigrate-remove-table.md)
   * Testing Commands
     * [wheels test](command-line-tools/commands/testing/test.md)
-    * [wheels test run](command-line-tools/commands/testing/test-run.md)
-    * [wheels test coverage](command-line-tools/commands/testing/test-coverage.md)
-    * [wheels test debug](command-line-tools/commands/testing/test-debug.md)
-  * Configuration Commands
-    * [wheels config list](command-line-tools/commands/config/config-list.md)
-    * [wheels config set](command-line-tools/commands/config/config-set.md)
-    * [wheels config env](command-line-tools/commands/config/config-env.md)
   * Environment Management
-    * [wheels env](command-line-tools/commands/environment/env.md)
     * [wheels env setup](command-line-tools/commands/environment/env-setup.md)
     * [wheels env list](command-line-tools/commands/environment/env-list.md)
+    * [wheels env merge](command-line-tools/commands/environment/env-merge.md)
+    * [wheels env set](command-line-tools/commands/environment/env-set.md)
+    * [wheels env show](command-line-tools/commands/environment/env-show.md)
     * [wheels env switch](command-line-tools/commands/environment/env-switch.md)
-    * [wheels environment](command-line-tools/commands/environment/environment.md)
-    * [wheels console](command-line-tools/commands/environment/console.md)
-    * [wheels runner](command-line-tools/commands/environment/runner.md)
-  * Server Management
-    * [wheels server](command-line-tools/commands/server/server.md)
-    * [wheels server start](command-line-tools/commands/server/server-start.md)
-    * [wheels server stop](command-line-tools/commands/server/server-stop.md)
-    * [wheels server restart](command-line-tools/commands/server/server-restart.md)
-    * [wheels server status](command-line-tools/commands/server/server-status.md)
-    * [wheels server log](command-line-tools/commands/server/server-log.md)
-    * [wheels server open](command-line-tools/commands/server/server-open.md)
-  * Plugin Management
-    * [wheels plugins](command-line-tools/commands/plugins/plugins.md)
-    * [wheels plugins list](command-line-tools/commands/plugins/plugins-list.md)
-    * [wheels plugins install](command-line-tools/commands/plugins/plugins-install.md)
-    * [wheels plugins remove](command-line-tools/commands/plugins/plugins-remove.md)
+    * [wheels env validate](command-line-tools/commands/environment/env-validate.md)
   * Code Analysis
-    * [wheels analyze](command-line-tools/commands/analysis/analyze.md)
     * [wheels analyze code](command-line-tools/commands/analysis/analyze-code.md)
     * [wheels analyze performance](command-line-tools/commands/analysis/analyze-performance.md)
     * [wheels analyze security](command-line-tools/commands/analysis/analyze-security.md)
-  * Security Commands
-    * [wheels security](command-line-tools/commands/security/security.md)
-    * [wheels security scan](command-line-tools/commands/security/security-scan.md)
-  * Performance Commands
-    * [wheels optimize](command-line-tools/commands/performance/optimize.md)
-    * [wheels optimize performance](command-line-tools/commands/performance/optimize-performance.md)
-  * Documentation Commands
-    * [wheels docs](command-line-tools/commands/documentation/docs.md)
-    * [wheels docs generate](command-line-tools/commands/documentation/docs-generate.md)
-    * [wheels docs serve](command-line-tools/commands/documentation/docs-serve.md)
+  * Config
+    * [wheels config check](command-line-tools/commands/config/config-check.md)
+    * [wheels config diff](command-line-tools/commands/config/config-diff.md)
+    * [wheels config dump](command-line-tools/commands/config/config-dump.md)
   * CI/CD Commands
     * [wheels ci init](command-line-tools/commands/ci/ci-init.md)
   * Docker Commands
     * [wheels docker init](command-line-tools/commands/docker/docker-init.md)
     * [wheels docker deploy](command-line-tools/commands/docker/docker-deploy.md)
-  * Deployment Commands
-    * [wheels deploy](command-line-tools/commands/deploy/deploy.md)
-    * [wheels deploy audit](command-line-tools/commands/deploy/deploy-audit.md)
-    * [wheels deploy exec](command-line-tools/commands/deploy/deploy-exec.md)
-    * [wheels deploy hooks](command-line-tools/commands/deploy/deploy-hooks.md)
-    * [wheels deploy init](command-line-tools/commands/deploy/deploy-init.md)
-    * [wheels deploy lock](command-line-tools/commands/deploy/deploy-lock.md)
-    * [wheels deploy logs](command-line-tools/commands/deploy/deploy-logs.md)
-    * [wheels deploy proxy](command-line-tools/commands/deploy/deploy-proxy.md)
-    * [wheels deploy push](command-line-tools/commands/deploy/deploy-push.md)
-    * [wheels deploy rollback](command-line-tools/commands/deploy/deploy-rollback.md)
-    * [wheels deploy secrets](command-line-tools/commands/deploy/deploy-secrets.md)
-    * [wheels deploy setup](command-line-tools/commands/deploy/deploy-setup.md)
-    * [wheels deploy status](command-line-tools/commands/deploy/deploy-status.md)
-    * [wheels deploy stop](command-line-tools/commands/deploy/deploy-stop.md)
+  * Get Commands
+    * [wheels get environment](command-line-tools/commands/get/get-environment.md)
+    * [wheels get settings](command-line-tools/commands/get/get-settings.md)
 * CLI Development Guides
   * [Configuration Management](command-line-tools/configuration.md)
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
@@ -208,11 +154,6 @@
   * [Migrations in Production](database-interaction-through-models/database-migrations/migrations-in-production.md)
 * [Using Multiple Data Sources](database-interaction-through-models/using-multiple-data-sources.md)
 
-## Plugins
-
-* [Installing and Using Plugins](plugins/installing-and-using-plugins.md)
-* [Developing Plugins](plugins/developing-plugins.md)
-* [Publishing Plugins](plugins/publishing-plugins.md)
 
 ## Project Documentation
 
@@ -224,3 +165,9 @@
 * [Issue Tracker](https://github.com/wheels-dev/wheels/issues)
 * [Sponsor Us](https://opencollective.com/wheels)
 * [Community](https://github.com/wheels-dev/wheels/discussions)
+
+## Plugins
+
+* [Installing and Using Plugins](plugins/installing-and-using-plugins.md)
+* [Developing Plugins](plugins/developing-plugins.md)
+* [Publishing Plugins](plugins/publishing-plugins.md)

@@ -281,6 +281,13 @@ component extends="testbox.system.BaseSpec" {
 				a[4] = [1, 2, 3, 4, 5, 6];
 				a[5] = {a = 1, b = 2, c = 3, d = 4};
 				a[6] = photo;
+				if (structKeyExists(server, "boxlang") && isObject(photo.filedata)) {
+					local.className = GetMetadata(photo.filedata).getName();
+					if (local.className == "oracle.sql.BLOB") {
+						// Convert Oracle BLOB to binary using getBytes() method
+						photo.filedata = photo.filedata.getBytes();
+					}
+				}
 				args = {};
 				args.a = a;
 				e = g.$hashedKey(argumentCollection = args);

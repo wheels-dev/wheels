@@ -8,8 +8,8 @@ component {
 	 *
 	 * @objectName The variable name of the object to build the form control for.
 	 * @property The name of the property to use in the form control.
-	 * @association The name of the association that the property is located on. Used for building nested forms that work with nested properties. If you are building a form with deep nesting, simply pass in a list to the nested object, and CFWheels will figure it out.
-	 * @position The position used when referencing a hasMany relationship in the association argument. Used for building nested forms that work with nested properties. If you are building a form with deep nestings, simply pass in a list of positions, and CFWheels will figure it out.
+	 * @association The name of the association that the property is located on. Used for building nested forms that work with nested properties. If you are building a form with deep nesting, simply pass in a list to the nested object, and Wheels will figure it out.
+	 * @position The position used when referencing a hasMany relationship in the association argument. Used for building nested forms that work with nested properties. If you are building a form with deep nestings, simply pass in a list of positions, and Wheels will figure it out.
 	 * @label The label text to use in the form control.
 	 * @labelPlacement Whether to place the label before, after, or wrapped around the form control. Label text placement can be controlled using aroundLeft or aroundRight.
 	 * @prepend String to prepend to the form control. Useful to wrap the form control with HTML tags.

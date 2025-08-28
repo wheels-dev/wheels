@@ -18,6 +18,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		string file = ".env"
 	)
 	{
+		arguments = reconstructArgs(arguments);
 		local.updates = {};
 
 		for (local.key in arguments) {

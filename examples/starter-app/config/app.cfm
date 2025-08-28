@@ -7,7 +7,7 @@
 		this.sessionTimeout = CreateTimeSpan(0,0,5,0);
 	*/
 
-	// Added via CFWheels CLI
+	// Added via Wheels CLI
 	this.name = "starterApp";
 
 	this.datasources["starterApp"] = {

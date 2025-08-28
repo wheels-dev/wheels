@@ -11,7 +11,7 @@
         package = "wheels.tests_testbox.specs";
         route = "wheelstestbox";
     } else if(type eq "App") {
-        package = "tests.Testbox.specs";
+        package = "tests.specs";
         route = "testbox";
     }
     // Convert TestBox results to a format similar to RocketUnit
@@ -97,7 +97,7 @@
 
         #startTable(title="Test Results", colspan=6)#
         <tr class="<cfif testResults.ok>positive<cfelse>error</cfif>">
-            <td><strong>Status</strong><br /><cfif testResults.ok><i class='icon check'></i> Passed<cfelse><i class='icon close'></i> Failed</cfif></td>
+            <td><strong>Status</strong><br /><cfif testResults.ok> Passed<cfelse> Failed</cfif></td>
             <td><strong>Duration</strong><br />#numberFormat(duration.hours, "00")#:#numberFormat(duration.minutes, "00")#:#numberFormat(duration.seconds, "00")#</td>
             <td><strong>Bundles</strong><br />#testResults.numCases#</td>
             <td><strong>Specs</strong><br />#testResults.numTests#</td>

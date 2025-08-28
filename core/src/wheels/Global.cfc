@@ -237,6 +237,35 @@ component output="false" {
 			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
 			return local.rv;
 		}
+		
+		// Get database adapter to check if it's Oracle
+		if (local.adapter == "Oracle") {
+			// Use direct SQL query instead of cfdbinfo for BoxLang + Oracle index queries
+			local.sql = "
+			SELECT 
+				NULL AS TABLE_CAT,
+				ai.OWNER AS TABLE_SCHEM,
+				ai.TABLE_NAME,
+				CASE WHEN ai.UNIQUENESS = 'NONUNIQUE' THEN 1 ELSE 0 END AS NON_UNIQUE,
+				ai.OWNER AS INDEX_QUALIFIER,
+				ai.INDEX_NAME,
+				'Other Index' AS TYPE,
+				ac.COLUMN_POSITION AS ORDINAL_POSITION,
+				ac.COLUMN_NAME,
+				CASE WHEN ac.DESCEND = 'DESC' THEN 'D' ELSE 'A' END AS ASC_OR_DESC,
+				0 AS CARDINALITY,
+				0 AS PAGES,
+				'' AS FILTER_CONDITION
+			FROM ALL_INDEXES ai
+			JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
+			WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
+				AND ai.INDEX_TYPE != 'LOB'
+			ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
+			";
+			
+			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+			return local.rv;
+		}
     }
 
     // If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
@@ -685,7 +714,7 @@ component output="false" {
 	}
 
 	/**
-	 * This copies all the variables CFWheels needs from the CGI scope to the request scope.
+	 * This copies all the variables Wheels needs from the CGI scope to the request scope.
 	 */
 	public struct function $cgiScope(
 		string keys = "request_method,http_x_requested_with,http_referer,server_name,path_info,script_name,query_string,remote_addr,server_port,server_port_secure,server_protocol,http_host,http_accept,content_type,http_x_rewrite_url,http_x_original_url,request_uri,redirect_url,http_x_forwarded_for,http_x_forwarded_proto",
@@ -1349,7 +1378,7 @@ component output="false" {
 				|| (local.major == local.minimumMajor && local.minor < local.minimumMinor)
 				|| (local.major == local.minimumMajor && local.minor == local.minimumMinor && local.patch < local.minimumPatch)
 			) {
-				local.rv = "The CFWheels framework requires BoxLang version #local.minimumMajor#.#local.minimumMinor#.#local.minimumPatch# or higher. You are currently running version #arguments.version#.";
+				local.rv = "The Wheels framework requires BoxLang version #local.minimumMajor#.#local.minimumMinor#.#local.minimumPatch# or higher. You are currently running version #arguments.version#.";
 			}
 			
 			// Check maximum version (optional - for major version compatibility)
@@ -1358,7 +1387,7 @@ component output="false" {
 				|| (local.major == local.maximumMajor && local.minor > local.maximumMinor)
 				|| (local.major == local.maximumMajor && local.minor == local.maximumMinor && local.patch > local.maximumPatch)
 			) {
-				local.rv = "The CFWheels framework has been tested up to BoxLang version #local.maximumMajor#.#local.maximumMinor#.#local.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
+				local.rv = "The Wheels framework has been tested up to BoxLang version #local.maximumMajor#.#local.maximumMinor#.#local.maximumPatch#. You are currently running version #arguments.version#. Please check for framework updates or compatibility issues.";
 			}
 		} else if (arguments.engine == "Lucee") {
 			local.minimumMajor = "5";
@@ -1574,7 +1603,7 @@ component output="false" {
 	 * NB: url rewriting files need to be removed from here.
 	 */
 	public string function $buildReleaseZip(string version = application.wheels.version, string directory = ExpandPath("/")) {
-		local.name = "cfwheels-" & LCase(Replace(arguments.version, " ", "-", "all"));
+		local.name = "wheels-" & LCase(Replace(arguments.version, " ", "-", "all"));
 		local.name = Replace(local.name, "alpha-", "alpha.");
 		local.name = Replace(local.name, "beta-", "beta.");
 		local.name = Replace(local.name, "rc-", "rc.");
@@ -1582,27 +1611,29 @@ component output="false" {
 
 		// directories & files to add to the zip
 		local.include = [
-			"config",
-			"controllers",
-			"events",
+			"/config",
+			"/app/controllers",
+			"/app/events",
+			"/app/lib",
+			"/app/migrator",
 			"files",
-			"global",
+			"/app/global",
 			"images",
 			"javascripts",
 			"miscellaneous",
-			"models",
-			"plugins",
+			"/app/models",
+			"/plugins",
 			"stylesheets",
-			"tests",
-			"views",
-			"wheels",
+			"/tests",
+			"/app/views",
+			"/wheels",
 			"Application.cfc",
-			"box.json",
+			"../box.json",
 			"index.cfm"
 		];
 
 		// directories & files to be removed
-		local.exclude = ["wheels/tests", "wheels/public/build.cfm"];
+		local.exclude = ["/wheels/tests", "/wheels/public/build.cfm", "/wheels/tests_testbox"];
 
 		// filter out these bad boys
 		local.filter = "*.settings, *.classpath, *.project, *.DS_Store";
@@ -1611,11 +1642,21 @@ component output="false" {
 		// FileCopy(ExpandPath("CHANGELOG.md"), ExpandPath("/wheels/CHANGELOG.md"));
 		// FileCopy(ExpandPath("LICENSE"), ExpandPath("/wheels/LICENSE"));
 
+		// Entries starting with "/" or ".." → treat as project-root paths (keep original folder structure)
+		// Entries without "/" → treat as webroot (/public) paths
 		for (local.i in local.include) {
 			if (FileExists(ExpandPath(local.i))) {
-				$zip(file = local.path, source = ExpandPath(local.i));
+				if(left(local.i,1) neq "/" && left(local.i,2) neq ".."){
+					$zip(file = local.path, source = ExpandPath(local.i), prefix = "/public");
+				} else {
+					$zip(file = local.path, source = ExpandPath(local.i));
+				}
 			} else if (DirectoryExists(ExpandPath(local.i))) {
-				$zip(file = local.path, source = ExpandPath(local.i), prefix = local.i);
+				if(left(local.i,1) neq "/" && left(local.i,2) neq ".."){
+					$zip(file = local.path, source = ExpandPath(local.i), prefix = "/public/#local.i#");
+				} else {
+					$zip(file = local.path, source = ExpandPath(local.i), prefix = local.i);
+				}
 			} else {
 				Throw(
 					type = "Wheels.Build",
@@ -1639,7 +1680,7 @@ component output="false" {
 	}
 
 	/**
-	 * Throw a developer friendly CFWheels error if set (typically in development mode).
+	 * Throw a developer friendly Wheels error if set (typically in development mode).
 	 * Otherwise show the 404 page for end users (typically in production mode).
 	 */
 	public void function $throwErrorOrShow404Page(required string type, required string message, string extendedInfo = "") {
@@ -2052,7 +2093,7 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the current setting for the supplied CFWheels setting or the current default for the supplied CFWheels function argument.
+	 * Returns the current setting for the supplied Wheels setting or the current default for the supplied Wheels function argument.
 	 *
 	 * [section: Configuration]
 	 * [category: Miscellaneous Functions]
@@ -2075,7 +2116,7 @@ component output="false" {
 	}
 
 	/**
-	 * Adds a new MIME type to your CFWheels application for use with responding to multiple formats.
+	 * Adds a new MIME type to your Wheels application for use with responding to multiple formats.
 	 *
 	 * [section: Configuration]
 	 * [category: Miscellaneous Functions]
@@ -2228,7 +2269,7 @@ component output="false" {
 			if (!StructKeyExists(request.wheels, arguments.handle)) {
 				Throw(
 					type = "Wheels.QueryHandleNotFound",
-					message = "CFWheels couldn't find a query with the handle of `#arguments.handle#`.",
+					message = "Wheels couldn't find a query with the handle of `#arguments.handle#`.",
 					extendedInfo = "Make sure your `findAll` call has the `page` argument specified and matching `handle` argument if specified."
 				);
 			}
@@ -2432,7 +2473,7 @@ component output="false" {
 	 * @controller Name of the controller to include in the URL.
 	 * @action Name of the action to include in the URL.
 	 * @key Key(s) to include in the URL.
-	 * @params Any additional parameters to be set in the query string (example: `wheels=cool&x=y`). Please note that CFWheels uses the `&` and `=` characters to split the parameters and encode them properly for you. However, if you need to pass in `&` or `=` as part of the value, then you need to encode them (and only them), example: `a=cats%26dogs%3Dtrouble!&b=1`.
+	 * @params Any additional parameters to be set in the query string (example: `wheels=cool&x=y`). Please note that Wheels uses the `&` and `=` characters to split the parameters and encode them properly for you. However, if you need to pass in `&` or `=` as part of the value, then you need to encode them (and only them), example: `a=cats%26dogs%3Dtrouble!&b=1`.
 	 * @anchor Sets an anchor name to be appended to the path.
 	 * @onlyPath If `true`, returns only the relative URL (no protocol, host name or port).
 	 * @host Set this to override the current host.
@@ -2707,7 +2748,7 @@ component output="false" {
 	}
 
 	/**
-	 * Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the `count` argument. CFWheels stores a list of words that are the same in both singular and plural form (e.g. "equipment", "information") and words that don't follow the regular pluralization rules (e.g. "child" / "children", "foot" / "feet"). Use `get("uncountables")` / `set("uncountables", newList)` and `get("irregulars")` / `set("irregulars", newList)` to modify them to suit your needs.
+	 * Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the `count` argument. Wheels stores a list of words that are the same in both singular and plural form (e.g. "equipment", "information") and words that don't follow the regular pluralization rules (e.g. "child" / "children", "foot" / "feet"). Use `get("uncountables")` / `set("uncountables", newList)` and `get("irregulars")` / `set("irregulars", newList)` to modify them to suit your needs.
 	 *
 	 * [section: Global Helpers]
 	 * [category: String Functions]

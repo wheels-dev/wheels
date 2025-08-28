@@ -98,26 +98,46 @@ component extends="../base" {
 		// Same logic as get environment command
 		local.environment = "";
 		
-		// Check .env file
+		// 1. Check .env file for WHEELS_ENV first, then Environment
 		local.envFile = arguments.appPath & "/.env";
 		if (FileExists(local.envFile)) {
 			local.envContent = FileRead(local.envFile);
-			local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*(.+)$", local.envContent, 1, true);
+			
+			// First check for WHEELS_ENV
+			local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*([^\s##]+)", local.envContent, 1, true);
 			if (local.envMatch.pos[1] > 0) {
 				local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
 			}
+			
+			// If not found, check for Environment
+			if (!Len(local.environment)) {
+				local.envMatch = REFind("(?m)^Environment\s*=\s*([^\s##]+)", local.envContent, 1, true);
+				if (local.envMatch.pos[1] > 0) {
+					local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
+				}
+			}
 		}
 		
-		// Check environment variable
+		// 2. Check system environment variables for WHEELS_ENV first, then Environment
 		if (!Len(local.environment)) {
 			local.sysEnv = CreateObject("java", "java.lang.System");
+			
+			// First check for WHEELS_ENV
 			local.wheelsEnv = local.sysEnv.getenv("WHEELS_ENV");
 			if (!IsNull(local.wheelsEnv) && Len(local.wheelsEnv)) {
 				local.environment = local.wheelsEnv;
 			}
+			
+			// If not found, check for Environment
+			if (!Len(local.environment)) {
+				local.env = local.sysEnv.getenv("Environment");
+				if (!IsNull(local.env) && Len(local.env)) {
+					local.environment = local.env;
+				}
+			}
 		}
 		
-		// Default to development
+		// 3. Default to development
 		if (!Len(local.environment)) {
 			local.environment = "development";
 		}
@@ -156,7 +176,7 @@ component extends="../base" {
 			"useTimestampsOnDeletedColumn": true,
 			"deletePluginDirectories": true,
 			"loadIncompatiblePlugins": true,
-			"migratorTableName": "migratorversions",
+			"migratorTableName": "c_o_r_e_migrator_versions",
 			"allowConcurrentRequestScope": false,
 			"booleanAttributes": "allowfullscreen,async,autofocus,autoplay,checked,compact,controls,declare,default,defaultchecked,defaultmuted,defaultselected,defer,disabled,draggable,enabled,formnovalidate,hidden,indeterminate,inert,ismap,itemscope,loop,multiple,muted,nohref,noresize,noshade,novalidate,nowrap,open,pauseonexit,readonly,required,reversed,scoped,seamless,selected,sortable,spellcheck,translate,truespeed,typemustmatch,visible"
 		};

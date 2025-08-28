@@ -15,7 +15,7 @@ Start by cloning the [Wheels](https://github.com/wheels-dev/wheels) repository. 
 
 The API Documentation is comprised of two parts. The first is a json file that contains the data for a particular version of the framework and the second is a small Wheels App that reads that json file and displays the UI you see when you visit [https://wheels.dev/api/v3.0.0](https://wheels.dev/api/v3.0.0).
 
-We use a javadoc style of notation to document all the public functions of the framework. This system is actually available to you to document your own functions and is documented at [Documenting your Code](https://wheels.dev/3.0.0/guides/working-with-cfwheels/documenting-your-code). Additionally the sample code is driven off text files that are located in [core/src/wheels/public/docs/reference](https://github.com/wheels-dev/wheels/tree/develop/core/src/wheels/public/docs/reference).
+We use a javadoc style of notation to document all the public functions of the framework. This system is actually available to you to document your own functions and is documented at [Documenting your Code](https://wheels.dev/3.0.0/guides/working-with-wheels/documenting-your-code). Additionally the sample code is driven off text files that are located in [core/src/wheels/public/docs/reference](https://github.com/wheels-dev/wheels/tree/develop/core/src/wheels/public/docs/reference).
 
 So the first step in submitting changes to the API Documentation is similar to the Wheels Guides and starts with cloning the repository, making the changes, and submitting a PR.
 

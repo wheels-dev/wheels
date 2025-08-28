@@ -349,7 +349,7 @@ component extends="Base" {
 	}
 
 	/**
-	 * adds CFWheels convention automatic timestamp and soft delete columns to table definition
+	 * adds Wheels convention automatic timestamp and soft delete columns to table definition
 	 *
 	 * [section: Migrator]
 	 * [category: Table Definition Functions]

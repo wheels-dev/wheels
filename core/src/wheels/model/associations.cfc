@@ -7,9 +7,9 @@ component {
 	 * [category: Association Functions]
 	 *
 	 * @name Gives the association a name that you refer to when working with the association (in the `include` argument to `findAll`, to name one example).
-	 * @modelName Name of associated model (usually not needed if you follow CFWheels conventions because the model name will be deduced from the `name` argument).
-	 * @foreignKey Foreign key property name (usually not needed if you follow CFWheels conventions since the foreign key name will be deduced from the `name` argument).
-	 * @joinKey Column name to join to if not the primary key (usually not needed if you follow CFWheels conventions since the join key will be the table's primary key/keys).
+	 * @modelName Name of associated model (usually not needed if you follow Wheels conventions because the model name will be deduced from the `name` argument).
+	 * @foreignKey Foreign key property name (usually not needed if you follow Wheels conventions since the foreign key name will be deduced from the `name` argument).
+	 * @joinKey Column name to join to if not the primary key (usually not needed if you follow Wheels conventions since the join key will be the table's primary key/keys).
 	 * @joinType Use to set the join type when joining associated tables. Possible values are `inner` (for `INNER JOIN`) and `outer` (for `LEFT OUTER JOIN`).
 	 */
 	public void function belongsTo(
@@ -43,7 +43,7 @@ component {
 	 * @joinType [see:belongsTo].
 	 * @dependent Defines how to handle dependent model objects when you delete an object from this model. `delete` / `deleteAll` deletes the record(s) (`deleteAll` bypasses object instantiation). `remove` / `removeAll` sets the forein key field(s) to `NULL` (`removeAll` bypasses object instantiation).
 	 * @shortcut Set this argument to create an additional dynamic method that gets the object(s) from the other side of a many-to-many association.
-	 * @through Set this argument if you need to override CFWheels conventions when using the `shortcut` argument. Accepts a list of two association names representing the chain from the opposite side of the many-to-many relationship to this model.
+	 * @through Set this argument if you need to override Wheels conventions when using the `shortcut` argument. Accepts a list of two association names representing the chain from the opposite side of the many-to-many relationship to this model.
 	 */
 	public void function hasMany(
 		required string name,

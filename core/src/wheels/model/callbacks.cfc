@@ -327,7 +327,38 @@ component {
 								continue;
 							}
 						}
-						arguments.collection[local.key][local.rowNumber] = local.result[local.key];
+						
+						// Handle Oracle TIMESTAMP objects in BoxLang by converting to string
+						local.valueToAssign = local.result[local.key];
+						if (structKeyExists(server, "boxlang") && IsObject(local.valueToAssign) && !IsStruct(local.valueToAssign)) {
+							try {
+								local.className = GetMetadata(local.valueToAssign).getName();
+							} catch (any e) {
+								local.className = "";
+							}
+							if (local.className == "oracle.sql.TIMESTAMP" || local.className == "oracle.sql.DATE") {
+								// Convert Oracle timestamp to string first
+								local.timestampString = local.valueToAssign.toString();
+								// Parse the timestamp string manually
+								local.dateParts = ListToArray(local.timestampString, " ");
+								local.dateOnly = local.dateParts[1];
+								local.timeOnly = local.dateParts[2];
+								
+								local.dateComponents = ListToArray(local.dateOnly, "-");
+								local.timeComponents = ListToArray(local.timeOnly, ":");
+								
+								local.valueToAssign = CreateDateTime(
+									Val(local.dateComponents[1]), // year
+									Val(local.dateComponents[2]), // month  
+									Val(local.dateComponents[3]), // day
+									Val(local.timeComponents[1]), // hour
+									Val(local.timeComponents[2]), // minute
+									Val(ListFirst(local.timeComponents[3], ".")) // second (remove decimal)
+								);
+							}
+						}
+						
+						arguments.collection[local.key][local.rowNumber] = local.valueToAssign;
 					}
 				} else if (IsBoolean(local.result) && !local.result) {
 					// Break the loop and return false if the callback returned false.

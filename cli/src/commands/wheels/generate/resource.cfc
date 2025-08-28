@@ -374,7 +374,7 @@ component aliases='wheels g resource' extends="../base" {
                 crud = true
             )
             .run();
-        arrayAppend(testPaths, "tests/Testbox/specs/models/#obj.objectNameSingularC#.cfc");
+        arrayAppend(testPaths, "tests/specs/models/#obj.objectNameSingularC#.cfc");
 
         // Generate controller test
         command("wheels generate test")
@@ -384,7 +384,7 @@ component aliases='wheels g resource' extends="../base" {
                 crud = true
             )
             .run();
-        arrayAppend(testPaths, "tests/Testbox/specs/controllers/#obj.objectNamePluralC#.cfc");
+        arrayAppend(testPaths, "tests/specs/controllers/#obj.objectNamePluralC#.cfc");
 
         return testPaths;
     }
