@@ -145,10 +145,10 @@ docker exec -it cfwheels-test-lucee5 /bin/bash
 
 # Run all tests
 cd /cfwheels-test-suite
-box wheels test run
+box wheels test app
 
 # Run a specific test bundle
-box wheels test run --testBundles=controllers
+box wheels test app --testBundles=controllers
 ```
 
 #### Testing with Adobe ColdFusion 2021 and SQL Server
@@ -159,10 +159,10 @@ docker exec -it cfwheels-test-adobe2021 /bin/bash
 
 # Run all tests
 cd /cfwheels-test-suite
-box wheels test run
+box wheels test app
 
 # Specify a test bundle
-box wheels test run --testBundles=models
+box wheels test app --testBundles=models
 ```
 
 #### Testing with Lucee 6 and PostgreSQL
@@ -173,10 +173,10 @@ docker exec -it cfwheels-test-lucee6 /bin/bash
 
 # Run all tests
 cd /cfwheels-test-suite
-box wheels test run
+box wheels test app
 
 # Run a specific test with specific options
-box wheels test run --testBundles=core&testSpecs=testCaseOne
+box wheels test app --testBundles=core&testSpecs=testCaseOne
 ```
 
 ### Running Comprehensive Test Suite
@@ -196,10 +196,10 @@ You can also run tests locally using CommandBox without Docker, though this will
 box server start
 
 # Run all tests
-box wheels test run
+box wheels test app
 
 # Run tests with specific parameters
-box wheels test run --testBundles=controllers
+box wheels test app --testBundles=controllers
 ```
 
 ## Test Environment Components
@@ -239,7 +239,7 @@ The TestUI includes features to help manage the test environment:
 When contributing to Wheels, you may need to create new tests for your code changes:
 
 1. Create a new test file in the appropriate directory:
-   - For core functions: `/tests_testbox/specs/functions/YourTest.cfc`
+   - For core functions: `core/src/wheels/tests_testbox/specs/functions/YourTest.cfc`
 
 If you are adding in the already created test files, then you have to add in the same tests file, otherwise you can create a separate test file.
 
