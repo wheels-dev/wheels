@@ -7,7 +7,7 @@ Wheels includes a comprehensive test environment specifically designed for testi
 The Wheels test environment uses Docker containers to provide a standardized setup for testing core framework functionality across:
 
 - Multiple CFML engines (Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023, BoxLang 1.x)
-- Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2)
+- Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2, Oracle)
 - A modern test user interface (TestUI)
 - Automated test execution capabilities
 
@@ -64,16 +64,16 @@ The test environment uses Docker Compose profiles to selectively start component
 
 ```bash
 # Start everything (all engines, databases, and test UI)
-docker compose --profile all up -d
+docker compose up -d all
 
 # Start just the test UI
-docker compose --profile ui up -d
+docker compose up -d ui
 
 # Start a specific CFML engine and database
-docker compose --profile lucee --profile mysql up -d
+docker compose up -d lucee mysql
 
 # Start a minimum testing setup
-docker compose --profile quick-test up -d
+docker compose up -d quick-test
 ```
 
 The first time you run these commands, Docker will build or download the necessary images, which may take several minutes.
@@ -94,7 +94,7 @@ This web interface allows you to:
 
 ## Available Docker Profiles
 
-The test environment includes several profiles you can use with `docker compose --profile [profile] up -d`:
+The test environment includes several profiles you can use with `docker compose up -d [profile]`:
 
 | Profile | Description |
 |---------|-------------|
@@ -116,7 +116,7 @@ The test environment includes several profiles you can use with `docker compose 
 You can combine multiple profiles by specifying them together:
 
 ```bash
-docker compose --profile lucee --profile mysql --profile ui up -d
+docker compose up -d lucee mysql ui
 ```
 
 ## Running Core Framework Tests
@@ -144,13 +144,10 @@ docker exec -it cfwheels-test-lucee5 /bin/bash
 
 # Run all tests
 cd /cfwheels-test-suite
-box wheels test app
-
-# Run a specific test
-box wheels test app TestName
+box wheels test run
 
 # Run a specific test bundle
-box wheels test app testBundles=controllers
+box wheels test run --testBundles=controllers
 ```
 
 #### Testing with Adobe ColdFusion 2021 and SQL Server
@@ -161,10 +158,10 @@ docker exec -it cfwheels-test-adobe2021 /bin/bash
 
 # Run all tests
 cd /cfwheels-test-suite
-box wheels test app
+box wheels test run
 
 # Specify a test bundle
-box wheels test app testBundles=models
+box wheels test run --testBundles=models
 ```
 
 #### Testing with Lucee 6 and PostgreSQL
@@ -175,10 +172,10 @@ docker exec -it cfwheels-test-lucee6 /bin/bash
 
 # Run all tests
 cd /cfwheels-test-suite
-box wheels test app
+box wheels test run
 
 # Run a specific test with specific options
-box wheels test app testBundles=core&testSpecs=testCaseOne
+box wheels test run --testBundles=core&testSpecs=testCaseOne
 ```
 
 ### Running Comprehensive Test Suite
@@ -198,13 +195,10 @@ You can also run tests locally using CommandBox without Docker, though this will
 box server start
 
 # Run all tests
-box wheels test app
-
-# Run a specific test
-box wheels test app TestName
+box wheels test run
 
 # Run tests with specific parameters
-box wheels test app testBundles=controllers
+box wheels test run --testBundles=controllers
 ```
 
 ## Test Environment Components
@@ -215,9 +209,11 @@ box wheels test app testBundles=controllers
 |--------|----------------|------|
 | Lucee 5 | cfwheels-test-lucee5 | 60005 |
 | Lucee 6 | cfwheels-test-lucee6 | 60006 |
+| Lucee 7 | cfwheels-test-lucee7 | 60007 |
 | Adobe 2018 | cfwheels-test-adobe2018 | 62018 |
 | Adobe 2021 | cfwheels-test-adobe2021 | 62021 |
 | Adobe 2023 | cfwheels-test-adobe2023 | 62023 |
+| Boxlang 1 | cfwheels-test-boxlang | 60001 |
 
 ### Databases
 
@@ -226,6 +222,7 @@ box wheels test app testBundles=controllers
 | MySQL | mysql | 3307 (3306 internal) |
 | PostgreSQL | postgres | 5433 (5432 internal) |
 | SQL Server | sqlserver_cicd | 1434 (1433 internal) |
+| Oracle | oracle | 1522 (1522 internal) |
 | H2 | (embedded) | n/a |
 
 ### Test User Interface
@@ -333,8 +330,8 @@ box install
 docker compose build
 
 # Restart the environment
-docker compose --profile all down
-docker compose --profile all up -d
+docker compose down all
+docker compose up -d all
 ```
 
 ## Conclusion
