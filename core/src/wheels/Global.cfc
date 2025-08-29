@@ -1611,27 +1611,29 @@ component output="false" {
 
 		// directories & files to add to the zip
 		local.include = [
-			"config",
-			"controllers",
-			"events",
+			"/config",
+			"/app/controllers",
+			"/app/events",
+			"/app/lib",
+			"/app/migrator",
 			"files",
-			"global",
+			"/app/global",
 			"images",
 			"javascripts",
 			"miscellaneous",
-			"models",
-			"plugins",
+			"/app/models",
+			"/plugins",
 			"stylesheets",
-			"tests",
-			"views",
-			"wheels",
+			"/tests",
+			"/app/views",
+			"/wheels",
 			"Application.cfc",
-			"box.json",
+			"../box.json",
 			"index.cfm"
 		];
 
 		// directories & files to be removed
-		local.exclude = ["wheels/tests", "wheels/public/build.cfm"];
+		local.exclude = ["/wheels/tests", "/wheels/public/build.cfm", "/wheels/tests_testbox"];
 
 		// filter out these bad boys
 		local.filter = "*.settings, *.classpath, *.project, *.DS_Store";
@@ -1640,11 +1642,21 @@ component output="false" {
 		// FileCopy(ExpandPath("CHANGELOG.md"), ExpandPath("/wheels/CHANGELOG.md"));
 		// FileCopy(ExpandPath("LICENSE"), ExpandPath("/wheels/LICENSE"));
 
+		// Entries starting with "/" or ".." → treat as project-root paths (keep original folder structure)
+		// Entries without "/" → treat as webroot (/public) paths
 		for (local.i in local.include) {
 			if (FileExists(ExpandPath(local.i))) {
-				$zip(file = local.path, source = ExpandPath(local.i));
+				if(left(local.i,1) neq "/" && left(local.i,2) neq ".."){
+					$zip(file = local.path, source = ExpandPath(local.i), prefix = "/public");
+				} else {
+					$zip(file = local.path, source = ExpandPath(local.i));
+				}
 			} else if (DirectoryExists(ExpandPath(local.i))) {
-				$zip(file = local.path, source = ExpandPath(local.i), prefix = local.i);
+				if(left(local.i,1) neq "/" && left(local.i,2) neq ".."){
+					$zip(file = local.path, source = ExpandPath(local.i), prefix = "/public/#local.i#");
+				} else {
+					$zip(file = local.path, source = ExpandPath(local.i), prefix = local.i);
+				}
 			} else {
 				Throw(
 					type = "Wheels.Build",
