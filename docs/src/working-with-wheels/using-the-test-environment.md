@@ -7,7 +7,7 @@ Wheels includes a comprehensive test environment specifically designed for testi
 The Wheels test environment uses Docker containers to provide a standardized setup for testing core framework functionality across:
 
 - Multiple CFML engines (Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023, BoxLang 1.x)
-- Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2)
+- Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2, Oracle)
 - A modern test user interface (TestUI)
 - Automated test execution capabilities
 
@@ -64,16 +64,13 @@ The test environment uses Docker Compose profiles to selectively start component
 
 ```bash
 # Start everything (all engines, databases, and test UI)
-docker compose --profile all up -d
+docker compose up -d
 
 # Start just the test UI
-docker compose --profile ui up -d
+docker compose up -d testui
 
 # Start a specific CFML engine and database
-docker compose --profile lucee --profile mysql up -d
-
-# Start a minimum testing setup
-docker compose --profile quick-test up -d
+docker compose up -d lucee6 mysql
 ```
 
 The first time you run these commands, Docker will build or download the necessary images, which may take several minutes.
@@ -83,7 +80,7 @@ The first time you run these commands, Docker will build or download the necessa
 Once the containers are running, access the TestUI by navigating to:
 
 ```
-http://localhost:3001
+http://localhost:3000
 ```
 
 This web interface allows you to:
@@ -94,29 +91,33 @@ This web interface allows you to:
 
 ## Available Docker Profiles
 
-The test environment includes several profiles you can use with `docker compose --profile [profile] up -d`:
+In order to run all CFML engines, databases, and the TestUI, use this command:
+
+```bash
+docker compose up -d
+```
+
+Besides this, test environment supports multiple profiles that you can run individually using `docker compose up -d [profile]`:
 
 | Profile | Description |
 |---------|-------------|
-| `all` | All CFML engines, databases, and the TestUI |
-| `ui` | Just the modern TestUI |
-| `ui-legacy` | The legacy TestUI interface |
-| `lucee` | Lucee 5, 6 and 7 engines |
-| `adobe` | Adobe ColdFusion 2018, 2021, 2023 engines |
+| `testui` | Just the modern TestUI |
+| `lucee5` | Lucee 5 engine |
+| `lucee6` | Lucee 6 engine |
+| `lucee7` | Lucee 7 engine |
+| `adobe2018` | Adobe ColdFusion 2018 engine |
+| `adobe2021` | Adobe ColdFusion 2021 engine |
+| `adobe2023` | Adobe ColdFusion 2023 engine |
 | `boxlang` | BoxLang 1 engine |
-| `db` | All database platforms |
 | `mysql` | MySQL database only |
 | `postgres` | PostgreSQL database only |
 | `sqlserver` | SQL Server database only |
-| `quick-test` | Minimal setup for quick testing (Lucee 5 + MySQL) |
-| `compatibility` | Engines used for compatibility testing |
-| `current` | Latest stable versions of engines |
-| `legacy` | Older versions of engines |
+| `oracle` | Oracle Server database only |
 
 You can combine multiple profiles by specifying them together:
 
 ```bash
-docker compose --profile lucee --profile mysql --profile ui up -d
+docker compose up -d lucee6 mysql testui
 ```
 
 ## Running Core Framework Tests
@@ -125,7 +126,7 @@ When contributing to Wheels, it's essential to run tests against various engine-
 
 ### Via the TestUI
 
-1. Open the TestUI at http://localhost:3001
+1. Open the TestUI at http://localhost:3000
 2. Select the CFML engine and database you want to test against (e.g., Lucee 5 + MySQL)
 3. Select the test bundle or specific test to run
 4. Click "Run Tests" to execute them
@@ -146,11 +147,8 @@ docker exec -it cfwheels-test-lucee5 /bin/bash
 cd /cfwheels-test-suite
 box wheels test app
 
-# Run a specific test
-box wheels test app TestName
-
 # Run a specific test bundle
-box wheels test app testBundles=controllers
+box wheels test app --testBundles=controllers
 ```
 
 #### Testing with Adobe ColdFusion 2021 and SQL Server
@@ -164,7 +162,7 @@ cd /cfwheels-test-suite
 box wheels test app
 
 # Specify a test bundle
-box wheels test app testBundles=models
+box wheels test app --testBundles=models
 ```
 
 #### Testing with Lucee 6 and PostgreSQL
@@ -178,7 +176,7 @@ cd /cfwheels-test-suite
 box wheels test app
 
 # Run a specific test with specific options
-box wheels test app testBundles=core&testSpecs=testCaseOne
+box wheels test app --testBundles=core&testSpecs=testCaseOne
 ```
 
 ### Running Comprehensive Test Suite
@@ -200,11 +198,8 @@ box server start
 # Run all tests
 box wheels test app
 
-# Run a specific test
-box wheels test app TestName
-
 # Run tests with specific parameters
-box wheels test app testBundles=controllers
+box wheels test app --testBundles=controllers
 ```
 
 ## Test Environment Components
@@ -215,9 +210,11 @@ box wheels test app testBundles=controllers
 |--------|----------------|------|
 | Lucee 5 | cfwheels-test-lucee5 | 60005 |
 | Lucee 6 | cfwheels-test-lucee6 | 60006 |
+| Lucee 7 | cfwheels-test-lucee7 | 60007 |
 | Adobe 2018 | cfwheels-test-adobe2018 | 62018 |
 | Adobe 2021 | cfwheels-test-adobe2021 | 62021 |
 | Adobe 2023 | cfwheels-test-adobe2023 | 62023 |
+| Boxlang 1 | cfwheels-test-boxlang | 60001 |
 
 ### Databases
 
@@ -226,14 +223,8 @@ box wheels test app testBundles=controllers
 | MySQL | mysql | 3307 (3306 internal) |
 | PostgreSQL | postgres | 5433 (5432 internal) |
 | SQL Server | sqlserver_cicd | 1434 (1433 internal) |
+| Oracle | oracle | 1522 (1521 internal) |
 | H2 | (embedded) | n/a |
-
-### Test User Interface
-
-| Component | URL | Description |
-|-----------|-----|-------------|
-| Modern TestUI | http://localhost:3001 | Vue.js based interface with dark/light theme |
-| Legacy TestUI | http://localhost:3000 | Original test interface |
 
 ## Pre-flight Checks and Container Management
 
@@ -248,26 +239,33 @@ The TestUI includes features to help manage the test environment:
 When contributing to Wheels, you may need to create new tests for your code changes:
 
 1. Create a new test file in the appropriate directory:
-   - For core functions: `/tests/functions/YourTest.cfc`
-   - For request tests: `/tests/requests/YourTest.cfc`
+   - For core functions: `core/src/wheels/tests_testbox/specs/functions/YourTest.cfc`
+
+If you are adding in the already created test files, then you have to add in the same tests file, otherwise you can create a separate test file.
 
 2. Follow the TestBox syntax for your tests:
 
 ```cfml
-component extends="wheels.Test" {
+component extends="testbox.system.BaseSpec" {
     
-    function setup() {
-        // Code to run before each test
-    }
-    
-    function teardown() {
-        // Code to run after each test
-    }
-    
-    function test_your_feature() {
-        // Your test code
-        assert(true);
-    }
+   function run() {
+
+      describe("test_your_feature", () => {
+
+         beforeEach(() => {
+            // Code to run before each test
+         })
+
+         afterEach(() => {
+            // Code to run after each test
+         })
+
+         it("test_your_feature_test", () => {
+            // Your test code
+            assert(true);
+         })
+      })
+   }
 }
 ```
 
@@ -333,8 +331,8 @@ box install
 docker compose build
 
 # Restart the environment
-docker compose --profile all down
-docker compose --profile all up -d
+docker compose down
+docker compose up -d
 ```
 
 ## Conclusion
