@@ -77,6 +77,9 @@
   * Get Commands
     * [wheels get environment](command-line-tools/commands/get/get-environment.md)
     * [wheels get settings](command-line-tools/commands/get/get-settings.md)
+  * Documentation
+    * [wheels docs generate](command-line-tools/commands/get/docs-generate.md)
+    * [wheels docs serve](command-line-tools/commands/get/docs-serve.md)
 * CLI Development Guides
   * [Configuration Management](command-line-tools/configuration.md)
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
