@@ -6,18 +6,12 @@ component extends="testbox.system.BaseSpec" {
 
 		describe("Stress Testing for Race Conditions", () => {
 
-			it("should handle concurrent model access with isolated cache", () => {
+			it("should handle concurrent model access with cache manipulation", () => {
 				// Store original state to restore later
 				var originalCacheConfig = application.wheels.cacheModelConfig;
-				var originalModels = duplicate(application.wheels.models);
+				var originalModelKeys = structKeyList(application.wheels.models);
 				
 				try {
-					// Create isolated test scope to avoid affecting other tests
-					var testScope = {
-						cacheModelConfig = false,
-						models = {}
-					};
-					
 					modelName = "UserBlank";
 					g.model(modelName);
 					
@@ -26,18 +20,21 @@ component extends="testbox.system.BaseSpec" {
 						arrayAppend(values, "*");
 					}
 
-					// Test with isolated model cache instead of global application cache
+					// Test concurrent model access with cache manipulation
 					results = values.map(function(v, i) {
 						try {
 							if (randRange(1, 10) == 1) {
-								testScope.models = {};
+								application.wheels.cacheModelConfig = false;
+								if (structKeyExists(application.wheels.models, modelName)) {
+									structDelete(application.wheels.models, modelName);
+								}
 							}
 							
-							// Test model loading with cache disabled locally
-							var localWheels = duplicate(application.wheels);
-							localWheels.cacheModelConfig = false;
-							
 							obj = g.model(modelName);
+							
+							// Reset cache config for next iteration
+							application.wheels.cacheModelConfig = originalCacheConfig;
+							
 							return { success: isObject(obj), error: "" };
 						} catch (any e) {
 							return { success: false, error: e.message & " " & e.detail };
@@ -55,7 +52,7 @@ component extends="testbox.system.BaseSpec" {
 				} finally {
 					// Always restore original state
 					application.wheels.cacheModelConfig = originalCacheConfig;
-					application.wheels.models = originalModels;
+					g.model(modelName);
 				}
 			});
 		});
