@@ -2550,23 +2550,25 @@ component output="false" {
 		if (Len(arguments.route)) {
 			local.route = $findRoute(argumentCollection = arguments);
 			local.foundVariables = local.route.foundvariables;
-			local.rv &= local.route.pattern;
+
+			if (arguments.$URLRewriting != "Off") {
+				local.rv &= local.route.pattern;
+			} else {
+				local.rv &= $buildQueryStringFallback(arguments, local.params);
+				local.foundVariables = ListAppend(local.foundVariables, local.coreVariables);
+			}
 		} else {
 			local.route = {};
 			local.foundVariables = local.coreVariables;
-			local.rv &= "?controller=[controller]&action=[action]&key=[key]&format=[format]";
-			if (StructKeyExists(local, "params")) {
-				if (!Len(arguments.action)) {
-					if (Len(arguments.controller)) {
-						arguments.action = "index";
-					} else if (StructKeyExists(local.params, "action")) {
-						arguments.action = local.params.action;
-					}
-				}
-				if (!Len(arguments.controller) && StructKeyExists(local.params, "controller")) {
-					arguments.controller = local.params.controller;
-				}
-			}
+			local.rv &= $buildQueryStringFallback(arguments, local.params);
+		}
+
+		// Fill controller/action from route if still missing.
+		if (structKeyExists(local.route, "controller") && !Len(arguments.controller)) {
+			arguments.controller = local.route.controller;
+		}
+		if (structKeyExists(local.route, "action") && !Len(arguments.action)) {
+			arguments.action = local.route.action;
 		}
 
 		// Replace each params variable with the correct value.
@@ -2658,6 +2660,27 @@ component output="false" {
 
 		return local.rv;
 	}
+
+	/**
+	 * Internal helper: builds the query string fallback (?controller=...).
+	 */
+	private string function $buildQueryStringFallback(required struct arguments, struct localParams = {}) {
+		var rv = "?controller=[controller]&action=[action]&key=[key]&format=[format]";
+
+		// Default controller/action resolution.
+		if (StructKeyExists(localParams, "action") && !Len(arguments.action)) {
+			arguments.action = localParams.action;
+		}
+		if (StructKeyExists(localParams, "controller") && !Len(arguments.controller)) {
+			arguments.controller = localParams.controller;
+		}
+		if (Len(arguments.controller) && !Len(arguments.action)) {
+			arguments.action = "index";
+		}
+
+		return rv;
+	}
+
 
 	/**
 	 * Internal function.
