@@ -2664,18 +2664,18 @@ component output="false" {
 	/**
 	 * Internal helper: builds the query string fallback (?controller=...).
 	 */
-	private string function $buildQueryStringFallback(required struct arguments, struct localParams = {}) {
+	private string function $buildQueryStringFallback(required struct args, struct localParams = {}) {
 		var rv = "?controller=[controller]&action=[action]&key=[key]&format=[format]";
 
 		// Default controller/action resolution.
-		if (StructKeyExists(localParams, "action") && !Len(arguments.action)) {
-			arguments.action = localParams.action;
+		if (StructKeyExists(localParams, "action") && !Len(arguments.args.action)) {
+			arguments.args.action = localParams.action;
 		}
-		if (StructKeyExists(localParams, "controller") && !Len(arguments.controller)) {
-			arguments.controller = localParams.controller;
+		if (StructKeyExists(localParams, "controller") && !Len(arguments.args.controller)) {
+			arguments.args.controller = localParams.controller;
 		}
-		if (Len(arguments.controller) && !Len(arguments.action)) {
-			arguments.action = "index";
+		if (Len(arguments.args.controller) && !Len(arguments.args.action)) {
+			arguments.args.action = "index";
 		}
 
 		return rv;
