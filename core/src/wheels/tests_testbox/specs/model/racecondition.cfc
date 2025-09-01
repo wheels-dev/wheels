@@ -9,7 +9,6 @@ component extends="testbox.system.BaseSpec" {
 			it("should handle concurrent model access with cache manipulation", () => {
 				// Store original state to restore later
 				var originalCacheConfig = application.wheels.cacheModelConfig;
-				var originalModelKeys = structKeyList(application.wheels.models);
 				
 				try {
 					modelName = "UserBlank";
