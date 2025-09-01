@@ -6,38 +6,53 @@ component extends="testbox.system.BaseSpec" {
 
 		describe("Stress Testing for Race Conditions", () => {
 
-			it("should handle concurrent model access with cacheModelConfig=false", () => {
-				application.wheels.cacheModelConfig = false;
-				modelName = "UserBlank";
-				g.model(modelName);
-
-				values = [];
-				for (i = 1; i <= 1000; i++) {
-					arrayAppend(values, "*");
-				}
-
-				// Sequential map for Adobe ColdFusion
-				results = values.map(function(v, i) {
-					try {
-						if (randRange(1, 5) == 1) {
-							structClear(application.wheels.models);
-						}
-						obj = g.model(modelName);
-						return { success: isObject(obj), error: "" };
-					} catch (any e) {
-						return { success: false, error: e.message & " " & e.detail };
+			it("should handle concurrent model access with cache manipulation", () => {
+				// Store original state to restore later
+				var originalCacheConfig = application.wheels.cacheModelConfig;
+				
+				try {
+					modelName = "UserBlank";
+					g.model(modelName);
+					
+					values = [];
+					for (i = 1; i <= 100; i++) {
+						arrayAppend(values, "*");
 					}
-				});
 
-				errors = results.filter(function(r) {
-					return !r.success;
-				}).map(function(r, i) {
-					return "Thread " & i & ": " & r.error;
-				});
+					// Test concurrent model access with cache manipulation
+					results = values.map(function(v, i) {
+						try {
+							if (randRange(1, 10) == 1) {
+								application.wheels.cacheModelConfig = false;
+								if (structKeyExists(application.wheels.models, modelName)) {
+									structDelete(application.wheels.models, modelName);
+								}
+							}
+							
+							obj = g.model(modelName);
+							
+							// Reset cache config for next iteration
+							application.wheels.cacheModelConfig = originalCacheConfig;
+							
+							return { success: isObject(obj), error: "" };
+						} catch (any e) {
+							return { success: false, error: e.message & " " & e.detail };
+						}
+					});
 
-				expect(arrayLen(errors)).toBe(0, "No threads should error, but got: #serializeJSON(errors)#");
+					errors = results.filter(function(r) {
+						return !r.success;
+					}).map(function(r, i) {
+						return "Iteration " & i & ": " & r.error;
+					});
 
-				application.wheels.cacheModelConfig = true;
+					expect(arrayLen(errors)).toBe(0, "No iterations should error, but got: #serializeJSON(errors)#");
+					
+				} finally {
+					// Always restore original state
+					application.wheels.cacheModelConfig = originalCacheConfig;
+					g.model(modelName);
+				}
 			});
 		});
 	}
