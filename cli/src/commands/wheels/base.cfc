@@ -1396,4 +1396,42 @@ component excludeFromHelp=true {
 		FileClose(local.file);
 	}
 
+    /**
+     * Get server configuration
+     */
+    function getServerConfig(string servername = "") {
+        try {
+            // Try to get actual server info from CommandBox
+            local.serverDetails = serverService.resolveServerDetails( serverProps={ name=arguments.servername } );
+            local.serverInfo = serverService.getServerInfoByName( len(arguments.servername) ? arguments.servername : local.serverDetails.defaultName );
+            
+            if (structKeyExists(local.serverInfo, "host") && structKeyExists(local.serverInfo, "port")) {
+                return {
+                    host = local.serverInfo.host,
+                    port = local.serverInfo.port
+                };
+            }
+        } catch (any e) {
+            // Try alternative method
+        }
+        
+        // Try alternative method to get server info
+        try {
+            local.serverInfo = $getServerInfo();
+            if (structKeyExists(local.serverInfo, "host") && structKeyExists(local.serverInfo, "port")) {
+                return {
+                    host = local.serverInfo.host,
+                    port = local.serverInfo.port
+                };
+            }
+        } catch (any e) {
+            // Fallback to defaults
+        }
+        
+        // Final fallback
+        return {
+            host = "localhost",
+            port = "8080"
+        };
+    }
 }
