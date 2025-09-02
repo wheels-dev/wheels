@@ -283,13 +283,13 @@ We've updated our minimum requirements to match officially supported versions fr
 * The global setting `cacheModelInitialization` has been renamed to `cacheModelConfig`.
 * The global setting `clearServerCache` has been renamed to `clearTemplateCache`.
 * The `updateProperties()` method has been removed, use `update()` instead.
-* JavaScript arguments like `confirm` and `disable` have been removed from the link and form helper functions (use the [JS Confirm](https://github.com/perdjurner/wheels-js-confirm) and [JS Disable](https://github.com/perdjurner/wheels-js-disable) plugins to reinstate the old behavior).
+* JavaScript arguments like `confirm` and `disable` have been removed from the link and form helper functions (use the [JS Confirm](https://github.com/perdjurner/cfwheels-js-confirm) and [JS Disable](https://github.com/perdjurner/cfwheels-js-disable) plugins to reinstate the old behavior).
 * The `renderPage` function has been renamed to `renderView`
 * `includePartial()` now requires the `partial` and `query` arguments to be set (if using a query)
 
 #### Routing
 
-The [addRoute()](https://wheels.dev/api/v1.4.5) function has been removed in Wheels 2.0 in favor of a new routing API. See the [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter for information about the new RESTful routing system.
+The [addRoute()](https://wheels.dev/api/v1.4.5/addRoute.html) function has been removed in Wheels 2.0 in favor of a new routing API. See the [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter for information about the new RESTful routing system.
 
 A limited version of the "wildcard" route (`[controller]/[action]/[key]`) is available as `[controller]/[action]`) if you use the new [wildcard()](https://wheels.dev/api/v3.0.0/mapper.wildcard.html) mapper method:
 

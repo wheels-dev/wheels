@@ -105,7 +105,7 @@ outputting an empty `<p>` tag on requests where the Flash is empty.\
 ( [flash()](https://wheels.dev/api/v3.0.0/controller.flash.html) will return an empty string when the specified key does not\
 exist.)
 
-Check out the [Controller > Flash Functions](https://wheels.dev/api/v3.0.0/) section in the API listing of all the functions that deal with the Flash.
+Check out the [Controller > Flash Functions](https://wheels.dev/api/v3.0.0) section in the API listing of all the functions that deal with the Flash.
 
 #### Wholesale Flash Handling with [flashMessages()](https://wheels.dev/api/v3.0.0/controller.flashmessages.html)
 
