@@ -17,9 +17,7 @@
         cfheader(name="Access-Control-Allow-Origin", value="*");
         DeJsonResult = DeserializeJSON(result);
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-            if(!structKeyExists(url, "cli") || !url.cli){
-                cfheader(statustext="Expectation Failed", statuscode=417);
-            }
+            cfheader(statustext="Expectation Failed", statuscode=417);
         } else {
             cfheader(statustext="OK", statuscode=200);
         }
@@ -132,7 +130,7 @@
         application.wo.set(rewriteFile = "index.cfm")
         application.wo.set(controllerPath = local.AssetPath & "controllers")
         application.wo.set(viewPath = local.AssetPath & "views")
-        application.wo.set(modelPath = local.AssetPath & "models")
+        application.wo.set(modelPath = "/app/models")
         application.wo.set(wheelsComponentPath = "/wheels")
 
         /* turn off default validations for testing */
@@ -143,8 +141,8 @@
         /* redirections should always delay when testing */
         application.wheels.functions.redirectTo.delay = true
 
-        /* turn off transactions by default */
-        application.wheels.transactionMode = "none"
+        /* enable transactions for proper test isolation */
+        application.wheels.transactionMode = "commit"
 
         /* turn off request query caching */
         application.wheels.cacheQueriesDuringRequest = false
