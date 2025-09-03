@@ -2551,24 +2551,40 @@ component output="false" {
 			local.route = $findRoute(argumentCollection = arguments);
 			local.foundVariables = local.route.foundvariables;
 
-			if (arguments.$URLRewriting != "Off") {
+			if (arguments.$URLRewriting neq "Off") {
 				local.rv &= local.route.pattern;
 			} else {
-				local.rv &= $buildQueryStringFallback(arguments, local.params);
-				local.foundVariables = ListAppend(local.foundVariables, local.coreVariables);
+				// Always include core variables when not rewriting
+				local.foundVariables &= "," & local.coreVariables;
+				local.rv &= "?controller=[controller]&action=[action]&key=[key]&format=[format]";
 			}
 		} else {
 			local.route = {};
 			local.foundVariables = local.coreVariables;
-			local.rv &= $buildQueryStringFallback(arguments, local.params);
+			local.rv &= "?controller=[controller]&action=[action]&key=[key]&format=[format]";
 		}
 
-		// Fill controller/action from route if still missing.
-		if (structKeyExists(local.route, "controller") && !Len(arguments.controller)) {
-			arguments.controller = local.route.controller;
-		}
-		if (structKeyExists(local.route, "action") && !Len(arguments.action)) {
-			arguments.action = local.route.action;
+		// Shared fallback logic for controller/action
+		if (StructKeyExists(local, "params")) {
+			// Handle action
+			if (!Len(arguments.action)) {
+				if (StructKeyExists(local.route, "action")) {
+					arguments.action = local.route.action;
+				} else if (Len(arguments.controller)) {
+					arguments.action = "index";
+				} else if (StructKeyExists(local.params, "action")) {
+					arguments.action = local.params.action;
+				}
+			}
+
+			// Handle controller
+			if (!Len(arguments.controller)) {
+				if (StructKeyExists(local.route, "controller")) {
+					arguments.controller = local.route.controller;
+				} else if (StructKeyExists(local.params, "controller")) {
+					arguments.controller = local.params.controller;
+				}
+			}
 		}
 
 		// Replace each params variable with the correct value.
@@ -2660,27 +2676,6 @@ component output="false" {
 
 		return local.rv;
 	}
-
-	/**
-	 * Internal helper: builds the query string fallback (?controller=...).
-	 */
-	private string function $buildQueryStringFallback(required struct args, struct localParams = {}) {
-		local.rv = "?controller=[controller]&action=[action]&key=[key]&format=[format]";
-
-		// Default controller/action resolution.
-		if (StructKeyExists(localParams, "action") && !Len(arguments.args.action)) {
-			arguments.args.action = localParams.action;
-		}
-		if (StructKeyExists(localParams, "controller") && !Len(arguments.args.controller)) {
-			arguments.args.controller = localParams.controller;
-		}
-		if (Len(arguments.args.controller) && !Len(arguments.args.action)) {
-			arguments.args.action = "index";
-		}
-
-		return local.rv;
-	}
-
 
 	/**
 	 * Internal function.
