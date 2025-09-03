@@ -87,6 +87,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Job: `wheels g job ProcessOrders --queue=high --schedule="0 0 * * *"`
 - Plugin: `wheels g plugin Authentication --version="1.0.0"`
 
+### Documentation Commands
+- Generate API docset: `wheels docs docset --output ~/Desktop --verbose`
+- Generate docs: `wheels docs generate --format=html`
+- Serve docs locally: `wheels docs serve`
+
 ### Deployment Commands (New)
 - Initialize deployment: `wheels deploy:init --provider=digitalocean --domain=myapp.com`
 - Setup servers: `wheels deploy:setup`
