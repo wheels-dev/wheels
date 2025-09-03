@@ -22,7 +22,7 @@ box install boxlang
 box server start cfengine=boxlang
 
 # Or specify specific BoxLang version (optional)
-box server start cfengine=boxlang@1.4.0+40
+box server start cfengine=boxlang@1.5.0+40
 ```
 
 ### BoxLang Module Dependencies
@@ -271,7 +271,7 @@ curl -LO https://downloads.ortussolutions.com/ortussolutions/boxlang-runtimes/bo
 #### Basic Command
 
 ```bash
-java -jar /path/to/boxlang-miniserver-1.4.0.jar \
+java -jar /path/to/boxlang-miniserver-1.5.0.jar \
   --webroot /path/to/your/app/public \
   --rewrite
 ```
@@ -279,7 +279,7 @@ java -jar /path/to/boxlang-miniserver-1.4.0.jar \
 #### Full Configuration Example
 
 ```bash
-java -jar /path/to/boxlang-miniserver-1.4.0.jar \
+java -jar /path/to/boxlang-miniserver-1.5.0.jar \
   --webroot /path/to/your/app/public \
   --host 127.0.0.1 \
   --port 8080 \
@@ -292,7 +292,7 @@ java -jar /path/to/boxlang-miniserver-1.4.0.jar \
 If using the Wheels base template structure:
 
 ```bash
-java -jar /path/to/boxlang-miniserver-1.4.0.jar \
+java -jar /path/to/boxlang-miniserver-1.5.0.jar \
   --webroot /path/to/your/app/templates/base/src/public \
   --rewrite \
   --port 8080
