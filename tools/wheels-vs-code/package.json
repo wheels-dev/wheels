@@ -1,0 +1,44 @@
+{
+	"name": "wheels-vs-code",
+	"displayName": "Wheels VS Code",
+	"description": "Code snippets for Wheels framework including controllers, models, views, migrations, and more.",
+	"version": "1.0.0",
+	"engines": {
+		"vscode": "^1.74.0"
+	},
+	"publisher": "wheels-dev",
+	"icon": "assets/wheels_logo.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/cfwheels/cfwheels.git"
+	},
+	"homepage": "https://wheels.dev",
+	"bugs": {
+		"url": "https://github.com/cfwheels/cfwheels/issues"
+	},
+	"license": "MIT",
+	"categories": [
+		"Snippets"
+	],
+	"keywords": [
+		"wheels.dev",
+		"wheels-dev",
+		"cfwheels",
+		"wheels",
+		"snippets",
+		"coldfusion",
+		"lucee",
+		"boxlang",
+		"cfml",
+		"mvc",
+		"framework"
+	],
+	"contributes": {
+		"snippets": [
+			{
+				"language": "cfml",
+				"path": "./snippets/wheels.code-snippets"
+			}
+		]
+	}
+}

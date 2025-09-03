@@ -1,0 +1,2774 @@
+{
+  "accessibleProperties": {
+    "prefix": "accessibleProperties",
+    "description": "Use this method to specify which properties can be set through mass assignment.",
+    "body": [
+      "accessibleProperties(${1:properties})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addColumn": {
+    "prefix": "addColumn",
+    "description": "adds a column to existing table Only available in a migration CFC",
+    "body": [
+      "addColumn(${1:table}, ${2:columnType}, ${3:columnName}, ${4:afterColumn}, ${5:referenceName}, ${6:default}, ${7:null}, ${8:limit}, ${9:precision}, ${10:scale})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addError": {
+    "prefix": "addError",
+    "description": "Adds an error on a specific property.",
+    "body": [
+      "addError(${1:property}, ${2:message}, ${3:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addErrorToBase": {
+    "prefix": "addErrorToBase",
+    "description": "Adds an error on a specific property.",
+    "body": [
+      "addErrorToBase(${1:message}, ${2:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addForeignKey": {
+    "prefix": "addForeignKey",
+    "description": "Add a foreign key constraint to the database, using the reference name that was used to create it Only available in a migration CFC",
+    "body": [
+      "addForeignKey(${1:table}, ${2:referenceTable}, ${3:column}, ${4:referenceColumn})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addFormat": {
+    "prefix": "addFormat",
+    "description": "Adds a new MIME type to your Wheels application for use with responding to multiple formats.",
+    "body": [
+      "addFormat(${1:extension}, ${2:mimeType})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addIndex": {
+    "prefix": "addIndex",
+    "description": "Add database index on a table column Only available in a migration CFC",
+    "body": [
+      "addIndex(${1:table}, ${2:columnNames}, ${3:false}, ${4:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addRecord": {
+    "prefix": "addRecord",
+    "description": "Adds a record to a table Only available in a migration CFC",
+    "body": [
+      "addRecord(${1:table})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "addReference": {
+    "prefix": "addReference",
+    "description": "Add a foreign key constraint to the database, using the reference name that was used to create it Only available in a migration CFC",
+    "body": [
+      "addReference(${1:table}, ${2:referenceName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterAll": {
+    "prefix": "afterAll",
+    "description": "Executes once after the test suite runs.",
+    "body": [
+      "afterAll()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterCreate": {
+    "prefix": "afterCreate",
+    "description": "Registers method(s) that should be called after a new object is created.",
+    "body": [
+      "afterCreate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterDelete": {
+    "prefix": "afterDelete",
+    "description": "Registers method(s) that should be called after an object is deleted.",
+    "body": [
+      "afterDelete(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterFind": {
+    "prefix": "afterFind",
+    "description": "Registers method(s) that should be called after an existing object has been initialized (which is usually done with the <code>findByKey</code> or <code>findOne</code> method).",
+    "body": [
+      "afterFind(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterInitialization": {
+    "prefix": "afterInitialization",
+    "description": "Registers method(s) that should be called after an object has been initialized.",
+    "body": [
+      "afterInitialization(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterNew": {
+    "prefix": "afterNew",
+    "description": "Registers method(s) that should be called after a new object has been initialized (which is usually done with the <code>new</code> method).",
+    "body": [
+      "afterNew(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterSave": {
+    "prefix": "afterSave",
+    "description": "Registers method(s) that should be called after an object is saved.",
+    "body": [
+      "afterSave(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterUpdate": {
+    "prefix": "afterUpdate",
+    "description": "Registers method(s) that should be called after an existing object is updated.",
+    "body": [
+      "afterUpdate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterValidation": {
+    "prefix": "afterValidation",
+    "description": "Registers method(s) that should be called after an object is validated.",
+    "body": [
+      "afterValidation(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterValidationOnCreate": {
+    "prefix": "afterValidationOnCreate",
+    "description": "Registers method(s) that should be called after a new object is validated.",
+    "body": [
+      "afterValidationOnCreate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "afterValidationOnUpdate": {
+    "prefix": "afterValidationOnUpdate",
+    "description": "Registers method(s) that should be called after an existing object is validated.",
+    "body": [
+      "afterValidationOnUpdate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "allChanges": {
+    "prefix": "allChanges",
+    "description": "Returns a struct detailing all changes that have been made on the object but not yet saved to the database.",
+    "body": [
+      "allChanges()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "allErrors": {
+    "prefix": "allErrors",
+    "description": "Returns an array of all the errors on the object.   It does this by storing instances of models that are associations, and not checking associations of those instances because they have already been checked.",
+    "body": [
+      "allErrors(${1:includeAssociations}, ${2:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "announce": {
+    "prefix": "announce",
+    "description": "",
+    "body": [
+      "announce(${1:message})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "assert": {
+    "prefix": "assert",
+    "description": "",
+    "body": [
+      "assert(${1:expression})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "authenticityToken": {
+    "prefix": "authenticityToken",
+    "description": "Returns the raw CSRF authenticity token",
+    "body": [
+      "authenticityToken()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "authenticityTokenField": {
+    "prefix": "authenticityTokenField",
+    "description": "Returns a hidden form field containing a new authenticity token.",
+    "body": [
+      "authenticityTokenField()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "autoLink": {
+    "prefix": "autoLink",
+    "description": "Turns all URLs and email addresses into links.",
+    "body": [
+      "autoLink(${1:text}, ${2:all}, ${3:true}, ${4:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "automaticValidations": {
+    "prefix": "automaticValidations",
+    "description": "Whether or not to enable default validations for this model.",
+    "body": [
+      "automaticValidations(${1:value})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "average": {
+    "prefix": "average",
+    "description": "Calculates the average value for a given property. Uses the SQL function <code>AVG</code>. If no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.",
+    "body": [
+      "average(${1:property}, ${2:where}, ${3:include}, ${4:distinct}, ${5:true}, ${6:ifNull}, ${7:false}, ${8:group})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeAll": {
+    "prefix": "beforeAll",
+    "description": "Executes once before the test suite runs.",
+    "body": [
+      "beforeAll()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeCreate": {
+    "prefix": "beforeCreate",
+    "description": "Registers method(s) that should be called before a new object is created.",
+    "body": [
+      "beforeCreate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeDelete": {
+    "prefix": "beforeDelete",
+    "description": "Registers method(s) that should be called before an object is deleted.",
+    "body": [
+      "beforeDelete(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeSave": {
+    "prefix": "beforeSave",
+    "description": "Registers method(s) that should be called before an object is saved.",
+    "body": [
+      "beforeSave(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeUpdate": {
+    "prefix": "beforeUpdate",
+    "description": "Registers method(s) that should be called before an existing object is updated.",
+    "body": [
+      "beforeUpdate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeValidation": {
+    "prefix": "beforeValidation",
+    "description": "Registers method(s) that should be called before an object is validated.",
+    "body": [
+      "beforeValidation(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeValidationOnCreate": {
+    "prefix": "beforeValidationOnCreate",
+    "description": "Registers method(s) that should be called before a new object is validated.",
+    "body": [
+      "beforeValidationOnCreate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "beforeValidationOnUpdate": {
+    "prefix": "beforeValidationOnUpdate",
+    "description": "Registers method(s) that should be called before an existing object is validated.",
+    "body": [
+      "beforeValidationOnUpdate(${1:methods})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "belongsTo": {
+    "prefix": "belongsTo",
+    "description": "Sets up a <code>belongsTo</code> association between this model and the specified one. Use this association when this model contains a foreign key referencing another model.",
+    "body": [
+      "belongsTo(${1:name}, ${2:modelName}, ${3:foreignKey}, ${4:joinKey}, ${5:inner})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "bigInteger": {
+    "prefix": "bigInteger",
+    "description": "Adds integer columns to table definition.",
+    "body": [
+      "bigInteger(${1:columnNames}, ${2:limit}, ${3:default}, ${4:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "binary": {
+    "prefix": "binary",
+    "description": "Adds binary columns to table definition.",
+    "body": [
+      "binary(${1:columnNames}, ${2:default}, ${3:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "boolean": {
+    "prefix": "boolean",
+    "description": "Adds boolean columns to table definition.",
+    "body": [
+      "boolean(${1:columnNames}, ${2:default}, ${3:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "buttonTag": {
+    "prefix": "buttonTag",
+    "description": "Builds and returns a string containing a button form control.",
+    "body": [
+      "buttonTag(${1:Save changes}, ${2:submit}, ${3:save}, ${4:image}, ${5:prepend}, ${6:append}, ${7:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "buttonTo": {
+    "prefix": "buttonTo",
+    "description": "Creates a form containing a single button that submits to the URL. The URL is built the same way as the <code>linkTo</code> function.",
+    "body": [
+      "buttonTo(${1:text}, ${2:image}, ${3:route}, ${4:controller}, ${5:action}, ${6:key}, ${7:params}, ${8:anchor}, ${9:method}, ${10:true}, ${11:host}, ${12:protocol}, ${13:port}, ${14:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "caches": {
+    "prefix": "caches",
+    "description": "Tells Wheels to cache one or more actions.",
+    "body": [
+      "caches(${1:action}, ${2:60}, ${3:static}, ${4:appendToKey})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "clearCachableActions": {
+    "prefix": "clearCachableActions",
+    "description": "Tells Wheels to remove one or more actions from cacheable actions.",
+    "body": [
+      "clearCachableActions(${1:action})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "capitalize": {
+    "prefix": "capitalize",
+    "description": "Capitalizes all words in the text to create a nicer looking title.",
+    "body": [
+      "capitalize(${1:text})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "change": {
+    "prefix": "change",
+    "description": "alters existing table in the database",
+    "body": [
+      "change(${1:false})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "changeColumn": {
+    "prefix": "changeColumn",
+    "description": "changes a column definition Only available in a migration CFC",
+    "body": [
+      "changeColumn(${1:table}, ${2:columnName}, ${3:columnType}, ${4:afterColumn}, ${5:referenceName}, ${6:default}, ${7:null}, ${8:limit}, ${9:precision}, ${10:scale}, ${11:false})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "changedFrom": {
+    "prefix": "changedFrom",
+    "description": "Returns the previous value of a property that has changed. Returns an empty string if no previous value exists. Wheels will keep a note of the previous property value until the object is saved to the database.",
+    "body": [
+      "changedFrom(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "changedProperties": {
+    "prefix": "changedProperties",
+    "description": "Returns a list of the object properties that have been changed but not yet saved to the database.",
+    "body": [
+      "changedProperties()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "changeTable": {
+    "prefix": "changeTable",
+    "description": "Creates a table definition object to store modifications to table properties Only available in a migration CFC",
+    "body": [
+      "changeTable(${1:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "char": {
+    "prefix": "char",
+    "description": "adds char columns to table definition",
+    "body": [
+      "char(${1:columnNames}, ${2:limit}, ${3:default}, ${4:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "checkBox": {
+    "prefix": "checkBox",
+    "description": "Builds and returns a string containing a check box form control based on the supplied name. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "checkBox(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:1}, ${6:uncheckedValue}, ${7:useDefaultLabel}, ${8:around}, ${9:prepend}, ${10:append}, ${11:prependToLabel}, ${12:appendToLabel}, ${13:span}, ${14:field-with-errors}, ${15:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "checkBoxTag": {
+    "prefix": "checkBoxTag",
+    "description": "Builds and returns a string containing a check box form control based on the supplied name. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "checkBoxTag(${1:name}, ${2:checked}, ${3:1}, ${4:uncheckedValue}, ${5:label}, ${6:around}, ${7:prepend}, ${8:append}, ${9:prependToLabel}, ${10:appendToLabel}, ${11:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "clearChangeInformation": {
+    "prefix": "clearChangeInformation",
+    "description": "Clears all internal knowledge of the current state of the object.",
+    "body": [
+      "clearChangeInformation(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "clearErrors": {
+    "prefix": "clearErrors",
+    "description": "Clears out all errors set on the object or only the ones set for a specific property or name.",
+    "body": [
+      "clearErrors(${1:property}, ${2:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "collection": {
+    "prefix": "collection",
+    "description": "A collection route doesn't require an id because it acts on a collection of objects. photos/search is an example of a collection route, because it acts on (and displays) a collection of objects.",
+    "body": [
+      "collection()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "column": {
+    "prefix": "column",
+    "description": "Adds a column to table definition.",
+    "body": [
+      "column(${1:columnName}, ${2:columnType}, ${3:default}, ${4:null}, ${5:limit}, ${6:precision}, ${7:scale})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "columnDataForProperty": {
+    "prefix": "columnDataForProperty",
+    "description": "Returns a struct with data for the named property.",
+    "body": [
+      "columnDataForProperty(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "columnForProperty": {
+    "prefix": "columnForProperty",
+    "description": "Returns the column name mapped for the named model property.",
+    "body": [
+      "columnForProperty(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "columnNames": {
+    "prefix": "columnNames",
+    "description": "Returns a list of column names in the table mapped to this model. The list is ordered according to the columns' ordinal positions in the database table.",
+    "body": [
+      "columnNames()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "columns": {
+    "prefix": "columns",
+    "description": "Returns an array of columns names for the table associated with this class. Does not include calculated properties that will be generated by the Wheels ORM.",
+    "body": [
+      "columns()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "compareTo": {
+    "prefix": "compareTo",
+    "description": "Pass in another model object to see if the two objects are the same.",
+    "body": [
+      "compareTo(${1:object})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "constraints": {
+    "prefix": "constraints",
+    "description": "Set variable patterns to use for matching.",
+    "body": [
+      "constraints()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "contentFor": {
+    "prefix": "contentFor",
+    "description": "Used to store a section's output for rendering within a layout. This content store acts as a stack, so you can store multiple pieces of content for a given section.",
+    "body": [
+      "contentFor(${1:last}, ${2:false})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "contentForLayout": {
+    "prefix": "contentForLayout",
+    "description": "Includes content for the body section, which equates to the output generated by the view template run by the request.",
+    "body": [
+      "contentForLayout()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "controller": {
+    "prefix": "controller",
+    "description": "Creates and returns a controller object with your own custom name and params. Used primarily for testing purposes.",
+    "body": [
+      "controller(${1:name}, ${2:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "count": {
+    "prefix": "count",
+    "description": "Returns the number of rows that match the arguments (or all rows if no arguments are passed in). Uses the SQL function <code>COUNT</code>. If no records can be found to perform the calculation on, <code>0</code> is returned.",
+    "body": [
+      "count(${1:where}, ${2:include}, ${3:true}, ${4:false}, ${5:group})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "create": {
+    "prefix": "create",
+    "description": "Creates a new object, saves it to the database (if the validation permits it), and returns it. If the validation fails, the unsaved object (with errors added to it) is still returned. Property names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument.",
+    "body": [
+      "create(${1:[runtime expression]}, ${2:true}, ${3:reload}, ${4:true}, ${5:[runtime expression]}, ${6:true}, ${7:allowExplicitTimestamps})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "createMigration": {
+    "prefix": "createMigration",
+    "description": "Creates a migration file. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
+    "body": [
+      "createMigration(${1:migrationName}, ${2:templateName}, ${3:timestamp})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "createTable": {
+    "prefix": "createTable",
+    "description": "Creates a table definition object to store table properties Only available in a migration CFC",
+    "body": [
+      "createTable(${1:name}, ${2:false}, ${3:true}, ${4:id})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "createView": {
+    "prefix": "createView",
+    "description": "Creates a view definition object to store view properties Only available in a migration CFC",
+    "body": [
+      "createView(${1:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "csrfMetaTags": {
+    "prefix": "csrfMetaTags",
+    "description": "Include this in your layouts' <code>head</code> sections to include meta tags containing the authenticity token for use by JavaScript AJAX requests needing to <code>POST</code> data to your application.",
+    "body": [
+      "csrfMetaTags()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "cycle": {
+    "prefix": "cycle",
+    "description": "Cycles through list values every time it is called.",
+    "body": [
+      "cycle(${1:values}, ${2:default})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dataSource": {
+    "prefix": "dataSource",
+    "description": "Use this method to override the data source connection information for this model.",
+    "body": [
+      "dataSource(${1:datasource}, ${2:username}, ${3:password})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "date": {
+    "prefix": "date",
+    "description": "Adds date columns to table definition.",
+    "body": [
+      "date(${1:columnNames}, ${2:default}, ${3:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dateSelect": {
+    "prefix": "dateSelect",
+    "description": "Builds and returns a string containing three <code>select</code> form controls for month, day, and year based on the supplied <code>objectName</code> and <code>property</code>.",
+    "body": [
+      "dateSelect(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:month,day,year}, ${6: }, ${7:2018}, ${8:2028}, ${9:names}, ${10:January,February,March,April,May,June,July,August,September,October,November,December}, ${11:Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec}, ${12:includeBlank}, ${13:label}, ${14:around}, ${15:prepend}, ${16:append}, ${17:prependToLabel}, ${18:appendToLabel}, ${19:span}, ${20:field-with-errors}, ${21:combine}, ${22:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dateSelectTags": {
+    "prefix": "dateSelectTags",
+    "description": "Builds and returns a string containing three <code>select</code> form controls (month, day, and year) based on a name and value.",
+    "body": [
+      "dateSelectTags(${1:name}, ${2:selected}, ${3:month,day,year}, ${4: }, ${5:2018}, ${6:2028}, ${7:names}, ${8:January,February,March,April,May,June,July,August,September,October,November,December}, ${9:Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec}, ${10:includeBlank}, ${11:label}, ${12:around}, ${13:prepend}, ${14:append}, ${15:prependToLabel}, ${16:appendToLabel}, ${17:combine}, ${18:true}, ${19:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "datetime": {
+    "prefix": "datetime",
+    "description": "adds datetime columns to table definition",
+    "body": [
+      "datetime(${1:columnNames}, ${2:default}, ${3:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dateTimeSelect": {
+    "prefix": "dateTimeSelect",
+    "description": "Builds and returns a string containing six <code>select</code> form controls (three for date selection and the remaining three for time selection) based on the supplied objectName and property.",
+    "body": [
+      "dateTimeSelect(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:month,day,year}, ${6: }, ${7:2018}, ${8:2028}, ${9:names}, ${10:January,February,March,April,May,June,July,August,September,October,November,December}, ${11:Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec}, ${12:hour,minute,second}, ${13::}, ${14:1}, ${15:1}, ${16: - }, ${17:includeBlank}, ${18:label}, ${19:around}, ${20:prepend}, ${21:append}, ${22:prependToLabel}, ${23:appendToLabel}, ${24:span}, ${25:field-with-errors}, ${26:combine}, ${27:twelveHour}, ${28:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dateTimeSelectTags": {
+    "prefix": "dateTimeSelectTags",
+    "description": "Builds and returns a string containing six <code>select</code> form controls (three for date selection and the remaining three for time selection) based on a name.",
+    "body": [
+      "dateTimeSelectTags(${1:name}, ${2:selected}, ${3:month,day,year}, ${4: }, ${5:2018}, ${6:2028}, ${7:names}, ${8:January,February,March,April,May,June,July,August,September,October,November,December}, ${9:Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec}, ${10:hour,minute,second}, ${11::}, ${12:1}, ${13:1}, ${14: - }, ${15:includeBlank}, ${16:label}, ${17:around}, ${18:prepend}, ${19:append}, ${20:prependToLabel}, ${21:appendToLabel}, ${22:combine}, ${23:twelveHour}, ${24:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "daySelectTag": {
+    "prefix": "daySelectTag",
+    "description": "Builds and returns a string containing a <code>select</code> form control for the days of the week based on the supplied name.",
+    "body": [
+      "daySelectTag(${1:name}, ${2:selected}, ${3:includeBlank}, ${4:label}, ${5:around}, ${6:prepend}, ${7:append}, ${8:prependToLabel}, ${9:appendToLabel}, ${10:true}, ${11:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "debug": {
+    "prefix": "debug",
+    "description": "Used to examine an expression Any overloaded arguments get passed to cfdump's attributeCollection",
+    "body": [
+      "debug(${1:expression}, ${2:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "decimal": {
+    "prefix": "decimal",
+    "description": "adds decimal columns to table definition",
+    "body": [
+      "decimal(${1:columnNames}, ${2:default}, ${3:null}, ${4:precision}, ${5:scale})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "delete": {
+    "prefix": "delete",
+    "description": "Deletes the object, which means the row is deleted from the database (unless prevented by a <code>beforeDelete</code> callback). Returns <code>true</code> on successful deletion of the row, <code>false</code> otherwise.",
+    "body": [
+      "delete(${1:true}, ${2:[runtime expression]}, ${3:true}, ${4:includeSoftDeletes}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "deleteAll": {
+    "prefix": "deleteAll",
+    "description": "Deletes all records that match the <code>where</code> argument. By default, objects will not be instantiated and therefore callbacks and validations are not invoked. You can change this behavior by passing in <code>instantiate=true</code>. Returns the number of records that were deleted.",
+    "body": [
+      "deleteAll(${1:where}, ${2:include}, ${3:reload}, ${4:true}, ${5:instantiate}, ${6:[runtime expression]}, ${7:true}, ${8:[runtime expression]}, ${9:includeSoftDeletes}, ${10:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "deleteByKey": {
+    "prefix": "deleteByKey",
+    "description": "Finds the record with the supplied key and deletes it. Returns <code>true</code> on successful deletion of the row, <code>false</code> otherwise.",
+    "body": [
+      "deleteByKey(${1:key}, ${2:reload}, ${3:[runtime expression]}, ${4:true}, ${5:includeSoftDeletes}, ${6:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "deleteOne": {
+    "prefix": "deleteOne",
+    "description": "Gets an object based on conditions and deletes it.",
+    "body": [
+      "deleteOne(${1:where}, ${2:order}, ${3:reload}, ${4:[runtime expression]}, ${5:true}, ${6:[runtime expression]}, ${7:includeSoftDeletes}, ${8:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "deobfuscateParam": {
+    "prefix": "deobfuscateParam",
+    "description": "Deobfuscates a value.",
+    "body": [
+      "deobfuscateParam(${1:param})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "distanceOfTimeInWords": {
+    "prefix": "distanceOfTimeInWords",
+    "description": "Pass in two dates to this method, and it will return a string describing the difference between them.",
+    "body": [
+      "distanceOfTimeInWords(${1:fromTime}, ${2:toTime}, ${3:includeSeconds})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "down": {
+    "prefix": "down",
+    "description": "Migrates down: will be executed when migrating your schema backward Along with up(), these are the two main functions in any migration file Only available in a migration CFC",
+    "body": [
+      "down()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dropForeignKey": {
+    "prefix": "dropForeignKey",
+    "description": "Drops a foreign key constraint from the database Only available in a migration CFC",
+    "body": [
+      "dropForeignKey(${1:table}, ${2:keyName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dropReference": {
+    "prefix": "dropReference",
+    "description": "Drop a foreign key constraint from the database, using the reference name that was used to create it Only available in a migration CFC",
+    "body": [
+      "dropReference(${1:table}, ${2:referenceName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dropTable": {
+    "prefix": "dropTable",
+    "description": "Drops a table from the database Only available in a migration CFC",
+    "body": [
+      "dropTable(${1:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "dropView": {
+    "prefix": "dropView",
+    "description": "drops a view from the database Only available in a migration CFC",
+    "body": [
+      "dropView(${1:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "end": {
+    "prefix": "end",
+    "description": "Call this to end a nested routing block or the entire route configuration. This method is chained on a sequence of routing mapper method calls started by <code>mapper()</code>.",
+    "body": [
+      "end()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "endFormTag": {
+    "prefix": "endFormTag",
+    "description": "Builds and returns a string containing the closing <code>form</code> tag.",
+    "body": [
+      "endFormTag(${1:prepend}, ${2:append}, ${3:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "errorCount": {
+    "prefix": "errorCount",
+    "description": "Returns the number of errors this object has associated with it. Specify property or name if you wish to count only specific errors.",
+    "body": [
+      "errorCount(${1:property}, ${2:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "errorMessageOn": {
+    "prefix": "errorMessageOn",
+    "description": "Returns the error message, if one exists, on the object's property. If multiple error messages exist, the first one is returned.",
+    "body": [
+      "errorMessageOn(${1:objectName}, ${2:property}, ${3:prependText}, ${4:appendText}, ${5:span}, ${6:error-message}, ${7:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "errorMessagesFor": {
+    "prefix": "errorMessagesFor",
+    "description": "Builds and returns a list (<code>ul</code> tag with a default <code>class</code> of <code>error-messages</code>) containing all the error messages for all the properties of the object. Returns an empty string if no errors exist.",
+    "body": [
+      "errorMessagesFor(${1:objectName}, ${2:error-messages}, ${3:true}, ${4:true}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "errorsOn": {
+    "prefix": "errorsOn",
+    "description": "Returns an array of all errors associated with the supplied property (and error name if passed in).",
+    "body": [
+      "errorsOn(${1:property}, ${2:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "errorsOnBase": {
+    "prefix": "errorsOnBase",
+    "description": "Returns an array of all errors associated with the object as a whole (not related to any specific property).",
+    "body": [
+      "errorsOnBase(${1:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "excerpt": {
+    "prefix": "excerpt",
+    "description": "Extracts an excerpt from text that matches the first instance of a given phrase.",
+    "body": [
+      "excerpt(${1:text}, ${2:phrase}, ${3:100}, ${4:...})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "execute": {
+    "prefix": "execute",
+    "description": "Executes a raw sql query Only available in a migration CFC",
+    "body": [
+      "execute(${1:sql})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "exists": {
+    "prefix": "exists",
+    "description": "Checks if a record exists in the table. You can pass in either a primary key value to the <code>key</code> argument or a string to the <code>where</code> argument. If you don't pass in either of those, it will simply check if any record exists in the table.",
+    "body": [
+      "exists(${1:key}, ${2:where}, ${3:reload}, ${4:true}, ${5:includeSoftDeletes})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "fail": {
+    "prefix": "fail",
+    "description": "",
+    "body": [
+      "fail(${1:message})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "fileField": {
+    "prefix": "fileField",
+    "description": "Builds and returns a string containing a file field form control based on the supplied objectName and property. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "fileField(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:useDefaultLabel}, ${6:around}, ${7:prepend}, ${8:append}, ${9:prependToLabel}, ${10:appendToLabel}, ${11:span}, ${12:field-with-errors}, ${13:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "fileFieldTag": {
+    "prefix": "fileFieldTag",
+    "description": "Builds and returns a string containing a file form control based on the supplied name. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "fileFieldTag(${1:name}, ${2:label}, ${3:around}, ${4:prepend}, ${5:append}, ${6:prependToLabel}, ${7:appendToLabel}, ${8:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "filterChain": {
+    "prefix": "filterChain",
+    "description": "Returns an array of all the filters set on current controller in the order in which they will be executed.",
+    "body": [
+      "filterChain(${1:all})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "filters": {
+    "prefix": "filters",
+    "description": "Tells Wheels to run a function before an action is run or after an action has been run.",
+    "body": [
+      "filters(${1:through}, ${2:before}, ${3:only}, ${4:except}, ${5:append})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "findAll": {
+    "prefix": "findAll",
+    "description": "Returns records from the database table mapped to this model according to the arguments passed in (use the <code>where</code> argument to decide which records to get, use the <code>order</code> argument to set the order in which those records should be returned, and so on). The records will be returned as either a <code>cfquery</code> result set, an array of objects, or an array of structs (depending on what the <code>returnAs</code> argument is set to).",
+    "body": [
+      "findAll(${1:where}, ${2:order}, ${3:group}, ${4:select}, ${5:false}, ${6:include}, ${7:-1}, ${8:0}, ${9:10}, ${10:0}, ${11:query}, ${12:cache}, ${13:reload}, ${14:true}, ${15:query}, ${16:true}, ${17:true}, ${18:false}, ${19:[runtime expression]}, ${20:[runtime expression]}, ${21:0}, ${22:0})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "findAllKeys": {
+    "prefix": "findAllKeys",
+    "description": "Returns all primary key values in a list. In addition to <code>quoted</code> and <code>delimiter</code> you can pass in any argument that <code>findAll()</code> accepts.",
+    "body": [
+      "findAllKeys(${1:false}, ${2:,})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "findByKey": {
+    "prefix": "findByKey",
+    "description": "Fetches the requested record by primary key and returns it as an object. Returns <code>false</code> if no record is found. You can override this behavior to return a <code>cfquery</code> result set instead, similar to what's described in the documentation for <code>findOne()</code>.",
+    "body": [
+      "findByKey(${1:key}, ${2:select}, ${3:include}, ${4:query}, ${5:cache}, ${6:reload}, ${7:true}, ${8:object}, ${9:true}, ${10:false}, ${11:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "findFirst": {
+    "prefix": "findFirst",
+    "description": "Fetches the first record ordered by primary key value. Use the <code>property</code> argument to order by something else. Returns a model object.",
+    "body": [
+      "findFirst(${1:[runtime expression]}, ${2:ASC})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "findLastOne": {
+    "prefix": "findLastOne",
+    "description": "Fetches the last record ordered by primary key value. Use the <code>property</code> argument to order by something else. Returns a model object. Formerly known as findLast.",
+    "body": [
+      "findLastOne(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "findOne": {
+    "prefix": "findOne",
+    "description": "Fetches the first record found based on the <code>WHERE</code> and <code>ORDER BY</code> clauses. With the default settings (i.e. the <code>returnAs</code> argument set to <code>object</code>), a model object will be returned if the record is found and the boolean value <code>false</code> if not. Instead of using the <code>where</code> argument, you can create cleaner code by making use of a concept called Dynamic Finders.",
+    "body": [
+      "findOne(${1:where}, ${2:order}, ${3:select}, ${4:include}, ${5:query}, ${6:cache}, ${7:reload}, ${8:true}, ${9:object}, ${10:false}, ${11:[runtime expression]}, ${12:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flash": {
+    "prefix": "flash",
+    "description": "Returns the value of a specific key in the Flash (or the entire Flash as a struct if no key is passed in).",
+    "body": [
+      "flash(${1:key})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashClear": {
+    "prefix": "flashClear",
+    "description": "Deletes everything from the Flash.",
+    "body": [
+      "flashClear()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashCount": {
+    "prefix": "flashCount",
+    "description": "Returns how many keys exist in the Flash.",
+    "body": [
+      "flashCount()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashDelete": {
+    "prefix": "flashDelete",
+    "description": "Deletes a specific key from the Flash. Returns <code>true</code> if the key exists.",
+    "body": [
+      "flashDelete(${1:key})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashInsert": {
+    "prefix": "flashInsert",
+    "description": "Inserts a new key / value into the Flash.",
+    "body": [
+      "flashInsert()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashIsEmpty": {
+    "prefix": "flashIsEmpty",
+    "description": "Returns whether or not the Flash is empty.",
+    "body": [
+      "flashIsEmpty()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashKeep": {
+    "prefix": "flashKeep",
+    "description": "Make the entire Flash or specific key in it stick around for one more request.",
+    "body": [
+      "flashKeep(${1:key})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashKeyExists": {
+    "prefix": "flashKeyExists",
+    "description": "Checks if a specific key exists in the Flash.",
+    "body": [
+      "flashKeyExists(${1:key})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "flashMessages": {
+    "prefix": "flashMessages",
+    "description": "Displays a marked-up listing of messages that exist in the Flash.",
+    "body": [
+      "flashMessages(${1:keys}, ${2:flash-messages}, ${3:false}, ${4:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "float": {
+    "prefix": "float",
+    "description": "adds float columns to table definition",
+    "body": [
+      "float(${1:columnNames}, ${2:default}, ${3:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "get": {
+    "prefix": "get",
+    "description": "Returns the current setting for the supplied Wheels setting or the current default for the supplied Wheels function argument.",
+    "body": [
+      "get(${1:name}, ${2:functionName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "getAvailableMigrations": {
+    "prefix": "getAvailableMigrations",
+    "description": "Searches db/migrate folder for migrations. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
+    "body": [
+      "getAvailableMigrations(${1:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "getCurrentMigrationVersion": {
+    "prefix": "getCurrentMigrationVersion",
+    "description": "Returns current database version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
+    "body": [
+      "getCurrentMigrationVersion()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "getEmails": {
+    "prefix": "getEmails",
+    "description": "Primarily used for testing to get information about emails sent during the request.",
+    "body": [
+      "getEmails()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "getFiles": {
+    "prefix": "getFiles",
+    "description": "Primarily used for testing to get information about files sent during the request.",
+    "body": [
+      "getFiles()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "getRedirect": {
+    "prefix": "getRedirect",
+    "description": "Primarily used for testing to establish whether the current request has performed a redirect.",
+    "body": [
+      "getRedirect()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "getRoutes": {
+    "prefix": "getRoutes",
+    "description": "",
+    "body": [
+      "getRoutes()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "getTableNamePrefix": {
+    "prefix": "getTableNamePrefix",
+    "description": "Returns the table name prefix set for the table.",
+    "body": [
+      "getTableNamePrefix()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "globalHelperFunction": {
+    "prefix": "globalHelperFunction",
+    "description": "",
+    "body": [
+      "globalHelperFunction()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hasChanged": {
+    "prefix": "hasChanged",
+    "description": "Returns <code>true</code> if the specified property (or any if none was passed in) has been changed but not yet saved to the database. Will also return <code>true</code> if the object is new and no record for it exists in the database.",
+    "body": [
+      "hasChanged(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hasErrors": {
+    "prefix": "hasErrors",
+    "description": "Returns <code>true</code> if the object has any errors. You can also limit to only check a specific property or name for errors.",
+    "body": [
+      "hasErrors(${1:property}, ${2:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hasMany": {
+    "prefix": "hasMany",
+    "description": "Sets up a <code>hasMany</code> association between this model and the specified one.",
+    "body": [
+      "hasMany(${1:name}, ${2:modelName}, ${3:foreignKey}, ${4:joinKey}, ${5:outer}, ${6:dependent}, ${7:shortcut}, ${8:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hasManyCheckBox": {
+    "prefix": "hasManyCheckBox",
+    "description": "Used as a shortcut to output the proper form elements for an association. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "hasManyCheckBox(${1:objectName}, ${2:association}, ${3:keys}, ${4:label}, ${5:labelPlacement}, ${6:prepend}, ${7:append}, ${8:prependToLabel}, ${9:appendToLabel}, ${10:errorElement}, ${11:errorClass}, ${12:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hasManyRadioButton": {
+    "prefix": "hasManyRadioButton",
+    "description": "Used as a shortcut to output the proper form elements for an association. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "hasManyRadioButton(${1:objectName}, ${2:association}, ${3:property}, ${4:keys}, ${5:tagValue}, ${6:checkIfBlank}, ${7:label}, ${8:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hasOne": {
+    "prefix": "hasOne",
+    "description": "Sets up a <code>hasOne</code> association between this model and the specified one.",
+    "body": [
+      "hasOne(${1:name}, ${2:modelName}, ${3:foreignKey}, ${4:joinKey}, ${5:outer}, ${6:dependent})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hasProperty": {
+    "prefix": "hasProperty",
+    "description": "Returns <code>true</code> if the specified property name exists on the model.",
+    "body": [
+      "hasProperty(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hiddenField": {
+    "prefix": "hiddenField",
+    "description": "Builds and returns a string containing a hidden field form control based on the supplied objectName and property. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "hiddenField(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hiddenFieldTag": {
+    "prefix": "hiddenFieldTag",
+    "description": "Builds and returns a string containing a hidden field form control based on the supplied name. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "hiddenFieldTag(${1:name}, ${2:value}, ${3:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "highlight": {
+    "prefix": "highlight",
+    "description": "Highlights the phrase(s) everywhere in the text if found by wrapping them in <code>span</code> tags.",
+    "body": [
+      "highlight(${1:text}, ${2:phrase}, ${3:,}, ${4:span}, ${5:highlight}, ${6:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hourSelectTag": {
+    "prefix": "hourSelectTag",
+    "description": "Builds and returns a string containing one <code>select</code> form control for the hours of the day based on the supplied name.",
+    "body": [
+      "hourSelectTag(${1:name}, ${2:selected}, ${3:includeBlank}, ${4:label}, ${5:around}, ${6:prepend}, ${7:append}, ${8:prependToLabel}, ${9:appendToLabel}, ${10:twelveHour}, ${11:true}, ${12:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "humanize": {
+    "prefix": "humanize",
+    "description": "Returns readable text by capitalizing and converting camel casing to multiple words.",
+    "body": [
+      "humanize(${1:text}, ${2:except})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "hyphenize": {
+    "prefix": "hyphenize",
+    "description": "Converts camelCase strings to lowercase strings with hyphens as word delimiters instead. Example: myVariable becomes my-variable.",
+    "body": [
+      "hyphenize(${1:string})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "imageTag": {
+    "prefix": "imageTag",
+    "description": "Returns an <code>img</code> tag. If the image is stored in the local <code>images</code> folder, the tag will also set the <code>width</code>, <code>height</code>, and <code>alt</code> attributes for you. You can pass any additional arguments (e.g. <code>class</code>, <code>rel</code>, <code>id</code>), and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "imageTag(${1:source}, ${2:true}, ${3:host}, ${4:protocol}, ${5:port}, ${6:true}, ${7:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "includeContent": {
+    "prefix": "includeContent",
+    "description": "Used to output the content for a particular section in a layout.",
+    "body": [
+      "includeContent(${1:body}, ${2:defaultValue})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "includedInObject": {
+    "prefix": "includedInObject",
+    "description": "Used as a shortcut to check if the specified IDs are a part of the main form object. This method should only be used for <code>hasMany</code> associations.",
+    "body": [
+      "includedInObject(${1:objectName}, ${2:association}, ${3:keys})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "includeLayout": {
+    "prefix": "includeLayout",
+    "description": "Includes the contents of another layout file. This is usually used to include a parent layout from within a child layout.",
+    "body": [
+      "includeLayout(${1:layout})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "includePartial": {
+    "prefix": "includePartial",
+    "description": "Includes the specified partial file in the view. Similar to using <code>cfinclude</code> but with the ability to cache the result and use Wheels-specific file look-up. By default, Wheels will look for the file in the current controller's view folder. To include a file relative from the base <code>views</code> folder, you can start the path supplied to <code>partial</code> with a forward slash.",
+    "body": [
+      "includePartial(${1:partial}, ${2:group}, ${3:cache}, ${4:layout}, ${5:spacer}, ${6:true}, ${7:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "integer": {
+    "prefix": "integer",
+    "description": "adds integer columns to table definition",
+    "body": [
+      "integer(${1:columnNames}, ${2:limit}, ${3:default}, ${4:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "invokeWithTransaction": {
+    "prefix": "invokeWithTransaction",
+    "description": "Runs the specified method within a single database transaction.",
+    "body": [
+      "invokeWithTransaction(${1:method}, ${2:commit}, ${3:read_committed})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isAjax": {
+    "prefix": "isAjax",
+    "description": "Returns whether the page was called from JavaScript or not.",
+    "body": [
+      "isAjax()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isClass": {
+    "prefix": "isClass",
+    "description": "Use this method to check whether you are currently in a class-level object.",
+    "body": [
+      "isClass()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isDelete": {
+    "prefix": "isDelete",
+    "description": "Returns whether the request was a <code>DELETE</code> request or not.",
+    "body": [
+      "isDelete()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isGet": {
+    "prefix": "isGet",
+    "description": "Returns whether the request was a normal <code>GET</code> request or not.",
+    "body": [
+      "isGet()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isHead": {
+    "prefix": "isHead",
+    "description": "Returns whether the request was a <code>HEAD</code> request or not.",
+    "body": [
+      "isHead()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isInstance": {
+    "prefix": "isInstance",
+    "description": "Use this method to check whether you are currently in an instance object.",
+    "body": [
+      "isInstance()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isNew": {
+    "prefix": "isNew",
+    "description": "Returns <code>true</code> if this object hasn't been saved yet (in other words, no matching record exists in the database yet). Returns <code>false</code> if a record exists.",
+    "body": [
+      "isNew()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isOptions": {
+    "prefix": "isOptions",
+    "description": "Returns whether the request was an <code>OPTIONS</code> request or not.",
+    "body": [
+      "isOptions()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isPatch": {
+    "prefix": "isPatch",
+    "description": "Returns whether the request was a <code>PATCH</code> request or not.",
+    "body": [
+      "isPatch()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isPersisted": {
+    "prefix": "isPersisted",
+    "description": "Returns <code>true</code> if this object has been persisted to the database or was loaded from the database via a finder. Returns <code>false</code> if the record has not been persisted to the database.",
+    "body": [
+      "isPersisted()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isPost": {
+    "prefix": "isPost",
+    "description": "Returns whether the request came from a form <code>POST</code> submission or not.",
+    "body": [
+      "isPost()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isPut": {
+    "prefix": "isPut",
+    "description": "Returns whether the request was a <code>PUT</code> request or not.",
+    "body": [
+      "isPut()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "isSecure": {
+    "prefix": "isSecure",
+    "description": "Returns whether Wheels is communicating over a secure port.",
+    "body": [
+      "isSecure()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "javaScriptIncludeTag": {
+    "prefix": "javaScriptIncludeTag",
+    "description": "Returns a <code>script</code> tag for a JavaScript file (or several) based on the supplied arguments.",
+    "body": [
+      "javaScriptIncludeTag(${1:sources}, ${2:text/javascript}, ${3:head}, ${4:,}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "key": {
+    "prefix": "key",
+    "description": "Returns the value of the primary key for the object. If you have a single primary key named id, then <code>someObject.key()</code> is functionally equivalent to <code>someObject.id</code>. This method is more useful when you do dynamic programming and don't know the name of the primary key or when you use composite keys (in which case it's convenient to use this method to get a list of both key values returned).",
+    "body": [
+      "key(${1:$persisted}, ${2:$returnTickCountWhenNew})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "linkTo": {
+    "prefix": "linkTo",
+    "description": "Creates a link to another page in your application. Pass in the name of a route to use your configured routes or a controller/action/key combination. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "linkTo(${1:text}, ${2:route}, ${3:controller}, ${4:action}, ${5:key}, ${6:params}, ${7:anchor}, ${8:true}, ${9:host}, ${10:protocol}, ${11:port}, ${12:href}, ${13:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "mailTo": {
+    "prefix": "mailTo",
+    "description": "Creates a <code>mailto</code> link tag to the specified email address, which is also used as the name of the link unless name is specified.",
+    "body": [
+      "mailTo(${1:emailAddress}, ${2:name}, ${3:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "mapper": {
+    "prefix": "mapper",
+    "description": "Returns the mapper object used to configure your application's routes. Usually you will use this method in <code>config/routes.cfm</code> to start chaining route mapping methods like <code>resources</code>, <code>namespace</code>, etc.",
+    "body": [
+      "mapper(${1:true}, ${2:[runtime expression]}, ${3:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "maximum": {
+    "prefix": "maximum",
+    "description": "Calculates the maximum value for a given property. Uses the SQL function <code>MAX</code>. If no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.",
+    "body": [
+      "maximum(${1:property}, ${2:where}, ${3:include}, ${4:true}, ${5:ifNull}, ${6:false}, ${7:group})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "member": {
+    "prefix": "member",
+    "description": "Scope routes within a nested resource which require use of the primary key as part of the URL pattern; A member route will require an ID, because it acts on a member. photos/1/preview is an example of a member route, because it acts on (and displays) a single object.",
+    "body": [
+      "member()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "migrateTo": {
+    "prefix": "migrateTo",
+    "description": "Migrates database to a specified version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
+    "body": [
+      "migrateTo(${1:version})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "migrateToLatest": {
+    "prefix": "migrateToLatest",
+    "description": "Shortcut function to migrate to the latest version",
+    "body": [
+      "migrateToLatest()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "mimeTypes": {
+    "prefix": "mimeTypes",
+    "description": "Returns an associated MIME type based on a file extension.",
+    "body": [
+      "mimeTypes(${1:extension}, ${2:application/octet-stream})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "minimum": {
+    "prefix": "minimum",
+    "description": "Calculates the minimum value for a given property. Uses the SQL function <code>MIN</code>. If no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.",
+    "body": [
+      "minimum(${1:property}, ${2:where}, ${3:include}, ${4:true}, ${5:ifNull}, ${6:false}, ${7:group})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "minuteSelectTag": {
+    "prefix": "minuteSelectTag",
+    "description": "Builds and returns a string containing one <code>select</code> form control for the minutes of an hour based on the supplied name.",
+    "body": [
+      "minuteSelectTag(${1:name}, ${2:selected}, ${3:1}, ${4:includeBlank}, ${5:label}, ${6:around}, ${7:prepend}, ${8:append}, ${9:prependToLabel}, ${10:appendToLabel}, ${11:true}, ${12:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "model": {
+    "prefix": "model",
+    "description": "Returns a reference to the requested model so that class level methods can be called on it.",
+    "body": [
+      "model(${1:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "monthSelectTag": {
+    "prefix": "monthSelectTag",
+    "description": "Builds and returns a string containing a <code>select</code> form control for the months of the year based on the supplied name.",
+    "body": [
+      "monthSelectTag(${1:name}, ${2:selected}, ${3:names}, ${4:January,February,March,April,May,June,July,August,September,October,November,December}, ${5:Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec}, ${6:includeBlank}, ${7:label}, ${8:around}, ${9:prepend}, ${10:append}, ${11:prependToLabel}, ${12:appendToLabel}, ${13:true}, ${14:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "namespace": {
+    "prefix": "namespace",
+    "description": "Scopes any the controllers for any routes configured within this block to a subfolder (package) and also adds the package name to the URL.",
+    "body": [
+      "namespace(${1:name}, ${2:[runtime expression]}, ${3:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "nestedProperties": {
+    "prefix": "nestedProperties",
+    "description": "Allows for nested objects, structs, and arrays to be set from params and other generated data.",
+    "body": [
+      "nestedProperties(${1:association}, ${2:true}, ${3:allowDelete}, ${4:sortProperty}, ${5:rejectIfBlank})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "new": {
+    "prefix": "new",
+    "description": "Creates a new object based on supplied <code>properties</code> and returns it. The object is not saved to the database, it only exists in memory. Property names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument.",
+    "body": [
+      "new(${1:[runtime expression]}, ${2:true}, ${3:allowExplicitTimestamps})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "obfuscateParam": {
+    "prefix": "obfuscateParam",
+    "description": "Obfuscates a value. Typically used for hiding primary key values when passed along in the URL.",
+    "body": [
+      "obfuscateParam(${1:param})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "onlyProvides": {
+    "prefix": "onlyProvides",
+    "description": "Use this in an individual controller action to define which formats the action will respond with. This can be used to define provides behavior in individual actions or to override a global setting set with <code>provides</code> in the controller's <code>config()</code>.",
+    "body": [
+      "onlyProvides(${1:formats}, ${2:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "onMissingMethod": {
+    "prefix": "onMissingMethod",
+    "description": "This method is not designed to be called directly from your code, but provides functionality for dynamic finders such as <code>findOneByEmail()</code>",
+    "body": [
+      "onMissingMethod(${1:missingMethodName}, ${2:missingMethodArguments})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "package": {
+    "prefix": "package",
+    "description": "Scopes any the controllers for any routes configured within this block to a subfolder (package) without adding the package name to the URL.",
+    "body": [
+      "package(${1:name}, ${2:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "packageSetup": {
+    "prefix": "packageSetup",
+    "description": "Executes once before this package's first test case.",
+    "body": [
+      "packageSetup()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "packageTeardown": {
+    "prefix": "packageTeardown",
+    "description": "Executes once after this package's last test case.",
+    "body": [
+      "packageTeardown()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "pagination": {
+    "prefix": "pagination",
+    "description": "Returns a struct with information about the specificed paginated query. The keys that will be included in the struct are <code>currentPage</code>, <code>totalPages</code> and <code>totalRecords</code>.",
+    "body": [
+      "pagination(${1:query})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "paginationLinks": {
+    "prefix": "paginationLinks",
+    "description": "Builds and returns a string containing links to pages based on a paginated query. Uses <code>linkTo()</code> internally to build the link, so you need to pass in a route name or a controller/action/key combination. All other <code>linkTo()</code> arguments can be supplied as well, in which case they are passed through directly to <code>linkTo()</code>. If you have paginated more than one query in the controller, you can use the handle argument to reference them. (Don't forget to pass in a handle to the <code>findAll()</code> function in your controller first.)",
+    "body": [
+      "paginationLinks(${1:2}, ${2:true}, ${3: ... }, ${4:linkToCurrentPage}, ${5:prepend}, ${6:append}, ${7:prependToPage}, ${8:addActiveClassToPrependedParent}, ${9:true}, ${10:true}, ${11:appendToPage}, ${12:true}, ${13:true}, ${14:classForCurrent}, ${15:query}, ${16:page}, ${17:showSinglePage}, ${18:true}, ${19:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "passwordField": {
+    "prefix": "passwordField",
+    "description": "Builds and returns a string containing a password field form control based on the supplied objectName and property. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "passwordField(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:useDefaultLabel}, ${6:around}, ${7:prepend}, ${8:append}, ${9:prependToLabel}, ${10:appendToLabel}, ${11:span}, ${12:field-with-errors}, ${13:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "passwordFieldTag": {
+    "prefix": "passwordFieldTag",
+    "description": "Builds and returns a string containing a password field form control based on the supplied name. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "passwordFieldTag(${1:name}, ${2:value}, ${3:label}, ${4:around}, ${5:prepend}, ${6:append}, ${7:prependToLabel}, ${8:appendToLabel}, ${9:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "patch": {
+    "prefix": "patch",
+    "description": "Create a route that matches a URL requiring an HTTP <code>PATCH</code> method. We recommend using this matcher to expose actions that update database records.",
+    "body": [
+      "patch(${1:name}, ${2:pattern}, ${3:to}, ${4:controller}, ${5:action}, ${6:package}, ${7:on}, ${8:redirect})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "pluginNames": {
+    "prefix": "pluginNames",
+    "description": "Returns a list of the names of all installed plugins.",
+    "body": [
+      "pluginNames()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "pluralize": {
+    "prefix": "pluralize",
+    "description": "Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the <code>count</code> argument. Wheels stores a list of words that are the same in both singular and plural form (e.g. \"equipment\", \"information\") and words that don't follow the regular pluralization rules (e.g. \"child\" / \"children\", \"foot\" / \"feet\"). Use <code>get(\"uncountables\")</code> / <code>set(\"uncountables\", newList)</code> and <code>get(\"irregulars\")</code> / <code>set(\"irregulars\", newList)</code> to modify them to suit your needs.",
+    "body": [
+      "pluralize(${1:word}, ${2:-1}, ${3:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "post": {
+    "prefix": "post",
+    "description": "Create a route that matches a URL requiring an HTTP <code>POST</code> method. We recommend using this matcher to expose actions that create database records.",
+    "body": [
+      "post(${1:name}, ${2:pattern}, ${3:to}, ${4:controller}, ${5:action}, ${6:package}, ${7:on}, ${8:redirect})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "primaryKey": {
+    "prefix": "primaryKey",
+    "description": "Adds a primary key definition to the table. this method also allows for multiple primary keys.",
+    "body": [
+      "primaryKey(${1:name}, ${2:integer}, ${3:false}, ${4:limit}, ${5:precision}, ${6:scale}, ${7:references}, ${8:onUpdate}, ${9:onDelete})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "primaryKeys": {
+    "prefix": "primaryKeys",
+    "description": "Alias for <code>primaryKey()</code>. Use this for better readability when you're accessing multiple primary keys.",
+    "body": [
+      "primaryKeys(${1:position})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "processAction": {
+    "prefix": "processAction",
+    "description": "Process the specified action of the controller. This is exposed in the API primarily for testing purposes; you would not usually call it directly unless in the test suite.",
+    "body": [
+      "processAction(${1:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "processRequest": {
+    "prefix": "processRequest",
+    "description": "Creates a controller and calls an action on it. Which controller and action that's called is determined by the params passed in. Returns the result of the request either as a string or in a struct with <code>body</code>, <code>emails</code>, <code>files</code>, <code>flash</code>, <code>redirect</code>, <code>status</code>, and <code>type</code>. Primarily used for testing purposes.",
+    "body": [
+      "processRequest(${1:params}, ${2:get}, ${3:returnAs}, ${4:rollback}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "properties": {
+    "prefix": "properties",
+    "description": "Returns a structure of all the properties with their names as keys and the values of the property as values.",
+    "body": [
+      "properties(${1:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "property": {
+    "prefix": "property",
+    "description": "Use this method to map an object property to either a table column with a different name than the property or to a SQL expression. You only need to use this method when you want to override the default object relational mapping that Wheels performs.",
+    "body": [
+      "property(${1:name}, ${2:column}, ${3:sql}, ${4:label}, ${5:defaultValue}, ${6:true}, ${7:char}, ${8:automaticValidations})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "propertyIsBlank": {
+    "prefix": "propertyIsBlank",
+    "description": "Returns <code>true</code> if the specified property doesn't exist on the model or is an empty string. This method is the inverse of <code>propertyIsPresent()</code>.",
+    "body": [
+      "propertyIsBlank(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "propertyIsPresent": {
+    "prefix": "propertyIsPresent",
+    "description": "Returns <code>true</code> if the specified property exists on the model and is not a blank string.",
+    "body": [
+      "propertyIsPresent(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "propertyNames": {
+    "prefix": "propertyNames",
+    "description": "Returns a list of property names ordered by their respective column's ordinal position in the database table. Also includes calculated property names that will be generated by the Wheels ORM.",
+    "body": [
+      "propertyNames()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "protectedProperties": {
+    "prefix": "protectedProperties",
+    "description": "Use this method to specify which properties cannot be set through mass assignment.",
+    "body": [
+      "protectedProperties(${1:properties})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "protectsFromForgery": {
+    "prefix": "protectsFromForgery",
+    "description": "Tells Wheels to protect <code>POST</code>ed requests from CSRF vulnerabilities. Instructs the controller to verify that <code>params.authenticityToken</code> or <code>X-CSRF-Token</code> HTTP header is provided along with the request containing a valid authenticity token. Call this method within a controller's <code>config</code> method, preferably the base <code>Controller.cfc</code> file, to protect the entire application.",
+    "body": [
+      "protectsFromForgery(${1:exception}, ${2:only}, ${3:except})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "provides": {
+    "prefix": "provides",
+    "description": "Defines formats that the controller will respond with upon request. The format can be requested through a URL variable called <code>format</code>, by appending the <code>format</code> name to the end of a URL as an extension (when URL rewriting is enabled), or in the request header.",
+    "body": [
+      "provides(${1:formats})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "put": {
+    "prefix": "put",
+    "description": "Create a route that matches a URL requiring an HTTP <code>PUT</code> method. We recommend using this matcher to expose actions that update database records. This method is provided as a convenience for when you really need to support the <code>PUT</code> verb; consider using the <code>patch</code> matcher instead of this one.",
+    "body": [
+      "put(${1:name}, ${2:pattern}, ${3:to}, ${4:controller}, ${5:action}, ${6:package}, ${7:on}, ${8:redirect})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "radioButton": {
+    "prefix": "radioButton",
+    "description": "Builds and returns a string containing a radio button form control based on the supplied objectName and property. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "radioButton(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:tagValue}, ${6:useDefaultLabel}, ${7:around}, ${8:prepend}, ${9:append}, ${10:prependToLabel}, ${11:appendToLabel}, ${12:span}, ${13:field-with-errors}, ${14:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "radioButtonTag": {
+    "prefix": "radioButtonTag",
+    "description": "Builds and returns a string containing a radio button form control based on the supplied name. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "radioButtonTag(${1:name}, ${2:value}, ${3:checked}, ${4:label}, ${5:around}, ${6:prepend}, ${7:append}, ${8:prependToLabel}, ${9:appendToLabel}, ${10:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "raised": {
+    "prefix": "raised",
+    "description": "Catches a raised error and returns the error type Great if you want to\ttest that a certain exception will be raised.",
+    "body": [
+      "raised(${1:expression})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "redirectTo": {
+    "prefix": "redirectTo",
+    "description": "Redirects the browser to the supplied controller/action/key, route or back to the referring page. Internally, this function uses the <code>URLFor</code> function to build the link and the <code>cflocation</code> tag to perform the redirect.",
+    "body": [
+      "redirectTo(${1:back}, ${2:addToken}, ${3:302}, ${4:route}, ${5:method}, ${6:controller}, ${7:action}, ${8:key}, ${9:params}, ${10:anchor}, ${11:true}, ${12:host}, ${13:protocol}, ${14:port}, ${15:url}, ${16:delay}, ${17:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "redoMigration": {
+    "prefix": "redoMigration",
+    "description": "Reruns the specified migration version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
+    "body": [
+      "redoMigration(${1:version})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "references": {
+    "prefix": "references",
+    "description": "adds integer reference columns to table definition and creates foreign key constraints",
+    "body": [
+      "references(${1:referenceNames}, ${2:default}, ${3:false}, ${4:false}, ${5:true}, ${6:onUpdate}, ${7:onDelete})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "reload": {
+    "prefix": "reload",
+    "description": "Reloads the property values of this object from the database.",
+    "body": [
+      "reload()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "removeColumn": {
+    "prefix": "removeColumn",
+    "description": "Removes a column from a database table Only available in a migration CFC",
+    "body": [
+      "removeColumn(${1:table}, ${2:columnName}, ${3:referenceName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "removeIndex": {
+    "prefix": "removeIndex",
+    "description": "Remove a database index Only available in a migration CFC",
+    "body": [
+      "removeIndex(${1:table}, ${2:indexName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "removeRecord": {
+    "prefix": "removeRecord",
+    "description": "Removes existing records from a table Only available in a migration CFC",
+    "body": [
+      "removeRecord(${1:table}, ${2:where})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "renameColumn": {
+    "prefix": "renameColumn",
+    "description": "Renames a table column Only available in a migration CFC",
+    "body": [
+      "renameColumn(${1:table}, ${2:columnName}, ${3:newColumnName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "renameTable": {
+    "prefix": "renameTable",
+    "description": "Renames a table Only available in a migration CFC",
+    "body": [
+      "renameTable(${1:oldName}, ${2:newName})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "renderNothing": {
+    "prefix": "renderNothing",
+    "description": "Instructs the controller to render an empty string when it's finished processing the action. This is very similar to calling <code>cfabort</code> with the advantage that any after filters you have set on the action will still be run.",
+    "body": [
+      "renderNothing(${1:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "renderPartial": {
+    "prefix": "renderPartial",
+    "description": "Instructs the controller to render a partial when it's finished processing the action.",
+    "body": [
+      "renderPartial(${1:partial}, ${2:cache}, ${3:layout}, ${4:returnAs}, ${5:true}, ${6:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "renderText": {
+    "prefix": "renderText",
+    "description": "Instructs the controller to render specified text when it's finished processing the action.",
+    "body": [
+      "renderText(${1:text}, ${2:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "renderView": {
+    "prefix": "renderView",
+    "description": "Instructs the controller which view template and layout to render when it's finished processing the action. Note that when passing values for controller and / or action, this function does not execute the actual action but rather just loads the corresponding view template.",
+    "body": [
+      "renderView(${1:[runtime expression]}, ${2:[runtime expression]}, ${3:template}, ${4:layout}, ${5:cache}, ${6:returnAs}, ${7:hideDebugInformation}, ${8:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "renderWith": {
+    "prefix": "renderWith",
+    "description": "Instructs the controller to render the data passed in to the format that is requested. If the format requested is <code>json</code> or <code>xml</code>, Wheels will transform the data into that format automatically. For other formats (or to override the automatic formatting), you can also create a view template in this format: <code>nameofaction.xml.cfm</code>, <code>nameofaction.json.cfm</code>, <code>nameofaction.pdf.cfm</code>, etc.",
+    "body": [
+      "renderWith(${1:data}, ${2:[runtime expression]}, ${3:[runtime expression]}, ${4:template}, ${5:layout}, ${6:cache}, ${7:returnAs}, ${8:hideDebugInformation}, ${9:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "resetCycle": {
+    "prefix": "resetCycle",
+    "description": "Resets a cycle so that it starts from the first list value the next time it is called.",
+    "body": [
+      "resetCycle(${1:default})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "resource": {
+    "prefix": "resource",
+    "description": "Create a group of routes that exposes actions for manipulating a singular resource. A singular resource exposes URL patterns for the entire CRUD lifecycle of a single entity (<code>show</code>, <code>new</code>, <code>create</code>, <code>edit</code>, <code>update</code>, and <code>delete</code>) without exposing a primary key in the URL. Usually this type of resource represents a singleton entity tied to the session, application, or another resource (perhaps nested within another resource). If you need to generate routes for manipulating a collection of resources with a primary key in the URL, see the <code>resources</code> mapper method.",
+    "body": [
+      "resource(${1:name}, ${2:nested}, ${3:[runtime expression]}, ${4:controller}, ${5:singular}, ${6:plural}, ${7:only}, ${8:except}, ${9:shallow}, ${10:shallowPath}, ${11:shallowName}, ${12:constraints}, ${13:resource}, ${14:$plural}, ${15:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "resources": {
+    "prefix": "resources",
+    "description": "Create a group of routes that exposes actions for manipulating a collection of resources. A plural resource exposes URL patterns for the entire CRUD lifecycle (<code>index</code>, <code>show</code>, <code>new</code>, <code>create</code>, <code>edit</code>, <code>update</code>, <code>delete</code>), exposing a primary key in the URL for showing, editing, updating, and deleting records. If you need to generate routes for manipulating a singular resource without a primary key, see the <code>resource</code> mapper method.",
+    "body": [
+      "resources(${1:name}, ${2:nested}, ${3:[runtime expression]}, ${4:controller}, ${5:singular}, ${6:plural}, ${7:only}, ${8:except}, ${9:shallow}, ${10:shallowPath}, ${11:shallowName}, ${12:constraints}, ${13:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "response": {
+    "prefix": "response",
+    "description": "Returns content that Wheels will send to the client in response to the request.",
+    "body": [
+      "response()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "root": {
+    "prefix": "root",
+    "description": "Create a route that matches the root of its current context. This mapper can be used for the application's web root (or home page), or it can generate a route for the root of a namespace or other path scoping mapper.",
+    "body": [
+      "root(${1:to}, ${2:mapFormat})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "save": {
+    "prefix": "save",
+    "description": "Saves the object if it passes validation and callbacks. Returns <code>true</code> if the object was saved successfully to the database, <code>false</code> if not.",
+    "body": [
+      "save(${1:true}, ${2:reload}, ${3:true}, ${4:[runtime expression]}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "scope": {
+    "prefix": "scope",
+    "description": "Set any number of parameters to be inherited by mappers called within this matcher's block. For example, set a package or URL path to be used by all child routes.",
+    "body": [
+      "scope(${1:name}, ${2:path}, ${3:package}, ${4:controller}, ${5:shallow}, ${6:shallowPath}, ${7:shallowName}, ${8:constraints}, ${9:scope})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "secondSelectTag": {
+    "prefix": "secondSelectTag",
+    "description": "Builds and returns a string containing one <code>select</code> form control for the seconds of a minute based on the supplied name.",
+    "body": [
+      "secondSelectTag(${1:name}, ${2:selected}, ${3:1}, ${4:includeBlank}, ${5:label}, ${6:around}, ${7:prepend}, ${8:append}, ${9:prependToLabel}, ${10:appendToLabel}, ${11:true}, ${12:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "select": {
+    "prefix": "select",
+    "description": "Builds and returns a string containing a select form control based on the supplied objectName and property. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "select(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:options}, ${6:includeBlank}, ${7:valueField}, ${8:textField}, ${9:useDefaultLabel}, ${10:around}, ${11:prepend}, ${12:append}, ${13:prependToLabel}, ${14:appendToLabel}, ${15:span}, ${16:field-with-errors}, ${17:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "selectTag": {
+    "prefix": "selectTag",
+    "description": "Builds and returns a string containing a select form control based on the supplied name and options. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "selectTag(${1:name}, ${2:options}, ${3:selected}, ${4:includeBlank}, ${5:multiple}, ${6:valueField}, ${7:textField}, ${8:label}, ${9:around}, ${10:prepend}, ${11:append}, ${12:prependToLabel}, ${13:appendToLabel}, ${14:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "sendEmail": {
+    "prefix": "sendEmail",
+    "description": "Sends an email using a template and an optional layout to wrap it in. Besides the Wheels-specific arguments documented here, you can also pass in any argument that is accepted by the <code>cfmail</code> tag as well as your own arguments to be used by the view.",
+    "body": [
+      "sendEmail(${1:template}, ${2:from}, ${3:to}, ${4:subject}, ${5:layout}, ${6:file}, ${7:true}, ${8:true}, ${9:writeToFile})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "sendFile": {
+    "prefix": "sendFile",
+    "description": "Sends a file to the user (from the <code>files</code> folder or a path relative to it by default).",
+    "body": [
+      "sendFile(${1:file}, ${2:name}, ${3:type}, ${4:attachment}, ${5:directory}, ${6:deleteFile}, ${7:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "set": {
+    "prefix": "set",
+    "description": "Use to configure a global setting or set a default for a function.",
+    "body": [
+      "set()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setFilterChain": {
+    "prefix": "setFilterChain",
+    "description": "Use this function if you need a more low level way of setting the entire filter chain for a controller.",
+    "body": [
+      "setFilterChain(${1:chain})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setPagination": {
+    "prefix": "setPagination",
+    "description": "Allows you to set a pagination handle for a custom query so you can perform pagination on it in your view with <code>paginationLinks</code>.",
+    "body": [
+      "setPagination(${1:totalRecords}, ${2:1}, ${3:25}, ${4:query})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setPrimaryKey": {
+    "prefix": "setPrimaryKey",
+    "description": "Allows you to pass in the name(s) of the property(s) that should be used as the primary key(s). Pass as a list if defining a composite primary key. This function is also aliased as <code>setPrimaryKeys()</code>.",
+    "body": [
+      "setPrimaryKey(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setPrimaryKeys": {
+    "prefix": "setPrimaryKeys",
+    "description": "Alias for <code>setPrimaryKey()</code>. Use this for better readability when you're setting multiple properties as the primary key.",
+    "body": [
+      "setPrimaryKeys(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setProperties": {
+    "prefix": "setProperties",
+    "description": "Allows you to set all the properties of an object at once by passing in a structure with keys matching the property names.",
+    "body": [
+      "setProperties(${1:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setResponse": {
+    "prefix": "setResponse",
+    "description": "Sets content that Wheels will send to the client in response to the request.",
+    "body": [
+      "setResponse(${1:content})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setTableNamePrefix": {
+    "prefix": "setTableNamePrefix",
+    "description": "Sets a prefix to prepend to the table name when this model runs SQL queries.",
+    "body": [
+      "setTableNamePrefix(${1:prefix})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setup": {
+    "prefix": "setup",
+    "description": "Executes before every test case.",
+    "body": [
+      "setup()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setVerificationChain": {
+    "prefix": "setVerificationChain",
+    "description": "Use this function if you need a more low level way of setting the entire verification chain for a controller.",
+    "body": [
+      "setVerificationChain(${1:chain})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "simpleFormat": {
+    "prefix": "simpleFormat",
+    "description": "Returns formatted text using HTML break tags (<code><br></code>) and HTML paragraph elements (<code><p></p></code>) based on the newline characters and carriage returns in the <code>text</code> that is passed in.",
+    "body": [
+      "simpleFormat(${1:text}, ${2:true}, ${3:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "singularize": {
+    "prefix": "singularize",
+    "description": "Returns the singular form of the passed in word.",
+    "body": [
+      "singularize(${1:word})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "startFormTag": {
+    "prefix": "startFormTag",
+    "description": "Builds and returns a string containing the opening <code>form</code> tag. The form's action will be built according to the same rules as <code>URLFor</code>. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "startFormTag(${1:post}, ${2:multipart}, ${3:route}, ${4:controller}, ${5:action}, ${6:key}, ${7:params}, ${8:anchor}, ${9:true}, ${10:host}, ${11:protocol}, ${12:port}, ${13:prepend}, ${14:append}, ${15:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "string": {
+    "prefix": "string",
+    "description": "adds string columns to table definition",
+    "body": [
+      "string(${1:columnNames}, ${2:limit}, ${3:default}, ${4:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "stripLinks": {
+    "prefix": "stripLinks",
+    "description": "Removes all links from an HTML string, leaving just the link text.",
+    "body": [
+      "stripLinks(${1:html}, ${2:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "stripTags": {
+    "prefix": "stripTags",
+    "description": "Removes all HTML tags from a string.",
+    "body": [
+      "stripTags(${1:html}, ${2:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "styleSheetLinkTag": {
+    "prefix": "styleSheetLinkTag",
+    "description": "Returns a <code>link</code> tag for a stylesheet (or several) based on the supplied arguments.",
+    "body": [
+      "styleSheetLinkTag(${1:sources}, ${2:text/css}, ${3:all}, ${4:rel}, ${5:head}, ${6:,}, ${7:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "submitTag": {
+    "prefix": "submitTag",
+    "description": "Builds and returns a string containing a submit button form control. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "submitTag(${1:Save changes}, ${2:image}, ${3:prepend}, ${4:append}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "sum": {
+    "prefix": "sum",
+    "description": "Calculates the sum of values for a given property. Uses the SQL function <code>SUM</code>. If no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.",
+    "body": [
+      "sum(${1:property}, ${2:where}, ${3:include}, ${4:distinct}, ${5:true}, ${6:ifNull}, ${7:false}, ${8:group})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "table": {
+    "prefix": "table",
+    "description": "Use this method to tell Wheels what database table to connect to for this model. You only need to use this method when your table naming does not follow the standard Wheels convention of a singular object name mapping to a plural table name. To not use a table for your model at all, call <code>table(false)</code>.",
+    "body": [
+      "table(${1:name})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "tableName": {
+    "prefix": "tableName",
+    "description": "Returns the name of the database table that this model is mapped to.",
+    "body": [
+      "tableName()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "teardown": {
+    "prefix": "teardown",
+    "description": "Executes after every test case.",
+    "body": [
+      "teardown()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "testExample": {
+    "prefix": "testExample",
+    "description": "An example test.",
+    "body": [
+      "testExample()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "text": {
+    "prefix": "text",
+    "description": "adds text columns to table definition",
+    "body": [
+      "text(${1:columnNames}, ${2:default}, ${3:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "textArea": {
+    "prefix": "textArea",
+    "description": "Builds and returns a string containing a text area field form control based on the supplied objectName and property. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "textArea(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:useDefaultLabel}, ${6:around}, ${7:prepend}, ${8:append}, ${9:prependToLabel}, ${10:appendToLabel}, ${11:span}, ${12:field-with-errors}, ${13:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "textAreaTag": {
+    "prefix": "textAreaTag",
+    "description": "Builds and returns a string containing a text area form control based on the supplied name. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "textAreaTag(${1:name}, ${2:content}, ${3:label}, ${4:around}, ${5:prepend}, ${6:append}, ${7:prependToLabel}, ${8:appendToLabel}, ${9:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "textField": {
+    "prefix": "textField",
+    "description": "Builds and returns a string containing a text field form control based on the supplied objectName and property. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "textField(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:useDefaultLabel}, ${6:around}, ${7:prepend}, ${8:append}, ${9:prependToLabel}, ${10:appendToLabel}, ${11:span}, ${12:field-with-errors}, ${13:text}, ${14:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "textFieldTag": {
+    "prefix": "textFieldTag",
+    "description": "Builds and returns a string containing a text field form control based on the supplied name. Note: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.",
+    "body": [
+      "textFieldTag(${1:name}, ${2:value}, ${3:label}, ${4:around}, ${5:prepend}, ${6:append}, ${7:prependToLabel}, ${8:appendToLabel}, ${9:text}, ${10:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "time": {
+    "prefix": "time",
+    "description": "adds time columns to table definition",
+    "body": [
+      "time(${1:columnNames}, ${2:default}, ${3:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "timeAgoInWords": {
+    "prefix": "timeAgoInWords",
+    "description": "Returns a string describing the approximate time difference between the date passed in and the current date.",
+    "body": [
+      "timeAgoInWords(${1:fromTime}, ${2:includeSeconds}, ${3:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "timeSelect": {
+    "prefix": "timeSelect",
+    "description": "Builds and returns a string containing three <code>select</code> form controls for hour, minute, and second based on the supplied objectName and property.",
+    "body": [
+      "timeSelect(${1:objectName}, ${2:property}, ${3:association}, ${4:position}, ${5:hour,minute,second}, ${6::}, ${7:1}, ${8:1}, ${9:includeBlank}, ${10:label}, ${11:around}, ${12:prepend}, ${13:append}, ${14:prependToLabel}, ${15:appendToLabel}, ${16:span}, ${17:field-with-errors}, ${18:combine}, ${19:twelveHour}, ${20:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "timeSelectTags": {
+    "prefix": "timeSelectTags",
+    "description": "Builds and returns a string containing three <code>select</code> form controls for hour, minute, and second based on name.",
+    "body": [
+      "timeSelectTags(${1:name}, ${2:selected}, ${3:hour,minute,second}, ${4::}, ${5:1}, ${6:1}, ${7:includeBlank}, ${8:label}, ${9:around}, ${10:prepend}, ${11:append}, ${12:prependToLabel}, ${13:appendToLabel}, ${14:combine}, ${15:twelveHour}, ${16:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "timestamp": {
+    "prefix": "timestamp",
+    "description": "adds timestamp columns to table definition",
+    "body": [
+      "timestamp(${1:columnNames}, ${2:default}, ${3:null}, ${4:datetime})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "timestamps": {
+    "prefix": "timestamps",
+    "description": "adds Wheels convention automatic timestamp and soft delete columns to table definition",
+    "body": [
+      "timestamps()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "timeUntilInWords": {
+    "prefix": "timeUntilInWords",
+    "description": "Returns a string describing the approximate time difference between the current date and the date passed in.",
+    "body": [
+      "timeUntilInWords(${1:toTime}, ${2:includeSeconds}, ${3:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "titleize": {
+    "prefix": "titleize",
+    "description": "Capitalizes all words in the text to create a nicer looking title.",
+    "body": [
+      "titleize(${1:word})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "toggle": {
+    "prefix": "toggle",
+    "description": "Assigns to the property specified the opposite of the property's current boolean value. Throws an error if the property cannot be converted to a boolean value. Returns this object if save called internally is <code>false</code>.",
+    "body": [
+      "toggle(${1:property}, ${2:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "truncate": {
+    "prefix": "truncate",
+    "description": "Truncates text to the specified length and replaces the last characters with the specified truncate string (which defaults to \"...\").",
+    "body": [
+      "truncate(${1:text}, ${2:30}, ${3:...})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "uniqueidentifier": {
+    "prefix": "uniqueidentifier",
+    "description": "adds UUID columns to table definition",
+    "body": [
+      "uniqueidentifier(${1:columnNames}, ${2:newid()}, ${3:null})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "up": {
+    "prefix": "up",
+    "description": "Migrates up: will be executed when migrating your schema forward Along with down(), these are the two main functions in any migration file Only available in a migration CFC",
+    "body": [
+      "up()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "update": {
+    "prefix": "update",
+    "description": "Updates the object with the supplied <code>properties</code> and saves it to the database. Returns <code>true</code> if the object was saved successfully to the database and <code>false</code> otherwise.",
+    "body": [
+      "update(${1:[runtime expression]}, ${2:true}, ${3:reload}, ${4:true}, ${5:[runtime expression]}, ${6:true}, ${7:allowExplicitTimestamps})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "updateAll": {
+    "prefix": "updateAll",
+    "description": "Updates all properties for the records that match the <code>where</code> argument. Property names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument. By default, objects will not be instantiated and therefore callbacks and validations are not invoked. You can change this behavior by passing in <code>instantiate=true</code>. This method returns the number of records that were updated.",
+    "body": [
+      "updateAll(${1:where}, ${2:include}, ${3:[runtime expression]}, ${4:reload}, ${5:true}, ${6:instantiate}, ${7:true}, ${8:[runtime expression]}, ${9:true}, ${10:[runtime expression]}, ${11:false})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "updateByKey": {
+    "prefix": "updateByKey",
+    "description": "Finds the object with the supplied <code>key</code> and saves it (if validation permits it) with the supplied <code>properties</code> and / or named arguments. Property names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument. Returns <code>true</code> if the object was found and updated successfully, <code>false</code> otherwise.",
+    "body": [
+      "updateByKey(${1:key}, ${2:[runtime expression]}, ${3:reload}, ${4:true}, ${5:[runtime expression]}, ${6:true}, ${7:false})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "updateOne": {
+    "prefix": "updateOne",
+    "description": "Gets an object based on the arguments used and updates it with the supplied <code>properties</code>. Returns <code>true</code> if an object was found and updated successfully, <code>false</code> otherwise.",
+    "body": [
+      "updateOne(${1:where}, ${2:order}, ${3:[runtime expression]}, ${4:reload}, ${5:true}, ${6:[runtime expression]}, ${7:true}, ${8:[runtime expression]}, ${9:false})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "updateProperty": {
+    "prefix": "updateProperty",
+    "description": "Updates a single <code>property</code> and saves the record without going through the normal validation procedure. This is especially useful for boolean flags on existing records.",
+    "body": [
+      "updateProperty(${1:property}, ${2:value}, ${3:true}, ${4:[runtime expression]}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "updateRecord": {
+    "prefix": "updateRecord",
+    "description": "Updates an existing record in a table Only available in a migration CFC",
+    "body": [
+      "updateRecord(${1:table}, ${2:where})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "URLFor": {
+    "prefix": "URLFor",
+    "description": "Creates an internal URL based on supplied arguments.",
+    "body": [
+      "URLFor(${1:route}, ${2:controller}, ${3:action}, ${4:key}, ${5:params}, ${6:anchor}, ${7:true}, ${8:host}, ${9:protocol}, ${10:port}, ${11:true}, ${12:$encodeForHtmlAttribute}, ${13:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "usesLayout": {
+    "prefix": "usesLayout",
+    "description": "Used within a controller's <code>config()</code> function to specify controller- or action-specific layouts.",
+    "body": [
+      "usesLayout(${1:template}, ${2:ajax}, ${3:except}, ${4:only}, ${5:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "valid": {
+    "prefix": "valid",
+    "description": "Runs the validation on the object and returns <code>true</code> if it passes it. Wheels will run the validation process automatically whenever an object is saved to the database, but sometimes it's useful to be able to run this method to see if the object is valid without saving it to the database.",
+    "body": [
+      "valid(${1:true}, ${2:validateAssociations})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validate": {
+    "prefix": "validate",
+    "description": "Registers method(s) that should be called to validate objects before they are saved.",
+    "body": [
+      "validate(${1:methods}, ${2:condition}, ${3:unless}, ${4:onSave})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validateOnCreate": {
+    "prefix": "validateOnCreate",
+    "description": "Registers method(s) that should be called to validate new objects before they are inserted.",
+    "body": [
+      "validateOnCreate(${1:methods}, ${2:condition}, ${3:unless})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validateOnUpdate": {
+    "prefix": "validateOnUpdate",
+    "description": "Registers method(s) that should be called to validate existing objects before they are updated.",
+    "body": [
+      "validateOnUpdate(${1:methods}, ${2:condition}, ${3:unless})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesConfirmationOf": {
+    "prefix": "validatesConfirmationOf",
+    "description": "Validates that the value of the specified property also has an identical confirmation value. This is common when having a user type in their email address a second time to confirm, confirming a password by typing it a second time, etc. The confirmation value only exists temporarily and never gets saved to the database. By convention, the confirmation property has to be named the same as the property with \"Confirmation\" appended at the end. Using the password example, to confirm our password property, we would create a property called <code>passwordConfirmation</code>.",
+    "body": [
+      "validatesConfirmationOf(${1:properties}, ${2:[property] should match confirmation}, ${3:onSave}, ${4:condition}, ${5:unless}, ${6:caseSensitive})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesExclusionOf": {
+    "prefix": "validatesExclusionOf",
+    "description": "Validates that the value of the specified property does not exist in the supplied list.",
+    "body": [
+      "validatesExclusionOf(${1:properties}, ${2:list}, ${3:[property] is reserved}, ${4:onSave}, ${5:allowBlank}, ${6:condition}, ${7:unless})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesFormatOf": {
+    "prefix": "validatesFormatOf",
+    "description": "Validates that the value of the specified property is formatted correctly by matching it against a regular expression using the regEx argument and / or against a built-in CFML validation type using the type argument (creditcard, date, email, etc.).",
+    "body": [
+      "validatesFormatOf(${1:properties}, ${2:regEx}, ${3:type}, ${4:[property] is invalid}, ${5:onSave}, ${6:allowBlank}, ${7:condition}, ${8:unless})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesInclusionOf": {
+    "prefix": "validatesInclusionOf",
+    "description": "Validates that the value of the specified property exists in the supplied list.",
+    "body": [
+      "validatesInclusionOf(${1:properties}, ${2:list}, ${3:[property] is not included in the list}, ${4:onSave}, ${5:allowBlank}, ${6:condition}, ${7:unless})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesLengthOf": {
+    "prefix": "validatesLengthOf",
+    "description": "Validates that the value of the specified property matches the length requirements supplied. Use the <code>exactly</code>, <code>maximum</code>, <code>minimum</code> and <code>within</code> arguments to specify the length requirements.",
+    "body": [
+      "validatesLengthOf(${1:properties}, ${2:[property] is the wrong length}, ${3:onSave}, ${4:allowBlank}, ${5:exactly}, ${6:maximum}, ${7:minimum}, ${8:within}, ${9:condition}, ${10:unless})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesNumericalityOf": {
+    "prefix": "validatesNumericalityOf",
+    "description": "Validates that the value of the specified property is numeric.",
+    "body": [
+      "validatesNumericalityOf(${1:properties}, ${2:[property] is not a number}, ${3:onSave}, ${4:allowBlank}, ${5:onlyInteger}, ${6:condition}, ${7:unless}, ${8:odd}, ${9:even}, ${10:greaterThan}, ${11:greaterThanOrEqualTo}, ${12:equalTo}, ${13:lessThan}, ${14:lessThanOrEqualTo})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesPresenceOf": {
+    "prefix": "validatesPresenceOf",
+    "description": "Validates that the specified property exists and that its value is not blank.",
+    "body": [
+      "validatesPresenceOf(${1:properties}, ${2:[property] can't be empty}, ${3:onSave}, ${4:condition}, ${5:unless})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validatesUniquenessOf": {
+    "prefix": "validatesUniquenessOf",
+    "description": "Validates that the value of the specified property is unique in the database table. Useful for ensuring that two users can't sign up to a website with identical usernames for example. When a new record is created, a check is made to make sure that no record already exists in the database table with the given value for the specified property. When the record is updated, the same check is made but disregarding the record itself.",
+    "body": [
+      "validatesUniquenessOf(${1:properties}, ${2:[property] has already been taken}, ${3:onSave}, ${4:allowBlank}, ${5:scope}, ${6:condition}, ${7:unless}, ${8:true})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "validationTypeForProperty": {
+    "prefix": "validationTypeForProperty",
+    "description": "Returns the validation type for the property.",
+    "body": [
+      "validationTypeForProperty(${1:property})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "verificationChain": {
+    "prefix": "verificationChain",
+    "description": "Returns an array of all the verifications set on this controller in the order in which they will be executed.",
+    "body": [
+      "verificationChain()",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "verifies": {
+    "prefix": "verifies",
+    "description": "Instructs Wheels to verify that some specific criterias are met before running an action. Note that all undeclared arguments will be passed to <code>redirectTo()</code> call if a <code>handler</code> is not specified.",
+    "body": [
+      "verifies(${1:only}, ${2:except}, ${3:post}, ${4:get}, ${5:ajax}, ${6:cookie}, ${7:session}, ${8:params}, ${9:handler}, ${10:cookieTypes}, ${11:sessionTypes}, ${12:paramsTypes})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "wildcard": {
+    "prefix": "wildcard",
+    "description": "Special wildcard matching generates routes with `",
+    "body": [
+      "wildcard(${1:get}, ${2:index}, ${3:mapKey}, ${4:mapFormat})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "wordTruncate": {
+    "prefix": "wordTruncate",
+    "description": "Truncates text to the specified length of words and replaces the remaining characters with the specified truncate string (which defaults to \"...\").",
+    "body": [
+      "wordTruncate(${1:text}, ${2:5}, ${3:...})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "yearSelectTag": {
+    "prefix": "yearSelectTag",
+    "description": "Builds and returns a string containing a <code>select</code> form control for a range of years based on the supplied name.",
+    "body": [
+      "yearSelectTag(${1:name}, ${2:selected}, ${3:2018}, ${4:2028}, ${5:includeBlank}, ${6:label}, ${7:around}, ${8:prepend}, ${9:append}, ${10:prependToLabel}, ${11:appendToLabel}, ${12:true}, ${13:[runtime expression]})",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "setFlashStorage": {
+    "prefix": "setFlashStorage",
+    "description": "Dynamically sets flashStorage during request lifecycle.",
+    "body": [
+      "setFlashStorage(${1:session}, ${2:setGlobally})",
+      "$0"
+    ],
+    "scope": "cfml"
+  }
+}
