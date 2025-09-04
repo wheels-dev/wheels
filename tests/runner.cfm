@@ -9,64 +9,6 @@
             reporter = "testbox.system.reports.JSONReporter"
         );
     }
-    else if(url.format eq "json" && structKeyExists(url, "cli") && url.cli==true){
-        // Handle TestBox CLI parameters when called from wheels test run
-        testBoxArgs = {};
-        
-        // Handle recurse parameter (default true)
-        if (structKeyExists(url, "recurse")) {
-            testBoxArgs.recurse = url.recurse;
-        }
-    
-        // Handle verbose parameter
-        if (structKeyExists(url, "verbose") && url.verbose) {
-            testBoxArgs.verbose = true;
-        }
-        
-        
-        // Determine reporter - default to JSON for CLI
-        local.reporterClass = "testbox.system.reports.JSONReporter";
-        
-        if (structKeyExists(url, "reporter") && len(url.reporter)) {
-          testBoxArgs.reporter = url.reporter;
-        }
-        
-        // Run TestBox with the configured parameters
-        result = testBox.run(argumentCollection = testBoxArgs);
-        
-        // Set appropriate content type based on reporter
-        if (findNoCase("JSON", local.reporterClass)) {
-            cfcontent(type="application/json");
-        } else if (findNoCase("JUnit", local.reporterClass) || findNoCase("XML", local.reporterClass)) {
-            cfcontent(type="text/xml");
-        } else {
-            cfcontent(type="text/plain");
-        }
-        
-        // Handle outputFile parameter for single output
-        if (structKeyExists(url, "outputFile") && len(url.outputFile)) {
-            fileWrite(expandPath(url.outputFile), result);
-        }
-        
-        writeOutput(result);
-        
-        cfheader(name="Access-Control-Allow-Origin", value="*");
-        
-        // Set status code based on results for JSON reporter
-        if (findNoCase("JSON", local.reporterClass)) {
-            try {
-                if (!structKeyExists(local, "jsonData")) {
-                    local.jsonData = deserializeJSON(result);
-                }
-                if (local.jsonData.totalFail > 0 || local.jsonData.totalError > 0) {
-                } else {
-                    cfheader(statustext="OK", statuscode=200);
-                }
-            } catch (any e) {
-                // If not JSON, continue
-            }
-        }
-    }
     else if(url.format eq "json"){
         result = testBox.run(
             reporter = "testbox.system.reports.JSONReporter"
@@ -75,9 +17,7 @@
         cfheader(name="Access-Control-Allow-Origin", value="*");
         DeJsonResult = DeserializeJSON(result);
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-            if(!structKeyExists(url, "cli") || !url.cli){
-                cfheader(statustext="Expectation Failed", statuscode=417);
-            }
+            cfheader(statustext="Expectation Failed", statuscode=417);
         } else {
             cfheader(statustext="OK", statuscode=200);
         }
