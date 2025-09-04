@@ -1,0 +1,62 @@
+{
+	"name": "wheels-vscode",
+	"displayName": "Wheels VS Code",
+	"description": "Intelligent code snippets and hover documentation for Wheels framework with required-only parameters and named syntax.",
+	"version": "1.0.0",
+	"engines": {
+		"vscode": "^1.80.0"
+	},
+	"publisher": "wheels-dev",
+	"icon": "assets/wheels_logo.png",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/cfwheels/cfwheels.git"
+	},
+	"homepage": "https://wheels.dev",
+	"bugs": {
+		"url": "https://github.com/cfwheels/cfwheels/issues"
+	},
+	"license": "MIT",
+	"categories": [
+		"Snippets"
+	],
+	"keywords": [
+		"wheels.dev",
+		"wheels-dev",
+		"cfwheels",
+		"wheels",
+		"snippets",
+		"coldfusion",
+		"lucee",
+		"boxlang",
+		"cfml",
+		"mvc",
+		"framework",
+		"hover",
+		"documentation"
+	],
+	"activationEvents": [
+		"onLanguage:cfml"
+	],
+	"main": "./src/extension.js",
+	"contributes": {
+		"snippets": [
+			{
+				"language": "cfml",
+				"path": "./snippets/wheels.code-snippets"
+			}
+		],
+		"commands": [
+			{
+				"command": "wheels.showDocumentation",
+				"title": "Open Wheels Documentation",
+				"category": "Wheels"
+			}
+		]
+	},
+	"galleryBanner": {
+		"color": "#B2050E",
+		"theme": "dark"
+	}
+
+}
