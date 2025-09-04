@@ -21,7 +21,6 @@ component extends="../base" {
         string bundles = "",
         string directory = "",
         boolean recurse = true,
-        string reporter = "json",
         boolean verbose = true,
         string servername = ""
     ) {
@@ -35,7 +34,8 @@ component extends="../base" {
         // Build the test URL
         var testUrl = buildTestUrl(
             type = arguments.type,
-            servername = arguments.servername
+            servername = arguments.servername,
+            format = arguments.format
         );
         
         // Build TestBox command parameters
@@ -43,7 +43,6 @@ component extends="../base" {
             runner = testUrl
         };
         params.recurse = arguments.recurse;
-        params.reporter = arguments.reporter;
         params.verbose = arguments.verbose;
         
         // Display test type

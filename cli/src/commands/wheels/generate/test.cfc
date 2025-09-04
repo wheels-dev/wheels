@@ -222,7 +222,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean factory = false
 	) {
-		var content = 'component extends="tests.BaseSpec" {' & chr(10) & chr(10);
+		var content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNameSingularC# Model", () => {' & chr(10) & chr(10);
 		
@@ -332,7 +332,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean mock = false
 	) {
-		var content = 'component extends="tests.BaseSpec" {' & chr(10) & chr(10);
+		var content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNamePluralC# Controller", () => {' & chr(10) & chr(10);
 		
@@ -429,7 +429,7 @@ component aliases='wheels g test' extends="../base"  {
 	 * Generate view test
 	 */
 	private function generateViewTest(required struct obj, required string viewName) {
-		var content = 'component extends="tests.BaseSpec" {' & chr(10) & chr(10);
+		var content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNamePluralC# #viewName# View", () => {' & chr(10) & chr(10);
 		
@@ -458,7 +458,7 @@ component aliases='wheels g test' extends="../base"  {
 	 * Generate unit test
 	 */
 	private function generateUnitTest(required struct obj, boolean mock = false) {
-		var content = 'component extends="tests.BaseSpec" {' & chr(10) & chr(10);
+		var content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNameSingularC# Unit Tests", () => {' & chr(10) & chr(10);
 		
@@ -502,7 +502,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean factory = false
 	) {
-		var content = 'component extends="tests.BaseSpec" {' & chr(10) & chr(10);
+		var content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNameSingularC# Integration Test", () => {' & chr(10) & chr(10);
 		
@@ -567,7 +567,7 @@ component aliases='wheels g test' extends="../base"  {
 		boolean crud = false,
 		boolean mock = false
 	) {
-		var content = 'component extends="tests.BaseSpec" {' & chr(10) & chr(10);
+		var content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNamePluralC# API", () => {' & chr(10) & chr(10);
 		
