@@ -2550,20 +2550,38 @@ component output="false" {
 		if (Len(arguments.route)) {
 			local.route = $findRoute(argumentCollection = arguments);
 			local.foundVariables = local.route.foundvariables;
-			local.rv &= local.route.pattern;
+
+			if (arguments.$URLRewriting neq "Off") {
+				local.rv &= local.route.pattern;
+			} else {
+				// Always include core variables when not rewriting
+				local.foundVariables &= "," & local.coreVariables;
+				local.rv &= "?controller=[controller]&action=[action]&key=[key]&format=[format]";
+			}
 		} else {
 			local.route = {};
 			local.foundVariables = local.coreVariables;
 			local.rv &= "?controller=[controller]&action=[action]&key=[key]&format=[format]";
-			if (StructKeyExists(local, "params")) {
-				if (!Len(arguments.action)) {
-					if (Len(arguments.controller)) {
-						arguments.action = "index";
-					} else if (StructKeyExists(local.params, "action")) {
-						arguments.action = local.params.action;
-					}
+		}
+
+		// Shared fallback logic for controller/action
+		if (StructKeyExists(local, "params")) {
+			// Handle action
+			if (!Len(arguments.action)) {
+				if (StructKeyExists(local.route, "action")) {
+					arguments.action = local.route.action;
+				} else if (Len(arguments.controller)) {
+					arguments.action = "index";
+				} else if (StructKeyExists(local.params, "action")) {
+					arguments.action = local.params.action;
 				}
-				if (!Len(arguments.controller) && StructKeyExists(local.params, "controller")) {
+			}
+
+			// Handle controller
+			if (!Len(arguments.controller)) {
+				if (StructKeyExists(local.route, "controller")) {
+					arguments.controller = local.route.controller;
+				} else if (StructKeyExists(local.params, "controller")) {
 					arguments.controller = local.params.controller;
 				}
 			}
