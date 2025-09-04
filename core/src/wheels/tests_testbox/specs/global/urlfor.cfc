@@ -94,9 +94,20 @@ component extends="testbox.system.BaseSpec" {
 				r2 = g.urlFor(controller = "Example", action = "MyAction")
 				r3 = g.urlFor(controller = "Example", action = "MyAction", key = 123)
 
-				expect(r1).toBe("/example/index")
-				expect(r2).toBe("/example/my-action")
-				expect(r3).toBe("/example/my-action/123")
+				if (application.wheels.URLRewriting eq 'On') {
+					expect(r1).toBe("/example/index")
+					expect(r2).toBe("/example/my-action")
+					expect(r3).toBe("/example/my-action/123")
+				} else if (application.wheels.URLRewriting eq 'Off') {
+					expect(r1).toBe("/index.cfm?controller=example&action=index")
+					expect(r2).toBe("/index.cfm?controller=example&action=my-action")
+					expect(r3).toBe("/index.cfm?controller=example&action=my-action&key=123")
+				} else {
+					expect(r1).toBe("/index.cfm/example/index")
+					expect(r2).toBe("/index.cfm/example/my-action")
+					expect(r3).toBe("/index.cfm/example/my-action/123")
+				}
+
 			})
 
 			it("encodes URL parameters with special characters when encode=true", () => {
@@ -118,9 +129,19 @@ component extends="testbox.system.BaseSpec" {
 				r3 = g.urlFor(controller = "example", action = "show", key = quotesParam, encode = true)
 				
 				// Expected encoded results
-				expect(r1).toBe("/example/show/%3Cstrong%3Ebold%3C%2Fstrong%3E")
-				expect(r2).toBe("/example/show/first%26second")
-				expect(r3).toBe("/example/show/quotes%22in%22param")
+				if (application.wheels.URLRewriting eq 'On') {
+					expect(r1).toBe("/example/show/%3Cstrong%3Ebold%3C%2Fstrong%3E")
+					expect(r2).toBe("/example/show/first%26second")
+					expect(r3).toBe("/example/show/quotes%22in%22param")
+				} else if (application.wheels.URLRewriting eq 'Off') {
+					expect(r1).toBe("/index.cfm?controller=example&action=show&key=%3Cstrong%3Ebold%3C%2Fstrong%3E")
+					expect(r2).toBe("/index.cfm?controller=example&action=show&key=first%26second")
+					expect(r3).toBe("/index.cfm?controller=example&action=show&key=quotes%22in%22param")
+				} else {
+					expect(r1).toBe("/index.cfm/example/show/%3Cstrong%3Ebold%3C%2Fstrong%3E")
+					expect(r2).toBe("/index.cfm/example/show/first%26second")
+					expect(r3).toBe("/index.cfm/example/show/quotes%22in%22param")
+				}
 			})
 			
 			it("does not encode URL parameters with special characters when encode=false", () => {
@@ -142,9 +163,19 @@ component extends="testbox.system.BaseSpec" {
 				r3 = g.urlFor(controller = "example", action = "show", key = quotesParam, encode = false)
 				
 				// Expected unencoded results
-				expect(r1).toBe("/example/show/<strong>bold</strong>")
-				expect(r2).toBe("/example/show/first&second")
-				expect(r3).toBe('/example/show/quotes"in"param')
+				if (application.wheels.URLRewriting eq 'On') {
+					expect(r1).toBe("/example/show/<strong>bold</strong>")
+					expect(r2).toBe("/example/show/first&second")
+					expect(r3).toBe('/example/show/quotes"in"param')
+				} else if (application.wheels.URLRewriting eq 'Off') {
+					expect(r1).toBe("/index.cfm?controller=example&action=show&key=<strong>bold</strong>")
+					expect(r2).toBe("/index.cfm?controller=example&action=show&key=first&second")
+					expect(r3).toBe('/index.cfm?controller=example&action=show&key=quotes"in"param')
+				} else {
+					expect(r1).toBe("/index.cfm/example/show/<strong>bold</strong>")
+					expect(r2).toBe("/index.cfm/example/show/first&second")
+					expect(r3).toBe('/index.cfm/example/show/quotes"in"param')
+				}
 			})
 		})
 	}

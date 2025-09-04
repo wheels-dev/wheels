@@ -52,17 +52,21 @@ if (executeAction) {
 			<pre><code class="sql" style="overflow-y: scroll; height:500px;">#result#</code></pre>
 		</cfif>
 	</div>
-</cfoutput>
+<cfif get("URLRewriting") eq "Off">
+	<cfset method = 'get'>
+<cfelse>
+	<cfset method = 'post'>
+</cfif>
 </div>
 <script>
 $(document).ready(function() {
 	$(".execute").on("click", function(e){
-		var res = $("#result");
+		var res = $("##result");
 		var url = $(this).data("data-url");
 			res.html('<div class="ui active inverted dimmer"><div class="ui text loader">Loading</div><p></p><p></p><p></p><p></p></div>');
 		var resp = $.ajax({
 				url: url,
-				method: 'post'
+				method: '#method#'
 		})
 		.done(function(data, status, req) {
 			res.html(data);
@@ -76,4 +80,5 @@ $(document).ready(function() {
 	});
 });
 </script>
+</cfoutput>
 <!--- cfformat-ignore-end --->

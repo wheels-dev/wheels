@@ -202,9 +202,14 @@ component extends="testbox.system.BaseSpec" {
 
 			it("works with ampersand in params with URL rewriting", () => {
 				request.cgi.script_name = "/index.cfm"
-				e = '#application.wheels.webpath#x/x?a=c+ats%26dogs&b=a+c'
 				r = _controller.URLFor(controller = "x", action = "x", params = "a=c ats%26dogs&b=a c", encode = true)
-
+				if (application.wheels.URLRewriting eq 'On') {
+					e = '#application.wheels.webpath#x/x?a=c+ats%26dogs&b=a+c'
+				} else if (application.wheels.URLRewriting eq 'Off') {
+					e = '#application.wheels.webpath#index.cfm?controller=x&action=x&a=c+ats%26dogs&b=a+c'
+				} else {
+					e = '#application.wheels.webpath#index.cfm/x/x?a=c+ats%26dogs&b=a+c'
+				}
 				expect(e).toBe(r)
 			})
 

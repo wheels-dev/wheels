@@ -160,8 +160,11 @@ if(structKeyExists(variables, "latestVersion") && currentVersion == latestVersio
 			<div class="ui cancel button">Close</div>
 		</div>
 	</div>
-</cfoutput>
-
+<cfif get("URLRewriting") eq "Off">
+	<cfset method = 'get'>
+<cfelse>
+	<cfset method = 'post'>
+</cfif>
 <script>
 $(document).ready(function() {
 
@@ -196,7 +199,7 @@ $(".performmigration").on("click", function(e){
 	var url = $(this).data("data-url");
 	var resp = $.ajax({
 		url: url,
-		method: 'post'
+		method: '#method#'
 	})
 	.done(function(data, status, req) {
 		var res = $(".migratorcommandmodal > .content");
@@ -227,5 +230,6 @@ $('.ui.icon.button')
 
 });
 </script>
+</cfoutput>
 <cfinclude template="../layout/_footer.cfm">
 <!--- cfformat-ignore-end --->

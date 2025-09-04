@@ -543,20 +543,25 @@ component {
 		arguments.select = primaryKey();
 		arguments.callbacks = false;
 		local.query = findAll(argumentCollection = arguments);
-    local.list = CreateObject("java", "java.lang.StringBuilder");
-    for (local.i = 1; local.i <= local.query.recordCount; local.i++) {
-      local.value = local.query[arguments.select][local.i];
-      if (local.i > 1) {
-        local.list.append(local.delimiter);
-      }
-      if (local.quoted) {
-        local.list.append("'").append(local.value).append("'");
-      } else {
-        local.list.append(local.value);
-      }
-    }
+		local.list = CreateObject("java", "java.lang.StringBuilder");
+		for (local.i = 1; local.i <= local.query.recordCount; local.i++) {
+			local.value = local.query[arguments.select][local.i];
+			if (isNumeric(local.value)) {
+				// Convert BigDecimal to plain string without trailing ".0" for Boxlang with oracle
+				local.value = rereplace(local.value.toString(), "\.0$", "");
+			}
 
-    return local.list.toString();
+			if (local.i > 1) {
+				local.list.append(local.delimiter);
+			}
+			if (local.quoted) {
+				local.list.append("'").append(local.value).append("'");
+			} else {
+				local.list.append(local.value);
+			}
+		}
+
+		return local.list.toString();
 	}
 
 	/**
