@@ -1,26 +1,125 @@
 <cfsetting requestTimeOut="1800">
 <cfscript>
-    testBox = new testbox.system.TestBox(directory="tests.specs")
-
-    setTestboxEnvironment()
-
-    if (!structKeyExists(url, "format") || url.format eq "html") {
-        result = testBox.run(
-            reporter = "testbox.system.reports.JSONReporter"
+    // Parameter defaults - handle all TestBox CLI parameters
+    param name="url.directory" default="tests.specs";
+    param name="url.bundles" default="";
+    param name="url.recurse" default="true" type="boolean";
+    param name="url.reporter" default="";
+    param name="url.labels" default="";
+    param name="url.excludes" default="";
+    param name="url.testBundles" default="";
+    param name="url.testSuites" default="";
+    param name="url.testSpecs" default="";
+    param name="url.verbose" default="false" type="boolean";
+    param name="url.format" default="html";
+    
+    // Add new parameters for coverage and bail
+    param name="url.coverage" default="false" type="boolean";
+    param name="url.bail" default="false" type="boolean";
+    param name="url.coveragePathToCapture" default="/app";
+    param name="url.coverageWhitelist" default="*.cfc";
+    param name="url.coverageBlacklist" default="*Test.cfc,*Spec.cfc";
+    param name="url.coverageBrowserOutputDir" default="/tests/results/coverage";
+    
+    // Build TestBox options
+    testBoxOptions = {};
+    
+    // Determine if using bundles or directory
+    if (len(url.bundles)) {
+        // If bundles are specified, use them
+        testBoxOptions.bundles = url.bundles;
+    } else {
+        // Otherwise use directory
+        testBoxOptions.directory = {
+            mapping = url.directory,
+            recurse = url.recurse
+        };
+    }
+    
+    // Add filtering options if provided
+    if (len(url.labels)) {
+        testBoxOptions.labels = url.labels;
+    }
+    
+    if (len(url.excludes)) {
+        testBoxOptions.excludes = url.excludes;
+    }
+    
+    // Add test filtering if provided
+    if (len(url.testBundles)) {
+        testBoxOptions.testBundles = url.testBundles;
+    }
+    
+    if (len(url.testSuites)) {
+        testBoxOptions.testSuites = url.testSuites;
+    }
+    
+    if (len(url.testSpecs)) {
+        testBoxOptions.testSpecs = url.testSpecs;
+    }
+    
+    // Add coverage options if enabled
+    if (url.coverage) {
+        testBoxOptions.coverage = {
+            enabled = true,
+            pathToCapture = url.coveragePathToCapture,
+            whitelist = url.coverageWhitelist,
+            blacklist = url.coverageBlacklist,
+            browserOutputDir = url.coverageBrowserOutputDir
+        };
+    }
+    
+    // Add bail option (stop on first failure)
+    if (url.bail) {
+        testBoxOptions.bail = true;
+    }
+    
+    // Initialize TestBox with options
+    if (len(url.bundles)) {
+        testBox = new testbox.system.TestBox(bundles=url.bundles);
+    } else {
+        testBox = new testbox.system.TestBox(
+            directory=testBoxOptions.directory.mapping,
+            recurse=testBoxOptions.directory.recurse
         );
     }
+
+    setTestboxEnvironment()
+    
+    // Variable to track if we should stop execution (for bail option)
+    shouldBail = false;
+
+    if (!structKeyExists(url, "format") || url.format eq "html") {
+        // Determine reporter for HTML format
+        if (len(url.reporter)) {
+            testBoxOptions.reporter = url.reporter;
+        } else {
+            testBoxOptions.reporter = "testbox.system.reports.JSONReporter";
+        }
+        
+        result = testBox.run(argumentCollection = testBoxOptions);
+    }
     else if(url.format eq "json"){
-        result = testBox.run(
-            reporter = "testbox.system.reports.JSONReporter"
-        );
+        // Set JSON reporter
+        testBoxOptions.reporter = "testbox.system.reports.JSONReporter";
+        
+        result = testBox.run(argumentCollection = testBoxOptions);
+        
         cfcontent(type="application/json");
         cfheader(name="Access-Control-Allow-Origin", value="*");
         DeJsonResult = DeserializeJSON(result);
+        
+        // Check for bail condition
+        if (url.bail && (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0)) {
+            shouldBail = true;
+        }
+        
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
             cfheader(statustext="Expectation Failed", statuscode=417);
         } else {
             cfheader(statustext="OK", statuscode=200);
         }
+        
         // Check if 'only' parameter is provided in the URL
         if (structKeyExists(url, "only") && url.only eq "failure,error") {
             allBundles = DeJsonResult.bundleStats;
@@ -95,16 +194,39 @@
         }
     }
     else if (url.format eq "txt") {
-        result = testBox.run(
-            reporter = "testbox.system.reports.TextReporter"
-        )        
+        // Set Text reporter
+        testBoxOptions.reporter = "testbox.system.reports.TextReporter";
+        
+        result = testBox.run(argumentCollection = testBoxOptions);
+        
         cfcontent(type="text/plain");
+        
+        // If bail is enabled, check result for failures
+        if (url.bail) {
+            try {
+                local.txtResult = result;
+                // Look for failure indicators in text output
+                if (findNoCase("FAILED", local.txtResult) || findNoCase("ERROR", local.txtResult)) {
+                    writeOutput("*** FAIL-FAST MODE: Test execution stopped on first failure ***#Chr(13)##Chr(10)##Chr(13)##Chr(10)#");
+                }
+            } catch (any e) {
+                // Continue with normal output if parsing fails
+            }
+        }
+        
         writeOutput(result)
+        
+        // Add coverage report location if enabled
+        if (url.coverage) {
+            writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)#*** Code Coverage Report: #url.coverageBrowserOutputDir#/index.html ***#Chr(13)##Chr(10)#");
+        }
     }
     else if(url.format eq "junit"){
-        result = testBox.run(
-            reporter = "testbox.system.reports.ANTJUnitReporter"
-        )
+        // Set JUnit reporter
+        testBoxOptions.reporter = "testbox.system.reports.ANTJUnitReporter";
+        
+        result = testBox.run(argumentCollection = testBoxOptions);
+        
         cfcontent(type="text/xml");
         writeOutput(result)
     }
