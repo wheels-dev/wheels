@@ -10,11 +10,11 @@
 	"icon": "assets/wheels_logo.png",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/cfwheels/cfwheels.git"
+		"url": "https://github.com/wheels-dev/wheels.git"
 	},
 	"homepage": "https://wheels.dev",
 	"bugs": {
-		"url": "https://github.com/cfwheels/cfwheels/issues"
+		"url": "https://github.com/wheels-dev/wheels/issues"
 	},
 	"license": "MIT",
 	"categories": [

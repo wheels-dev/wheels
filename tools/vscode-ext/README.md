@@ -52,8 +52,8 @@ type = mimeTypes(extension = "", fallback = "")
 
 This extension is part of the [Wheels project](https://wheels.dev).
 
-- [Community Discussions](https://github.com/cfwheels/cfwheels/discussions)
-- [Report Issues](https://github.com/cfwheels/cfwheels/issues)
+- [Community Discussions](https://github.com/wheels-dev/wheels/discussions)
+- [Report Issues](https://github.com/wheels-dev/wheels/issues)
 - [Wheels Docs](https://wheels.dev)
 
 ## License
