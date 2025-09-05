@@ -1,6 +1,6 @@
 # Wheels VS Code Extension
 
-**Intelligent code snippets & hover docs** for the Wheels framework. Build faster and cleaner CFML apps with smart completions, examples, and professional hover documentation.
+Boost your Wheels development experience with **intelligent code snippets** for all framework functions, offered in **required-only and full-parameter** variants, along with **integrated function documentation**.
 
 ## Features
 

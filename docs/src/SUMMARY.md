@@ -96,6 +96,7 @@
 * [Testing Your Application](working-with-wheels/testing-your-application.md)
 * [Using the Test Environment](working-with-wheels/using-the-test-environment.md)
 * [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
+* [Contributing to Wheels VS Code Extension](working-with-wheels/contributing-to-wheels-vscode-extension.md)
 * [Submitting Pull Requests](working-with-wheels/submitting-pull-requests.md)
 * [Documenting your Code](working-with-wheels/documenting-your-code.md)
 
