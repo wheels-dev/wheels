@@ -3118,7 +3118,7 @@ box install testbox --saveDev
 
 # Error: BaseSpec not found
 # Fix: Ensure test extends correct path
-# component extends="tests.BaseSpec"
+# component extends="testbox.system.BaseSpec"
 ```
 
 ### CLI Module Issues

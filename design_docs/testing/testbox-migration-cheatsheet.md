@@ -6,7 +6,7 @@ This quick reference guide helps you migrate from RocketUnit to TestBox syntax i
 
 | RocketUnit | TestBox |
 |------------|---------|
-| `component extends="tests.Test"` | `component extends="tests.BaseSpec"` |
+| `component extends="tests.Test"` | `component extends="testbox.system.BaseSpec"` |
 | Test methods start with `test` | Test methods wrapped in `it()` blocks |
 | Methods run in order | Tests can be organized with `describe()` |
 
@@ -23,7 +23,7 @@ component extends="tests.Test" {
 
 **TestBox:**
 ```cfc
-component extends="tests.BaseSpec" {
+component extends="testbox.system.BaseSpec" {
 	function run() {
 		describe("Feature", () => {
 			it("should do something", () => {
