@@ -85,9 +85,6 @@
     }
 
     setTestboxEnvironment()
-    
-    // Variable to track if we should stop execution (for bail option)
-    shouldBail = false;
 
     if (!structKeyExists(url, "format") || url.format eq "html") {
         // Determine reporter for HTML format
@@ -108,11 +105,6 @@
         cfcontent(type="application/json");
         cfheader(name="Access-Control-Allow-Origin", value="*");
         DeJsonResult = DeserializeJSON(result);
-        
-        // Check for bail condition
-        if (url.bail && (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0)) {
-            shouldBail = true;
-        }
         
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
             cfheader(statustext="Expectation Failed", statuscode=417);
@@ -165,7 +157,18 @@
                     writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
                     writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
                     writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
-                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                    
+                    // Add bail indicator if enabled
+                    if (url.bail) {
+                        writeOutput("Fail-Fast Mode: ENABLED#Chr(13)##Chr(10)#")
+                    }
+                    
+                    // Add coverage indicator if enabled
+                    if (url.coverage) {
+                        writeOutput("Code Coverage: REQUESTED#Chr(13)##Chr(10)#")
+                    }
+                    
+                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                     if(bundle.totalFail > 0 || bundle.totalError > 0){
                         for(suite in DeJsonResult.bundleStats[count].suiteStats){
                             writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
@@ -173,11 +176,25 @@
                                 writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
                                 writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
                                 writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                                
+                                // If bail is enabled and we found a failure, indicate stopping
+                                if (url.bail) {
+                                    writeOutput("       [BAIL] Stopping test execution due to failure...#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                                    break;
+                                }
+                            }
+                            if (url.bail && (bundle.totalFail > 0 || bundle.totalError > 0)) {
+                                break;
                             }
                         }
                         count += 1;
                     }
                     writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                    
+                    // Break out of bundle loop if bail is enabled
+                    if (url.bail && (bundle.totalFail > 0 || bundle.totalError > 0)) {
+                        break;
+                    }
                 }
                 
             }else{
@@ -186,7 +203,16 @@
                     writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
                     writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
                     writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
-                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                    
+                    // Add bail and coverage indicators
+                    if (url.bail) {
+                        writeOutput("Fail-Fast Mode: ENABLED#Chr(13)##Chr(10)#")
+                    }
+                    if (url.coverage) {
+                        writeOutput("Code Coverage: REQUESTED#Chr(13)##Chr(10)#")
+                    }
+                    
+                    writeOutput("╔═══════════════════════════════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                 }
             }
         }else{
@@ -200,26 +226,7 @@
         result = testBox.run(argumentCollection = testBoxOptions);
         
         cfcontent(type="text/plain");
-        
-        // If bail is enabled, check result for failures
-        if (url.bail) {
-            try {
-                local.txtResult = result;
-                // Look for failure indicators in text output
-                if (findNoCase("FAILED", local.txtResult) || findNoCase("ERROR", local.txtResult)) {
-                    writeOutput("*** FAIL-FAST MODE: Test execution stopped on first failure ***#Chr(13)##Chr(10)##Chr(13)##Chr(10)#");
-                }
-            } catch (any e) {
-                // Continue with normal output if parsing fails
-            }
-        }
-        
         writeOutput(result)
-        
-        // Add coverage report location if enabled
-        if (url.coverage) {
-            writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)#*** Code Coverage Report: #url.coverageBrowserOutputDir#/index.html ***#Chr(13)##Chr(10)#");
-        }
     }
     else if(url.format eq "junit"){
         // Set JUnit reporter

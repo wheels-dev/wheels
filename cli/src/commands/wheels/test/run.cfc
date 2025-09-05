@@ -162,38 +162,5 @@ component extends="../base" {
         
         print.greenBoldLine("============ #ucase(arguments.type)# Tests Completed ==================").toConsole();
     }
-    
-    /**
-     * Build test URL with parameters
-     */
-    private function buildTestUrl(
-        required string type,
-        string servername = "",
-        string format = "txt"
-    ) {
-        // Get actual server configuration
-        local.serverConfig = getServerConfig(arguments.servername);
-        local.baseUrl = "http://#local.serverConfig.host#:#local.serverConfig.port#/";
-        
-        // http://localhost:8080/wheels/app/tests?format=txt
 
-        // Build base URL based on type
-        switch (arguments.type) {
-            case "app":
-                local.url = local.baseUrl & "/wheels/app/tests?format=#arguments.format#";
-                break;
-            case "core":
-                local.url = local.baseUrl & "/wheels/core/tests?format=#arguments.format#";
-                break;
-            case "plugin":
-                local.url = local.baseUrl & "/wheels/plugins/tests?format=#arguments.format#";
-                break;
-            default:
-                // Default to app tests for invalid types
-                local.url = local.baseUrl & "/wheels/app/tests?format=#arguments.format#";
-                break;
-        }
-        
-        return local.url;
-    }
 }
