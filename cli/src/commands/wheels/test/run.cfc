@@ -5,6 +5,8 @@
  * wheels test run UserTest
  * wheels test run type=core
  * wheels test run --verbose --debug
+ * wheels test run filter="User*" --coverage
+ * wheels test run group="unit" --failFast
  */
 component extends="../base" {
     
@@ -14,6 +16,10 @@ component extends="../base" {
      * @reporter.hint Test reporter format (text, json, junit, tap, antjunit)
      * @verbose.hint Verbose output
      * @servername.hint Name of server to use
+     * @filter.hint Filter tests by pattern or name
+     * @group.hint Run specific test group
+     * @coverage.hint Generate coverage report (boolean flag)
+     * @failFast.hint Stop on first test failure (boolean flag)
      */
     function run(
         string type = "app",
@@ -22,13 +28,37 @@ component extends="../base" {
         string directory = "",
         boolean recurse = true,
         boolean verbose = true,
-        string servername = ""
+        string servername = "",
+        string filter = "",
+        string group = "",
+        boolean coverage = false,
+        string reporter = "",
+        boolean failFast = false
     ) {
         arguments = reconstructArgs(arguments);
         
         // Validate we're in a Wheels project
         if (!isWheelsApp()) {
             error("This command must be run from the root of a Wheels application.");
+        }
+        
+        // Map reporter to format if reporter is specified
+        if (structKeyExists(arguments, "reporter") && len(arguments.reporter)) {
+            // Map common reporter names to formats your runner expects
+            switch(arguments.reporter) {
+                case "console":
+                case "tap":
+                case "text":
+                    arguments.format = "txt";
+                    break;
+                case "json":
+                    arguments.format = "json";
+                    break;
+                case "junit":
+                case "antjunit":
+                    arguments.format = "junit";
+
+            }
         }
         
         // Build the test URL
@@ -45,8 +75,68 @@ component extends="../base" {
         params.recurse = arguments.recurse;
         params.verbose = arguments.verbose;
         
+        // Add bundles if specified
+        if (len(arguments.bundles)) {
+            params.bundles = arguments.bundles;
+        }
+        
+        // Add directory if specified
+        if (len(arguments.directory)) {
+            params.directory = arguments.directory;
+        }
+        
+        // Handle filter parameter
+        if (len(arguments.filter)) {
+            // Filter can be used for testSpecs or testBundles depending on pattern
+            // If it looks like a bundle name (e.g., UserTest), use testBundles
+            // If it looks like a spec pattern, use testSpecs
+            if (reFindNoCase("Test$", arguments.filter)) {
+                params.testBundles = arguments.filter;
+            } else {
+                params.testSpecs = arguments.filter;
+            }
+        }
+        
+        // Handle group parameter (maps to labels in TestBox)
+        if (len(arguments.group)) {
+            params.labels = arguments.group;
+        }
+        
+        // Handle coverage parameter
+        if (arguments.coverage) {
+            // Add coverage parameters to the URL since TestBox CLI doesn't directly support coverage
+            // You'll need to handle this in your runner.cfm
+            testUrl &= "&coverage=true";
+        }
+        
+        // Handle fail-fast parameter (maps to bail in TestBox)
+        if (arguments.failFast) {
+            // Add bail parameter to stop on first failure
+            testUrl &= "&bail=true";
+        }
+        
+        // Update the runner URL in params
+        params.runner = testUrl;
+        
         // Display test type
         print.greenBoldLine("================ #ucase(arguments.type)# Tests =======================").toConsole();
+        
+        // Display additional info if verbose
+        if (arguments.verbose) {
+            print.line("Test URL: #testUrl#").toConsole();
+            if (len(arguments.filter)) {
+                print.line("Filter: #arguments.filter#").toConsole();
+            }
+            if (len(arguments.group)) {
+                print.line("Group: #arguments.group#").toConsole();
+            }
+            if (arguments.coverage) {
+                print.line("Coverage: Enabled").toConsole();
+            }
+            if (arguments.failFast) {
+                print.line("Fail Fast: Enabled").toConsole();
+            }
+        }
         
         try {
             // Try using runCommand which should handle the CommandBox command properly
@@ -72,37 +162,5 @@ component extends="../base" {
         
         print.greenBoldLine("============ #ucase(arguments.type)# Tests Completed ==================").toConsole();
     }
-    
-    /**
-     * Build test URL with parameters
-     */
-    private function buildTestUrl(
-        required string type,
-        string servername = ""
-    ) {
-        // Get actual server configuration
-        local.serverConfig = getServerConfig(arguments.servername);
-        local.baseUrl = "http://#local.serverConfig.host#:#local.serverConfig.port#/";
-        
-        // http://localhost:8080/wheels/app/tests?format=txt
 
-        // Build base URL based on type
-        switch (arguments.type) {
-            case "app":
-                local.url = local.baseUrl & "/wheels/app/tests?format=#arguments.format#";
-                break;
-            case "core":
-                local.url = local.baseUrl & "/wheels/core/tests?format=#arguments.format#";
-                break;
-            case "plugin":
-                local.url = local.baseUrl & "/wheels/plugins/tests?format=#arguments.format#";
-                break;
-            default:
-                // Default to app tests for invalid types
-                local.url = local.baseUrl & "/wheels/app/tests?format=#arguments.format#";
-                break;
-        }
-        
-        return local.url;
-    }
 }

@@ -64,7 +64,7 @@ wheels generate test api v1.users --mock
 All tests extend `BaseSpec.cfc` which provides Wheels-specific helpers:
 
 ```cfc
-component extends="tests.BaseSpec" {
+component extends="testbox.system.BaseSpec" {
 
     function run() {
 
@@ -589,7 +589,7 @@ wheels test migrate tests --report
 component extends="tests.Test" {
 
 // New
-component extends="tests.BaseSpec" {
+component extends="testbox.system.BaseSpec" {
 ```
 
 #### 2. Wrap Tests in run() and describe()

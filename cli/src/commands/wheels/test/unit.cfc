@@ -1,66 +1,75 @@
 /**
  * Run unit tests only
  * 
- * This is a wrapper for TestBox CLI that runs tests in the tests/unit directory.
- * Install TestBox CLI first: box install commandbox-testbox-cli
+ * This command runs tests in the tests/unit directory using the Wheels test runner.
  * 
  * Examples:
  * wheels test:unit
- * wheels test:unit --reporter=spec
+ * wheels test:unit --format=json
  * wheels test:unit --filter=UserTest
  */
 component aliases='wheels test:unit' extends="../base" {
     
-    property name="detailOutput" inject="DetailOutputService@wheels-cli";
-    
     /**
-     * @reporter.hint Test reporter format (simple, spec, junit, json, tap, min, doc)
-     * @reporter.options simple,spec,junit,json,tap,min,doc
+     * @type.hint Type of tests to run: (app, core, plugin)
+     * @format.hint Output format (txt, json, junit, html)
+     * @format.options txt,json,junit,html
      * @verbose.hint Verbose output
      * @failFast.hint Stop on first test failure
      * @bundles.hint Comma-delimited list of test bundles to run
      * @labels.hint Comma-delimited list of test labels to run
-     * @excludes.hint Comma-delimited list of test bundles to exclude
+     * @excludes.hint Comma-delimited list of test labels to exclude
      * @filter.hint Test filter pattern
      * @directory.hint Unit test directory (default: tests/unit)
+     * @servername.hint Name of server to use
      */
     function run(
-        string reporter = "simple",
+        string type = "app",
+        string format = "txt",
         boolean verbose = false,
         boolean failFast = false,
         string bundles = "",
         string labels = "",
         string excludes = "",
         string filter = "",
-        string directory = "tests/unit"
+        string directory = "tests/unit",
+        string servername = ""
     ) {
-        detailOutput.header("🧪", "Running unit tests");
+        arguments = reconstructArgs(arguments);
         
-        // Check if TestBox CLI is installed
-        if (!isTestBoxCLIInstalled()) {
-            error("TestBox CLI is not installed. Please run: box install commandbox-testbox-cli");
-            return;
+        // Validate we're in a Wheels project
+        if (!isWheelsApp()) {
+            error("This command must be run from the root of a Wheels application.");
         }
         
-        // Check if unit test directory exists
+        // Check if unit test directory exists, create if not
         var unitTestPath = fileSystemUtil.resolvePath(arguments.directory);
         if (!directoryExists(unitTestPath)) {
-            print.yellowLine("Unit test directory not found: #arguments.directory#");
-            print.line("Creating directory structure...");
-            directoryCreate(unitTestPath, true);
-            
-            // Create a sample unit test
+            directoryCreate(unitTestPath, true, true);
             createSampleUnitTest(unitTestPath);
+        }
+        
+        // Build the test URL using arguments
+        var testUrl = buildTestUrl(
+            type = arguments.type,
+            servername = arguments.servername,
+            format = arguments.format
+        );
+        
+        // Add fail-fast parameter if specified
+        if (arguments.failFast) {
+            testUrl &= "&bail=true";
         }
         
         // Build TestBox command parameters
         var params = {
+            runner = testUrl,
             directory = arguments.directory,
-            reporter = arguments.reporter,
-            recurse = true
+            recurse = true,
+            verbose = arguments.verbose
         };
         
-        // Add optional parameters
+        // Add optional filtering parameters
         if (len(arguments.bundles)) {
             params.bundles = arguments.bundles;
         }
@@ -74,34 +83,22 @@ component aliases='wheels test:unit' extends="../base" {
         }
         
         if (len(arguments.filter)) {
-            params.filter = arguments.filter;
+            // Handle filter parameter - if it ends with "Test", treat as bundle
+            if (reFindNoCase("Test$", arguments.filter)) {
+                params.testBundles = arguments.filter;
+            } else {
+                params.testSpecs = arguments.filter;
+            }
         }
         
-        if (arguments.verbose) {
-            params.verbose = true;
-        }
-        
-        if (arguments.failFast) {
-            params.failfast = true;
-        }
-        
-        // Execute TestBox command
-        print.line("Executing: testbox run for unit tests");
-        print.line();
-        
-        command('testbox run').params(argumentCollection=params).run();
-    }
-    
-    /**
-     * Check if TestBox CLI is installed
-     */
-    private boolean function isTestBoxCLIInstalled() {
         try {
-            // Try to run testbox help command
-            var result = command("testbox help").run(returnOutput=true);
-            return true;
+            // Execute TestBox command
+            command("testbox run").params(argumentCollection = params).run();
         } catch (any e) {
-            return false;
+            // Let TestBox handle its own output and errors
+            if (!findNoCase("failing exit code", e.message)) {
+                rethrow;
+            }
         }
     }
     
@@ -123,12 +120,22 @@ component aliases='wheels test:unit' extends="../base" {
                 expect(result).toBeNumeric();
                 expect(result).toBeGT(3);
             });
+            
+            it("should show how to test a function", function() {
+                // Example of testing a function
+                var calculator = {
+                    add: function(a, b) { return a + b; },
+                    multiply: function(a, b) { return a * b; }
+                };
+                
+                expect(calculator.add(5, 3)).toBe(8);
+                expect(calculator.multiply(4, 7)).toBe(28);
+            });
         });
     }
 }';
         
         var testPath = arguments.directory & "/SampleUnitTest.cfc";
         fileWrite(testPath, sampleTest);
-        print.greenLine("Created sample unit test: #testPath#");
     }
 }

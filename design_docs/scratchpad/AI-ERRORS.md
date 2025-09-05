@@ -501,7 +501,7 @@ Invalid route pattern: '/users/:id'
 
 **Symptoms:**
 ```
-Could not find the ColdFusion component or interface tests.BaseSpec
+Could not find the ColdFusion component or interface testbox.system.BaseSpec
 ```
 
 **Cause:** Test not extending BaseSpec or path issue
@@ -509,7 +509,7 @@ Could not find the ColdFusion component or interface tests.BaseSpec
 **Solution:**
 ```cfscript
 // Correct test setup
-component extends="tests.BaseSpec" {
+component extends="testbox.system.BaseSpec" {
     function run() {
         describe("My Test", () => {
             it("should work", () => {
@@ -549,7 +549,7 @@ Cannot rollback transaction, no transaction active
 **Solution:**
 ```cfscript
 // Tests automatically use transactions when extending BaseSpec
-component extends="tests.BaseSpec" {
+component extends="testbox.system.BaseSpec" {
     // Don't manually manage transactions
 }
 ```

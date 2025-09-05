@@ -182,7 +182,7 @@ component {
         var content = fileRead(arguments.filePath);
 
         // Replace extends
-        content = replace(content, 'extends="tests.Test"', 'extends="tests.BaseSpec"', "all");
+        content = replace(content, 'extends="tests.Test"', 'extends="testbox.system.BaseSpec"', "all");
 
         // Wrap test methods in describe/it blocks
         content = reFindReplace(content,
@@ -235,7 +235,7 @@ wheels generate test integration UserRegistration
 Example generated test:
 
 ```cfc
-component extends="tests.BaseSpec" {
+component extends="testbox.system.BaseSpec" {
 
     describe("User Model", () => {
 
@@ -281,7 +281,7 @@ Create `.vscode/cfwheels-test.code-snippets`:
     "TestBox Spec": {
         "prefix": "tbspec",
         "body": [
-            "component extends=\"tests.BaseSpec\" {",
+            "component extends=\"testbox.system.BaseSpec\" {",
             "\t",
             "\tdescribe(\"${1:Feature}\", () => {",
             "\t\t",

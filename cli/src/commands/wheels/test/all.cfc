@@ -1,21 +1,19 @@
 /**
  * Run all tests with TestBox CLI
  * 
- * This is a wrapper for the TestBox CLI 'testbox run' command.
- * Install TestBox CLI first: box install commandbox-testbox-cli
+ * This command runs all tests using the Wheels test runner.
  * 
  * Examples:
  * wheels test:all
- * wheels test:all --reporter=junit
- * wheels test:all coverage=true coverageReporter=html
+ * wheels test:all --format=junit
+ * wheels test:all --coverage --coverageReporter=html
  */
 component aliases='wheels test:all' extends="../base" {
     
-    property name="detailOutput" inject="DetailOutputService@wheels-cli";
-    
     /**
-     * @reporter.hint Test reporter format (simple, spec, junit, json, tap, min, doc)
-     * @reporter.options simple,spec,junit,json,tap,min,doc
+     * @type.hint Type of tests to run: (app, core, plugin)
+     * @format.hint Output format (txt, json, junit, html)
+     * @format.options txt,json,junit,html
      * @coverage.hint Generate coverage report
      * @coverageReporter.hint Coverage reporter format (html, json, xml)
      * @coverageReporter.options html,json,xml
@@ -26,42 +24,66 @@ component aliases='wheels test:all' extends="../base" {
      * @recurse.hint Recurse into subdirectories
      * @bundles.hint Comma-delimited list of test bundles to run
      * @labels.hint Comma-delimited list of test labels to run
-     * @excludes.hint Comma-delimited list of test bundles to exclude
+     * @excludes.hint Comma-delimited list of test labels to exclude
      * @filter.hint Test filter pattern
+     * @servername.hint Name of server to use
      */
     function run(
-        string reporter = "simple",
+        string type = "app",
+        string format = "txt",
         boolean coverage = false,
-        string coverageReporter = "html", 
+        string coverageReporter = "html",
         string coverageOutputDir = "tests/results/coverage",
-        boolean verbose = false,
+        boolean verbose = true,
         boolean failFast = false,
-        string directory = "tests",
+        string directory = "tests/specs",
         boolean recurse = true,
         string bundles = "",
         string labels = "",
         string excludes = "",
-        string filter = ""
+        string filter = "",
+        string servername = ""
     ) {
-        detailOutput.header("🧪", "Running all tests with TestBox");
+        arguments = reconstructArgs(arguments);
         
-        // Check if TestBox CLI is installed
-        if (!isTestBoxCLIInstalled()) {
-            error("TestBox CLI is not installed. Please run: box install commandbox-testbox-cli");
-            return;
+        // Validate we're in a Wheels project
+        if (!isWheelsApp()) {
+            error("This command must be run from the root of a Wheels application.");
+        }
+        
+        // Build the test URL
+        var testUrl = buildTestUrl(
+            type = arguments.type,
+            servername = arguments.servername,
+            format = arguments.format
+        );
+        
+        // Add coverage parameters if enabled
+        if (arguments.coverage) {
+            testUrl &= "&coverage=true";
+            testUrl &= "&coverageBrowserOutputDir=#encodeForURL(arguments.coverageOutputDir)#";
+            // Add coverage reporter format to URL
+            testUrl &= "&coverageReporter=#encodeForURL(arguments.coverageReporter)#";
+        }
+        
+        // Add fail-fast parameter if specified
+        if (arguments.failFast) {
+            testUrl &= "&bail=true";
         }
         
         // Build TestBox command parameters
         var params = {
-            directory = arguments.directory,
-            reporter = arguments.reporter
+            runner = testUrl,
+            recurse = arguments.recurse,
+            verbose = arguments.verbose
         };
         
-        // Add optional parameters
-        if (arguments.recurse) {
-            params.recurse = true;
+        // Add directory parameter if specified
+        if (len(arguments.directory)) {
+            params.directory = arguments.directory;
         }
         
+        // Add optional filtering parameters
         if (len(arguments.bundles)) {
             params.bundles = arguments.bundles;
         }
@@ -75,41 +97,22 @@ component aliases='wheels test:all' extends="../base" {
         }
         
         if (len(arguments.filter)) {
-            params.filter = arguments.filter;
+            // Handle filter parameter
+            if (reFindNoCase("Test$", arguments.filter)) {
+                params.testBundles = arguments.filter;
+            } else {
+                params.testSpecs = arguments.filter;
+            }
         }
         
-        if (arguments.verbose) {
-            params.verbose = true;
-        }
-        
-        if (arguments.failFast) {
-            params.failfast = true;
-        }
-        
-        // Add coverage options
-        if (arguments.coverage) {
-            params.coverage = true;
-            params.coverageReporter = arguments.coverageReporter;
-            params.coverageOutputDir = arguments.coverageOutputDir;
-        }
-        
-        // Execute TestBox command
-        print.line("Executing: testbox run");
-        print.line();
-        
-        command('testbox run').params(argumentCollection=params).run();
-    }
-    
-    /**
-     * Check if TestBox CLI is installed
-     */
-    private boolean function isTestBoxCLIInstalled() {
         try {
-            // Try to run testbox help command
-            var result = command("testbox help").run(returnOutput=true);
-            return true;
+            // Execute TestBox command
+            command('testbox run').params(argumentCollection=params).run();
         } catch (any e) {
-            return false;
+            // Let TestBox handle its own output and errors
+            if (!findNoCase("failing exit code", e.message)) {
+                rethrow;
+            }
         }
     }
 }

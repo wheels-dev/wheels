@@ -56,7 +56,7 @@
   "testingPatterns": {
     "framework": "TestBox",
     "syntax": "BDD (describe/it blocks)",
-    "baseClass": "tests.BaseSpec",
+    "baseClass": "testbox.system.BaseSpec",
     "factories": "Use factories for test data generation",
     "transactions": "Tests run in automatic rollback transactions",
     "commands": {
