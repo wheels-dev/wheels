@@ -1,0 +1,637 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
+
+## Quick Start
+
+### New to Wheels?
+1. **Install Wheels CLI**: `box install wheels-cli`
+2. **Generate an app**: `wheels g app myapp`
+3. **Start developing**: `server start`
+
+### Common Development Tasks
+- **Create a model**: `wheels g model User name:string,email:string,active:boolean`
+- **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
+- **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,inStock:boolean`
+- **Run migrations**: `wheels dbmigrate latest`
+- **Run tests**: `wheels test run`
+- **Reload application**: Visit `/?reload=true&password=yourpassword`
+
+## Application Architecture
+
+### MVC Framework Structure
+Wheels follows the Model-View-Controller (MVC) architectural pattern:
+
+- **Models** (`/app/models/`): Data layer with ActiveRecord ORM, validation, associations
+- **Views** (`/app/views/`): Presentation layer with CFML templates, layouts, partials
+- **Controllers** (`/app/controllers/`): Request handling, business logic coordination
+- **Configuration** (`/config/`): Application settings, routes, environment configurations
+- **Database** (`/app/migrator/migrations/`): Version-controlled schema changes
+- **Assets** (`/public/`): Static files, CSS, JavaScript, images
+- **Tests** (`/tests/`): TestBox unit and integration tests
+
+### Directory Structure
+```
+/
+├── app/                  (Application code)
+│   ├── controllers/      (Request handlers)
+│   ├── models/           (Data layer)
+│   ├── views/            (Templates)
+│   ├── migrator/         (Database migrations)
+│   ├── events/           (Application events)
+│   ├── global/           (Global functions)
+│   ├── mailers/          (Email components)
+│   ├── jobs/             (Background jobs)
+│   ├── lib/              (Custom libraries)
+│   ├── plugins/          (Third-party plugins)
+│   └── snippets/         (Code templates)
+├── config/               (Configuration files)
+│   ├── app.cfm           (Application.cfc this scope settings)
+│   ├── environment.cfm   (Current environment)
+│   ├── routes.cfm        (URL routing)
+│   ├── settings.cfm      (Framework settings)
+│   └── [environment]/    (Environment-specific overrides)
+├── public/               (Web-accessible files)
+│   ├── files/            (User uploads, sendFile() content)
+│   ├── images/           (Image assets)
+│   ├── javascripts/      (JavaScript files)
+│   ├── stylesheets/      (CSS files)
+│   ├── Application.cfc   (Framework bootstrap)
+│   └── index.cfm         (Entry point)
+├── tests/                (Test files)
+├── vendor/               (Dependencies)
+├── .env                  (Environment variables - NEVER commit)
+├── box.json              (Package configuration)
+└── server.json           (CommandBox server configuration)
+```
+
+## Development Commands
+
+### Code Generation
+```bash
+# Generate MVC components
+wheels g model User name:string,email:string,active:boolean
+wheels g controller Users index,show,new,create,edit,update,delete
+wheels g view users/dashboard
+
+# Generate full CRUD scaffold
+wheels g scaffold Product name:string,price:decimal,inStock:boolean
+
+# Generate database migrations
+wheels g migration CreateUsersTable
+wheels g migration AddEmailToUsers --attributes="email:string:index"
+
+# Generate other components
+wheels g mailer UserNotifications --methods="welcome,passwordReset"
+wheels g job ProcessOrders --queue=high
+wheels g test model User
+wheels g helper StringUtils
+```
+
+### Database Management
+```bash
+# Setup database from scratch
+wheels db setup
+
+# Run migrations
+wheels dbmigrate latest
+
+# Check migration status
+wheels db status
+
+# Rollback migrations
+wheels db rollback --steps=3
+
+# Reset database (drop + recreate + migrate)
+wheels db reset --force
+
+# Database shell access
+wheels db shell                  # CLI interface
+wheels db shell --web           # H2 web console
+
+# Backup and restore
+wheels db dump --output=backup.sql
+wheels db restore backup.sql
+```
+
+### Server Management
+```bash
+# Start/stop development server
+server start
+server stop
+server restart
+
+# View server status
+wheels server status
+
+# View server logs
+wheels server log --follow
+```
+
+### Testing
+```bash
+# Run all tests
+wheels test run
+
+# Run specific test bundles
+box testbox run --testBundles=tests.models.UserTest
+
+# Run tests with coverage
+box testbox run --coverage --coverageReporter=html
+
+# Watch mode for TDD
+box testbox watch
+```
+
+### Code Quality
+```bash
+# Format code
+box run-script format
+
+# Check formatting
+box run-script format:check
+```
+
+## Configuration Management
+
+### Environment Settings
+Set your environment in `/config/environment.cfm`:
+```cfm
+<cfscript>
+    set(environment="development");
+</cfscript>
+```
+
+**Available Environments:**
+- `development` - Local development with debug info
+- `testing` - Automated testing environment  
+- `maintenance` - Maintenance mode with limited access
+- `production` - Live production environment
+
+### Framework Settings
+Configure global settings in `/config/settings.cfm`:
+```cfm
+<cfscript>
+    // Database configuration
+    set(dataSourceName="myapp-dev");
+    set(dataSourceUserName="username");
+    set(dataSourcePassword="password");
+    
+    // URL rewriting
+    set(URLRewriting="On");
+    
+    // Reload password
+    set(reloadPassword="mypassword");
+    
+    // Error handling
+    set(showErrorInformation=true);
+    set(sendEmailOnError=false);
+</cfscript>
+```
+
+### Environment-Specific Overrides
+Create environment-specific settings in `/config/[environment]/settings.cfm`:
+```cfm
+// /config/production/settings.cfm
+<cfscript>
+    set(dataSourceName="myapp-prod");
+    set(showErrorInformation=false);
+    set(sendEmailOnError=true);
+    set(cachePages=true);
+</cfscript>
+```
+
+## URL Routing
+
+### Default Route Pattern
+URLs follow the pattern: `[controller]/[action]/[key]`
+
+**Examples:**
+- `/users` → `Users.cfc`, `index()` action
+- `/users/show/12` → `Users.cfc`, `show()` action, `params.key = 12`
+
+### Custom Routes
+Define custom routes in `/config/routes.cfm`:
+```cfm
+<cfscript>
+mapper()
+    // Named routes
+    .get(name="login", to="sessions##new")
+    .post(name="authenticate", to="sessions##create")
+    
+    // RESTful resources
+    .resources("users")
+    .resources("products", except="destroy")
+    
+    // Nested resources
+    .resources("users", function(nested) {
+        nested.resources("orders");
+    })
+    
+    // Root route
+    .root(to="home##index", method="get")
+    
+    // Wildcard (keep last)
+    .wildcard()
+.end();
+</cfscript>
+```
+
+### Route Helpers
+```cfm
+// Link generation
+#linkTo(route="user", key=user.id, text="View User")#
+#linkTo(controller="products", action="index", text="All Products")#
+
+// Form generation
+#startFormTag(route="user", method="put", key=user.id)#
+
+// URL generation
+#urlFor(route="users")#
+
+// Redirects in controllers
+redirectTo(route="user", key=user.id);
+```
+
+## Model-View-Controller Patterns
+
+### Controller Structure
+```cfm
+component extends="Controller" {
+
+    function config() {
+        // Filters for authentication/authorization
+        filters(through="authenticate", except="index");
+        filters(through="findUser", only="show,edit,update,delete");
+        
+        // Parameter verification
+        verifies(except="index,new,create", params="key", paramsTypes="integer");
+        
+        // Content type support
+        provides("html,json");
+    }
+
+    function index() {
+        users = model("User").findAll(order="createdAt DESC");
+    }
+
+    function create() {
+        user = model("User").new(params.user);
+        
+        if (user.save()) {
+            redirectTo(route="user", key=user.id, success="User created!");
+        } else {
+            renderView(action="new");
+        }
+    }
+
+    private function authenticate() {
+        if (!session.authenticated) {
+            redirectTo(controller="sessions", action="new");
+        }
+    }
+}
+```
+
+### Model Structure
+```cfm
+component extends="Model" {
+
+    function config() {
+        // Associations
+        hasMany("orders");
+        belongsTo("role");
+        
+        // Validations
+        validatesPresenceOf("firstName,lastName,email");
+        validatesUniquenessOf(property="email");
+        validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
+        
+        // Callbacks
+        beforeSave("hashPassword");
+        afterCreate("sendWelcomeEmail");
+        
+        // Scopes
+        scope(name="active", where="active = 1");
+    }
+
+    function findByEmail(required string email) {
+        return findOne(where="email = '#arguments.email#'");
+    }
+
+    function fullName() {
+        return trim("#firstName# #lastName#");
+    }
+}
+```
+
+### View Structure
+```cfm
+<!-- Layout: /app/views/layout.cfm -->
+<cfoutput>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    #csrfMetaTags()#
+    <title>#contentFor("title", "MyApp")#</title>
+    #styleSheetLinkTag("application")#
+</head>
+<body>
+    <main>
+        #flashMessages()#
+        #includeContent()#
+    </main>
+    #javaScriptIncludeTag("application")#
+</body>
+</html>
+</cfoutput>
+
+<!-- View: /app/views/users/index.cfm -->
+<cfparam name="users">
+<cfoutput>
+#contentFor("title", "Users")#
+
+<h1>Users</h1>
+#linkTo(route="newUser", text="New User", class="btn btn-primary")#
+
+<cfif users.recordCount>
+    <table class="table">
+        <cfloop query="users">
+        <tr>
+            <td>#linkTo(route="user", key=users.id, text=users.firstName)#</td>
+            <td>#users.email#</td>
+            <td>
+                #linkTo(route="editUser", key=users.id, text="Edit")#
+                #buttonTo(route="user", method="delete", key=users.id, 
+                         text="Delete", confirm="Are you sure?")#
+            </td>
+        </tr>
+        </cfloop>
+    </table>
+<cfelse>
+    <p>No users found.</p>
+</cfif>
+</cfoutput>
+```
+
+## Database Migrations
+
+### Migration Workflow
+```bash
+# Generate new migration
+wheels g migration CreateUsersTable
+
+# Generate migration with attributes
+wheels g migration AddEmailToUsers --attributes="email:string:index"
+
+# Run pending migrations
+wheels dbmigrate latest
+
+# Rollback migrations
+wheels dbmigrate down
+```
+
+### Migration Example
+```cfm
+component extends="wheels.migrator.Migration" {
+
+    function up() {
+        transaction {
+            t = createTable(name="users", force=false);
+            t.string("firstName,lastName", null=false);
+            t.string("email", limit=100, null=false);
+            t.boolean("active", default=true);
+            t.timestamps();
+            t.create();
+            
+            addIndex(table="users", columnNames="email", unique=true);
+        }
+    }
+
+    function down() {
+        dropTable("users");
+    }
+}
+```
+
+### Column Types
+```cfm
+t.string("name", limit=255, null=false, default="");
+t.text("description", null=true);
+t.integer("count", null=false, default=0);
+t.decimal("price", precision=10, scale=2);
+t.boolean("active", default=false);
+t.date("eventDate");
+t.datetime("createdAt");
+t.timestamps();  // Creates createdAt and updatedAt
+t.integer("userId", null=false);  // Foreign key
+```
+
+## Testing
+
+### Test Structure
+```
+tests/
+├── Test.cfc               (Base test component)
+├── controllers/           (Controller tests)
+├── models/                (Model tests)
+└── integration/           (Integration tests)
+```
+
+### Model Testing
+```cfm
+component extends="tests.Test" {
+
+    function testUserValidation() {
+        user = model("User").new();
+        assert("!user.valid()");
+        assert("ArrayLen(user.allErrors()) GT 0");
+    }
+
+    function testUserCreation() {
+        userData = {
+            firstName = "John",
+            lastName = "Doe", 
+            email = "john@example.com"
+        };
+        
+        user = model("User").create(userData);
+        
+        assert("IsObject(user)");
+        assert("user.valid()");
+        assert("user.firstName EQ 'John'");
+    }
+}
+```
+
+## Security Best Practices
+
+### CSRF Protection
+```cfm
+// In controllers
+function config() {
+    protectFromForgery(); // Enable CSRF protection
+}
+
+// In forms
+#startFormTag(route="user", method="put", key=user.id)#
+    #hiddenFieldTag("authenticityToken", authenticityToken())#
+    <!-- form fields -->
+#endFormTag()#
+
+// In layout head
+#csrfMetaTags()#
+```
+
+### Input Validation
+```cfm
+// Parameter verification
+function config() {
+    verifies(only="show,edit,update,delete", params="key", paramsTypes="integer");
+    verifies(only="create,update", params="user", paramsTypes="struct");
+}
+
+// Model validation
+function config() {
+    validatesPresenceOf("firstName,lastName,email");
+    validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
+    validatesLengthOf(property="password", minimum=8);
+}
+```
+
+### SQL Injection Prevention
+```cfm
+// Use model methods (automatically sanitized)
+users = model("User").findAll(where="email = ?", values=[params.email]);
+
+// Or use cfqueryparam in custom queries
+users = model("User").findBySQL("
+    SELECT * FROM users 
+    WHERE email = <cfqueryparam value='#params.email#' cfsqltype='cf_sql_varchar'>
+");
+```
+
+## Performance Optimization
+
+### Caching
+```cfm
+// Page caching
+function config() {
+    caches(action="index", time=30); // Cache for 30 minutes
+}
+
+// Query caching
+users = model("User").findAll(cache=60); // Cache for 60 minutes
+```
+
+### Database Optimization
+```cfm
+// Use includes to avoid N+1 queries
+users = model("User").findAll(include="role,orders");
+
+// Use select to limit columns
+users = model("User").findAll(select="id,firstName,lastName,email");
+
+// Use pagination
+users = model("User").findAll(page=params.page, perPage=25);
+```
+
+## Deployment
+
+### Production Configuration
+```cfm
+// /config/production/settings.cfm
+<cfscript>
+    // Database
+    set(dataSourceName="myapp-prod");
+    
+    // Security
+    set(showErrorInformation=false);
+    set(sendEmailOnError=true);
+    
+    // Performance
+    set(cachePages=true);
+    set(cachePartials=true);
+    set(cacheQueries=true);
+</cfscript>
+```
+
+### Environment Variables
+Use `.env` file for sensitive configuration (never commit to version control):
+```bash
+# .env
+DATABASE_URL=mysql://user:pass@localhost:3306/myapp_prod
+SMTP_HOST=smtp.example.com
+API_KEY=your-secret-api-key
+```
+
+Access in configuration:
+```cfm
+<cfscript>
+    if (FileExists(ExpandPath("/.env"))) {
+        set(dataSourceName=GetEnv("DATABASE_NAME"));
+        set(dataSourceUserName=GetEnv("DATABASE_USER"));
+        set(dataSourcePassword=GetEnv("DATABASE_PASSWORD"));
+    }
+</cfscript>
+```
+
+## Common Patterns
+
+### Service Layer Pattern
+```cfm
+// /app/lib/UserService.cfc
+component {
+    
+    function createUser(required struct userData) {
+        local.user = model("User").new(arguments.userData);
+        
+        transaction {
+            if (local.user.save()) {
+                sendWelcomeEmail(local.user);
+                return local.user;
+            } else {
+                transaction action="rollback";
+                return false;
+            }
+        }
+    }
+}
+```
+
+### API Development
+```cfm
+// API base controller
+component extends="wheels.Controller" {
+    
+    function config() {
+        provides("json");
+        filters(through="authenticate");
+    }
+    
+    private function authenticate() {
+        // API authentication logic
+    }
+}
+
+// API endpoint
+function index() {
+    users = model("User").findAll();
+    renderWith(data={users=users});
+}
+```
+
+### Error Handling
+```cfm
+// Global error handler in Application.cfc
+function onError(exception, eventname) {
+    if (get("environment") == "production") {
+        WriteLog(file="application", text=exception.message, type="error");
+        include "/app/views/errors/500.cfm";
+    } else {
+        return true; // Let ColdFusion handle it
+    }
+}
+```
