@@ -31,14 +31,17 @@ echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 echo "Copying base template files..."
 cp -r templates/base/src/app "${BUILD_DIR}/"
 cp -r templates/base/src/config "${BUILD_DIR}/"
+cp -r templates/base/src/db "${BUILD_DIR}/"
+cp -r templates/base/src/plugins "${BUILD_DIR}/"
 cp -r templates/base/src/public "${BUILD_DIR}/"
-cp -r tests "${BUILD_DIR}/"
+cp -r templates/base/src/tests "${BUILD_DIR}/"
+cp -r templates/base/src/vendor "${BUILD_DIR}/"
 
 # Copy AI documentation files
 echo "Copying AI documentation..."
-cp CLAUDE.md "${BUILD_DIR}/"
-cp .ai-config.json "${BUILD_DIR}/"
-cp design_docs/scratchpad/AI-*.md "${BUILD_DIR}/"
+cp templates/base/src/CLAUDE.md "${BUILD_DIR}/"
+# cp .ai-config.json "${BUILD_DIR}/"
+# cp design_docs/scratchpad/AI-*.md "${BUILD_DIR}/"
 
 # Copy Apache License
 cp LICENSE "${BUILD_DIR}/"
@@ -48,11 +51,6 @@ echo "Copying VS Code snippets..."
 mkdir -p "${BUILD_DIR}/.vscode"
 cp .vscode/wheels.code-snippets "${BUILD_DIR}/.vscode/"
 cp .vscode/wheels-test.code-snippets "${BUILD_DIR}/.vscode/"
-
-# Copy vendor directory from tools/build/base if it exists
-if [ -d "tools/build/base/vendor" ]; then
-    cp -r tools/build/base/vendor "${BUILD_DIR}/"
-fi
 
 # Copy template files, overwriting defaults
 cp tools/build/base/box.json "${BUILD_DIR}/box.json"

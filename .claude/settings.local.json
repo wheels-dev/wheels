@@ -101,7 +101,8 @@
       "Bash(/Users/peter/Library/Python/3.9/bin/mkdocs build --strict)",
       "Bash(sudo rm:*)",
       "Bash(git rm:*)",
-      "Bash(ln:*)"
+      "Bash(ln:*)",
+      "Read(//Users/peter/projects/wheels.dev/tests/Testbox/specs/controllers/**)"
     ],
     "deny": []
   }

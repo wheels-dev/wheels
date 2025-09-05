@@ -1,0 +1,1809 @@
+# CLAUDE.md - Models (Object-Relational Mapping)
+
+This file provides guidance to Claude Code (claude.ai/code) when working with Wheels model components.
+
+## Overview
+
+The `/app/models/` folder contains model classes that represent your application's data layer and implement the Active Record pattern. Models in Wheels extend `Model.cfc` and provide object-relational mapping (ORM) between database tables and CFML objects.
+
+**Why Use Models:**
+- Implement the Active Record pattern for database interactions
+- Define business logic and data validation rules
+- Establish relationships between different data entities
+- Provide a clean interface for database operations
+- Enable automatic query generation and caching
+- Support advanced features like callbacks, soft deletes, and dirty tracking
+
+**Key Concept:** Models represent both the structure (database schema) and behavior (business logic) of your data.
+
+## Model Architecture
+
+### Base Model Structure
+All models extend `wheels.Model`, which provides:
+- Database interaction methods (CRUD operations)
+- Validation framework
+- Association management
+- Callback system
+- Query building and caching
+- Transaction support
+
+### Core Model Methods
+
+#### Class Methods (called on model class)
+- **`findAll()`** - Find multiple records with conditions
+- **`findByKey(key)`** - Find single record by primary key
+- **`findOne()`** - Find single record with conditions
+- **`create(properties)`** - Create and save new record
+- **`new(properties)`** - Create new unsaved record
+- **`updateAll()`** - Update multiple records
+- **`deleteAll()`** - Delete multiple records
+- **`count()`** - Count records matching conditions
+- **`exists()`** - Check if records exist
+
+#### Instance Methods (called on model object)
+- **`save()`** - Save changes to database
+- **`update(properties)`** - Update and save record
+- **`delete()`** - Delete record from database
+- **`valid()`** - Check if record passes validation
+- **`hasErrors()`** - Check if record has validation errors
+- **`reload()`** - Reload record from database
+
+#### Configuration Methods (used in config())
+- **`property()`** - Define custom properties and mappings
+- **`table()`** - Specify database table name
+- **`belongsTo()`** - Define parent relationship
+- **`hasMany()`** - Define child collection relationship
+- **`hasOne()`** - Define one-to-one relationship
+- **`validates*()`** - Define validation rules
+
+## Model Generation
+
+### CLI Generator
+Use the Wheels CLI to generate model classes and optionally create database migrations:
+
+```bash
+# Basic model
+wheels g model User
+
+# Model with properties
+wheels g model User name:string,email:string,age:integer
+
+# Model with associations
+wheels g model Post belongsTo=User hasMany=Comments
+
+# Model with custom table name
+wheels g model Product tableName=tbl_products
+
+# Model without migration
+wheels g model Category migration=false
+```
+
+### Generator Options
+- **`name`** - Model name (singular form, becomes class name)
+- **`properties`** - Column definitions (name:type,name2:type2)
+- **`belongsTo`** - Parent model relationships (comma-separated)
+- **`hasMany`** - Child model relationships (comma-separated)
+- **`hasOne`** - One-to-one relationships (comma-separated)
+- **`primaryKey`** - Primary key column name (default: id)
+- **`tableName`** - Custom database table name
+- **`migration`** - Generate database migration (default: true)
+- **`force`** - Overwrite existing files
+
+## Basic Model Structure
+
+### Simple Model Template
+```cfm
+/**
+ * User Model - Represents application users
+ * Table: users
+ * Primary Key: id
+ */
+component extends="Model" {
+
+    /**
+     * Model configuration - associations, validations, properties
+     */
+    function config() {
+        // Table configuration (if different from convention)
+        // table("custom_users_table");
+        
+        // Associations
+        hasMany("posts");
+        hasMany("comments");
+        hasOne("profile");
+        
+        // Validations
+        validatesPresenceOf("name,email");
+        validatesUniquenessOf("email");
+        validatesLengthOf(property="name", minimum=2, maximum=100);
+        validatesFormatOf(property="email", with="^[^@]+@[^@]+\.[^@]+$");
+        
+        // Custom properties
+        property(name="fullName", sql=false); // Virtual property
+        
+        // Callbacks
+        beforeSave("encryptPassword");
+        afterCreate("sendWelcomeEmail");
+        
+        // Soft delete
+        softDelete(true);
+    }
+    
+    // Custom business logic methods go here
+    
+    /**
+     * Get user's full display name
+     */
+    function getFullName() {
+        return trim(this.firstName & " " & this.lastName);
+    }
+    
+    /**
+     * Check if user has specific role
+     */
+    function hasRole(required string roleName) {
+        return listFindNoCase(this.roles, arguments.roleName) > 0;
+    }
+    
+    /**
+     * Callback: Encrypt password before saving
+     */
+    private void function encryptPassword() {
+        if (hasChanged("password") && len(this.password)) {
+            this.password = hash(this.password, "SHA-256");
+        }
+    }
+    
+    /**
+     * Callback: Send welcome email after user creation
+     */
+    private void function sendWelcomeEmail() {
+        // Queue welcome email job
+        local.mailer = createObject("component", "mailers.UserMailer");
+        local.mailer.welcomeEmail(to=this.email, user=this);
+    }
+}
+```
+
+## Advanced Model Patterns
+
+### 1. E-commerce Product Model
+```cfm
+/**
+ * Product Model - E-commerce product catalog
+ */
+component extends="Model" {
+
+    function config() {
+        // Associations
+        belongsTo("category");
+        hasMany("orderItems");
+        hasMany("productImages");
+        hasMany("reviews");
+        hasOne("inventory");
+        
+        // Validations
+        validatesPresenceOf("name,price,categoryId");
+        validatesNumericalityOf("price", greaterThan=0);
+        validatesNumericalityOf("weight", greaterThan=0, allowBlank=true);
+        validatesLengthOf(property="name", minimum=3, maximum=255);
+        validatesLengthOf(property="sku", maximum=50, allowBlank=true);
+        validatesUniquenessOf("sku", allowBlank=true);
+        
+        // Custom properties
+        property(name="isActive", type="boolean", defaultValue=true);
+        property(name="discountedPrice", sql=false); // Calculated property
+        property(name="inStock", sql=false);
+        
+        // Callbacks
+        beforeSave("generateSku", "updateSlug");
+        afterUpdate("clearProductCache");
+        
+        // Soft delete for maintaining order history
+        softDelete(true);
+    }
+    
+    /**
+     * Get discounted price if on sale
+     */
+    function getDiscountedPrice() {
+        if (this.salePrice > 0 && this.salePrice < this.price) {
+            return this.salePrice;
+        }
+        return this.price;
+    }
+    
+    /**
+     * Check if product is in stock
+     */
+    function getInStock() {
+        return this.inventory().quantity > 0;
+    }
+    
+    /**
+     * Get primary product image
+     */
+    function getPrimaryImage() {
+        return this.productImages(where="isPrimary = 1").first();
+    }
+    
+    /**
+     * Calculate average rating from reviews
+     */
+    function getAverageRating() {
+        return this.reviews().average("rating");
+    }
+    
+    /**
+     * Scope: Active products only
+     */
+    function scopeActive() {
+        return this.where("isActive = ? AND deletedAt IS NULL", true);
+    }
+    
+    /**
+     * Scope: Products in specific category
+     */
+    function scopeInCategory(required numeric categoryId) {
+        return this.where("categoryId = ?", arguments.categoryId);
+    }
+    
+    /**
+     * Scope: Products on sale
+     */
+    function scopeOnSale() {
+        return this.where("salePrice > 0 AND salePrice < price");
+    }
+    
+    /**
+     * Search products by name and description
+     */
+    function searchByText(required string searchTerm) {
+        local.term = "%" & arguments.searchTerm & "%";
+        return this.where("name LIKE ? OR description LIKE ?", [local.term, local.term]);
+    }
+    
+    /**
+     * Callback: Generate SKU if not provided
+     */
+    private void function generateSku() {
+        if (!len(this.sku)) {
+            // Generate SKU from category and name
+            local.categoryCode = this.category().code ?: "GEN";
+            local.namePart = reReplace(this.name, "[^A-Za-z0-9]", "", "all");
+            local.namePart = left(uCase(local.namePart), 8);
+            this.sku = local.categoryCode & "-" & local.namePart & "-" & randRange(1000, 9999);
+        }
+    }
+    
+    /**
+     * Callback: Update URL slug from name
+     */
+    private void function updateSlug() {
+        if (hasChanged("name")) {
+            this.slug = createSlug(this.name);
+        }
+    }
+    
+    /**
+     * Callback: Clear cached product data
+     */
+    private void function clearProductCache() {
+        // Clear relevant cache entries
+        cacheRemove("product_#this.id#_details");
+        cacheRemove("category_#this.categoryId#_products");
+    }
+    
+    /**
+     * Helper: Create URL-friendly slug
+     */
+    private string function createSlug(required string text) {
+        local.slug = lCase(trim(arguments.text));
+        local.slug = reReplace(local.slug, "[^a-z0-9\s]", "", "all");
+        local.slug = reReplace(local.slug, "\s+", "-", "all");
+        local.slug = reReplace(local.slug, "-+", "-", "all");
+        local.slug = reReplace(local.slug, "^-|-$", "", "all");
+        
+        // Ensure uniqueness
+        local.counter = 1;
+        local.originalSlug = local.slug;
+        while (model("Product").exists(where="slug = ? AND id != ?", whereParams=[local.slug, this.id ?: 0])) {
+            local.slug = local.originalSlug & "-" & local.counter;
+            local.counter++;
+        }
+        
+        return local.slug;
+    }
+}
+```
+
+### 2. Blog Post Model with Rich Features
+```cfm
+/**
+ * Post Model - Blog posts with rich content management
+ */
+component extends="Model" {
+
+    function config() {
+        // Associations
+        belongsTo("author", modelName="User", foreignKey="authorId");
+        belongsTo("category");
+        hasMany("comments");
+        hasMany("tags", through="postTags");
+        hasMany("postTags");
+        
+        // Validations
+        validatesPresenceOf("title,content,authorId");
+        validatesLengthOf(property="title", minimum=5, maximum=255);
+        validatesLengthOf(property="excerpt", maximum=500, allowBlank=true);
+        validatesLengthOf(property="content", minimum=50);
+        validatesUniquenessOf("slug");
+        
+        // Custom properties
+        property(name="status", type="string", defaultValue="draft");
+        property(name="publishedAt", type="timestamp", null=true);
+        property(name="wordCount", sql=false);
+        property(name="readingTime", sql=false);
+        property(name="isPublished", sql=false);
+        
+        // Callbacks
+        beforeValidation("generateSlugFromTitle");
+        beforeSave("calculateWordCount", "setPublishedDate");
+        afterCreate("notifySubscribers");
+        afterUpdate("clearPostCache");
+        
+        // Automatic timestamps
+        timeStampOnCreate(true);
+        timeStampOnUpdate(true);
+    }
+    
+    /**
+     * Get calculated word count
+     */
+    function getWordCount() {
+        local.plainText = reReplace(this.content, "<[^>]*>", "", "all");
+        local.words = listToArray(local.plainText, " " & chr(10) & chr(13) & chr(9));
+        return arrayLen(local.words);
+    }
+    
+    /**
+     * Calculate estimated reading time
+     */
+    function getReadingTime() {
+        local.wordsPerMinute = 200; // Average reading speed
+        local.minutes = ceiling(getWordCount() / local.wordsPerMinute);
+        return max(1, local.minutes); // Minimum 1 minute
+    }
+    
+    /**
+     * Check if post is published
+     */
+    function getIsPublished() {
+        return this.status == "published" && 
+               isDate(this.publishedAt) && 
+               this.publishedAt <= now();
+    }
+    
+    /**
+     * Get formatted excerpt or auto-generate from content
+     */
+    function getFormattedExcerpt(numeric length = 200) {
+        if (len(this.excerpt)) {
+            return this.excerpt;
+        }
+        
+        // Auto-generate from content
+        local.plainText = reReplace(this.content, "<[^>]*>", "", "all");
+        local.plainText = reReplace(local.plainText, "\s+", " ", "all");
+        
+        if (len(local.plainText) <= arguments.length) {
+            return local.plainText;
+        }
+        
+        local.truncated = left(local.plainText, arguments.length - 3);
+        local.lastSpace = find(" ", reverse(local.truncated));
+        if (local.lastSpace > 0 && local.lastSpace < 20) {
+            local.truncated = left(local.truncated, len(local.truncated) - local.lastSpace + 1);
+        }
+        
+        return trim(local.truncated) & "...";
+    }
+    
+    /**
+     * Get next published post
+     */
+    function getNextPost() {
+        return model("Post")
+            .where("status = ? AND publishedAt > ?", ["published", this.publishedAt])
+            .order("publishedAt ASC")
+            .first();
+    }
+    
+    /**
+     * Get previous published post
+     */
+    function getPreviousPost() {
+        return model("Post")
+            .where("status = ? AND publishedAt < ?", ["published", this.publishedAt])
+            .order("publishedAt DESC")
+            .first();
+    }
+    
+    /**
+     * Get related posts by tags
+     */
+    function getRelatedPosts(numeric limit = 5) {
+        if (!this.tags().count()) {
+            return [];
+        }
+        
+        local.tagIds = [];
+        for (local.tag in this.tags()) {
+            arrayAppend(local.tagIds, local.tag.id);
+        }
+        
+        return model("Post")
+            .joins("INNER JOIN postTags pt ON posts.id = pt.postId")
+            .where("pt.tagId IN (?) AND posts.id != ? AND posts.status = ?", 
+                   [arrayToList(local.tagIds), this.id, "published"])
+            .group("posts.id")
+            .order("COUNT(pt.tagId) DESC, posts.publishedAt DESC")
+            .limit(arguments.limit);
+    }
+    
+    /**
+     * Publish the post
+     */
+    function publish() {
+        if (this.status != "published") {
+            this.status = "published";
+            this.publishedAt = now();
+            return this.save();
+        }
+        return true;
+    }
+    
+    /**
+     * Unpublish the post (set to draft)
+     */
+    function unpublish() {
+        this.status = "draft";
+        this.publishedAt = "";
+        return this.save();
+    }
+    
+    /**
+     * Scope: Published posts only
+     */
+    function scopePublished() {
+        return this.where("status = ? AND publishedAt <= ?", ["published", now()]);
+    }
+    
+    /**
+     * Scope: Draft posts only
+     */
+    function scopeDrafts() {
+        return this.where("status = ?", "draft");
+    }
+    
+    /**
+     * Scope: Posts by specific author
+     */
+    function scopeByAuthor(required numeric authorId) {
+        return this.where("authorId = ?", arguments.authorId);
+    }
+    
+    /**
+     * Scope: Posts in date range
+     */
+    function scopeDateRange(required date startDate, required date endDate) {
+        return this.where("publishedAt BETWEEN ? AND ?", [arguments.startDate, arguments.endDate]);
+    }
+    
+    // Callback methods
+    
+    /**
+     * Callback: Generate slug from title if not provided
+     */
+    private void function generateSlugFromTitle() {
+        if (!len(this.slug) && len(this.title)) {
+            this.slug = createUrlSlug(this.title);
+        }
+    }
+    
+    /**
+     * Callback: Calculate and store word count
+     */
+    private void function calculateWordCount() {
+        // Store actual word count for database queries/sorting
+        this.actualWordCount = getWordCount();
+    }
+    
+    /**
+     * Callback: Set published date when status changes to published
+     */
+    private void function setPublishedDate() {
+        if (hasChanged("status") && this.status == "published" && !isDate(this.publishedAt)) {
+            this.publishedAt = now();
+        }
+    }
+    
+    /**
+     * Callback: Notify subscribers when post is published
+     */
+    private void function notifySubscribers() {
+        if (this.status == "published") {
+            // Queue job to send notifications
+            local.job = createObject("component", "jobs.NotifySubscribersJob");
+            local.job.enqueue({postId: this.id});
+        }
+    }
+    
+    /**
+     * Callback: Clear cached post data
+     */
+    private void function clearPostCache() {
+        cacheRemove("post_#this.id#_details");
+        cacheRemove("recent_posts");
+        cacheRemove("category_#this.categoryId#_posts");
+    }
+    
+    /**
+     * Helper: Create URL-friendly slug
+     */
+    private string function createUrlSlug(required string text) {
+        local.slug = lCase(trim(arguments.text));
+        local.slug = reReplace(local.slug, "[^\w\s-]", "", "all");
+        local.slug = reReplace(local.slug, "[\s-]+", "-", "all");
+        local.slug = reReplace(local.slug, "^-+|-+$", "", "all");
+        
+        // Ensure uniqueness
+        local.counter = 1;
+        local.originalSlug = local.slug;
+        while (model("Post").exists(where="slug = ? AND id != ?", whereParams=[local.slug, this.id ?: 0])) {
+            local.slug = local.originalSlug & "-" & local.counter;
+            local.counter++;
+        }
+        
+        return local.slug;
+    }
+}
+```
+
+### 3. User Authentication Model
+```cfm
+/**
+ * User Model - User authentication and profile management
+ */
+component extends="Model" {
+
+    function config() {
+        // Associations
+        hasOne("profile");
+        hasMany("posts", foreignKey="authorId");
+        hasMany("comments");
+        hasMany("sessions");
+        hasMany("loginAttempts");
+        hasMany("userRoles");
+        hasMany("roles", through="userRoles");
+        
+        // Validations
+        validatesPresenceOf("email,username");
+        validatesUniquenessOf("email,username");
+        validatesLengthOf(property="username", minimum=3, maximum=50);
+        validatesLengthOf(property="password", minimum=8, when="onCreate");
+        validatesFormatOf(property="email", with="^[^\s@]+@[^\s@]+\.[^\s@]+$");
+        validatesConfirmationOf(property="password", when="onCreate");
+        
+        // Custom validations
+        validates(method="validatePasswordStrength", when="onCreate");
+        validates(method="validateUsernameFormat");
+        
+        // Custom properties
+        property(name="isActive", type="boolean", defaultValue=true);
+        property(name="lastLoginAt", type="timestamp", null=true);
+        property(name="loginCount", type="integer", defaultValue=0);
+        property(name="failedLoginAttempts", type="integer", defaultValue=0);
+        property(name="lockedUntil", type="timestamp", null=true);
+        property(name="emailVerifiedAt", type="timestamp", null=true);
+        property(name="twoFactorEnabled", type="boolean", defaultValue=false);
+        
+        // Virtual properties
+        property(name="fullName", sql=false);
+        property(name="isLocked", sql=false);
+        property(name="isEmailVerified", sql=false);
+        
+        // Callbacks
+        beforeCreate("generateVerificationToken");
+        beforeSave("hashPasswordIfChanged");
+        afterCreate("sendVerificationEmail");
+        afterUpdate("logProfileChanges");
+        
+        // Soft delete to maintain referential integrity
+        softDelete(true);
+        
+        // Automatic timestamps
+        timeStampOnCreate(true);
+        timeStampOnUpdate(true);
+    }
+    
+    /**
+     * Authenticate user with email/username and password
+     */
+    static function authenticate(required string identifier, required string password) {
+        // Find user by email or username
+        local.user = model("User").findOne(
+            where="(email = ? OR username = ?) AND deletedAt IS NULL",
+            whereParams=[arguments.identifier, arguments.identifier]
+        );
+        
+        if (!isObject(local.user)) {
+            return {success: false, error: "Invalid credentials"};
+        }
+        
+        // Check if account is locked
+        if (local.user.getIsLocked()) {
+            return {success: false, error: "Account is temporarily locked"};
+        }
+        
+        // Verify password
+        if (local.user.verifyPassword(arguments.password)) {
+            // Update login statistics
+            local.user.recordSuccessfulLogin();
+            return {success: true, user: local.user};
+        } else {
+            // Record failed attempt
+            local.user.recordFailedLogin();
+            return {success: false, error: "Invalid credentials"};
+        }
+    }
+    
+    /**
+     * Verify password against stored hash
+     */
+    function verifyPassword(required string password) {
+        return hash(arguments.password & this.salt, "SHA-256") == this.passwordHash;
+    }
+    
+    /**
+     * Get user's full display name
+     */
+    function getFullName() {
+        if (len(this.firstName) && len(this.lastName)) {
+            return this.firstName & " " & this.lastName;
+        } else if (len(this.firstName)) {
+            return this.firstName;
+        } else if (len(this.lastName)) {
+            return this.lastName;
+        } else {
+            return this.username;
+        }
+    }
+    
+    /**
+     * Check if account is locked
+     */
+    function getIsLocked() {
+        return isDate(this.lockedUntil) && this.lockedUntil > now();
+    }
+    
+    /**
+     * Check if email is verified
+     */
+    function getIsEmailVerified() {
+        return isDate(this.emailVerifiedAt);
+    }
+    
+    /**
+     * Check if user has specific role
+     */
+    function hasRole(required string roleName) {
+        return this.roles().exists(where="name = ?", whereParams=[arguments.roleName]);
+    }
+    
+    /**
+     * Check if user has any of the specified roles
+     */
+    function hasAnyRole(required string roleNames) {
+        local.roleList = listToArray(arguments.roleNames);
+        return this.roles().exists(where="name IN (?)", whereParams=[roleList]);
+    }
+    
+    /**
+     * Check if user has permission
+     */
+    function hasPermission(required string permission) {
+        return this.roles().joins("INNER JOIN rolePermissions rp ON roles.id = rp.roleId")
+                          .joins("INNER JOIN permissions p ON rp.permissionId = p.id")
+                          .exists(where="p.name = ?", whereParams=[arguments.permission]);
+    }
+    
+    /**
+     * Add role to user
+     */
+    function addRole(required string roleName) {
+        local.role = model("Role").findOne(where="name = ?", whereParams=[arguments.roleName]);
+        if (isObject(local.role) && !this.hasRole(arguments.roleName)) {
+            model("UserRole").create(userId=this.id, roleId=local.role.id);
+        }
+    }
+    
+    /**
+     * Remove role from user
+     */
+    function removeRole(required string roleName) {
+        local.role = model("Role").findOne(where="name = ?", whereParams=[arguments.roleName]);
+        if (isObject(local.role)) {
+            model("UserRole").deleteAll(where="userId = ? AND roleId = ?", whereParams=[this.id, local.role.id]);
+        }
+    }
+    
+    /**
+     * Generate password reset token
+     */
+    function generatePasswordResetToken() {
+        this.passwordResetToken = createUUID();
+        this.passwordResetExpires = dateAdd("h", 2, now()); // 2 hour expiry
+        return this.save();
+    }
+    
+    /**
+     * Reset password with token
+     */
+    function resetPassword(required string token, required string newPassword) {
+        if (this.passwordResetToken != arguments.token || 
+            !isDate(this.passwordResetExpires) || 
+            this.passwordResetExpires < now()) {
+            return {success: false, error: "Invalid or expired reset token"};
+        }
+        
+        // Validate new password
+        this.password = arguments.newPassword;
+        this.passwordConfirmation = arguments.newPassword;
+        
+        if (!this.valid()) {
+            return {success: false, errors: this.allErrors()};
+        }
+        
+        // Clear reset token and save
+        this.passwordResetToken = "";
+        this.passwordResetExpires = "";
+        
+        if (this.save()) {
+            return {success: true, message: "Password updated successfully"};
+        } else {
+            return {success: false, error: "Failed to update password"};
+        }
+    }
+    
+    /**
+     * Verify email with token
+     */
+    function verifyEmail(required string token) {
+        if (this.emailVerificationToken == arguments.token) {
+            this.emailVerifiedAt = now();
+            this.emailVerificationToken = "";
+            return this.save();
+        }
+        return false;
+    }
+    
+    /**
+     * Record successful login
+     */
+    function recordSuccessfulLogin() {
+        this.lastLoginAt = now();
+        this.loginCount = this.loginCount + 1;
+        this.failedLoginAttempts = 0;
+        this.lockedUntil = "";
+        this.save();
+        
+        // Clean up old login attempts
+        this.loginAttempts().deleteAll(where="createdAt < ?", whereParams=[dateAdd("d", -7, now())]);
+    }
+    
+    /**
+     * Record failed login attempt
+     */
+    function recordFailedLogin() {
+        this.failedLoginAttempts = this.failedLoginAttempts + 1;
+        
+        // Lock account after 5 failed attempts
+        if (this.failedLoginAttempts >= 5) {
+            this.lockedUntil = dateAdd("n", 30, now()); // 30 minutes
+        }
+        
+        this.save();
+        
+        // Log failed attempt
+        model("LoginAttempt").create(
+            userId = this.id,
+            ipAddress = getClientIP(),
+            success = false,
+            attemptedAt = now()
+        );
+    }
+    
+    /**
+     * Scope: Active users only
+     */
+    function scopeActive() {
+        return this.where("isActive = ? AND deletedAt IS NULL", true);
+    }
+    
+    /**
+     * Scope: Email verified users
+     */
+    function scopeEmailVerified() {
+        return this.where("emailVerifiedAt IS NOT NULL");
+    }
+    
+    /**
+     * Scope: Users with specific role
+     */
+    function scopeWithRole(required string roleName) {
+        return this.joins("INNER JOIN userRoles ur ON users.id = ur.userId")
+                   .joins("INNER JOIN roles r ON ur.roleId = r.id")
+                   .where("r.name = ?", arguments.roleName);
+    }
+    
+    // Callback methods
+    
+    /**
+     * Callback: Generate email verification token
+     */
+    private void function generateVerificationToken() {
+        this.emailVerificationToken = createUUID();
+        this.salt = generateSalt();
+    }
+    
+    /**
+     * Callback: Hash password if it has changed
+     */
+    private void function hashPasswordIfChanged() {
+        if (hasChanged("password") && len(this.password)) {
+            this.passwordHash = hash(this.password & this.salt, "SHA-256");
+            // Clear plain text password
+            this.password = "";
+            this.passwordConfirmation = "";
+        }
+    }
+    
+    /**
+     * Callback: Send verification email after creation
+     */
+    private void function sendVerificationEmail() {
+        local.mailer = createObject("component", "mailers.UserMailer");
+        local.mailer.emailVerification(
+            user = this,
+            token = this.emailVerificationToken
+        );
+    }
+    
+    /**
+     * Callback: Log significant profile changes
+     */
+    private void function logProfileChanges() {
+        local.significantFields = "email,username,isActive";
+        local.changedFields = changedProperties();
+        
+        for (local.field in local.changedFields) {
+            if (listFindNoCase(local.significantFields, local.field)) {
+                model("UserAuditLog").create(
+                    userId = this.id,
+                    action = "profile_change",
+                    field = local.field,
+                    oldValue = local.changedFields[local.field].oldValue,
+                    newValue = local.changedFields[local.field].newValue,
+                    changedAt = now()
+                );
+            }
+        }
+    }
+    
+    // Validation methods
+    
+    /**
+     * Custom validation: Password strength
+     */
+    private void function validatePasswordStrength() {
+        if (len(this.password)) {
+            local.errors = [];
+            
+            // Check length
+            if (len(this.password) < 8) {
+                arrayAppend(local.errors, "must be at least 8 characters long");
+            }
+            
+            // Check for uppercase letter
+            if (!reFindNoCase("[A-Z]", this.password)) {
+                arrayAppend(local.errors, "must contain at least one uppercase letter");
+            }
+            
+            // Check for lowercase letter
+            if (!reFindNoCase("[a-z]", this.password)) {
+                arrayAppend(local.errors, "must contain at least one lowercase letter");
+            }
+            
+            // Check for number
+            if (!reFindNoCase("[0-9]", this.password)) {
+                arrayAppend(local.errors, "must contain at least one number");
+            }
+            
+            // Check for special character
+            if (!reFindNoCase("[^A-Za-z0-9]", this.password)) {
+                arrayAppend(local.errors, "must contain at least one special character");
+            }
+            
+            if (arrayLen(local.errors)) {
+                addError(property="password", message="Password #arrayToList(local.errors, ', ')#");
+            }
+        }
+    }
+    
+    /**
+     * Custom validation: Username format
+     */
+    private void function validateUsernameFormat() {
+        if (len(this.username)) {
+            // Check for valid characters
+            if (reFindNoCase("[^A-Za-z0-9_-]", this.username)) {
+                addError(property="username", message="Username can only contain letters, numbers, hyphens, and underscores");
+            }
+            
+            // Check for reserved usernames
+            local.reserved = "admin,administrator,root,system,api,www,mail,ftp";
+            if (listFindNoCase(local.reserved, this.username)) {
+                addError(property="username", message="This username is not available");
+            }
+        }
+    }
+    
+    // Helper methods
+    
+    /**
+     * Generate cryptographic salt
+     */
+    private string function generateSalt() {
+        return hash(createUUID() & now() & randRange(1, 100000), "MD5");
+    }
+    
+    /**
+     * Get client IP address
+     */
+    private string function getClientIP() {
+        if (structKeyExists(cgi, "http_x_forwarded_for") && len(cgi.http_x_forwarded_for)) {
+            return listFirst(cgi.http_x_forwarded_for);
+        } else {
+            return cgi.remote_addr ?: "0.0.0.0";
+        }
+    }
+}
+```
+
+## Model Associations
+
+### Association Types and Usage
+
+#### belongsTo (Many-to-One)
+```cfm
+component extends="Model" {
+    function config() {
+        // Post belongs to User (author)
+        belongsTo("author", modelName="User", foreignKey="authorId");
+        
+        // Order belongs to Customer
+        belongsTo("customer");
+        
+        // Comment belongs to Post
+        belongsTo("post");
+    }
+}
+```
+
+#### hasMany (One-to-Many)
+```cfm
+component extends="Model" {
+    function config() {
+        // User has many Posts
+        hasMany("posts", foreignKey="authorId");
+        
+        // Category has many Products
+        hasMany("products");
+        
+        // Post has many Comments with dependency
+        hasMany("comments", dependent="delete");
+    }
+}
+```
+
+#### hasOne (One-to-One)
+```cfm
+component extends="Model" {
+    function config() {
+        // User has one Profile
+        hasOne("profile", dependent="delete");
+        
+        // Product has one Inventory
+        hasOne("inventory");
+    }
+}
+```
+
+#### Many-to-Many with Shortcuts
+```cfm
+component extends="Model" {
+    function config() {
+        // User has many Roles through UserRoles
+        hasMany("userRoles");
+        hasMany(name="userRoles", shortcut="roles");
+        
+        // Post has many Tags through PostTags
+        hasMany("postTags");
+        hasMany(name="postTags", shortcut="tags");
+    }
+}
+```
+
+### Dynamic Association Methods
+
+#### hasMany Methods Example
+```cfm
+// Given: Post hasMany("comments")
+post = model("Post").findByKey(1);
+
+// Get all comments
+comments = post.comments();
+
+// Get comments with conditions
+recentComments = post.comments(where="createdAt > ?", whereParams=[dateAdd("d", -7, now())]);
+
+// Count comments
+commentCount = post.commentCount();
+
+// Check if has comments
+hasComments = post.hasComments();
+
+// Create new comment
+newComment = post.createComment(content="Great post!", authorName="John");
+
+// Add existing comment
+post.addComment(existingComment);
+
+// Remove comment (set foreign key to null)
+post.removeComment(comment);
+
+// Delete comment
+post.deleteComment(comment);
+```
+
+## Model Validations
+
+### Built-in Validation Methods
+
+#### Presence and Format Validations
+```cfm
+component extends="Model" {
+    function config() {
+        // Required fields
+        validatesPresenceOf("name,email,password");
+        
+        // Email format
+        validatesFormatOf(
+            property="email", 
+            with="^[^\s@]+@[^\s@]+\.[^\s@]+$",
+            message="Please enter a valid email address"
+        );
+        
+        // Phone format
+        validatesFormatOf(
+            property="phone",
+            with="^\(\d{3}\) \d{3}-\d{4}$",
+            message="Phone must be in format (123) 456-7890"
+        );
+        
+        // URL format
+        validatesFormatOf(
+            property="website",
+            with="^https?://[^\s]+$",
+            allowBlank=true
+        );
+    }
+}
+```
+
+#### Length and Numerical Validations
+```cfm
+component extends="Model" {
+    function config() {
+        // String length constraints
+        validatesLengthOf(property="username", minimum=3, maximum=50);
+        validatesLengthOf(property="password", minimum=8);
+        validatesLengthOf(property="bio", maximum=500, allowBlank=true);
+        
+        // Exact length
+        validatesLengthOf(property="postalCode", is=6);
+        
+        // Numerical constraints
+        validatesNumericalityOf(property="age", onlyInteger=true, greaterThan=0, lessThan=150);
+        validatesNumericalityOf(property="price", greaterThan=0);
+        validatesNumericalityOf(property="discount", greaterThanOrEqualTo=0, lessThanOrEqualTo=100);
+    }
+}
+```
+
+#### Uniqueness and Confirmation
+```cfm
+component extends="Model" {
+    function config() {
+        // Unique values
+        validatesUniquenessOf("email");
+        validatesUniquenessOf("username");
+        validatesUniquenessOf("sku", allowBlank=true);
+        
+        // Scoped uniqueness
+        validatesUniquenessOf(property="name", scope="categoryId");
+        
+        // Password confirmation
+        validatesConfirmationOf("password");
+        
+        // Email confirmation
+        validatesConfirmationOf("email", when="onCreate");
+    }
+}
+```
+
+#### Conditional Validations
+```cfm
+component extends="Model" {
+    function config() {
+        // Only on create
+        validatesPresenceOf("password", when="onCreate");
+        
+        // Only on update
+        validatesPresenceOf("currentPassword", when="onUpdate");
+        
+        // Custom condition
+        validatesPresenceOf("parentId", condition="this.type == 'child'");
+        
+        // Unless condition
+        validatesPresenceOf("companyName", unless="this.isIndividual");
+    }
+}
+```
+
+### Custom Validations
+
+#### Method-based Custom Validations
+```cfm
+component extends="Model" {
+    function config() {
+        // Custom validation methods
+        validates(method="validateAge");
+        validates(method="validateCreditCard", when="onCreate");
+        validates(method="validateBusinessHours");
+    }
+    
+    /**
+     * Custom validation: Age must be reasonable
+     */
+    private void function validateAge() {
+        if (this.age < 13 || this.age > 120) {
+            addError(property="age", message="Age must be between 13 and 120");
+        }
+    }
+    
+    /**
+     * Custom validation: Credit card format
+     */
+    private void function validateCreditCard() {
+        if (len(this.creditCardNumber)) {
+            local.cleaned = reReplace(this.creditCardNumber, "[^\d]", "", "all");
+            
+            // Basic length check
+            if (len(local.cleaned) < 13 || len(local.cleaned) > 19) {
+                addError(property="creditCardNumber", message="Invalid credit card number");
+                return;
+            }
+            
+            // Luhn algorithm check
+            if (!passesLuhnCheck(local.cleaned)) {
+                addError(property="creditCardNumber", message="Invalid credit card number");
+            }
+        }
+    }
+    
+    /**
+     * Custom validation: Business hours format
+     */
+    private void function validateBusinessHours() {
+        if (len(this.businessHours)) {
+            // Expected format: "09:00-17:00"
+            if (!reFindNoCase("^\d{2}:\d{2}-\d{2}:\d{2}$", this.businessHours)) {
+                addError(property="businessHours", message="Business hours must be in format HH:MM-HH:MM");
+            }
+        }
+    }
+    
+    /**
+     * Helper: Luhn algorithm for credit card validation
+     */
+    private boolean function passesLuhnCheck(required string number) {
+        local.sum = 0;
+        local.alternate = false;
+        
+        for (local.i = len(arguments.number); local.i >= 1; local.i--) {
+            local.digit = val(mid(arguments.number, local.i, 1));
+            
+            if (local.alternate) {
+                local.digit *= 2;
+                if (local.digit > 9) {
+                    local.digit -= 9;
+                }
+            }
+            
+            local.sum += local.digit;
+            local.alternate = !local.alternate;
+        }
+        
+        return (local.sum % 10) == 0;
+    }
+}
+```
+
+## Model Callbacks
+
+### Available Callback Points
+```cfm
+component extends="Model" {
+    function config() {
+        // Before callbacks
+        beforeValidation("normalizeData");
+        beforeSave("updateTimestamps");
+        beforeCreate("generateId");
+        beforeUpdate("trackChanges");
+        beforeDelete("checkReferences");
+        
+        // After callbacks
+        afterValidation("processData");
+        afterSave("clearCache");
+        afterCreate("sendNotifications");
+        afterUpdate("logChanges");
+        afterDelete("cleanupFiles");
+    }
+    
+    // Callback implementations
+    private void function normalizeData() {
+        // Normalize email to lowercase
+        if (len(this.email)) {
+            this.email = lCase(trim(this.email));
+        }
+        
+        // Normalize phone number
+        if (len(this.phone)) {
+            this.phone = reReplace(this.phone, "[^\d]", "", "all");
+        }
+    }
+    
+    private void function updateTimestamps() {
+        if (isNew()) {
+            this.createdAt = now();
+        }
+        this.updatedAt = now();
+    }
+    
+    private void function generateId() {
+        if (!len(this.id)) {
+            this.id = createUUID();
+        }
+    }
+    
+    private void function trackChanges() {
+        // Store changed properties for audit trail
+        variables.changedData = changedProperties();
+    }
+    
+    private void function checkReferences() {
+        // Prevent deletion if referenced by other records
+        if (model("Order").exists(where="customerId = ?", whereParams=[this.id])) {
+            throw(type="ReferentialIntegrityError", message="Cannot delete customer with existing orders");
+        }
+    }
+    
+    private void function sendNotifications() {
+        // Send welcome email for new users
+        local.mailer = createObject("component", "mailers.UserMailer");
+        local.mailer.welcomeEmail(user=this);
+    }
+    
+    private void function logChanges() {
+        // Log changes to audit table
+        if (structKeyExists(variables, "changedData")) {
+            for (local.field in variables.changedData) {
+                model("AuditLog").create(
+                    tableName = "users",
+                    recordId = this.id,
+                    fieldName = local.field,
+                    oldValue = variables.changedData[local.field].oldValue,
+                    newValue = variables.changedData[local.field].newValue,
+                    changedAt = now(),
+                    changedBy = session.userId ?: 0
+                );
+            }
+        }
+    }
+    
+    private void function cleanupFiles() {
+        // Delete associated files
+        if (len(this.avatarPath) && fileExists(expandPath(this.avatarPath))) {
+            fileDelete(expandPath(this.avatarPath));
+        }
+    }
+}
+```
+
+## Testing Models
+
+### Model Test Structure
+```cfm
+/**
+ * UserTest - Test User model functionality
+ */
+component extends="wheels.Test" {
+
+    function setup() {
+        // Set up test data
+        variables.validUserData = {
+            username = "testuser",
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            password = "SecurePass123!",
+            passwordConfirmation = "SecurePass123!"
+        };
+    }
+
+    function teardown() {
+        // Clean up test data
+        model("User").deleteAll(where="email LIKE '%test%'");
+    }
+
+    // Validation tests
+    function test_user_requires_email() {
+        local.user = model("User").new(variables.validUserData);
+        local.user.email = "";
+        
+        assert(!local.user.valid(), "User should be invalid without email");
+        assert(local.user.hasErrors("email"), "User should have email error");
+    }
+
+    function test_user_requires_unique_email() {
+        // Create first user
+        local.firstUser = model("User").create(variables.validUserData);
+        assert(local.firstUser.valid(), "First user should be valid");
+
+        // Try to create second user with same email
+        variables.validUserData.username = "testuser2";
+        local.secondUser = model("User").new(variables.validUserData);
+        
+        assert(!local.secondUser.valid(), "Second user should be invalid with duplicate email");
+        assert(local.secondUser.hasErrors("email"), "User should have email uniqueness error");
+    }
+
+    function test_password_validation() {
+        local.user = model("User").new(variables.validUserData);
+        
+        // Test weak password
+        local.user.password = "weak";
+        local.user.passwordConfirmation = "weak";
+        assert(!local.user.valid(), "User should be invalid with weak password");
+        
+        // Test strong password
+        local.user.password = "StrongPass123!";
+        local.user.passwordConfirmation = "StrongPass123!";
+        assert(local.user.valid(), "User should be valid with strong password");
+    }
+
+    function test_password_confirmation() {
+        local.user = model("User").new(variables.validUserData);
+        local.user.passwordConfirmation = "DifferentPassword123!";
+        
+        assert(!local.user.valid(), "User should be invalid when passwords don't match");
+        assert(local.user.hasErrors("password"), "User should have password confirmation error");
+    }
+
+    // Authentication tests
+    function test_authenticate_with_valid_credentials() {
+        // Create user
+        local.user = model("User").create(variables.validUserData);
+        
+        // Test authentication
+        local.result = model("User").authenticate("test@example.com", "SecurePass123!");
+        
+        assert(local.result.success, "Authentication should succeed with valid credentials");
+        assert(isObject(local.result.user), "Result should include user object");
+        assert(local.result.user.id == local.user.id, "Should return correct user");
+    }
+
+    function test_authenticate_with_invalid_password() {
+        // Create user
+        local.user = model("User").create(variables.validUserData);
+        
+        // Test with wrong password
+        local.result = model("User").authenticate("test@example.com", "WrongPassword");
+        
+        assert(!local.result.success, "Authentication should fail with invalid password");
+        assert(structKeyExists(local.result, "error"), "Result should include error message");
+    }
+
+    function test_authenticate_with_nonexistent_user() {
+        local.result = model("User").authenticate("nonexistent@example.com", "AnyPassword");
+        
+        assert(!local.result.success, "Authentication should fail for nonexistent user");
+    }
+
+    // Association tests
+    function test_user_has_many_posts() {
+        local.user = model("User").create(variables.validUserData);
+        local.post1 = model("Post").create(title="Post 1", content="Content 1", authorId=local.user.id);
+        local.post2 = model("Post").create(title="Post 2", content="Content 2", authorId=local.user.id);
+        
+        local.posts = local.user.posts();
+        assert(local.posts.recordCount == 2, "User should have 2 posts");
+    }
+
+    function test_user_can_have_roles() {
+        local.user = model("User").create(variables.validUserData);
+        local.adminRole = model("Role").findOrCreateByName("admin");
+        
+        local.user.addRole("admin");
+        assert(local.user.hasRole("admin"), "User should have admin role");
+        
+        local.user.removeRole("admin");
+        assert(!local.user.hasRole("admin"), "User should no longer have admin role");
+    }
+
+    // Business logic tests
+    function test_full_name_generation() {
+        local.user = model("User").new(variables.validUserData);
+        local.fullName = local.user.getFullName();
+        
+        assert(local.fullName == "Test User", "Full name should combine first and last name");
+    }
+
+    function test_password_reset_workflow() {
+        local.user = model("User").create(variables.validUserData);
+        
+        // Generate reset token
+        local.result = local.user.generatePasswordResetToken();
+        assert(local.result, "Password reset token generation should succeed");
+        assert(len(local.user.passwordResetToken) > 0, "Should have reset token");
+        assert(isDate(local.user.passwordResetExpires), "Should have expiry date");
+        
+        // Reset password with valid token
+        local.resetResult = local.user.resetPassword(local.user.passwordResetToken, "NewSecurePass123!");
+        assert(local.resetResult.success, "Password reset should succeed with valid token");
+        
+        // Verify old password no longer works
+        local.authResult = model("User").authenticate(local.user.email, "SecurePass123!");
+        assert(!local.authResult.success, "Old password should no longer work");
+        
+        // Verify new password works
+        local.authResult = model("User").authenticate(local.user.email, "NewSecurePass123!");
+        assert(local.authResult.success, "New password should work");
+    }
+
+    function test_account_locking_after_failed_attempts() {
+        local.user = model("User").create(variables.validUserData);
+        
+        // Simulate 5 failed login attempts
+        for (local.i = 1; local.i <= 5; local.i++) {
+            model("User").authenticate(local.user.email, "WrongPassword");
+        }
+        
+        // Reload user to get updated data
+        local.user.reload();
+        
+        assert(local.user.getIsLocked(), "Account should be locked after 5 failed attempts");
+        assert(local.user.failedLoginAttempts >= 5, "Should track failed attempts");
+    }
+
+    // Callback tests
+    function test_password_encryption_on_save() {
+        local.user = model("User").new(variables.validUserData);
+        local.originalPassword = local.user.password;
+        
+        local.user.save();
+        
+        // Password should be cleared and hash should be set
+        assert(local.user.password == "", "Plain text password should be cleared");
+        assert(len(local.user.passwordHash) > 0, "Password hash should be set");
+        assert(local.user.passwordHash != local.originalPassword, "Hash should be different from original");
+    }
+
+    function test_email_verification_token_generation() {
+        local.user = model("User").create(variables.validUserData);
+        
+        assert(len(local.user.emailVerificationToken) > 0, "Should generate email verification token");
+        assert(!local.user.getIsEmailVerified(), "Email should not be verified initially");
+        
+        // Test email verification
+        local.result = local.user.verifyEmail(local.user.emailVerificationToken);
+        assert(local.result, "Email verification should succeed with valid token");
+        assert(local.user.getIsEmailVerified(), "Email should be verified after token validation");
+    }
+
+    // Scopes and finder tests
+    function test_active_scope() {
+        // Create active and inactive users
+        local.activeUser = model("User").create(variables.validUserData);
+        
+        variables.validUserData.username = "inactive";
+        variables.validUserData.email = "inactive@test.com";
+        variables.validUserData.isActive = false;
+        local.inactiveUser = model("User").create(variables.validUserData);
+        
+        local.activeUsers = model("User").scopeActive().findAll();
+        local.foundActive = false;
+        local.foundInactive = false;
+        
+        for (local.user in activeUsers) {
+            if (local.user.id == local.activeUser.id) local.foundActive = true;
+            if (local.user.id == local.inactiveUser.id) local.foundInactive = true;
+        }
+        
+        assert(local.foundActive, "Active scope should include active user");
+        assert(!local.foundInactive, "Active scope should not include inactive user");
+    }
+}
+```
+
+## Performance and Optimization
+
+### Query Optimization
+```cfm
+component extends="Model" {
+    
+    /**
+     * Efficient data loading with includes
+     */
+    function getPostsWithAuthors() {
+        return this.findAll(
+            include="author",
+            select="posts.*, authors.firstName, authors.lastName",
+            order="posts.createdAt DESC"
+        );
+    }
+    
+    /**
+     * Use specific selects to reduce data transfer
+     */
+    function getRecentPostTitles(numeric days = 7) {
+        return this.findAll(
+            select="id, title, createdAt",
+            where="createdAt > ?",
+            whereParams=[dateAdd("d", -arguments.days, now())],
+            order="createdAt DESC"
+        );
+    }
+    
+    /**
+     * Pagination for large datasets
+     */
+    function getPostsPaginated(numeric page = 1, numeric perPage = 10) {
+        return this.findAll(
+            page=arguments.page,
+            perPage=arguments.perPage,
+            order="createdAt DESC"
+        );
+    }
+    
+    /**
+     * Use exists() instead of count() for boolean checks
+     */
+    function hasRecentActivity(numeric days = 30) {
+        return this.posts().exists(
+            where="createdAt > ?",
+            whereParams=[dateAdd("d", -arguments.days, now())]
+        );
+    }
+}
+```
+
+### Caching Strategies
+```cfm
+component extends="Model" {
+    
+    function config() {
+        // Enable query caching
+        afterFind("enableQueryCache");
+        afterSave("clearRelatedCache");
+    }
+    
+    /**
+     * Cache expensive calculations
+     */
+    function getStatistics() {
+        local.cacheKey = "user_#this.id#_stats";
+        
+        if (!cacheKeyExists(local.cacheKey)) {
+            local.stats = {
+                postCount = this.posts().count(),
+                commentCount = this.comments().count(),
+                totalViews = this.posts().sum("viewCount"),
+                averageRating = this.posts().average("rating")
+            };
+            
+            cachePut(local.cacheKey, local.stats, createTimeSpan(0, 1, 0, 0)); // 1 hour
+        }
+        
+        return cacheGet(local.cacheKey);
+    }
+    
+    /**
+     * Clear related caches when data changes
+     */
+    private void function clearRelatedCache() {
+        cacheRemove("user_#this.id#_stats");
+        cacheRemove("recent_posts");
+        cacheRemove("top_authors");
+    }
+}
+```
+
+## Best Practices
+
+### 1. Model Organization
+```cfm
+/**
+ * Organize config() method logically
+ */
+function config() {
+    // 1. Table configuration
+    table("custom_table_name");
+    
+    // 2. Associations
+    belongsTo("category");
+    hasMany("comments");
+    hasOne("profile");
+    
+    // 3. Validations (grouped by type)
+    validatesPresenceOf("name,email");
+    validatesUniquenessOf("email");
+    validatesLengthOf(property="name", maximum=100);
+    
+    // 4. Properties
+    property(name="customField", type="string");
+    
+    // 5. Callbacks
+    beforeSave("normalizeData");
+    afterCreate("sendNotification");
+    
+    // 6. Other configuration
+    softDelete(true);
+    timeStampOnCreate(true);
+}
+```
+
+### 2. Business Logic Placement
+```cfm
+component extends="Model" {
+    
+    // Keep complex business logic in models
+    function calculateShippingCost(required string shippingMethod) {
+        switch (arguments.shippingMethod) {
+            case "standard":
+                return this.weight * 0.5 + 5.99;
+            case "express":
+                return this.weight * 1.0 + 12.99;
+            case "overnight":
+                return this.weight * 2.0 + 24.99;
+            default:
+                return 0;
+        }
+    }
+    
+    // Provide clear interfaces for complex operations
+    function processOrder() {
+        transaction {
+            this.status = "processing";
+            this.processedAt = now();
+            
+            // Update inventory
+            for (local.item in this.orderItems()) {
+                local.item.product().decrementStock(local.item.quantity);
+            }
+            
+            // Send confirmation
+            this.sendConfirmationEmail();
+            
+            this.save();
+        }
+    }
+}
+```
+
+### 3. Error Handling
+```cfm
+component extends="Model" {
+    
+    function processPayment(required struct paymentData) {
+        try {
+            transaction {
+                // Process payment logic
+                local.result = chargeCard(arguments.paymentData);
+                
+                if (local.result.success) {
+                    this.paymentStatus = "paid";
+                    this.transactionId = local.result.transactionId;
+                    this.save();
+                    return {success: true, transactionId: local.result.transactionId};
+                } else {
+                    throw(type="PaymentError", message=local.result.error);
+                }
+            }
+        } catch (any e) {
+            // Log error
+            writeLog(text="Payment failed for order #this.id#: #e.message#", file="payments");
+            
+            // Return structured error
+            return {
+                success: false,
+                error: e.message,
+                errorType: e.type
+            };
+        }
+    }
+}
+```
+
+### 4. Security Considerations
+```cfm
+component extends="Model" {
+    
+    function config() {
+        // Mass assignment protection
+        protectedProperties("isAdmin,createdAt,updatedAt");
+        
+        // Or whitelist approach
+        accessibleProperties("name,email,bio");
+    }
+    
+    /**
+     * Sanitize input data
+     */
+    private void function sanitizeInput() {
+        if (len(this.bio)) {
+            // Remove potentially harmful HTML
+            this.bio = reReplace(this.bio, "<script[^>]*>.*?</script>", "", "all");
+            this.bio = reReplace(this.bio, "javascript:", "", "all");
+        }
+    }
+    
+    /**
+     * Validate permissions before sensitive operations
+     */
+    function deleteWithPermissionCheck(required numeric currentUserId) {
+        if (this.userId != arguments.currentUserId && !hasAdminRole(arguments.currentUserId)) {
+            throw(type="PermissionDenied", message="Cannot delete another user's record");
+        }
+        
+        return this.delete();
+    }
+}
+```
+
+## Important Notes
+
+- **Convention over Configuration**: Follow Wheels naming conventions for tables, columns, and foreign keys
+- **Active Record Pattern**: Models represent both data and behavior - use them for business logic
+- **Database First**: Wheels introspects database schema to determine model properties automatically
+- **Configuration in config()**: All model configuration should be done in the `config()` method
+- **Validation Lifecycle**: Validations run automatically before save/create/update operations
+- **Association Benefits**: Proper associations enable powerful query capabilities and data integrity
+- **Performance Considerations**: Use includes, specific selects, and caching for optimal performance
+- **Testing**: Always test models thoroughly including validations, associations, and business logic
+- **Security**: Protect against mass assignment and always validate/sanitize input data
+- **Transactions**: Use database transactions for operations that modify multiple records
+
+Models are the foundation of your data layer in Wheels applications, providing a rich, object-oriented interface to your database while maintaining the simplicity and conventions that make Wheels productive.

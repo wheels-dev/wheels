@@ -13,8 +13,9 @@ WEB-INF
 /manual/
 /bin/
 /migrator/sql/
-/vendor/testbox/
-/vendor/wirebox/
+/templates/base/src/vendor
+/templates/base/src/vendor/testbox/
+/templates/base/src/vendor/wirebox/
 /cli/workspace/
 /cli/simpletestapp/
 
