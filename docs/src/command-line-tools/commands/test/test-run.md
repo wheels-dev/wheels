@@ -15,101 +15,440 @@ box install testbox-cli --global
 ## Synopsis
 
 ```bash
-wheels test run [options]
+wheels test run [spec] [options]
 ```
 
 ## Description
 
-Executes TestBox tests through CFWheels' controller-based test runners.
+The `wheels test run` command executes your application's TestBox test suite with support, filtering, and various output formats. This is the primary command for running your application tests (as opposed to framework tests).
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `type` | Type of tests: app, core,  | `app` |
-| `recurse` | Recurse into subdirectories | `true` |
-| `reporter` | Reporter format (see below) | `json` |
-| `options` | Adhoc options (key:value;key2:value2) | |
-| `--verbose` | Verbose output | `true` |
-| `servername` | Name of server to use | |
-
-### Coverage Options
-
-| Option | Description |
-|--------|-------------|
-| `coverageSonarQubeXMLOutputPath` | Path for SonarQube XML |
-| `coveragePathToCapture` | Path to capture for coverage |
-| `coverageWhitelist` | Coverage whitelist |
-| `coverageBlacklist` | Coverage blacklist |
-
-### Available Reporters
-
-- `json` - JSON format (Default)
-- `text` - Plain text output
-- `junit` - JUnit XML format
-- `antjunit` - ANT-compatible JUnit
-- `tap` - Test Anything Protocol
-- `codexwiki` - CodexWiki format
+| `filter` | Filter tests by pattern or name | |
+| `group` | Run specific test group | |
+| `--coverage` | Generate coverage report (boolean flag) | `false` |
+| `format` | Test  format format:txt, junit, json | `txt` |
+| `--verbose` | Verbose output (boolean flag) | `true` |
+| `--failFast` | Stop on first test failure (boolean flag) | `false` |
 
 ## Examples
 
-### Basic Usage
+### Run all tests
 ```bash
-# Run tests (Default type=app)
 wheels test run
-
-# Run specific type
-wheels test run type=core
 ```
 
-
-### Output Options
+### Filter tests by pattern
 ```bash
-# Different reporters
-wheels test run reporter=json
-wheels test run reporter=junit
+wheels test run filter="User"
+wheels test run filter="test_user_validation"
 ```
 
+### Run specific test group
 ```bash
+wheels test run group="unit"
+wheels test run group="integration"
+```
 
-# Coverage
+### Generate coverage report
+```bash
 wheels test run --coverage
-wheels test run --coverage coveragePathToCapture=/models
-
-# Verbose
-wheels test run --verbose
-
-# Combined
-wheels test run bundles=UserTest --coverage --verbose reporter=json
 ```
 
-## Test URL Structure
-
-- **App tests**: `?controller=wheels.public&action=testbox&view=runner&cli=true&format=json`
-- **Core tests**: `?controller=wheels.public&action=tests_testbox&view=runner&cli=true&format=json`
-
-## Troubleshooting
-
-### TestBox CLI Not Found
+### Use different  format
 ```bash
-box install testbox-cli --global
+wheels test run  format=json
+wheels test run  format=junit
+wheels test run  format=tap
 ```
 
-### Server Not Running
+### Stop on first failure
 ```bash
-box server start
-wheels test run
+wheels test run --fail-fast
 ```
 
-### Wrong Test Path
+### Verbose output with coverage
 ```bash
-# Verify test type
-wheels test run type=app    # For /tests/
-wheels test run type=core   # For /wheels/tests/
-wheels test run type=plugin # For /plugins/tests/
+wheels test run --verbose --coverage  format=console
 ```
+
+## Test Structure
+
+Standard test directory layout:
+```
+/tests/
+├── Application.cfc      # Test configuration
+├── models/             # Model tests
+│   ├── UserTest.cfc
+│   └── ProductTest.cfc
+├── controllers/        # Controller tests
+│   ├── UsersTest.cfc
+│   └── ProductsTest.cfc
+├── views/             # View tests
+├── integration/       # Integration tests
+└── helpers/          # Test helpers
+```
+
+## Writing Tests
+
+### Model Test Example
+```cfc
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("User Model", function() {
+
+            beforeEach(function() {
+                // Reset test data
+                application.wirebox.getInstance("User").deleteAll();
+            });
+
+            it("validates required fields", function() {
+                var user = model("User").new();
+                expect(user.valid()).toBeFalse();
+                expect(user.errors).toHaveKey("email");
+                expect(user.errors).toHaveKey("username");
+            });
+
+            it("saves with valid data", function() {
+                var user = model("User").new(
+                    email="test@example.com",
+                    username="testuser",
+                    password="secret123"
+                );
+                expect(user.save()).toBeTrue();
+                expect(user.id).toBeGT(0);
+            });
+
+            it("prevents duplicate emails", function() {
+                var user1 = model("User").create(
+                    email="test@example.com",
+                    username="user1"
+                );
+
+                var user2 = model("User").new(
+                    email="test@example.com",
+                    username="user2"
+                );
+
+                expect(user2.valid()).toBeFalse();
+                expect(user2.errors.email).toContain("already exists");
+            });
+
+        });
+    }
+
+}
+```
+
+### Controller Test Example
+```cfc
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Products Controller", function() {
+
+            it("lists all products", function() {
+                // Create test data
+                var product = model("Product").create(name="Test Product");
+
+                // Make request
+                var event = execute(
+                    event="products.index",
+                    renderResults=true
+                );
+
+                // Assert response
+                expect(event.getRenderedContent()).toInclude("Test Product");
+                expect(event.getValue("products")).toBeArray();
+            });
+
+            it("requires auth for create", function() {
+                var event = execute(
+                    event="products.create",
+                    renderResults=false
+                );
+
+                expect(event.getValue("relocate_URI")).toBe("/login");
+            });
+
+        });
+    }
+
+}
+```
+
+## Test Configuration
+
+### /tests/Application.cfc
+```cfc
+component {
+    this.name = "WheelsTestingSuite" & Hash(GetCurrentTemplatePath());
+
+    // Use test datasource
+    this.datasources["wheelstestdb"] = {
+        url = "jdbc:h2:mem:wheelstestdb;MODE=MySQL"
+    };
+    this.datasource = "wheelstestdb";
+
+    // Test settings
+    this.testbox = {
+        testBundles = "tests",
+        recurse = true,
+         format = "simple",
+        labels = "",
+        options = {}
+    };
+}
+```
+
+## Reporters
+
+### Simple (Default)
+```bash
+wheels test run  format=simple
+```
+- Colored console output
+- Shows progress dots
+- Summary at end
+
+### txt
+```bash
+wheels test run  format=txt
+```
+- Plain txt output
+- Good for CI systems
+- No colors
+
+### JSON
+```bash
+wheels test run  format=json
+```
+```
+√ tests.specs.functions.Example (3 ms)
+[Passed: 1] [Failed: 0] [Errors: 0] [Skipped: 0] [Suites/Specs: 1/1]
+
+    √ Tests that DummyTest
+        √ is Returning True (1 ms)
+╔═════════════════════════════════════════════════════════════════════╗
+║ Passed  ║ Failed  ║ Errored ║ Skipped ║ Bundles ║ Suites  ║ Specs   ║
+╠═════════════════════════════════════════════════════════════════════╣
+║ 1       ║ 0       ║ 0       ║ 0       ║ 1       ║ 1       ║ 1       ║
+╚═════════════════════════════════════════════════════════════════════╝
+```
+
+### JUnit
+```bash
+wheels test run  format=junit outputFile=results.xml
+```
+- JUnit XML format
+- For CI integration
+- Jenkins compatible
+
+### TAP
+```bash
+wheels test run  format=tap
+```
+- Test Anything Protocol
+- Cross-language format
+
+## Filtering Tests
+
+### By Bundle
+```bash
+# Run only model tests
+wheels test run bundles=models
+
+# Run multiple bundles
+wheels test run bundles=models,controllers
+```
+
+### By Label
+```cfc
+it("can authenticate", function() {
+    // test code
+}).labels("auth,critical");
+```
+
+```bash
+# Run only critical tests
+wheels test run labels=critical
+
+# Run auth OR api tests
+wheels test run labels=auth,api
+```
+
+### By Name Filter
+```bash
+# Run tests matching pattern
+wheels test run filter="user"
+wheels test run filter="validate*"
+```
+
+### Exclude Patterns
+```bash
+# Skip slow tests
+wheels test run excludes="*slow*,*integration*"
+```
+
+## Parallel Execution
+
+Run tests in parallel threads:
+```bash
+wheels test run threads=4
+```
+
+Benefits:
+- Faster execution
+- Better CPU utilization
+- Finds concurrency issues
+
+## Code Coverage
+
+Generate coverage reports:
+```bash
+wheels test run --coverage coverageOutputDir=coverage/
+```
+
+View report:
+```bash
+open coverage/index.html
+```
+
+## Test Helpers
+
+Create reusable test utilities:
+
+```cfc
+// /tests/helpers/TestHelper.cfc
+component {
+
+    function createTestUser(struct overrides={}) {
+        var defaults = {
+            email: "test#CreateUUID()#@example.com",
+            username: "user#CreateUUID()#",
+            password: "testpass123"
+        };
+
+        return model("User").create(
+            argumentCollection = defaults.append(arguments.overrides)
+        );
+    }
+
+    function loginAs(required user) {
+        session.userId = arguments.user.id;
+        session.isAuthenticated = true;
+    }
+
+}
+```
+
+## Database Strategies
+
+### Transaction Rollback
+```cfc
+function beforeAll() {
+    transaction action="begin";
+}
+
+function afterAll() {
+    transaction action="rollback";
+}
+```
+
+### Database Cleaner
+```cfc
+function beforeEach() {
+    queryExecute("DELETE FROM users");
+    queryExecute("DELETE FROM products");
+}
+```
+
+### Fixtures
+```cfc
+function loadFixtures() {
+    var users = deserializeJSON(
+        fileRead("/tests/fixtures/users.json")
+    );
+
+    for (var userData in users) {
+        model("User").create(userData);
+    }
+}
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+```yaml
+- name: Run tests
+  run: |
+    wheels test run  format=junit outputFile=test-results.xml
+
+- name: Upload results
+  uses: actions/upload-artifact@v4
+  with:
+    name: test-results
+    path: test-results.xml
+```
+
+### Pre-commit Hook
+```bash
+#!/bin/bash
+# .git/hooks/pre-commit
+
+echo "Running tests..."
+wheels test run labels=unit
+
+if [ $? -ne 0 ]; then
+    echo "Tests failed. Commit aborted."
+    exit 1
+fi
+```
+
+## Performance Tips
+
+1. **Use labels** for fast feedback
+   ```bash
+   wheels test run labels=unit  # Fast
+   wheels test run labels=integration  # Slow
+   ```
+
+2. **Parallel execution**
+   ```bash
+   wheels test run threads=4
+   ```
+
+
+4. **Skip slow tests during development**
+   ```bash
+   wheels test run excludes="*integration*"
+   ```
+
+## Common Issues
+
+### Out of Memory
+```bash
+# Increase memory
+box server set jvm.heapSize=1024
+box server restart
+```
+
+### Test Pollution
+- Use `beforeEach`/`afterEach`
+- Reset global state
+- Use transactions
+
+### Flaky Tests
+- Avoid time-dependent tests
+- Mock external services
+- Use fixed test data
 
 ## See Also
 
-- [TestBox Documentation](https://testbox.ortusbooks.com/)
-- [CommandBox TestBox CLI](https://www.forgebox.io/view/testbox-cli)
+- [wheels test](test.md) - Run framework tests
+- [wheels test coverage](test-coverage.md) - Generate coverage
+- [wheels test debug](test-debug.md) - Debug tests
+- [wheels generate test](../generate/test.md) - Generate test files

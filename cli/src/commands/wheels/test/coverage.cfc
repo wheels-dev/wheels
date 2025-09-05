@@ -43,12 +43,7 @@ component aliases='wheels test:coverage' extends="../base" {
         string servername = "",
         string outputFile = "test-results-coverage"
     ) {
-        // Header without icons for Windows compatibility
-        print.line("========================================");
-        print.boldLine("Running Tests with Code Coverage");
-        print.line("========================================");
-        print.line();
-        
+		arguments = reconstructArgs(arguments);
         // Use relative path for outputDir to avoid issues with TestBox
         var outputPath = arguments.outputDir;
         
@@ -125,13 +120,8 @@ component aliases='wheels test:coverage' extends="../base" {
         // Add JSON output format to get structured results
         params.outputFormats = "json,junit";
         
-        print.line("========================================");
-        print.boldGreenLine("Executing Tests with Coverage...");
-        print.line("========================================");
-        print.line();
         
         var testsPassed = true;
-        var coverageEnabled = false;
         
         try {
             // Execute TestBox command
@@ -141,55 +131,10 @@ component aliases='wheels test:coverage' extends="../base" {
             print.greenLine("[SUCCESS] Tests completed successfully!");
             
         } catch (any e) {
-            // Check if it's just test failures (not an actual error)
-            if (findNoCase("failing exit code", e.message) || findNoCase("expectation failed", e.message)) {
-                print.line();
-                print.yellowLine("[WARNING] Tests completed with failures");
-                print.yellowLine("Coverage data was still collected for executed tests");
-                testsPassed = false;
-            } else {
-                print.line();
-                print.redLine("[ERROR] Test execution failed: #e.message#");
-                testsPassed = false;
-            }
+			print.redLine("[ERROR] Test execution failed: #e.message#");
+			testsPassed = false;
         }
         
-        
-        print.line();
-        print.line("========================================");
-        print.boldLine("Test Execution Complete");
-        print.line("========================================");
-        
-        // Check for generated files
-        print.line();
-        print.boldLine("Output Files:");
-        
-        var filesGenerated = false;
-        var jsonFile = getCWD() & params.outputFile & ".json";
-        var junitFile = getCWD() & params.outputFile & "-junit.xml";
-
-        // Check for JSON output
-        if (fileExists(jsonFile)) {
-            print.greenLine("  [OK] JSON Report: #jsonFile#");
-            filesGenerated = true;
-        } else {
-            print.yellowLine("  [--] JSON Report not generated at: #jsonFile#");
-        }
-        
-        if (fileExists(junitFile)) {
-            print.greenLine("  [OK] JUnit Report: #junitFile#");
-            filesGenerated = true;
-        } else {
-            print.yellowLine("  [--] JUnit Report not generated at: #junitFile#");
-        }
-        
-        print.line();
-        print.line("========================================");
-        
-        // Set exit code based on test results
-        if (!testsPassed) {
-            setExitCode(1);
-        }
     }
     
 }

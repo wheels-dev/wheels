@@ -60,8 +60,28 @@
     
     // Add coverage options if enabled
     if (url.coverage) {
+        // Check if FusionReactor is available using Java class detection
+        hasFusionReactor = false;
+        try {
+            frAgentClass = createObject("java", "com.intergral.fusionreactor.agent.Agent");
+            // Do a quick test to ensure the line performance instrumentation is loaded
+            instrumentation = frAgentClass.getAgentInstrumentation().get("cflpi");
+            if (!isNull(instrumentation)) {
+                hasFusionReactor = true;
+            }
+        } catch (any e) {
+            // FusionReactor not available or not properly configured
+            hasFusionReactor = false;
+        }
+
+        if (!hasFusionReactor) {
+            cfheader(statustext="Expectation Failed", statuscode=417);
+            writeOutput("Warning: Code coverage requested but FusionReactor not detected. Please install FusionReactor first.#Chr(10)#");
+            abort;
+        }
+        
         testBoxOptions.coverage = {
-            enabled = true,
+            enabled = hasFusionReactor,
             pathToCapture = url.coveragePathToCapture,
             whitelist = url.coverageWhitelist,
             blacklist = url.coverageBlacklist,
@@ -203,16 +223,7 @@
                     writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
                     writeOutput("Duration: #bundle.totalDuration#ms#Chr(13)##Chr(10)#")
                     writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
-                    
-                    // Add bail and coverage indicators
-                    if (url.bail) {
-                        writeOutput("Fail-Fast Mode: ENABLED#Chr(13)##Chr(10)#")
-                    }
-                    if (url.coverage) {
-                        writeOutput("Code Coverage: REQUESTED#Chr(13)##Chr(10)#")
-                    }
-                    
-                    writeOutput("╔═══════════════════════════════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                    writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                 }
             }
         }else{
