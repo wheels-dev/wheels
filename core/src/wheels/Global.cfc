@@ -1626,7 +1626,7 @@ component output="false" {
 			"stylesheets",
 			"/tests",
 			"/app/views",
-			"/wheels",
+			"/vendor/wheels",
 			"Application.cfc",
 			"../box.json",
 			"index.cfm"
