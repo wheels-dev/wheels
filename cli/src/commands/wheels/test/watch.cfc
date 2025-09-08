@@ -27,7 +27,7 @@ component aliases='wheels test:watch' extends="../base" {
      */
     function run(
         string type = "app",
-        string directory = "tests/specs",
+        string directory = "",
         string format = "txt",
         boolean verbose = false,
         numeric delay = 1000,
@@ -40,6 +40,7 @@ component aliases='wheels test:watch' extends="../base" {
         string servername = ""
     ) {
         arguments = reconstructArgs(arguments);
+        arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
         
         // Validate we're in a Wheels project
         if (!isWheelsApp()) {
