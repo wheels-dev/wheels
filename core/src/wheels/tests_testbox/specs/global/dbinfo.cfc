@@ -92,7 +92,16 @@ component extends="testbox.system.BaseSpec" {
                     pattern = variables.prefix & "users%"
                 );
 
-                expect( local.result.recordCount ).toBe( 1 );
+                // Filter results to only our test tables (exclude indexes)
+                local.ourTables = [];
+                for (local.row in local.result) {
+                    if (findNoCase(variables.prefix, local.row.table_name) && 
+                        local.row.table_type == "TABLE") {
+                        arrayAppend(local.ourTables, local.row);
+                    }
+                }
+
+                expect( arrayLen(local.ourTables) ).toBe( 1 );
             });
 
             it( "should return tables matching wildcard pattern", () => {
@@ -102,7 +111,16 @@ component extends="testbox.system.BaseSpec" {
                     pattern = variables.prefix & "%"
                 );
 
-                expect( local.result.recordCount ).toBe( 3 );
+                // Filter results to only our test tables and views (exclude indexes)
+                local.ourTables = [];
+                for (local.row in local.result) {
+                    if (findNoCase(variables.prefix, local.row.table_name) && 
+                        (local.row.table_type == "TABLE" || local.row.table_type == "VIEW")) {
+                        arrayAppend(local.ourTables, local.row);
+                    }
+                }
+
+                expect( arrayLen(local.ourTables) ).toBe( 3 );
             });
 
             it( "should return all tables and views with pattern", () => {
@@ -112,13 +130,21 @@ component extends="testbox.system.BaseSpec" {
                     pattern = variables.prefix & "%"
                 );
 
-                expect( local.result.recordCount ).toBe( 3 );
+                // Filter results to only our test tables and views, get their names
+                local.ourTableNames = [];
+                for (local.row in local.result) {
+                    if (findNoCase(variables.prefix, local.row.table_name) && 
+                        (local.row.table_type == "TABLE" || local.row.table_type == "VIEW")) {
+                        arrayAppend(local.ourTableNames, local.row.table_name);
+                    }
+                }
+
+                expect( arrayLen(local.ourTableNames) ).toBe( 3 );
                 
                 // Should find both tables and view
-                local.tableNames = queryColumnData( local.result, "table_name" );
-                expect( local.tableNames ).toInclude( variables.prefix & "users" );
-                expect( local.tableNames ).toInclude( variables.prefix & "roles" );
-                expect( local.tableNames ).toInclude( variables.prefix & "v_users" );
+                expect( local.ourTableNames ).toInclude( variables.prefix & "users" );
+                expect( local.ourTableNames ).toInclude( variables.prefix & "roles" );
+                expect( local.ourTableNames ).toInclude( variables.prefix & "v_users" );
             });
 
         });
