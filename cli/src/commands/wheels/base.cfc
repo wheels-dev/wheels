@@ -1487,7 +1487,7 @@ component excludeFromHelp=true {
 				baseDirectory = "tests/specs";
 				break;
 			case "core":
-				baseDirectory = "test_box/specs";
+				baseDirectory = "wheels/tests_testbox/specs";
 				break;
 			default:
 				error("Invalid type specified. Valid types are: app, core.");
