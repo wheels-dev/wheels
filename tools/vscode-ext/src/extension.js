@@ -31,7 +31,8 @@ class WheelsHoverProvider {
                             returnType: func.returntype || 'any',
                             parameters: this.parseParameters(func.parameters),
                             category: this.getCategory(func),
-                            availableIn: func.availableIn || []
+                            availableIn: func.availableIn || [],
+                            tags: func.tags || {}
                         };
                         count++;
                     }
@@ -126,7 +127,10 @@ class WheelsHoverProvider {
         markdown.supportHtml = true;
         markdown.isTrusted = true;
 
-        // 1. Function Signature
+        // 1. Wheels Version and Core Function Badge
+        markdown.appendMarkdown(`**Wheels 3.0.0** • Core Function\n\n`);
+
+        // 2. Function Signature
         const params = func.parameters.required.concat(func.parameters.optional);
         const signatureParams = params.map(p => {
             const optional = p.required ? '' : '?';
@@ -135,22 +139,26 @@ class WheelsHoverProvider {
         const signature = `function ${func.name}(${signatureParams}): ${func.returnType}`;
         markdown.appendCodeblock(signature, 'typescript');
 
-        // 2. Clean Description
+        // 3. Framework Context (Section & Category)
+        if (func.tags?.section && func.tags?.category) {
+            markdown.appendMarkdown(`**Framework Area:** ${func.tags.section}\n\n`);
+        }
+
+        // 4. Scope Information
+        if (func.availableIn.length > 0) {
+            const scopeBadges = func.availableIn.map(scope => `\`${scope}\``).join(' ');
+            markdown.appendMarkdown(`**Available in:** ${scopeBadges}\n\n`);
+        }
+
+        // 5. Clean Description
         if (func.description) {
-            markdown.appendMarkdown(`\n${func.description}\n`);
+            markdown.appendMarkdown(`${func.description}\n\n`);
         }
 
-        // 3. Example Usage
-        const example = this.buildExample(func);
-        if (example) {
-            markdown.appendMarkdown(`\n\n**Example:**\n`);
-            markdown.appendCodeblock(example, 'cfml');
-        }
-
-        // 4. Parameters Table
+        // 6. Parameters Table
         const allParams = func.parameters.required.concat(func.parameters.optional);
         if (allParams.length > 0) {
-            markdown.appendMarkdown(`\n**Parameters:**\n`);
+            markdown.appendMarkdown(`**Parameters:**\n`);
             markdown.appendMarkdown(`| **Parameter** | **Type** | **Required** | **Default** | **Description** |\n`);
             markdown.appendMarkdown(`|--------------|----------|--------------|-------------|------------------|\n`);
 
@@ -163,14 +171,6 @@ class WheelsHoverProvider {
                     `| \`${param.name}\` | \`${type}\` | ${required} | ${defaultVal} | ${description} |\n`
                 );
             });
-        }
-
-        // 5. Footer - Context Info
-        if (func.availableIn.length > 0 || func.category) {
-            markdown.appendMarkdown(
-                `\n\n---\n*Available in:* \`${func.availableIn.join(', ')}\`` +
-                (func.category ? ` • **${func.category}**` : '')
-            );
         }
 
         return new vscode.Hover(markdown);
