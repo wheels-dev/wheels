@@ -424,26 +424,52 @@ tests/
 
 ### Model Testing
 ```cfm
-component extends="tests.Test" {
+component extends="testbox.system.BaseSpec" {
 
-    function testUserValidation() {
-        user = model("User").new();
-        assert("!user.valid()");
-        assert("ArrayLen(user.allErrors()) GT 0");
+    function beforeAll() {
+        // Setup for all tests in this spec
+        variables.testData = {};
     }
 
-    function testUserCreation() {
-        userData = {
-            firstName = "John",
-            lastName = "Doe", 
-            email = "john@example.com"
-        };
-        
-        user = model("User").create(userData);
-        
-        assert("IsObject(user)");
-        assert("user.valid()");
-        assert("user.firstName EQ 'John'");
+    function afterAll() {
+        // Cleanup after all tests
+    }
+
+    function beforeEach() {
+        // Setup before each test
+        variables.user = "";
+    }
+
+    function afterEach() {
+        // Cleanup after each test
+        if (isObject(variables.user)) {
+            variables.user.delete();
+        }
+    }
+
+    function run() {
+        describe("User Model", function() {
+            
+            it("should be invalid when no data provided", function() {
+                var user = model("User").new();
+                expect(user.valid()).toBeFalse("User should be invalid without data");
+                expect(arrayLen(user.allErrors())).toBeGT(0, "Should have validation errors");
+            });
+
+            it("should create user with valid data", function() {
+                var userData = {
+                    firstName = "John",
+                    lastName = "Doe", 
+                    email = "john@example.com"
+                };
+                
+                var user = model("User").create(userData);
+                
+                expect(isObject(user)).toBeTrue("Should return user object");
+                expect(user.valid()).toBeTrue("User should be valid");
+                expect(user.firstName).toBe("John", "Should set firstName correctly");
+            });
+        });
     }
 }
 ```
