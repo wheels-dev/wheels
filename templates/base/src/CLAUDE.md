@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with a 
 ## Quick Start
 
 ### New to Wheels?
-1. **Install Wheels CLI**: `box install wheels-cli`
+1. **Install Wheels CLI**: `brew install wheels` on Mac and `choco install wheels` on Windows
 2. **Generate an app**: `wheels g app myapp`
-3. **Start developing**: `server start`
+3. **Start developing**: `wheels server start`
 
 ### Common Development Tasks
 - **Create a model**: `wheels g model User name:string,email:string,active:boolean`
@@ -117,9 +117,9 @@ wheels db restore backup.sql
 ### Server Management
 ```bash
 # Start/stop development server
-server start
-server stop
-server restart
+wheels server start
+wheels server stop
+wheels server restart
 
 # View server status
 wheels server status
@@ -132,24 +132,6 @@ wheels server log --follow
 ```bash
 # Run all tests
 wheels test run
-
-# Run specific test bundles
-box testbox run --testBundles=tests.models.UserTest
-
-# Run tests with coverage
-box testbox run --coverage --coverageReporter=html
-
-# Watch mode for TDD
-box testbox watch
-```
-
-### Code Quality
-```bash
-# Format code
-box run-script format
-
-# Check formatting
-box run-script format:check
 ```
 
 ## Configuration Management
