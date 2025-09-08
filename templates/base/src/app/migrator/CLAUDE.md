@@ -43,7 +43,7 @@ component extends="wheels.migrator.Migration" hint="Description of what this mig
 
             if (StructKeyExists(local, "exception")) {
                 transaction action="rollback";
-                Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+                throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
             } else {
                 transaction action="commit";
             }
@@ -61,7 +61,7 @@ component extends="wheels.migrator.Migration" hint="Description of what this mig
 
             if (StructKeyExists(local, "exception")) {
                 transaction action="rollback";
-                Throw(errorCode = "1", detail = local.exception.detail, message = local.exception.message, type = "any");
+                throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
             } else {
                 transaction action="commit";
             }
@@ -111,25 +111,25 @@ function up() {
         t = createTable("products");
         
         // Column types
-        t.string("name", limit=100, null=false);
-        t.text("description");
-        t.text("content", size="mediumtext"); // MySQL: 16MB
-        t.text("longDescription", size="longtext"); // MySQL: 4GB
-        t.integer("quantity", default=0);
-        t.bigInteger("views", default=0);
-        t.float("weight");
-        t.decimal("price", precision=10, scale=2);
-        t.boolean("active", default=true);
-        t.date("releaseDate");
-        t.datetime("publishedAt");
-        t.timestamp("lastModified");
-        t.time("openingTime");
-        t.binary("data");
-        t.uuid("uniqueId");
+        t.string(columnNames="name", limit=100, null=false);
+        t.text(columnNames="description");
+        t.text(columnNames="content", size="mediumtext"); // MySQL: 16MB
+        t.text(columnNames="longDescription", size="longtext"); // MySQL: 4GB
+        t.integer(columnNames="quantity", default=0);
+        t.biginteger(columnNames="views", default=0);
+        t.float(columnNames="weight");
+        t.decimal(columnNames="price", precision=10, scale=2);
+        t.boolean(columnNames="active", default=true);
+        t.date(columnNames="releaseDate");
+        t.datetime(columnNames="publishedAt");
+        t.timestamp(columnNames="lastModified");
+        t.time(columnNames="openingTime");
+        t.binary(columnNames="data");
+        t.uuid(columnNames="uniqueId");
         
         // Special columns
         t.timestamps(); // Creates createdAt, updatedAt, deletedAt
-        t.references("user"); // Creates userId foreign key
+        t.references(columnNames="user"); // Creates userId foreign key
         
         t.create();
     }
@@ -173,29 +173,29 @@ function up() {
         // Single column
         addColumn(
             table="users",
-            column="phoneNumber", 
-            type="string",
+            columnName="phoneNumber", 
+            columnType="string",
             limit=20,
             null=true
         );
         
         // Multiple columns using changeTable
         t = changeTable("users");
-        t.string("address");
-        t.string("city", limit=100);
-        t.string("postalCode", limit=10);
+        t.string(columnNames="address");
+        t.string(columnNames="city", limit=100);
+        t.string(columnNames="postalCode", limit=10);
         t.update();
     }
 }
 
 function down() {
     transaction {
-        removeColumn(table="users", column="phoneNumber");
+        removeColumn(table="users", columnName="phoneNumber");
         
         t = changeTable("users");
-        t.removeColumn("address");
-        t.removeColumn("city");
-        t.removeColumn("postalCode");
+        t.removeColumn(columnNames="address");
+        t.removeColumn(columnNames="city");
+        t.removeColumn(columnNames="postalCode");
         t.update();
     }
 }
@@ -207,8 +207,8 @@ function up() {
     transaction {
         changeColumn(
             table="products",
-            column="price",
-            type="decimal",
+            columnName="price",
+            columnType="decimal",
             precision=12,
             scale=2,
             null=false,
@@ -224,8 +224,8 @@ function up() {
     transaction {
         renameColumn(
             table="users",
-            column="email_address",
-            newName="email"
+            columnName="email_address",
+            newColumnName="email"
         );
     }
 }
@@ -234,8 +234,8 @@ function down() {
     transaction {
         renameColumn(
             table="users", 
-            column="email",
-            newName="email_address"
+            columnName="email",
+            newColumnName="email_address"
         );
     }
 }
@@ -248,30 +248,30 @@ function down() {
 function up() {
     transaction {
         // Simple index
-        addIndex(table="users", column="email");
+        addIndex(table="users", columnNames="email");
         
         // Unique index
-        addIndex(table="users", column="username", unique=true);
+        addIndex(table="users", columnNames="username", unique=true);
         
         // Composite index
         addIndex(
             table="products",
-            columns="category,status",
-            name="idx_products_category_status"
+            columnNames="category,status",
+            indexName="idx_products_category_status"
         );
         
         // Index during table creation
         t = createTable("orders");
-        t.string("orderNumber");
-        t.index("orderNumber", unique=true);
+        t.string(columnNames="orderNumber");
+        t.index(columnNames="orderNumber", unique=true);
         t.create();
     }
 }
 
 function down() {
     transaction {
-        removeIndex(table="users", name="idx_users_email");
-        removeIndex(table="products", column="sku");
+        removeIndex(table="users", indexName="idx_users_email");
+        removeIndex(table="products", indexName="products_sku");
     }
 }
 ```
@@ -368,13 +368,13 @@ function up() {
     transaction {
         // Check if column exists
         if (!hasColumn("users", "avatar")) {
-            addColumn(table="users", column="avatar", type="string");
+            addColumn(table="users", columnName="avatar", columnType="string");
         }
         
         // Check if table exists  
         if (!hasTable("analytics")) {
             t = createTable("analytics");
-            t.integer("views");
+            t.integer(columnNames="views");
             t.timestamps();
             t.create();
         }
@@ -392,7 +392,7 @@ function up() {
 function up() {
     transaction {
         // Always run
-        addColumn(table="users", column="lastLoginAt", type="datetime");
+        addColumn(table="users", columnName="lastLoginAt", columnType="datetime");
         
         // Development environment only
         if (getEnvironment() == "development") {
@@ -533,13 +533,13 @@ wheels dbmigrate create blank fix_users_email_column
 function up() {
     transaction {
         // Add nullable first
-        addColumn(table="users", column="role", type="string", null=true);
+        addColumn(table="users", columnName="role", columnType="string", null=true);
         
         // Set default values
         updateRecord(table="users", where="1=1", values={role: "member"});
         
         // Make non-nullable
-        changeColumn(table="users", column="role", null=false);
+        changeColumn(table="users", columnName="role", null=false);
     }
 }
 ```
@@ -549,7 +549,7 @@ function up() {
 function up() {
     transaction {
         // Drop foreign keys first
-        removeForeignKey(table="posts", name="fk_posts_users");
+        removeForeignKey(table="posts", keyName="fk_posts_users");
         
         // Rename table
         renameTable(oldName="posts", newName="articles");
@@ -557,7 +557,7 @@ function up() {
         // Recreate foreign keys
         addForeignKey(
             table="articles",
-            column="userId",
+            columnName="userId",
             referenceTable="users", 
             referenceColumn="id"
         );
@@ -576,7 +576,7 @@ function up() {
         if (getDatabaseType() == "mysql") {
             sql("ALTER TABLE large_table ADD INDEX idx_column (column) ALGORITHM=INPLACE");
         } else {
-            addIndex(table="large_table", column="column");
+            addIndex(table="large_table", columnNames="column");
         }
     }
 }
@@ -723,31 +723,31 @@ addColumn("users", "email", "string", {limit: 255, null: false});
 removeColumn("users", "old_field");
 
 // Named arguments (correct)
-addColumn(table="users", column="email", type="string", limit=255, null=false);
-removeColumn(table="users", column="old_field");
+addColumn(table="users", columnName="email", columnType="string", limit=255, null=false);
+removeColumn(table="users", columnName="old_field");
 
 // Mixed arguments (WRONG - will cause errors)
-addColumn("users", column="email", type="string"); // Don't do this!
+addColumn("users", columnName="email", columnType="string"); // Don't do this!
 ```
 
 ### Index Methods
-- `addIndex(table, column, options)` - Add index
-- `removeIndex(table, column)` - Remove index
+- `addIndex(table, columnNames, options)` - Add index
+- `removeIndex(table, indexName)` - Remove index
 
 **Examples:**
 ```cfc
 // Positional arguments (correct)
 addIndex("users", "email", {unique: true});
-removeIndex("users", "email");
+removeIndex("users", "users_email");
 
 // Named arguments (correct)
-addIndex(table="users", column="email", unique=true);
-removeIndex(table="users", column="email");
+addIndex(table="users", columnNames="email", unique=true);
+removeIndex(table="users", indexName="users_email");
 ```
 
 ### Foreign Key Methods
-- `addForeignKey(table, column, referenceTable, referenceColumn, options)` - Add FK
-- `removeForeignKey(table, name)` - Remove FK
+- `addForeignKey(table, columnName, referenceTable, referenceColumn, options)` - Add FK
+- `removeForeignKey(table, keyName)` - Remove FK
 
 **Examples:**
 ```cfc
@@ -758,12 +758,12 @@ removeForeignKey("orders", "fk_orders_users");
 // Named arguments (correct)
 addForeignKey(
     table="orders",
-    column="userId", 
+    columnName="userId", 
     referenceTable="users",
     referenceColumn="id",
     onDelete="CASCADE"
 );
-removeForeignKey(table="orders", name="fk_orders_users");
+removeForeignKey(table="orders", keyName="fk_orders_users");
 ```
 
 ### Data Methods
