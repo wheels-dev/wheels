@@ -32,11 +32,12 @@ component aliases='wheels test:unit' extends="../base" {
         string labels = "",
         string excludes = "",
         string filter = "",
-        string directory = "tests/unit",
+        string directory = "unit",
         string servername = ""
     ) {
         arguments = reconstructArgs(arguments);
-        
+        arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
+
         // Validate we're in a Wheels project
         if (!isWheelsApp()) {
             error("This command must be run from the root of a Wheels application.");

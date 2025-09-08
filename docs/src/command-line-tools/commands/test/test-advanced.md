@@ -7,7 +7,7 @@ The Wheels CLI provides advanced testing capabilities through integration with T
 Before using these commands, you must install TestBox CLI:
 
 ```bash
-box install commandbox-testbox-cli
+box install testbox-cli
 ```
 
 ## Available Commands
@@ -205,7 +205,7 @@ When you run `test:unit` or `test:integration` for the first time and the direct
 If you get an error about TestBox CLI not being installed:
 
 ```bash
-box install commandbox-testbox-cli
+box install testbox-cli
 box reload
 ```
 

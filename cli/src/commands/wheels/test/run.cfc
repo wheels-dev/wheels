@@ -36,6 +36,7 @@ component extends="../base" {
         boolean failFast = false
     ) {
         arguments = reconstructArgs(arguments);
+        arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
         
         // Validate we're in a Wheels project
         if (!isWheelsApp()) {

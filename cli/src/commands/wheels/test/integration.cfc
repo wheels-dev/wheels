@@ -32,10 +32,11 @@ component aliases='wheels test:integration' extends="../base" {
         string labels = "",
         string excludes = "",
         string filter = "",
-        string directory = "tests/integration",
+        string directory = "integration",
         string servername = ""
     ) {
         arguments = reconstructArgs(arguments);
+        arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
         
         // Validate we're in a Wheels project
         if (!isWheelsApp()) {
