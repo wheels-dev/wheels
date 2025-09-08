@@ -1,18 +1,16 @@
 component extends="testbox.system.BaseSpec" {
+	function beforeAll(){
+			// setup test data
+	}
+	function afterAll(){
+			// clean up test data
+	}
 
 	function run() {
 
-		describe("Tests that DummyTest", () => {
+		describe("Tests that DummyTest", function() {
 
-			beforeEach(() => {
-				
-			})
-
-			afterEach(() => {
-				
-			})
-
-			it("is Returning True", () => {
+			it("is Returning True", function() {
 				assert("true")
 			})
 			

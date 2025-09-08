@@ -36,11 +36,17 @@ Or visit: `http://localhost/tests/runner.cfm`
 
 ```cfc
 component extends="tests.BaseSpec" {
+	function beforeAll(){
+			// setup test data
+	}
+	function afterAll(){
+			// clean up test data
+	}
     
     function run() {
-        describe("My Feature", () => {
+        describe("My Feature", function() {
             
-            it("should work as expected", () => {
+            it("should work as expected", function() {
                 expect(true).toBeTrue();
             });
             
@@ -65,12 +71,12 @@ component extends="tests.BaseSpec" {
 ### Testing Models
 
 ```cfc
-describe("User Model", () => {
-    beforeEach(() => {
+describe("User Model", function() {
+    beforeEach() {
         variables.user = model("User").new();
     });
     
-    it("should validate email", () => {
+    it("should validate email", function() {
         user.email = "invalid";
         expect(user.valid()).toBeFalse();
         assertHasErrors(user, "email");
@@ -81,8 +87,8 @@ describe("User Model", () => {
 ### Testing Controllers
 
 ```cfc
-describe("UsersController", () => {
-    it("should list users", () => {
+describe("UsersController", function() {
+    it("should list users", function() {
         var result = processRequest(
             route = "users",
             method = "GET"
