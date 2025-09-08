@@ -36,7 +36,7 @@ component aliases='wheels test:all' extends="../base" {
         string coverageOutputDir = "tests/results/coverage",
         boolean verbose = true,
         boolean failFast = false,
-        string directory = "tests/specs",
+        string directory = "",
         boolean recurse = true,
         string bundles = "",
         string labels = "",
@@ -45,6 +45,7 @@ component aliases='wheels test:all' extends="../base" {
         string servername = ""
     ) {
         arguments = reconstructArgs(arguments);
+        arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
         
         // Validate we're in a Wheels project
         if (!isWheelsApp()) {

@@ -1469,4 +1469,37 @@ component excludeFromHelp=true {
         
         return local.url;
     }
+
+	/**
+	* Resolve the test directory based on type and optional subdirectory
+	*
+	* @type Valid options: "app", "core"
+	* @directory Optional subdirectory (with or without leading slash)
+	*/
+	private string function resolveTestDirectory(
+		string type="app",
+		string directory = ""
+	) {
+		var baseDirectory = "";
+
+		switch (arguments.type) {
+			case "app":
+				baseDirectory = "tests/specs";
+				break;
+			case "core":
+				baseDirectory = "wheels/tests_testbox/specs";
+				break;
+			default:
+				error("Invalid type specified. Valid types are: app, core.");
+		}
+
+		// Normalize subdirectory (remove leading slash if present)
+		if (len(trim(arguments.directory))) {
+			var subDir = reReplace(arguments.directory, "^/+", ""); // strip leading slashes
+			return baseDirectory & "/" & subDir;
+		}
+
+		return baseDirectory;
+	}
+
 }
