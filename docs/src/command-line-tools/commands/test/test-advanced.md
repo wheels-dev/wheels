@@ -1,14 +1,6 @@
 # Advanced Testing Commands
 
-The Wheels CLI provides advanced testing capabilities through integration with TestBox CLI. These commands offer specialized test runners for different testing scenarios.
-
-## Prerequisites
-
-Before using these commands, you must install TestBox CLI:
-
-```bash
-box install testbox-cli
-```
+The Wheels CLI provides advanced testing capabilities through integration with TestBox. These commands offer specialized test runners for different testing scenarios.
 
 ## Available Commands
 
@@ -22,24 +14,28 @@ wheels test:all
 
 #### Options
 
-- `--reporter` - Test reporter format (simple, spec, junit, json, tap, min, doc)
+- `--type` - Type of tests to run: (app, core, plugin) - default: app
+- `--format` - Output format (txt, json, junit, html) - default: txt
 - `--coverage` - Generate coverage report
 - `--coverageReporter` - Coverage reporter format (html, json, xml)
 - `--coverageOutputDir` - Directory for coverage output
 - `--verbose` - Verbose output
 - `--failFast` - Stop on first test failure
-- `--directory` - Test directory to run (default: tests)
+- `--directory` - Test directory to run (default: tests/specs)
 - `--recurse` - Recurse into subdirectories
 - `--bundles` - Comma-delimited list of test bundles to run
 - `--labels` - Comma-delimited list of test labels to run
-- `--excludes` - Comma-delimited list of test bundles to exclude
+- `--excludes` - Comma-delimited list of test labels to exclude
 - `--filter` - Test filter pattern
 
 #### Examples
 
 ```bash
-# Run with spec reporter
-wheels test:all --reporter=spec
+# Run all app tests
+wheels test:all
+
+# Run with JSON format
+wheels test:all --format=json
 
 # Run with coverage
 wheels test:all --coverage --coverageReporter=html
@@ -47,13 +43,16 @@ wheels test:all --coverage --coverageReporter=html
 # Filter tests by name
 wheels test:all --filter=UserTest --verbose
 
+# Run core tests
+wheels test:all --type=core
+
 # Run specific bundles
-wheels test:all --bundles=tests.unit.models,tests.unit.controllers
+wheels test:all --bundles=tests.specs.unit.models,tests.specs.unit.controllers
 ```
 
 ### test:unit - Run Unit Tests
 
-Runs only unit tests located in the `tests/unit` directory.
+Runs only unit tests located in the `tests/specs/unit` directory.
 
 ```bash
 wheels test:unit
@@ -61,31 +60,38 @@ wheels test:unit
 
 #### Options
 
-- `--reporter` - Test reporter format (simple, spec, junit, json, tap, min, doc)
+- `--type` - Type of tests to run: (app, core, plugin) - default: app
+- `--format` - Output format (txt, json, junit, html) - default: txt
 - `--verbose` - Verbose output
 - `--failFast` - Stop on first test failure
 - `--bundles` - Comma-delimited list of test bundles to run
 - `--labels` - Comma-delimited list of test labels to run
-- `--excludes` - Comma-delimited list of test bundles to exclude
+- `--excludes` - Comma-delimited list of test labels to exclude
 - `--filter` - Test filter pattern
-- `--directory` - Unit test directory (default: tests/unit)
+- `--directory` - Unit test directory (default: tests/specs/unit)
 
 #### Examples
 
 ```bash
-# Run with spec reporter
-wheels test:unit --reporter=spec
+# Run unit tests
+wheels test:unit
+
+# Run with JSON format
+wheels test:unit --format=json
 
 # Filter specific tests
 wheels test:unit --filter=UserModelTest
 
 # Verbose output with fail fast
 wheels test:unit --verbose --failFast
+
+# Run core unit tests
+wheels test:unit --type=core
 ```
 
 ### test:integration - Run Integration Tests
 
-Runs only integration tests located in the `tests/integration` directory.
+Runs only integration tests located in the `tests/specs/integration` directory.
 
 ```bash
 wheels test:integration
@@ -93,7 +99,7 @@ wheels test:integration
 
 #### Options
 
-Same as `test:unit` but defaults to `tests/integration` directory.
+Same as `test:unit` but defaults to `tests/specs/integration` directory.
 
 #### Examples
 
@@ -104,13 +110,57 @@ wheels test:integration
 # Run specific workflow tests
 wheels test:integration --filter=UserWorkflowTest
 
-# With verbose output
-wheels test:integration --verbose
+# With verbose output and JUnit format
+wheels test:integration --verbose --format=junit
+
+# Run plugin integration tests
+wheels test:integration --type=plugin
+```
+
+### test:watch - Watch Mode
+
+Watches for file changes and automatically reruns tests.
+
+```bash
+wheels test:watch
+```
+
+#### Options
+
+- `--type` - Type of tests to run: (app, core, plugin) - default: app
+- `--directory` - Test directory to watch (default: tests/specs)
+- `--format` - Output format (txt, json, junit, html) - default: txt
+- `--verbose` - Verbose output
+- `--delay` - Delay in milliseconds before rerunning tests (default: 1000)
+- `--watchPaths` - Additional paths to watch (comma-separated)
+- `--excludePaths` - Paths to exclude from watching (comma-separated)
+- `--bundles` - Test bundles to run
+- `--labels` - Test labels to run
+- `--excludes` - Test bundles to exclude
+- `--filter` - Test filter pattern
+
+#### Examples
+
+```bash
+# Watch all tests
+wheels test:watch
+
+# Watch unit tests only
+wheels test:watch --directory=tests/specs/unit
+
+# Watch with custom delay and JSON format
+wheels test:watch --delay=500 --format=json
+
+# Watch additional paths
+wheels test:watch --watchPaths=models,controllers
+
+# Exclude paths from watching
+wheels test:watch --excludePaths=logs,temp
 ```
 
 ### test:coverage - Code Coverage
 
-Runs tests with code coverage analysis.
+Runs tests with code coverage analysis (requires FusionReactor).
 
 ```bash
 wheels test:coverage
@@ -118,13 +168,14 @@ wheels test:coverage
 
 #### Options
 
-- `--directory` - Test directory to run (default: tests)
-- `--reporter` - Coverage reporter format (html, json, xml, simple)
-- `--outputDir` - Directory to output the coverage report
+- `--type` - Type of tests to run: (app, core, plugin) - default: app
+- `--directory` - Test directory to run (default: tests/specs)
+- `--format` - Output format (txt, json, junit, html) - default: txt
+- `--outputDir` - Directory to output the coverage report (default: tests/results/coverage)
 - `--threshold` - Coverage percentage threshold (0-100)
-- `--pathsToCapture` - Paths to capture for coverage (comma-separated)
-- `--whitelist` - Whitelist paths for coverage (comma-separated)
-- `--blacklist` - Blacklist paths from coverage (comma-separated)
+- `--pathsToCapture` - Paths to capture for coverage (default: /app)
+- `--whitelist` - Whitelist paths for coverage (default: *.cfc)
+- `--blacklist` - Blacklist paths from coverage (default: *Test.cfc,*Spec.cfc)
 - `--bundles` - Test bundles to run
 - `--labels` - Test labels to run
 - `--excludes` - Test bundles to exclude
@@ -137,47 +188,65 @@ wheels test:coverage
 # Basic coverage
 wheels test:coverage
 
-# JSON reporter with threshold
-wheels test:coverage --reporter=json --threshold=80
+# With threshold and specific directory
+wheels test:coverage --threshold=80 --directory=tests/specs/unit
 
-# Coverage for specific directories
-wheels test:coverage --pathsToCapture=models,controllers
+# Coverage for specific paths
+wheels test:coverage --pathsToCapture=/models,/controllers
 
-# Unit tests only with coverage
-wheels test:coverage --directory=tests/unit
-
-# With whitelist
-wheels test:coverage --whitelist=app/models,app/controllers
+# With JUnit output
+wheels test:coverage --format=junit --outputDir=coverage-reports
 ```
 
 ## Test Organization
 
 ### Directory Structure
 
-The recommended test directory structure:
+The standard test directory structure for Wheels applications:
 
 ```
 tests/
-├── unit/           # Unit tests
-│   ├── models/     # Model unit tests
-│   ├── controllers/# Controller unit tests
-│   └── helpers/    # Helper unit tests
-├── integration/    # Integration tests
-│   ├── workflows/  # User workflow tests
-│   └── api/        # API integration tests
-└── results/        # Test results and coverage
-    └── coverage/   # Coverage reports
+├── specs/             # Main test directory (default for type=app)
+│   ├── unit/          # Unit tests
+│   │   ├── models/    # Model unit tests
+│   │   ├── controllers/ # Controller unit tests
+│   │   └── helpers/   # Helper unit tests
+│   ├── integration/   # Integration tests
+│   │   ├── workflows/ # User workflow tests
+│   │   └── api/       # API integration tests
+│   └── functions/     # Function-specific tests
+└── results/           # Test results and reports
+    └── coverage/      # Coverage reports
 ```
+
+### Test Types
+
+The `--type` parameter determines which test suite to run:
+
+- **app** (default): Runs tests in `/wheels/app/tests` route, uses `tests/specs` directory
+- **core**: Runs tests in `/wheels/core/tests` route, for framework tests
 
 ### Sample Tests
 
-When you run `test:unit` or `test:integration` for the first time and the directories don't exist, sample test files are created automatically.
+When you run `test:unit` or `test:integration` for the first time and the directories don't exist, sample test files are created automatically in the correct locations:
+- Unit tests: `tests/specs/unit/SampleUnitTest.cfc`
+- Integration tests: `tests/specs/integration/SampleIntegrationTest.cfc`
+
+## Output Formats
+
+All test commands support multiple output formats via the `--format` parameter:
+
+- **txt** (default): Human-readable text output
+- **json**: JSON format for parsing and automation
+- **junit**: JUnit XML format for CI/CD integration
+- **html**: HTML format for browser viewing
 
 ## Best Practices
 
-1. **Separate Unit and Integration Tests**
-   - Keep unit tests fast and isolated
-   - Integration tests can interact with databases and external services
+1. **Organize Tests by Type**
+   - Keep unit tests in `tests/specs/unit/`
+   - Keep integration tests in `tests/specs/integration/`
+   - Use subdirectories for better organization
 
 2. **Use Labels for Test Organization**
    ```cfc
@@ -195,8 +264,18 @@ When you run `test:unit` or `test:integration` for the first time and the direct
    - Keep tests running in a separate terminal
 
 5. **CI/CD Integration**
-   - Use `--reporter=junit` for CI systems
-   - Generate coverage reports with `--reporter=xml`
+   - Use `--format=junit` for CI systems
+   - Generate coverage reports with `--coverageReporter=xml`
+   - Use `--failFast` for faster feedback
+
+## Coverage Requirements
+
+Code coverage requires FusionReactor 8.0+ to be installed and configured:
+
+1. Install FusionReactor
+2. Enable Code Coverage in FusionReactor settings
+3. Restart your ColdFusion/Lucee server
+4. Run `wheels test:coverage`
 
 ## Troubleshooting
 
@@ -212,16 +291,24 @@ box reload
 ### No Tests Found
 
 Make sure your test files:
-- Are in the correct directory
+- Are in the correct directory (`tests/specs/` or subdirectories)
 - Have the `.cfc` extension
 - Extend `testbox.system.BaseSpec`
 
 ### Coverage Not Working
 
-Ensure:
-- Tests are actually executing code
-- Paths to capture are correctly specified
-- No syntax errors in tested code
+If coverage shows as disabled:
+- Verify FusionReactor is installed
+- Check that Code Coverage is enabled in FusionReactor settings
+- Ensure you've restarted the server after enabling coverage
+
+### Test Routes Not Working
+
+The test commands use these routes:
+- App tests: `http://localhost:port/wheels/app/tests`
+- Core tests: `http://localhost:port/wheels/core/tests`
+
+Ensure these routes are accessible and properly configured.
 
 ## Related Commands
 
