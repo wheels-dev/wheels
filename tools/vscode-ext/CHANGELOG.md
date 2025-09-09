@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.0.2] - 2025-09-09
+
+### Added
+- Language support configuration for CFML files (.cfm, .cfc, .cfml)
+
 ## [1.0.1] - 2025-09-09
 
 ### Changed
