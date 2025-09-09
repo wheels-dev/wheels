@@ -2,6 +2,30 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with Wheels database migrations.
 
+## CRITICAL: Argument Passing Rules
+
+**MOST IMPORTANT**: CFML migration functions require **EITHER** all positional arguments **OR** all named arguments - **NEVER MIX THEM**.
+
+### ✅ CORRECT Examples:
+```cfc
+// All positional arguments
+addColumn("users", "email", "string");
+dropTable("old_table");
+
+// All named arguments  
+addColumn(table="users", columnName="email", columnType="string");
+dropTable(name="old_table");
+```
+
+### ❌ INCORRECT Examples (Will cause "Missing argument name" error):
+```cfc
+// Mixed arguments - DON'T DO THIS!
+addColumn("users", columnName="email", columnType="string");
+addIndex("users", columnNames="email", unique=true);
+```
+
+**Choose ONE style per function call and stick with it consistently.**
+
 ## Overview
 
 Database migrations in Wheels provide version control for your database schema. They allow you to:
@@ -108,9 +132,10 @@ wheels dbmigrate reset
 ```cfc
 function up() {
     transaction {
-        t = createTable("products");
+        // Use all named arguments for createTable
+        t = createTable(name="products");
         
-        // Column types
+        // Column types - all named arguments
         t.string(columnNames="name", limit=100, null=false);
         t.text(columnNames="description");
         t.text(columnNames="content", size="mediumtext"); // MySQL: 16MB
@@ -137,7 +162,8 @@ function up() {
 
 function down() {
     transaction {
-        dropTable("products");
+        // Use all named arguments for consistency
+        dropTable(name="products");
     }
 }
 ```
@@ -146,19 +172,20 @@ function down() {
 ```cfc
 function up() {
     transaction {
-        // Table without auto-increment id
-        t = createTable("user_roles", id=false);
-        t.primaryKey(["userId", "roleId"]); // Composite primary key
-        t.integer("userId", null=false);
-        t.integer("roleId", null=false);
+        // Table without auto-increment id - all named arguments
+        t = createTable(name="user_roles", id=false);
+        t.primaryKey(columnNames=["userId", "roleId"]); // Composite primary key
+        t.integer(columnNames="userId", null=false);
+        t.integer(columnNames="roleId", null=false);
         t.create();
         
-        // Table with custom options (MySQL)
-        t = createTable("products", 
+        // Table with custom options (MySQL) - all named arguments
+        t = createTable(
+            name="products", 
             force=true, // Drop if exists
             options="ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
-        t.string("name");
+        t.string(columnNames="name");
         t.create();
     }
 }
@@ -170,7 +197,7 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        // Single column
+        // Single column - all named arguments
         addColumn(
             table="users",
             columnName="phoneNumber", 
@@ -179,8 +206,8 @@ function up() {
             null=true
         );
         
-        // Multiple columns using changeTable
-        t = changeTable("users");
+        // Multiple columns using changeTable - all named arguments
+        t = changeTable(name="users");
         t.string(columnNames="address");
         t.string(columnNames="city", limit=100);
         t.string(columnNames="postalCode", limit=10);
@@ -190,9 +217,10 @@ function up() {
 
 function down() {
     transaction {
+        // All named arguments consistently
         removeColumn(table="users", columnName="phoneNumber");
         
-        t = changeTable("users");
+        t = changeTable(name="users");
         t.removeColumn(columnNames="address");
         t.removeColumn(columnNames="city");
         t.removeColumn(columnNames="postalCode");
@@ -247,21 +275,21 @@ function down() {
 ```cfc
 function up() {
     transaction {
-        // Simple index
+        // Simple index - all named arguments
         addIndex(table="users", columnNames="email");
         
-        // Unique index
+        // Unique index - all named arguments
         addIndex(table="users", columnNames="username", unique=true);
         
-        // Composite index
+        // Composite index - all named arguments
         addIndex(
             table="products",
             columnNames="category,status",
             indexName="idx_products_category_status"
         );
         
-        // Index during table creation
-        t = createTable("orders");
+        // Index during table creation - all named arguments
+        t = createTable(name="orders");
         t.string(columnNames="orderNumber");
         t.index(columnNames="orderNumber", unique=true);
         t.create();
@@ -270,6 +298,7 @@ function up() {
 
 function down() {
     transaction {
+        // All named arguments consistently
         removeIndex(table="users", indexName="idx_users_email");
         removeIndex(table="products", indexName="products_sku");
     }
@@ -282,37 +311,38 @@ function down() {
 ```cfc
 function up() {
     transaction {
-        // Simple foreign key
+        // Simple foreign key - all named arguments
         addForeignKey(
             table="orders",
-            column="userId",
+            columnName="userId",
             referenceTable="users",
             referenceColumn="id"
         );
         
-        // With cascade options
+        // With cascade options - all named arguments
         addForeignKey(
             table="orderItems",
-            column="orderId", 
+            columnName="orderId", 
             referenceTable="orders",
             referenceColumn="id",
             onDelete="CASCADE",
             onUpdate="CASCADE"
         );
         
-        // During table creation
-        t = createTable("posts");
-        t.references("user", onDelete="SET NULL");
-        t.references("category", foreignKey=true);
+        // During table creation - all named arguments
+        t = createTable(name="posts");
+        t.references(columnNames="user", onDelete="SET NULL");
+        t.references(columnNames="category", foreignKey=true);
         t.create();
     }
 }
 
 function down() {
     transaction {
+        // All named arguments consistently
         removeForeignKey(
             table="orders",
-            name="fk_orders_users"
+            keyName="fk_orders_users"
         );
     }
 }
@@ -324,13 +354,13 @@ function down() {
 ```cfc
 function up() {
     transaction {
-        // Using SQL
+        // Using SQL - positional argument
         sql("
             INSERT INTO roles (name, description, createdAt) 
             VALUES ('admin', 'Administrator', NOW())
         ");
         
-        // Using helper method
+        // Using helper method - all named arguments
         addRecord(table="permissions", name="users.create");
         addRecord(table="permissions", name="users.read"); 
         addRecord(table="permissions", name="users.update");
@@ -343,14 +373,14 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        // Update with where clause
+        // Update with where clause - all named arguments
         updateRecord(
             table="products",
             where="status IS NULL",
             values={status: "active"}
         );
         
-        // Complex update with SQL
+        // Complex update with SQL - positional argument
         sql("
             UPDATE users 
             SET fullName = CONCAT(firstName, ' ', lastName)
@@ -366,20 +396,20 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        // Check if column exists
+        // Check if column exists - all positional arguments
         if (!hasColumn("users", "avatar")) {
             addColumn(table="users", columnName="avatar", columnType="string");
         }
         
-        // Check if table exists  
+        // Check if table exists - all positional arguments  
         if (!hasTable("analytics")) {
-            t = createTable("analytics");
+            t = createTable(name="analytics");
             t.integer(columnNames="views");
             t.timestamps();
             t.create();
         }
         
-        // Database-specific operations
+        // Database-specific operations - positional argument
         if (getDatabaseType() == "mysql") {
             sql("ALTER TABLE users ENGINE=InnoDB");
         }
@@ -391,12 +421,12 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        // Always run
+        // Always run - all named arguments
         addColumn(table="users", columnName="lastLoginAt", columnType="datetime");
         
         // Development environment only
         if (getEnvironment() == "development") {
-            // Add test data
+            // Add test data - all named arguments
             for (var i = 1; i <= 100; i++) {
                 addRecord(
                     table="users",
@@ -413,14 +443,14 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        // Create view
+        // Create view - positional argument
         sql("
             CREATE VIEW active_products AS
             SELECT * FROM products
             WHERE active = 1 AND deletedAt IS NULL
         ");
         
-        // Create stored procedure
+        // Create stored procedure - positional argument
         sql("
             CREATE PROCEDURE CleanupOldData()
             BEGIN
@@ -532,13 +562,13 @@ wheels dbmigrate create blank fix_users_email_column
 ```cfc
 function up() {
     transaction {
-        // Add nullable first
+        // Add nullable first - all named arguments
         addColumn(table="users", columnName="role", columnType="string", null=true);
         
-        // Set default values
+        // Set default values - all named arguments
         updateRecord(table="users", where="1=1", values={role: "member"});
         
-        // Make non-nullable
+        // Make non-nullable - all named arguments
         changeColumn(table="users", columnName="role", null=false);
     }
 }
@@ -548,13 +578,13 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        // Drop foreign keys first
+        // Drop foreign keys first - all named arguments
         removeForeignKey(table="posts", keyName="fk_posts_users");
         
-        // Rename table
+        // Rename table - all named arguments
         renameTable(oldName="posts", newName="articles");
         
-        // Recreate foreign keys
+        // Recreate foreign keys - all named arguments
         addForeignKey(
             table="articles",
             columnName="userId",
@@ -568,8 +598,8 @@ function up() {
 ### Performance for Large Tables
 ```cfc
 function up() {
-    // Increase timeout for large operations
-    setting requestTimeout="300";
+    // Increase timeout for large operations - named arguments
+    setting(requestTimeout="300");
     
     transaction {
         // Use database-specific optimizations
@@ -684,9 +714,10 @@ wheels dbmigrate latest
 
 ## Available Helper Methods in Migrations
 
-**IMPORTANT: Argument Passing Rules**
-- Helper functions require **either** all positional arguments **or** all named arguments
-- **Cannot mix positional and named arguments** in the same function call
+**CRITICAL: Argument Passing Rules (NEVER MIX!)**
+- Helper functions require **EITHER** all positional arguments **OR** all named arguments
+- **NEVER mix positional and named arguments** in the same function call
+- **This will cause "Missing argument name" errors**
 - Choose one style and use it consistently throughout your migration
 
 ### Table Methods
@@ -697,16 +728,17 @@ wheels dbmigrate latest
 
 **Examples:**
 ```cfc
-// Positional arguments (correct)
+// ✅ All positional arguments (correct)
 t = createTable("users");
 dropTable("old_table");
 
-// Named arguments (correct)
+// ✅ All named arguments (correct)
 t = createTable(name="users", id=true);
 dropTable(name="old_table");
 
-// Mixed arguments (WRONG - will cause errors)
-t = createTable("users", id=true); // Don't do this!
+// ❌ Mixed arguments (CAUSES ERRORS - DON'T DO THIS!)
+t = createTable("users", id=true); // WRONG! Mixed positional and named
+dropTable("old_table", force=true); // WRONG! Mixed positional and named
 ```
 
 ### Column Methods
@@ -718,16 +750,17 @@ t = createTable("users", id=true); // Don't do this!
 
 **Examples:**
 ```cfc
-// Positional arguments (correct)
-addColumn("users", "email", "string", {limit: 255, null: false});
+// ✅ All positional arguments (correct)
+addColumn("users", "email", "string");
 removeColumn("users", "old_field");
 
-// Named arguments (correct)
+// ✅ All named arguments (correct)  
 addColumn(table="users", columnName="email", columnType="string", limit=255, null=false);
 removeColumn(table="users", columnName="old_field");
 
-// Mixed arguments (WRONG - will cause errors)
-addColumn("users", columnName="email", columnType="string"); // Don't do this!
+// ❌ Mixed arguments (CAUSES ERRORS - DON'T DO THIS!)
+addColumn("users", columnName="email", columnType="string"); // WRONG! Mixed positional and named
+removeColumn("users", columnName="old_field"); // WRONG! Mixed positional and named
 ```
 
 ### Index Methods
@@ -736,13 +769,16 @@ addColumn("users", columnName="email", columnType="string"); // Don't do this!
 
 **Examples:**
 ```cfc
-// Positional arguments (correct)
-addIndex("users", "email", {unique: true});
+// ✅ All positional arguments (correct)
+addIndex("users", "email");
 removeIndex("users", "users_email");
 
-// Named arguments (correct)
+// ✅ All named arguments (correct)
 addIndex(table="users", columnNames="email", unique=true);
 removeIndex(table="users", indexName="users_email");
+
+// ❌ Mixed arguments (CAUSES ERRORS - DON'T DO THIS!)
+addIndex("users", columnNames="email"); // WRONG! Mixed positional and named
 ```
 
 ### Foreign Key Methods
@@ -751,11 +787,11 @@ removeIndex(table="users", indexName="users_email");
 
 **Examples:**
 ```cfc
-// Positional arguments (correct)
-addForeignKey("orders", "userId", "users", "id", {onDelete: "CASCADE"});
+// ✅ All positional arguments (correct)
+addForeignKey("orders", "userId", "users", "id");
 removeForeignKey("orders", "fk_orders_users");
 
-// Named arguments (correct)
+// ✅ All named arguments (correct)
 addForeignKey(
     table="orders",
     columnName="userId", 
@@ -764,6 +800,9 @@ addForeignKey(
     onDelete="CASCADE"
 );
 removeForeignKey(table="orders", keyName="fk_orders_users");
+
+// ❌ Mixed arguments (CAUSES ERRORS - DON'T DO THIS!)
+addForeignKey("orders", columnName="userId", referenceTable="users", referenceColumn="id"); // WRONG!
 ```
 
 ### Data Methods
@@ -773,10 +812,13 @@ removeForeignKey(table="orders", keyName="fk_orders_users");
 
 **Examples:**
 ```cfc
-// Named arguments (recommended for data methods)
+// ✅ All named arguments (recommended for data methods)
 addRecord(table="users", email="test@example.com", name="Test User");
 updateRecord(table="users", where="id = 1", values={email: "updated@example.com"});
 removeRecord(table="users", where="email = 'test@example.com'");
+
+// ❌ Mixed arguments (CAUSES ERRORS - DON'T DO THIS!)
+addRecord("users", email="test@example.com"); // WRONG! Mixed positional and named
 ```
 
 ### Utility Methods
@@ -787,11 +829,11 @@ removeRecord(table="users", where="email = 'test@example.com'");
 
 **Examples:**
 ```cfc
-// Simple functions with positional arguments
+// ✅ Simple functions with positional arguments (correct)
 sql("CREATE INDEX idx_users_email ON users(email)");
 announce("Creating user indexes");
 
-// Functions that return values
+// ✅ Functions that return values (no arguments to mix)
 if (getDatabaseType() == "mysql") {
     // MySQL-specific logic
 }
