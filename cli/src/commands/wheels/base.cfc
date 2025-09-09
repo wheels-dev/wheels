@@ -321,7 +321,7 @@ component excludeFromHelp=true {
  			}
 
 			 // Plugins in place?
- 		var pluginsFolder=fileSystemUtil.resolvePath("app/plugins");
+ 		var pluginsFolder=fileSystemUtil.resolvePath("plugins");
  			if(!directoryExists(pluginsFolder)){
  				error("We can't find your plugins folder. Check you have installed Wheels, and you're running this from the site root.");
  			}
@@ -330,12 +330,12 @@ component excludeFromHelp=true {
  		// Wheels 2.x has dbmigrate + dbmigratebridge equivalents in core
  		if($isWheelsVersion(1, "major")){
 
- 			var DBMigratePluginLocation=fileSystemUtil.resolvePath("app/plugins/dbmigrate");
+ 			var DBMigratePluginLocation=fileSystemUtil.resolvePath("plugins/dbmigrate");
  			if(!directoryExists(DBMigratePluginLocation)){
  				error("We can't find your plugins/dbmigrate folder? Please check the plugin is successfully installed; if you've not started the server using server start for the first time, this folder may not be created yet.");
  			}
 
-			var DBMigrateBridgePluginLocation=fileSystemUtil.resolvePath("app/plugins/dbmigratebridge");
+			var DBMigrateBridgePluginLocation=fileSystemUtil.resolvePath("plugins/dbmigratebridge");
  			if(!directoryExists(DBMigrateBridgePluginLocation)){
  				error("We can't find your plugins/dbmigratebridge folder? Please check the plugin is successfully installed;  if you've not started the server using server start for the first time, this folder may not be created yet.");
  			}
