@@ -607,41 +607,30 @@ http://localhost:8080/tests/runner.cfm?format=txt
 http://localhost:8080/tests/runner.cfm?format=junit
 ```
 
-### CommandBox CLI
-
-Run tests from the command line:
-
-```bash
-# Run all tests
-box testbox run
-
-# Run specific test directory
-box testbox run --directory=tests/specs/unit
-
-# Run specific test bundle
-box testbox run --testBundles=tests.specs.unit.models.UserTest
-
-# Watch mode for continuous testing
-box testbox watch
-
-# Generate coverage report
-box testbox run --coverage --coverageReporter=html
-```
-
 ### Wheels CLI Commands
 
 Use Wheels-specific test commands:
 
 ```bash
-# Run tests (if available)
+# Run all tests
 wheels test run
+#Available Flags
+--coverage                (Generate coverage report (boolean flag))   --norecurse                       (Not recurse into subdirectories)
+--failFast              (Stop on first test failure (boolean flag))   --noverbose                                    (Not verbose output)
+--nocoverage          (Not generate coverage report (boolean flag))   --recurse                             (Recurse into subdirectories)
+--nofailFast        (Not stop on first test failure (boolean flag))   --verbose                                          (Verbose output)
+# Available Parameters
+bundles=                                                              group=                                    (Run specific test group)
+coverage=                 (Generate coverage report (boolean flag))   recurse=                              (Recurse into subdirectories)
+directory=                                                            reporter= (Test reporter format (text, json, junit, tap, antjunit))
+failFast=               (Stop on first test failure (boolean flag))   servername=                                 (Name of server to use)
+filter=                           (Filter tests by pattern or name)   type=                           (Type of tests to run: (app, core))
+format=                                                               verbose=                                           (Verbose output)
 
 # Generate test files
 wheels generate test model User
 wheels generate test controller Products --crud
 
-# Run tests with specific database
-wheels test run --db=mysql
 ```
 
 ## Test Configuration
@@ -817,6 +806,543 @@ If you have legacy RocketUnit tests, you can migrate them:
 - Move tests to `/tests/specs/` directory
 - Change component extension from `app.tests.Test` to `testbox.system.BaseSpec`
 - Wrap individual test methods in `it()` blocks within `describe()` blocks
+
+## Using application.wo in Tests
+
+The `application.wo` object is the global Wheels framework instance that provides direct access to all framework functionality. Understanding how to use it effectively in tests is crucial for testing framework internals, accessing models directly, and working with the Wheels testing environment.
+
+### Understanding application.wo
+
+`application.wo` is created during `onApplicationStart()` in `Application.cfc` and provides:
+
+- **Framework Access**: All Wheels framework methods and utilities
+- **Model Access**: Direct access to models without instantiation
+- **Internal Functions**: Configuration, caching, debugging, templating
+- **Test Environment**: Special testing methods and state management
+
+### Basic application.wo Usage in Tests
+
+#### Accessing Models Directly
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("User Model via application.wo", function() {
+
+            it("should create user using application.wo", function() {
+                var user = application.wo.model("User").create({
+                    email = "test@example.com",
+                    firstName = "Test",
+                    lastName = "User"
+                });
+                
+                expect(user).toBeObject();
+                expect(user.email).toBe("test@example.com");
+            });
+
+            it("should access model methods through application.wo", function() {
+                var userCount = application.wo.model("User").count();
+                expect(userCount).toBeGT(0);
+                
+                var users = application.wo.model("User").findAll();
+                expect(users).toBeQuery();
+            });
+
+        });
+    }
+}
+```
+
+#### Framework Configuration Access
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Framework Configuration", function() {
+
+            it("should access framework settings", function() {
+                var environment = application.wo.get("environment");
+                expect(environment).toBe("testing");
+                
+                var dataSource = application.wo.get("dataSourceName");
+                expect(dataSource).toInclude("test");
+            });
+
+            it("should modify settings for test", function() {
+                // Store original value
+                var originalValue = application.wo.get("sendEmailOnError");
+                
+                // Temporarily change setting
+                application.wo.set(sendEmailOnError = false);
+                expect(application.wo.get("sendEmailOnError")).toBeFalse();
+                
+                // Restore original value
+                application.wo.set(sendEmailOnError = originalValue);
+            });
+
+        });
+    }
+}
+```
+
+### Advanced Testing Patterns with application.wo
+
+#### Testing Controllers Through Framework
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Controllers via application.wo", function() {
+
+            it("should access controller directly", function() {
+                // Create controller instance
+                var controller = application.wo.controller("Users");
+                expect(controller).toBeObject();
+                
+                // Test controller methods
+                expect(controller).toHaveKey("index");
+                expect(controller).toHaveKey("show");
+            });
+
+            it("should test controller with mock params", function() {
+                var controller = application.wo.controller("Users");
+                
+                // Mock request parameters
+                controller.params = {
+                    key = 1,
+                    user = {
+                        firstName = "Test",
+                        lastName = "User"
+                    }
+                };
+                
+                // Test controller action behavior
+                try {
+                    controller.show();
+                    expect(controller.user).toBeObject();
+                } catch (any e) {
+                    // Handle expected errors in testing
+                    expect(e.type).toBe("Wheels.RecordNotFound");
+                }
+            });
+
+        });
+    }
+}
+```
+
+#### Database and Migration Testing
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Database Operations", function() {
+
+            it("should access database information", function() {
+                var dbInfo = application.wo.$dbinfo(
+                    datasource = application.wo.get("dataSourceName"),
+                    type = "version"
+                );
+                
+                expect(dbInfo).toBeStruct();
+                expect(dbInfo).toHaveKey("database_version");
+            });
+
+            it("should execute raw SQL through framework", function() {
+                var result = application.wo.model("User").findBySQL(
+                    sql = "SELECT COUNT(*) AS userCount FROM users WHERE email LIKE ?",
+                    values = ["%@test.com"]
+                );
+                
+                expect(result).toBeQuery();
+                expect(result.userCount[1]).toBeGTE(0);
+            });
+
+        });
+    }
+}
+```
+
+### Testing Framework Internals
+
+#### Template and Include Testing
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Template System", function() {
+
+            it("should include templates through framework", function() {
+                // Test template inclusion
+                var templateOutput = application.wo.$includeAndReturnOutput(
+                    template = "/tests/_assets/test_template.cfm"
+                );
+                
+                expect(templateOutput).toInclude("Test Template");
+            });
+
+            it("should handle missing templates gracefully", function() {
+                expect(function() {
+                    application.wo.$include(template = "/nonexistent/template.cfm");
+                }).toThrow();
+            });
+
+        });
+    }
+}
+```
+
+#### Route Testing
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Routing System", function() {
+
+            it("should recognize defined routes", function() {
+                // Test route recognition
+                var routeMatch = application.wo.$findMatchingRoute(
+                    path = "/users/123"
+                );
+                
+                expect(routeMatch).toBeStruct();
+                expect(routeMatch.controller).toBe("users");
+                expect(routeMatch.action).toBe("show");
+                expect(routeMatch.key).toBe("123");
+            });
+
+            it("should generate URLs from routes", function() {
+                var userUrl = application.wo.urlFor(
+                    controller = "users",
+                    action = "show",
+                    key = 123
+                );
+                
+                expect(userUrl).toBe("/users/show/123");
+            });
+
+        });
+    }
+}
+```
+
+### Test Environment Management
+
+#### Test Data Management
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function beforeAll() {
+        // Store original test environment state
+        variables.originalTestState = application.wo.$getTestRunnerApplicationScope();
+    }
+
+    function afterAll() {
+        // Restore test environment
+        if (isDefined("variables.originalTestState")) {
+            application.wo.$restoreTestRunnerApplicationScope(variables.originalTestState);
+        }
+        
+        // Clean up test data using application.wo
+        application.wo.model("User").deleteAll(where = "email LIKE '%@test.com'");
+    }
+
+    function run() {
+        describe("Test Environment Management", function() {
+
+            it("should isolate test data", function() {
+                // Create test data in isolation
+                var testUser = application.wo.model("User").create({
+                    email = "isolation-test@test.com",
+                    firstName = "Isolation",
+                    lastName = "Test"
+                });
+                
+                expect(testUser).toBeObject();
+                expect(testUser.persisted()).toBeTrue();
+            });
+
+        });
+    }
+}
+```
+
+#### Transaction-Based Testing
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Transaction Testing", function() {
+
+            beforeEach(function() {
+                // Start transaction for each test
+                application.wo.model("User").$getConnection().startTransaction();
+            });
+
+            afterEach(function() {
+                // Rollback after each test
+                application.wo.model("User").$getConnection().rollbackTransaction();
+            });
+
+            it("should rollback changes automatically", function() {
+                var initialCount = application.wo.model("User").count();
+                
+                application.wo.model("User").create({
+                    email = "rollback-test@test.com",
+                    firstName = "Rollback",
+                    lastName = "Test"
+                });
+                
+                var newCount = application.wo.model("User").count();
+                expect(newCount).toBe(initialCount + 1);
+                
+                // This will be rolled back in afterEach
+            });
+
+        });
+    }
+}
+```
+
+### Debugging and Introspection
+
+#### Framework State Inspection
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Framework Debugging", function() {
+
+            it("should inspect framework configuration", function() {
+                // Get all framework settings
+                var settings = application.wo.$getFrameworkSettings();
+                
+                expect(settings).toBeStruct();
+                expect(settings).toHaveKey("environment");
+                expect(settings).toHaveKey("dataSourceName");
+                
+                // Inspect specific subsystems
+                expect(settings.environment).toBe("testing");
+            });
+
+            it("should access debug information", function() {
+                // Enable debugging for test
+                application.wo.set(showDebugInformation = true);
+                
+                // Check debug state
+                var debugEnabled = application.wo.get("showDebugInformation");
+                expect(debugEnabled).toBeTrue();
+            });
+
+        });
+    }
+}
+```
+
+### Common application.wo Test Patterns
+
+#### Model Factory Pattern
+
+```cfm
+// In your test support files
+component {
+
+    function createUserViaFramework(struct attributes = {}) {
+        var defaults = {
+            email = "user-#createUUID()#@test.com",
+            firstName = "Test",
+            lastName = "User"
+        };
+        
+        defaults.append(attributes);
+        return application.wo.model("User").create(defaults);
+    }
+
+    function findOrCreateUser(required string email) {
+        var user = application.wo.model("User").findOne(where = "email = '#arguments.email#'");
+        
+        if (!isObject(user)) {
+            user = application.wo.model("User").create({
+                email = arguments.email,
+                firstName = "Generated",
+                lastName = "User"
+            });
+        }
+        
+        return user;
+    }
+
+}
+```
+
+#### Configuration Testing Pattern
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Configuration Testing", function() {
+
+            it("should handle different environments", function() {
+                var originalEnv = application.wo.get("environment");
+                
+                try {
+                    // Test production-like settings
+                    application.wo.set(environment = "production");
+                    application.wo.set(showErrorInformation = false);
+                    
+                    expect(application.wo.get("environment")).toBe("production");
+                    expect(application.wo.get("showErrorInformation")).toBeFalse();
+                    
+                } finally {
+                    // Always restore original environment
+                    application.wo.set(environment = originalEnv);
+                    application.wo.set(showErrorInformation = true);
+                }
+            });
+
+        });
+    }
+}
+```
+
+### Performance Testing with application.wo
+
+#### Query Performance Testing
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Performance Testing", function() {
+
+            it("should measure query performance", function() {
+                var startTime = getTickCount();
+                
+                var users = application.wo.model("User").findAll(
+                    select = "id,email,firstName,lastName",
+                    limit = 100
+                );
+                
+                var endTime = getTickCount();
+                var queryTime = endTime - startTime;
+                
+                expect(queryTime).toBeLT(1000, "Query should complete in under 1 second");
+                expect(users.recordCount).toBeLTE(100);
+            });
+
+            it("should test caching effectiveness", function() {
+                // First query (uncached)
+                var startTime1 = getTickCount();
+                var users1 = application.wo.model("User").findAll(cache = 60);
+                var queryTime1 = getTickCount() - startTime1;
+                
+                // Second query (should be cached)
+                var startTime2 = getTickCount();
+                var users2 = application.wo.model("User").findAll(cache = 60);
+                var queryTime2 = getTickCount() - startTime2;
+                
+                expect(queryTime2).toBeLT(queryTime1, "Cached query should be faster");
+                expect(users2.recordCount).toBe(users1.recordCount);
+            });
+
+        });
+    }
+}
+```
+
+### Troubleshooting application.wo in Tests
+
+#### Common Issues and Solutions
+
+**Issue**: `application.wo` is undefined
+```cfm
+// Solution: Ensure test environment is properly initialized
+function beforeAll() {
+    // Force application start if needed
+    if (!isDefined("application.wo")) {
+        new Application().onApplicationStart();
+    }
+}
+```
+
+**Issue**: Database connection errors
+```cfm
+// Solution: Verify test database configuration
+function beforeAll() {
+    expect(application.wo.get("dataSourceName")).toInclude("test");
+    
+    try {
+        var testQuery = application.wo.model("User").findAll(limit = 1);
+        expect(testQuery).toBeQuery();
+    } catch (any e) {
+        fail("Database connection failed: #e.message#");
+    }
+}
+```
+
+**Issue**: Model not found errors
+```cfm
+// Solution: Check model loading and paths
+function run() {
+    describe("Model Loading", function() {
+        it("should load all required models", function() {
+            var requiredModels = ["User", "Product", "Category"];
+            
+            for (var modelName in requiredModels) {
+                expect(function() {
+                    var model = application.wo.model(modelName);
+                    expect(model).toBeObject();
+                }).notToThrow("Model #modelName# should load without errors");
+            }
+        });
+    });
+}
+```
+
+### Integration with CI/CD
+
+#### Test Environment Validation
+
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("CI/CD Environment", function() {
+
+            it("should validate test environment setup", function() {
+                // Verify we're in test environment
+                expect(application.wo.get("environment")).toBe("testing");
+                
+                // Verify test database
+                var dataSourceName = application.wo.get("dataSourceName");
+                expect(dataSourceName).toInclude("test", "Should use test database");
+                
+                // Verify email is disabled
+                expect(application.wo.get("sendEmailOnError")).toBeFalse();
+            });
+
+            it("should have required test data", function() {
+                // Verify test data exists
+                var userCount = application.wo.model("User").count();
+                expect(userCount).toBeGTE(1, "Should have at least one test user");
+            });
+
+        });
+    }
+}
+```
+
+Using `application.wo` effectively in your tests provides deep access to the Wheels framework, enabling comprehensive testing of both your application code and the framework integration. This approach is particularly valuable for integration testing, framework customization testing, and debugging complex application behaviors.
 
 ## Testing Resources
 
