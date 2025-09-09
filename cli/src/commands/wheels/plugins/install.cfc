@@ -5,8 +5,8 @@
  * wheels plugins install wheels-docker --dev
  * wheels plugins install https://github.com/user/wheels-plugin --global
  */
-component extends="../base" {
-    
+component aliases="wheels plugin install" extends="../base" {
+
     property name="pluginService" inject="PluginService@wheels-cli";
     
     /**
@@ -21,22 +21,23 @@ component extends="../base" {
         boolean global = false,
         string version = ""
     ) {
-        print.yellowLine("📦 Installing plugin: #arguments.name#...")
+        arguments = reconstructArgs(arguments);
+        print.yellowLine("Installing plugin: #arguments.name#...")
              .line();
         
         var result = pluginService.install(argumentCollection = arguments);
         
         if (result.success) {
-            print.greenLine("✅ Plugin installed successfully");
+            print.greenLine("Plugin installed successfully");
             
             if (result.keyExists("plugin") && result.plugin.keyExists("description")) {
-                print.line("📝 #result.plugin.description#");
+                print.line("#result.plugin.description#");
             }
             
             print.line()
                  .yellowLine("Run 'wheels plugins list' to see installed plugins");
         } else {
-            print.redLine("❌ Failed to install plugin: #result.error#");
+            print.redLine("Failed to install plugin: #result.error#");
             setExitCode(1);
         }
     }

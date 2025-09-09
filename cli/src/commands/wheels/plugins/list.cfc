@@ -41,27 +41,48 @@ component aliases="wheels plugin list" extends="../base" {
         }
         
         if (arguments.format == "json") {
-            print.line(serializeJSON(plugins, true));
+            // JSON format output
+            var jsonOutput = {
+                "plugins": plugins
+            };
+            print.line(serializeJSON(jsonOutput, true));
         } else {
-            print.greenBoldLine(" Installed Wheels CLI Plugins" & (arguments.global ? " (Global)" : ""))
+            // Table format output (matching the guide)
+            print.line("Installed Wheels CLI Plugins" & (arguments.global ? " (Global)" : ""))
                  .line();
             
-            // Display plugins in a formatted way
-            for (var plugin in plugins) {
-                print.line(" #plugin.name# (#plugin.version#)");
+            if (arrayLen(plugins) > 0) {
+                // Print table header
+                print.line("Name                Version    Description");
+                print.line("---------------------------------------------");
                 
-                if (plugin.keyExists("dev") && plugin.dev) {
-                    print.text("    Dev Dependency");
-                }
-                
-                if (plugin.keyExists("description") && len(plugin.description)) {
-                    print.line("    #plugin.description#");
+                // Display plugins in table format
+                for (var plugin in plugins) {
+                    var name = padRight(plugin.name, 20);
+                    var version = padRight(plugin.version, 11);
+                    var description = plugin.keyExists("description") && len(plugin.description) ? plugin.description : "";
+                    
+                    // Truncate description if too long
+                    if (len(description) > 40) {
+                        description = left(description, 37) & "...";
+                    }
+                    
+                    print.line("#name##version##description#");
                 }
                 
                 print.line();
+                print.yellowLine("Total: #arrayLen(plugins)# plugin" & (arrayLen(plugins) != 1 ? "s" : ""));
             }
-            
-            print.yellowLine("Total plugins: #arrayLen(plugins)#");
         }
+    }
+    
+    /**
+     * Pad string to right with spaces
+     */
+    private function padRight(required string text, required numeric length) {
+        if (len(arguments.text) >= arguments.length) {
+            return left(arguments.text, arguments.length);
+        }
+        return arguments.text & repeatString(" ", arguments.length - len(arguments.text));
     }
 }

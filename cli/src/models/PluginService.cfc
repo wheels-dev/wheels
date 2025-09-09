@@ -1,20 +1,10 @@
 component {
     
-    // Note: These services are not available in the module context
-    // property name="packageService" inject="PackageService@commandbox-core";
-    // property name="forgebox" inject="ForgeBox@commandbox-core";
-    // property name="fileSystemUtil" inject="FileSystem@commandbox-core";
+    property name="packageService" inject="PackageService";
+    property name="forgebox" inject="ForgeBox";
+    property name="fileSystemUtil" inject="FileSystem";
+    property name="configService" inject="ConfigService";
     
-    /**
-     * List installed plugins
-     */
-    function list(boolean global = false) {
-        return {
-            success: true,
-            message: "Plugin functionality is currently being refactored. Please use CommandBox package management directly.",
-            plugins: []
-        };
-    }
     
     /**
      * Install a Wheels CLI plugin
@@ -50,7 +40,7 @@ component {
             if (!pluginInfo.isValid) {
                 return {
                     success: false,
-                    error: "Plugin '#arguments.name#' not found or is not a valid Wheels CLI plugin"
+                    error: "Plugin '" & arguments.name & "' not found or is not a valid Wheels CLI plugin"
                 };
             }
             
@@ -62,7 +52,7 @@ component {
             
             // Install the plugin
             if (arguments.global) {
-                // Install globally via CommandBox
+                // Install globally via CommandBox (this is for CLI plugins)
                 packageService.installPackage(
                     ID = packageSpec,
                     save = false,
@@ -153,8 +143,8 @@ component {
         var plugins = [];
         
         if (arguments.global) {
-            // Get global CommandBox modules
-            var globalModules = ConfigService.getSetting("modules", {});
+            // Get global CommandBox modules (CLI plugins)
+            var globalModules = configService.getSetting("modules", {});
             for (var moduleName in globalModules) {
                 if (isWheelsPlugin(moduleName)) {
                     arrayAppend(plugins, {
@@ -166,7 +156,20 @@ component {
                 }
             }
         } else {
-            // Get local plugins from box.json
+            // Check for Wheels application plugins in /plugins folder
+            var pluginsDir = fileSystemUtil.resolvePath("plugins");
+            if (directoryExists(pluginsDir)) {
+                // Get all .zip files in plugins directory (Wheels application plugins)
+                var pluginZips = directoryList(pluginsDir, false, "query", "*.zip", "name");
+                for (var zipFile in pluginZips) {
+                    var pluginInfo = parseWheelsPluginZip(pluginsDir & "/" & zipFile.name);
+                    if (pluginInfo.isValid) {
+                        arrayAppend(plugins, pluginInfo);
+                    }
+                }
+            }
+            
+            // Also check box.json for CLI plugins installed locally
             var boxJsonPath = resolvePath("box.json");
             if (fileExists(boxJsonPath)) {
                 var boxJson = deserializeJSON(fileRead(boxJsonPath));
@@ -242,21 +245,17 @@ component {
             };
         }
         
-        // Search ForgeBox
-        try {
-            var packageInfo = packageService.getPackage(arguments.pluginName);
-            return {
-                isValid: true,
-                name: packageInfo.name,
-                slug: packageInfo.slug,
-                version: packageInfo.version,
-                description: packageInfo.summary
-            };
-        } catch (any e) {
-            return {
-                isValid: false
-            };
-        }
+        // Assume package names are valid and let PackageService/ForgeBox handle validation during install
+        // This approach is more permissive and mirrors how CommandBox handles package installation
+        var slug = lCase(arguments.pluginName);
+        
+        return {
+            isValid: true,
+            name: arguments.pluginName,
+            slug: slug,
+            version: "latest",
+            description: "ForgeBox package"
+        };
     }
     
     /**
@@ -270,6 +269,63 @@ component {
     }
     
     /**
+     * Parse information from a Wheels plugin zip file
+     */
+    private function parseWheelsPluginZip(required string zipPath) {
+        var pluginInfo = {
+            isValid: false,
+            name: "",
+            version: "unknown",
+            dev: false,
+            global: false,
+            description: "",
+            type: "wheels-plugin"
+        };
+        
+        try {
+            // Extract plugin name and version from filename
+            var fileName = listLast(arguments.zipPath, "/\\");
+            fileName = reReplace(fileName, "\.zip$", "");
+            
+            // Parse filename pattern: PluginName-Version.zip
+            var parts = listToArray(fileName, "-");
+            if (arrayLen(parts) >= 2) {
+                pluginInfo.name = parts[1];
+                pluginInfo.version = parts[arrayLen(parts)];
+            } else {
+                pluginInfo.name = fileName;
+            }
+            
+            // Try to extract more info from box.json inside the zip
+            try {
+                cfzip(action="read", file=arguments.zipPath, entryPath="box.json", variable="boxJsonContent");
+                if (len(boxJsonContent)) {
+                    var boxJsonData = deserializeJSON(boxJsonContent);
+                    if (structKeyExists(boxJsonData, "name")) {
+                        pluginInfo.name = boxJsonData.name;
+                    }
+                    if (structKeyExists(boxJsonData, "version")) {
+                        pluginInfo.version = boxJsonData.version;
+                    }
+                    if (structKeyExists(boxJsonData, "description")) {
+                        pluginInfo.description = boxJsonData.description;
+                    } else if (structKeyExists(boxJsonData, "summary")) {
+                        pluginInfo.description = boxJsonData.summary;
+                    }
+                }
+            } catch (any e) {
+                // Ignore errors reading box.json from zip
+            }
+            
+            pluginInfo.isValid = true;
+            return pluginInfo;
+            
+        } catch (any e) {
+            return pluginInfo;
+        }
+    }
+
+    /**
      * Get information about an installed plugin
      */
     private function getInstalledPluginInfo(pluginName, isDev) {
@@ -282,12 +338,12 @@ component {
         };
         
         // Try to read module info
-        var modulePath = resolvePath("modules/#arguments.pluginName#");
+        var modulePath = resolvePath("modules/" & arguments.pluginName);
         if (directoryExists(modulePath)) {
             var moduleConfigPath = modulePath & "/ModuleConfig.cfc";
             if (fileExists(moduleConfigPath)) {
                 try {
-                    var moduleConfig = createObject("component", "modules.#arguments.pluginName#.ModuleConfig");
+                    var moduleConfig = createObject("component", "modules." & arguments.pluginName & ".ModuleConfig");
                     info.version = moduleConfig.version ?: "unknown";
                     info.description = moduleConfig.description ?: "";
                 } catch (any e) {
@@ -298,7 +354,40 @@ component {
         
         return info;
     }
+    /**
+     * Create a temporary directory
+     */
+    private function createTempDir() {
+        var tempDir = getTempDirectory() & "wheels_plugin_" & createUUID();
+        directoryCreate(tempDir);
+        return tempDir;
+    }
     
+    /**
+     * Clean up temporary directory with retry logic
+     */
+    private function cleanupTempDir(required string tempDir) {
+        if (!directoryExists(arguments.tempDir)) {
+            return;
+        }
+        
+        // Try multiple times since Windows can have file locks
+        for (var i = 1; i <= 3; i++) {
+            try {
+                directoryDelete(arguments.tempDir, true);
+                return;
+            } catch (any e) {
+                if (i < 3) {
+                    sleep(100); // Wait 100ms before retry
+                }
+            }
+        }
+        
+        // If still can't delete, just log it (don't fail the operation)
+        systemOutput("Warning: Could not clean up temporary directory: " & arguments.tempDir, true);
+    }
+    
+
     /**
      * Register plugin commands with CommandBox
      */
@@ -311,29 +400,11 @@ component {
      * Resolve a file path  
      */
     private function resolvePath(path, baseDirectory = "") {
-        // Prepend app/ to common paths if not already present
-        var appPath = arguments.path;
-        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
-            // Common app directories
-            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
-                appPath = "app/" & appPath;
-            }
+        // Use fileSystemUtil.resolvePath() which is already injected and handles paths correctly
+        if (len(arguments.baseDirectory)) {
+            return fileSystemUtil.resolvePath(arguments.path, arguments.baseDirectory);
+        } else {
+            return fileSystemUtil.resolvePath(arguments.path);
         }
-        
-        // If path is already absolute, return it
-        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
-            return appPath;
-        }
-        
-        // Build absolute path from current working directory
-        // Use provided base directory or fall back to expandPath
-        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
-        
-        // Ensure we have a trailing slash
-        if (right(baseDir, 1) != "/") {
-            baseDir &= "/";
-        }
-        
-        return baseDir & appPath;
     }
 }
