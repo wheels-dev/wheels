@@ -507,7 +507,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 		local.i = 0;
 		for (local.row in local.packages) {
 			local.i++;
-			local.instance = CreateObject("component", local.row.package);
+			local.instance = application.wirebox.getInstance(name = "#local.row.package#");
 			// is there a better way to check for existence of a function?
 			// if the beforeall method is present, run it once only per request
 			if (StructKeyExists(local.instance, "beforeAll") && local.i eq 1) {
