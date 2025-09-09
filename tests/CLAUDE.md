@@ -15,6 +15,96 @@ Wheels 3.0 uses **TestBox 5** as its primary testing framework, providing modern
 - Asynchronous testing support
 - Code coverage reporting via FusionReactor
 
+## Accessing Framework Components in Tests
+
+### The application.wo Object
+
+**CRITICAL**: In Wheels tests, ALL framework functionality is accessed through the `application.wo` object. This is your gateway to models, helpers, and other framework features:
+
+```cfm
+// Access models
+var user = application.wo.model("User");
+var product = application.wo.model("Product").new();
+
+// Create records
+var newUser = application.wo.model("User").create({
+    email = "test@example.com",
+    firstName = "Test"
+});
+
+// Query records
+var users = application.wo.model("User").findAll();
+var user = application.wo.model("User").findOne(where = "email = 'test@example.com'");
+
+// Delete records
+application.wo.model("User").deleteAll(where = "email LIKE '%@test.com'");
+```
+
+### Other Available Methods
+
+The `application.wo` object provides access to all framework functionality needed in tests:
+
+#### Model Access
+```cfm
+// Access model classes
+var user = application.wo.model("User");
+var product = application.wo.model("Product");
+
+// Work with associations
+var user = application.wo.model("User").findOne();
+var posts = user.posts(); // Access associated models
+```
+
+#### URL Generation and Routing
+```cfm
+// Generate URLs for testing HTTP requests
+var userUrl = application.wo.URLFor(controller = "users", action = "show", key = 1);
+var loginUrl = application.wo.URLFor(controller = "sessions", action = "new");
+
+// Test route recognition
+var params = application.wo.recognizeRoute("/users/123");
+expect(params.controller).toBe("users");
+expect(params.action).toBe("show");
+expect(params.key).toBe("123");
+```
+
+#### View and Controller Testing
+```cfm
+// Render views for testing output
+var content = application.wo.renderPage(controller = "users", action = "index");
+expect(content).toInclude("Users List");
+
+// Access controller instances for testing
+var controller = application.wo.controller("Users");
+expect(controller).toBeObject();
+```
+
+#### Helper Functions
+```cfm
+// Access framework helper functions
+var formatted = application.wo.truncate("Long text here", 10);
+var time = application.wo.timeAgoInWords("2023-01-01");
+var currency = application.wo.numberToCurrency(19.99);
+
+// Form helpers for testing form generation
+var textField = application.wo.textField(objectName = "user", property = "name");
+expect(textField).toInclude('name="user[name]"');
+```
+
+#### Framework Configuration Access
+```cfm
+// Access framework settings during tests
+var dsn = application.wo.get("dataSourceName");
+var env = application.wo.get("environment");
+
+// Test environment-specific behavior
+if (application.wo.get("environment") == "testing") {
+    // Testing-specific assertions
+}
+```
+
+**Always use `application.wo` in your tests** - never call framework methods directly. This ensures your tests work correctly with Wheels' dependency injection and configuration system.
+
 ## Test Directory Structure
 
 ```
@@ -60,21 +150,21 @@ component extends="testbox.system.BaseSpec" {
 
     function afterAll() {
         // Cleanup once after all tests complete
-        model("User").deleteAll(where = "email LIKE '%@example.com'");
+        application.wo.model("User").deleteAll(where = "email LIKE '%@example.com'");
     }
 
     function run() {
         describe("User Model", function() {
 
             it("should validate email presence", function() {
-                var user = model("User").new();
+                var user = application.wo.model("User").new();
                 user.email = "";
                 expect(user.valid()).toBeFalse();
                 expect(user.errors).toHaveKey("email");
             });
 
             it("should create valid user", function() {
-                var user = model("User").new(variables.testData);
+                var user = application.wo.model("User").new(variables.testData);
                 expect(user.valid()).toBeTrue();
             });
 
@@ -92,7 +182,7 @@ component extends="testbox.system.BaseSpec" {
 
     function beforeAll() {
         // Setup test data once for all tests in this component
-        variables.testCategory = model("Category").create(name = "Test Category");
+        variables.testCategory = application.wo.model("Category").create(name = "Test Category");
         variables.validProductData = {
             name = "Test Product",
             price = 19.99,
@@ -102,7 +192,7 @@ component extends="testbox.system.BaseSpec" {
 
     function afterAll() {
         // Cleanup once after all tests complete
-        model("Product").deleteAll(where = "name LIKE 'Test%'");
+        application.wo.model("Product").deleteAll(where = "name LIKE 'Test%'");
         if (isDefined("variables.testCategory")) variables.testCategory.delete();
     }
 
@@ -112,13 +202,13 @@ component extends="testbox.system.BaseSpec" {
             describe("Validations", function() {
                 
                 it("should require a name", function() {
-                    var product = model("Product").new();
+                    var product = application.wo.model("Product").new();
                     expect(product.valid()).toBeFalse();
                     expect(product.errors).toHaveKey("name");
                 });
 
                 it("should require positive price", function() {
-                    var product = model("Product").new(
+                    var product = application.wo.model("Product").new(
                         name = "Test Product",
                         price = -10
                     );
@@ -127,7 +217,7 @@ component extends="testbox.system.BaseSpec" {
                 });
 
                 it("should validate email format", function() {
-                    var user = model("User").new(email = "invalid-email");
+                    var user = application.wo.model("User").new(email = "invalid-email");
                     expect(user.valid()).toBeFalse();
                     expect(user.errors.email).toInclude("valid email");
                 });
@@ -137,7 +227,7 @@ component extends="testbox.system.BaseSpec" {
             describe("Associations", function() {
                 
                 it("should have many reviews", function() {
-                    var product = model("Product").findOne();
+                    var product = application.wo.model("Product").findOne();
                     expect(product).toHaveKey("reviews");
                     expect(product.reviews()).toBeQuery();
                 });
@@ -154,10 +244,10 @@ component extends="testbox.system.BaseSpec" {
                 
                 it("should filter active products", function() {
                     // Create test data
-                    model("Product").create(name = "Active", active = true);
-                    model("Product").create(name = "Inactive", active = false);
+                    application.wo.model("Product").create(name = "Active", active = true);
+                    application.wo.model("Product").create(name = "Inactive", active = false);
 
-                    var activeProducts = model("Product").active().findAll();
+                    var activeProducts = application.wo.model("Product").active().findAll();
                     expect(activeProducts.recordCount).toBe(1);
                     expect(activeProducts.name).toBe("Active");
                 });
@@ -167,13 +257,13 @@ component extends="testbox.system.BaseSpec" {
             describe("Custom Methods", function() {
                 
                 it("should calculate discount price", function() {
-                    var product = model("Product").new(price = 100);
+                    var product = application.wo.model("Product").new(price = 100);
                     var discountPrice = product.calculateDiscountPrice(0.20);
                     expect(discountPrice).toBe(80);
                 });
 
                 it("should generate slug from name", function() {
-                    var product = model("Product").new(name = "Test Product Name");
+                    var product = application.wo.model("Product").new(name = "Test Product Name");
                     expect(product.generateSlug()).toBe("test-product-name");
                 });
 
@@ -238,7 +328,7 @@ component extends="testbox.system.BaseSpec" {
                     expect(response.status_code).toBe(302); // Redirect after creation
                     
                     // Verify product was created
-                    var product = model("Product").findOne(where = "name = 'New Product'");
+                    var product = application.wo.model("Product").findOne(where = "name = 'New Product'");
                     expect(product).toBeObject();
                     expect(product.price).toBe(29.99);
                 });
@@ -369,7 +459,7 @@ component extends="testbox.system.BaseSpec" {
                 expect(response.status_code).toBe(302);
 
                 // 4. Verify user was created
-                var user = model("User").findOne(where = "email = '#userData.email#'");
+                var user = application.wo.model("User").findOne(where = "email = '#userData.email#'");
                 expect(user).toBeObject();
                 expect(user.firstName).toBe(userData.firstName);
 
@@ -459,7 +549,7 @@ component {
         };
         
         defaults.append(arguments.overrides);
-        return model("User").create(defaults);
+        return application.wo.model("User").create(defaults);
     }
 
     function createProduct(struct overrides = {}) {
@@ -471,14 +561,14 @@ component {
         };
         
         defaults.append(arguments.overrides);
-        return model("Product").create(defaults);
+        return application.wo.model("Product").create(defaults);
     }
 
     function buildUser(struct overrides = {}) {
         // Build without saving to database
         var defaults = createUserDefaults();
         defaults.append(arguments.overrides);
-        return model("User").new(defaults);
+        return application.wo.model("User").new(defaults);
     }
 
 }
@@ -539,7 +629,7 @@ describe("User Registration", function() {
     
     afterEach(function() {
         // AVOID: This runs after every single test, slowing down the suite
-        model("User").deleteAll(where = "email LIKE '%@test.com'");
+        application.wo.model("User").deleteAll(where = "email LIKE '%@test.com'");
     });
 
     // Multiple test methods here...
@@ -552,13 +642,13 @@ component extends="testbox.system.BaseSpec" {
     
     function beforeAll() {
         // Expensive setup once per component - much faster
-        variables.testCategory = model("Category").create(name = "Test Category");
-        variables.testUser = model("User").create(email = "test@example.com");
+        variables.testCategory = application.wo.model("Category").create(name = "Test Category");
+        variables.testUser = application.wo.model("User").create(email = "test@example.com");
     }
 
     function afterAll() {
         // Clean up once per component
-        model("Product").deleteAll(where = "name LIKE 'Test%'");
+        application.wo.model("Product").deleteAll(where = "name LIKE 'Test%'");
         if (isDefined("variables.testCategory")) variables.testCategory.delete();
         if (isDefined("variables.testUser")) variables.testUser.delete();
     }
@@ -568,7 +658,7 @@ component extends="testbox.system.BaseSpec" {
 
             // Tests can use shared test data - much faster than recreating for each test
             it("should create product with category", function() {
-                var product = model("Product").create(
+                var product = application.wo.model("Product").create(
                     name = "Test Product",
                     categoryId = variables.testCategory.id
                 );
@@ -576,7 +666,7 @@ component extends="testbox.system.BaseSpec" {
             });
 
             it("should create product with user", function() {
-                var product = model("Product").create(
+                var product = application.wo.model("Product").create(
                     name = "Test User Product", 
                     userId = variables.testUser.id
                 );
@@ -663,9 +753,9 @@ Configure test-specific settings in `/tests/populate.cfm`:
     // Create test data
     try {
         // Create test users
-        var testUser = model("User").findOne(where = "email = 'test@example.com'");
+        var testUser = application.wo.model("User").findOne(where = "email = 'test@example.com'");
         if (!isObject(testUser)) {
-            testUser = model("User").create({
+            testUser = application.wo.model("User").create({
                 email = "test@example.com",
                 password = "password123",
                 firstName = "Test",
@@ -674,9 +764,9 @@ Configure test-specific settings in `/tests/populate.cfm`:
         }
         
         // Create test categories
-        var testCategory = model("Category").findOne(where = "name = 'Test Category'");
+        var testCategory = application.wo.model("Category").findOne(where = "name = 'Test Category'");
         if (!isObject(testCategory)) {
-            testCategory = model("Category").create({
+            testCategory = application.wo.model("Category").create({
                 name = "Test Category",
                 description = "Category for testing"
             });
@@ -758,7 +848,7 @@ it("should require unique email addresses", function() {
 ### Testing Callbacks
 ```cfm
 it("should hash password before saving", function() {
-    var user = model("User").new(password = "plaintext");
+    var user = application.wo.model("User").new(password = "plaintext");
     user.save();
     
     expect(user.passwordHash).notToBe("plaintext");
@@ -772,7 +862,7 @@ it("should find only published posts", function() {
     createPost(title = "Published", published = true);
     createPost(title = "Draft", published = false);
     
-    var publishedPosts = model("Post").published().findAll();
+    var publishedPosts = application.wo.model("Post").published().findAll();
     expect(publishedPosts.recordCount).toBe(1);
     expect(publishedPosts.title).toBe("Published");
 });
@@ -782,7 +872,7 @@ it("should find only published posts", function() {
 ```cfm
 it("should handle missing records gracefully", function() {
     expect(function() {
-        var post = model("Post").findByKey(99999);
+        var post = application.wo.model("Post").findByKey(99999);
         if (!isObject(post)) {
             throw(message = "Post not found");
         }
