@@ -810,10 +810,10 @@ component {
 		local.normalizedCondition = Replace(local.normalizedCondition, "  ", " ", "all"); // Normalize spaces
 		local.before = local.normalizedCondition;
 
-		for(value in local.operatorList){
-			local.position = FindNoCase(value, local.normalizedCondition);
+		for(local.value in local.operatorList){
+			local.position = FindNoCase(local.value, local.normalizedCondition);
 			if(local.position){
-				local.middle = value;
+				local.middle = local.value;
 				local.before = trim(Mid(local.normalizedCondition,1,local.position - 1));
 				local.after = trim(Mid(local.normalizedCondition, local.position + len(local.middle), len(local.normalizedCondition)));
 			}
