@@ -578,9 +578,10 @@ component {
 							local.groupQueryCount = 1;
 						}
 						QueryAddRow(arguments.group);
-						local.jEnd = ListLen(local.query.columnList);
+						local.columnArray = ListToArray(local.query.columnList);
+						local.jEnd = ArrayLen(local.columnArray);
 						for (local.j = 1; local.j <= local.jEnd; local.j++) {
-							local.property = ListGetAt(local.query.columnList, local.j);
+							local.property = local.columnArray[local.j];
 							arguments[local.property] = local.query[local.property][local.i];
 							QuerySetCell(arguments.group, local.property, local.query[local.property][local.i], local.groupQueryCount);
 						}
@@ -605,9 +606,10 @@ component {
 					for (local.i = 1; local.i <= local.iEnd; local.i++) {
 						arguments.current = local.i;
 						arguments.totalCount = local.iEnd;
-						local.jEnd = ListLen(local.query.columnList);
+						local.columnArray = ListToArray(local.query.columnList);
+						local.jEnd = ArrayLen(local.columnArray);
 						for (local.j = 1; local.j <= local.jEnd; local.j++) {
-							local.property = ListGetAt(local.query.columnList, local.j);
+							local.property = local.columnArray[local.j];
 							try {
 								arguments[local.property] = local.query[local.property][local.i];
 							} catch (any e) {

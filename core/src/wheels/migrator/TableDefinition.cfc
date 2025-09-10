@@ -11,9 +11,10 @@ component extends="Base" {
 		this.primaryKeys = [];
 		this.foreignKeys = [];
 		this.columns = [];
-		local.iEnd = ListLen(local.args);
+		local.argsArray = ListToArray(local.args);
+		local.iEnd = ArrayLen(local.argsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.args, local.i);
+			local.argumentName = local.argsArray[local.i];
 			if (StructKeyExists(arguments, local.argumentName)) {
 				this[local.argumentName] = arguments[local.argumentName];
 			}
@@ -113,9 +114,10 @@ component extends="Base" {
 	public any function bigInteger(string columnNames, numeric limit, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "biginteger";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -130,9 +132,10 @@ component extends="Base" {
 	public any function binary(string columnNames, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "binary";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -147,9 +150,10 @@ component extends="Base" {
 	public any function boolean(string columnNames, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "boolean";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -164,9 +168,10 @@ component extends="Base" {
 	public any function date(string columnNames, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "date";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -181,9 +186,10 @@ component extends="Base" {
 	public any function datetime(string columnNames, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "datetime";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -198,9 +204,10 @@ component extends="Base" {
 	public any function decimal(string columnNames, string default, boolean allowNull, numeric precision, numeric scale) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "decimal";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -215,9 +222,10 @@ component extends="Base" {
 	public any function float(string columnNames, string default = "", boolean allowNull = "true") {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "float";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -232,9 +240,10 @@ component extends="Base" {
 	public any function integer(string columnNames, numeric limit, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "integer";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -249,9 +258,10 @@ component extends="Base" {
 	public any function string(string columnNames, any limit, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "string";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -266,9 +276,10 @@ component extends="Base" {
 	public any function char(string columnNames, any limit, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "char";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -290,9 +301,10 @@ component extends="Base" {
 	public any function text(string columnNames, string default, boolean allowNull, string size) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "text";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -307,9 +319,10 @@ component extends="Base" {
 	public any function uniqueidentifier(string columnNames, string default = "newid()", boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "uniqueidentifier";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -324,9 +337,10 @@ component extends="Base" {
 	public any function time(string columnNames, string default, boolean allowNull) {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
 		arguments.columnType = "time";
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -340,9 +354,10 @@ component extends="Base" {
 	 */
 	public any function timestamp(string columnNames, string default, boolean allowNull, string columnType = "datetime") {
 		$combineArguments(args = arguments, combine = "columnNames,columnName", required = true);
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			arguments.columnName = Trim(ListGetAt(arguments.columnNames, local.i));
+			arguments.columnName = Trim(local.columnNamesArray[local.i]);
 			column(argumentCollection = arguments);
 		}
 		return this;
@@ -375,9 +390,10 @@ component extends="Base" {
 		string onUpdate = "",
 		string onDelete = ""
 	) {
-		local.iEnd = ListLen(arguments.referenceNames);
+		local.referenceNamesArray = ListToArray(arguments.referenceNames);
+		local.iEnd = ArrayLen(local.referenceNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.referenceName = ListGetAt(arguments.referenceNames, local.i);
+			local.referenceName = local.referenceNamesArray[local.i];
 
 			// get all possible arguments for the column
 			local.columnArgs = {};

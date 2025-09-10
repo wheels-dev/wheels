@@ -151,16 +151,18 @@ component {
 	 */
 	public boolean function $checkVerificationsVars(required struct scope, required string vars, required string types) {
 		local.rv = true;
-		local.iEnd = ListLen(arguments.vars);
+		local.varsArray = ListToArray(arguments.vars);
+		local.typesArray = Len(arguments.types) ? ListToArray(arguments.types) : [];
+		local.iEnd = ArrayLen(local.varsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(arguments.vars, local.i);
+			local.item = local.varsArray[local.i];
 			if (!StructKeyExists(arguments.scope, local.item)) {
 				local.rv = false;
 				break;
 			}
-			if (Len(arguments.types)) {
+			if (ArrayLen(local.typesArray)) {
 				local.value = arguments.scope[local.item];
-				local.typeCheck = ListGetAt(arguments.types, local.i);
+				local.typeCheck = local.typesArray[local.i];
 
 				// By default string aren't allowed to be blank.
 				local.typeAllowedBlank = false;

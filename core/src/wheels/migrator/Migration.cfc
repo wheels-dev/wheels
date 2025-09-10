@@ -117,9 +117,10 @@ component extends="Base" {
 		local.appKey = $appKey();
 		if (application[local.appKey].serverName != "lucee") {
 			local.foreignKeys = $getForeignKeys(arguments.name);
-			local.iEnd = ListLen(local.foreignKeys);
+			local.foreignKeysArray = ListToArray(local.foreignKeys);
+			local.iEnd = ArrayLen(local.foreignKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.foreignKeyName = ListGetAt(local.foreignKeys, local.i);
+				local.foreignKeyName = local.foreignKeysArray[local.i];
 				dropForeignKey(table = arguments.name, keyname = local.foreignKeyName);
 			}
 		}

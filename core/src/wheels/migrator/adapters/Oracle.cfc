@@ -121,9 +121,10 @@ component extends="Abstract" {
 		}
 		sql = sql & "INDEX #arguments.indexName# ON #arguments.table#(";
 
-		local.iEnd = ListLen(arguments.columnNames);
+		local.columnNamesArray = ListToArray(arguments.columnNames);
+		local.iEnd = ArrayLen(local.columnNamesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			sql = sql & quoteColumnName(ListGetAt(arguments.columnNames, local.i));
+			sql = sql & quoteColumnName(local.columnNamesArray[local.i]);
 			if (local.i != local.iEnd) {
 				sql = sql & ",";
 			}

@@ -64,9 +64,10 @@ component {
 
 			// Loop through arguments and when the first flash argument is found we set it.
 			local.argumentNames = StructKeyList(arguments);
-			local.iEnd = ListLen(local.argumentNames);
+			local.argumentNamesArray = ListToArray(local.argumentNames);
+			local.iEnd = ArrayLen(local.argumentNamesArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = ListGetAt(local.argumentNames, local.i);
+				local.item = local.argumentNamesArray[local.i];
 				if (!ListFindNoCase(local.nonFlashArgumentNames, local.item)) {
 					local.key = ReReplaceNoCase(local.item, "^flash(.)", "\l\1");
 					local.flashArguments = {};
