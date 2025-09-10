@@ -12,13 +12,11 @@ component aliases="wheels plugin install" extends="../base" {
     /**
      * @name.hint Plugin name or repository URL
      * @dev.hint Install as development dependency
-     * @global.hint Install globally
      * @version.hint Specific version to install
      */
     function run(
         required string name,
         boolean dev = false,
-        boolean global = false,
         string version = ""
     ) {
         arguments = reconstructArgs(arguments);

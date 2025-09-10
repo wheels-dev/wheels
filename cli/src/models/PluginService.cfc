@@ -12,7 +12,6 @@ component {
     function install(
         required string name,
         boolean dev = false,
-        boolean global = false,
         string version = ""
     ) {
         try {
@@ -50,28 +49,18 @@ component {
                 packageSpec &= "@" & arguments.version;
             }
             
-            // Install the plugin
-            if (arguments.global) {
-                // Install globally via CommandBox (this is for CLI plugins)
-                packageService.installPackage(
-                    ID = packageSpec,
-                    save = false,
-                    global = true
-                );
-            } else {
-                // Add to box.json
-                boxJson[depType][pluginInfo.slug] = packageSpec;
-                
-                // Write updated box.json
-                fileWrite(boxJsonPath, serializeJSON(boxJson, true));
-                
-                // Install via CommandBox
-                packageService.installPackage(
-                    ID = packageSpec,
-                    save = true,
-                    saveDev = arguments.dev
-                );
-            }
+            // Add to box.json
+            boxJson[depType][pluginInfo.slug] = packageSpec;
+            
+            // Write updated box.json
+            fileWrite(boxJsonPath, serializeJSON(boxJson, true));
+            
+            // Install via CommandBox
+            packageService.installPackage(
+                ID = packageSpec,
+                save = true,
+                saveDev = arguments.dev
+            );
             
             // Register plugin commands
             registerPluginCommands(pluginInfo);
@@ -139,56 +128,47 @@ component {
     /**
      * List installed plugins
      */
-    function list(boolean global = false) {
+    function list() {
         var plugins = [];
+        var pluginNames = [];
         
-        if (arguments.global) {
-            // Get global CommandBox modules (CLI plugins)
-            var globalModules = configService.getSetting("modules", {});
-            for (var moduleName in globalModules) {
-                if (isWheelsPlugin(moduleName)) {
-                    arrayAppend(plugins, {
-                        name: moduleName,
-                        version: globalModules[moduleName].version ?: "unknown",
-                        global: true,
-                        description: globalModules[moduleName].description ?: ""
-                    });
+        // Check for Wheels application plugins in /plugins folder first (priority)
+        var pluginsDir = fileSystemUtil.resolvePath("plugins");
+        if (directoryExists(pluginsDir)) {
+            // Get all .zip files in plugins directory (Wheels application plugins)
+            var pluginZips = directoryList(pluginsDir, false, "query", "*.zip", "name");
+            for (var zipFile in pluginZips) {
+                var pluginInfo = parseWheelsPluginZip(pluginsDir & "/" & zipFile.name);
+                if (pluginInfo.isValid) {
+                    arrayAppend(plugins, pluginInfo);
+                    arrayAppend(pluginNames, pluginInfo.name);
                 }
             }
-        } else {
-            // Check for Wheels application plugins in /plugins folder
-            var pluginsDir = fileSystemUtil.resolvePath("plugins");
-            if (directoryExists(pluginsDir)) {
-                // Get all .zip files in plugins directory (Wheels application plugins)
-                var pluginZips = directoryList(pluginsDir, false, "query", "*.zip", "name");
-                for (var zipFile in pluginZips) {
-                    var pluginInfo = parseWheelsPluginZip(pluginsDir & "/" & zipFile.name);
-                    if (pluginInfo.isValid) {
+        }
+        
+        // Also check box.json for CLI plugins installed locally (avoid duplicates)
+        var boxJsonPath = resolvePath("box.json");
+        if (fileExists(boxJsonPath)) {
+            var boxJson = deserializeJSON(fileRead(boxJsonPath));
+            
+            // Check dependencies
+            if (boxJson.keyExists("dependencies")) {
+                for (var dep in boxJson.dependencies) {
+                    if (isWheelsPlugin(dep) && !isDuplicatePlugin(dep, pluginNames)) {
+                        var pluginInfo = getInstalledPluginInfo(dep, false);
                         arrayAppend(plugins, pluginInfo);
+                        arrayAppend(pluginNames, pluginInfo.name);
                     }
                 }
             }
             
-            // Also check box.json for CLI plugins installed locally
-            var boxJsonPath = resolvePath("box.json");
-            if (fileExists(boxJsonPath)) {
-                var boxJson = deserializeJSON(fileRead(boxJsonPath));
-                
-                // Check dependencies
-                if (boxJson.keyExists("dependencies")) {
-                    for (var dep in boxJson.dependencies) {
-                        if (isWheelsPlugin(dep)) {
-                            arrayAppend(plugins, getInstalledPluginInfo(dep, false));
-                        }
-                    }
-                }
-                
-                // Check devDependencies
-                if (boxJson.keyExists("devDependencies")) {
-                    for (var dep in boxJson.devDependencies) {
-                        if (isWheelsPlugin(dep)) {
-                            arrayAppend(plugins, getInstalledPluginInfo(dep, true));
-                        }
+            // Check devDependencies
+            if (boxJson.keyExists("devDependencies")) {
+                for (var dep in boxJson.devDependencies) {
+                    if (isWheelsPlugin(dep) && !isDuplicatePlugin(dep, pluginNames)) {
+                        var pluginInfo = getInstalledPluginInfo(dep, true);
+                        arrayAppend(plugins, pluginInfo);
+                        arrayAppend(pluginNames, pluginInfo.name);
                     }
                 }
             }
@@ -262,10 +242,42 @@ component {
      * Check if a module is a Wheels CLI plugin
      */
     private function isWheelsPlugin(moduleName) {
-        // Check module name patterns
-        return reFindNoCase("^wheels-", arguments.moduleName) ||
+        // Exclude the core framework and common non-plugin dependencies
+        if (listFindNoCase("wheels-core,wirebox,testbox,cfformat", arguments.moduleName)) {
+            return false;
+        }
+        
+        // Check for actual Wheels plugin patterns
+        return reFindNoCase("^cfwheels-.*-plugin", arguments.moduleName) ||
+               reFindNoCase("^wheels-.*-plugin", arguments.moduleName) ||
                reFindNoCase("-wheels-cli$", arguments.moduleName) ||
                reFindNoCase("wheels.*cli", arguments.moduleName);
+    }
+    
+    /**
+     * Check if a plugin is already in the list (handles name variations)
+     */
+    private function isDuplicatePlugin(required string pluginName, required array existingNames) {
+        // Direct name match
+        if (arrayFindNoCase(arguments.existingNames, arguments.pluginName)) {
+            return true;
+        }
+        
+        // Check for common name variations
+        var cleanName = reReplace(arguments.pluginName, "^cfwheels-", "");
+        cleanName = reReplace(cleanName, "-plugin$", "");
+        
+        for (var existingName in arguments.existingNames) {
+            var cleanExisting = reReplace(existingName, "^cfwheels-", "");
+            cleanExisting = reReplace(cleanExisting, "-plugin$", "");
+            cleanExisting = reReplace(cleanExisting, "\s+Plugin$", "");
+            
+            if (compareNoCase(cleanName, cleanExisting) == 0) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     /**
@@ -307,7 +319,9 @@ component {
                     if (structKeyExists(boxJsonData, "version")) {
                         pluginInfo.version = boxJsonData.version;
                     }
-                    if (structKeyExists(boxJsonData, "description")) {
+                    if (structKeyExists(boxJsonData, "shortDescription")) {
+                        pluginInfo.description = boxJsonData.shortDescription;
+                    } else if (structKeyExists(boxJsonData, "description")) {
                         pluginInfo.description = boxJsonData.description;
                     } else if (structKeyExists(boxJsonData, "summary")) {
                         pluginInfo.description = boxJsonData.summary;
@@ -354,39 +368,7 @@ component {
         
         return info;
     }
-    /**
-     * Create a temporary directory
-     */
-    private function createTempDir() {
-        var tempDir = getTempDirectory() & "wheels_plugin_" & createUUID();
-        directoryCreate(tempDir);
-        return tempDir;
-    }
-    
-    /**
-     * Clean up temporary directory with retry logic
-     */
-    private function cleanupTempDir(required string tempDir) {
-        if (!directoryExists(arguments.tempDir)) {
-            return;
-        }
-        
-        // Try multiple times since Windows can have file locks
-        for (var i = 1; i <= 3; i++) {
-            try {
-                directoryDelete(arguments.tempDir, true);
-                return;
-            } catch (any e) {
-                if (i < 3) {
-                    sleep(100); // Wait 100ms before retry
-                }
-            }
-        }
-        
-        // If still can't delete, just log it (don't fail the operation)
-        systemOutput("Warning: Could not clean up temporary directory: " & arguments.tempDir, true);
-    }
-    
+
 
     /**
      * Register plugin commands with CommandBox

@@ -5,12 +5,11 @@ Lists installed Wheels CLI plugins or shows available plugins from ForgeBox.
 ## Usage
 
 ```bash
-wheels plugins list [--global] [--format=<format>] [--available]
+wheels plugins list [--format=<format>] [--available]
 ```
 
 ## Parameters
 
-- `--global` - (Optional) Show globally installed plugins
 - `--format` - (Optional) Output format: `table`, `json`. Default: `table`
 - `--available` - (Optional) Show available plugins from ForgeBox
 
@@ -29,10 +28,6 @@ The `plugins list` command displays information about all plugins installed in y
 wheels plugins list
 ```
 
-### Show globally installed plugins
-```bash
-wheels plugins list --global
-```
 
 ### Export as JSON
 ```bash
@@ -81,7 +76,6 @@ Total: 3 plugins
 
 ## Notes
 
-- Local plugins are stored in your project
-- Global plugins are available to all projects
-- Use `wheels plugins install` to add new plugins
+- Plugins are stored in your project's `/plugins` folder
+- Use `wheels plugins install` to add new plugins  
 - The `--available` flag queries the ForgeBox registry

@@ -5,14 +5,13 @@ Installs a Wheels CLI plugin from various sources including ForgeBox, GitHub, or
 ## Usage
 
 ```bash
-wheels plugins install <name> [--dev] [--global] [--version=<version>]
+wheels plugins install <name> [--dev] [--version=<version>]
 ```
 
 ## Parameters
 
 - `name` - (Required) Plugin name or repository URL
 - `--dev` - (Optional) Install as development dependency
-- `--global` - (Optional) Install globally
 - `--version` - (Optional) Specific version to install
 
 ## Description
@@ -52,12 +51,7 @@ wheels plugins install https://github.com/user/wheels-plugin
 wheels plugins install wheels-docker --dev
 ```
 
-### Install globally
-```bash
-wheels plugins install wheels-cli-tools --global
-```
-
-### Install with multiple options
+### Install with version
 ```bash
 wheels plugins install wheels-testing --dev --version=1.5.0
 ```
