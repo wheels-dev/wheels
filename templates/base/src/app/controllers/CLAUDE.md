@@ -394,71 +394,314 @@ private function checkPermission(permission = "read") {
 }
 ```
 
-## Working with Models
+## Working with Models in Controllers
 
-### Basic Model Operations
+Controllers primarily interact with models to retrieve, create, update, and delete data. This section covers common controller-model interaction patterns.
+
+> **📚 For comprehensive model documentation**, see `/app/models/CLAUDE.md` which covers all model methods, associations, validations, callbacks, and advanced features like dirty tracking, dynamic finders, statistical functions, and more.
+
+### Basic Model Operations in Controllers
 ```cfc
 function index() {
-    // Find all records
-    products = model("Product").findAll();
-    
-    // With conditions and ordering
-    products = model("Product").findAll(
-        where="active = true",
-        order="name ASC",
-        include="category,reviews"
-    );
-    
-    // With pagination
+    // Find all records with common controller patterns
     products = model("Product").findAll(
         page=params.page ?: 1,
-        perPage=25
+        perPage=25,
+        order="createdAt DESC"
     );
+    
+    // With search filtering
+    if (StructKeyExists(params, "q") && len(params.q)) {
+        products = model("Product").findAll(
+            where="name LIKE ? OR description LIKE ?",
+            whereParams=["%#params.q#%", "%#params.q#%"],
+            page=params.page ?: 1,
+            perPage=25
+        );
+    }
 }
 
 function show() {
-    // Find by primary key
+    // Find by primary key with error handling
     product = model("Product").findByKey(params.key);
     
-    // Find with includes
+    if (!IsObject(product)) {
+        redirectTo(action="index", error="Product not found");
+        return;
+    }
+    
+    // Load related data for display
     product = model("Product").findByKey(
         key=params.key,
         include="category,reviews.user"
     );
 }
 
+function new() {
+    // Create new model instance for form
+    product = model("Product").new();
+    
+    // Load related data for form dropdowns
+    categories = model("Category").findAll(order="name");
+}
+
 function create() {
-    // Create with validation
+    // Create with form data and handle validation
     product = model("Product").create(params.product);
     
     if (product.hasErrors()) {
-        // Handle validation errors
+        // Re-display form with errors
+        categories = model("Category").findAll(order="name");
         renderView(action="new");
     } else {
-        redirectTo(action="index", success="Product created");
+        redirectTo(action="show", key=product.id, success="Product created successfully");
+    }
+}
+
+function edit() {
+    // Load record for editing
+    product = model("Product").findByKey(params.key);
+    categories = model("Category").findAll(order="name");
+}
+
+function update() {
+    // Update existing record
+    product = model("Product").findByKey(params.key);
+    
+    if (product.update(params.product)) {
+        redirectTo(action="show", key=product.id, success="Product updated successfully");
+    } else {
+        categories = model("Category").findAll(order="name");
+        renderView(action="edit");
+    }
+}
+
+function delete() {
+    // Delete record with confirmation
+    product = model("Product").findByKey(params.key);
+    product.delete();
+    redirectTo(action="index", success="Product deleted successfully");
+}
+```
+
+### Controller-Specific Model Patterns
+
+#### Pagination in Controllers
+```cfc
+function index() {
+    // Standard pagination pattern
+    products = model("Product").findAll(
+        page=params.page ?: 1,
+        perPage=params.perPage ?: 25,
+        order="name"
+    );
+    
+    // Make pagination info available to view
+    pagination = {
+        currentPage: products.currentPage,
+        totalPages: products.pageCount,
+        totalRecords: products.totalRecords
+    };
+}
+```
+
+#### Search and Filtering
+```cfc
+function search() {
+    searchCriteria = {};
+    
+    // Build dynamic where clause
+    if (len(params.q ?: "")) {
+        searchCriteria.where = "name LIKE ? OR description LIKE ?";
+        searchCriteria.whereParams = ["%#params.q#%", "%#params.q#%"];
+    }
+    
+    if (isNumeric(params.categoryId ?: "")) {
+        local.where = searchCriteria.where ?: "";
+        if (len(local.where)) local.where &= " AND ";
+        local.where &= "categoryId = ?";
+        
+        searchCriteria.where = local.where;
+        searchCriteria.whereParams = searchCriteria.whereParams ?: [];
+        arrayAppend(searchCriteria.whereParams, params.categoryId);
+    }
+    
+    products = model("Product").findAll(argumentCollection=searchCriteria);
+}
+```
+
+#### Association Loading
+```cfc
+function dashboard() {
+    // Load multiple models efficiently
+    recentProducts = model("Product").findAll(
+        limit=5,
+        order="createdAt DESC",
+        include="category"  // Avoid N+1 queries
+    );
+    
+    topCategories = model("Category").findAll(
+        joins="INNER JOIN products p ON categories.id = p.categoryId",
+        group="categories.id",
+        order="COUNT(p.id) DESC",
+        limit=10
+    );
+    
+    // Use statistical functions (see models/CLAUDE.md for full reference)
+    totalProducts = model("Product").count();
+    averagePrice = model("Product").average("price");
+}
+```
+
+#### Validation Handling
+```cfc
+function create() {
+    product = model("Product").new(params.product);
+    
+    if (product.save()) {
+        redirectTo(action="show", key=product.id, success="Created successfully");
+    } else {
+        // Make errors available to view
+        errors = product.allErrors();
+        
+        // Reload supporting data
+        categories = model("Category").findAll(order="name");
+        
+        renderView(action="new");
+    }
+}
+
+function bulkUpdate() {
+    errors = [];
+    successes = 0;
+    
+    for (productId in params.selectedIds) {
+        product = model("Product").findByKey(productId);
+        
+        if (IsObject(product)) {
+            if (product.update(params.bulkData)) {
+                successes++;
+            } else {
+                arrayAppend(errors, "Product ##productId##: #arrayToList(product.errorMessages())#");
+            }
+        }
+    }
+    
+    if (successes > 0) {
+        flashInsert(success="#successes# products updated");
+    }
+    if (arrayLen(errors) > 0) {
+        flashInsert(error="Errors: #arrayToList(errors, '; ')#");
+    }
+    
+    redirectTo(action="index");
+}
+```
+
+### Advanced Controller-Model Patterns
+
+#### Dynamic Finders in Controllers
+```cfc
+function findByEmail() {
+    // Use dynamic finders (see models/CLAUDE.md for complete reference)
+    user = model("User").findOneByEmail(params.email);
+    
+    if (IsObject(user)) {
+        renderWith(user);
+    } else {
+        renderWith(data={error: "User not found"}, status=404);
+    }
+}
+
+function filterByStatus() {
+    // Dynamic finder with additional parameters
+    products = model("Product").findAllByStatus(
+        value=params.status,
+        order="createdAt DESC",
+        page=params.page ?: 1
+    );
+}
+```
+
+#### Statistical Queries in Controllers
+```cfc
+function reports() {
+    // Use model statistical functions
+    totalRevenue = model("Order").sum("total", where="status = 'completed'");
+    averageOrderValue = model("Order").average("total", where="status = 'completed'");
+    orderCount = model("Order").count(where="status = 'completed'");
+    
+    topProducts = model("Product").findBySQL("
+        SELECT p.*, COUNT(oi.id) as orderCount
+        FROM products p
+        INNER JOIN orderItems oi ON p.id = oi.productId
+        GROUP BY p.id
+        ORDER BY orderCount DESC
+        LIMIT 10
+    ");
+}
+```
+
+#### Change Tracking in Controllers
+```cfc
+function update() {
+    product = model("Product").findByKey(params.key);
+    originalPrice = product.price;
+    
+    if (product.update(params.product)) {
+        // Use dirty tracking to detect changes (see models/CLAUDE.md)
+        if (product.hasChanged("price")) {
+            // Log price change
+            writeLog("Price changed for product #product.id#: #originalPrice# to #product.price#");
+        }
+        
+        redirectTo(action="show", key=product.id, success="Updated successfully");
+    } else {
+        renderView(action="edit");
     }
 }
 ```
 
-### Advanced Model Queries
+### API Controller Model Patterns
 ```cfc
-function search() {
-    criteria = {};
+function apiIndex() {
+    products = model("Product").findAll(
+        page=params.page ?: 1,
+        perPage=params.perPage ?: 25
+    );
     
-    if (StructKeyExists(params, "q")) {
-        criteria.where = "name LIKE :search OR description LIKE :search";
-        criteria.params = {search: "%#params.q#%"};
+    renderWith(data={
+        products: products,
+        meta: {
+            page: products.currentPage,
+            totalPages: products.pageCount,
+            total: products.totalRecords
+        }
+    });
+}
+
+function apiCreate() {
+    product = model("Product").new(params.product);
+    
+    if (product.save()) {
+        renderWith(data={product: product}, status=201);
+    } else {
+        renderWith(data={
+            error: "Validation failed",
+            errors: product.allErrors()
+        }, status=422);
     }
-    
-    if (StructKeyExists(params, "category")) {
-        criteria.where = (StructKeyExists(criteria, "where") ? criteria.where & " AND " : "") & "categoryId = :categoryId";
-        criteria.params = StructKeyExists(criteria, "params") ? criteria.params : {};
-        criteria.params.categoryId = params.category;
-    }
-    
-    products = model("Product").findAll(argumentCollection=criteria);
 }
 ```
+
+> **🔗 Model Method Reference**: For complete documentation of all available model methods including:
+> - **Finders**: `findAll()`, `findByKey()`, `findOne()`, dynamic finders
+> - **CRUD**: `create()`, `new()`, `save()`, `update()`, `delete()`
+> - **Associations**: `hasMany()`, `belongsTo()`, `hasOne()`, nested properties
+> - **Validations**: All validation methods and custom validations
+> - **Advanced Features**: Dirty tracking, callbacks, soft delete, statistics, etc.
+> 
+> See `/app/models/CLAUDE.md`
 
 ## Flash Messages
 

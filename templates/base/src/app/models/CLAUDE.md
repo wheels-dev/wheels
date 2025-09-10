@@ -51,10 +51,39 @@ All models extend `wheels.Model`, which provides:
 #### Configuration Methods (used in config())
 - **`property()`** - Define custom properties and mappings
 - **`table()`** - Specify database table name
-- **`belongsTo()`** - Define parent relationship
+- **`dataSource()`** - Specify custom data source for this model
+- **`belongsTo(name="model name", foreignKey="")`** - Define parent relationship
 - **`hasMany()`** - Define child collection relationship
 - **`hasOne()`** - Define one-to-one relationship
 - **`validates*()`** - Define validation rules
+- **`validate(method="")`** - Define custom validation methods
+- **`nestedProperties()`** - Enable saving of associated models in single operation
+- **`timeStampOnCreate()`** - Enable automatic createdAt timestamp
+- **`timeStampOnUpdate()`** - Enable automatic updatedAt timestamp
+- **`protectedProperties()`** - Protect properties from mass assignment
+- **`accessibleProperties()`** - Allow specific properties for mass assignment
+
+#### Query and Statistical Methods
+- **`sum(property)`** - Calculate sum of property values
+- **`average(property)`** - Calculate average of property values  
+- **`minimum(property)`** - Find minimum property value
+- **`maximum(property)`** - Find maximum property value
+- **`findBySQL(sql)`** - Execute raw SQL queries
+- **`invokeWithTransaction()`** - Execute method within transaction
+
+#### Change Tracking Methods
+- **`hasChanged(property="")`** - Check if object/property has changed
+- **`changedFrom(property)`** - Get previous value of property
+- **`changedProperties()`** - Get list of changed property names
+- **`allChanges()`** - Get struct of all changes (names and values)
+- **`isNew()`** - Check if object is new (not yet saved to database)
+
+#### Dynamic Finder Methods
+- **`findOneBy[Property](value)`** - Dynamic finder for single property
+- **`findAllBy[Property](value)`** - Dynamic finder for single property
+- **`findOneBy[Property]And[Property](values)`** - Dynamic finder for multiple properties
+- **`[property]HasChanged()`** - Dynamic change check for specific property
+- **`[property]ChangedFrom()`** - Dynamic previous value check for specific property
 
 ## Model Generation
 
@@ -125,8 +154,7 @@ component extends="Model" {
         beforeSave("encryptPassword");
         afterCreate("sendWelcomeEmail");
         
-        // Soft delete
-        softDelete(true);
+        // Soft delete enabled automatically if deletedAt column exists
     }
     
     // Custom business logic methods go here
@@ -199,8 +227,7 @@ component extends="Model" {
         beforeSave("generateSku", "updateSlug");
         afterUpdate("clearProductCache");
         
-        // Soft delete for maintaining order history
-        softDelete(true);
+        // Soft delete enabled automatically if deletedAt column exists
     }
     
     /**
@@ -619,8 +646,7 @@ component extends="Model" {
         afterCreate("sendVerificationEmail");
         afterUpdate("logProfileChanges");
         
-        // Soft delete to maintain referential integrity
-        softDelete(true);
+        // Soft delete enabled automatically if deletedAt column exists
         
         // Automatic timestamps
         timeStampOnCreate(true);
@@ -1679,9 +1705,9 @@ function config() {
     beforeSave("normalizeData");
     afterCreate("sendNotification");
     
-    // 6. Other configuration
-    softDelete(true);
+    // 6. Other configuration  
     timeStampOnCreate(true);
+    // Note: Soft delete enabled automatically if deletedAt column exists
 }
 ```
 
@@ -1793,6 +1819,562 @@ component extends="Model" {
 }
 ```
 
+## Automatic Time Stamps
+
+Wheels automatically handles time stamping of records when you have the proper columns in your database.
+
+### Time Stamp Columns
+- **`createdAt`** - Automatically set to current date/time when record is created
+- **`updatedAt`** - Automatically set to current date/time when record is updated
+
+```cfm
+component extends="Model" {
+    function config() {
+        // Enable automatic timestamps
+        timeStampOnCreate(true);  // Sets createdAt on creation
+        timeStampOnUpdate(true);  // Sets updatedAt on modification
+    }
+}
+```
+
+### Time Zone Configuration
+Time stamps use UTC by default, but you can configure to use local time:
+```cfm
+// In /config/settings.cfm
+set(timeStampMode="local");
+```
+
+### Database Column Requirements
+- Columns must accept date/time values (`datetime` or `timestamp`)
+- Columns should allow `null` values
+- Use exact column names: `createdAt` and `updatedAt`
+
+## Column Statistics
+
+Wheels provides built-in statistical functions for performing aggregate calculations on your data.
+
+### Basic Statistical Methods
+```cfm
+// Count records
+authorCount = model("Author").count();
+authorCount = model("Author").count(where="lastName LIKE 'A%'");
+
+// Get average value
+avgSalary = model("Employee").average(property="salary", where="departmentId=1");
+
+// Get minimum and maximum values
+highestSalary = model("Employee").maximum("salary");
+lowestSalary = model("Employee").minimum("salary");
+
+// Calculate sum
+totalRevenue = model("Invoice").sum("billedAmount");
+```
+
+### Advanced Statistical Queries
+```cfm
+// With associations
+authorCount = model("Author").count(include="profile", where="countryId=1");
+
+// With grouping (returns query result set)
+avgSalaries = model("Employee").average(property="salary", group="departmentId");
+
+// Using distinct values
+uniqueAverage = model("Product").average(property="price", distinct=true);
+```
+
+### Statistics with Associations
+```cfm
+// Count with hasMany association (uses DISTINCT automatically)
+authorCount = model("Author").count(include="books", where="title LIKE 'Wheels%'");
+
+// Complex joins
+authorCount = model("Author").count(
+    include="profile(country)", 
+    where="countries.name='USA' AND lastName LIKE 'A%'"
+);
+```
+
+## Calculated Properties
+
+Generate additional properties dynamically using SQL calculations without storing redundant data.
+
+### Basic Calculated Properties
+```cfm
+component extends="Model" {
+    function config() {
+        // Full name calculation
+        property(
+            name="fullName",
+            sql="RTRIM(LTRIM(ISNULL(users.firstname, '') + ' ' + ISNULL(users.lastname, '')))"
+        );
+        
+        // Age calculation from birthdate
+        property(
+            name="age",
+            sql="(CAST(CONVERT(CHAR(8), GETDATE(), 112) AS INT) - 
+                  CAST(CONVERT(CHAR(8), users.birthDate, 112) AS INT)) / 10000"
+        );
+        
+        // Virtual property (not from database)
+        property(name="displayName", sql=false);
+    }
+}
+```
+
+### Using Calculated Properties in Queries
+```cfm
+// Use calculated properties in WHERE clauses
+youngAdults = model("User").findAll(
+    where="age >= 18 AND age < 30",
+    order="age DESC"
+);
+
+// Use in SELECT statements
+users = model("User").findAll(select="id, fullName, age");
+```
+
+### Specifying Data Types
+```cfm
+component extends="Model" {
+    function config() {
+        property(
+            name="createdAtAlias",
+            sql="posts.createdAt",
+            dataType="datetime"
+        );
+    }
+}
+```
+
+## Dirty Records (Change Tracking)
+
+Track changes to model objects to know what has been modified since loading from the database.
+
+### Change Tracking Methods
+```cfm
+post = model("Post").findByKey(1);
+
+// Check if any property has changed
+result = post.hasChanged();  // false (just loaded)
+
+// Make a change
+post.title = "New Title";
+result = post.hasChanged();  // true
+
+// Check specific property
+result = post.hasChanged("title");  // true
+result = post.titleHasChanged();    // Dynamic method - true
+
+// Get previous value
+oldTitle = post.changedFrom("title");
+oldTitle = post.titleChangedFrom();  // Dynamic method
+
+// Get all changes
+changedProps = post.changedProperties();  // Array of property names
+allChanges = post.allChanges();          // Struct with old/new values
+```
+
+### Change Tracking Lifecycle
+```cfm
+post = model("Post").new();
+result = post.hasChanged();  // true (new objects are always "changed")
+result = post.isNew();       // true (hasn't been saved yet)
+
+post.save();
+result = post.hasChanged();  // false (cleared after save)
+
+// Revert changes
+post.title = "Changed Title";
+post.reload();  // Reloads from database, loses changes
+```
+
+### Practical Usage in Callbacks
+```cfm
+component extends="Model" {
+    function config() {
+        beforeSave("trackImportantChanges");
+    }
+    
+    private void function trackImportantChanges() {
+        if (hasChanged("email")) {
+            // Send email verification when email changes
+            this.emailVerified = false;
+            this.emailVerificationToken = createUUID();
+        }
+        
+        if (hasChanged("price") && this.price > changedFrom("price")) {
+            // Log price increases
+            writeLog("Price increase for product #this.id#: #changedFrom('price')# to #this.price#");
+        }
+    }
+}
+```
+
+## Dynamic Finders
+
+Use method names to define search criteria instead of passing arguments.
+
+### Basic Dynamic Finders
+```cfm
+// Instead of findOne(where="email='me@example.com'")
+user = model("User").findOneByEmail("me@example.com");
+
+// Instead of findAll(where="status='active'")  
+users = model("User").findAllByStatus("active");
+```
+
+### Multiple Property Finders
+```cfm
+// Find by multiple properties (note: single argument with comma-separated values)
+user = model("User").findOneByUsernameAndPassword("bob,secretpass");
+
+// With named parameters when using additional arguments
+users = model("User").findAllByState(
+    value="NY",
+    order="lastName", 
+    page=2
+);
+
+// Multiple values with named parameter
+users = model("User").findAllByCityAndState(
+    values="Buffalo,NY",
+    order="lastName DESC"
+);
+```
+
+### Dynamic Finder Guidelines
+```cfm
+// Good - clear column names
+users = model("User").findAllByFirstNameAndLastName("John,Smith");
+
+// Bad - avoid "And" in column names (breaks parsing)
+// Don't name columns like: "firstandlastname"
+
+// Works with all finder arguments
+users = model("User").findAllByState(
+    value="CA",
+    include="profile",
+    order="lastName",
+    page=3,
+    perPage=25
+);
+```
+
+## Nested Properties
+
+Save parent and associated child models in a single operation using nested properties.
+
+### One-to-One Nested Properties
+```cfm
+// User model with profile association
+component extends="Model" {
+    function config() {
+        hasOne("profile");
+        nestedProperties(associations="profile");
+    }
+}
+
+// Controller setup
+function new() {
+    newProfile = model("Profile").new();
+    user = model("User").new(profile=newProfile);
+}
+
+// View form with association
+#textField(objectName="user", property="firstName")#
+#textField(
+    objectName="user", 
+    association="profile", 
+    property="bio"
+)#
+
+// Save both user and profile
+user = model("User").new(params.user);
+user.save();  // Saves both user and profile in transaction
+```
+
+### One-to-Many Nested Properties
+```cfm
+// User with multiple addresses
+component extends="Model" {
+    function config() {
+        hasMany("addresses");
+        nestedProperties(associations="addresses", allowDelete=true);
+    }
+}
+
+// Controller setup
+function new() {
+    newAddresses = [model("Address").new()];
+    user = model("User").new(addresses=newAddresses);
+}
+
+// Partial view for addresses (_address.cfm)
+#textField(
+    objectName="user",
+    association="addresses", 
+    position=arguments.current,
+    property="street"
+)#
+
+// Form includes addresses
+<div id="addresses">
+    #includePartial(user.addresses)#
+</div>
+```
+
+### Many-to-Many with Nested Properties
+```cfm
+// Customer with publication subscriptions
+component extends="Model" {
+    function config() {
+        hasMany(name="subscriptions", shortcut="publications");
+        nestedProperties(associations="subscriptions", allowDelete=true);
+    }
+}
+
+// Form with checkboxes for many-to-many
+<cfloop query="publications">
+    #hasManyCheckBox(
+        label=publications.title,
+        objectName="customer",
+        association="subscriptions", 
+        keys="#customer.key()#,#publications.id#"
+    )#
+</cfloop>
+```
+
+### Nested Properties Benefits
+- Automatic transaction wrapping
+- Single save operation for complex data
+- Maintains referential integrity
+- Supports validation across all models
+- Handles creates, updates, and deletes
+
+## Transactions
+
+Wheels automatically manages database transactions for data integrity and provides manual transaction control.
+
+### Automatic Transactions
+```cfm
+// All callbacks run in single transaction
+component extends="Model" {
+    function config() {
+        afterCreate("createFirstPost");
+    }
+    
+    function createFirstPost() {
+        post = model("Post").new(
+            authorId=this.id,
+            title="My First Post"
+        );
+        post.save();  // If this fails, author creation rolls back
+    }
+}
+```
+
+### Manual Transaction Control
+```cfm
+// Disable automatic transactions
+model("Author").create(name="John", transaction=false);
+
+// Force rollback for testing
+model("Author").create(name="John", transaction="rollback");
+```
+
+### Global Transaction Configuration
+```cfm
+// In /config/settings.cfm
+set(transactionMode=false);      // Disable all transactions
+set(transactionMode="rollback"); // Rollback all transactions
+```
+
+### Nested Transaction Support
+```cfm
+// Use invokeWithTransaction for nested transaction support
+invokeWithTransaction(
+    method="transferFunds",
+    personFrom=david,
+    personTo=mary,
+    amount=100
+);
+
+function transferFunds(required personFrom, required personTo, required numeric amount) {
+    arguments.personFrom.update(balance=personFrom.balance - arguments.amount);
+    arguments.personTo.update(balance=personTo.balance + arguments.amount);
+}
+```
+
+## Multiple Data Sources
+
+Configure models to use different databases for data distribution or legacy system integration.
+
+### Per-Model Data Source Configuration
+```cfm
+component extends="Model" {
+    function config() {
+        dataSource("mySecondDatabase");  // Must be configured in CFML engine
+    }
+}
+```
+
+### Data Source Limitations
+```cfm
+// Main model determines data source for entire query
+// Photo uses "myFirstDatabase", PhotoGallery uses "mySecondDatabase"
+// But this query uses Photo's data source for the entire join
+myPhotos = model("Photo").findAll(include="photoGalleries");
+```
+
+### Multi-Database Architecture Example
+```cfm
+// User data in primary database
+component name="User" extends="Model" {
+    function config() {
+        dataSource("primaryDB");
+        hasMany("orders");
+    }
+}
+
+// Analytics data in separate database  
+component name="UserAnalytics" extends="Model" {
+    function config() {
+        dataSource("analyticsDB");
+        table("user_analytics");
+    }
+}
+```
+
+## Pagination
+
+Efficiently handle large datasets by breaking results into pages.
+
+### Basic Pagination
+```cfm
+// Get records 26-50 (page 2, 25 per page)
+authors = model("Author").findAll(page=2, perPage=25, order="lastName");
+
+// Pagination is object-based, not record-based
+authorsWithBooks = model("Author").findAll(
+    include="books",
+    page=2, 
+    perPage=25  // 25 authors, but may return more records due to books
+);
+
+// For record-based pagination, flip the relationship
+booksWithAuthors = model("Book").findAll(
+    include="author",
+    page=2,
+    perPage=25  // Always returns exactly 25 records
+);
+```
+
+### Pagination Metadata
+```cfm
+// Get pagination information
+users = model("User").findAll(page=params.page, perPage=20);
+paginationInfo = pagination();
+
+// Available metadata
+currentPage = paginationInfo.currentPage;
+totalPages = paginationInfo.totalPages;
+totalRecords = paginationInfo.totalRecords;
+```
+
+### Advanced Pagination Examples
+```cfm
+// Paginated search results
+searchResults = model("Product").findAll(
+    where="name LIKE ? OR description LIKE ?",
+    whereParams=["%#params.q#%", "%#params.q#%"],
+    page=params.page ?: 1,
+    perPage=24,
+    order="name"
+);
+
+// Paginated with complex associations
+posts = model("Post").findAll(
+    include="author,category,comments",
+    where="posts.status = 'published'",
+    page=params.page ?: 1,
+    perPage=10,
+    order="posts.publishedAt DESC"
+);
+```
+
+## Soft Delete
+
+Implement logical deletion where records are marked as deleted rather than physically removed from the database.
+
+### How Soft Delete Works in Wheels
+
+Soft delete is enabled automatically when you add a `deletedAt` column to your database table. No configuration is needed in your model.
+
+### Database Column Requirements
+- Column name: `deletedAt` (exact case)
+- Column type: `date`, `datetime`, or `timestamp` (depends on your database)
+- Should allow `NULL` values
+
+### Soft Delete Behavior
+```cfm
+// When deletedAt column exists, delete() sets timestamp instead of removing record
+user = model("User").findByKey(1);
+user.delete();  // Sets deletedAt to current timestamp, record stays in database
+
+// Normal finders automatically exclude soft-deleted records
+users = model("User").findAll();  // Won't include records where deletedAt IS NOT NULL
+
+// Include soft-deleted records explicitly
+allUsers = model("User").findAll(includeSoftDeletes=true);
+
+// Manual queries need to exclude soft deletes explicitly
+activeUsers = model("User").findAll(where="deletedAt IS NULL");
+```
+
+### Benefits of Soft Delete
+- Keep deleted data for audit trails
+- Maintain referential integrity
+- Allow data recovery if needed
+- Business logic can treat data as deleted while preserving it
+- No application code changes needed once column exists
+
+## Advanced Query Methods
+
+### Raw SQL Queries
+```cfm
+// Execute custom SQL
+topCustomers = model("Customer").findBySQL("
+    SELECT c.*, COUNT(o.id) as orderCount, SUM(o.total) as totalSpent
+    FROM customers c
+    INNER JOIN orders o ON c.id = o.customerId  
+    WHERE c.active = ?
+    GROUP BY c.id
+    ORDER BY totalSpent DESC
+    LIMIT 10
+", [1]);
+```
+
+### Boolean Existence Checks
+```cfm
+// More efficient than count() > 0
+hasOrders = model("Customer").exists(where="id = ?", whereParams=[customerId]);
+hasRecentActivity = model("User").posts().exists(where="createdAt > ?", whereParams=[lastWeek]);
+```
+
+### Query Optimization with Includes and Select
+```cfm
+// Eager load associations to avoid N+1 queries
+posts = model("Post").findAll(include="author,category,tags");
+
+// Limit columns to reduce data transfer
+recentTitles = model("Post").findAll(
+    select="id, title, createdAt",
+    where="createdAt > ?",
+    whereParams=[dateAdd("d", -7, now())],
+    order="createdAt DESC"
+);
+```
+
 ## Important Notes
 
 - **Convention over Configuration**: Follow Wheels naming conventions for tables, columns, and foreign keys
@@ -1805,5 +2387,11 @@ component extends="Model" {
 - **Testing**: Always test models thoroughly including validations, associations, and business logic
 - **Security**: Protect against mass assignment and always validate/sanitize input data
 - **Transactions**: Use database transactions for operations that modify multiple records
+- **Change Tracking**: Leverage dirty record functionality for audit trails and conditional logic
+- **Dynamic Methods**: Use dynamic finders and change tracking methods for cleaner code
+- **Statistical Functions**: Utilize built-in aggregate functions instead of raw SQL when possible
+- **Time Stamps**: Configure automatic time stamping to track record creation and modification
+- **Calculated Properties**: Use SQL-based calculated properties for computed values
+- **Soft Deletes**: Add `deletedAt` column to enable automatic soft delete functionality
 
 Models are the foundation of your data layer in Wheels applications, providing a rich, object-oriented interface to your database while maintaining the simplicity and conventions that make Wheels productive.
