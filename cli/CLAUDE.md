@@ -32,6 +32,37 @@ This is the Wheels CLI, a CommandBox module that provides command-line tools for
 - First create an app with the `wheels g app` command.
 - Then start the web server with `server start` commandbox command
 
+## Monorepo Integration
+
+The Wheels CLI is part of a larger monorepo ecosystem:
+
+### CLI's Role in the Ecosystem
+- **Source**: `/cli/src/` contains CLI source code (commands, models, templates)
+- **Build**: `tools/build/scripts/build-cli.sh` packages CLI for distribution
+- **Distribution**: Published to ForgeBox as `wheels-cli` CommandBox module
+- **Integration**: Works with base templates and generates code following framework patterns
+
+### Key Dependencies
+- **ForgeBox Integration**: Downloads `wheels-base-template` package from ForgeBox during `wheels g app`
+- **Template Snippets**: Uses base template snippets from `/templates/base/src/app/snippets/`
+- **Core Patterns**: Generates code that follows core framework conventions (`$` prefix, `config()` methods)
+- **Version Sync**: Shares version numbers with other monorepo components
+
+### Development Workflow
+1. Modify CLI source in `/cli/src/`
+2. Test in monorepo `/workspace/` directory
+3. Reload CommandBox: `box reload` after changes
+4. Build process handles packaging and ForgeBox distribution via GitHub Actions
+
+### Package Structure
+- `ModuleConfig.cfc` - CommandBox module configuration
+- `commands/wheels/` - Hierarchical command structure extending `base.cfc`
+- `models/` - Business logic with WireBox dependency injection
+- `templates/` - Code generation templates using `{{variable}}` syntax
+- `box.json` - Package metadata with `type: "commandbox-modules"`
+
+For complete monorepo architecture details, see the main repository's `CLAUDE.md` file.
+
 ## Things to remember
 - Don't add the Claude signature to commit messages
 - Don't add the Claude signature to PR reviews

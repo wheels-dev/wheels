@@ -235,6 +235,195 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Test CLI commands in the `/workspace/` directory
 - Use `.claude/commands/cli/test-next-group.md` for systematic CLI testing
 
+## Monorepo Architecture & Package Distribution
+
+The Wheels framework uses a sophisticated monorepo structure that produces multiple ForgeBox packages working together to create the complete developer ecosystem. Understanding this architecture is crucial for framework development and maintenance.
+
+### Component Overview
+
+The monorepo contains four main distributable components plus documentation:
+
+1. **Wheels CLI** (`wheels-cli`) - CommandBox module providing development tools
+2. **Wheels Core** (`wheels-core`) - Framework runtime installed in `/vendor/wheels`  
+3. **Base Template** (`wheels-base-template`) - Starting structure downloaded by CLI for new applications
+4. **Starter App** (`wheels-starterapp`) - Complete example application
+5. **Documentation** (`/docs`) - Comprehensive guides published to wheels.dev/guides
+
+### CLI Component Architecture
+
+**Source Location**: `/cli/src/`
+- `ModuleConfig.cfc` - CommandBox module configuration
+- `commands/wheels/` - Hierarchical command structure (all extend `base.cfc`)
+- `models/` - Business logic with WireBox dependency injection
+- `templates/` - Code generation templates using `{{variable}}` syntax
+- `box.json` - Package metadata with `type: "commandbox-modules"`
+
+**Build Process** (`tools/build/scripts/build-cli.sh`):
+1. Copies `/cli/src/` content to `build-wheels-cli/wheels-cli/`
+2. Replaces version placeholders (`@build.version@`, `@build.number@`)
+3. Creates ZIP package with checksums
+4. Publishes to ForgeBox as `wheels-cli` package
+
+**Distribution & Usage**:
+- Install: `box install wheels-cli`
+- CommandBox recognizes the module type and registers `wheels` namespace
+- Commands become available: `wheels g app`, `wheels g model`, etc.
+- After CLI modifications: `box reload` to reload CommandBox
+
+### Base Template Architecture
+
+**Source Location**: `/templates/base/src/`
+- Complete starter application structure (`app/`, `config/`, `views/`, etc.)
+- Code generation snippets in `app/snippets/` (used by CLI generators)
+- `box.json` with dependency on `wheels-core`
+- Bootstrap-ready layouts and configuration examples
+
+**Build Process** (`tools/build/scripts/build-base.sh`):
+1. Copies `/templates/base/src/` content to `build-wheels-base/`
+2. Includes AI documentation, VS Code snippets, and test framework
+3. Replaces version placeholders (`@build.version@`, `@build.number@`)
+4. Creates ZIP package with checksums
+5. Publishes to ForgeBox as `wheels-base-template` package with `type: "cfwheels-templates"`
+
+**Distribution & Usage**:
+- Published to ForgeBox as `wheels-base-template` package
+- CLI's `wheels g app myapp` command downloads from ForgeBox and extracts structure
+- Provides consistent MVC directory layout and development server setup
+- Includes proper dependency configuration for `wheels-core`, `wirebox`, `testbox`
+- Snippets ensure generated code follows framework patterns
+
+### Core Framework Architecture
+
+**Source Location**: `/core/src/wheels/`
+- Complete framework implementation (Controller.cfc, Model.cfc, etc.)
+- Database adapters for H2, MySQL, PostgreSQL, SQLServer, Oracle
+- Migration system with database-specific implementations
+- Testing framework and utilities
+- All internal methods use `$` prefix convention
+
+**Build Process** (`tools/build/scripts/build-core.sh`):
+1. Copies `/core/src/wheels/` content to `build-wheels-core/wheels/`
+2. Includes documentation from `/docs/` directory
+3. Replaces version placeholders
+4. Creates ZIP package with checksums
+5. Publishes to ForgeBox as `wheels-core` package
+
+**Distribution**:
+- New applications include `wheels-core` dependency in `box.json`
+- `box install` places framework in `/vendor/wheels/` directory
+- Application.cfc includes framework mapping for access
+
+### Documentation Architecture
+
+**Source Location**: `/docs/src/`
+- Comprehensive framework guides covering all major topics
+- Organized into logical sections (controllers, models, views, CLI, etc.)
+- Written in Markdown with GitBook-style formatting
+- MkDocs configuration for static site generation
+
+**Build Process** (`docs/mkdocs.yml` + GitHub Actions):
+1. MkDocs processes Markdown files from `/docs/src/`
+2. Applies Material theme with custom styling (`docs/stylesheets/gitbook.css`)
+3. Generates static HTML site with navigation, search, and responsive design
+4. GitHub Actions workflow (`docs-sync.yml`) syncs content to shared hosting
+
+**Publication**:
+- Documentation published to `wheels.dev/guides` (and `guides.cfwheels.org`)
+- Automated deployment via rsync to shared hosting directory
+- Version-specific paths (e.g., `/3.0.0/guides`) for different framework versions
+- Assets and images synchronized to public directories
+
+### Build & Release Pipeline
+
+**GitHub Actions Workflows**:
+- `release.yml` - Handles main branch releases
+- `snapshot.yml` - Creates development snapshots
+- `pr.yml` - Tests pull requests across all CFML engines
+- `docs-sync.yml` - Syncs documentation to wheels.dev/guides
+
+**Build Orchestration**:
+1. Version calculation from `templates/base/src/box.json` + build number
+2. Parallel execution of build scripts for all components
+3. Version placeholder replacement throughout all packages
+4. ZIP creation with MD5 and SHA512 checksums
+5. ForgeBox publication with package verification
+
+**Publication Script** (`tools/build/scripts/publish-to-forgebox.sh`):
+- Verifies package contents and structure
+- Authenticates with ForgeBox API
+- Publishes all packages atomically
+- Handles force updates and error recovery
+- Creates "bleeding edge" versions for continuous deployment
+
+### Package Dependencies & Integration
+
+**ForgeBox Package Flow**:
+```
+Developer Workflow:
+1. box install wheels-cli           # Downloads CLI CommandBox module
+2. wheels g app myapp              # CLI downloads wheels-base-template from ForgeBox
+3. box install                     # App downloads wheels-core from ForgeBox to /vendor/wheels
+
+ForgeBox Packages:
+├── wheels-cli (CommandBox module)
+├── wheels-base-template (app structure)
+├── wheels-core (framework runtime)
+└── wheels-starterapp (example app)
+
+Documentation:
+└── wheels.dev/guides (comprehensive framework guides)
+```
+
+**Integration Points**:
+- CLI downloads `wheels-base-template` package from ForgeBox during `wheels g app`
+- Base template's `box.json` specifies `wheels-core` dependency
+- `box install` in new app downloads `wheels-core` to `/vendor/wheels/`
+- Generated code follows core framework conventions (`$` prefix, `config()` methods)
+- All packages share synchronized version numbers through build process
+
+### Development Workflow
+
+**For CLI Development**:
+1. Modify files in `/cli/src/`
+2. Test in `/workspace/` directory
+3. Run `box reload` after changes
+4. Use `.claude/commands/cli/test-next-group.md` for systematic testing
+
+**For Core Development**:
+1. Modify files in `/core/src/wheels/`
+2. Run framework tests: `wheels test run` or `box testbox run`
+3. Test across engines: `docker compose up adobe2021 -d` etc.
+
+**For Build System**:
+1. Build scripts in `/tools/build/scripts/`
+2. Package templates in `/tools/build/{cli,core,base}/`
+3. GitHub Actions coordinate the entire release process
+
+**For Documentation**:
+1. Edit Markdown files in `/docs/src/`
+2. Test locally with `mkdocs serve` (requires MkDocs and Material theme)
+3. GitHub Actions automatically syncs changes to wheels.dev/guides
+
+### Key Architecture Principles
+
+**Separation of Concerns**:
+- CLI handles development-time operations
+- Core provides runtime functionality
+- Base template ensures consistency
+- Build system manages distribution
+
+**Version Synchronization**:
+- All packages share the same version number
+- Build process ensures atomic updates across ecosystem
+- Dependency resolution prevents version conflicts
+
+**Template-Driven Code Generation**:
+- CLI uses sophisticated template system with `{{variable}}` syntax
+- Templates check `app/snippets/` first, then fall back to CLI templates
+- Ensures generated code matches application patterns
+
+This architecture allows independent development of each component while maintaining a cohesive developer experience through shared patterns, synchronized versioning, and coordinated distribution via ForgeBox.
+
 ## Recent Changes (2025-06-21)
 
 ### Configuration Directory Move
