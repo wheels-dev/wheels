@@ -151,11 +151,11 @@ component {
 	 */
 	public boolean function $checkVerificationsVars(required struct scope, required string vars, required string types) {
 		local.rv = true;
-		local.varsArray = ListToArray(arguments.vars);
+		local.variablesArray = ListToArray(arguments.vars);
 		local.typesArray = Len(arguments.types) ? ListToArray(arguments.types) : [];
-		local.iEnd = ArrayLen(local.varsArray);
+		local.iEnd = ArrayLen(local.variablesArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = local.varsArray[local.i];
+			local.item = local.variablesArray[local.i];
 			if (!StructKeyExists(arguments.scope, local.item)) {
 				local.rv = false;
 				break;

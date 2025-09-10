@@ -19,10 +19,10 @@ component {
 			arguments.action = "*";
 		}
 
-		local.actionArray = ListToArray(arguments.action);
-		local.iEnd = ArrayLen(local.actionArray);
+		local.actionsArray = ListToArray(arguments.action);
+		local.iEnd = ArrayLen(local.actionsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = local.actionArray[local.i];
+			local.item = local.actionsArray[local.i];
 			local.action = {
 				action = local.item,
 				time = arguments.time,

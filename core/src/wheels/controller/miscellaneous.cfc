@@ -121,10 +121,10 @@ component {
 		}
 
 		// Delete arguments that we don't want to pass through to the cfmail tag.
-		local.nonPassThruArray = ListToArray(local.nonPassThruArgs);
-		local.iEnd = ArrayLen(local.nonPassThruArray);
+		local.nonPassThruKeysArray = ListToArray(local.nonPassThruArgs);
+		local.iEnd = ArrayLen(local.nonPassThruKeysArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = local.nonPassThruArray[local.i];
+			local.item = local.nonPassThruKeysArray[local.i];
 			StructDelete(arguments, local.item);
 		}
 

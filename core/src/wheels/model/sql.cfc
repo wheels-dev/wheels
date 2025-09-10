@@ -538,10 +538,10 @@ component {
 			if (Len(arguments.include) && arguments.clause == "select") {
 				local.newSelect = "";
 				local.addedProperties = "";
-				local.rvArray = ListToArray(local.rv);
-				local.iEnd = ArrayLen(local.rvArray);
+				local.filteredArray = ListToArray(local.rv);
+				local.iEnd = ArrayLen(local.filteredArray);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.iItem = local.rvArray[local.i];
+					local.iItem = local.filteredArray[local.i];
 
 					// get the property part, done by taking everything from the end of the string to a . or a space (which would be found when using " AS ")
 					local.property = Reverse(SpanExcluding(Reverse(local.iItem), ". "));

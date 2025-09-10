@@ -956,10 +956,10 @@ component output="false" {
 		string required = ""
 	) {
 		if (Len(arguments.combine)) {
-			local.combineArray = ListToArray(arguments.combine);
-			local.iEnd = ArrayLen(local.combineArray);
+			local.combineKeysArray = ListToArray(arguments.combine);
+			local.iEnd = ArrayLen(local.combineKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = local.combineArray[local.i];
+				local.item = local.combineKeysArray[local.i];
 				local.first = ListGetAt(local.item, 1, "/");
 				local.second = ListGetAt(local.item, 2, "/");
 				local.required = false;
@@ -998,10 +998,10 @@ component output="false" {
 
 		// make sure that the arguments marked as required exist
 		if (Len(arguments.required)) {
-			local.requiredArray = ListToArray(arguments.required);
-			local.iEnd = ArrayLen(local.requiredArray);
+			local.requiredKeysArray = ListToArray(arguments.required);
+			local.iEnd = ArrayLen(local.requiredKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.arg = local.requiredArray[local.i];
+				local.arg = local.requiredKeysArray[local.i];
 				if (!StructKeyExists(arguments.args, local.arg)) {
 					Throw(type = "Wheels.IncorrectArguments", message = "The `#local.arg#` argument is required but not passed in.");
 				}
@@ -2764,10 +2764,10 @@ component output="false" {
 		local.rv = ReReplace(local.rv, "([[:upper:]])([[:upper:]])([[:lower:]])", "\1\2 \3", "all");
 
 		if (Len(arguments.except)) {
-			local.exceptArray = ListToArray(arguments.except, " ");
-			local.iEnd = ArrayLen(local.exceptArray);
+			local.exceptKeysArray = ListToArray(arguments.except, " ");
+			local.iEnd = ArrayLen(local.exceptKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = local.exceptArray[local.i];
+				local.item = local.exceptKeysArray[local.i];
 				local.rv = ReReplaceNoCase(local.rv, "#local.item#(?:\b)", "#local.item#", "all");
 			}
 		}

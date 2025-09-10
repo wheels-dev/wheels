@@ -22,11 +22,11 @@ component {
 		arguments.only = $listClean(arguments.only);
 		arguments.except = $listClean(arguments.except);
 		local.namedArguments = "through,type,only,except,placement";
-		local.throughArray = ListToArray(arguments.through);
-		local.iEnd = ArrayLen(local.throughArray);
+		local.throughKeysArray = ListToArray(arguments.through);
+		local.iEnd = ArrayLen(local.throughKeysArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.filter = {};
-			local.filter.through = local.throughArray[local.i];
+			local.filter.through = local.throughKeysArray[local.i];
 			local.filter.type = arguments.type;
 			local.filter.only = arguments.only;
 			local.filter.except = arguments.except;
