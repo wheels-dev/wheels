@@ -88,30 +88,22 @@ wheels g test model User
 wheels g helper StringUtils
 ```
 
-### Database Management
+### Migration Management
 ```bash
-# Setup database from scratch
-wheels db setup
+# Check migration status
+wheels dbmigrate info
 
-# Run migrations
+# Migration to Latest
 wheels dbmigrate latest
 
-# Check migration status
-wheels db status
+# Migration to version 0
+wheels dbmigrate reset
 
-# Rollback migrations
-wheels db rollback --steps=3
+# Migration one version UP
+wheels dbmigrate up
 
-# Reset database (drop + recreate + migrate)
-wheels db reset --force
-
-# Database shell access
-wheels db shell                  # CLI interface
-wheels db shell --web           # H2 web console
-
-# Backup and restore
-wheels db dump --output=backup.sql
-wheels db restore backup.sql
+# Migration one version DOWN
+wheels dbmigrate down
 ```
 
 ### Server Management
