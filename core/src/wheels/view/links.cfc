@@ -251,9 +251,10 @@ component {
 		}
 		local.skipArgs = "windowSize,alwaysShowAnchors,anchorDivider,linkToCurrentPage,prepend,append,prependToPage,addActiveClassToPrependedParent,prependOnFirst,prependOnAnchor,appendToPage,appendOnLast,appendOnAnchor,classForCurrent,handle,name,showSinglePage,pageNumberAsParam";
 		local.linkToArguments = Duplicate(arguments);
-		local.iEnd = ListLen(local.skipArgs);
+		local.skipArgsArray = ListToArray(local.skipArgs);
+		local.iEnd = ArrayLen(local.skipArgsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			StructDelete(local.linkToArguments, ListGetAt(local.skipArgs, local.i));
+			StructDelete(local.linkToArguments, local.skipArgsArray[local.i]);
 		}
 		local.currentPage = pagination(arguments.handle).currentPage;
 		local.totalPages = pagination(arguments.handle).totalPages;

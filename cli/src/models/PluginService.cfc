@@ -1,20 +1,10 @@
 component {
     
-    // Note: These services are not available in the module context
-    // property name="packageService" inject="PackageService@commandbox-core";
-    // property name="forgebox" inject="ForgeBox@commandbox-core";
-    // property name="fileSystemUtil" inject="FileSystem@commandbox-core";
+    property name="packageService" inject="PackageService";
+    property name="forgebox" inject="ForgeBox";
+    property name="fileSystemUtil" inject="FileSystem";
+    property name="configService" inject="ConfigService";
     
-    /**
-     * List installed plugins
-     */
-    function list(boolean global = false) {
-        return {
-            success: true,
-            message: "Plugin functionality is currently being refactored. Please use CommandBox package management directly.",
-            plugins: []
-        };
-    }
     
     /**
      * Install a Wheels CLI plugin
@@ -22,7 +12,6 @@ component {
     function install(
         required string name,
         boolean dev = false,
-        boolean global = false,
         string version = ""
     ) {
         try {
@@ -50,7 +39,7 @@ component {
             if (!pluginInfo.isValid) {
                 return {
                     success: false,
-                    error: "Plugin '#arguments.name#' not found or is not a valid Wheels CLI plugin"
+                    error: "Plugin '" & arguments.name & "' not found or is not a valid Wheels CLI plugin"
                 };
             }
             
@@ -60,28 +49,18 @@ component {
                 packageSpec &= "@" & arguments.version;
             }
             
-            // Install the plugin
-            if (arguments.global) {
-                // Install globally via CommandBox
-                packageService.installPackage(
-                    ID = packageSpec,
-                    save = false,
-                    global = true
-                );
-            } else {
-                // Add to box.json
-                boxJson[depType][pluginInfo.slug] = packageSpec;
-                
-                // Write updated box.json
-                fileWrite(boxJsonPath, serializeJSON(boxJson, true));
-                
-                // Install via CommandBox
-                packageService.installPackage(
-                    ID = packageSpec,
-                    save = true,
-                    saveDev = arguments.dev
-                );
-            }
+            // Add to box.json
+            boxJson[depType][pluginInfo.slug] = packageSpec;
+            
+            // Write updated box.json
+            fileWrite(boxJsonPath, serializeJSON(boxJson, true));
+            
+            // Install via CommandBox
+            packageService.installPackage(
+                ID = packageSpec,
+                save = true,
+                saveDev = arguments.dev
+            );
             
             // Register plugin commands
             registerPluginCommands(pluginInfo);
@@ -149,43 +128,47 @@ component {
     /**
      * List installed plugins
      */
-    function list(boolean global = false) {
+    function list() {
         var plugins = [];
+        var pluginNames = [];
         
-        if (arguments.global) {
-            // Get global CommandBox modules
-            var globalModules = ConfigService.getSetting("modules", {});
-            for (var moduleName in globalModules) {
-                if (isWheelsPlugin(moduleName)) {
-                    arrayAppend(plugins, {
-                        name: moduleName,
-                        version: globalModules[moduleName].version ?: "unknown",
-                        global: true,
-                        description: globalModules[moduleName].description ?: ""
-                    });
+        // Check for Wheels application plugins in /plugins folder first (priority)
+        var pluginsDir = fileSystemUtil.resolvePath("plugins");
+        if (directoryExists(pluginsDir)) {
+            // Get all .zip files in plugins directory (Wheels application plugins)
+            var pluginZips = directoryList(pluginsDir, false, "query", "*.zip", "name");
+            for (var zipFile in pluginZips) {
+                var pluginInfo = parseWheelsPluginZip(pluginsDir & "/" & zipFile.name);
+                if (pluginInfo.isValid) {
+                    arrayAppend(plugins, pluginInfo);
+                    arrayAppend(pluginNames, pluginInfo.name);
                 }
             }
-        } else {
-            // Get local plugins from box.json
-            var boxJsonPath = resolvePath("box.json");
-            if (fileExists(boxJsonPath)) {
-                var boxJson = deserializeJSON(fileRead(boxJsonPath));
-                
-                // Check dependencies
-                if (boxJson.keyExists("dependencies")) {
-                    for (var dep in boxJson.dependencies) {
-                        if (isWheelsPlugin(dep)) {
-                            arrayAppend(plugins, getInstalledPluginInfo(dep, false));
-                        }
+        }
+        
+        // Also check box.json for CLI plugins installed locally (avoid duplicates)
+        var boxJsonPath = resolvePath("box.json");
+        if (fileExists(boxJsonPath)) {
+            var boxJson = deserializeJSON(fileRead(boxJsonPath));
+            
+            // Check dependencies
+            if (boxJson.keyExists("dependencies")) {
+                for (var dep in boxJson.dependencies) {
+                    if (isWheelsPlugin(dep) && !isDuplicatePlugin(dep, pluginNames)) {
+                        var pluginInfo = getInstalledPluginInfo(dep, false);
+                        arrayAppend(plugins, pluginInfo);
+                        arrayAppend(pluginNames, pluginInfo.name);
                     }
                 }
-                
-                // Check devDependencies
-                if (boxJson.keyExists("devDependencies")) {
-                    for (var dep in boxJson.devDependencies) {
-                        if (isWheelsPlugin(dep)) {
-                            arrayAppend(plugins, getInstalledPluginInfo(dep, true));
-                        }
+            }
+            
+            // Check devDependencies
+            if (boxJson.keyExists("devDependencies")) {
+                for (var dep in boxJson.devDependencies) {
+                    if (isWheelsPlugin(dep) && !isDuplicatePlugin(dep, pluginNames)) {
+                        var pluginInfo = getInstalledPluginInfo(dep, true);
+                        arrayAppend(plugins, pluginInfo);
+                        arrayAppend(pluginNames, pluginInfo.name);
                     }
                 }
             }
@@ -242,33 +225,120 @@ component {
             };
         }
         
-        // Search ForgeBox
-        try {
-            var packageInfo = packageService.getPackage(arguments.pluginName);
-            return {
-                isValid: true,
-                name: packageInfo.name,
-                slug: packageInfo.slug,
-                version: packageInfo.version,
-                description: packageInfo.summary
-            };
-        } catch (any e) {
-            return {
-                isValid: false
-            };
-        }
+        // Assume package names are valid and let PackageService/ForgeBox handle validation during install
+        // This approach is more permissive and mirrors how CommandBox handles package installation
+        var slug = lCase(arguments.pluginName);
+        
+        return {
+            isValid: true,
+            name: arguments.pluginName,
+            slug: slug,
+            version: "latest",
+            description: "ForgeBox package"
+        };
     }
     
     /**
      * Check if a module is a Wheels CLI plugin
      */
     private function isWheelsPlugin(moduleName) {
-        // Check module name patterns
-        return reFindNoCase("^wheels-", arguments.moduleName) ||
+        // Exclude the core framework and common non-plugin dependencies
+        if (listFindNoCase("wheels-core,wirebox,testbox,cfformat", arguments.moduleName)) {
+            return false;
+        }
+        
+        // Check for actual Wheels plugin patterns
+        return reFindNoCase("^cfwheels-.*-plugin", arguments.moduleName) ||
+               reFindNoCase("^wheels-.*-plugin", arguments.moduleName) ||
                reFindNoCase("-wheels-cli$", arguments.moduleName) ||
                reFindNoCase("wheels.*cli", arguments.moduleName);
     }
     
+    /**
+     * Check if a plugin is already in the list (handles name variations)
+     */
+    private function isDuplicatePlugin(required string pluginName, required array existingNames) {
+        // Direct name match
+        if (arrayFindNoCase(arguments.existingNames, arguments.pluginName)) {
+            return true;
+        }
+        
+        // Check for common name variations
+        var cleanName = reReplace(arguments.pluginName, "^cfwheels-", "");
+        cleanName = reReplace(cleanName, "-plugin$", "");
+        
+        for (var existingName in arguments.existingNames) {
+            var cleanExisting = reReplace(existingName, "^cfwheels-", "");
+            cleanExisting = reReplace(cleanExisting, "-plugin$", "");
+            cleanExisting = reReplace(cleanExisting, "\s+Plugin$", "");
+            
+            if (compareNoCase(cleanName, cleanExisting) == 0) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Parse information from a Wheels plugin zip file
+     */
+    private function parseWheelsPluginZip(required string zipPath) {
+        var pluginInfo = {
+            isValid: false,
+            name: "",
+            version: "unknown",
+            dev: false,
+            global: false,
+            description: "",
+            type: "wheels-plugin"
+        };
+        
+        try {
+            // Extract plugin name and version from filename
+            var fileName = listLast(arguments.zipPath, "/\\");
+            fileName = reReplace(fileName, "\.zip$", "");
+            
+            // Parse filename pattern: PluginName-Version.zip
+            var parts = listToArray(fileName, "-");
+            if (arrayLen(parts) >= 2) {
+                pluginInfo.name = parts[1];
+                pluginInfo.version = parts[arrayLen(parts)];
+            } else {
+                pluginInfo.name = fileName;
+            }
+            
+            // Try to extract more info from box.json inside the zip
+            try {
+                cfzip(action="read", file=arguments.zipPath, entryPath="box.json", variable="boxJsonContent");
+                if (len(boxJsonContent)) {
+                    var boxJsonData = deserializeJSON(boxJsonContent);
+                    if (structKeyExists(boxJsonData, "name")) {
+                        pluginInfo.name = boxJsonData.name;
+                    }
+                    if (structKeyExists(boxJsonData, "version")) {
+                        pluginInfo.version = boxJsonData.version;
+                    }
+                    if (structKeyExists(boxJsonData, "shortDescription")) {
+                        pluginInfo.description = boxJsonData.shortDescription;
+                    } else if (structKeyExists(boxJsonData, "description")) {
+                        pluginInfo.description = boxJsonData.description;
+                    } else if (structKeyExists(boxJsonData, "summary")) {
+                        pluginInfo.description = boxJsonData.summary;
+                    }
+                }
+            } catch (any e) {
+                // Ignore errors reading box.json from zip
+            }
+            
+            pluginInfo.isValid = true;
+            return pluginInfo;
+            
+        } catch (any e) {
+            return pluginInfo;
+        }
+    }
+
     /**
      * Get information about an installed plugin
      */
@@ -282,12 +352,12 @@ component {
         };
         
         // Try to read module info
-        var modulePath = resolvePath("modules/#arguments.pluginName#");
+        var modulePath = resolvePath("modules/" & arguments.pluginName);
         if (directoryExists(modulePath)) {
             var moduleConfigPath = modulePath & "/ModuleConfig.cfc";
             if (fileExists(moduleConfigPath)) {
                 try {
-                    var moduleConfig = createObject("component", "modules.#arguments.pluginName#.ModuleConfig");
+                    var moduleConfig = createObject("component", "modules." & arguments.pluginName & ".ModuleConfig");
                     info.version = moduleConfig.version ?: "unknown";
                     info.description = moduleConfig.description ?: "";
                 } catch (any e) {
@@ -298,7 +368,8 @@ component {
         
         return info;
     }
-    
+
+
     /**
      * Register plugin commands with CommandBox
      */
@@ -311,29 +382,11 @@ component {
      * Resolve a file path  
      */
     private function resolvePath(path, baseDirectory = "") {
-        // Prepend app/ to common paths if not already present
-        var appPath = arguments.path;
-        if (!findNoCase("app/", appPath) && !findNoCase("tests/", appPath)) {
-            // Common app directories
-            if (reFind("^(controllers|models|views|migrator)/", appPath)) {
-                appPath = "app/" & appPath;
-            }
+        // Use fileSystemUtil.resolvePath() which is already injected and handles paths correctly
+        if (len(arguments.baseDirectory)) {
+            return fileSystemUtil.resolvePath(arguments.path, arguments.baseDirectory);
+        } else {
+            return fileSystemUtil.resolvePath(arguments.path);
         }
-        
-        // If path is already absolute, return it
-        if (left(appPath, 1) == "/" || mid(appPath, 2, 1) == ":") {
-            return appPath;
-        }
-        
-        // Build absolute path from current working directory
-        // Use provided base directory or fall back to expandPath
-        var baseDir = len(arguments.baseDirectory) ? arguments.baseDirectory : expandPath(".");
-        
-        // Ensure we have a trailing slash
-        if (right(baseDir, 1) != "/") {
-            baseDir &= "/";
-        }
-        
-        return baseDir & appPath;
     }
 }

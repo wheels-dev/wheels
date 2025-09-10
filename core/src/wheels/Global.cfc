@@ -486,9 +486,10 @@ component output="false" {
 			case "struct":
 				local.str = "";
 				local.keyList = ListSort(StructKeyList(arguments.value), "textnocase", "asc");
-				local.iEnd = ListLen(local.keyList);
+				local.keyArray = ListToArray(local.keyList);
+				local.iEnd = ArrayLen(local.keyArray);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.key = ListGetAt(local.keyList, local.i);
+					local.key = local.keyArray[local.i];
 					local.str = ListAppend(local.str, local.key & "=" & arguments.value[local.key]);
 				}
 				arguments.value = local.str;
@@ -588,9 +589,10 @@ component output="false" {
 		// we need to make sure we are looping through the passed in arguments in the same order everytime
 		local.values = [];
 		local.keyList = ListSort(StructKeyList(arguments), "textnocase", "asc");
-		local.iEnd = ListLen(local.keyList);
+		local.keyArray = ListToArray(local.keyList);
+		local.iEnd = ArrayLen(local.keyArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			ArrayAppend(local.values, arguments[ListGetAt(local.keyList, local.i)]);
+			ArrayAppend(local.values, arguments[local.keyArray[local.i]]);
 		}
 
 		if (!ArrayIsEmpty(local.values)) {
@@ -628,19 +630,20 @@ component output="false" {
 		if (IsNumeric(arguments.cache)) {
 			local.cache = arguments.cache;
 		}
-		local.list = "0,0,0,0";
+		local.listArray = [0,0,0,0];
 		local.dateParts = "d,h,n,s";
-		local.iEnd = ListLen(local.dateParts);
+		local.datePartsArray = ListToArray(local.dateParts);
+		local.iEnd = ArrayLen(local.datePartsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			if (arguments.cacheDatePart == ListGetAt(local.dateParts, local.i)) {
-				local.list = ListSetAt(local.list, local.i, local.cache);
+			if (arguments.cacheDatePart == local.datePartsArray[local.i]) {
+				local.listArray[local.i] = local.cache;
 			}
 		}
 		local.rv = CreateTimespan(
-			ListGetAt(local.list, 1),
-			ListGetAt(local.list, 2),
-			ListGetAt(local.list, 3),
-			ListGetAt(local.list, 4)
+			local.listArray[1],
+			local.listArray[2],
+			local.listArray[3],
+			local.listArray[4]
 		);
 		return local.rv;
 	}
@@ -697,13 +700,15 @@ component output="false" {
 	 */
 	public boolean function $structKeysExist(required struct struct, string keys = "") {
 		local.rv = true;
-		local.iEnd = ListLen(arguments.keys);
+		local.keyArray = ListToArray(arguments.keys);
+		local.iEnd = ArrayLen(local.keyArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+			local.key = local.keyArray[local.i];
 			if (
-				!StructKeyExists(arguments.struct, ListGetAt(arguments.keys, local.i))
+				!StructKeyExists(arguments.struct, local.key)
 				|| (
-					IsSimpleValue(arguments.struct[ListGetAt(arguments.keys, local.i)])
-					&& !Len(arguments.struct[ListGetAt(arguments.keys, local.i)])
+					IsSimpleValue(arguments.struct[local.key])
+					&& !Len(arguments.struct[local.key])
 				)
 			) {
 				local.rv = false;
@@ -721,9 +726,10 @@ component output="false" {
 		struct scope = cgi
 	) {
 		local.rv = {};
-		local.iEnd = ListLen(arguments.keys);
+		local.keyArray = ListToArray(arguments.keys);
+		local.iEnd = ArrayLen(local.keyArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(arguments.keys, local.i);
+			local.item = local.keyArray[local.i];
 			local.rv[local.item] = arguments.scope[local.item];
 		}
 
@@ -905,9 +911,10 @@ component output="false" {
 		}
 
 		local.rv = "";
-		local.iEnd = ListLen(arguments.params, "&");
+		local.paramsArray = ListToArray(arguments.params, "&");
+		local.iEnd = ArrayLen(local.paramsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.params = ListToArray(ListGetAt(arguments.params, local.i, "&"), "=");
+			local.params = ListToArray(local.paramsArray[local.i], "=");
 			local.name = local.params[1];
 			if (arguments.encode && $get("encodeURLs")) {
 				local.name = EncodeForURL($canonicalize(local.name));
@@ -949,9 +956,10 @@ component output="false" {
 		string required = ""
 	) {
 		if (Len(arguments.combine)) {
-			local.iEnd = ListLen(arguments.combine);
+			local.combineKeysArray = ListToArray(arguments.combine);
+			local.iEnd = ArrayLen(local.combineKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = ListGetAt(arguments.combine, local.i);
+				local.item = local.combineKeysArray[local.i];
 				local.first = ListGetAt(local.item, 1, "/");
 				local.second = ListGetAt(local.item, 2, "/");
 				local.required = false;
@@ -990,9 +998,10 @@ component output="false" {
 
 		// make sure that the arguments marked as required exist
 		if (Len(arguments.required)) {
-			local.iEnd = ListLen(arguments.required);
+			local.requiredKeysArray = ListToArray(arguments.required);
+			local.iEnd = ArrayLen(local.requiredKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.arg = ListGetAt(arguments.required, local.i);
+				local.arg = local.requiredKeysArray[local.i];
 				if (!StructKeyExists(arguments.args, local.arg)) {
 					Throw(type = "Wheels.IncorrectArguments", message = "The `#local.arg#` argument is required but not passed in.");
 				}
@@ -1024,9 +1033,10 @@ component output="false" {
 		if (!StructKeyExists(request.wheels, "execution")) {
 			request.wheels.execution = {};
 		}
-		local.iEnd = ListLen(arguments.name);
+		local.nameArray = ListToArray(arguments.name);
+		local.iEnd = ArrayLen(local.nameArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(arguments.name, local.i);
+			local.item = local.nameArray[local.i];
 			if (StructKeyExists(request.wheels.execution, local.item)) {
 				request.wheels.execution[local.item] = GetTickCount() - request.wheels.execution[local.item];
 			} else {
@@ -1064,9 +1074,10 @@ component output="false" {
 		}
 		local.fileList = application[local.appKey].directoryFiles[local.pathHash];
 		// loop through the file list and return the file name if exists regardless of case (the == operator is case insensitive)
-		local.iEnd = ListLen(local.fileList);
+		local.fileArray = ListToArray(local.fileList);
+		local.iEnd = ArrayLen(local.fileArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.foundFile = ListGetAt(local.fileList, local.i);
+			local.foundFile = local.fileArray[local.i];
 			if (local.foundFile == local.file) {
 				local.rv = local.foundFile;
 				break;
@@ -1145,11 +1156,12 @@ component output="false" {
 	) {
 		// let's allow for multiple controller paths so that plugins can contain controllers
 		// the last path is the one we will instantiate the base controller on if the controller is not found on any of the paths
-		local.iEnd = ListLen(arguments.controllerPaths);
+		local.controllerPathsArray = ListToArray(arguments.controllerPaths);
+		local.iEnd = ArrayLen(local.controllerPathsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.controllerPath = ListGetAt(arguments.controllerPaths, local.i);
+			local.controllerPath = local.controllerPathsArray[local.i];
 			local.fileName = $objectFileName(name = arguments.name, objectPath = local.controllerPath, type = arguments.type);
-			if (local.fileName != "Controller" || local.i == ListLen(arguments.controllerPaths)) {
+			if (local.fileName != "Controller" || local.i == ArrayLen(local.controllerPathsArray)) {
 				application.wheels.controllers[arguments.name] = $createObjectFromRoot(
 					path = local.controllerPath,
 					fileName = local.fileName,
@@ -1272,11 +1284,12 @@ component output="false" {
 	) {
 		// let's allow for multiple model paths so that plugins can contain models
 		// the last path is the one we will instantiate the base model on if the model is not found on any of the paths
-		local.iEnd = ListLen(arguments.modelPaths);
+		local.modelPathsArray = ListToArray(arguments.modelPaths);
+		local.iEnd = ArrayLen(local.modelPathsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.modelPath = ListGetAt(arguments.modelPaths, local.i);
+			local.modelPath = local.modelPathsArray[local.i];
 			local.fileName = $objectFileName(name = arguments.name, objectPath = local.modelPath, type = arguments.type);
-			if (local.fileName != arguments.type || local.i == ListLen(arguments.modelPaths)) {
+			if (local.fileName != arguments.type || local.i == ArrayLen(local.modelPathsArray)) {
 				application.wheels.models[arguments.name] = $createObjectFromRoot(
 					path = local.modelPath,
 					fileName = local.fileName,
@@ -2700,9 +2713,10 @@ component output="false" {
 		if (ArrayLen(arguments) > 1) {
 			for (local.key in arguments) {
 				if (local.key != "functionName") {
-					local.iEnd = ListLen(arguments.functionName);
+					local.functionNameArray = ListToArray(arguments.functionName);
+					local.iEnd = ArrayLen(local.functionNameArray);
 					for (local.i = 1; local.i <= local.iEnd; local.i++) {
-						local.functionName = Trim(ListGetAt(arguments.functionName, local.i));
+						local.functionName = Trim(local.functionNameArray[local.i]);
 						application[local.appKey].functions[local.functionName][local.key] = arguments[local.key];
 					}
 				}
@@ -2750,9 +2764,10 @@ component output="false" {
 		local.rv = ReReplace(local.rv, "([[:upper:]])([[:upper:]])([[:lower:]])", "\1\2 \3", "all");
 
 		if (Len(arguments.except)) {
-			local.iEnd = ListLen(arguments.except, " ");
+			local.exceptKeysArray = ListToArray(arguments.except, " ");
+			local.iEnd = ArrayLen(local.exceptKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = ListGetAt(arguments.except, local.i);
+				local.item = local.exceptKeysArray[local.i];
 				local.rv = ReReplaceNoCase(local.rv, "#local.item#(?:\b)", "#local.item#", "all");
 			}
 		}

@@ -13,9 +13,10 @@ component extends="Base" {
 		string onDelete = ""
 	) {
 		local.args = "adapter,table,referenceTable,column,referenceColumn,onUpdate,onDelete";
-		local.iEnd = ListLen(local.args);
+		local.argsArray = ListToArray(local.args);
+		local.iEnd = ArrayLen(local.argsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.args, local.i);
+			local.argumentName = local.argsArray[local.i];
 			if (StructKeyExists(arguments, local.argumentName)) {
 				this[local.argumentName] = arguments[local.argumentName];
 			}
@@ -26,10 +27,11 @@ component extends="Base" {
 
 	public string function toSQL() {
 		local.args = "name,table,referenceTable,column,referenceColumn,onUpdate,onDelete";
-		local.iEnd = ListLen(local.args);
+		local.argsArray = ListToArray(local.args);
+		local.iEnd = ArrayLen(local.argsArray);
 		local.adapterArgs = {};
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.args, local.i);
+			local.argumentName = local.argsArray[local.i];
 			local.adapterArgs[local.argumentName] = this[local.argumentName];
 		}
 		return this.adapter.foreignKeySQL(argumentcollection = local.adapterArgs);
@@ -44,9 +46,10 @@ component extends="Base" {
 	public string function addForeignKeyOptions(required string sql) {
 		local.options = {};
 		local.optionalArguments = "referenceTable,referenceColumn,column";
-		local.iEnd = ListLen(local.optionalArguments);
+		local.optionalArgumentsArray = ListToArray(local.optionalArguments);
+		local.iEnd = ArrayLen(local.optionalArgumentsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.optionalArguments, local.i);
+			local.argumentName = local.optionalArgumentsArray[local.i];
 			if (StructKeyExists(this, local.argumentName)) {
 				local.options[local.argumentName] = this[local.argumentName];
 			}

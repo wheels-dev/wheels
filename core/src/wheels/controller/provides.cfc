@@ -12,9 +12,10 @@ component {
 		$combineArguments(args = arguments, combine = "formats,format", required = true);
 		arguments.formats = $listClean(arguments.formats);
 		local.possibleFormats = StructKeyList($get("formats"));
-		local.iEnd = ListLen(arguments.formats);
+		local.formatsArray = ListToArray(arguments.formats);
+		local.iEnd = ArrayLen(local.formatsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(arguments.formats, local.i);
+			local.item = local.formatsArray[local.i];
 			if ($get("showErrorInformation") && !ListFindNoCase(local.possibleFormats, local.item)) {
 				Throw(
 					type = "Wheels.InvalidFormat",
@@ -40,9 +41,10 @@ component {
 		$combineArguments(args = arguments, combine = "formats,format", required = true);
 		arguments.formats = $listClean(arguments.formats);
 		local.possibleFormats = StructKeyList($get("formats"));
-		local.iEnd = ListLen(arguments.formats);
+		local.formatsArray = ListToArray(arguments.formats);
+		local.iEnd = ArrayLen(local.formatsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(arguments.formats, local.i);
+			local.item = local.formatsArray[local.i];
 			if ($get("showErrorInformation") && !ListFindNoCase(local.possibleFormats, local.item)) {
 				Throw(
 					type = "Wheels.InvalidFormat",

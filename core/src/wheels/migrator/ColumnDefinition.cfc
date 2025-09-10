@@ -2,9 +2,10 @@ component extends="Base" {
 
 	public ColumnDefinition function init(required any adapter, required string name, required string type) {
 		local.args = "adapter,name,type,limit,precision,scale,default,null,autoIncrement,afterColumn";
-		local.iEnd = ListLen(local.args);
+		local.argsArray = ListToArray(local.args);
+		local.iEnd = ArrayLen(local.argsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.args, local.i);
+			local.argumentName = local.argsArray[local.i];
 			if (StructKeyExists(arguments, local.argumentName)) {
 				this[local.argumentName] = arguments[local.argumentName];
 			}
@@ -32,9 +33,10 @@ component extends="Base" {
 	public string function sqlType() {
 		local.options = {};
 		local.optionalArguments = "limit,precision,scale";
-		local.iEnd = ListLen(local.optionalArguments);
+		local.optionalArgumentsArray = ListToArray(local.optionalArguments);
+		local.iEnd = ArrayLen(local.optionalArgumentsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.optionalArguments, local.i);
+			local.argumentName = local.optionalArgumentsArray[local.i];
 			if (StructKeyExists(this, local.argumentName)) {
 				local.options[local.argumentName] = this[local.argumentName];
 			}
@@ -46,9 +48,10 @@ component extends="Base" {
 	public string function addColumnOptions(required string sql) {
 		local.options = {};
 		local.optionalArguments = "type,default,null,afterColumn";
-		local.iEnd = ListLen(local.optionalArguments);
+		local.optionalArgumentsArray = ListToArray(local.optionalArguments);
+		local.iEnd = ArrayLen(local.optionalArgumentsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.optionalArguments, local.i);
+			local.argumentName = local.optionalArgumentsArray[local.i];
 			if (StructKeyExists(this, local.argumentName)) {
 				local.options[local.argumentName] = this[local.argumentName];
 			}
@@ -60,9 +63,10 @@ component extends="Base" {
 	public string function addPrimaryKeyOptions(required string sql) {
 		local.options = {};
 		local.optionalArguments = "autoIncrement,null";
-		local.iEnd = ListLen(local.optionalArguments);
+		local.optionalArgumentsArray = ListToArray(local.optionalArguments);
+		local.iEnd = ArrayLen(local.optionalArgumentsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.argumentName = ListGetAt(local.optionalArguments, local.i);
+			local.argumentName = local.optionalArgumentsArray[local.i];
 			if (StructKeyExists(this, local.argumentName)) {
 				local.options[local.argumentName] = this[local.argumentName];
 			}
