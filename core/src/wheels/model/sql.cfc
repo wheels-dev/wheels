@@ -236,9 +236,10 @@ component {
 				ArrayPrepend(local.classes, variables.wheels.class);
 
 				local.rv = "";
-				local.iEnd = ListLen(arguments.order);
+				local.orderArray = ListToArray(arguments.order);
+				local.iEnd = ArrayLen(local.orderArray);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.iItem = Trim(ListGetAt(arguments.order, local.i));
+					local.iItem = Trim(local.orderArray[local.i]);
 					if (!Find(" ASC", local.iItem) && !Find(" DESC", local.iItem)) {
 						local.iItem &= " ASC";
 					}
@@ -537,9 +538,10 @@ component {
 			if (Len(arguments.include) && arguments.clause == "select") {
 				local.newSelect = "";
 				local.addedProperties = "";
-				local.iEnd = ListLen(local.rv);
+				local.filteredArray = ListToArray(local.rv);
+				local.iEnd = ArrayLen(local.filteredArray);
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.iItem = ListGetAt(local.rv, local.i);
+					local.iItem = local.filteredArray[local.i];
 
 					// get the property part, done by taking everything from the end of the string to a . or a space (which would be found when using " AS ")
 					local.property = Reverse(SpanExcluding(Reverse(local.iItem), ". "));
@@ -700,9 +702,11 @@ component {
 				"\1#Chr(7)#\2\3",
 				"all"
 			);
-			for (local.i = 1; local.i <= ListLen(local.where, Chr(7)); local.i++) {
+			local.whereArray = ListToArray(local.where, Chr(7));
+			local.iEnd = ArrayLen(local.whereArray);
+			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.param = {};
-				local.element = ListGetAt(local.where, local.i, Chr(7));
+				local.element = local.whereArray[local.i];
 				if (Find("(", local.element) && Find(")", local.element)) {
 					local.elementDataPart = SpanExcluding(Reverse(SpanExcluding(Reverse(local.element), "(")), ")");
 				} else if (Find("(", local.element)) {
@@ -776,13 +780,14 @@ component {
 
 			// add to sql array
 			local.where = " " & local.where & " ";
-			local.iEnd = ListLen(local.where, "?");
+			local.whereArray = ListToArray(local.where, "?");
+			local.iEnd = ArrayLen(local.whereArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = ListGetAt(local.where, local.i, "?");
+				local.item = local.whereArray[local.i];
 				if (Len(Trim(local.item))) {
 					ArrayAppend(local.rv, local.item);
 				}
-				if (local.i < ListLen(local.where, "?")) {
+				if (local.i < ArrayLen(local.whereArray)) {
 					local.column = local.params[local.i].column;
 					ArrayAppend(local.rv, local.column & " " & local.params[local.i].operator);
 					local.param = {
@@ -1178,13 +1183,16 @@ component {
 	 */
 	public string function $keyWhereString(any properties = primaryKeys(), any values = "", any keys = "") {
 		local.rv = "";
-		local.iEnd = ListLen(arguments.properties);
+		local.propertiesArray = ListToArray(arguments.properties);
+		local.iEnd = ArrayLen(local.propertiesArray);
+		local.valuesArray = Len(arguments.values) ? ListToArray(arguments.values) : [];
+		local.keysArray = Len(arguments.keys) ? ListToArray(arguments.keys) : [];
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.key = Trim(ListGetAt(arguments.properties, local.i));
-			if (Len(arguments.values)) {
-				local.value = ListGetAt(arguments.values, local.i);
-			} else if (Len(arguments.keys)) {
-				local.value = this[ListGetAt(arguments.keys, local.i)];
+			local.key = Trim(local.propertiesArray[local.i]);
+			if (ArrayLen(local.valuesArray)) {
+				local.value = local.valuesArray[local.i];
+			} else if (ArrayLen(local.keysArray)) {
+				local.value = this[local.keysArray[local.i]];
 			} else {
 				local.value = "";
 			}

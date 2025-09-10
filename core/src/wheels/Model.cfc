@@ -46,14 +46,16 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		setTableNamePrefix($get("tableNamePrefix"));
 		table(LCase(pluralize(variables.wheels.class.modelName)));
 		local.callbacks = "afterNew,afterFind,afterInitialization,beforeDelete,afterDelete,beforeSave,afterSave,beforeCreate,afterCreate,beforeUpdate,afterUpdate,beforeValidation,afterValidation,beforeValidationOnCreate,afterValidationOnCreate,beforeValidationOnUpdate,afterValidationOnUpdate";
-		local.iEnd = ListLen(local.callbacks);
+		local.callbacksArray = ListToArray(local.callbacks);
+		local.iEnd = ArrayLen(local.callbacksArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			variables.wheels.class.callbacks[ListGetAt(local.callbacks, local.i)] = [];
+			variables.wheels.class.callbacks[local.callbacksArray[local.i]] = [];
 		}
 		local.validations = "onSave,onCreate,onUpdate";
-		local.iEnd = ListLen(local.validations);
+		local.validationsArray = ListToArray(local.validations);
+		local.iEnd = ArrayLen(local.validationsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			variables.wheels.class.validations[ListGetAt(local.validations, local.i)] = [];
+			variables.wheels.class.validations[local.validationsArray[local.i]] = [];
 		}
 
 		variables.wheels.class.propertyStruct = StructNew("ordered");

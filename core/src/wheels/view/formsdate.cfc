@@ -175,9 +175,10 @@ component {
 		}
 		local.rv = "";
 		local.firstDone = false;
-		local.iEnd = ListLen(arguments.order);
+		local.orderArray = ListToArray(arguments.order);
+		local.iEnd = ArrayLen(local.orderArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(arguments.order, local.i);
+			local.item = local.orderArray[local.i];
 			local.marker = "($" & local.item & ")";
 			if (!local.combine) {
 				local.name = $tagName(arguments.objectName, "#arguments.property#-#local.item#");
@@ -357,9 +358,10 @@ component {
 			arguments.id = arguments.$id & "-ampm";
 		}
 		local.content = "";
-		local.iEnd = ListLen(local.options);
+		local.optionsArray = ListToArray(local.options);
+		local.iEnd = ArrayLen(local.optionsArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.option = ListGetAt(local.options, local.i);
+			local.option = local.optionsArray[local.i];
 			local.args = {};
 			local.args.value = local.option;
 			if (arguments.value == local.option) {

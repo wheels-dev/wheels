@@ -578,9 +578,10 @@ component {
 			// Sort struct keys alphabetically.
 			local.sortedKeys = ListSort(StructKeyList(arguments.options), "textnocase");
 
-			local.iEnd = ListLen(local.sortedKeys);
+			local.sortedKeysArray = ListToArray(local.sortedKeys);
+			local.iEnd = ArrayLen(local.sortedKeysArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.key = ListGetAt(local.sortedKeys, local.i);
+				local.key = local.sortedKeysArray[local.i];
 				local.rv &= $option(
 					objectValue = local.value,
 					optionValue = LCase(local.key),
@@ -616,9 +617,10 @@ component {
 					local.object = arguments.options[local.i];
 					if (!Len(arguments.valueField) || !Len(arguments.textField)) {
 						local.propertyNames = local.object.propertyNames();
-						local.jEnd = ListLen(local.propertyNames);
+						local.propertyNamesArray = ListToArray(local.propertyNames);
+						local.jEnd = ArrayLen(local.propertyNamesArray);
 						for (local.j = 1; local.j <= local.jEnd; local.j++) {
-							local.propertyName = ListGetAt(local.propertyNames, local.j);
+							local.propertyName = local.propertyNamesArray[local.j];
 							if (StructKeyExists(local.object, local.propertyName)) {
 								local.propertyValue = local.object[local.propertyName];
 								if (!Len(arguments.valueField) && IsNumeric(local.propertyValue)) {

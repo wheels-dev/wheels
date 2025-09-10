@@ -53,11 +53,13 @@ component {
 
 		// Get the content of the email templates and store them as cfmailparts.
 		arguments.mailparts = [];
-		local.iEnd = ListLen(arguments.template);
+		local.templateArray = ListToArray(arguments.template);
+		local.layoutArray = ListToArray(arguments.layout);
+		local.iEnd = ArrayLen(local.templateArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			// Include the email template and return it,
-			local.item = ListGetAt(arguments.template, local.i);
-			local.content = $renderView($template = local.item, $layout = ListGetAt(arguments.layout, local.i));
+			local.item = local.templateArray[local.i];
+			local.content = $renderView($template = local.item, $layout = local.layoutArray[local.i]);
 
 			local.mailpart = {};
 			local.mailpart.tagContent = local.content;
@@ -105,9 +107,10 @@ component {
 		// Attach files using the cfmailparam tag.
 		if (Len(arguments.file)) {
 			arguments.mailparams = [];
-			local.iEnd = ListLen(arguments.file);
+			local.fileArray = ListToArray(arguments.file);
+			local.iEnd = ArrayLen(local.fileArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.item = ListGetAt(arguments.file, local.i);
+				local.item = local.fileArray[local.i];
 				arguments.mailparams[local.i] = {};
 				if (!ReFindNoCase("\\|/", local.item)) {
 					// no directory delimiter is present so append the path
@@ -118,9 +121,10 @@ component {
 		}
 
 		// Delete arguments that we don't want to pass through to the cfmail tag.
-		local.iEnd = ListLen(local.nonPassThruArgs);
+		local.nonPassThruKeysArray = ListToArray(local.nonPassThruArgs);
+		local.iEnd = ArrayLen(local.nonPassThruKeysArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(local.nonPassThruArgs, local.i);
+			local.item = local.nonPassThruKeysArray[local.i];
 			StructDelete(arguments, local.item);
 		}
 

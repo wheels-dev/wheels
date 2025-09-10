@@ -28,10 +28,11 @@ component {
 			return local.text;
 		}
 
-		local.iEnd = ListLen(arguments.phrase, arguments.delimiter);
+		local.phraseArray = ListToArray(arguments.phrase, arguments.delimiter);
+		local.iEnd = ArrayLen(local.phraseArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.newText = "";
-			local.phrase = Trim(ListGetAt(arguments.phrase, local.i, arguments.delimiter));
+			local.phrase = Trim(local.phraseArray[local.i]);
 			local.pos = 1;
 			while (FindNoCase(local.phrase, local.text, local.pos)) {
 				local.foundAt = FindNoCase(local.phrase, local.text, local.pos);
@@ -123,9 +124,10 @@ component {
 
 		// generate markup for each Flash item in the list
 		local.listItems = "";
-		local.iEnd = ListLen(local.flashKeys);
+		local.flashKeysArray = ListToArray(local.flashKeys);
+		local.iEnd = ArrayLen(local.flashKeysArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.item = ListGetAt(local.flashKeys, local.i);
+			local.item = local.flashKeysArray[local.i];
 			local.class = LCase(local.item) & "-message";
 			local.attributes = {class = local.class};
 			if (!StructKeyExists(arguments, "key") || arguments.key == local.item) {
@@ -400,9 +402,10 @@ component {
 		// add the names of the attributes and their values to the output string with a space in between (class="something" name="somethingelse" etc)
 		// since the order of a struct can differ we sort the attributes in alphabetical order before placing them in the HTML tag (we could just place them in random order in the HTML but that would complicate testing for example)
 		local.sortedKeys = ListSort(StructKeyList(arguments.attributes), "textnocase");
-		local.iEnd = ListLen(local.sortedKeys);
+		local.sortedKeysArray = ListToArray(local.sortedKeys);
+		local.iEnd = ArrayLen(local.sortedKeysArray);
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
-			local.key = ListGetAt(local.sortedKeys, local.i);
+			local.key = local.sortedKeysArray[local.i];
 			// place the attribute name and value in the string unless it should be skipped according to the arguments or if it's an internal argument (starting with a "$" sign)
 			if (
 				!ListFindNoCase(arguments.skip, local.key)
@@ -525,22 +528,24 @@ component {
 
 		// only try to create the object name if we have a simple value
 		if (IsSimpleValue(arguments.objectName) && ListLen(arguments.associations)) {
-			local.iEnd = ListLen(arguments.associations);
+			local.associationsArray = ListToArray(arguments.associations);
+			local.positionsArray = ListToArray(arguments.positions);
+			local.iEnd = ArrayLen(local.associationsArray);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
-				local.association = ListGetAt(arguments.associations, local.i);
+				local.association = local.associationsArray[local.i];
 				local.currentModelObject = $getObject(arguments.objectName);
 				arguments.objectName &= "['" & local.association & "']";
 				local.expanded = local.currentModelObject.$expandedAssociations(include = local.association);
 				local.expanded = local.expanded[1];
 				if (local.expanded.type == "hasMany") {
 					local.hasManyAssociationCount++;
-					if ($get("showErrorInformation") && local.hasManyAssociationCount > ListLen(arguments.positions)) {
+					if ($get("showErrorInformation") && local.hasManyAssociationCount > ArrayLen(local.positionsArray)) {
 						Throw(
 							type = "Wheels.InvalidArgument",
 							message = "You passed the hasMany association of `#local.association#` but did not provide a corresponding position."
 						);
 					}
-					arguments.objectName &= "[" & ListGetAt(arguments.positions, local.hasManyAssociationCount) & "]";
+					arguments.objectName &= "[" & local.positionsArray[local.hasManyAssociationCount] & "]";
 				}
 			}
 		}
