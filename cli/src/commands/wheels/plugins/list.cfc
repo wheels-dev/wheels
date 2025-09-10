@@ -11,13 +11,11 @@ component aliases="wheels plugin list" extends="../base" {
     property name="pluginService" inject="PluginService@wheels-cli";
     
     /**
-     * @global.hint Show globally installed plugins
      * @format.hint Output format: table (default) or json
      * @format.options table,json
      * @available.hint Show available plugins from ForgeBox
      */
     function run(
-        boolean global = false,
         string format = "table",
         boolean available = false
     ) {
@@ -31,37 +29,73 @@ component aliases="wheels plugin list" extends="../base" {
         }
         
         // Show installed plugins
-        var plugins = pluginService.list(global = arguments.global);
+        var plugins = pluginService.list();
         
         if (arrayLen(plugins) == 0) {
-            print.yellowLine("No plugins installed" & (arguments.global ? " globally" : " locally"));
+            print.yellowLine("No plugins installed");
             print.line("Install plugins with: wheels plugins install <plugin-name>");
             print.line("See available plugins with: wheels plugins list --available");
             return;
         }
         
         if (arguments.format == "json") {
-            print.line(serializeJSON(plugins, true));
+            // JSON format output
+            var jsonOutput = {
+                "plugins": plugins
+            };
+            print.line(jsonOutput);
         } else {
-            print.greenBoldLine(" Installed Wheels CLI Plugins" & (arguments.global ? " (Global)" : ""))
+            // Table format output (matching the guide)
+            print.line("Installed Wheels CLI Plugins")
                  .line();
             
-            // Display plugins in a formatted way
-            for (var plugin in plugins) {
-                print.line(" #plugin.name# (#plugin.version#)");
+            if (arrayLen(plugins) > 0) {
+                // Calculate column widths dynamically
+                var maxNameLength = 4; // minimum for "Name"
+                var maxVersionLength = 7; // minimum for "Version"
                 
-                if (plugin.keyExists("dev") && plugin.dev) {
-                    print.text("    Dev Dependency");
+                for (var plugin in plugins) {
+                    if (len(plugin.name) > maxNameLength) {
+                        maxNameLength = len(plugin.name);
+                    }
+                    if (len(plugin.version) > maxVersionLength) {
+                        maxVersionLength = len(plugin.version);
+                    }
                 }
                 
-                if (plugin.keyExists("description") && len(plugin.description)) {
-                    print.line("    #plugin.description#");
+                // Add padding
+                maxNameLength += 2;
+                maxVersionLength += 2;
+                
+                // Print dynamic table header
+                var headerLine = padRight("Name", maxNameLength) & padRight("Version", maxVersionLength) & "Description";
+                var separatorLine = repeatString("-", len(headerLine));
+                
+                print.line(headerLine);
+                print.line(separatorLine);
+                
+                // Display plugins in table format with full information
+                for (var plugin in plugins) {
+                    var name = padRight(plugin.name, maxNameLength);
+                    var version = padRight(plugin.version, maxVersionLength);
+                    var description = plugin.keyExists("description") && len(plugin.description) ? plugin.description : "";
+                    
+                    print.line("#name##version##description#");
                 }
                 
                 print.line();
+                print.yellowLine("Total: #arrayLen(plugins)# plugin" & (arrayLen(plugins) != 1 ? "s" : ""));
             }
-            
-            print.yellowLine("Total plugins: #arrayLen(plugins)#");
         }
+    }
+    
+    /**
+     * Pad string to right with spaces
+     */
+    private function padRight(required string text, required numeric length) {
+        if (len(arguments.text) >= arguments.length) {
+            return left(arguments.text, arguments.length);
+        }
+        return arguments.text & repeatString(" ", arguments.length - len(arguments.text));
     }
 }

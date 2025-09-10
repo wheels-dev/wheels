@@ -81,6 +81,9 @@
   * Test
     * [wheels test run](command-line-tools/commands/test/test-run.md)
     * [wheels advanced testing](command-line-tools/commands/test/test-advanced.md)
+  * Plugins
+    * [wheels plugin install](command-line-tools/commands/plugins/plugins-install.md)
+    * [wheels plugin list](command-line-tools/commands/plugins/plugins-list.md)
 * CLI Development Guides
   * [Configuration Management](command-line-tools/configuration.md)
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
