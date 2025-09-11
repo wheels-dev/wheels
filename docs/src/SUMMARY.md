@@ -50,7 +50,8 @@
       * [wheels dbmigrate create column](command-line-tools/commands/database/dbmigrate-create-column.md)
       * [wheels dbmigrate remove table](command-line-tools/commands/database/dbmigrate-remove-table.md)
   * Testing Commands
-    * [wheels test](command-line-tools/commands/testing/test.md)
+    * [wheels test run](command-line-tools/commands/test/test-run.md)
+    * [wheels advanced testing](command-line-tools/commands/test/test-advanced.md)
   * Environment Management
     * [wheels env setup](command-line-tools/commands/environment/env-setup.md)
     * [wheels env list](command-line-tools/commands/environment/env-list.md)
@@ -78,9 +79,6 @@
   * Documentation
     * [wheels docs generate](command-line-tools/commands/docs/docs-generate.md)
     * [wheels docs serve](command-line-tools/commands/docs/docs-serve.md)
-  * Test
-    * [wheels test run](command-line-tools/commands/test/test-run.md)
-    * [wheels advanced testing](command-line-tools/commands/test/test-advanced.md)
   * Plugins
     * [wheels plugin install](command-line-tools/commands/plugins/plugins-install.md)
     * [wheels plugin list](command-line-tools/commands/plugins/plugins-list.md)
