@@ -16,11 +16,6 @@ The `wheels info` command displays information about the Wheels CLI module and i
 
 This command has no arguments.
 
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
 
 ## Output
 

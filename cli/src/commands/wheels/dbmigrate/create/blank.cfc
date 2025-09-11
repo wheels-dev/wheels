@@ -18,6 +18,10 @@ component aliases='wheels db create blank' extends="../../base"  {
 	 * @name.hint The Name of the migration file 
 	 **/
 	function run(required string name) {
+
+		// Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+		
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		

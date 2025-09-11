@@ -226,12 +226,12 @@ These commands create new Wheels applications with various configurations.
 [Standard app creation output]
 🎨 Installing Bootstrap...
         update  app/views/layout.cfm
-        update  app/config/settings.cfm (Bootstrap settings)
-Creating /Users/peter/projects/wheels/workspace/test-phase2-1750393388/myapp3/app/plugins//FlashMessagesBootstrap-1.0.4.zip
+        update  config/settings.cfm (Bootstrap settings)
+Creating /Users/peter/projects/wheels/workspace/test-phase2-1750393388/myapp3/plugins/FlashMessagesBootstrap-1.0.4.zip
 ```
 **Notes**:
 - Bootstrap flag correctly installs Bootstrap plugin
-- Creates FlashMessagesBootstrap plugin in app/plugins/
+- Creates FlashMessagesBootstrap plugin in ``plugins/``
 - H2 setup flag works as expected
 
 ### Command: `wheels g app name=myapp4 directory=./subdirectory/`

@@ -37,12 +37,15 @@
 	function run(
 		required string name,
 		required string dataType,
-		string columnName="",
+		required string columnName="",
 		any default,
 		boolean null=true,
 		number limit,
 		number precision,
 		number scale) {
+	
+		// Reconstruct arguments for handling -- prefixed options
+		arguments = reconstructArgs(arguments);
 
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
