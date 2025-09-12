@@ -63,7 +63,7 @@ component extends="Controller" {
 
     // GET /users
     function index() {
-        users = model("User").findAll(order="createdAt DESC");
+        users = model("User").findAll(order="createdat DESC");
     }
 
     // GET /users/12 
@@ -196,7 +196,7 @@ component extends="Model" {
         belongsTo(name="role");
 
         // Validations
-        validatesPresenceOf(properties="firstName,lastName,email");
+        validatesPresenceOf(properties="firstname,lastname,email");
         validatesUniquenessOf(property="email", message="Email address is already taken");
         validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$", message="Please enter a valid email address");
         validatesLengthOf(property="password", minimum=6, when="onCreate");
@@ -206,7 +206,7 @@ component extends="Model" {
         beforeSave("hashPassword");
         afterCreate("sendWelcomeEmail");
 
-        // Custom finder methods will be added below (scope() doesn't exist in Wheels)
+        // Custom finder methods (Wheels doesn't have scope() - use custom finder methods instead)
     }
 
     // Custom finder methods
@@ -219,7 +219,7 @@ component extends="Model" {
     }
     
     function findRecent(numeric limit = 10) {
-        return findAll(order="createdAt DESC", limit=arguments.limit);
+        return findAll(order="createdat DESC", limit=arguments.limit);
     }
 
     function authenticate(required string email, required string password) {
@@ -234,7 +234,7 @@ component extends="Model" {
 
     // Instance methods
     function fullName() {
-        return trim("#firstName# #lastName#");
+        return trim("#firstname# #lastname#");
     }
 
     function checkPassword(required string password) {
@@ -286,7 +286,7 @@ component extends="Model" {
         beforeValidation("calculateTotal");
         afterSave("updateInventory");
 
-        // Custom finder methods will be added below (scope() doesn't exist in Wheels)
+        // Custom finder methods (Wheels doesn't have scope() - use custom finder methods instead)
     }
 
     // Custom finder methods
@@ -300,7 +300,7 @@ component extends="Model" {
     
     function findThisMonth() {
         local.startOfMonth = CreateDate(Year(Now()), Month(Now()), 1);
-        return findAll(where="createdAt >= ?", whereParams=[local.startOfMonth]);
+        return findAll(where="createdat >= ?", whereParams=[local.startOfMonth]);
     }
 
     // Business logic methods
@@ -431,7 +431,7 @@ Views handle the presentation layer of your application, typically generating HT
             <cfloop query="users">
                 <tr>
                     <td>
-                        #linkTo(route="user", key=users.id, text="#users.firstName# #users.lastName#")#
+                        #linkTo(route="user", key=users.id, text="#users.firstname# #users.lastname#")#
                     </td>
                     <td>#users.email#</td>
                     <td>
@@ -439,7 +439,7 @@ Views handle the presentation layer of your application, typically generating HT
                             <span class="badge">#users.roleName#</span>
                         </cfif>
                     </td>
-                    <td>#dateTimeFormat(users.createdAt, "mm/dd/yyyy")#</td>
+                    <td>#dateTimeFormat(users.createdat, "mm/dd/yyyy")#</td>
                     <td>
                         #linkTo(route="editUser", key=users.id, text="Edit", class="btn btn-sm btn-secondary")#
                         #buttonTo(route="user", method="delete", key=users.id, text="Delete", 
@@ -470,15 +470,15 @@ Views handle the presentation layer of your application, typically generating HT
 #errorMessagesFor("user")#
 
 <div class="form-group">
-    #label(objectName="user", property="firstName", text="First Name")#
-    #textField(objectName="user", property="firstName", class="form-control")#
-    #errorMessageOn(objectName="user", property="firstName")#
+    #label(objectName="user", property="firstname", text="First Name")#
+    #textField(objectName="user", property="firstname", class="form-control")#
+    #errorMessageOn(objectName="user", property="firstname")#
 </div>
 
 <div class="form-group">
-    #label(objectName="user", property="lastName", text="Last Name")#
-    #textField(objectName="user", property="lastName", class="form-control")#
-    #errorMessageOn(objectName="user", property="lastName")#
+    #label(objectName="user", property="lastname", text="Last Name")#
+    #textField(objectName="user", property="lastname", class="form-control")#
+    #errorMessageOn(objectName="user", property="lastname")#
 </div>
 
 <div class="form-group">
@@ -521,12 +521,12 @@ Views handle the presentation layer of your application, typically generating HT
 {
     "user": {
         "id": #user.id#,
-        "firstName": "#JSStringFormat(user.firstName)#",
-        "lastName": "#JSStringFormat(user.lastName)#", 
+        "firstname": "#JSStringFormat(user.firstname)#",
+        "lastname": "#JSStringFormat(user.lastname)#", 
         "email": "#JSStringFormat(user.email)#",
         "role": <cfif IsObject(user.role)>"#JSStringFormat(user.role.name)#"<cfelse>null</cfif>,
-        "createdAt": "#dateFormat(user.createdAt, 'yyyy-mm-dd')#T#timeFormat(user.createdAt, 'HH:mm:ss')#Z",
-        "updatedAt": "#dateFormat(user.updatedAt, 'yyyy-mm-dd')#T#timeFormat(user.updatedAt, 'HH:mm:ss')#Z"
+        "createdat": "#dateFormat(user.createdat, 'yyyy-mm-dd')#T#timeFormat(user.createdat, 'HH:mm:ss')#Z",
+        "updatedat": "#dateFormat(user.updatedat, 'yyyy-mm-dd')#T#timeFormat(user.updatedat, 'HH:mm:ss')#Z"
     }
 }
 </cfoutput>
@@ -648,7 +648,7 @@ component extends="admin.Base" {
     }
 
     function index() {
-        users = model("User").findAll(include="role", order="createdAt DESC");
+        users = model("User").findAll(include="role", order="createdat DESC");
     }
 
     private function requireAdmin() {
@@ -681,21 +681,21 @@ component extends="Controller" {
 component {
 
     function addTrackingToModel(required model) {
-        arguments.model.property(name="createdAt", type="datetime");
-        arguments.model.property(name="updatedAt", type="datetime");
+        arguments.model.property(name="createdat", type="datetime");
+        arguments.model.property(name="updatedat", type="datetime");
         
         arguments.model.beforeCreate("setCreatedAt");
         arguments.model.beforeUpdate("setUpdatedAt");
     }
 
     function setCreatedAt() {
-        if (!StructKeyExists(this, "createdAt")) {
-            this.createdAt = Now();
+        if (!StructKeyExists(this, "createdat")) {
+            this.createdat = Now();
         }
     }
 
     function setUpdatedAt() {
-        this.updatedAt = Now();
+        this.updatedat = Now();
     }
 }
 
@@ -836,7 +836,7 @@ component {
         local.user = model("User").findByEmail(arguments.email);
         
         if (IsObject(local.user) && local.user.authenticate(arguments.password)) {
-            session.userId = local.user.id;
+            session.userid = local.user.id;
             session.authenticated = true;
             session.user = local.user;
             
@@ -882,7 +882,7 @@ component extends="tests.Test" {
 
     function setup() {
         super.setup();
-        user = model("User").create(firstName="John", lastName="Doe", email="john@example.com");
+        user = model("User").create(firstname="John", lastname="Doe", email="john@example.com");
     }
 
     function testIndexAction() {
@@ -910,8 +910,8 @@ component extends="tests.Test" {
             controller = "users",
             action = "create", 
             user = {
-                firstName = "Jane",
-                lastName = "Smith", 
+                firstname = "Jane",
+                lastname = "Smith", 
                 email = "jane@example.com"
             }
         };
@@ -947,8 +947,8 @@ component extends="tests.Test" {
 
     function testUserCreationWithValidData() {
         userData = {
-            firstName = "John",
-            lastName = "Doe",
+            firstname = "John",
+            lastname = "Doe",
             email = "john@example.com",
             password = "password123"
         };
@@ -957,7 +957,7 @@ component extends="tests.Test" {
         
         assert("IsObject(user)");
         assert("user.valid()");
-        assert("user.firstName EQ 'John'");
+        assert("user.firstname EQ 'John'");
         assert("!StructKeyExists(user, 'password')"); // Password should be hashed and removed
     }
 
@@ -989,14 +989,14 @@ component extends="Controller" {
 
     function dashboard() {
         // Manual caching for complex data
-        cacheKey = "user_dashboard_#session.userId#";
+        cacheKey = "user_dashboard_#session.userid#";
         dashboardData = $cacheRead(cacheKey);
         
         if (!IsStruct(dashboardData)) {
             dashboardData = {
-                recentOrders = model("Order").findAll(where="userId=#session.userId#", limit=5),
-                totalSpent = model("Order").sumOf("total", where="userId=#session.userId#"),
-                favoriteProducts = getFavoriteProducts(session.userId)
+                recentOrders = model("Order").findAll(where="userid=#session.userid#", limit=5),
+                totalSpent = model("Order").sumOf("total", where="userid=#session.userid#"),
+                favoriteProducts = getFavoriteProducts(session.userid)
             };
             
             $cacheWrite(key=cacheKey, value=dashboardData, timeSpan=CreateTimeSpan(0,1,0,0));
@@ -1008,18 +1008,18 @@ component extends="Controller" {
         favoriteProducts = dashboardData.favoriteProducts;
     }
 
-    private function getFavoriteProducts(required numeric userId) {
+    private function getFavoriteProducts(required numeric userid) {
         // Complex query to determine favorite products
         return model("Product").findBySQL("
             SELECT p.*, COUNT(oi.id) as orderCount
             FROM products p
             INNER JOIN orderitems oi ON p.id = oi.productId  
             INNER JOIN orders o ON oi.orderId = o.id
-            WHERE o.userId = ?
+            WHERE o.userid = ?
             GROUP BY p.id
             ORDER BY orderCount DESC
             LIMIT 10
-        ", [arguments.userId]);
+        ", [arguments.userid]);
     }
 }
 ```
@@ -1044,7 +1044,7 @@ component extends="Model" {
         return findAll(
             where = "active = 1",
             include = "role,orders",
-            order = "createdAt DESC"
+            order = "createdat DESC"
         );
     }
 
@@ -1055,7 +1055,7 @@ component extends="Model" {
                    COUNT(o.id) as orderCount,
                    SUM(o.total) as totalSpent
             FROM users u
-            INNER JOIN orders o ON u.id = o.userId
+            INNER JOIN orders o ON u.id = o.userid
             WHERE u.active = 1
             GROUP BY u.id
             ORDER BY totalSpent DESC

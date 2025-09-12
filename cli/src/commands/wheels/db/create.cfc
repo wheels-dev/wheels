@@ -102,11 +102,11 @@ component extends="../base" {
 		try {
 			printStep("Initializing " & arguments.dbType & " database creation...");
 			
-			// Get database-specific configuration
-			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo, arguments.dbName);
+			// Get database-specific configuration (don't pass target dbName, use system DB)
+			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo);
 			
-			// Build connection URL
-			local.url = buildJDBCUrl(local.dbConfig.tempDS);
+			// Build connection URL to system database (not the target database)
+			local.url = buildSystemJDBCUrl(local.dbConfig.tempDS);
 			local.username = local.dbConfig.tempDS.username ?: "";
 			local.password = local.dbConfig.tempDS.password ?: "";
 			
