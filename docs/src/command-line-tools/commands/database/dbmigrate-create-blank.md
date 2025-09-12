@@ -187,7 +187,7 @@ Within your blank migration, you can use these helper methods:
 - `addColumn(table, column, type, options)` - Add a column
 - `removeColumn(table, column)` - Remove a column
 - `changeColumn(table, column, type, options)` - Modify a column
-- `addIndex(table, column, options)` - Add an index
+- `addIndex(table, columnNames, unique, indexName)` - Add an index
 - `removeIndex(table, column)` - Remove an index
 - `execute(sql)` - Execute raw SQL
 - `announce(message)` - Output a message during migration

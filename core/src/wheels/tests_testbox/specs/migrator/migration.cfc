@@ -25,7 +25,7 @@ component extends="testbox.system.BaseSpec" {
 				tableName = "dbm_add_big_integer_tests"
 				columnName = "bigIntegerCOLUMN"
 				t = migration.createTable(name = tableName, force = true)
-				t.bigInteger(columnName = columnName)
+				t.bigInteger(columnNames = columnName)
 				t.create()
 
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
@@ -377,7 +377,7 @@ component extends="testbox.system.BaseSpec" {
 				tableName = "dbm_add_integer_tests"
 				columnName = "integerCOLUMN"
 				t = migration.createTable(name = tableName, force = true)
-				t.integer(columnName = columnName)
+				t.integer(columnNames = columnName)
 				t.create()
 
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")

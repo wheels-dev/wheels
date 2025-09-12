@@ -22,7 +22,7 @@
 			t.integer(columnNames='age', default='', null=true, limit='1');
       t.time(columnNames='lunchStarts', default='', null=true);
 			t.uniqueidentifier(columnNames='uid', default='newid()', null=false);
-			t.references("vacation");
+			t.references(referenceNames="vacation");
 			t.timestamps();
 			t.create();
 */

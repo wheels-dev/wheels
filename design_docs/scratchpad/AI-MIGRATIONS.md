@@ -304,7 +304,7 @@ t.binary(columnNames='data');
 t.uniqueidentifier(columnNames='guid');
 
 // Foreign keys
-t.references('user'); // Creates userId integer column
+t.references(referenceNames='user'); // Creates userId integer column
 ```
 
 ## Migration Best Practices

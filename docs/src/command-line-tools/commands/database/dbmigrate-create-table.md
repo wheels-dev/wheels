@@ -65,8 +65,8 @@ component extends="wheels.migrator.Migration" hint="create users table" {
         transaction {
             t = createTable(name="users", force=false, id=true, primaryKey="id");
             // Add your columns here
-            // t.string(columnName="name");
-            // t.integer(columnName="age");
+            // t.string(columnNames="name");
+            // t.integer(columnNames="age");
             t.timestamps();
             t.create();
         }
@@ -123,9 +123,9 @@ After generating the migration, edit it to add columns:
 ```cfml
 // In the generated migration file
 t = createTable(name="orders", force=false, id=true, primaryKey="id");
-t.integer(columnName="customer_id");
-t.decimal(columnName="total", precision=10, scale=2);
-t.string(columnName="status", default="pending");
+t.integer(columnNames="customer_id");
+t.decimal(columnNames="total", precision=10, scale=2);
+t.string(columnNames="status", default="pending");
 t.timestamps();
 t.create();
 ```

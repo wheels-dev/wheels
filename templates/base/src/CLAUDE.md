@@ -56,6 +56,7 @@ Wheels follows the Model-View-Controller (MVC) architectural pattern:
 │   ├── images/           (Image assets)
 │   ├── javascripts/      (JavaScript files)
 │   ├── stylesheets/      (CSS files)
+│   ├── miscellaneous/    (Miscellaneous files)
 │   ├── Application.cfc   (Framework bootstrap)
 │   └── index.cfm         (Entry point)
 ├── tests/                (Test files)
@@ -374,9 +375,9 @@ component extends="wheels.migrator.Migration" {
     function up() {
         transaction {
             t = createTable(name="users", force=false);
-            t.string("firstName,lastName", null=false);
-            t.string("email", limit=100, null=false);
-            t.boolean("active", default=true);
+            t.string(columnNames="firstName,lastName", null=false);
+            t.string(columnNames="email", limit=100, null=false);
+            t.boolean(columnNames="active", default=true);
             t.timestamps();
             t.create();
             
@@ -392,15 +393,15 @@ component extends="wheels.migrator.Migration" {
 
 ### Column Types
 ```cfm
-t.string("name", limit=255, null=false, default="");
-t.text("description", null=true);
-t.integer("count", null=false, default=0);
-t.decimal("price", precision=10, scale=2);
-t.boolean("active", default=false);
-t.date("eventDate");
-t.datetime("createdAt");
+t.string(columnNames="name", limit=255, null=false, default="");
+t.text(columnNames="description", null=true);
+t.integer(columnNames="count", null=false, default=0);
+t.decimal(columnNames="price", precision=10, scale=2);
+t.boolean(columnNames="active", default=false);
+t.date(columnNames="eventDate");
+t.datetime(columnNames="createdAt");
 t.timestamps();  // Creates createdAt and updatedAt
-t.integer("userId", null=false);  // Foreign key
+t.integer(columnNames="userId", null=false);  // Foreign key
 ```
 
 ## Testing

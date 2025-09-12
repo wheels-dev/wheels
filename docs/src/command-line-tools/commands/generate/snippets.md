@@ -383,13 +383,13 @@ component extends="wheels.migrator.Migration" {
     function up() {
         createTable(name="audit_logs") {
             t.increments("id");
-            t.string("model_name", null=false);
-            t.integer("record_id", null=false);
-            t.string("action", null=false);
-            t.text("changes");
-            t.integer("user_id");
-            t.string("ip_address");
-            t.string("user_agent");
+            t.string(columnNames="model_name", null=false);
+            t.integer(columnNames="record_id", null=false);
+            t.string(columnNames="action", null=false);
+            t.text(columnNames="changes");
+            t.integer(columnNames="user_id");
+            t.string(columnNames="ip_address");
+            t.string(columnNames="user_agent");
             t.timestamps();
             
             t.index(["model_name", "record_id"]);

@@ -1299,7 +1299,7 @@ component extends="Model" {
         validatesFormatOf(property="email", with=isValidEmail, message="Please enter a valid email address");
         
         // Custom validation using global function
-        validates(property="password", method="validatePasswordStrength");
+        validate(property="password", method="validatePasswordStrength");
     }
     
     private function validatePasswordStrength() {

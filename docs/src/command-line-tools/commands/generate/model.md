@@ -253,7 +253,7 @@ component extends="wheels.migrator.Migration" {
             t.timestamps();
             t.create();
             
-            addIndex(table="users", columns="email", unique=true);
+            addIndex(table="users", columnNames="email", unique=true);
         }
     }
 

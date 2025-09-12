@@ -290,9 +290,9 @@ component extends="cfwheels.migrator.Migration" {
     function up() {
         createTable(name="users") {
             table.increments("id");
-            table.string("firstName");
-            table.string("lastName");
-            table.string("email");
+            table.string(columnNames="firstName");
+            table.string(columnNames="lastName");
+            table.string(columnNames="email");
             table.timestamps();
             table.index("email", unique=true);
         };

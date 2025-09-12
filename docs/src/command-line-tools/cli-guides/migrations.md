@@ -83,25 +83,25 @@ function up() {
         t.primaryKey("productId"); // Custom primary key
         
         // Column types
-        t.string("name", limit=100);
-        t.text("description");
-        t.text("content", size="mediumtext"); // MySQL only: mediumtext (16MB)
-        t.text("longDescription", size="longtext"); // MySQL only: longtext (4GB)
-        t.integer("quantity");
-        t.bigInteger("views");
-        t.float("weight");
-        t.decimal("price", precision=10, scale=2);
-        t.boolean("active", default=true);
-        t.date("releaseDate");
-        t.datetime("publishedAt");
-        t.timestamp("lastModified");
-        t.time("openingTime");
-        t.binary("data");
-        t.uuid("uniqueId");
+        t.string(columnNames="name", limit=100);
+        t.text(columnNames="description");
+        t.text(columnNames="content", size="mediumtext"); // MySQL only: mediumtext (16MB)
+        t.text(columnNames="longDescription", size="longtext"); // MySQL only: longtext (4GB)
+        t.integer(columnNames="quantity");
+        t.bigInteger(columnNames="views");
+        t.float(columnNames="weight");
+        t.decimal(columnNames="price", precision=10, scale=2);
+        t.boolean(columnNames="active", default=true);
+        t.date(columnNames="releaseDate");
+        t.datetime(columnNames="publishedAt");
+        t.timestamp(columnNames="lastModified");
+        t.time(columnNames="openingTime");
+        t.binary(columnNames="data");
+        t.uniqueidentifier(columnNames="uniqueId");
         
         // Special columns
         t.timestamps(); // Creates createdAt and updatedAt
-        t.references("user"); // Creates userId foreign key
+        t.references(referenceNames="user"); // Creates userId foreign key
         
         // Create the table
         t.create();
@@ -155,9 +155,9 @@ function up() {
         
         // Multiple columns
         t = changeTable("users");
-        t.string("address");
-        t.string("city");
-        t.string("postalCode", limit=10);
+        t.string(columnNames="address");
+        t.string(columnNames="city");
+        t.string(columnNames="postalCode", limit=10);
         t.update();
     }
 }
@@ -219,25 +219,25 @@ function up() {
 function up() {
     transaction {
         // Simple index
-        addIndex(table="users", column="email");
+        addIndex(table="users", columnNames="email");
         
         // Unique index
         addIndex(
             table="users",
-            column="username",
+            columnNames="username",
             unique=true
         );
         
         // Composite index
         addIndex(
             table="products",
-            columns="category,status",
+            columnNames="category,status",
             name="idx_category_status"
         );
         
         // In table creation
         t = createTable("orders");
-        t.string("orderNumber");
+        t.string(columnNames="orderNumber");
         t.index("orderNumber", unique=true);
         t.create();
     }
@@ -284,8 +284,8 @@ function up() {
         
         // In table creation
         t = createTable("posts");
-        t.references("user", onDelete="SET NULL");
-        t.references("category", foreignKey=true);
+        t.references(referenceNames="user", onDelete="SET NULL");
+        t.references(referenceNames="category", foreignKey=true);
         t.create();
     }
 }

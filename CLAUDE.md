@@ -377,9 +377,9 @@ component extends="wheels.migrator.Migration" {
     function up() {
         transaction {
             t = createTable(name="users", force=false);
-            t.string("firstName,lastName", null=false);
-            t.string("email", limit=100, null=false);
-            t.boolean("active", default=true);
+            t.string(columnNames="firstName,lastName", null=false);
+            t.string(columnNames="email", limit=100, null=false);
+            t.boolean(columnNames="active", default=true);
             t.timestamps();
             t.create();
             
@@ -395,15 +395,15 @@ component extends="wheels.migrator.Migration" {
 
 ### Column Types
 ```cfm
-t.string("name", limit=255, null=false, default="");
-t.text("description", null=true);
-t.integer("count", null=false, default=0);
+t.string(columnNames="name", limit=255, null=false, default="");
+t.text(columnNames="description", null=true);
+t.integer(columnNames="count", null=false, default=0);
 t.decimal("price", precision=10, scale=2);
-t.boolean("active", default=false);
+t.boolean(columnNames="active", default=false);
 t.date("eventDate");
-t.datetime("createdAt");
+t.datetime(columnNames="createdAt"); // Use for createdAt/updatedAt only when not using timestamps(); OK for other columns
 t.timestamps();  // Creates createdAt and updatedAt
-t.integer("userId", null=false);  // Foreign key
+t.integer(columnNames="userId", null=false);  // Foreign key
 ```
 
 ## Testing
