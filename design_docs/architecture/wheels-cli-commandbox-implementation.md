@@ -2741,9 +2741,9 @@ component extends="tests.specs.BaseCommandSpec" {
             function up() {
                 createTable(name="users") {
                     table.primaryKey();
-                    table.string("firstName");
-                    table.string("lastName");
-                    table.string("email");
+                    table.string(columnNames="firstName");
+                    table.string(columnNames="lastName");
+                    table.string(columnNames="email");
                     table.timestamps();
                 };
             }

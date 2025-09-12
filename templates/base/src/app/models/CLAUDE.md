@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with Wh
 
 The `/app/models/` folder contains model classes that represent your application's data layer and implement the Active Record pattern. Models in Wheels extend `Model.cfc` and provide object-relational mapping (ORM) between database tables and CFML objects.
 
-**⚠️ IMPORTANT:** CFWheels models do NOT have a `scope()` function. The `scope()` function exists only in the routing system (`/config/routes.cfm`) for grouping routes. Do not confuse this with Ruby on Rails ActiveRecord scopes. In CFWheels models, use custom finder methods instead.
+**⚠️ IMPORTANT:** Wheels models do NOT have a `scope()` function. The `scope()` function exists only in the routing system (`/config/routes.cfm`) for grouping routes. Do not confuse this with Ruby on Rails ActiveRecord scopes. In Wheels models, use custom finder methods instead.
 
 **Why Use Models:**
 - Implement the Active Record pattern for database interactions
@@ -57,11 +57,11 @@ All models extend `wheels.Model`, which provides:
 - **`belongsTo(name="model name", foreignKey="")`** - Define parent relationship
 - **`hasMany()`** - Define child collection relationship
 - **`hasOne()`** - Define one-to-one relationship
-- **`validates*()`** - Define validation rules
+- **`validate*()`** - Define validation rules
 - **`validate(method="")`** - Define custom validation methods
 - **`nestedProperties()`** - Enable saving of associated models in single operation
-- **`timeStampOnCreate()`** - Enable automatic createdat timestamp
-- **`timeStampOnUpdate()`** - Enable automatic updatedat timestamp
+- **`timeStampOnCreateProperty`** - Enable automatic createdAt timestamp using `set` function
+- **`timeStampOnUpdateProperty`** - Enable automatic updatedAt timestamp using `set` function
 - **`protectedProperties()`** - Protect properties from mass assignment
 - **`accessibleProperties()`** - Allow specific properties for mass assignment
 
@@ -382,8 +382,8 @@ component extends="Model" {
         afterUpdate("clearPostCache");
         
         // Automatic timestamps
-        timeStampOnCreate(true);
-        timeStampOnUpdate(true);
+        set(timeStampOnCreateProperty="createdAt");
+        set(timeStampOnUpdateProperty="updatedAt");
     }
     
     /**
@@ -625,8 +625,8 @@ component extends="Model" {
         validatesConfirmationOf(property="password", when="onCreate");
         
         // Custom validations
-        validates(method="validatePasswordStrength", when="onCreate");
-        validates(method="validateUsernameFormat");
+        validate(method="validatePasswordStrength", when="onCreate");
+        validate(method="validateUsernameFormat");
         
         // Custom properties
         property(name="isactive", type="boolean", defaultValue=true);
@@ -651,8 +651,8 @@ component extends="Model" {
         // Soft delete enabled automatically if deletedat column exists
         
         // Automatic timestamps
-        timeStampOnCreate(true);
-        timeStampOnUpdate(true);
+        set(timeStampOnCreateProperty="createdAt");
+        set(timeStampOnUpdateProperty="updatedAt");
     }
     
     /**
@@ -1209,9 +1209,9 @@ component extends="Model" {
 component extends="Model" {
     function config() {
         // Custom validation methods
-        validates(method="validateAge");
-        validates(method="validateCreditCard", when="onCreate");
-        validates(method="validateBusinessHours");
+        validate(method="validateAge");
+        validate(method="validateCreditCard", when="onCreate");
+        validate(method="validateBusinessHours");
     }
     
     /**
@@ -1710,8 +1710,8 @@ function config() {
     afterCreate("sendNotification");
     
     // 6. Other configuration  
-    timeStampOnCreate(true);
-    // Note: Soft delete enabled automatically if deletedat column exists
+    set(timeStampOnCreateProperty="createdAt");
+    // Note: Soft delete enabled automatically if deletedAt column exists
 }
 ```
 
@@ -1835,8 +1835,8 @@ Wheels automatically handles time stamping of records when you have the proper c
 component extends="Model" {
     function config() {
         // Enable automatic timestamps
-        timeStampOnCreate(true);  // Sets createdat on creation
-        timeStampOnUpdate(true);  // Sets updatedat on modification
+        set(timeStampOnCreateProperty="createdAt");  // Sets createdAt on creation
+        set(timeStampOnUpdateProperty="updatedAt");  // Sets updatedAt on modification
     }
 }
 ```

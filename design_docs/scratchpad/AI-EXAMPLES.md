@@ -62,10 +62,20 @@ component extends="Model" {
     // Calculated properties
     property(name="authorName", sql="(SELECT name FROM users WHERE id = posts.userId)");
     property(name="commentCount", sql="(SELECT COUNT(*) FROM comments WHERE postId = posts.id)");
-    
-    // Scopes
-    scope("published", where="publishedAt <= NOW() AND status = 'published'");
-    scope("recent", order="publishedAt DESC", maxRows=10);
+  }
+
+  // Custom Finder Methods
+  function findPublished() {
+    return findAll(
+      where = "publishedAt <= #NOW()# AND status = 'published'"
+    );
+  }
+
+  function findRecent() {
+    return findAll(
+      order   = "publishedAt DESC",
+      maxRows = 10
+    );
   }
   
   // Callbacks
@@ -718,9 +728,19 @@ component extends="Model" {
     validatesInclusionOf(property="status", list="pending,processing,completed,failed");
     
     beforeCreate("setDefaults");
-    
-    scope("pending", where="status = 'pending'");
-    scope("ready", where="status = 'pending' AND runAt <= NOW()");
+  }
+
+  // Custom Finder Methods
+  function findPending() {
+    return findAll(
+      where = "status = 'pending'"
+    );
+  }
+
+  function findReady() {
+    return findAll(
+      where = "status = 'pending' AND runAt <= #NOW()#"
+    );
   }
   
   private function setDefaults() {

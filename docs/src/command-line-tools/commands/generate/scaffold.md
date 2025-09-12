@@ -247,12 +247,12 @@ component extends="wheels.migrator.Migration" {
         transaction {
             t = createTable("products");
             t.string("name");
-            t.decimal("price", precision=10, scale=2);
+            t.decimal(columnNames="price", precision=10, scale=2);
             t.integer("stock");
             t.timestamps();
             t.create();
             
-            addIndex(table="products", columns="name", unique=true);
+            addIndex(table="products", columnNames="name", unique=true);
         }
     }
 

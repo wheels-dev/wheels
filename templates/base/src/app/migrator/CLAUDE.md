@@ -150,11 +150,11 @@ function up() {
         t.timestamp(columnNames="lastModified");
         t.time(columnNames="openingTime");
         t.binary(columnNames="data");
-        t.uuid(columnNames="uniqueId");
+        t.uniqueidentifier(columnNames="uniqueId");
         
         // Special columns
-        t.timestamps(); // Creates createdat, updatedat, deletedat
-        t.references(columnNames="user"); // Creates userid foreign key
+        t.timestamps(); // Creates createdAt, updatedAt, deletedAt
+        t.references(referenceNames="user"); // Creates userId foreign key
         
         t.create();
     }
@@ -331,8 +331,8 @@ function up() {
         
         // During table creation - all named arguments
         t = createTable(name="posts");
-        t.references(columnNames="user", onDelete="SET NULL");
-        t.references(columnNames="category", foreignKey=true);
+        t.references(referenceNames="user", onDelete="SET NULL");
+        t.references(referenceNames="category", foreignKey=true);
         t.create();
     }
 }
@@ -764,7 +764,7 @@ removeColumn("users", columnName="old_field"); // WRONG! Mixed positional and na
 ```
 
 ### Index Methods
-- `addIndex(table, columnNames, options)` - Add index
+- `addIndex(table, columnNames, unique, indexName)` - Add index
 - `removeIndex(table, indexName)` - Remove index
 
 **Examples:**

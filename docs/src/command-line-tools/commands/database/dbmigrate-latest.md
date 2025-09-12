@@ -92,7 +92,7 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        addColumn(table="users", column="email", type="string");
+        addColumn(table="users", columnNames="email", type="string");
     }
 }
 ```
@@ -101,7 +101,7 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        addIndex(table="users", columns="email", unique=true);
+        addIndex(table="users", columnNames="email", unique=true);
     }
 }
 ```
@@ -110,7 +110,7 @@ function up() {
 ```cfc
 function up() {
     transaction {
-        changeColumn(table="products", column="price", type="decimal", precision=10, scale=2);
+        changeColumn(table="products", columnNames="price", type="decimal", precision=10, scale=2);
     }
 }
 ```
