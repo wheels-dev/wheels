@@ -60,8 +60,8 @@ All models extend `wheels.Model`, which provides:
 - **`validates*()`** - Define validation rules
 - **`validate(method="")`** - Define custom validation methods
 - **`nestedProperties()`** - Enable saving of associated models in single operation
-- **`timeStampOnCreate()`** - Enable automatic createdAt timestamp
-- **`timeStampOnUpdate()`** - Enable automatic updatedAt timestamp
+- **`timeStampOnCreate()`** - Enable automatic createdat timestamp
+- **`timeStampOnUpdate()`** - Enable automatic updatedat timestamp
 - **`protectedProperties()`** - Protect properties from mass assignment
 - **`accessibleProperties()`** - Allow specific properties for mass assignment
 
@@ -156,7 +156,7 @@ component extends="Model" {
         beforeSave("encryptPassword");
         afterCreate("sendWelcomeEmail");
         
-        // Soft delete enabled automatically if deletedAt column exists
+        // Soft delete enabled automatically if deletedat column exists
     }
     
     // Custom business logic methods go here
@@ -165,7 +165,7 @@ component extends="Model" {
      * Get user's full display name
      */
     function getFullName() {
-        return trim(this.firstName & " " & this.lastName);
+        return trim(this.firstname & " " & this.lastname);
     }
     
     /**
@@ -213,7 +213,7 @@ component extends="Model" {
         hasOne("inventory");
         
         // Validations
-        validatesPresenceOf("name,price,categoryId");
+        validatesPresenceOf("name,price,categoryid");
         validatesNumericalityOf("price", greaterThan=0);
         validatesNumericalityOf("weight", greaterThan=0, allowBlank=true);
         validatesLengthOf(property="name", minimum=3, maximum=255);
@@ -221,7 +221,7 @@ component extends="Model" {
         validatesUniquenessOf("sku", allowBlank=true);
         
         // Custom properties
-        property(name="isActive", type="boolean", defaultValue=true);
+        property(name="isactive", type="boolean", defaultValue=true);
         property(name="discountedPrice", sql=false); // Calculated property
         property(name="inStock", sql=false);
         
@@ -229,7 +229,7 @@ component extends="Model" {
         beforeSave("generateSku", "updateSlug");
         afterUpdate("clearProductCache");
         
-        // Soft delete enabled automatically if deletedAt column exists
+        // Soft delete enabled automatically if deletedat column exists
     }
     
     /**
@@ -267,14 +267,14 @@ component extends="Model" {
      * Find active products only
      */
     function findActive() {
-        return findAll(where="isActive = 1 AND deletedAt IS NULL");
+        return findAll(where="isactive = 1 AND deletedat IS NULL");
     }
     
     /**
      * Find products in specific category
      */
-    function findInCategory(required numeric categoryId) {
-        return findAll(where="categoryId = ?", whereParams=[arguments.categoryId]);
+    function findInCategory(required numeric categoryid) {
+        return findAll(where="categoryid = ?", whereParams=[arguments.categoryid]);
     }
     
     /**
@@ -320,7 +320,7 @@ component extends="Model" {
     private void function clearProductCache() {
         // Clear relevant cache entries
         cacheRemove("product_#this.id#_details");
-        cacheRemove("category_#this.categoryId#_products");
+        cacheRemove("category_#this.categoryid#_products");
     }
     
     /**
@@ -355,14 +355,14 @@ component extends="Model" {
 
     function config() {
         // Associations
-        belongsTo("author", modelName="User", foreignKey="authorId");
+        belongsTo("author", modelName="User", foreignKey="authorid");
         belongsTo("category");
         hasMany("comments");
         hasMany("tags", through="postTags");
         hasMany("postTags");
         
         // Validations
-        validatesPresenceOf("title,content,authorId");
+        validatesPresenceOf("title,content,authorid");
         validatesLengthOf(property="title", minimum=5, maximum=255);
         validatesLengthOf(property="excerpt", maximum=500, allowBlank=true);
         validatesLengthOf(property="content", minimum=50);
@@ -518,8 +518,8 @@ component extends="Model" {
     /**
      * Find posts by specific author
      */
-    function findByAuthor(required numeric authorId) {
-        return findAll(where="authorId = ?", whereParams=[arguments.authorId]);
+    function findByAuthor(required numeric authorid) {
+        return findAll(where="authorid = ?", whereParams=[arguments.authorid]);
     }
     
     /**
@@ -574,7 +574,7 @@ component extends="Model" {
     private void function clearPostCache() {
         cacheRemove("post_#this.id#_details");
         cacheRemove("recent_posts");
-        cacheRemove("category_#this.categoryId#_posts");
+        cacheRemove("category_#this.categoryid#_posts");
     }
     
     /**
@@ -609,7 +609,7 @@ component extends="Model" {
     function config() {
         // Associations
         hasOne("profile");
-        hasMany("posts", foreignKey="authorId");
+        hasMany("posts", foreignKey="authorid");
         hasMany("comments");
         hasMany("sessions");
         hasMany("loginAttempts");
@@ -629,13 +629,13 @@ component extends="Model" {
         validates(method="validateUsernameFormat");
         
         // Custom properties
-        property(name="isActive", type="boolean", defaultValue=true);
-        property(name="lastLoginAt", type="timestamp", null=true);
-        property(name="loginCount", type="integer", defaultValue=0);
-        property(name="failedLoginAttempts", type="integer", defaultValue=0);
-        property(name="lockedUntil", type="timestamp", null=true);
-        property(name="emailVerifiedAt", type="timestamp", null=true);
-        property(name="twoFactorEnabled", type="boolean", defaultValue=false);
+        property(name="isactive", type="boolean", defaultValue=true);
+        property(name="lastloginat", type="timestamp", null=true);
+        property(name="logincount", type="integer", defaultValue=0);
+        property(name="failedloginattempts", type="integer", defaultValue=0);
+        property(name="lockeduntil", type="timestamp", null=true);
+        property(name="emailverifiedat", type="timestamp", null=true);
+        property(name="twofactorenabled", type="boolean", defaultValue=false);
         
         // Virtual properties
         property(name="fullName", sql=false);
@@ -648,7 +648,7 @@ component extends="Model" {
         afterCreate("sendVerificationEmail");
         afterUpdate("logProfileChanges");
         
-        // Soft delete enabled automatically if deletedAt column exists
+        // Soft delete enabled automatically if deletedat column exists
         
         // Automatic timestamps
         timeStampOnCreate(true);
@@ -661,7 +661,7 @@ component extends="Model" {
     static function authenticate(required string identifier, required string password) {
         // Find user by email or username
         local.user = model("User").findOne(
-            where="(email = ? OR username = ?) AND deletedAt IS NULL",
+            where="(email = ? OR username = ?) AND deletedat IS NULL",
             whereParams=[arguments.identifier, arguments.identifier]
         );
         
@@ -697,12 +697,12 @@ component extends="Model" {
      * Get user's full display name
      */
     function getFullName() {
-        if (len(this.firstName) && len(this.lastName)) {
-            return this.firstName & " " & this.lastName;
-        } else if (len(this.firstName)) {
-            return this.firstName;
-        } else if (len(this.lastName)) {
-            return this.lastName;
+        if (len(this.firstname) && len(this.lastname)) {
+            return this.firstname & " " & this.lastname;
+        } else if (len(this.firstname)) {
+            return this.firstname;
+        } else if (len(this.lastname)) {
+            return this.lastname;
         } else {
             return this.username;
         }
@@ -712,14 +712,14 @@ component extends="Model" {
      * Check if account is locked
      */
     function getIsLocked() {
-        return isDate(this.lockedUntil) && this.lockedUntil > now();
+        return isDate(this.lockeduntil) && this.lockeduntil > now();
     }
     
     /**
      * Check if email is verified
      */
     function getIsEmailVerified() {
-        return isDate(this.emailVerifiedAt);
+        return isDate(this.emailverifiedat);
     }
     
     /**
@@ -741,7 +741,7 @@ component extends="Model" {
      * Check if user has permission
      */
     function hasPermission(required string permission) {
-        return this.roles().joins("INNER JOIN rolePermissions rp ON roles.id = rp.roleId")
+        return this.roles().joins("INNER JOIN rolePermissions rp ON roles.id = rp.roleid")
                           .joins("INNER JOIN permissions p ON rp.permissionId = p.id")
                           .exists(where="p.name = ?", whereParams=[arguments.permission]);
     }
@@ -752,7 +752,7 @@ component extends="Model" {
     function addRole(required string roleName) {
         local.role = model("Role").findOne(where="name = ?", whereParams=[arguments.roleName]);
         if (isObject(local.role) && !this.hasRole(arguments.roleName)) {
-            model("UserRole").create(userId=this.id, roleId=local.role.id);
+            model("UserRole").create(userid=this.id, roleid=local.role.id);
         }
     }
     
@@ -762,7 +762,7 @@ component extends="Model" {
     function removeRole(required string roleName) {
         local.role = model("Role").findOne(where="name = ?", whereParams=[arguments.roleName]);
         if (isObject(local.role)) {
-            model("UserRole").deleteAll(where="userId = ? AND roleId = ?", whereParams=[this.id, local.role.id]);
+            model("UserRole").deleteAll(where="userid = ? AND roleid = ?", whereParams=[this.id, local.role.id]);
         }
     }
     
@@ -809,7 +809,7 @@ component extends="Model" {
      */
     function verifyEmail(required string token) {
         if (this.emailVerificationToken == arguments.token) {
-            this.emailVerifiedAt = now();
+            this.emailverifiedat = now();
             this.emailVerificationToken = "";
             return this.save();
         }
@@ -820,32 +820,32 @@ component extends="Model" {
      * Record successful login
      */
     function recordSuccessfulLogin() {
-        this.lastLoginAt = now();
-        this.loginCount = this.loginCount + 1;
-        this.failedLoginAttempts = 0;
-        this.lockedUntil = "";
+        this.lastloginat = now();
+        this.logincount = this.logincount + 1;
+        this.failedloginattempts = 0;
+        this.lockeduntil = "";
         this.save();
         
         // Clean up old login attempts
-        this.loginAttempts().deleteAll(where="createdAt < ?", whereParams=[dateAdd("d", -7, now())]);
+        this.loginAttempts().deleteAll(where="createdat < ?", whereParams=[dateAdd("d", -7, now())]);
     }
     
     /**
      * Record failed login attempt
      */
     function recordFailedLogin() {
-        this.failedLoginAttempts = this.failedLoginAttempts + 1;
+        this.failedloginattempts = this.failedloginattempts + 1;
         
         // Lock account after 5 failed attempts
-        if (this.failedLoginAttempts >= 5) {
-            this.lockedUntil = dateAdd("n", 30, now()); // 30 minutes
+        if (this.failedloginattempts >= 5) {
+            this.lockeduntil = dateAdd("n", 30, now()); // 30 minutes
         }
         
         this.save();
         
         // Log failed attempt
         model("LoginAttempt").create(
-            userId = this.id,
+            userid = this.id,
             ipAddress = getClientIP(),
             success = false,
             attemptedAt = now()
@@ -856,14 +856,14 @@ component extends="Model" {
      * Find active users only
      */
     function findActive() {
-        return findAll(where="isActive = 1 AND deletedAt IS NULL");
+        return findAll(where="isactive = 1 AND deletedat IS NULL");
     }
     
     /**
      * Find email verified users
      */
     function findEmailVerified() {
-        return findAll(where="emailVerifiedAt IS NOT NULL");
+        return findAll(where="emailverifiedat IS NOT NULL");
     }
     
     /**
@@ -914,13 +914,13 @@ component extends="Model" {
      * Callback: Log significant profile changes
      */
     private void function logProfileChanges() {
-        local.significantFields = "email,username,isActive";
+        local.significantFields = "email,username,isactive";
         local.changedFields = changedProperties();
         
         for (local.field in local.changedFields) {
             if (listFindNoCase(local.significantFields, local.field)) {
                 model("UserAuditLog").create(
-                    userId = this.id,
+                    userid = this.id,
                     action = "profile_change",
                     field = local.field,
                     oldValue = local.changedFields[local.field].oldValue,
@@ -1020,7 +1020,7 @@ component extends="Model" {
 component extends="Model" {
     function config() {
         // Post belongs to User (author)
-        belongsTo("author", modelName="User", foreignKey="authorId");
+        belongsTo("author", modelName="User", foreignKey="authorid");
         
         // Order belongs to Customer
         belongsTo("customer");
@@ -1036,7 +1036,7 @@ component extends="Model" {
 component extends="Model" {
     function config() {
         // User has many Posts
-        hasMany("posts", foreignKey="authorId");
+        hasMany("posts", foreignKey="authorid");
         
         // Category has many Products
         hasMany("products");
@@ -1086,7 +1086,7 @@ post = model("Post").findByKey(1);
 comments = post.comments();
 
 // Get comments with conditions
-recentComments = post.comments(where="createdAt > ?", whereParams=[dateAdd("d", -7, now())]);
+recentComments = post.comments(where="createdat > ?", whereParams=[dateAdd("d", -7, now())]);
 
 // Count comments
 commentCount = post.commentCount();
@@ -1172,7 +1172,7 @@ component extends="Model" {
         validatesUniquenessOf("sku", allowBlank=true);
         
         // Scoped uniqueness (within category)
-        validatesUniquenessOf(property="name", scope="categoryId");
+        validatesUniquenessOf(property="name", scope="categoryid");
         
         // Password confirmation
         validatesConfirmationOf("password");
@@ -1317,9 +1317,9 @@ component extends="Model" {
     
     private void function updateTimestamps() {
         if (isNew()) {
-            this.createdAt = now();
+            this.createdat = now();
         }
-        this.updatedAt = now();
+        this.updatedat = now();
     }
     
     private void function generateId() {
@@ -1357,7 +1357,7 @@ component extends="Model" {
                     oldValue = variables.changedData[local.field].oldValue,
                     newValue = variables.changedData[local.field].newValue,
                     changedAt = now(),
-                    changedBy = session.userId ?: 0
+                    changedBy = session.userid ?: 0
                 );
             }
         }
@@ -1386,8 +1386,8 @@ component extends="wheels.Test" {
         variables.validUserData = {
             username = "testuser",
             email = "test@example.com",
-            firstName = "Test",
-            lastName = "User",
+            firstname = "Test",
+            lastname = "User",
             password = "SecurePass123!",
             passwordConfirmation = "SecurePass123!"
         };
@@ -1475,8 +1475,8 @@ component extends="wheels.Test" {
     // Association tests
     function test_user_has_many_posts() {
         local.user = model("User").create(variables.validUserData);
-        local.post1 = model("Post").create(title="Post 1", content="Content 1", authorId=local.user.id);
-        local.post2 = model("Post").create(title="Post 2", content="Content 2", authorId=local.user.id);
+        local.post1 = model("Post").create(title="Post 1", content="Content 1", authorid=local.user.id);
+        local.post2 = model("Post").create(title="Post 2", content="Content 2", authorid=local.user.id);
         
         local.posts = local.user.posts();
         assert(local.posts.recordCount == 2, "User should have 2 posts");
@@ -1535,7 +1535,7 @@ component extends="wheels.Test" {
         local.user.reload();
         
         assert(local.user.getIsLocked(), "Account should be locked after 5 failed attempts");
-        assert(local.user.failedLoginAttempts >= 5, "Should track failed attempts");
+        assert(local.user.failedloginattempts >= 5, "Should track failed attempts");
     }
 
     // Callback tests
@@ -1570,7 +1570,7 @@ component extends="wheels.Test" {
         
         variables.validUserData.username = "inactive";
         variables.validUserData.email = "inactive@test.com";
-        variables.validUserData.isActive = false;
+        variables.validUserData.isactive = false;
         local.inactiveUser = model("User").create(variables.validUserData);
         
         local.activeUsers = model("User").findActive();
@@ -1600,8 +1600,8 @@ component extends="Model" {
     function getPostsWithAuthors() {
         return this.findAll(
             include="author",
-            select="posts.*, authors.firstName, authors.lastName",
-            order="posts.createdAt DESC"
+            select="posts.*, authors.firstname, authors.lastname",
+            order="posts.createdat DESC"
         );
     }
     
@@ -1610,10 +1610,10 @@ component extends="Model" {
      */
     function getRecentPostTitles(numeric days = 7) {
         return this.findAll(
-            select="id, title, createdAt",
-            where="createdAt > ?",
+            select="id, title, createdat",
+            where="createdat > ?",
             whereParams=[dateAdd("d", -arguments.days, now())],
-            order="createdAt DESC"
+            order="createdat DESC"
         );
     }
     
@@ -1624,7 +1624,7 @@ component extends="Model" {
         return this.findAll(
             page=arguments.page,
             perPage=arguments.perPage,
-            order="createdAt DESC"
+            order="createdat DESC"
         );
     }
     
@@ -1633,7 +1633,7 @@ component extends="Model" {
      */
     function hasRecentActivity(numeric days = 30) {
         return this.posts().exists(
-            where="createdAt > ?",
+            where="createdat > ?",
             whereParams=[dateAdd("d", -arguments.days, now())]
         );
     }
@@ -1711,7 +1711,7 @@ function config() {
     
     // 6. Other configuration  
     timeStampOnCreate(true);
-    // Note: Soft delete enabled automatically if deletedAt column exists
+    // Note: Soft delete enabled automatically if deletedat column exists
 }
 ```
 
@@ -1793,7 +1793,7 @@ component extends="Model" {
     
     function config() {
         // Mass assignment protection
-        protectedProperties("isAdmin,createdAt,updatedAt");
+        protectedProperties("isAdmin,createdat,updatedat");
         
         // Or whitelist approach
         accessibleProperties("name,email,bio");
@@ -1814,7 +1814,7 @@ component extends="Model" {
      * Validate permissions before sensitive operations
      */
     function deleteWithPermissionCheck(required numeric currentUserId) {
-        if (this.userId != arguments.currentUserId && !hasAdminRole(arguments.currentUserId)) {
+        if (this.userid != arguments.currentUserId && !hasAdminRole(arguments.currentUserId)) {
             throw(type="PermissionDenied", message="Cannot delete another user's record");
         }
         
@@ -1828,15 +1828,15 @@ component extends="Model" {
 Wheels automatically handles time stamping of records when you have the proper columns in your database.
 
 ### Time Stamp Columns
-- **`createdAt`** - Automatically set to current date/time when record is created
-- **`updatedAt`** - Automatically set to current date/time when record is updated
+- **`createdat`** - Automatically set to current date/time when record is created
+- **`updatedat`** - Automatically set to current date/time when record is updated
 
 ```cfm
 component extends="Model" {
     function config() {
         // Enable automatic timestamps
-        timeStampOnCreate(true);  // Sets createdAt on creation
-        timeStampOnUpdate(true);  // Sets updatedAt on modification
+        timeStampOnCreate(true);  // Sets createdat on creation
+        timeStampOnUpdate(true);  // Sets updatedat on modification
     }
 }
 ```
@@ -1851,7 +1851,7 @@ set(timeStampMode="local");
 ### Database Column Requirements
 - Columns must accept date/time values (`datetime` or `timestamp`)
 - Columns should allow `null` values
-- Use exact column names: `createdAt` and `updatedAt`
+- Use exact column names: `createdat` and `updatedat`
 
 ## Column Statistics
 
@@ -1861,7 +1861,7 @@ Wheels provides built-in statistical functions for performing aggregate calculat
 ```cfm
 // Count records
 authorCount = model("Author").count();
-authorCount = model("Author").count(where="lastName LIKE 'A%'");
+authorCount = model("Author").count(where="lastname LIKE 'A%'");
 
 // Get average value
 avgSalary = model("Employee").average(property="salary", where="departmentId=1");
@@ -1894,7 +1894,7 @@ authorCount = model("Author").count(include="books", where="title LIKE 'Wheels%'
 // Complex joins
 authorCount = model("Author").count(
     include="profile(country)", 
-    where="countries.name='USA' AND lastName LIKE 'A%'"
+    where="countries.name='USA' AND lastname LIKE 'A%'"
 );
 ```
 
@@ -1942,8 +1942,8 @@ users = model("User").findAll(select="id, fullName, age");
 component extends="Model" {
     function config() {
         property(
-            name="createdAtAlias",
-            sql="posts.createdAt",
+            name="createdatAlias",
+            sql="posts.createdat",
             dataType="datetime"
         );
     }
@@ -2035,14 +2035,14 @@ user = model("User").findOneByUsernameAndPassword("bob,secretpass");
 // With named parameters when using additional arguments
 users = model("User").findAllByState(
     value="NY",
-    order="lastName", 
+    order="lastname", 
     page=2
 );
 
 // Multiple values with named parameter
 users = model("User").findAllByCityAndState(
     values="Buffalo,NY",
-    order="lastName DESC"
+    order="lastname DESC"
 );
 ```
 
@@ -2058,7 +2058,7 @@ users = model("User").findAllByFirstNameAndLastName("John,Smith");
 users = model("User").findAllByState(
     value="CA",
     include="profile",
-    order="lastName",
+    order="lastname",
     page=3,
     perPage=25
 );
@@ -2085,7 +2085,7 @@ function new() {
 }
 
 // View form with association
-#textField(objectName="user", property="firstName")#
+#textField(objectName="user", property="firstname")#
 #textField(
     objectName="user", 
     association="profile", 
@@ -2169,7 +2169,7 @@ component extends="Model" {
     
     function createFirstPost() {
         post = model("Post").new(
-            authorId=this.id,
+            authorid=this.id,
             title="My First Post"
         );
         post.save();  // If this fails, author creation rolls back
@@ -2256,7 +2256,7 @@ Efficiently handle large datasets by breaking results into pages.
 ### Basic Pagination
 ```cfm
 // Get records 26-50 (page 2, 25 per page)
-authors = model("Author").findAll(page=2, perPage=25, order="lastName");
+authors = model("Author").findAll(page=2, perPage=25, order="lastname");
 
 // Pagination is object-based, not record-based
 authorsWithBooks = model("Author").findAll(
@@ -2312,27 +2312,27 @@ Implement logical deletion where records are marked as deleted rather than physi
 
 ### How Soft Delete Works in Wheels
 
-Soft delete is enabled automatically when you add a `deletedAt` column to your database table. No configuration is needed in your model.
+Soft delete is enabled automatically when you add a `deletedat` column to your database table. No configuration is needed in your model.
 
 ### Database Column Requirements
-- Column name: `deletedAt` (exact case)
+- Column name: `deletedat` (exact case)
 - Column type: `date`, `datetime`, or `timestamp` (depends on your database)
 - Should allow `NULL` values
 
 ### Soft Delete Behavior
 ```cfm
-// When deletedAt column exists, delete() sets timestamp instead of removing record
+// When deletedat column exists, delete() sets timestamp instead of removing record
 user = model("User").findByKey(1);
-user.delete();  // Sets deletedAt to current timestamp, record stays in database
+user.delete();  // Sets deletedat to current timestamp, record stays in database
 
 // Normal finders automatically exclude soft-deleted records
-users = model("User").findAll();  // Won't include records where deletedAt IS NOT NULL
+users = model("User").findAll();  // Won't include records where deletedat IS NOT NULL
 
 // Include soft-deleted records explicitly
 allUsers = model("User").findAll(includeSoftDeletes=true);
 
 // Manual queries need to exclude soft deletes explicitly
-activeUsers = model("User").findAll(where="deletedAt IS NULL");
+activeUsers = model("User").findAll(where="deletedat IS NULL");
 ```
 
 ### Benefits of Soft Delete
@@ -2362,7 +2362,7 @@ topCustomers = model("Customer").findBySQL("
 ```cfm
 // More efficient than count() > 0
 hasOrders = model("Customer").exists(where="id = ?", whereParams=[customerId]);
-hasRecentActivity = model("User").posts().exists(where="createdAt > ?", whereParams=[lastWeek]);
+hasRecentActivity = model("User").posts().exists(where="createdat > ?", whereParams=[lastWeek]);
 ```
 
 ### Query Optimization with Includes and Select
@@ -2372,10 +2372,10 @@ posts = model("Post").findAll(include="author,category,tags");
 
 // Limit columns to reduce data transfer
 recentTitles = model("Post").findAll(
-    select="id, title, createdAt",
-    where="createdAt > ?",
+    select="id, title, createdat",
+    where="createdat > ?",
     whereParams=[dateAdd("d", -7, now())],
-    order="createdAt DESC"
+    order="createdat DESC"
 );
 ```
 
@@ -2384,7 +2384,7 @@ recentTitles = model("Post").findAll(
 **❌ INCORRECT (Rails-style):**
 ```cfm
 // These Rails patterns DO NOT work in CFWheels:
-scope(name="active", where="isActive = 1");           // ❌ No scope() in models
+scope(name="active", where="isactive = 1");           // ❌ No scope() in models
 function scopeActive() { return this.where(...); }   // ❌ No scopeXXX() methods  
 User.active.published                                 // ❌ No chainable scopes
 has_many :posts, dependent: :destroy                 // ❌ Wrong syntax
@@ -2394,7 +2394,7 @@ has_many :posts, dependent: :destroy                 // ❌ Wrong syntax
 ```cfm
 // Use custom finder methods instead:
 function findActive() {
-    return findAll(where="isActive = 1");
+    return findAll(where="isactive = 1");
 }
 
 function findPublished() {
@@ -2422,6 +2422,6 @@ hasMany("posts", dependent="delete");               // ✅ Correct syntax
 - **Statistical Functions**: Utilize built-in aggregate functions instead of raw SQL when possible
 - **Time Stamps**: Configure automatic time stamping to track record creation and modification
 - **Calculated Properties**: Use SQL-based calculated properties for computed values
-- **Soft Deletes**: Add `deletedAt` column to enable automatic soft delete functionality
+- **Soft Deletes**: Add `deletedat` column to enable automatic soft delete functionality
 
 Models are the foundation of your data layer in Wheels applications, providing a rich, object-oriented interface to your database while maintaining the simplicity and conventions that make Wheels productive.

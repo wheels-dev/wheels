@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with a 
 ### Common Development Tasks
 - **Create a model**: `wheels g model User name:string,email:string,active:boolean`
 - **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
-- **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,inStock:boolean`
+- **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,instock:boolean`
 - **Run migrations**: `wheels dbmigrate latest` `wheels dbmigrate up` `wheels dbmigrate down`
 - **Run tests**: `wheels test run`
 - **Reload application**: Visit `/?reload=true&password=yourpassword`
@@ -75,7 +75,7 @@ wheels g controller Users index,show,new,create,edit,update,delete
 wheels g view users/dashboard
 
 # Generate full CRUD scaffold
-wheels g scaffold Product name:string,price:decimal,inStock:boolean
+wheels g scaffold Product name:string,price:decimal,instock:boolean
 
 # Generate database migrations
 wheels g migration CreateUsersTable
@@ -246,7 +246,7 @@ component extends="Controller" {
     }
 
     function index() {
-        users = model("User").findAll(order="createdAt DESC");
+        users = model("User").findAll(order="createdat DESC");
     }
 
     function create() {
@@ -277,7 +277,7 @@ component extends="Model" {
         belongsTo("role");
         
         // Validations
-        validatesPresenceOf("firstName,lastName,email");
+        validatesPresenceOf("firstname,lastname,email");
         validatesUniquenessOf(property="email");
         validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
         
@@ -294,7 +294,7 @@ component extends="Model" {
     }
 
     function fullName() {
-        return trim("#firstName# #lastName#");
+        return trim("#firstname# #lastname#");
     }
 }
 ```
@@ -334,7 +334,7 @@ component extends="Model" {
     <table class="table">
         <cfloop query="users">
         <tr>
-            <td>#linkTo(route="user", key=users.id, text=users.firstName)#</td>
+            <td>#linkTo(route="user", key=users.id, text=users.firstname)#</td>
             <td>#users.email#</td>
             <td>
                 #linkTo(route="editUser", key=users.id, text="Edit")#
@@ -374,7 +374,7 @@ component extends="wheels.migrator.Migration" {
     function up() {
         transaction {
             t = createTable(name="users", force=false);
-            t.string("firstName,lastName", null=false);
+            t.string("firstname,lastname", null=false);
             t.string("email", limit=100, null=false);
             t.boolean("active", default=true);
             t.timestamps();
@@ -398,9 +398,9 @@ t.integer("count", null=false, default=0);
 t.decimal("price", precision=10, scale=2);
 t.boolean("active", default=false);
 t.date("eventDate");
-t.datetime("createdAt");
-t.timestamps();  // Creates createdAt and updatedAt
-t.integer("userId", null=false);  // Foreign key
+t.datetime("createdat");
+t.timestamps();  // Creates createdat and updatedat
+t.integer("userid", null=false);  // Foreign key
 ```
 
 ## Testing
@@ -450,8 +450,8 @@ component extends="testbox.system.BaseSpec" {
 
             it("should create user with valid data", function() {
                 var userData = {
-                    firstName = "John",
-                    lastName = "Doe", 
+                    firstname = "John",
+                    lastname = "Doe", 
                     email = "john@example.com"
                 };
                 
@@ -459,7 +459,7 @@ component extends="testbox.system.BaseSpec" {
                 
                 expect(isObject(user)).toBeTrue("Should return user object");
                 expect(user.valid()).toBeTrue("User should be valid");
-                expect(user.firstName).toBe("John", "Should set firstName correctly");
+                expect(user.firstname).toBe("John", "Should set firstname correctly");
             });
         });
     }
@@ -495,7 +495,7 @@ function config() {
 
 // Model validation
 function config() {
-    validatesPresenceOf("firstName,lastName,email");
+    validatesPresenceOf("firstname,lastname,email");
     validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
     validatesLengthOf(property="password", minimum=8);
 }
@@ -532,7 +532,7 @@ users = model("User").findAll(cache=60); // Cache for 60 minutes
 users = model("User").findAll(include="role,orders");
 
 // Use select to limit columns
-users = model("User").findAll(select="id,firstName,lastName,email");
+users = model("User").findAll(select="id,firstname,lastname,email");
 
 // Use pagination
 users = model("User").findAll(page=params.page, perPage=25);

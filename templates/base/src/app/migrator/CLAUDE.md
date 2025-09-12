@@ -153,8 +153,8 @@ function up() {
         t.uuid(columnNames="uniqueId");
         
         // Special columns
-        t.timestamps(); // Creates createdAt, updatedAt, deletedAt
-        t.references(columnNames="user"); // Creates userId foreign key
+        t.timestamps(); // Creates createdat, updatedat, deletedat
+        t.references(columnNames="user"); // Creates userid foreign key
         
         t.create();
     }
@@ -174,9 +174,9 @@ function up() {
     transaction {
         // Table without auto-increment id - all named arguments
         t = createTable(name="user_roles", id=false);
-        t.primaryKey(columnNames=["userId", "roleId"]); // Composite primary key
-        t.integer(columnNames="userId", null=false);
-        t.integer(columnNames="roleId", null=false);
+        t.primaryKey(columnNames=["userid", "roleid"]); // Composite primary key
+        t.integer(columnNames="userid", null=false);
+        t.integer(columnNames="roleid", null=false);
         t.create();
         
         // Table with custom options (MySQL) - all named arguments
@@ -314,7 +314,7 @@ function up() {
         // Simple foreign key - all named arguments
         addForeignKey(
             table="orders",
-            columnName="userId",
+            columnName="userid",
             referenceTable="users",
             referenceColumn="id"
         );
@@ -322,7 +322,7 @@ function up() {
         // With cascade options - all named arguments
         addForeignKey(
             table="orderItems",
-            columnName="orderId", 
+            columnName="orderid", 
             referenceTable="orders",
             referenceColumn="id",
             onDelete="CASCADE",
@@ -356,7 +356,7 @@ function up() {
     transaction {
         // Using SQL - positional argument
         sql("
-            INSERT INTO roles (name, description, createdAt) 
+            INSERT INTO roles (name, description, createdat) 
             VALUES ('admin', 'Administrator', NOW())
         ");
         
@@ -383,8 +383,8 @@ function up() {
         // Complex update with SQL - positional argument
         sql("
             UPDATE users 
-            SET fullName = CONCAT(firstName, ' ', lastName)
-            WHERE fullName IS NULL
+            SET fullname = CONCAT(firstname, ' ', lastname)
+            WHERE fullname IS NULL
         ");
     }
 }
@@ -447,14 +447,14 @@ function up() {
         sql("
             CREATE VIEW active_products AS
             SELECT * FROM products
-            WHERE active = 1 AND deletedAt IS NULL
+            WHERE active = 1 AND deletedat IS NULL
         ");
         
         // Create stored procedure - positional argument
         sql("
             CREATE PROCEDURE CleanupOldData()
             BEGIN
-                DELETE FROM logs WHERE createdAt < DATE_SUB(NOW(), INTERVAL 90 DAY);
+                DELETE FROM logs WHERE createdat < DATE_SUB(NOW(), INTERVAL 90 DAY);
             END
         ");
     }
@@ -587,7 +587,7 @@ function up() {
         // Recreate foreign keys - all named arguments
         addForeignKey(
             table="articles",
-            columnName="userId",
+            columnName="userid",
             referenceTable="users", 
             referenceColumn="id"
         );
@@ -788,13 +788,13 @@ addIndex("users", columnNames="email"); // WRONG! Mixed positional and named
 **Examples:**
 ```cfc
 // ✅ All positional arguments (correct)
-addForeignKey("orders", "userId", "users", "id");
+addForeignKey("orders", "userid", "users", "id");
 removeForeignKey("orders", "fk_orders_users");
 
 // ✅ All named arguments (correct)
 addForeignKey(
     table="orders",
-    columnName="userId", 
+    columnName="userid", 
     referenceTable="users",
     referenceColumn="id",
     onDelete="CASCADE"
@@ -802,7 +802,7 @@ addForeignKey(
 removeForeignKey(table="orders", keyName="fk_orders_users");
 
 // ❌ Mixed arguments (CAUSES ERRORS - DON'T DO THIS!)
-addForeignKey("orders", columnName="userId", referenceTable="users", referenceColumn="id"); // WRONG!
+addForeignKey("orders", columnName="userid", referenceTable="users", referenceColumn="id"); // WRONG!
 ```
 
 ### Data Methods
