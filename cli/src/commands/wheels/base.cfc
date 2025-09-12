@@ -899,9 +899,40 @@ component excludeFromHelp=true {
 			case "MSSQLServer":
 			case "MSSQL":
 				if (!Len(local.port)) local.port = "1433";
-				local.database = "master";
 				return "jdbc:sqlserver://#local.host#:#local.port#;databaseName=#local.database#;encrypt=false;trustServerCertificate=true";
 			case "H2":
+				return "jdbc:h2:#local.database#";
+			default:
+				return "";
+		}
+	}
+
+	/**
+	 * Build JDBC URL for connecting to system database (for database creation/management)
+	 */
+	private string function buildSystemJDBCUrl(required struct dsInfo) {
+		local.driver = arguments.dsInfo.driver;
+		local.host = arguments.dsInfo.host ?: "localhost";
+		local.port = arguments.dsInfo.port ?: "";
+		
+		switch (local.driver) {
+			case "MySQL":
+			case "MySQL5":
+				if (!Len(local.port)) local.port = "3306";
+				// Connect to information_schema for MySQL system operations
+				return "jdbc:mysql://#local.host#:#local.port#/information_schema";
+			case "PostgreSQL":
+				if (!Len(local.port)) local.port = "5432";
+				// Connect to postgres system database
+				return "jdbc:postgresql://#local.host#:#local.port#/postgres";
+			case "MSSQLServer":
+			case "MSSQL":
+				if (!Len(local.port)) local.port = "1433";
+				// Connect to master system database
+				return "jdbc:sqlserver://#local.host#:#local.port#;databaseName=master;encrypt=false;trustServerCertificate=true";
+			case "H2":
+				// H2 databases are created automatically, no system database needed
+				local.database = arguments.dsInfo.database ?: "";
 				return "jdbc:h2:#local.database#";
 			default:
 				return "";

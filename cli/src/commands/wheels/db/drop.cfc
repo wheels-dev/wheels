@@ -61,7 +61,7 @@ component extends="../base" {
 				return;
 			}
 			
-			// Extract database name
+			// Extract database name with priority: argument > config > default
 			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels-dev";
 			local.dbType = local.dsInfo.driver;
 			
@@ -117,8 +117,8 @@ component extends="../base" {
 			// Get database-specific configuration
 			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo);
 			
-			// Build connection URL
-			local.url = buildJDBCUrl(local.dbConfig.tempDS);
+			// Build connection URL to system database (not the target database)
+			local.url = buildSystemJDBCUrl(local.dbConfig.tempDS);
 			local.username = local.dbConfig.tempDS.username ?: "";
 			local.password = local.dbConfig.tempDS.password ?: "";
 			
