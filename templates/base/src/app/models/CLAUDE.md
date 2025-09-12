@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with Wh
 
 The `/app/models/` folder contains model classes that represent your application's data layer and implement the Active Record pattern. Models in Wheels extend `Model.cfc` and provide object-relational mapping (ORM) between database tables and CFML objects.
 
+**⚠️ IMPORTANT:** CFWheels models do NOT have a `scope()` function. The `scope()` function exists only in the routing system (`/config/routes.cfm`) for grouping routes. Do not confuse this with Ruby on Rails ActiveRecord scopes. In CFWheels models, use custom finder methods instead.
+
 **Why Use Models:**
 - Implement the Active Record pattern for database interactions
 - Define business logic and data validation rules
@@ -262,24 +264,24 @@ component extends="Model" {
     }
     
     /**
-     * Scope: Active products only
+     * Find active products only
      */
-    function scopeActive() {
-        return this.where("isActive = ? AND deletedAt IS NULL", true);
+    function findActive() {
+        return findAll(where="isActive = 1 AND deletedAt IS NULL");
     }
     
     /**
-     * Scope: Products in specific category
+     * Find products in specific category
      */
-    function scopeInCategory(required numeric categoryId) {
-        return this.where("categoryId = ?", arguments.categoryId);
+    function findInCategory(required numeric categoryId) {
+        return findAll(where="categoryId = ?", whereParams=[arguments.categoryId]);
     }
     
     /**
-     * Scope: Products on sale
+     * Find products on sale
      */
-    function scopeOnSale() {
-        return this.where("salePrice > 0 AND salePrice < price");
+    function findOnSale() {
+        return findAll(where="salePrice > 0 AND salePrice < price");
     }
     
     /**
@@ -500,31 +502,31 @@ component extends="Model" {
     }
     
     /**
-     * Scope: Published posts only
+     * Find published posts only
      */
-    function scopePublished() {
-        return this.where("status = ? AND publishedAt <= ?", ["published", now()]);
+    function findPublished() {
+        return findAll(where="status = 'published' AND publishedAt <= '#Now()#'");
     }
     
     /**
-     * Scope: Draft posts only
+     * Find draft posts only
      */
-    function scopeDrafts() {
-        return this.where("status = ?", "draft");
+    function findDrafts() {
+        return findAll(where="status = 'draft'");
     }
     
     /**
-     * Scope: Posts by specific author
+     * Find posts by specific author
      */
-    function scopeByAuthor(required numeric authorId) {
-        return this.where("authorId = ?", arguments.authorId);
+    function findByAuthor(required numeric authorId) {
+        return findAll(where="authorId = ?", whereParams=[arguments.authorId]);
     }
     
     /**
-     * Scope: Posts in date range
+     * Find posts in date range
      */
-    function scopeDateRange(required date startDate, required date endDate) {
-        return this.where("publishedAt BETWEEN ? AND ?", [arguments.startDate, arguments.endDate]);
+    function findInDateRange(required date startDate, required date endDate) {
+        return findAll(where="publishedAt BETWEEN ? AND ?", whereParams=[arguments.startDate, arguments.endDate]);
     }
     
     // Callback methods
@@ -851,26 +853,28 @@ component extends="Model" {
     }
     
     /**
-     * Scope: Active users only
+     * Find active users only
      */
-    function scopeActive() {
-        return this.where("isActive = ? AND deletedAt IS NULL", true);
+    function findActive() {
+        return findAll(where="isActive = 1 AND deletedAt IS NULL");
     }
     
     /**
-     * Scope: Email verified users
+     * Find email verified users
      */
-    function scopeEmailVerified() {
-        return this.where("emailVerifiedAt IS NOT NULL");
+    function findEmailVerified() {
+        return findAll(where="emailVerifiedAt IS NOT NULL");
     }
     
     /**
-     * Scope: Users with specific role
+     * Find users with specific role
      */
-    function scopeWithRole(required string roleName) {
-        return this.joins("INNER JOIN userRoles ur ON users.id = ur.userId")
-                   .joins("INNER JOIN roles r ON ur.roleId = r.id")
-                   .where("r.name = ?", arguments.roleName);
+    function findWithRole(required string roleName) {
+        return findAll(
+            include="userRoles(role)", 
+            where="roles.name = ?", 
+            whereParams=[arguments.roleName]
+        );
     }
     
     // Callback methods
@@ -1167,7 +1171,7 @@ component extends="Model" {
         validatesUniquenessOf("username");
         validatesUniquenessOf("sku", allowBlank=true);
         
-        // Scoped uniqueness
+        // Scoped uniqueness (within category)
         validatesUniquenessOf(property="name", scope="categoryId");
         
         // Password confirmation
@@ -1559,8 +1563,8 @@ component extends="wheels.Test" {
         assert(local.user.getIsEmailVerified(), "Email should be verified after token validation");
     }
 
-    // Scopes and finder tests
-    function test_active_scope() {
+    // Custom finder tests
+    function test_active_finder() {
         // Create active and inactive users
         local.activeUser = model("User").create(variables.validUserData);
         
@@ -1569,7 +1573,7 @@ component extends="wheels.Test" {
         variables.validUserData.isActive = false;
         local.inactiveUser = model("User").create(variables.validUserData);
         
-        local.activeUsers = model("User").scopeActive().findAll();
+        local.activeUsers = model("User").findActive();
         local.foundActive = false;
         local.foundInactive = false;
         
@@ -1578,8 +1582,8 @@ component extends="wheels.Test" {
             if (local.user.id == local.inactiveUser.id) local.foundInactive = true;
         }
         
-        assert(local.foundActive, "Active scope should include active user");
-        assert(!local.foundInactive, "Active scope should not include inactive user");
+        assert(local.foundActive, "Active finder should include active user");
+        assert(!local.foundInactive, "Active finder should not include inactive user");
     }
 }
 ```
@@ -2373,6 +2377,32 @@ recentTitles = model("Post").findAll(
     whereParams=[dateAdd("d", -7, now())],
     order="createdAt DESC"
 );
+```
+
+## CFWheels vs Ruby on Rails - Common Mistakes to Avoid
+
+**❌ INCORRECT (Rails-style):**
+```cfm
+// These Rails patterns DO NOT work in CFWheels:
+scope(name="active", where="isActive = 1");           // ❌ No scope() in models
+function scopeActive() { return this.where(...); }   // ❌ No scopeXXX() methods  
+User.active.published                                 // ❌ No chainable scopes
+has_many :posts, dependent: :destroy                 // ❌ Wrong syntax
+```
+
+**✅ CORRECT (CFWheels-style):**
+```cfm
+// Use custom finder methods instead:
+function findActive() {
+    return findAll(where="isActive = 1");
+}
+
+function findPublished() {
+    return findAll(where="status = 'published'");
+}
+
+// Proper CFWheels associations:
+hasMany("posts", dependent="delete");               // ✅ Correct syntax
 ```
 
 ## Important Notes

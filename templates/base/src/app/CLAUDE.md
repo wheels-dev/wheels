@@ -206,14 +206,20 @@ component extends="Model" {
         beforeSave("hashPassword");
         afterCreate("sendWelcomeEmail");
 
-        // Scopes
-        scope(name="active", where="active = 1");
-        scope(name="recent", order="createdAt DESC", limit=10);
+        // Custom finder methods will be added below (scope() doesn't exist in CFWheels)
     }
 
     // Custom finder methods
     function findByEmail(required string email) {
         return findOne(where="email = '#arguments.email#'");
+    }
+    
+    function findActive() {
+        return findAll(where="active = 1");
+    }
+    
+    function findRecent(numeric limit = 10) {
+        return findAll(order="createdAt DESC", limit=arguments.limit);
     }
 
     function authenticate(required string email, required string password) {
@@ -280,10 +286,21 @@ component extends="Model" {
         beforeValidation("calculateTotal");
         afterSave("updateInventory");
 
-        // Named scopes
-        scope(name="pending", where="status = 'pending'");
-        scope(name="completed", where="status IN ('delivered')");
-        scope(name="thisMonth", where="createdAt >= '#CreateDate(Year(Now()), Month(Now()), 1)#'");
+        // Custom finder methods will be added below (scope() doesn't exist in CFWheels)
+    }
+
+    // Custom finder methods
+    function findPending() {
+        return findAll(where="status = 'pending'");
+    }
+    
+    function findCompleted() {
+        return findAll(where="status = 'delivered'");
+    }
+    
+    function findThisMonth() {
+        local.startOfMonth = CreateDate(Year(Now()), Month(Now()), 1);
+        return findAll(where="createdAt >= ?", whereParams=[local.startOfMonth]);
     }
 
     // Business logic methods

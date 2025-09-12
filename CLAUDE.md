@@ -1,458 +1,640 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
 
 ## Quick Start
 
 ### New to Wheels?
-1. **Install Wheels CLI**: `box install wheels-cli`
+1. **Install Wheels CLI**: `brew install wheels` on Mac and `choco install wheels` on Windows
 2. **Generate an app**: `wheels g app myapp`
-3. **Start developing**: `server start`
+3. **Start developing**: `wheels server start`
 
-### Common Tasks
+### Common Development Tasks
 - **Create a model**: `wheels g model User name:string,email:string,active:boolean`
 - **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
 - **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,inStock:boolean`
-- **Run migrations**: `wheels dbmigrate latest`
-- **Run tests**: `wheels test run` or `box testbox run`
+- **Run migrations**: `wheels dbmigrate latest` `wheels dbmigrate up` `wheels dbmigrate down`
+- **Run tests**: `wheels test run`
+- **Reload application**: Visit `/?reload=true&password=yourpassword`
 
-### AI-Specific Documentation
-- **Patterns**: See AI-PATTERNS.md for common code patterns
-- **Testing**: See AI-TESTING.md for TestBox patterns
-- **Errors**: See AI-ERRORS.md for troubleshooting
-- **CLI**: See AI-CLI.md for complete command reference
-- **Migrations**: See AI-MIGRATIONS.md for database migration patterns
-- **Examples**: See AI-EXAMPLES.md and `/examples/` directory for working applications
-- **Context**: See AI-CONTEXT.md for framework concepts
-- **Troubleshooting**: See AI-TROUBLESHOOTING.md for common issues
-- **Upgrading**: See `/guides/upgrading/3.0.0-config-migration.md` for config directory migration
+## Application Architecture
 
-## Build/Test Commands
+### MVC Framework Structure
+Wheels follows the Model-View-Controller (MVC) architectural pattern:
+
+- **Models** (`/app/models/`): Data layer with ActiveRecord ORM, validation, associations
+- **Views** (`/app/views/`): Presentation layer with CFML templates, layouts, partials
+- **Controllers** (`/app/controllers/`): Request handling, business logic coordination
+- **Configuration** (`/config/`): Application settings, routes, environment configurations
+- **Database** (`/app/migrator/migrations/`): Version-controlled schema changes
+- **Assets** (`/public/`): Static files, CSS, JavaScript, images
+- **Tests** (`/tests/`): TestBox unit and integration tests
+
+### Directory Structure
+```
+/
+├── app/                  (Application code)
+│   ├── controllers/      (Request handlers)
+│   ├── models/           (Data layer)
+│   ├── views/            (Templates)
+│   ├── migrator/         (Database migrations)
+│   ├── events/           (Application events)
+│   ├── global/           (Global functions)
+│   ├── mailers/          (Email components)
+│   ├── jobs/             (Background jobs)
+│   ├── lib/              (Custom libraries)
+│   ├── plugins/          (Third-party plugins)
+│   └── snippets/         (Code templates)
+├── config/               (Configuration files)
+│   ├── app.cfm           (Application.cfc this scope settings)
+│   ├── environment.cfm   (Current environment)
+│   ├── routes.cfm        (URL routing)
+│   ├── settings.cfm      (Framework settings)
+│   └── [environment]/    (Environment-specific overrides)
+├── public/               (Web-accessible files)
+│   ├── files/            (User uploads, sendFile() content)
+│   ├── images/           (Image assets)
+│   ├── javascripts/      (JavaScript files)
+│   ├── stylesheets/      (CSS files)
+│   ├── Application.cfc   (Framework bootstrap)
+│   └── index.cfm         (Entry point)
+├── tests/                (Test files)
+├── vendor/               (Dependencies)
+├── .env                  (Environment variables - NEVER commit)
+├── box.json              (Package configuration)
+└── server.json           (CommandBox server configuration)
+```
+
+## Development Commands
+
+### Code Generation
+```bash
+# Generate MVC components
+wheels g model User name:string,email:string,active:boolean
+wheels g controller Users index,show,new,create,edit,update,delete
+wheels g view users/dashboard
+
+# Generate full CRUD scaffold
+wheels g scaffold Product name:string,price:decimal,inStock:boolean
+
+# Generate database migrations
+wheels g migration CreateUsersTable
+wheels g migration AddEmailToUsers --attributes="email:string:index"
+
+# Generate other components
+wheels g mailer UserNotifications --methods="welcome,passwordReset"
+wheels g job ProcessOrders --queue=high
+wheels g test model User
+wheels g helper StringUtils
+```
+
+### Migration Management
+```bash
+# Check migration status
+wheels dbmigrate info
+
+# Migration to Latest
+wheels dbmigrate latest
+
+# Migration to version 0
+wheels dbmigrate reset
+
+# Migration one version UP
+wheels dbmigrate up
+
+# Migration one version DOWN
+wheels dbmigrate down
+```
+
+### Server Management
+```bash
+# Start/stop development server
+wheels server start
+wheels server stop
+wheels server restart
+
+# View server status
+wheels server status
+
+# View server logs
+wheels server log --follow
+```
 
 ### Testing
-- Run a single test: `box testbox run --testBundles=path.to.TestFile`
-- Run tests by directory: `box testbox run --directory=tests/specs/unit`
-- Run tests with coverage: `box testbox run --coverage --coverageReporter=html`
-- Watch mode for TDD: `box testbox watch`
-- Run unit tests only: `box run-script test:unit`
-- Run integration tests: `box run-script test:integration`
-- Run tests for specific engine with Docker: `docker compose up lucee -d`
-- Available Docker profiles: `lucee`, `lucee6`, `lucee7`, `adobe2018`, `adobe2021`, `adobe2023`, `adobe2025`, `boxlang`
-
-### Advanced Testing (TestBox CLI)
-- Install TestBox CLI: `box install commandbox-testbox-cli`
-- Run all tests: `wheels test:all`
-- Run unit tests: `wheels test:unit`
-- Run integration tests: `wheels test:integration`
-- Watch mode: `wheels test:watch`
-- Coverage: `wheels test:coverage`
-
-### Code Quality
-- Format code: `box run-script format` (uses cfformat)
-- Check formatting: `box run-script format:check`
-- Watch mode formatting: `box run-script format:watch`
-
-### Development
-- Install dependencies: `box install`
-- Install CFML modules on server: `cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver`
-- Reload application: `wheels reload [development|testing|maintenance|production]`
-- Start server in workspace: `cd workspace && server start`
-- Restart server: `server restart`
-- Reload CommandBox after CLI changes: `box reload`
-
-### Database Management
-- Create database: `wheels db create`
-- Setup database (create + migrate + seed): `wheels db setup`
-- Reset database: `wheels db reset --force`
-- Database shell: `wheels db shell` (CLI) or `wheels db shell --web` (H2 web console)
-- Backup database: `wheels db dump --output=backup.sql`
-- Restore database: `wheels db restore backup.sql`
-- Check migration status: `wheels db status`
-- Rollback migrations: `wheels db rollback --steps=3`
-
-### Migration Commands
-- **ALWAYS use CLI to generate migrations**: `wheels g migration MigrationName`
-- Create table: `wheels g migration CreateUsers`
-- Add column: `wheels g migration AddEmailToUsers`
-- Remove column: `wheels g migration RemovePasswordFromUsers`
-- Add index: `wheels g migration AddIndexToUsersEmail`
-- Run migrations: `wheels dbmigrate latest`
-- Rollback: `wheels dbmigrate down`
-
-### Enhanced Generators
-- Migration: `wheels g migration CreateUsersTable --attributes="name:string,email:string:index"`
-- Mailer: `wheels g mailer UserNotifications --methods="welcome,passwordReset"`
-- Service: `wheels g service PaymentProcessor --type=singleton`
-- Helper: `wheels g helper StringUtils --functions="truncate,slugify"`
-- Job: `wheels g job ProcessOrders --queue=high --schedule="0 0 * * *"`
-- Plugin: `wheels g plugin Authentication --version="1.0.0"`
-
-### Deployment Commands (New)
-- Initialize deployment: `wheels deploy:init --provider=digitalocean --domain=myapp.com`
-- Setup servers: `wheels deploy:setup`
-- Deploy application: `wheels deploy:push`
-- Check status: `wheels deploy:status`
-- View logs: `wheels deploy:logs --follow`
-- Rollback: `wheels deploy:rollback`
-- Manage secrets: `wheels deploy:secrets push`
-
-### Security & Analysis (New)
-- Security scan: `wheels security scan --fix`
-- Performance optimization: `wheels optimize performance --analysis`
-- Code analysis: `wheels analyze code --metrics`
-- Dependency analysis: `wheels deps --tree`
-
-### Environment Management (New)
-- List environments: `wheels env list`
-- Switch environment: `wheels env switch production`
-- Setup environment: `wheels env setup --name=staging`
-- Environment diff: `wheels config diff production staging`
-
-## High-Level Architecture
-
-### Request Lifecycle
-1. **Application.cfc** initializes framework containers and loads configuration
-2. **Dispatch.cfc** receives request, finds matching route, creates params struct
-3. **Controller** instantiated and `processAction()` called
-4. **Model** interactions through ActiveRecord pattern
-5. **View** rendering (automatic or explicit)
-6. Response sent with proper content type
-
-### Core Components
-- **Application.cfc**: Framework initialization and request lifecycle
-- **Controller.cfc**: Base controller providing MVC functionality, rendering, filters, and provides() for content negotiation
-- **Model.cfc**: ActiveRecord-style ORM with associations, validations, callbacks, and database adapters
-- **Dispatch.cfc**: Request routing and parameter handling
-- **Global.cfc**: Framework-wide helper functions and utilities
-- **Mapper.cfc**: RESTful routing configuration with resource mapping
-- **Migrator.cfc**: Database migration management
-- **Wirebox.cfc**: Dependency injection container
-
-### CLI Module Architecture
-- **Commands**: Hierarchical structure under `/cli/commands/wheels/`, all extend `base.cfc`
-- **Services**: Business logic in `/cli/models/` using WireBox dependency injection
-- **Templates**: Sophisticated template system with `{{variable}}` syntax, checks `app/snippets/` first
-- **SharedParameters.cfc**: Centralizes parameter definitions for consistency
-- **Important**: After modifying CLI code, reload CommandBox: `box reload`
-
-### Key Framework Patterns
-
-#### The $ Prefix Convention
-- All internal framework methods prefixed with `$` (e.g., `$callAction()`, `$performedRenderOrRedirect()`)
-- Clear boundary between framework and application code
-- Never call $ methods directly from application code
-
-#### Initialization Pattern
-- **CRITICAL**: Both Controllers and Models use `config()` method for initialization, NOT `init()`
-- The `config()` method is where associations, validations, filters are defined
-- Framework uses `$init()` internally, application code uses `config()`
-
-#### Component Integration
-- Framework uses `$integrateComponents()` to mix functionality into base classes
-- Avoids deep inheritance in favor of composition
-- Allows modular architecture with clear separation of concerns
-
-#### Content Negotiation
-- Use `provides()` or `onlyProvides()` in controller config()
-- Automatic format detection from URL or Accept headers
-- Format-specific views (e.g., `show.json.cfm`)
-- View rendering automatic for HTML, skipped for JSON/XML when using renderText/renderWith
-
-#### Database Adapter System
-- Base adapter provides common functionality
-- Database-specific adapters (H2, MySQL, PostgreSQL, SQLServer) handle:
-  - Type mapping and identity/auto-increment handling
-  - Database-specific SQL generation
-  - Migration SQL differences
-
-#### Plugin System
-- Plugins extracted from `/app/plugins/` directory
-- Can extend any framework component via mixins
-- Environment-specific plugin support
-- Version compatibility checking
-
-### Testing Architecture
-- **BaseSpec.cfc** provides Wheels-aware test helpers
-- Tests run in transactions that automatically roll back
-- Create `wheelstestdb` database and datasource for testing
-- Use factories for consistent test data generation
-- Docker compose provides multi-engine testing environments (see `/tools/docker/`)
-
-### Important Framework Specifics
-- Always check `$performedRenderOrRedirect()` before automatic view rendering
-- Use `$requestContentType()` and `$acceptableFormats()` for content negotiation
-- View files use `.cfm` extension, not `.cfc`
-- Partials start with underscore (e.g., `_form.cfm`)
-- Routes are matched in order of definition
-- Models derive structure from database schema (database-first approach)
-- **Configuration location**: Config files are now in `/config` at root level (NOT `/app/config`)
-
-## Adobe ColdFusion Compatibility
-
-### Key Differences from Lucee
-- **Function calls require parentheses**: Use `abort()` not `abort`
-- **Dynamic method invocation**: Use `invoke(object=component, methodname=method)` instead of `component[method]()`
-- **Variable scoping**: Be explicit with scopes in includes and view contexts
-- **Built-in functions**: Some functions like `cfheader()` don't exist as script functions in Adobe CF
-
-### Common Adobe CF Fixes
-1. Replace `abort;` with `abort();`
-2. Replace `component[method]()` with `invoke(object=component, methodname=method)`
-3. For Adobe CF 2018/2021: Use `object` and `methodname` parameters for invoke()
-4. Ensure all included files exist (Adobe CF validates includes during compilation)
-5. Use proper CF tag syntax (`<cfheader>`) instead of script functions where needed
-
-### Testing with Adobe CF
-- Local Docker testing: `docker compose up adobe2021 -d`
-- Access Adobe CF instances: http://localhost:62018, http://localhost:62021, http://localhost:62023
-- All Adobe versions must pass tests before PR submission
-- Check compilation errors first, then runtime errors
-
-## BoxLang Support
-
-### Testing with BoxLang
-- Local Docker testing: `docker compose up boxlang -d`
-- Access BoxLang instance: http://localhost:60001
-- BoxLang version support: 1
-
-## Repository Structure
-
-### Key Directories
-- `/vendor/wheels/` - Core framework code (do not modify directly)
-- `/app/` - Application code (controllers, models, views)
-- `/config/` - Configuration files (routes, settings, environments) - **NOTE: Moved from /app/config in 3.0.0**
-- `/cli/` - CommandBox CLI module for Wheels commands
-- `/tests/` - Framework test suite
-- `/guides/` - Framework documentation
-- `/examples/` - Example applications
-- `/tools/docker/` - Docker configurations for different CFML engines
-- `/tools/build/` - Build artifacts and scripts
-- `/workspace/` - Sandbox for testing CLI commands
-
-### Working with the CLI Module
-- CLI commands are in `/cli/commands/wheels/`
-- After modifying CLI code, reload CommandBox: `box reload`
-- Test CLI commands in the `/workspace/` directory
-- Use `.claude/commands/cli/test-next-group.md` for systematic CLI testing
-
-## Monorepo Architecture & Package Distribution
-
-The Wheels framework uses a sophisticated monorepo structure that produces multiple ForgeBox packages working together to create the complete developer ecosystem. Understanding this architecture is crucial for framework development and maintenance.
-
-### Component Overview
-
-The monorepo contains four main distributable components plus documentation:
-
-1. **Wheels CLI** (`wheels-cli`) - CommandBox module providing development tools
-2. **Wheels Core** (`wheels-core`) - Framework runtime installed in `/vendor/wheels`  
-3. **Base Template** (`wheels-base-template`) - Starting structure downloaded by CLI for new applications
-4. **Starter App** (`wheels-starterapp`) - Complete example application
-5. **Documentation** (`/docs`) - Comprehensive guides published to wheels.dev/guides
-
-### CLI Component Architecture
-
-**Source Location**: `/cli/src/`
-- `ModuleConfig.cfc` - CommandBox module configuration
-- `commands/wheels/` - Hierarchical command structure (all extend `base.cfc`)
-- `models/` - Business logic with WireBox dependency injection
-- `templates/` - Code generation templates using `{{variable}}` syntax
-- `box.json` - Package metadata with `type: "commandbox-modules"`
-
-**Build Process** (`tools/build/scripts/build-cli.sh`):
-1. Copies `/cli/src/` content to `build-wheels-cli/wheels-cli/`
-2. Replaces version placeholders (`@build.version@`, `@build.number@`)
-3. Creates ZIP package with checksums
-4. Publishes to ForgeBox as `wheels-cli` package
-
-**Distribution & Usage**:
-- Install: `box install wheels-cli`
-- CommandBox recognizes the module type and registers `wheels` namespace
-- Commands become available: `wheels g app`, `wheels g model`, etc.
-- After CLI modifications: `box reload` to reload CommandBox
-
-### Base Template Architecture
-
-**Source Location**: `/templates/base/src/`
-- Complete starter application structure (`app/`, `config/`, `views/`, etc.)
-- Code generation snippets in `app/snippets/` (used by CLI generators)
-- `box.json` with dependency on `wheels-core`
-- Bootstrap-ready layouts and configuration examples
-
-**Build Process** (`tools/build/scripts/build-base.sh`):
-1. Copies `/templates/base/src/` content to `build-wheels-base/`
-2. Includes AI documentation, VS Code snippets, and test framework
-3. Replaces version placeholders (`@build.version@`, `@build.number@`)
-4. Creates ZIP package with checksums
-5. Publishes to ForgeBox as `wheels-base-template` package with `type: "cfwheels-templates"`
-
-**Distribution & Usage**:
-- Published to ForgeBox as `wheels-base-template` package
-- CLI's `wheels g app myapp` command downloads from ForgeBox and extracts structure
-- Provides consistent MVC directory layout and development server setup
-- Includes proper dependency configuration for `wheels-core`, `wirebox`, `testbox`
-- Snippets ensure generated code follows framework patterns
-
-### Core Framework Architecture
-
-**Source Location**: `/core/src/wheels/`
-- Complete framework implementation (Controller.cfc, Model.cfc, etc.)
-- Database adapters for H2, MySQL, PostgreSQL, SQLServer, Oracle
-- Migration system with database-specific implementations
-- Testing framework and utilities
-- All internal methods use `$` prefix convention
-
-**Build Process** (`tools/build/scripts/build-core.sh`):
-1. Copies `/core/src/wheels/` content to `build-wheels-core/wheels/`
-2. Includes documentation from `/docs/` directory
-3. Replaces version placeholders
-4. Creates ZIP package with checksums
-5. Publishes to ForgeBox as `wheels-core` package
-
-**Distribution**:
-- New applications include `wheels-core` dependency in `box.json`
-- `box install` places framework in `/vendor/wheels/` directory
-- Application.cfc includes framework mapping for access
-
-### Documentation Architecture
-
-**Source Location**: `/docs/src/`
-- Comprehensive framework guides covering all major topics
-- Organized into logical sections (controllers, models, views, CLI, etc.)
-- Written in Markdown with GitBook-style formatting
-- MkDocs configuration for static site generation
-
-**Build Process** (`docs/mkdocs.yml` + GitHub Actions):
-1. MkDocs processes Markdown files from `/docs/src/`
-2. Applies Material theme with custom styling (`docs/stylesheets/gitbook.css`)
-3. Generates static HTML site with navigation, search, and responsive design
-4. GitHub Actions workflow (`docs-sync.yml`) syncs content to shared hosting
-
-**Publication**:
-- Documentation published to `wheels.dev/guides` (and `guides.cfwheels.org`)
-- Automated deployment via rsync to shared hosting directory
-- Version-specific paths (e.g., `/3.0.0/guides`) for different framework versions
-- Assets and images synchronized to public directories
-
-### Build & Release Pipeline
-
-**GitHub Actions Workflows**:
-- `release.yml` - Handles main branch releases
-- `snapshot.yml` - Creates development snapshots
-- `pr.yml` - Tests pull requests across all CFML engines
-- `docs-sync.yml` - Syncs documentation to wheels.dev/guides
-
-**Build Orchestration**:
-1. Version calculation from `templates/base/src/box.json` + build number
-2. Parallel execution of build scripts for all components
-3. Version placeholder replacement throughout all packages
-4. ZIP creation with MD5 and SHA512 checksums
-5. ForgeBox publication with package verification
-
-**Publication Script** (`tools/build/scripts/publish-to-forgebox.sh`):
-- Verifies package contents and structure
-- Authenticates with ForgeBox API
-- Publishes all packages atomically
-- Handles force updates and error recovery
-- Creates "bleeding edge" versions for continuous deployment
-
-### Package Dependencies & Integration
-
-**ForgeBox Package Flow**:
-```
-Developer Workflow:
-1. box install wheels-cli           # Downloads CLI CommandBox module
-2. wheels g app myapp              # CLI downloads wheels-base-template from ForgeBox
-3. box install                     # App downloads wheels-core from ForgeBox to /vendor/wheels
-
-ForgeBox Packages:
-├── wheels-cli (CommandBox module)
-├── wheels-base-template (app structure)
-├── wheels-core (framework runtime)
-└── wheels-starterapp (example app)
-
-Documentation:
-└── wheels.dev/guides (comprehensive framework guides)
+```bash
+# Run all tests
+wheels test run
 ```
 
-**Integration Points**:
-- CLI downloads `wheels-base-template` package from ForgeBox during `wheels g app`
-- Base template's `box.json` specifies `wheels-core` dependency
-- `box install` in new app downloads `wheels-core` to `/vendor/wheels/`
-- Generated code follows core framework conventions (`$` prefix, `config()` methods)
-- All packages share synchronized version numbers through build process
+## Configuration Management
 
-### Development Workflow
+### Environment Settings
+Set your environment in `/config/environment.cfm`:
+```cfm
+<cfscript>
+    set(environment="development");
+</cfscript>
+```
 
-**For CLI Development**:
-1. Modify files in `/cli/src/`
-2. Test in `/workspace/` directory
-3. Run `box reload` after changes
-4. Use `.claude/commands/cli/test-next-group.md` for systematic testing
+**Available Environments:**
+- `development` - Local development with debug info
+- `testing` - Automated testing environment  
+- `maintenance` - Maintenance mode with limited access
+- `production` - Live production environment
 
-**For Core Development**:
-1. Modify files in `/core/src/wheels/`
-2. Run framework tests: `wheels test run` or `box testbox run`
-3. Test across engines: `docker compose up adobe2021 -d` etc.
+### Framework Settings
+Configure global settings in `/config/settings.cfm`:
+```cfm
+<cfscript>
+    // Database configuration
+    set(dataSourceName="myapp-dev");
+    set(dataSourceUserName="username");
+    set(dataSourcePassword="password");
+    
+    // URL rewriting
+    set(URLRewriting="On");
+    
+    // Reload password
+    set(reloadPassword="mypassword");
+    
+    // Error handling
+    set(showErrorInformation=true);
+    set(sendEmailOnError=false);
+</cfscript>
+```
 
-**For Build System**:
-1. Build scripts in `/tools/build/scripts/`
-2. Package templates in `/tools/build/{cli,core,base}/`
-3. GitHub Actions coordinate the entire release process
+### Environment-Specific Overrides
+Create environment-specific settings in `/config/[environment]/settings.cfm`:
+```cfm
+// /config/production/settings.cfm
+<cfscript>
+    set(dataSourceName="myapp-prod");
+    set(showErrorInformation=false);
+    set(sendEmailOnError=true);
+    set(cachePages=true);
+</cfscript>
+```
 
-**For Documentation**:
-1. Edit Markdown files in `/docs/src/`
-2. Test locally with `mkdocs serve` (requires MkDocs and Material theme)
-3. GitHub Actions automatically syncs changes to wheels.dev/guides
+## URL Routing
 
-### Key Architecture Principles
+### Default Route Pattern
+URLs follow the pattern: `[controller]/[action]/[key]`
 
-**Separation of Concerns**:
-- CLI handles development-time operations
-- Core provides runtime functionality
-- Base template ensures consistency
-- Build system manages distribution
+**Examples:**
+- `/users` → `Users.cfc`, `index()` action
+- `/users/show/12` → `Users.cfc`, `show()` action, `params.key = 12`
 
-**Version Synchronization**:
-- All packages share the same version number
-- Build process ensures atomic updates across ecosystem
-- Dependency resolution prevents version conflicts
+### Custom Routes
+Define custom routes in `/config/routes.cfm`:
+```cfm
+<cfscript>
+mapper()
+    // Named routes
+    .get(name="login", to="sessions##new")
+    .post(name="authenticate", to="sessions##create")
+    
+    // RESTful resources
+    .resources("users")
+    .resources("products", except="destroy")
+    
+    // Nested resources
+    .resources("users", function(nested) {
+        nested.resources("orders");
+    })
+    
+    // Root route
+    .root(to="home##index", method="get")
+    
+    // Wildcard (keep last)
+    .wildcard()
+.end();
+</cfscript>
+```
 
-**Template-Driven Code Generation**:
-- CLI uses sophisticated template system with `{{variable}}` syntax
-- Templates check `app/snippets/` first, then fall back to CLI templates
-- Ensures generated code matches application patterns
+### Route Helpers
+```cfm
+// Link generation
+#linkTo(route="user", key=user.id, text="View User")#
+#linkTo(controller="products", action="index", text="All Products")#
 
-This architecture allows independent development of each component while maintaining a cohesive developer experience through shared patterns, synchronized versioning, and coordinated distribution via ForgeBox.
+// Form generation
+#startFormTag(route="user", method="put", key=user.id)#
 
-## Recent Changes (2025-06-21)
+// URL generation
+#urlFor(route="users")#
 
-### Configuration Directory Move
-- **BREAKING CHANGE**: Configuration moved from `/app/config` to `/config` at root level
-- This affects: routes.cfm, settings.cfm, environment.cfm, and all environment-specific settings
-- Mapping added to Application.cfc for compatibility
+// Redirects in controllers
+redirectTo(route="user", key=user.id);
+```
 
-### Recent CLI Enhancements (2025-06-20)
+## Model-View-Controller Patterns
 
-#### Fixed Issues
-- Database and server command namespaces now properly route to subcommands
-- Test commands now detect actual server port instead of hardcoded 8080
-- Scaffold generator supports non-interactive mode
-- Plugin and console commands have proper dependency injection
-- Get/set commands now route to their subcommands correctly
-- Model generator now creates foreign key columns for relationships
-- View generator now respects layout parameter
-- App wizard includes application name validation
+### Controller Structure
+```cfm
+component extends="Controller" {
 
-#### New Features
-- **Deploy System**: Full production deployment with zero-downtime support
-- **Security Scanner**: Vulnerability detection and automated fixes
-- **Performance Optimizer**: Caching, asset optimization, query analysis
-- **Environment Management**: Multi-environment configuration and switching
-- **Advanced Generators**: API resources, frontend scaffolding, job scheduling
+    function config() {
+        // Filters for authentication/authorization
+        filters(through="authenticate", except="index");
+        filters(through="findUser", only="show,edit,update,delete");
+        
+        // Parameter verification
+        verifies(except="index,new,create", params="key", paramsTypes="integer");
+        
+        // Content type support
+        provides("html,json");
+    }
 
-## Commit Message Guidelines
-- Use conventional commit format: `type: description`
-- Types: feat, fix, docs, style, refactor, test, chore
-- Keep subject line under 50 characters
-- Don't add Claude signature to commits
-- Don't add Claude signature to PR descriptions
+    function index() {
+        users = model("User").findAll(order="createdAt DESC");
+    }
+
+    function create() {
+        user = model("User").new(params.user);
+        
+        if (user.save()) {
+            redirectTo(route="user", key=user.id, success="User created!");
+        } else {
+            renderView(action="new");
+        }
+    }
+
+    private function authenticate() {
+        if (!session.authenticated) {
+            redirectTo(controller="sessions", action="new");
+        }
+    }
+}
+```
+
+### Model Structure
+```cfm
+component extends="Model" {
+
+    function config() {
+        // Associations
+        hasMany("orders");
+        belongsTo("role");
+        
+        // Validations
+        validatesPresenceOf("firstName,lastName,email");
+        validatesUniquenessOf(property="email");
+        validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
+        
+        // Callbacks
+        beforeSave("hashPassword");
+        afterCreate("sendWelcomeEmail");
+        
+        // Custom finder methods (scope() doesn't exist in CFWheels models)
+    }
+
+    function findByEmail(required string email) {
+        return findOne(where="email = '#arguments.email#'");
+    }
+    
+    function findActive() {
+        return findAll(where="active = 1");
+    }
+
+    function fullName() {
+        return trim("#firstName# #lastName#");
+    }
+}
+```
+
+### View Structure
+```cfm
+<!-- Layout: /app/views/layout.cfm -->
+<cfoutput>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    #csrfMetaTags()#
+    <title>#contentFor("title", "MyApp")#</title>
+    #styleSheetLinkTag("application")#
+</head>
+<body>
+    <main>
+        #flashMessages()#
+        #includeContent()#
+    </main>
+    #javaScriptIncludeTag("application")#
+</body>
+</html>
+</cfoutput>
+
+<!-- View: /app/views/users/index.cfm -->
+<cfparam name="users">
+<cfoutput>
+#contentFor("title", "Users")#
+
+<h1>Users</h1>
+#linkTo(route="newUser", text="New User", class="btn btn-primary")#
+
+<cfif users.recordCount>
+    <table class="table">
+        <cfloop query="users">
+        <tr>
+            <td>#linkTo(route="user", key=users.id, text=users.firstName)#</td>
+            <td>#users.email#</td>
+            <td>
+                #linkTo(route="editUser", key=users.id, text="Edit")#
+                #buttonTo(route="user", method="delete", key=users.id, 
+                         text="Delete", confirm="Are you sure?")#
+            </td>
+        </tr>
+        </cfloop>
+    </table>
+<cfelse>
+    <p>No users found.</p>
+</cfif>
+</cfoutput>
+```
+
+## Database Migrations
+
+### Migration Workflow
+```bash
+# Generate new migration
+wheels g migration CreateUsersTable
+
+# Generate migration with attributes
+wheels g migration AddEmailToUsers --attributes="email:string:index"
+
+# Run pending migrations
+wheels dbmigrate latest
+
+# Rollback migrations
+wheels dbmigrate down
+```
+
+### Migration Example
+```cfm
+component extends="wheels.migrator.Migration" {
+
+    function up() {
+        transaction {
+            t = createTable(name="users", force=false);
+            t.string("firstName,lastName", null=false);
+            t.string("email", limit=100, null=false);
+            t.boolean("active", default=true);
+            t.timestamps();
+            t.create();
+            
+            addIndex(table="users", columnNames="email", unique=true);
+        }
+    }
+
+    function down() {
+        dropTable("users");
+    }
+}
+```
+
+### Column Types
+```cfm
+t.string("name", limit=255, null=false, default="");
+t.text("description", null=true);
+t.integer("count", null=false, default=0);
+t.decimal("price", precision=10, scale=2);
+t.boolean("active", default=false);
+t.date("eventDate");
+t.datetime("createdAt");
+t.timestamps();  // Creates createdAt and updatedAt
+t.integer("userId", null=false);  // Foreign key
+```
+
+## Testing
+
+### Test Structure
+```
+tests/
+├── Test.cfc               (Base test component)
+├── controllers/           (Controller tests)
+├── models/                (Model tests)
+└── integration/           (Integration tests)
+```
+
+### Model Testing
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function beforeAll() {
+        // Setup for all tests in this spec
+        variables.testData = {};
+    }
+
+    function afterAll() {
+        // Cleanup after all tests
+    }
+
+    function beforeEach() {
+        // Setup before each test
+        variables.user = "";
+    }
+
+    function afterEach() {
+        // Cleanup after each test
+        if (isObject(variables.user)) {
+            variables.user.delete();
+        }
+    }
+
+    function run() {
+        describe("User Model", function() {
+            
+            it("should be invalid when no data provided", function() {
+                var user = model("User").new();
+                expect(user.valid()).toBeFalse("User should be invalid without data");
+                expect(arrayLen(user.allErrors())).toBeGT(0, "Should have validation errors");
+            });
+
+            it("should create user with valid data", function() {
+                var userData = {
+                    firstName = "John",
+                    lastName = "Doe", 
+                    email = "john@example.com"
+                };
+                
+                var user = model("User").create(userData);
+                
+                expect(isObject(user)).toBeTrue("Should return user object");
+                expect(user.valid()).toBeTrue("User should be valid");
+                expect(user.firstName).toBe("John", "Should set firstName correctly");
+            });
+        });
+    }
+}
+```
+
+## Security Best Practices
+
+### CSRF Protection
+```cfm
+// In controllers
+function config() {
+    protectFromForgery(); // Enable CSRF protection
+}
+
+// In forms
+#startFormTag(route="user", method="put", key=user.id)#
+    #hiddenFieldTag("authenticityToken", authenticityToken())#
+    <!-- form fields -->
+#endFormTag()#
+
+// In layout head
+#csrfMetaTags()#
+```
+
+### Input Validation
+```cfm
+// Parameter verification
+function config() {
+    verifies(only="show,edit,update,delete", params="key", paramsTypes="integer");
+    verifies(only="create,update", params="user", paramsTypes="struct");
+}
+
+// Model validation
+function config() {
+    validatesPresenceOf("firstName,lastName,email");
+    validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
+    validatesLengthOf(property="password", minimum=8);
+}
+```
+
+### SQL Injection Prevention
+```cfm
+// Use model methods (automatically sanitized)
+users = model("User").findAll(where="email = ?", values=[params.email]);
+
+// Or use cfqueryparam in custom queries
+users = model("User").findBySQL("
+    SELECT * FROM users 
+    WHERE email = <cfqueryparam value='#params.email#' cfsqltype='cf_sql_varchar'>
+");
+```
+
+## Performance Optimization
+
+### Caching
+```cfm
+// Page caching
+function config() {
+    caches(action="index", time=30); // Cache for 30 minutes
+}
+
+// Query caching
+users = model("User").findAll(cache=60); // Cache for 60 minutes
+```
+
+### Database Optimization
+```cfm
+// Use includes to avoid N+1 queries
+users = model("User").findAll(include="role,orders");
+
+// Use select to limit columns
+users = model("User").findAll(select="id,firstName,lastName,email");
+
+// Use pagination
+users = model("User").findAll(page=params.page, perPage=25);
+```
+
+## Deployment
+
+### Production Configuration
+```cfm
+// /config/production/settings.cfm
+<cfscript>
+    // Database
+    set(dataSourceName="myapp-prod");
+    
+    // Security
+    set(showErrorInformation=false);
+    set(sendEmailOnError=true);
+    
+    // Performance
+    set(cachePages=true);
+    set(cachePartials=true);
+    set(cacheQueries=true);
+</cfscript>
+```
+
+### Environment Variables
+Use `.env` file for sensitive configuration (never commit to version control):
+```bash
+# .env
+DATABASE_URL=mysql://user:pass@localhost:3306/myapp_prod
+SMTP_HOST=smtp.example.com
+API_KEY=your-secret-api-key
+```
+
+Access in configuration:
+```cfm
+<cfscript>
+    if (FileExists(ExpandPath("/.env"))) {
+        set(dataSourceName=GetEnv("DATABASE_NAME"));
+        set(dataSourceUserName=GetEnv("DATABASE_USER"));
+        set(dataSourcePassword=GetEnv("DATABASE_PASSWORD"));
+    }
+</cfscript>
+```
+
+## Common Patterns
+
+### Service Layer Pattern
+```cfm
+// /app/lib/UserService.cfc
+component {
+    
+    function createUser(required struct userData) {
+        local.user = model("User").new(arguments.userData);
+        
+        transaction {
+            if (local.user.save()) {
+                sendWelcomeEmail(local.user);
+                return local.user;
+            } else {
+                transaction action="rollback";
+                return false;
+            }
+        }
+    }
+}
+```
+
+### API Development
+```cfm
+// API base controller
+component extends="wheels.Controller" {
+    
+    function config() {
+        provides("json");
+        filters(through="authenticate");
+    }
+    
+    private function authenticate() {
+        // API authentication logic
+    }
+}
+
+// API endpoint
+function index() {
+    users = model("User").findAll();
+    renderWith(data={users=users});
+}
+```
+
+### Error Handling
+```cfm
+// Global error handler in Application.cfc
+function onError(exception, eventname) {
+    if (get("environment") == "production") {
+        WriteLog(file="application", text=exception.message, type="error");
+        include "/app/views/errors/500.cfm";
+    } else {
+        return true; // Let ColdFusion handle it
+    }
+}
+```
