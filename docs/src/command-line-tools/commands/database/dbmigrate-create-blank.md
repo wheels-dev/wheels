@@ -1,12 +1,12 @@
 # dbmigrate create blank
-*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
+
 
 Create an empty database migration file with up and down methods.
 
 ## Synopsis
 
 ```bash
-wheels dbmigrate create blank --name=<name> [options]
+wheels dbmigrate create blank <name>
 ```
 
 ## Description
@@ -20,6 +20,7 @@ The `dbmigrate create blank` command generates a new empty migration file with t
 - **Required:** Yes
 - **Description:** The name of the migration (will be prefixed with timestamp)
 
+<!-- These options are temporarily removed from the front end and will be functional later.
 ### `--datasource`
 - **Type:** String
 - **Default:** Application default
@@ -33,7 +34,7 @@ The `dbmigrate create blank` command generates a new empty migration file with t
 ### `--template`
 - **Type:** String
 - **Default:** `blank`
-- **Description:** Use a custom template for the migration
+- **Description:** Use a custom template for the migration -->
 
 ## Examples
 

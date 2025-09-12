@@ -23,7 +23,7 @@ None.
 The command displays:
 
 1. **Datasource**: The database connection being used
-2. **Database Type**: The type of database (MySQL, PostgreSQL, etc.)
+2. **Database Type**: The type of database (MySQL, PostgreSQL, H2, MSSQL(SQL Server), Oracle.)
 3. **Total Migrations**: Count of all migration files found
 4. **Available Migrations**: Number of pending migrations
 5. **Current Version**: The latest migration that has been run
@@ -67,10 +67,10 @@ Example:
 
 ## Database Schema Table
 
-Migration status is tracked in `schema_migrations` table:
+Migration status is tracked in `c_o_r_e_migrator_versions` table:
 
 ```sql
-SELECT * FROM schema_migrations;
+SELECT * FROM c_o_r_e_migrator_versions;
 +----------------+
 | version        |
 +----------------+
@@ -108,7 +108,7 @@ SELECT * FROM schema_migrations;
 - Ensure proper timestamp format
 
 ### Version Mismatch
-- Check `schema_migrations` table
+- Check `c_o_r_e_migrator_versions` table
 - Verify migration files haven't been renamed
 - Look for duplicate timestamps
 

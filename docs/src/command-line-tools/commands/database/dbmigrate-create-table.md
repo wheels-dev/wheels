@@ -6,7 +6,7 @@ Generate a migration file for creating a new database table.
 ## Synopsis
 
 ```bash
-wheels dbmigrate create table name=<table_name> [--force] [--id] primary-key=<key_name>
+wheels dbmigrate create table name=<table_name> [--force] [--id] primaryKey=<key_name>
 ```
 
 Alias: `wheels db create table`
@@ -22,7 +22,7 @@ The `dbmigrate create table` command generates a migration file that creates a n
 | `name` | string | Yes | - | The name of the table to create |
 | `--force` | boolean | No | false | Force the creation of the table |
 | `--id` | boolean | No | true | Auto create ID column as autoincrement ID |
-| `primary-key` | string | No | "id" | Overrides the default primary key column name |
+| `primaryKey` | string | No | "id" | Overrides the default primary key column name |
 
 ## Notes About Column Definition
 
@@ -42,7 +42,7 @@ wheels dbmigrate create table name=user_roles --id=false
 
 ### Create table with custom primary key
 ```bash
-wheels dbmigrate create table name=products primary-key=productCode
+wheels dbmigrate create table name=products primaryKey=productCode
 ```
 
 ### Force creation (overwrite existing)
@@ -101,7 +101,7 @@ wheels dbmigrate create table name=products_categories --id=false
 ### Table with Custom Primary Key
 Create a table with non-standard primary key:
 ```bash
-wheels dbmigrate create table name=legacy_customer primary-key=customer_code
+wheels dbmigrate create table name=legacy_customer primaryKey=customer_code
 ```
 
 ## Best Practices

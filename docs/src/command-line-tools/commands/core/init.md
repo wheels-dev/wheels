@@ -16,11 +16,6 @@ The `wheels init` command initializes an existing Wheels application to work wit
 
 This command has no arguments - it runs interactively and prompts for required information.
 
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help information |
 
 ## Interactive Prompts
 

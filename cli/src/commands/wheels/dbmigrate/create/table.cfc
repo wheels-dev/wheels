@@ -34,6 +34,9 @@
 		boolean id 		 = true,
 		string primaryKey="id") {
 		
+		// Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+		
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 
