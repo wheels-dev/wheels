@@ -206,7 +206,7 @@ component extends="Model" {
         beforeSave("hashPassword");
         afterCreate("sendWelcomeEmail");
 
-        // Custom finder methods will be added below (scope() doesn't exist in CFWheels)
+        // Custom finder methods will be added below (scope() doesn't exist in Wheels)
     }
 
     // Custom finder methods
@@ -286,7 +286,7 @@ component extends="Model" {
         beforeValidation("calculateTotal");
         afterSave("updateInventory");
 
-        // Custom finder methods will be added below (scope() doesn't exist in CFWheels)
+        // Custom finder methods will be added below (scope() doesn't exist in Wheels)
     }
 
     // Custom finder methods

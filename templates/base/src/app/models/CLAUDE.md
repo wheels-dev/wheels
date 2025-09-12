@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with Wh
 
 The `/app/models/` folder contains model classes that represent your application's data layer and implement the Active Record pattern. Models in Wheels extend `Model.cfc` and provide object-relational mapping (ORM) between database tables and CFML objects.
 
-**⚠️ IMPORTANT:** CFWheels models do NOT have a `scope()` function. The `scope()` function exists only in the routing system (`/config/routes.cfm`) for grouping routes. Do not confuse this with Ruby on Rails ActiveRecord scopes. In CFWheels models, use custom finder methods instead.
+**⚠️ IMPORTANT:** Wheels models do NOT have a `scope()` function. The `scope()` function exists only in the routing system (`/config/routes.cfm`) for grouping routes. Do not confuse this with Ruby on Rails ActiveRecord scopes. In Wheels models, use custom finder methods instead.
 
 **Why Use Models:**
 - Implement the Active Record pattern for database interactions
