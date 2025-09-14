@@ -177,6 +177,12 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 
+	function ai() {
+		include "/wheels/public/helpers.cfm";
+		include "/wheels/public/views/ai.cfm";
+		return "";
+	}
+
 	function guideImage() {
 		var file = StructKeyExists(request.wheels.params, "file") ? request.wheels.params.file : "";
 		var assetPath = expandPath("/wheels/docs/src/.gitbook/assets/" & file);

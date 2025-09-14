@@ -1,4 +1,7 @@
 <cfscript>
+// Check for JSON format request
+param name="request.wheels.params.format" default="html";
+
 // Split out internal routes
 "routes" = {
 	"internalRoutes" = [],
@@ -11,6 +14,23 @@ for (r in application.wheels.routes){
 	} else {
 		ArrayAppend(routes.appRoutes, r);
 	}
+}
+
+// If JSON format is requested, return JSON response
+if (request.wheels.params.format == "json") {
+	local.routesData = {
+		"version": application.wheels.version,
+		"timestamp": now(),
+		"routes": {
+			"app": routes.appRoutes,
+			"internal": routes.internalRoutes,
+			"total": ArrayLen(routes.appRoutes) + ArrayLen(routes.internalRoutes)
+		}
+	};
+
+	cfcontent(type="application/json", reset=true);
+	writeOutput(serializeJSON(local.routesData));
+	abort;
 }
 </cfscript>
 <!--- cfformat-ignore-start --->

@@ -1,5 +1,7 @@
-<cfinclude template="../layout/_header.cfm">
 <cfscript>
+// Check for JSON format request
+param name="request.wheels.params.format" default="html";
+
 datasourceAvailable = true;
 try {
 	availableMigrations = application.wheels.migrator.getAvailableMigrations();
@@ -17,7 +19,51 @@ if(structKeyExists(variables, "latestVersion") && currentVersion == latestVersio
 		if(local.migration.status != "migrated") arrayAppend(local.remainingMigrations, local.migration);
 	}
 }
+
+// If JSON format is requested, return JSON response
+if (request.wheels.params.format == "json") {
+	local.migratorData = {
+		"version": application.wheels.version,
+		"timestamp": now(),
+		"migrator": {
+			"datasourceAvailable": datasourceAvailable
+		}
+	};
+
+	if (datasourceAvailable) {
+		local.migratorData.migrator.currentVersion = currentVersion;
+		if (structKeyExists(variables, "latestVersion")) {
+			local.migratorData.migrator.latestVersion = latestVersion;
+		}
+		local.migratorData.migrator.migrations = availableMigrations;
+		local.migratorData.migrator.migrationsCount = ArrayLen(availableMigrations);
+
+		// Count migrated vs pending
+		local.migratedCount = 0;
+		local.pendingCount = 0;
+		for (local.mig in availableMigrations) {
+			if (structKeyExists(local.mig, "status") && local.mig.status == "migrated") {
+				local.migratedCount++;
+			} else {
+				local.pendingCount++;
+			}
+		}
+		local.migratorData.migrator.migratedCount = local.migratedCount;
+		local.migratorData.migrator.pendingCount = local.pendingCount;
+
+		if (structKeyExists(variables, "local") && structKeyExists(local, "remainingMigrations")) {
+			local.migratorData.migrator.remainingMigrations = local.remainingMigrations;
+		}
+	} else {
+		local.migratorData.migrator.error = message;
+	}
+
+	cfcontent(type="application/json", reset=true);
+	writeOutput(serializeJSON(local.migratorData));
+	abort;
+}
 </cfscript>
+<cfinclude template="../layout/_header.cfm">
 <!--- cfformat-ignore-start --->
 <cfoutput>
 	<div class="ui container">
