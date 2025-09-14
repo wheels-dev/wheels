@@ -107,7 +107,8 @@
       "Bash(python3:*)",
       "Read(//private/tmp/wheels-mcp-test/**)",
       "Bash(node:*)",
-      "Bash(npm:*)"
+      "Bash(npm:*)",
+      "WebSearch"
     ],
     "deny": []
   }

@@ -210,7 +210,35 @@ jobs:
             exit 0
           fi
 
-          docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle
+          # Install packages with retry logic
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Installing CFPM packages..."
+
+            # Try to install all packages
+            if docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle; then
+              echo "✅ CFPM packages installed successfully"
+              exit 0
+            else
+              echo "❌ CFPM installation failed on attempt $RETRY_COUNT"
+
+              if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                echo "Waiting 10 seconds before retry..."
+                sleep 10
+
+                # Try to restart the CF service before retry
+                echo "Attempting to restart ColdFusion service..."
+                docker exec wheels-${{ matrix.cfengine }}-1 box server restart || true
+                sleep 10
+              fi
+            fi
+          done
+
+          echo "Failed to install CFPM packages after $MAX_RETRIES attempts"
+          exit 1
 
       - name: Run Tests with Retry
         id: run-tests
