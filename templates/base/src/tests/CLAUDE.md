@@ -952,11 +952,9 @@ component extends="testbox.system.BaseSpec" {
                 expect(dbInfo).toHaveKey("database_version");
             });
 
-            it("should execute raw SQL through framework", function() {
-                var result = application.wo.model("User").findBySQL(
-                    sql = "SELECT COUNT(*) AS userCount FROM users WHERE email LIKE ?",
-                    values = ["%@test.com"]
-                );
+            it("should execute raw SQL", function() {
+                sql = "SELECT COUNT(*) AS userCount FROM users WHERE email LIKE :email";
+                var result = queryExecute(sql, { email = { value = "%@test.com", cfsqltype = "cf_sql_varchar" } }, { datasource = "yourDatasourceName" });
                 
                 expect(result).toBeQuery();
                 expect(result.userCount[1]).toBeGTE(0);

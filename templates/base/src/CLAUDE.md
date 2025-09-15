@@ -505,13 +505,11 @@ function config() {
 ### SQL Injection Prevention
 ```cfm
 // Use model methods (automatically sanitized)
-users = model("User").findAll(where="email = ?", values=[params.email]);
+users = model("User").findAll(where="email = '#params.email#'");
 
 // Or use cfqueryparam in custom queries
-users = model("User").findBySQL("
-    SELECT * FROM users 
-    WHERE email = <cfqueryparam value='#params.email#' cfsqltype='cf_sql_varchar'>
-");
+sql = "SELECT * FROM users WHERE email = :email";
+users = queryExecute(sql, { email = { value = params.email, cfsqltype = "cf_sql_varchar" } }, {datasource = yourDatasourceName});
 ```
 
 ## Performance Optimization
