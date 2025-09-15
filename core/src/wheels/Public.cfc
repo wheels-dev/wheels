@@ -206,4 +206,10 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			writeOutput("Image not found");
 		}
 	}
+
+	function mcp() {
+		include "/wheels/public/helpers.cfm";
+		include "/wheels/public/views/mcp.cfm";
+		return "";
+	}
 }
