@@ -1,11 +1,12 @@
 /**
  * Test MCP (Model Context Protocol) connection and configuration
- * Verifies that your MCP setup is working correctly
+ * Verifies that your native CFML MCP server is working correctly
  *
  * Examples:
  * {code:bash}
  * wheels mcp test
  * wheels mcp test --verbose
+ * wheels mcp test --port=8080
  * {code}
  **/
 component extends="../base" {
@@ -14,67 +15,75 @@ component extends="../base" {
 
 	/**
 	 * @verbose Show detailed test output
+	 * @port Port number for Wheels server (auto-detected if not provided)
 	 **/
 	function run(
-		boolean verbose = false
+		boolean verbose = false,
+		numeric port
 	) {
 		print.line();
 		print.boldYellowLine("🧪 Testing MCP Integration");
 		print.line("=" .repeatString(40));
 		print.line();
 
-		var status = mcpService.getMCPStatus();
 		var allTestsPassed = true;
+		var serverPort = 0;
 
-		// Test 1: Check if MCP server file exists
-		print.line("1. Checking MCP server file...");
-		if (status.serverFile) {
-			print.greenLine("   ✅ mcp-server.js found");
+		// Detect or use provided port
+		if (!isNull(arguments.port)) {
+			serverPort = arguments.port;
 		} else {
-			print.redLine("   ❌ mcp-server.js not found");
-			print.yellowLine("      Run 'wheels mcp setup' to install");
-			allTestsPassed = false;
+			// Use the improved port detection to get the actual running server info
+			serverPort = mcpService.detectServerPort(false); // Don't auto-start during test
 		}
-		print.line();
 
-		// Test 2: Check dependencies
-		print.line("2. Checking dependencies...");
-		if (status.dependencies) {
-			print.greenLine("   ✅ MCP SDK installed");
-		} else {
-			print.redLine("   ❌ MCP SDK not installed");
-			print.yellowLine("      Run 'npm install' to install dependencies");
-			allTestsPassed = false;
-		}
-		print.line();
-
-		// Test 3: Check Node.js
-		print.line("3. Checking Node.js...");
-		if (len(status.nodeVersion)) {
-			print.greenLine("   ✅ Node.js " & status.nodeVersion);
-			if (arguments.verbose) {
-				print.line("      npm " & status.npmVersion);
+		// Test 1: Check if .mcp.json configuration exists
+		print.line("1. Checking MCP configuration...");
+		var mcpConfigPath = getCWD() & "/.mcp.json";
+		if (fileExists(mcpConfigPath)) {
+			try {
+				var mcpConfig = deserializeJSON(fileRead(mcpConfigPath));
+				if (structKeyExists(mcpConfig, "mcpServers") && structKeyExists(mcpConfig.mcpServers, "wheels")) {
+					var wheelsConfig = mcpConfig.mcpServers.wheels;
+					if (structKeyExists(wheelsConfig, "type") && wheelsConfig.type == "http") {
+						print.greenLine("   ✅ .mcp.json configured for native MCP server");
+						if (arguments.verbose) {
+							print.line("      URL: " & wheelsConfig.url);
+						}
+					} else {
+						print.yellowLine("   ⚠️  .mcp.json exists but not configured for HTTP transport");
+						print.yellowLine("      Run 'wheels mcp setup --force' to update");
+					}
+				} else {
+					print.yellowLine("   ⚠️  .mcp.json exists but missing wheels configuration");
+				}
+			} catch (any e) {
+				print.redLine("   ❌ Invalid .mcp.json file");
+				allTestsPassed = false;
 			}
 		} else {
-			print.redLine("   ❌ Node.js not found");
-			print.yellowLine("      Install Node.js from https://nodejs.org/");
+			print.redLine("   ❌ .mcp.json not found");
+			print.yellowLine("      Run 'wheels mcp setup' to configure");
 			allTestsPassed = false;
 		}
 		print.line();
 
-		// Test 4: Check server port
-		print.line("4. Checking Wheels server...");
-		if (status.port > 0) {
-			print.greenLine("   ✅ Server configured on port " & status.port);
+		// Test 2: Check Wheels server
+		print.line("2. Checking Wheels server...");
+		if (serverPort > 0) {
+			print.greenLine("   ✅ Server detected on port " & serverPort);
 		} else {
 			print.yellowLine("   ⚠️  Server port not detected");
 			print.yellowLine("      Make sure your Wheels server is running");
-			// This is a warning, not a failure
+			print.yellowLine("      Or specify port: wheels mcp test --port=8080");
+			// This is a warning, not a failure for now
+			serverPort = 60000; // Use default for testing
 		}
 		print.line();
 
-		// Test 5: Check IDE configurations
-		print.line("5. Checking IDE configurations...");
+		// Test 3: Check IDE configurations
+		print.line("3. Checking IDE configurations...");
+		var status = mcpService.getMCPStatus();
 		if (status.configured && arrayLen(status.configuredIDEs) > 0) {
 			print.greenLine("   ✅ Configured for: " & arrayToList(status.configuredIDEs, ", "));
 		} else {
@@ -84,54 +93,89 @@ component extends="../base" {
 		}
 		print.line();
 
-		// Test 6: Try to validate MCP server can start
-		if (status.serverFile && status.dependencies) {
-			print.line("6. Testing MCP server startup...");
+		// Test 4: Test MCP endpoint (SSE)
+		print.line("4. Testing MCP SSE endpoint...");
+		try {
+			var http = new http();
+			http.setMethod("GET");
+			http.setUrl("http://localhost:#serverPort#/wheels/mcp");
+			http.addParam(type="header", name="Accept", value="text/event-stream");
+			http.setTimeout(5);
+			var result = http.send().getPrefix();
 
-			// Create a simple test by checking if the server file is valid JavaScript
-			try {
-				var testCommand = "!node -c mcp-server.js";
-				shell.run(command=testCommand, timeout=5);
-				print.greenLine("   ✅ MCP server syntax valid");
-			} catch (any e) {
-				print.redLine("   ❌ MCP server has syntax errors");
-				if (arguments.verbose) {
-					print.redLine("      " & e.message);
+			if (result.statusCode contains "200") {
+				print.greenLine("   ✅ MCP SSE endpoint is accessible");
+				if (arguments.verbose && structKeyExists(result, "Mcp-Session-Id")) {
+					print.line("      Session ID: " & result["Mcp-Session-Id"]);
 				}
+			} else {
+				print.redLine("   ❌ MCP SSE endpoint returned: " & result.statusCode);
 				allTestsPassed = false;
 			}
-			print.line();
-		}
-
-		// Test 7: Check if Wheels dev server is accessible
-		print.line("7. Testing Wheels dev server connection...");
-
-		// Use the improved port detection to get the actual running server info
-		var actualPort = mcpService.detectServerPort(false); // Don't auto-start during test
-
-		if (actualPort > 0) {
-			try {
-				var http = new http();
-				http.setMethod("GET");
-				http.setUrl("http://localhost:#actualPort#/wheels/ai?mode=info");
-				http.setTimeout(5);
-				var result = http.send().getPrefix();
-
-				if (result.statusCode contains "200") {
-					print.greenLine("   ✅ Wheels dev server is accessible on port " & actualPort);
-				} else {
-					print.yellowLine("   ⚠️  Wheels dev server returned: " & result.statusCode & ". Status code unavailable.");
-				}
-			} catch (any e) {
-				print.yellowLine("   ⚠️  Wheels dev server returned: Connection Failure. Status code unavailable.");
-				if (arguments.verbose) {
-					print.yellowLine("      Error: " & e.message);
-					print.yellowLine("      URL tested: http://localhost:" & actualPort & "/wheels/ai?mode=info");
-				}
+		} catch (any e) {
+			print.redLine("   ❌ Could not connect to MCP endpoint");
+			if (arguments.verbose) {
+				print.redLine("      Error: " & e.message);
 			}
-		} else {
-			print.yellowLine("   ⚠️  No running Wheels server detected");
-			print.yellowLine("      Start server with: wheels server start");
+			allTestsPassed = false;
+		}
+		print.line();
+
+		// Test 5: Test MCP JSON-RPC
+		print.line("5. Testing MCP JSON-RPC endpoint...");
+		try {
+			var http = new http();
+			http.setMethod("POST");
+			http.setUrl("http://localhost:#serverPort#/wheels/mcp");
+			http.addParam(type="header", name="Content-Type", value="application/json");
+			http.addParam(type="body", value='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"0.1.0","capabilities":{}},"id":1}');
+			http.setTimeout(5);
+			var result = http.send();
+			var responseBody = result.getPrefix().fileContent;
+
+			if (result.getPrefix().statusCode contains "200") {
+				try {
+					var jsonResponse = deserializeJSON(responseBody);
+					if (structKeyExists(jsonResponse, "result") && structKeyExists(jsonResponse.result, "serverInfo")) {
+						print.greenLine("   ✅ MCP JSON-RPC working (" & jsonResponse.result.serverInfo.name & ")");
+					} else {
+						print.yellowLine("   ⚠️  MCP JSON-RPC response missing expected fields");
+					}
+				} catch (any je) {
+					print.yellowLine("   ⚠️  MCP JSON-RPC returned invalid JSON");
+				}
+			} else {
+				print.redLine("   ❌ MCP JSON-RPC endpoint returned: " & result.getPrefix().statusCode);
+				allTestsPassed = false;
+			}
+		} catch (any e) {
+			print.redLine("   ❌ Could not connect to MCP JSON-RPC endpoint");
+			if (arguments.verbose) {
+				print.redLine("      Error: " & e.message);
+			}
+			allTestsPassed = false;
+		}
+		print.line();
+
+		// Test 6: Check if Wheels AI endpoint is accessible
+		print.line("6. Testing Wheels AI endpoint...");
+		try {
+			var http = new http();
+			http.setMethod("GET");
+			http.setUrl("http://localhost:#serverPort#/wheels/ai?mode=info");
+			http.setTimeout(5);
+			var result = http.send().getPrefix();
+
+			if (result.statusCode contains "200") {
+				print.greenLine("   ✅ Wheels AI endpoint is accessible");
+			} else {
+				print.yellowLine("   ⚠️  Wheels AI endpoint returned: " & result.statusCode);
+			}
+		} catch (any e) {
+			print.yellowLine("   ⚠️  Could not connect to Wheels AI endpoint");
+			if (arguments.verbose) {
+				print.yellowLine("      Error: " & e.message);
+			}
 		}
 		print.line();
 
@@ -140,8 +184,8 @@ component extends="../base" {
 		if (allTestsPassed) {
 			print.boldGreenLine("✅ All tests passed!");
 			print.line();
-			print.greenLine("Your MCP integration is ready to use.");
-			print.line("Restart your AI IDE to activate the MCP server.");
+			print.greenLine("Your native CFML MCP server is ready to use.");
+			print.line("Restart your AI IDE to connect to the MCP server.");
 		} else {
 			print.boldYellowLine("⚠️  Some tests failed");
 			print.line();
@@ -153,9 +197,9 @@ component extends="../base" {
 		if (arguments.verbose) {
 			print.boldLine("Detailed Configuration:");
 			print.line("Project Root: " & getCWD());
-			print.line("MCP Server: " & (status.serverFile ? "Installed" : "Not installed"));
-			print.line("Dependencies: " & (status.dependencies ? "Installed" : "Not installed"));
-			print.line("Server Port: " & (status.port > 0 ? status.port : "Not detected"));
+			print.line("MCP Type: Native CFML (no Node.js required)");
+			print.line("MCP Endpoint: http://localhost:" & serverPort & "/wheels/mcp");
+			print.line("Server Port: " & serverPort);
 			print.line();
 
 			print.boldLine("IDE Detection:");
@@ -167,14 +211,19 @@ component extends="../base" {
 
 			print.boldLine("Available MCP Tools:");
 			print.indentedLine("• wheels_generate - Generate models, controllers, migrations");
+			print.indentedLine("• wheels_analyze - Analyze project structure");
+			print.indentedLine("• wheels_validate - Validate models and schema");
 			print.indentedLine("• wheels_migrate - Run database migrations");
 			print.indentedLine("• wheels_test - Execute tests");
 			print.indentedLine("• wheels_server - Manage development server");
 			print.indentedLine("• wheels_reload - Reload application");
-			print.indentedLine("• wheels_info - Get system configuration");
-			print.indentedLine("• wheels_routes - Inspect application routes");
-			print.indentedLine("• wheels_plugins - List installed plugins");
-			print.indentedLine("• wheels_test_status - Check test results");
+			print.line();
+
+			print.boldLine("Available MCP Resources:");
+			print.indentedLine("• Documentation chunks (models, controllers, views, etc.)");
+			print.indentedLine("• Project context and structure");
+			print.indentedLine("• Routes, migrations, and plugins info");
+			print.indentedLine("• Complete API reference and guides");
 			print.line();
 		}
 	}

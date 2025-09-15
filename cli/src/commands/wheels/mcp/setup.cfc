@@ -1,6 +1,7 @@
 /**
  * Set up MCP (Model Context Protocol) integration for AI IDE support
  * Configures your Wheels project to work with AI coding assistants like Claude Code, Cursor, and Continue
+ * Uses the native CFML MCP server built into Wheels (no Node.js required)
  *
  * Examples:
  * {code:bash}
@@ -18,7 +19,6 @@ component extends="../base" {
 	 * @ide Specific IDE to configure (claude, cursor, continue, windsurf)
 	 * @all Configure all detected IDEs
 	 * @force Overwrite existing configuration
-	 * @skipNpm Skip npm install step
 	 * @noAutoStart Don't automatically start server if not running
 	 **/
 	function run(
@@ -26,7 +26,6 @@ component extends="../base" {
 		string ide,
 		boolean all = false,
 		boolean force = false,
-		boolean skipNpm = false,
 		boolean noAutoStart = false
 	) {
 		print.line();
@@ -42,25 +41,11 @@ component extends="../base" {
 			print.yellowLine("   Run this command from your Wheels project root directory.");
 			return;
 		} else {
-			print.greenLine("✅ Wheels directory detected");
+			print.greenLine("✅ Wheels application detected");
 		}
 
-		try {
-			// Check if node command exists
-			command(name='!which node', timeout=2);
-			print.greenLine("✅ Node.js detected");
-		} catch (any e) {
-			print.redLine("❌ Node.js may not be installed - MCP requires Node.js 16 or later.");// Node not installed
-		}
-
-		try {
-			// Check if node command exists
-			command(name='!which npm', timeout=2);
-			print.greenLine("✅ npm detected");
-		} catch (any e) {
-			print.redLine("❌ npm is not installed.");
-			print.line("   npm is required to install MCP dependencies.");
-		}
+		// Note: No Node.js required anymore!
+		print.greenLine("✅ Using native CFML MCP server (no Node.js required)");
 
 		// Detect or use provided port
 		var serverPort = 0;
@@ -70,158 +55,80 @@ component extends="../base" {
 			print.line("Using specified port: " & serverPort);
 		} else {
 			print.line("Detecting Wheels server port...");
-			print.yellowLine("    DEBUG - Step 1: Starting server detection");
 
 			// Try to detect running server
-			print.yellowLine("    DEBUG - Step 2: About to run 'server status' command");
 			var serverStatusResult = command("server status").params(getCWD()).run(returnOutput=true);
 			var statusOutput = serverStatusResult;
-			print.yellowLine("    DEBUG - Step 3: Command completed successfully");
-			print.yellowLine("    DEBUG - statusOutput: " & statusOutput);
-			print.yellowLine("    DEBUG - statusOutput length: " & len(statusOutput));
-			print.yellowLine("    DEBUG - getCWD(): " & getCWD());
 
 			// Look for port in server status output (format: http://localhost:PORT or 127.0.0.1:PORT)
-			print.yellowLine("    DEBUG - Step 4: Starting regex pattern matching");
 			var portPattern = "(?:localhost|127\.0\.0\.1):(\d+)";
-			print.yellowLine("    DEBUG - Using pattern: " & portPattern);
-
 			var portMatch = reFind(portPattern, statusOutput, 1, true);
-			print.yellowLine("    DEBUG - Step 5: Regex completed");
-			print.yellowLine("    DEBUG - portMatch result: " & serializeJSON(portMatch));
 
-			if (isStruct(portMatch)) {
-				print.yellowLine("    DEBUG - Step 6: portMatch is a struct");
-				print.yellowLine("    DEBUG - portMatch keys: " & structKeyList(portMatch));
-
-				if (structKeyExists(portMatch, "pos")) {
-					print.yellowLine("    DEBUG - Step 7: 'pos' key exists");
-					print.yellowLine("    DEBUG - pos array: " & serializeJSON(portMatch.pos));
-					print.yellowLine("    DEBUG - pos array length: " & arrayLen(portMatch.pos));
-
-					if (arrayLen(portMatch.pos) > 1) {
-						print.yellowLine("    DEBUG - Step 8: pos array has more than 1 element");
-						print.yellowLine("    DEBUG - pos[2] value: " & portMatch.pos[2]);
-
-						if (portMatch.pos[2] > 0) {
-							print.yellowLine("    DEBUG - Step 9: pos[2] > 0, extracting port");
-							print.yellowLine("    DEBUG - len array: " & serializeJSON(portMatch.len));
-							print.yellowLine("    DEBUG - len[2] value: " & portMatch.len[2]);
-
-							serverPort = mid(statusOutput, portMatch.pos[2], portMatch.len[2]);
-							print.yellowLine("    DEBUG - Step 10: Extracted port: " & serverPort);
-							print.greenLine("✅ Detected server on port " & serverPort);
-						} else {
-							print.yellowLine("    DEBUG - Step 9: pos[2] is 0 or negative");
-						}
-					} else {
-						print.yellowLine("    DEBUG - Step 8: pos array length is " & arrayLen(portMatch.pos));
-					}
-				} else {
-					print.yellowLine("    DEBUG - Step 7: 'pos' key does not exist");
-				}
-			} else {
-				print.yellowLine("    DEBUG - Step 6: portMatch is not a struct, type: " & getMetadata(portMatch).name);
+			if (isStruct(portMatch) && structKeyExists(portMatch, "pos") && arrayLen(portMatch.pos) > 1 && portMatch.pos[2] > 0) {
+				serverPort = mid(statusOutput, portMatch.pos[2], portMatch.len[2]);
+				print.greenLine("✅ Detected server on port " & serverPort);
 			}
 
 			// If first pattern didn't work, try simpler pattern
 			if (serverPort == 0) {
-				print.yellowLine("    DEBUG - Step 11: First pattern failed, trying simpler pattern");
 				var simplePattern = "127\.0\.0\.1:(\d+)";
-				print.yellowLine("    DEBUG - Using simple pattern: " & simplePattern);
-
 				var simpleMatch = reFind(simplePattern, statusOutput, 1, true);
-				print.yellowLine("    DEBUG - Simple pattern result: " & serializeJSON(simpleMatch));
 
 				if (isStruct(simpleMatch) && structKeyExists(simpleMatch, "pos") && arrayLen(simpleMatch.pos) > 1 && simpleMatch.pos[2] > 0) {
 					serverPort = mid(statusOutput, simpleMatch.pos[2], simpleMatch.len[2]);
-					print.yellowLine("    DEBUG - Simple pattern extracted port: " & serverPort);
-					print.greenLine("✅ Detected server on port " & serverPort & " (using simple pattern)");
-				} else {
-					print.yellowLine("    DEBUG - Simple pattern also failed");
+					print.greenLine("✅ Detected server on port " & serverPort);
 				}
 			}
 
 			// If still no port, try to find any number after localhost or 127.0.0.1
 			if (serverPort == 0) {
-				print.yellowLine("    DEBUG - Step 12: Trying manual string search");
 				if (findNoCase("localhost:", statusOutput) > 0) {
 					var localhostPos = findNoCase("localhost:", statusOutput);
-					print.yellowLine("    DEBUG - Found localhost: at position " & localhostPos);
 					var afterLocalhost = mid(statusOutput, localhostPos + 10, 10);
-					print.yellowLine("    DEBUG - Text after localhost:: " & afterLocalhost);
 
 					var numberMatch = reFind("(\d+)", afterLocalhost, 1, true);
 					if (isStruct(numberMatch) && structKeyExists(numberMatch, "pos") && arrayLen(numberMatch.pos) > 1 && numberMatch.pos[2] > 0) {
 						serverPort = mid(afterLocalhost, numberMatch.pos[2], numberMatch.len[2]);
-						print.yellowLine("    DEBUG - Manual extraction found port: " & serverPort);
-						print.greenLine("✅ Detected server on port " & serverPort & " (manual extraction)");
+						print.greenLine("✅ Detected server on port " & serverPort);
 					}
 				} else if (findNoCase("127.0.0.1:", statusOutput) > 0) {
 					var ipPos = findNoCase("127.0.0.1:", statusOutput);
-					print.yellowLine("    DEBUG - Found 127.0.0.1: at position " & ipPos);
 					var afterIP = mid(statusOutput, ipPos + 10, 10);
-					print.yellowLine("    DEBUG - Text after 127.0.0.1:: " & afterIP);
 
 					var numberMatch = reFind("(\d+)", afterIP, 1, true);
 					if (isStruct(numberMatch) && structKeyExists(numberMatch, "pos") && arrayLen(numberMatch.pos) > 1 && numberMatch.pos[2] > 0) {
 						serverPort = mid(afterIP, numberMatch.pos[2], numberMatch.len[2]);
-						print.yellowLine("    DEBUG - Manual IP extraction found port: " & serverPort);
-						print.greenLine("✅ Detected server on port " & serverPort & " (manual IP extraction)");
+						print.greenLine("✅ Detected server on port " & serverPort);
 					}
-				} else {
-					print.yellowLine("    DEBUG - No localhost: or 127.0.0.1: found in output");
 				}
 			}
-
-			print.yellowLine("    DEBUG - Step 13: Server detection complete, final serverPort: " & serverPort);
 		}
 
 		// If no server detected and auto-start enabled, try to start server
 		if (serverPort == 0 && !arguments.noAutoStart) {
 			print.line("No running server detected. Attempting to start server...");
-			print.yellowLine("    DEBUG - Auto-start: serverPort is 0, noAutoStart is " & arguments.noAutoStart);
 
 			try {
-				print.yellowLine("    DEBUG - Auto-start: About to run 'server start' command");
 				command("server start").params(getCWD()).run();
-				print.yellowLine("    DEBUG - Auto-start: Server start command completed");
-
-				print.yellowLine("    DEBUG - Auto-start: Sleeping for 3 seconds");
 				sleep(3000); // Wait for server to start
-				print.yellowLine("    DEBUG - Auto-start: Sleep completed");
 
 				// Try to detect port again
-				print.yellowLine("    DEBUG - Auto-start: Running 'server status' again");
 				var serverStatusResult = command("server status").params(getCWD()).run(returnOutput=true);
 				var statusOutput = serverStatusResult;
-				print.yellowLine("    DEBUG - Auto-start: Second status output: " & statusOutput);
 
 				var portPattern = "(?:localhost|127\.0\.0\.1):(\d+)";
 				var portMatch = reFind(portPattern, statusOutput, 1, true);
-				print.yellowLine("    DEBUG - Auto-start: Second portMatch: " & serializeJSON(portMatch));
 
 				if (isStruct(portMatch) && structKeyExists(portMatch, "pos") && arrayLen(portMatch.pos) > 1 && portMatch.pos[2] > 0) {
 					serverPort = mid(statusOutput, portMatch.pos[2], portMatch.len[2]);
-					print.yellowLine("    DEBUG - Auto-start: Extracted port: " & serverPort);
 					print.greenLine("✅ Started server and detected port " & serverPort);
-				} else {
-					print.yellowLine("    DEBUG - Auto-start: Failed to detect port after server start");
 				}
 			} catch (any e) {
 				print.yellowLine("⚠️  Could not start server automatically");
-				print.yellowLine("    DEBUG - Auto-start exception: " & e.message);
-			}
-		} else {
-			if (serverPort == 0) {
-				print.yellowLine("    DEBUG - Auto-start skipped: noAutoStart is " & arguments.noAutoStart);
-			} else {
-				print.yellowLine("    DEBUG - Auto-start not needed: serverPort is " & serverPort);
 			}
 		}
 
 		if (serverPort == 0) {
-			print.yellowLine("    DEBUG - Final check: serverPort is still 0");
 			print.yellowLine("⚠️  Could not detect server port.");
 			print.line();
 			print.line("Options:");
@@ -232,96 +139,35 @@ component extends="../base" {
 
 			// Ask for port
 			var userPort = ask("Enter your Wheels server port (or press Enter to use 60000): ");
-			print.yellowLine("    DEBUG - User entered port: '" & userPort & "'");
 			serverPort = len(trim(userPort)) ? userPort : 60000;
-			print.yellowLine("    DEBUG - Final serverPort set to: " & serverPort);
-		} else {
-			print.yellowLine("    DEBUG - Final check: serverPort detected as " & serverPort);
 		}
 		print.line();
 
-		// Install MCP server files
-		print.boldLine("Installing MCP Server...");
-		print.yellowLine("    DEBUG - Install: Starting MCP server installation");
+		// Configure MCP project file
+		print.boldLine("Configuring MCP Integration...");
 
 		try {
-			// Check if package.json exists, create if not
-			var packageJsonPath = getCWD() & "/package.json";
-			print.yellowLine("    DEBUG - Install: Checking package.json at: " & packageJsonPath);
-			print.yellowLine("    DEBUG - Install: package.json exists: " & fileExists(packageJsonPath));
-			print.yellowLine("    DEBUG - Install: force flag: " & arguments.force);
-
-			if (!fileExists(packageJsonPath) || arguments.force) {
-				print.yellowLine("    DEBUG - Install: Creating package.json");
-				var packageContent = {
-					"name": "wheels-mcp-server",
-					"version": "1.0.0",
-					"description": "MCP server for Wheels framework",
-					"main": "mcp-server.js",
-					"dependencies": {
-						"@modelcontextprotocol/sdk": "^0.5.0"
-					},
-					"scripts": {
-						"start": "node mcp-server.js"
-					}
-				};
-				fileWrite(packageJsonPath, serializeJSON(packageContent));
-				print.greenLine("✅ Created package.json");
-			}
-
-			// Install npm dependencies
-			if (!arguments.skipNpm) {
-				print.line("Installing npm dependencies...");
-				try {
-					command(name='!npm install', timeout=60);
-					print.greenLine("✅ npm dependencies installed");
-				} catch (any e) {
-					print.redLine("❌ Failed to install npm dependencies: " & e.message);
-					return;
-				}
-			}
-
-			// Create MCP server file
-			var mcpServerPath = getCWD() & "/mcp-server.js";
-			if (!fileExists(mcpServerPath) || arguments.force) {
-				try {
-					// Create basic working MCP server
-					fileWrite(mcpServerPath, "console.log('MCP Server - will be enhanced later');");
-					print.greenLine("✅ Created mcp-server.js");
-				} catch (any e) {
-					print.redLine("❌ Failed to create mcp-server.js: " & e.message);
-					return;
-				}
-			}
-
-			// Make the server executable
-			try {
-				command(name='!chmod +x mcp-server.js', timeout=5);
-			} catch (any e) {
-				// Ignore chmod errors on Windows
-			}
-
 			// Create .mcp.json for Claude Code project-level configuration
+			// This points to the native CFML MCP server endpoint
 			var mcpConfigPath = getCWD() & "/.mcp.json";
 			if (!fileExists(mcpConfigPath) || arguments.force) {
 				var mcpConfig = {
 					"mcpServers": {
 						"wheels": {
-							"command": "node",
-							"args": ["mcp-server.js"],
-							"env": {
-								"WHEELS_DEV_SERVER": "http://localhost:" & serverPort
-							}
+							"type": "http",
+							"url": "http://localhost:" & serverPort & "/wheels/mcp"
 						}
 					}
 				};
 				fileWrite(mcpConfigPath, serializeJSON(mcpConfig));
-				print.greenLine("✅ Created .mcp.json for Claude Code");
+				print.greenLine("✅ Created .mcp.json for project-level configuration");
+			} else {
+				print.yellowLine("⚠️  .mcp.json already exists (use --force to overwrite)");
 			}
 
-			print.greenLine("✅ MCP server installation completed");
+			print.greenLine("✅ MCP configuration completed");
 		} catch (any e) {
-			print.redLine("❌ Installation failed: " & e.message);
+			print.redLine("❌ Configuration failed: " & e.message);
 			return;
 		}
 		print.line();
@@ -446,8 +292,8 @@ component extends="../base" {
 		print.boldGreenLine("✨ MCP Integration Setup Complete!");
 		print.line();
 		print.boldLine("Configuration Summary:");
-		print.indentedLine("Server URL: http://localhost:" & serverPort);
-		print.indentedLine("MCP Server: ./mcp-server.js");
+		print.indentedLine("MCP Endpoint: http://localhost:" & serverPort & "/wheels/mcp");
+		print.indentedLine("Server Type: Native CFML (no Node.js required)");
 
 		if (arrayLen(idesToConfigure) > 0) {
 			print.indentedLine("Configured IDEs: " & arrayToList(idesToConfigure, ", "));
@@ -456,22 +302,22 @@ component extends="../base" {
 
 		print.boldLine("Next Steps:");
 		print.indentedLine("1. Ensure your Wheels server is running on port " & serverPort);
-		print.indentedLine("2. Restart your AI IDE to load the MCP server");
+		print.indentedLine("2. Restart your AI IDE to connect to the MCP server");
 		print.indentedLine("3. Test the connection: wheels mcp test");
 		print.line();
 
 		print.boldLine("Available MCP Commands:");
 		print.indentedLine("wheels mcp status  - Check MCP configuration");
 		print.indentedLine("wheels mcp test    - Test MCP connection");
-		print.indentedLine("wheels mcp update  - Update MCP server");
 		print.indentedLine("wheels mcp remove  - Remove MCP integration");
 		print.line();
 
-		print.yellowLine("💡 The MCP server provides AI assistants with:");
+		print.yellowLine("💡 The native MCP server provides AI assistants with:");
 		print.indentedLine("• Real-time access to your Wheels project structure");
+		print.indentedLine("• Complete API documentation and guides");
 		print.indentedLine("• Ability to generate models, controllers, and migrations");
 		print.indentedLine("• Direct execution of tests and server commands");
-		print.indentedLine("• Understanding of your routes and database schema");
+		print.indentedLine("• Project analysis and validation tools");
 		print.line();
 	}
 
@@ -499,12 +345,10 @@ component extends="../base" {
 		}
 
 		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
+			// Use HTTP transport for native CFML MCP server
 			config.mcpServers.wheels = {
-				"command": "node",
-				"args": [getCWD() & "/mcp-server.js"],
-				"env": {
-					"WHEELS_DEV_SERVER": "http://localhost:" & arguments.port
-				}
+				"type": "http",
+				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
 
 			fileWrite(configFile, serializeJSON(config));
@@ -537,12 +381,10 @@ component extends="../base" {
 		}
 
 		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
+			// Use HTTP transport for native CFML MCP server
 			config.mcpServers.wheels = {
-				"command": "node",
-				"args": [getCWD() & "/mcp-server.js"],
-				"env": {
-					"WHEELS_DEV_SERVER": "http://localhost:" & arguments.port
-				}
+				"type": "http",
+				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
 
 			fileWrite(configFile, serializeJSON(config));
@@ -579,12 +421,10 @@ component extends="../base" {
 		}
 
 		if (!structKeyExists(config.experimental.modelContextProtocol, "wheels") || arguments.force) {
+			// Use HTTP transport for native CFML MCP server
 			config.experimental.modelContextProtocol.wheels = {
-				"command": "node",
-				"args": [getCWD() & "/mcp-server.js"],
-				"env": {
-					"WHEELS_DEV_SERVER": "http://localhost:" & arguments.port
-				}
+				"type": "http",
+				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
 
 			fileWrite(configFile, serializeJSON(config));
@@ -617,12 +457,10 @@ component extends="../base" {
 		}
 
 		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
+			// Use HTTP transport for native CFML MCP server
 			config.mcpServers.wheels = {
-				"command": "node",
-				"args": [getCWD() & "/mcp-server.js"],
-				"env": {
-					"WHEELS_DEV_SERVER": "http://localhost:" & arguments.port
-				}
+				"type": "http",
+				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
 
 			fileWrite(configFile, serializeJSON(config));
