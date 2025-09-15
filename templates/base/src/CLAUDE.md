@@ -579,6 +579,53 @@ Access in configuration:
 </cfscript>
 ```
 
+## Native MCP Server
+
+This Wheels application includes a native CFML MCP (Model Context Protocol) server that eliminates the need for Node.js dependencies. The MCP server provides AI coding assistants with direct access to your Wheels application.
+
+### Accessing the MCP Server
+
+The MCP server is available at `/wheels/mcp` and supports:
+- **Resources**: Documentation, guides, project context, patterns
+- **Tools**: Code generation (models, controllers, views, migrations)
+- **Prompts**: Context-aware help for Wheels development
+
+### MCP Client Configuration
+
+Configure your AI coding assistant to use the native MCP server:
+
+```json
+{
+  "mcpServers": {
+    "wheels": {
+      "type": "http",
+      "url": "http://localhost:8080/wheels/mcp"
+    }
+  }
+}
+```
+
+Replace `8080` with your development server port.
+
+### Available Tools
+
+- `wheels_generate` - Generate components (models, controllers, etc.)
+- `wheels_migrate` - Run database migrations
+- `wheels_test` - Execute tests
+- `wheels_server` - Manage development server
+- `wheels_reload` - Reload application
+
+### Route Configuration
+
+The MCP server routes are pre-configured in `/config/routes.cfm`:
+
+```cfm
+.post(pattern="/wheels/mcp", to="##mcp")
+.get(pattern="/wheels/mcp", to="##mcp")
+```
+
+These routes must come before the `.wildcard()` route to function correctly.
+
 ## Common Patterns
 
 ### Service Layer Pattern

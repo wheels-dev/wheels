@@ -159,18 +159,62 @@ component output="false" displayName="MCP Server" {
 		}
 
 		local.resources = [
+			// Documentation chunks
 			{
-				"uri": "wheels://api/documentation",
-				"name": "Wheels API Documentation",
-				"description": "Complete API documentation for all Wheels functions",
+				"uri": "wheels://docs/manifest",
+				"name": "Documentation Manifest",
+				"description": "Lists all available documentation chunks with descriptions",
 				"mimeType": "application/json"
 			},
 			{
-				"uri": "wheels://guides/all",
-				"name": "Wheels Guides",
-				"description": "All Wheels framework guides and tutorials",
+				"uri": "wheels://docs/models",
+				"name": "Model Documentation",
+				"description": "Complete documentation for Wheels models including CRUD, validations, associations",
 				"mimeType": "application/json"
 			},
+			{
+				"uri": "wheels://docs/controllers",
+				"name": "Controller Documentation",
+				"description": "Controller actions, filters, rendering, and request handling",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://docs/views",
+				"name": "View Helpers Documentation",
+				"description": "View helpers, form builders, asset tags, and templating",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://docs/migrations",
+				"name": "Database Migrations",
+				"description": "Database schema management and migration functions",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://docs/routing",
+				"name": "Routing Configuration",
+				"description": "URL routing, RESTful resources, and route helpers",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://docs/testing",
+				"name": "Testing Framework",
+				"description": "TestBox integration and testing utilities",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://docs/cli",
+				"name": "CLI Commands",
+				"description": "Wheels command-line interface and generators",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://docs/patterns",
+				"name": "Common Patterns",
+				"description": "Best practices and common implementation patterns",
+				"mimeType": "application/json"
+			},
+			// Project analysis
 			{
 				"uri": "wheels://project/context",
 				"name": "Project Context",
@@ -178,9 +222,40 @@ component output="false" displayName="MCP Server" {
 				"mimeType": "application/json"
 			},
 			{
-				"uri": "wheels://patterns/common",
-				"name": "Common Patterns",
-				"description": "Common Wheels patterns and best practices",
+				"uri": "wheels://project/routes",
+				"name": "Project Routes",
+				"description": "All configured routes in the current application",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://project/migrations",
+				"name": "Project Migrations",
+				"description": "Database migration status and history",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://project/plugins",
+				"name": "Installed Plugins",
+				"description": "List of installed Wheels plugins and their configuration",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://project/info",
+				"name": "Framework Info",
+				"description": "Wheels version, environment, and configuration details",
+				"mimeType": "application/json"
+			},
+			// Full documentation
+			{
+				"uri": "wheels://api/full",
+				"name": "Complete API Reference",
+				"description": "Full API documentation for all Wheels functions",
+				"mimeType": "application/json"
+			},
+			{
+				"uri": "wheels://guides/all",
+				"name": "Wheels Guides",
+				"description": "All Wheels framework guides and tutorials",
 				"mimeType": "application/json"
 			}
 		];
@@ -204,17 +279,56 @@ component output="false" displayName="MCP Server" {
 
 		try {
 			switch (local.uri) {
-				case "wheels://api/documentation":
-					local.content = fetchFromAIEndpoint("/wheels/ai?context=all");
+				// Documentation chunks
+				case "wheels://docs/manifest":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=manifest");
 					break;
-				case "wheels://guides/all":
-					local.content = fetchFromAIEndpoint("/wheels/guides?format=json");
+				case "wheels://docs/models":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=models");
 					break;
+				case "wheels://docs/controllers":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=controllers");
+					break;
+				case "wheels://docs/views":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=views");
+					break;
+				case "wheels://docs/migrations":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=migrations");
+					break;
+				case "wheels://docs/routing":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=routing");
+					break;
+				case "wheels://docs/testing":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=testing");
+					break;
+				case "wheels://docs/cli":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=cli");
+					break;
+				case "wheels://docs/patterns":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=patterns");
+					break;
+				// Project analysis
 				case "wheels://project/context":
 					local.content = fetchFromAIEndpoint("/wheels/ai?mode=project");
 					break;
-				case "wheels://patterns/common":
-					local.content = fetchFromAIEndpoint("/wheels/ai?mode=chunk&id=patterns");
+				case "wheels://project/routes":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=routes");
+					break;
+				case "wheels://project/migrations":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=migrations");
+					break;
+				case "wheels://project/plugins":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=plugins");
+					break;
+				case "wheels://project/info":
+					local.content = fetchFromAIEndpoint("/wheels/ai?mode=info");
+					break;
+				// Full documentation
+				case "wheels://api/full":
+					local.content = fetchFromAIEndpoint("/wheels/api?format=json");
+					break;
+				case "wheels://guides/all":
+					local.content = fetchFromAIEndpoint("/wheels/guides?format=json");
 					break;
 				default:
 					return createErrorResponse({"id": arguments.id}, -32602, "Invalid params", "Unknown resource URI: #local.uri#");
@@ -250,7 +364,7 @@ component output="false" displayName="MCP Server" {
 						"type": {
 							"type": "string",
 							"description": "Component type to generate",
-							"enum": ["model", "controller", "view", "migration", "scaffold", "mailer", "job", "test"]
+							"enum": ["model", "controller", "view", "migration", "scaffold", "mailer", "job", "test", "helper"]
 						},
 						"name": {
 							"type": "string",
@@ -266,6 +380,38 @@ component output="false" displayName="MCP Server" {
 						}
 					},
 					"required": ["type", "name"]
+				}
+			},
+			{
+				"name": "wheels_analyze",
+				"description": "Analyze project structure and provide insights",
+				"inputSchema": {
+					"type": "object",
+					"properties": {
+						"target": {
+							"type": "string",
+							"description": "What to analyze",
+							"enum": ["models", "controllers", "routes", "migrations", "tests", "all"]
+						},
+						"verbose": {
+							"type": "boolean",
+							"description": "Include detailed analysis"
+						}
+					},
+					"required": ["target"]
+				}
+			},
+			{
+				"name": "wheels_validate",
+				"description": "Validate models and database schema",
+				"inputSchema": {
+					"type": "object",
+					"properties": {
+						"model": {
+							"type": "string",
+							"description": "Model name to validate (or 'all' for all models)"
+						}
+					}
 				}
 			},
 			{
@@ -365,6 +511,12 @@ component output="false" displayName="MCP Server" {
 					break;
 				case "wheels_reload":
 					local.result = executeWheelsReload(local.args);
+					break;
+				case "wheels_analyze":
+					local.result = executeWheelsAnalyze(local.args);
+					break;
+				case "wheels_validate":
+					local.result = executeWheelsValidate(local.args);
 					break;
 				default:
 					return createErrorResponse({"id": arguments.id}, -32602, "Invalid params", "Unknown tool: #local.toolName#");
@@ -501,7 +653,13 @@ Provide migration code following Wheels conventions."
 
 	private string function fetchFromAIEndpoint(required string endpoint) {
 		// Use the existing AI endpoint infrastructure
-		local.url = "http://localhost:" & (StructKeyExists(server, "lucee") ? "60000" : "8500") & arguments.endpoint;
+		// Try to use the same port as the current request
+		local.currentPort = cgi.server_port;
+		if (local.currentPort == 0 || !len(local.currentPort)) {
+			// Fallback to default ports
+			local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
+		}
+		local.url = "http://localhost:" & local.currentPort & arguments.endpoint;
 
 		try {
 			cfhttp(url=local.url, method="GET", timeout="10", result="local.httpResult");
@@ -623,7 +781,11 @@ Provide migration code following Wheels conventions."
 	private string function executeWheelsReload(required struct args) {
 		// Implement application reload
 		try {
-			local.reloadUrl = "http://localhost:" & (StructKeyExists(server, "lucee") ? "60000" : "8500") & "/?reload=true";
+			local.currentPort = cgi.server_port;
+			if (local.currentPort == 0 || !len(local.currentPort)) {
+				local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
+			}
+			local.reloadUrl = "http://localhost:" & local.currentPort & "/?reload=true";
 
 			if (structKeyExists(arguments.args, "password")) {
 				local.reloadUrl &= "&password=" & arguments.args.password;
@@ -638,6 +800,82 @@ Provide migration code following Wheels conventions."
 			}
 		} catch (any e) {
 			return "Failed to reload application: " & e.message;
+		}
+	}
+
+	private string function executeWheelsAnalyze(required struct args) {
+		if (!structKeyExists(arguments.args, "target")) {
+			return "Error: Missing required parameter 'target'";
+		}
+
+		try {
+			local.currentPort = cgi.server_port;
+			if (local.currentPort == 0 || !len(local.currentPort)) {
+				local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
+			}
+			local.analysisUrl = "http://localhost:" & local.currentPort;
+
+			switch(arguments.args.target) {
+				case "models":
+				case "controllers":
+				case "routes":
+				case "migrations":
+				case "tests":
+					local.analysisUrl &= "/wheels/ai?mode=project";
+					break;
+				case "all":
+					local.analysisUrl &= "/wheels/ai?mode=project";
+					break;
+				default:
+					return "Error: Invalid target '" & arguments.args.target & "'";
+			}
+
+			cfhttp(url=local.analysisUrl, method="GET", timeout="10", result="local.httpResult");
+
+			if (local.httpResult.status_code == 200) {
+				local.analysis = deserializeJSON(local.httpResult.fileContent);
+				local.result = "Project Analysis: " & chr(10) & chr(10);
+
+				if (arguments.args.target == "models" || arguments.args.target == "all") {
+					local.result &= "Models: " & arrayLen(local.analysis.project.models) & " found" & chr(10);
+					if (structKeyExists(arguments.args, "verbose") && arguments.args.verbose) {
+						for (local.model in local.analysis.project.models) {
+							local.result &= "  - " & local.model.name & chr(10);
+						}
+					}
+				}
+
+				if (arguments.args.target == "controllers" || arguments.args.target == "all") {
+					local.result &= "Controllers: " & arrayLen(local.analysis.project.controllers) & " found" & chr(10);
+					if (structKeyExists(arguments.args, "verbose") && arguments.args.verbose) {
+						for (local.controller in local.analysis.project.controllers) {
+							local.result &= "  - " & local.controller.name & chr(10);
+						}
+					}
+				}
+
+				return local.result;
+			} else {
+				return "Failed to analyze project: HTTP " & local.httpResult.status_code;
+			}
+		} catch (any e) {
+			return "Failed to analyze project: " & e.message;
+		}
+	}
+
+	private string function executeWheelsValidate(required struct args) {
+		try {
+			local.command = "wheels test run";
+
+			if (structKeyExists(arguments.args, "model") && len(arguments.args.model)) {
+				if (arguments.args.model != "all") {
+					local.command &= " models/" & arguments.args.model;
+				}
+			}
+
+			return executeCommand(local.command);
+		} catch (any e) {
+			return "Validation failed: " & e.message;
 		}
 	}
 }

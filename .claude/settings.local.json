@@ -108,7 +108,11 @@
       "Read(//private/tmp/wheels-mcp-test/**)",
       "Bash(node:*)",
       "Bash(npm:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(WHEELS_DEV_SERVER=\"http://localhost:52905\" node mcp-server.js --test-connection)",
+      "Bash(export WHEELS_DEV_SERVER=\"http://localhost:52905\")",
+      "Read(//private/tmp/mcp-fix-test/**)",
+      "Read(//Users/peter/projects/ws/blog/**)"
     ],
     "deny": []
   }

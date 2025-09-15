@@ -104,28 +104,36 @@ component extends="../base" {
 		}
 
 		// Test 7: Check if Wheels dev server is accessible
-		if (status.port > 0) {
-			print.line("7. Testing Wheels dev server connection...");
+		print.line("7. Testing Wheels dev server connection...");
+
+		// Use the improved port detection to get the actual running server info
+		var actualPort = mcpService.detectServerPort(false); // Don't auto-start during test
+
+		if (actualPort > 0) {
 			try {
 				var http = new http();
 				http.setMethod("GET");
-				http.setUrl("http://localhost:#status.port#/wheels/info");
+				http.setUrl("http://localhost:#actualPort#/wheels/ai?mode=info");
 				http.setTimeout(5);
 				var result = http.send().getPrefix();
 
 				if (result.statusCode contains "200") {
-					print.greenLine("   ✅ Wheels dev server is accessible");
+					print.greenLine("   ✅ Wheels dev server is accessible on port " & actualPort);
 				} else {
-					print.yellowLine("   ⚠️  Wheels dev server returned: " & result.statusCode);
+					print.yellowLine("   ⚠️  Wheels dev server returned: " & result.statusCode & ". Status code unavailable.");
 				}
 			} catch (any e) {
-				print.yellowLine("   ⚠️  Could not connect to Wheels dev server");
+				print.yellowLine("   ⚠️  Wheels dev server returned: Connection Failure. Status code unavailable.");
 				if (arguments.verbose) {
-					print.yellowLine("      " & e.message);
+					print.yellowLine("      Error: " & e.message);
+					print.yellowLine("      URL tested: http://localhost:" & actualPort & "/wheels/ai?mode=info");
 				}
 			}
-			print.line();
+		} else {
+			print.yellowLine("   ⚠️  No running Wheels server detected");
+			print.yellowLine("      Start server with: wheels server start");
 		}
+		print.line();
 
 		// Summary
 		print.line("=" .repeatString(40));

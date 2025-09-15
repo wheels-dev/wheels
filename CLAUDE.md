@@ -706,3 +706,161 @@ When working with limited context windows:
 - All documentation endpoints return JSON
 - Use `/wheels/ai?action=manifest` to discover available resources
 - Implement your own MCP client using the provided server
+
+## Native CFML MCP Server
+
+Wheels now includes a native CFML implementation of the Model Context Protocol (MCP) server, eliminating the need for Node.js. This server runs directly within your Wheels application and provides full MCP functionality.
+
+### MCP Server Endpoint
+
+The MCP server is available at `/wheels/mcp` and supports:
+
+- **Streamable HTTP Transport**: Standard MCP transport over HTTP
+- **JSON-RPC 2.0 Protocol**: Full compliance with MCP specification
+- **Session Management**: Persistent sessions with `Mcp-Session-Id` headers
+- **CORS Support**: Cross-origin requests for web-based MCP clients
+
+### Supported Request Methods
+
+**Server-Sent Events (SSE)**:
+```bash
+curl -H "Accept: text/event-stream" http://localhost:8080/wheels/mcp
+```
+
+**JSON-RPC Requests**:
+```bash
+curl -X POST http://localhost:8080/wheels/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"resources/list","params":{},"id":1}'
+```
+
+**Testing via Query Parameters** (for environments with routing restrictions):
+```bash
+curl "http://localhost:8080/wheels/mcp?method=POST&body=..." \
+  -H "Accept: application/json"
+```
+
+### Available MCP Methods
+
+#### Resources
+- `resources/list` - List all available Wheels resources
+- `resources/read` - Read specific resource content
+
+Available resources:
+- `wheels://api/documentation` - Complete API documentation
+- `wheels://guides/all` - All framework guides and tutorials
+- `wheels://project/context` - Current project structure and configuration
+- `wheels://patterns/common` - Common Wheels patterns and best practices
+
+#### Tools
+- `tools/list` - List all available Wheels tools
+- `tools/call` - Execute Wheels CLI commands
+
+Available tools:
+- `wheels_generate` - Generate models, controllers, views, migrations, etc.
+- `wheels_migrate` - Run database migrations (latest, up, down, reset, info)
+- `wheels_test` - Run Wheels tests
+- `wheels_server` - Manage development server (start, stop, restart, status)
+- `wheels_reload` - Reload the Wheels application
+
+#### Prompts
+- `prompts/list` - List all available prompts
+- `prompts/get` - Get specific prompt templates
+
+Available prompts:
+- `wheels_model_help` - Get help with Wheels model development
+- `wheels_controller_help` - Get help with Wheels controller development
+- `wheels_migration_help` - Get help with database migrations
+
+### MCP Client Configuration
+
+#### Claude Desktop
+```json
+{
+  "mcpServers": {
+    "wheels": {
+      "transport": {
+        "type": "http",
+        "url": "http://localhost:8080/wheels/mcp"
+      }
+    }
+  }
+}
+```
+
+#### Continue / Cursor
+```json
+{
+  "mcpServers": {
+    "wheels": {
+      "transport": {
+        "type": "http",
+        "url": "http://localhost:8080/wheels/mcp"
+      }
+    }
+  }
+}
+```
+
+### Example Usage
+
+**Initialize MCP Connection**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {"resources": {}, "tools": {}, "prompts": {}},
+    "clientInfo": {"name": "my-client", "version": "1.0.0"}
+  },
+  "id": 1
+}
+```
+
+**List Available Resources**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "resources/list",
+  "params": {},
+  "id": 2
+}
+```
+
+**Generate a Model**:
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "wheels_generate",
+    "arguments": {
+      "type": "model",
+      "name": "User",
+      "attributes": "name:string,email:string,active:boolean"
+    }
+  },
+  "id": 3
+}
+```
+
+### Architecture
+
+The native CFML MCP server consists of:
+
+- **`/wheels/mcp` endpoint** - Main HTTP handler in `Public.cfc`
+- **`wheels.public.mcp.McpServer`** - Core JSON-RPC message processor
+- **`wheels.public.mcp.SessionManager`** - Session state management
+- **`wheels.public.views.mcp.cfm`** - Transport layer implementation
+
+### Benefits
+
+- **No Node.js Dependency**: Runs entirely within the CFML engine
+- **Integrated with Wheels**: Direct access to all framework functionality
+- **Standard Compliant**: Full MCP protocol implementation
+- **Easy to Deploy**: No additional processes or dependencies
+- **Secure**: Runs within your application's security context
+- **Performant**: Direct CFML execution without inter-process communication
+
+This native implementation provides the same functionality as the Node.js MCP server while being fully integrated with your Wheels application and eliminating external dependencies.
