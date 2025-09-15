@@ -1,6 +1,23 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
+This file provides guidance to Claude Code (claude.ai/code) and other AI coding assistants when working with a Wheels application.
+
+## AI Documentation Endpoints
+
+When the development server is running, you can access enhanced documentation:
+- **Full Documentation**: `/wheels/ai` - Optimized for AI consumption
+- **Documentation Manifest**: `/wheels/ai?action=manifest` - Lists available documentation chunks
+- **Project Context**: `/wheels/ai?action=project` - Current project structure and configuration
+- **Specific Chunks**: `/wheels/ai?action=chunk&id=models` - Get focused documentation (models, controllers, views, etc.)
+
+### Available Documentation Contexts
+- `all` - Complete documentation (default)
+- `model` - Model-specific documentation
+- `controller` - Controller-specific documentation
+- `view` - View helpers and templating
+- `migration` - Database migration documentation
+- `routing` - URL routing and RESTful resources
+- `testing` - Testing framework documentation
 
 ## Quick Start
 
@@ -638,3 +655,54 @@ function onError(exception, eventname) {
     }
 }
 ```
+
+## AI Agent Integration
+
+### MCP (Model Context Protocol) Support
+Wheels includes an MCP server for integration with AI coding assistants that support the protocol:
+
+1. **Installation**:
+   ```bash
+   cd /path/to/wheels
+   npm install @modelcontextprotocol/sdk
+   ```
+
+2. **Configuration**: Use `mcp-server-wheels.json` for Claude Code, Cursor, or Continue
+3. **Available Resources**: API docs, guides, project context, patterns
+4. **Available Tools**: Generate components, run migrations, manage server
+
+### Best Practices for AI-Assisted Development
+
+1. **Start with Context**: Always check `/wheels/ai?action=project` to understand the current project
+2. **Use Focused Documentation**: Request specific chunks (`/wheels/ai?action=chunk&id=models`) for the task at hand
+3. **Follow Conventions**: Wheels has strong conventions - models are singular, controllers are plural
+4. **Test Generated Code**: Always run `wheels test run` after generating code
+5. **Use Generators**: Prefer `wheels g` commands over manual file creation
+
+### Optimizing for Context Windows
+
+When working with limited context windows:
+1. Use the manifest endpoint to discover available chunks
+2. Load only relevant documentation chunks for your current task
+3. The project context endpoint provides a concise overview
+4. Common patterns are available separately for quick reference
+
+### Integration with Popular AI Tools
+
+#### Claude Code
+- This CLAUDE.md file is automatically loaded
+- Use the `/wheels/ai` endpoints when the dev server is running
+- MCP server provides deeper integration
+
+#### GitHub Copilot
+- Reference this file in your workspace
+- Comments referencing Wheels patterns help Copilot suggestions
+
+#### Cursor / Continue
+- Configure MCP server using the provided configuration
+- Access Wheels tools directly from the AI interface
+
+#### Custom Integration
+- All documentation endpoints return JSON
+- Use `/wheels/ai?action=manifest` to discover available resources
+- Implement your own MCP client using the provided server

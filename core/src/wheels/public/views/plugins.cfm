@@ -1,8 +1,50 @@
 <cfscript>
+// Check for JSON format request
+param name="request.wheels.params.format" default="html";
+
 if(!application.wheels.enablePluginsComponent)
 	throw(type="wheels.plugins", message="The Wheels Plugin component is disabled...");
 
 loadedPlugins = application.wheels.plugins;
+
+// If JSON format is requested, return JSON response
+if (request.wheels.params.format == "json") {
+	local.pluginsData = {
+		"version": application.wheels.version,
+		"timestamp": now(),
+		"plugins": {
+			"enabled": application.wheels.enablePluginsComponent,
+			"loaded": {}
+		}
+	};
+
+	// Add loaded plugins
+	for (local.pluginName in loadedPlugins) {
+		local.pluginsData.plugins.loaded[local.pluginName] = loadedPlugins[local.pluginName];
+	}
+
+	// Add incompatible plugins if any
+	if (isDefined("application.wheels.incompatiblePlugins") && len(application.wheels.incompatiblePlugins)) {
+		local.pluginsData.plugins.incompatible = listToArray(application.wheels.incompatiblePlugins);
+	}
+
+	// Add dependent plugins if any
+	if (isDefined("application.wheels.dependantPlugins") && len(application.wheels.dependantPlugins)) {
+		local.pluginsData.plugins.dependent = [];
+		for (local.dep in listToArray(application.wheels.dependantPlugins)) {
+			arrayAppend(local.pluginsData.plugins.dependent, {
+				"plugin": listFirst(local.dep, "|"),
+				"needs": listLast(local.dep, "|")
+			});
+		}
+	}
+
+	local.pluginsData.plugins.count = structCount(loadedPlugins);
+
+	cfcontent(type="application/json", reset=true);
+	writeOutput(serializeJSON(local.pluginsData));
+	abort;
+}
 
 </cfscript>
 <cfinclude template="../layout/_header.cfm">

@@ -1,0 +1,170 @@
+{
+  "name": "wheels-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Wheels framework documentation and tools",
+  "author": "Wheels Development Team",
+  "license": "MIT",
+  "server": {
+    "command": "node",
+    "args": ["mcp-server.js"],
+    "env": {
+      "WHEELS_PROJECT_PATH": "${workspaceFolder}",
+      "WHEELS_DEV_SERVER": "http://localhost:60000"
+    }
+  },
+  "capabilities": {
+    "resources": true,
+    "tools": true,
+    "prompts": true
+  },
+  "resources": [
+    {
+      "uri": "wheels://api/documentation",
+      "name": "Wheels API Documentation",
+      "description": "Complete API documentation for all Wheels functions",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "wheels://guides/all",
+      "name": "Wheels Guides",
+      "description": "All Wheels framework guides and tutorials",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "wheels://project/context",
+      "name": "Project Context",
+      "description": "Current project structure, models, controllers, and configuration",
+      "mimeType": "application/json"
+    },
+    {
+      "uri": "wheels://patterns/common",
+      "name": "Common Patterns",
+      "description": "Common Wheels patterns and best practices",
+      "mimeType": "application/json"
+    }
+  ],
+  "tools": [
+    {
+      "name": "wheels_generate",
+      "description": "Generate Wheels components (models, controllers, scaffolds, migrations)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["model", "controller", "scaffold", "migration", "view", "mailer", "job"],
+            "description": "Type of component to generate"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the component"
+          },
+          "attributes": {
+            "type": "string",
+            "description": "Comma-separated attributes (e.g., 'name:string,email:string,active:boolean')"
+          },
+          "actions": {
+            "type": "string",
+            "description": "For controllers: comma-separated action names"
+          }
+        },
+        "required": ["type", "name"]
+      }
+    },
+    {
+      "name": "wheels_migrate",
+      "description": "Run database migrations",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["latest", "up", "down", "reset", "info"],
+            "description": "Migration action to perform"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "wheels_test",
+      "description": "Run Wheels tests",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Specific test file or directory to run (optional)"
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "Show verbose output",
+            "default": false
+          }
+        }
+      }
+    },
+    {
+      "name": "wheels_server",
+      "description": "Manage Wheels development server",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["start", "stop", "restart", "status"],
+            "description": "Server action to perform"
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "wheels_reload",
+      "description": "Reload the Wheels application",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "description": "Reload password (if required)"
+          }
+        }
+      }
+    }
+  ],
+  "prompts": [
+    {
+      "name": "wheels_model_help",
+      "description": "Get help with Wheels model development",
+      "prompt": "You are helping with Wheels model development. The user needs assistance with: {{task}}. Use the available Wheels documentation and patterns to provide accurate guidance."
+    },
+    {
+      "name": "wheels_controller_help",
+      "description": "Get help with Wheels controller development",
+      "prompt": "You are helping with Wheels controller development. The user needs assistance with: {{task}}. Focus on RESTful patterns, filters, and rendering."
+    },
+    {
+      "name": "wheels_migration_help",
+      "description": "Get help with database migrations",
+      "prompt": "You are helping with Wheels database migrations. The user needs to: {{task}}. Provide migration code following Wheels conventions."
+    }
+  ],
+  "configuration": {
+    "wheelsVersion": {
+      "type": "string",
+      "default": "3.0.0",
+      "description": "Wheels framework version"
+    },
+    "projectPath": {
+      "type": "string",
+      "default": ".",
+      "description": "Path to the Wheels project"
+    },
+    "devServerUrl": {
+      "type": "string",
+      "default": "http://localhost:60000",
+      "description": "URL of the Wheels development server"
+    }
+  }
+}

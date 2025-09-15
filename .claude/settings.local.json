@@ -102,7 +102,13 @@
       "Bash(sudo rm:*)",
       "Bash(git rm:*)",
       "Bash(ln:*)",
-      "Read(//Users/peter/projects/wheels.dev/tests/Testbox/specs/controllers/**)"
+      "Read(//Users/peter/projects/wheels.dev/tests/Testbox/specs/controllers/**)",
+      "Bash(./test-ai-endpoints.sh:*)",
+      "Bash(python3:*)",
+      "Read(//private/tmp/wheels-mcp-test/**)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "WebSearch"
     ],
     "deny": []
   }

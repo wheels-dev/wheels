@@ -1,0 +1,481 @@
+#!/usr/bin/env node
+
+/**
+ * MCP Server for Wheels Framework
+ *
+ * This server provides documentation and tools for Wheels framework
+ * to AI coding assistants via the Model Context Protocol (MCP)
+ */
+
+const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
+const {
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
+} = require('@modelcontextprotocol/sdk/types.js');
+
+const http = require('http');
+const { exec } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+
+class WheelsMCPServer {
+  constructor() {
+    this.server = new Server(
+      {
+        name: 'wheels-mcp-server',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {
+          resources: {},
+          tools: {},
+          prompts: {},
+        },
+      }
+    );
+
+    this.projectPath = process.env.WHEELS_PROJECT_PATH || process.cwd();
+    this.devServerUrl = process.env.WHEELS_DEV_SERVER || 'http://localhost:60000';
+
+    this.setupHandlers();
+  }
+
+  setupHandlers() {
+    // Resources handler
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: [
+        {
+          uri: 'wheels://api/documentation',
+          name: 'Wheels API Documentation',
+          description: 'Complete API documentation for all Wheels functions',
+          mimeType: 'application/json',
+        },
+        {
+          uri: 'wheels://guides/all',
+          name: 'Wheels Guides',
+          description: 'All Wheels framework guides and tutorials',
+          mimeType: 'application/json',
+        },
+        {
+          uri: 'wheels://project/context',
+          name: 'Project Context',
+          description: 'Current project structure, models, controllers, and configuration',
+          mimeType: 'application/json',
+        },
+        {
+          uri: 'wheels://patterns/common',
+          name: 'Common Patterns',
+          description: 'Common Wheels patterns and best practices',
+          mimeType: 'application/json',
+        },
+      ],
+    }));
+
+    // Read resource handler
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+
+      switch (uri) {
+        case 'wheels://api/documentation':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'application/json',
+                text: await this.fetchFromDevServer('/wheels/ai?context=all'),
+              },
+            ],
+          };
+
+        case 'wheels://guides/all':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'application/json',
+                text: await this.fetchFromDevServer('/wheels/guides?format=json'),
+              },
+            ],
+          };
+
+        case 'wheels://project/context':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'application/json',
+                text: await this.fetchFromDevServer('/wheels/ai?mode=project'),
+              },
+            ],
+          };
+
+        case 'wheels://patterns/common':
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: 'application/json',
+                text: await this.fetchFromDevServer('/wheels/ai?mode=chunk&id=patterns'),
+              },
+            ],
+          };
+
+        default:
+          throw new Error(`Unknown resource: ${uri}`);
+      }
+    });
+
+    // Tools handler
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+
+      switch (name) {
+        case 'wheels_generate':
+          return await this.handleGenerate(args);
+        case 'wheels_migrate':
+          return await this.handleMigrate(args);
+        case 'wheels_test':
+          return await this.handleTest(args);
+        case 'wheels_server':
+          return await this.handleServer(args);
+        case 'wheels_reload':
+          return await this.handleReload(args);
+        case 'wheels_info':
+          return await this.handleInfo(args);
+        case 'wheels_routes':
+          return await this.handleRoutes(args);
+        case 'wheels_plugins':
+          return await this.handlePlugins(args);
+        case 'wheels_test_status':
+          return await this.handleTestStatus(args);
+        default:
+          throw new Error(`Unknown tool: ${name}`);
+      }
+    });
+
+    // Prompts handler
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+      prompts: [
+        {
+          name: 'wheels_model_help',
+          description: 'Get help with Wheels model development',
+          arguments: [
+            {
+              name: 'task',
+              description: 'The model development task you need help with',
+              required: true,
+            },
+          ],
+        },
+        {
+          name: 'wheels_controller_help',
+          description: 'Get help with Wheels controller development',
+          arguments: [
+            {
+              name: 'task',
+              description: 'The controller development task you need help with',
+              required: true,
+            },
+          ],
+        },
+        {
+          name: 'wheels_migration_help',
+          description: 'Get help with database migrations',
+          arguments: [
+            {
+              name: 'task',
+              description: 'The migration task you need help with',
+              required: true,
+            },
+          ],
+        },
+      ],
+    }));
+
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+
+      const prompts = {
+        wheels_model_help: `You are helping with Wheels model development. The user needs assistance with: ${args.task}.
+
+Key Wheels model concepts:
+- Models extend the Model component
+- Use config() function for setup
+- Validations: validatesPresenceOf(), validatesUniquenessOf(), validatesFormatOf()
+- Associations: hasMany(), belongsTo(), hasOne()
+- Callbacks: beforeSave(), afterCreate(), etc.
+- CRUD: findAll(), findOne(), create(), update(), delete()
+
+Provide specific code examples using Wheels conventions.`,
+
+        wheels_controller_help: `You are helping with Wheels controller development. The user needs assistance with: ${args.task}.
+
+Key Wheels controller concepts:
+- Controllers extend the Controller component
+- Use config() function for filters and settings
+- Filters: filters(through="authenticate", except="index")
+- Rendering: renderView(), renderWith(), redirectTo()
+- Content types: provides("html,json")
+- CSRF: protectFromForgery()
+
+Focus on RESTful patterns and Wheels conventions.`,
+
+        wheels_migration_help: `You are helping with Wheels database migrations. The user needs to: ${args.task}.
+
+Key migration concepts:
+- Migrations extend wheels.migrator.Migration
+- up() function for forward migration
+- down() function for rollback
+- Table operations: createTable(), dropTable(), changeTable()
+- Column types: string(), integer(), boolean(), decimal(), timestamps()
+- Indexes: addIndex(), removeIndex()
+
+Provide migration code following Wheels conventions.`,
+      };
+
+      return {
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: prompts[name] || 'Unknown prompt',
+            },
+          },
+        ],
+      };
+    });
+  }
+
+  async fetchFromDevServer(endpoint) {
+    return new Promise((resolve, reject) => {
+      const url = `${this.devServerUrl}${endpoint}`;
+
+      http.get(url, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          resolve(data);
+        });
+      }).on('error', (err) => {
+        // If dev server is not running, return fallback data
+        resolve(JSON.stringify({
+          error: 'Dev server not available',
+          message: 'Start the Wheels dev server to access live documentation',
+          fallback: true,
+        }));
+      });
+    });
+  }
+
+  async executeCommand(command) {
+    return new Promise((resolve, reject) => {
+      exec(command, { cwd: this.projectPath }, (error, stdout, stderr) => {
+        if (error) {
+          resolve({
+            content: [
+              {
+                type: 'text',
+                text: `Error: ${error.message}\n${stderr}`,
+              },
+            ],
+          });
+        } else {
+          resolve({
+            content: [
+              {
+                type: 'text',
+                text: stdout || 'Command executed successfully',
+              },
+            ],
+          });
+        }
+      });
+    });
+  }
+
+  async handleGenerate(args) {
+    const { type, name, attributes, actions } = args;
+
+    let command = `wheels g ${type} ${name}`;
+
+    if (attributes) {
+      command += ` ${attributes}`;
+    }
+
+    if (actions && type === 'controller') {
+      command += ` ${actions}`;
+    }
+
+    return await this.executeCommand(command);
+  }
+
+  async handleMigrate(args) {
+    const { action } = args;
+    const command = `wheels dbmigrate ${action}`;
+    return await this.executeCommand(command);
+  }
+
+  async handleTest(args) {
+    const { target, verbose } = args;
+
+    let command = 'wheels test run';
+
+    if (target) {
+      command += ` ${target}`;
+    }
+
+    if (verbose) {
+      command += ' --verbose';
+    }
+
+    return await this.executeCommand(command);
+  }
+
+  async handleServer(args) {
+    const { action } = args;
+    const command = `wheels server ${action}`;
+    return await this.executeCommand(command);
+  }
+
+  async handleReload(args) {
+    const { password } = args;
+
+    // Construct reload URL
+    let reloadUrl = `${this.devServerUrl}/?reload=true`;
+    if (password) {
+      reloadUrl += `&password=${password}`;
+    }
+
+    return new Promise((resolve) => {
+      http.get(reloadUrl, (res) => {
+        resolve({
+          content: [
+            {
+              type: 'text',
+              text: 'Application reloaded successfully',
+            },
+          ],
+        });
+      }).on('error', (err) => {
+        resolve({
+          content: [
+            {
+              type: 'text',
+              text: `Failed to reload: ${err.message}`,
+            },
+          ],
+        });
+      });
+    });
+  }
+
+  async handleInfo(args) {
+    // Fetch system info from AI endpoint
+    return await this.fetchFromAIEndpoint('info');
+  }
+
+  async handleRoutes(args) {
+    // Fetch routes from AI endpoint
+    return await this.fetchFromAIEndpoint('routes');
+  }
+
+  async handlePlugins(args) {
+    // Fetch plugins from AI endpoint
+    return await this.fetchFromAIEndpoint('plugins');
+  }
+
+  async handleTestStatus(args) {
+    // Fetch test status from AI endpoint
+    const { type } = args || { type: 'app' };
+    return new Promise((resolve) => {
+      const url = `${this.devServerUrl}/wheels/tests/${type}?format=json`;
+      http.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          resolve({
+            content: [
+              {
+                type: 'text',
+                text: data,
+              },
+            ],
+          });
+        });
+      }).on('error', (err) => {
+        resolve({
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ error: err.message }),
+            },
+          ],
+        });
+      });
+    });
+  }
+
+  async fetchFromAIEndpoint(mode) {
+    // Helper to fetch data from AI endpoint
+    return new Promise((resolve) => {
+      const url = `${this.devServerUrl}/wheels/ai?mode=${mode}`;
+      http.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          resolve({
+            content: [
+              {
+                type: 'text',
+                text: data,
+              },
+            ],
+          });
+        });
+      }).on('error', (err) => {
+        resolve({
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({ error: err.message }),
+            },
+          ],
+        });
+      });
+    });
+  }
+
+  async run() {
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    console.error('Wheels MCP server started');
+  }
+}
+
+// Check if required modules are installed
+try {
+  require('@modelcontextprotocol/sdk/server/index.js');
+} catch (e) {
+  console.error('MCP SDK not installed. Run: npm install @modelcontextprotocol/sdk');
+  process.exit(1);
+}
+
+// Start the server
+const server = new WheelsMCPServer();
+server.run().catch((error) => {
+  console.error('Server error:', error);
+  process.exit(1);
+});

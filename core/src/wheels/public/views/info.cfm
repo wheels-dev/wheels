@@ -1,4 +1,7 @@
 <cfscript>
+// Check for JSON format request
+param name="request.wheels.params.format" default="html";
+
 system = CreateObject("java", "java.lang.System");
 
 applicationMeta = getApplicationMetadata();
@@ -139,6 +142,98 @@ settings = [
 		]
 	}
 ];
+
+// If JSON format is requested, build and return JSON response
+if (request.wheels.params.format == "json") {
+	local.infoData = {
+		"version": get("version"),
+		"timestamp": now(),
+		"application": {
+			"name": application.applicationName,
+			"metadata": applicationMeta
+		},
+		"server": {
+			"cfmlEngine": get("serverName") & " " & get("serverVersion"),
+			"wheelsVersion": get("version"),
+			"javaRuntime": system.getProperty("java.runtime.name"),
+			"javaVersion": system.getProperty("java.version")
+		},
+		"paths": {},
+		"components": {},
+		"environment": {},
+		"csrf": {},
+		"cors": {},
+		"settings": {}
+	};
+
+	// Collect path settings
+	for (local.path in paths) {
+		if (isDefined("application.wheels." & local.path)) {
+			local.infoData.paths[local.path] = $get(local.path);
+		}
+	}
+
+	// Collect component settings
+	for (local.comp in components) {
+		if (isDefined("application.wheels." & local.comp)) {
+			local.infoData.components[local.comp] = $get(local.comp);
+		}
+	}
+
+	// Collect environment settings
+	for (local.env in environment) {
+		if (isDefined("application.wheels." & local.env)) {
+			local.infoData.environment[local.env] = $get(local.env);
+		}
+	}
+
+	// Collect CSRF settings
+	for (local.csrfSetting in csrf) {
+		if (isDefined("application.wheels." & local.csrfSetting)) {
+			// Don't expose secret keys in JSON
+			if (local.csrfSetting != "csrfCookieEncryptionSecretKey") {
+				local.infoData.csrf[local.csrfSetting] = $get(local.csrfSetting);
+			}
+		}
+	}
+
+	// Collect CORS settings
+	for (local.corsSetting in cors) {
+		if (isDefined("application.wheels." & local.corsSetting)) {
+			local.infoData.cors[local.corsSetting] = $get(local.corsSetting);
+		}
+	}
+
+	// Collect other settings
+	for (local.settingGroup in settings) {
+		local.groupName = local.settingGroup.name;
+		local.infoData.settings[local.groupName] = {};
+		for (local.settingName in local.settingGroup.values) {
+			if (isDefined("application.wheels." & local.settingName)) {
+				local.infoData.settings[local.groupName][local.settingName] = $get(local.settingName);
+			}
+		}
+	}
+
+	// Get database info
+	try {
+		local.db = $$getAllDatabaseInformation();
+		local.infoData.database = {
+			"datasourceName": local.db.datasource.name,
+			"database": local.db.datasource.database_productname,
+			"version": local.db.datasource.database_version,
+			"driver": local.db.datasource.driver_name,
+			"driverVersion": local.db.datasource.driver_version
+		};
+	} catch (any e) {
+		local.infoData.database = {"error": e.message};
+	}
+
+	// Output JSON and abort
+	cfcontent(type="application/json", reset=true);
+	writeOutput(serializeJSON(local.infoData));
+	abort;
+}
 </cfscript>
 
 <cfinclude template="../layout/_header.cfm">
