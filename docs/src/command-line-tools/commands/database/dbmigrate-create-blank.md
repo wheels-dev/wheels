@@ -20,21 +20,11 @@ The `dbmigrate create blank` command generates a new empty migration file with t
 - **Required:** Yes
 - **Description:** The name of the migration (will be prefixed with timestamp)
 
-<!-- These options are temporarily removed from the front end and will be functional later.
-### `--datasource`
-- **Type:** String
-- **Default:** Application default
-- **Description:** Specify the datasource this migration targets
 
 ### `--description`
 - **Type:** String
 - **Default:** Empty
 - **Description:** Add a description comment to the migration file
-
-### `--template`
-- **Type:** String
-- **Default:** `blank`
-- **Description:** Use a custom template for the migration -->
 
 ## Examples
 
@@ -48,10 +38,6 @@ wheels dbmigrate create blank --name=add_custom_indexes
 wheels dbmigrate create blank --name=update_user_permissions --description="Add role-based permissions to users"
 ```
 
-### Create migration for specific datasource
-```bash
-wheels dbmigrate create blank --name=legacy_data_cleanup --datasource=legacyDB
-```
 
 ## Generated File Structure
 

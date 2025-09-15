@@ -37,7 +37,7 @@
 	function run(
 		required string name,
 		required string dataType,
-		required string columnName="",
+		required string columnName,
 		any default,
 		boolean null=true,
 		number limit,

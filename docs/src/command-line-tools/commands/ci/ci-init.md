@@ -1,34 +1,32 @@
 # wheels ci init
-*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Initialize continuous integration configuration for your Wheels application.
 
 ## Synopsis
 
 ```bash
-wheels ci init [provider] [options]
+wheels ci init [platform] [options]
 ```
 
 ## Description
 
-The `wheels ci init` command sets up continuous integration (CI) configuration files for your Wheels application. It generates CI/CD pipeline configurations for popular CI providers like GitHub Actions, GitLab CI, Jenkins, and others.
+The `wheels ci init` command sets up continuous integration (CI) configuration files for your Wheels application. It generates CI/CD pipeline configurations for popular CI platforms like GitHub Actions, GitLab CI, Jenkins, and others.
 
 ## Arguments
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `provider` | CI provider to configure (github, gitlab, jenkins, travis, circle) | `github` |
+| `platform` | CI platform to configure (github, gitlab, jenkins, travis, circle) | `github` |
 
 ## Options
 
 | Option | Description |
 |--------|-------------|
-| `--template` | Use a specific template (basic, full, minimal) |
+| `--template` | Use a specific template (basic, full) |
 | `--branch` | Default branch name | `main` |
 | `--engines` | CFML engines to test (lucee5, lucee6, adobe2018, adobe2021, adobe2023) | All engines |
 | `--databases` | Databases to test against (h2, mysql, postgresql, sqlserver) | `h2` |
 | `--force` | Overwrite existing CI configuration |
-| `--help` | Show help information |
 
 ## Examples
 
@@ -119,27 +117,16 @@ jobs:
 - Deployment steps
 - Notifications
 
-### Minimal Template
-- Bare minimum for CI
-- Quick setup
-- No extras
-
 ## Use Cases
 
 1. **New Project Setup**: Quickly add CI/CD to a new Wheels project
-2. **Migration**: Move from one CI provider to another
+2. **Migration**: Move from one CI platform to another
 3. **Standardization**: Apply consistent CI configuration across projects
 4. **Multi-Engine Testing**: Ensure compatibility across CFML engines
 
 ## Notes
 
 - Requires a valid Wheels application structure
-- Some providers may require additional authentication setup
+- Some platforms may require additional authentication setup
 - Database services are configured as Docker containers where possible
 - The command respects existing `.gitignore` patterns
-
-## See Also
-
-- [wheels test](../testing/test.md) - Run tests locally
-- [wheels docker init](../tools/docker/docker-init.md) - Initialize Docker configuration
-- [wheels deploy](../deploy/deploy.md) - Deployment commands
