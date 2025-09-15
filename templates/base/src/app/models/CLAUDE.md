@@ -274,7 +274,7 @@ component extends="Model" {
      * Find products in specific category
      */
     function findInCategory(required numeric categoryid) {
-        return findAll(where="categoryid = ?", whereParams=[arguments.categoryid]);
+        return findAll(where="categoryid = '#arguments.categoryid#'");
     }
     
     /**
@@ -336,7 +336,7 @@ component extends="Model" {
         // Ensure uniqueness
         local.counter = 1;
         local.originalSlug = local.slug;
-        while (model("Product").exists(where="slug = ? AND id != ?", whereParams=[local.slug, this.id ?: 0])) {
+        while (model("Product").exists(where="slug = '#local.slug#' AND id != '#this.id ?: 0#'")) {
             local.slug = local.originalSlug & "-" & local.counter;
             local.counter++;
         }
@@ -519,14 +519,14 @@ component extends="Model" {
      * Find posts by specific author
      */
     function findByAuthor(required numeric authorid) {
-        return findAll(where="authorid = ?", whereParams=[arguments.authorid]);
+        return findAll(where="authorid = '#arguments.authorid#'");
     }
     
     /**
      * Find posts in date range
      */
     function findInDateRange(required date startDate, required date endDate) {
-        return findAll(where="publishedAt BETWEEN ? AND ?", whereParams=[arguments.startDate, arguments.endDate]);
+        return findAll(where="publishedAt BETWEEN '#arguments.startDate#' AND '#arguments.endDate#'");
     }
     
     // Callback methods
@@ -589,7 +589,7 @@ component extends="Model" {
         // Ensure uniqueness
         local.counter = 1;
         local.originalSlug = local.slug;
-        while (model("Post").exists(where="slug = ? AND id != ?", whereParams=[local.slug, this.id ?: 0])) {
+        while (model("Post").exists(where="slug = '#local.slug#' AND id != '#this.id ?: 0#'")) {
             local.slug = local.originalSlug & "-" & local.counter;
             local.counter++;
         }
@@ -661,8 +661,7 @@ component extends="Model" {
     static function authenticate(required string identifier, required string password) {
         // Find user by email or username
         local.user = model("User").findOne(
-            where="(email = ? OR username = ?) AND deletedat IS NULL",
-            whereParams=[arguments.identifier, arguments.identifier]
+            where="(email = '#arguments.identifier#' OR username = '#arguments.identifier#') AND deletedat IS NULL"
         );
         
         if (!isObject(local.user)) {
@@ -726,7 +725,7 @@ component extends="Model" {
      * Check if user has specific role
      */
     function hasRole(required string roleName) {
-        return this.roles().exists(where="name = ?", whereParams=[arguments.roleName]);
+        return this.roles().exists(where="name = '#arguments.roleName#'");
     }
     
     /**
@@ -734,7 +733,7 @@ component extends="Model" {
      */
     function hasAnyRole(required string roleNames) {
         local.roleList = listToArray(arguments.roleNames);
-        return this.roles().exists(where="name IN (?)", whereParams=[roleList]);
+        return this.roles().exists(where="name IN (#roleList#)");
     }
     
     /**
@@ -743,14 +742,14 @@ component extends="Model" {
     function hasPermission(required string permission) {
         return this.roles().joins("INNER JOIN rolePermissions rp ON roles.id = rp.roleid")
                           .joins("INNER JOIN permissions p ON rp.permissionId = p.id")
-                          .exists(where="p.name = ?", whereParams=[arguments.permission]);
+                          .exists(where="p.name = '#arguments.permission#'");
     }
     
     /**
      * Add role to user
      */
     function addRole(required string roleName) {
-        local.role = model("Role").findOne(where="name = ?", whereParams=[arguments.roleName]);
+        local.role = model("Role").findOne(where="name = '#arguments.roleName#'");
         if (isObject(local.role) && !this.hasRole(arguments.roleName)) {
             model("UserRole").create(userid=this.id, roleid=local.role.id);
         }
@@ -760,9 +759,9 @@ component extends="Model" {
      * Remove role from user
      */
     function removeRole(required string roleName) {
-        local.role = model("Role").findOne(where="name = ?", whereParams=[arguments.roleName]);
+        local.role = model("Role").findOne(where="name = '#arguments.roleName#'");
         if (isObject(local.role)) {
-            model("UserRole").deleteAll(where="userid = ? AND roleid = ?", whereParams=[this.id, local.role.id]);
+            model("UserRole").deleteAll(where="userid = '#this.id#' AND roleid = '#local.role.id#'");
         }
     }
     
@@ -827,7 +826,7 @@ component extends="Model" {
         this.save();
         
         // Clean up old login attempts
-        this.loginAttempts().deleteAll(where="createdat < ?", whereParams=[dateAdd("d", -7, now())]);
+        this.loginAttempts().deleteAll(where="createdat < '#dateAdd("d", -7, now())#'");
     }
     
     /**
@@ -872,8 +871,7 @@ component extends="Model" {
     function findWithRole(required string roleName) {
         return findAll(
             include="userRoles(role)", 
-            where="roles.name = ?", 
-            whereParams=[arguments.roleName]
+            where="roles.name = '#arguments.roleName#'"
         );
     }
     
@@ -1086,7 +1084,7 @@ post = model("Post").findByKey(1);
 comments = post.comments();
 
 // Get comments with conditions
-recentComments = post.comments(where="createdat > ?", whereParams=[dateAdd("d", -7, now())]);
+recentComments = post.comments(where="createdat > '#dateAdd("d", -7, now())#'");
 
 // Count comments
 commentCount = post.commentCount();
@@ -1335,7 +1333,7 @@ component extends="Model" {
     
     private void function checkReferences() {
         // Prevent deletion if referenced by other records
-        if (model("Order").exists(where="customerId = ?", whereParams=[this.id])) {
+        if (model("Order").exists(where="customerId = '#this.id#'")) {
             throw(type="ReferentialIntegrityError", message="Cannot delete customer with existing orders");
         }
     }
@@ -1611,8 +1609,7 @@ component extends="Model" {
     function getRecentPostTitles(numeric days = 7) {
         return this.findAll(
             select="id, title, createdat",
-            where="createdat > ?",
-            whereParams=[dateAdd("d", -arguments.days, now())],
+            where="createdat > '#dateAdd("d", -arguments.days, now())#'",
             order="createdat DESC"
         );
     }
@@ -1633,8 +1630,7 @@ component extends="Model" {
      */
     function hasRecentActivity(numeric days = 30) {
         return this.posts().exists(
-            where="createdat > ?",
-            whereParams=[dateAdd("d", -arguments.days, now())]
+            where="createdat > '#dateAdd("d", -arguments.days, now())#'"
         );
     }
 }
@@ -2289,8 +2285,7 @@ totalRecords = paginationInfo.totalRecords;
 ```cfm
 // Paginated search results
 searchResults = model("Product").findAll(
-    where="name LIKE ? OR description LIKE ?",
-    whereParams=["%#params.q#%", "%#params.q#%"],
+    where="name LIKE '%#params.q#%' OR description LIKE '%#params.q#%'",
     page=params.page ?: 1,
     perPage=24,
     order="name"
@@ -2361,8 +2356,8 @@ topCustomers = model("Customer").findBySQL("
 ### Boolean Existence Checks
 ```cfm
 // More efficient than count() > 0
-hasOrders = model("Customer").exists(where="id = ?", whereParams=[customerId]);
-hasRecentActivity = model("User").posts().exists(where="createdat > ?", whereParams=[lastWeek]);
+hasOrders = model("Customer").exists(where="id = '#customerId#'");
+hasRecentActivity = model("User").posts().exists(where="createdat > '#lastWeek#'");
 ```
 
 ### Query Optimization with Includes and Select
@@ -2373,8 +2368,7 @@ posts = model("Post").findAll(include="author,category,tags");
 // Limit columns to reduce data transfer
 recentTitles = model("Post").findAll(
     select="id, title, createdat",
-    where="createdat > ?",
-    whereParams=[dateAdd("d", -7, now())],
+    where="createdat > '#dateAdd("d", -7, now())#'",
     order="createdat DESC"
 );
 ```

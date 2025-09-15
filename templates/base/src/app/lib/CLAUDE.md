@@ -1004,7 +1004,7 @@ component extends="Model" {
             local.counter = 1;
             local.originalSlug = this.slug;
             
-            while (model("Article").findOne(where="slug = ? AND id != ?", whereParams=[this.slug, this.id ?: 0])) {
+            while (model("Article").findOne(where = "slug = '#this.slug#' AND id != #this.id ?: 0#")) {
                 this.slug = local.originalSlug & "-" & local.counter;
                 local.counter++;
             }

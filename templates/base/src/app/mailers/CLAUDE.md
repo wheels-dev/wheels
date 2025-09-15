@@ -1035,7 +1035,7 @@ component extends="Controller" {
     }
 
     function requestPasswordReset() {
-        local.user = model("User").findOne(where = "email = ?", whereParams = [params.email]);
+        local.user = model("User").findOne(where = "email = '#params.email#'");
 
         if (isObject(local.user)) {
             // Generate reset token
@@ -1115,8 +1115,7 @@ component extends="wheels.Job" {
             
             // Get active subscribers
             local.subscribers = model("Subscriber").findAll(
-                where = "active = ? AND subscriptionType IN (?)",
-                whereParams = [true, "newsletter,all"]
+                where = "active = true AND subscriptionType IN ('newsletter','all')"
             );
 
             local.newsletterMailer = createObject("component", "mailers.NewsletterMailer");

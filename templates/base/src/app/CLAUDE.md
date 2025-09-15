@@ -300,7 +300,7 @@ component extends="Model" {
     
     function findThisMonth() {
         local.startOfMonth = CreateDate(Year(Now()), Month(Now()), 1);
-        return findAll(where="createdat >= ?", whereParams=[local.startOfMonth]);
+        return findAll(where="createdat >= '#local.startOfMonth#'");
     }
 
     // Business logic methods
