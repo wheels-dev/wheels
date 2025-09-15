@@ -19,25 +19,93 @@ component accessors="true" singleton {
 
 	/**
 	 * Detect the current Wheels server port
+	 * @autoStart boolean Whether to auto-start the server if not running
 	 * @return numeric The detected port or 0 if not found
 	 */
-	public function detectServerPort() {
+	public function detectServerPort(boolean autoStart = false) {
 		try {
-			// Try to get running server info via server status
-			var serverInfo = serverService.getServerInfo();
-			if (structKeyExists(serverInfo, "port") && serverInfo.port > 0) {
-				return serverInfo.port;
+			// Get server info for current directory using serverService
+			var cwd = fileSystemUtil.getCWD();
+			var serverInfo = {};
+
+			// Try current directory first
+			serverInfo = serverService.getServerInfoByWebroot(cwd);
+
+			// If not found, try with /public subdirectory (common Wheels setup)
+			if (serverInfo.isEmpty() && directoryExists(cwd & "/public")) {
+				serverInfo = serverService.getServerInfoByWebroot(cwd & "/public");
+			}
+
+			// If still not found, try parent directory (in case we're in /public)
+			if (serverInfo.isEmpty() && getFileFromPath(cwd) == "public") {
+				var parentDir = getDirectoryFromPath(cwd.substring(1, cwd.length() - 1));
+				serverInfo = serverService.getServerInfoByWebroot(parentDir);
+			}
+
+			if (!serverInfo.isEmpty()) {
+				// Check if server is running
+				if (serverInfo.status == "running") {
+					// Try different locations where port might be stored
+					if (structKeyExists(serverInfo, "port") && serverInfo.port > 0) {
+						return serverInfo.port;
+					} else if (structKeyExists(serverInfo, "web") &&
+							   structKeyExists(serverInfo.web, "http") &&
+							   structKeyExists(serverInfo.web.http, "port")) {
+						return serverInfo.web.http.port;
+					}
+				} else if (serverInfo.status == "stopped") {
+					// Server is configured but stopped
+					if (arguments.autoStart) {
+						// Try to start the server
+						try {
+							// Determine correct directory for starting
+							var startDir = cwd;
+							if (directoryExists(cwd & "/public")) {
+								// We're in the app root, server should start from here
+								startDir = cwd;
+							} else if (getFileFromPath(cwd) == "public") {
+								// We're in the public directory, go up one level
+								startDir = getDirectoryFromPath(cwd.substring(1, cwd.length() - 1));
+							}
+
+							serverService.start(
+								name = "",
+								directory = startDir,
+								saveSettings = true
+							);
+							sleep(3000); // Wait for server to start
+
+							// Get info again after starting
+							serverInfo = serverService.getServerInfoByWebroot(cwd);
+							if (serverInfo.isEmpty() && directoryExists(cwd & "/public")) {
+								serverInfo = serverService.getServerInfoByWebroot(cwd & "/public");
+							}
+							if (!serverInfo.isEmpty() && structKeyExists(serverInfo, "port")) {
+								return serverInfo.port;
+							}
+						} catch (any e) {
+							// Could not start server
+						}
+					} else {
+						// Return configured port even if stopped
+						if (structKeyExists(serverInfo, "port") && serverInfo.port > 0) {
+							return serverInfo.port;
+						}
+					}
+				}
 			}
 		} catch (any e) {
-			// Server not running, continue checking
+			// Server service failed, continue with fallback checks
 		}
 
-		// Check server.json
+		// Fallback: Check server.json directly
 		var serverJsonPath = fileSystemUtil.resolvePath("server.json");
 		if (fileExists(serverJsonPath)) {
 			try {
 				var serverConfig = deserializeJSON(fileRead(serverJsonPath));
-				if (structKeyExists(serverConfig, "web") && structKeyExists(serverConfig.web, "http") && structKeyExists(serverConfig.web.http, "port")) {
+				if (structKeyExists(serverConfig, "web") &&
+				    structKeyExists(serverConfig.web, "http") &&
+				    structKeyExists(serverConfig.web.http, "port")) {
 					return serverConfig.web.http.port;
 				}
 			} catch (any e) {
@@ -495,21 +563,11 @@ component accessors="true" singleton {
 	 */
 	public function getMCPStatus() {
 		var status = {
-			"installed": false,
 			"configured": false,
-			"serverFile": false,
-			"dependencies": false,
 			"port": 0,
 			"ides": {},
-			"nodeVersion": "",
-			"npmVersion": ""
+			"configuredIDEs": []
 		};
-
-		// Check server file
-		status.serverFile = fileExists(fileSystemUtil.resolvePath("mcp-server.js"));
-
-		// Check dependencies
-		status.dependencies = directoryExists(fileSystemUtil.resolvePath("node_modules/@modelcontextprotocol"));
 
 		// Get port
 		status.port = detectServerPort();
@@ -517,25 +575,58 @@ component accessors="true" singleton {
 		// Check IDEs
 		status.ides = detectIDEs();
 
-		// Check if any IDE is configured
+		// Check if any IDE is configured with native MCP
 		var configuredIDEs = [];
-		if (status.ides.claude && fileExists(fileSystemUtil.resolvePath(".claude/claude_project_config.json"))) {
-			arrayAppend(configuredIDEs, "Claude Code");
-		}
-		if (status.ides.cursor && fileExists(fileSystemUtil.resolvePath(".cursor/mcp.json"))) {
-			arrayAppend(configuredIDEs, "Cursor");
-		}
-		if (status.ides.continue && fileExists(fileSystemUtil.resolvePath(".continue/config.json"))) {
-			// Check if Wheels is in the config
+		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
+
+		// Check Claude Code
+		var claudeConfigFile = homeDir & "/.config/claude/claude_desktop_config.json";
+		if (fileExists(claudeConfigFile)) {
 			try {
-				var continueConfig = deserializeJSON(fileRead(fileSystemUtil.resolvePath(".continue/config.json")));
-				if (structKeyExists(continueConfig, "mcpServers")) {
-					for (var server in continueConfig.mcpServers) {
-						if (structKeyExists(server, "name") && server.name == "wheels") {
-							arrayAppend(configuredIDEs, "Continue");
-							break;
-						}
-					}
+				var config = deserializeJSON(fileRead(claudeConfigFile));
+				if (structKeyExists(config, "mcpServers") && structKeyExists(config.mcpServers, "wheels")) {
+					arrayAppend(configuredIDEs, "Claude Code");
+				}
+			} catch (any e) {
+				// Invalid config
+			}
+		}
+
+		// Check Cursor
+		var cursorConfigFile = homeDir & "/.cursor/mcp_servers.json";
+		if (fileExists(cursorConfigFile)) {
+			try {
+				var config = deserializeJSON(fileRead(cursorConfigFile));
+				if (structKeyExists(config, "mcpServers") && structKeyExists(config.mcpServers, "wheels")) {
+					arrayAppend(configuredIDEs, "Cursor");
+				}
+			} catch (any e) {
+				// Invalid config
+			}
+		}
+
+		// Check Continue
+		var continueConfigFile = homeDir & "/.continue/config.json";
+		if (fileExists(continueConfigFile)) {
+			try {
+				var config = deserializeJSON(fileRead(continueConfigFile));
+				if (structKeyExists(config, "experimental") &&
+				    structKeyExists(config.experimental, "modelContextProtocol") &&
+				    structKeyExists(config.experimental.modelContextProtocol, "wheels")) {
+					arrayAppend(configuredIDEs, "Continue");
+				}
+			} catch (any e) {
+				// Invalid config
+			}
+		}
+
+		// Check Windsurf
+		var windsurfConfigFile = homeDir & "/.windsurf/mcp_servers.json";
+		if (fileExists(windsurfConfigFile)) {
+			try {
+				var config = deserializeJSON(fileRead(windsurfConfigFile));
+				if (structKeyExists(config, "mcpServers") && structKeyExists(config.mcpServers, "wheels")) {
+					arrayAppend(configuredIDEs, "Windsurf");
 				}
 			} catch (any e) {
 				// Invalid config
@@ -544,18 +635,12 @@ component accessors="true" singleton {
 
 		status.configured = arrayLen(configuredIDEs) > 0;
 		status.configuredIDEs = configuredIDEs;
-		status.installed = status.serverFile && status.dependencies;
-
-		// Get Node.js info
-		var nodeInfo = checkNodeJS();
-		status.nodeVersion = nodeInfo.version;
-		status.npmVersion = nodeInfo.npmVersion;
 
 		return status;
 	}
 
 	/**
-	 * Remove MCP integration
+	 * Remove MCP configuration
 	 * @return struct Removal result
 	 */
 	public function removeMCP() {
@@ -565,32 +650,84 @@ component accessors="true" singleton {
 			"errors": []
 		};
 
-		// Remove mcp-server.js
-		var mcpServerPath = fileSystemUtil.resolvePath("mcp-server.js");
-		if (fileExists(mcpServerPath)) {
+		// Remove .mcp.json project configuration
+		var mcpConfigPath = fileSystemUtil.resolvePath(".mcp.json");
+		if (fileExists(mcpConfigPath)) {
 			try {
-				fileDelete(mcpServerPath);
-				arrayAppend(result.messages, "✅ Removed mcp-server.js");
+				fileDelete(mcpConfigPath);
+				arrayAppend(result.messages, "✅ Removed .mcp.json");
 			} catch (any e) {
-				arrayAppend(result.errors, "Failed to remove mcp-server.js: " & e.message);
+				arrayAppend(result.errors, "Failed to remove .mcp.json: " & e.message);
 			}
 		}
 
-		// Remove IDE configurations
-		var configs = [
-			".claude/claude_project_config.json",
-			".cursor/mcp.json"
-		];
+		// Remove IDE configurations for native MCP
+		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
+		var removedCount = 0;
 
-		for (var configPath in configs) {
-			var fullPath = fileSystemUtil.resolvePath(configPath);
-			if (fileExists(fullPath)) {
-				try {
-					fileDelete(fullPath);
-					arrayAppend(result.messages, "✅ Removed " & configPath);
-				} catch (any e) {
-					arrayAppend(result.errors, "Failed to remove " & configPath & ": " & e.message);
+		// Remove from Claude Code config
+		var claudeConfigFile = homeDir & "/.config/claude/claude_desktop_config.json";
+		if (fileExists(claudeConfigFile)) {
+			try {
+				var config = deserializeJSON(fileRead(claudeConfigFile));
+				if (structKeyExists(config, "mcpServers") && structKeyExists(config.mcpServers, "wheels")) {
+					structDelete(config.mcpServers, "wheels");
+					fileWrite(claudeConfigFile, serializeJSON(config));
+					arrayAppend(result.messages, "✅ Removed from Claude Code configuration");
+					removedCount++;
 				}
+			} catch (any e) {
+				arrayAppend(result.errors, "Failed to update Claude Code config: " & e.message);
+			}
+		}
+
+		// Remove from Cursor config
+		var cursorConfigFile = homeDir & "/.cursor/mcp_servers.json";
+		if (fileExists(cursorConfigFile)) {
+			try {
+				var config = deserializeJSON(fileRead(cursorConfigFile));
+				if (structKeyExists(config, "mcpServers") && structKeyExists(config.mcpServers, "wheels")) {
+					structDelete(config.mcpServers, "wheels");
+					fileWrite(cursorConfigFile, serializeJSON(config));
+					arrayAppend(result.messages, "✅ Removed from Cursor configuration");
+					removedCount++;
+				}
+			} catch (any e) {
+				arrayAppend(result.errors, "Failed to update Cursor config: " & e.message);
+			}
+		}
+
+		// Remove from Continue config
+		var continueConfigFile = homeDir & "/.continue/config.json";
+		if (fileExists(continueConfigFile)) {
+			try {
+				var config = deserializeJSON(fileRead(continueConfigFile));
+				if (structKeyExists(config, "experimental") &&
+				    structKeyExists(config.experimental, "modelContextProtocol") &&
+				    structKeyExists(config.experimental.modelContextProtocol, "wheels")) {
+					structDelete(config.experimental.modelContextProtocol, "wheels");
+					fileWrite(continueConfigFile, serializeJSON(config));
+					arrayAppend(result.messages, "✅ Removed from Continue configuration");
+					removedCount++;
+				}
+			} catch (any e) {
+				arrayAppend(result.errors, "Failed to update Continue config: " & e.message);
+			}
+		}
+
+		// Remove from Windsurf config
+		var windsurfConfigFile = homeDir & "/.windsurf/mcp_servers.json";
+		if (fileExists(windsurfConfigFile)) {
+			try {
+				var config = deserializeJSON(fileRead(windsurfConfigFile));
+				if (structKeyExists(config, "mcpServers") && structKeyExists(config.mcpServers, "wheels")) {
+					structDelete(config.mcpServers, "wheels");
+					fileWrite(windsurfConfigFile, serializeJSON(config));
+					arrayAppend(result.messages, "✅ Removed from Windsurf configuration");
+					removedCount++;
+				}
+			} catch (any e) {
+				arrayAppend(result.errors, "Failed to update Windsurf config: " & e.message);
 			}
 		}
 

@@ -56,51 +56,52 @@ component extends="../base" {
 		} else {
 			print.line("Detecting Wheels server port...");
 
-			// Try to detect running server
-			var serverStatusResult = command("server status").params(getCWD()).run(returnOutput=true);
-			var statusOutput = serverStatusResult;
+			// Use CommandBox serverService to get server info
+			try {
+				var cwd = getCWD();
+				var serverInfo = {};
 
-			// Look for port in server status output (format: http://localhost:PORT or 127.0.0.1:PORT)
-			var portPattern = "(?:localhost|127\.0\.0\.1):(\d+)";
-			var portMatch = reFind(portPattern, statusOutput, 1, true);
+				// Try current directory first
+				serverInfo = serverService.getServerInfoByWebroot(cwd);
 
-			if (isStruct(portMatch) && structKeyExists(portMatch, "pos") && arrayLen(portMatch.pos) > 1 && portMatch.pos[2] > 0) {
-				serverPort = mid(statusOutput, portMatch.pos[2], portMatch.len[2]);
-				print.greenLine("✅ Detected server on port " & serverPort);
-			}
-
-			// If first pattern didn't work, try simpler pattern
-			if (serverPort == 0) {
-				var simplePattern = "127\.0\.0\.1:(\d+)";
-				var simpleMatch = reFind(simplePattern, statusOutput, 1, true);
-
-				if (isStruct(simpleMatch) && structKeyExists(simpleMatch, "pos") && arrayLen(simpleMatch.pos) > 1 && simpleMatch.pos[2] > 0) {
-					serverPort = mid(statusOutput, simpleMatch.pos[2], simpleMatch.len[2]);
-					print.greenLine("✅ Detected server on port " & serverPort);
+				// If not found, try with /public subdirectory (common Wheels setup)
+				if (serverInfo.isEmpty() && directoryExists(cwd & "/public")) {
+					serverInfo = serverService.getServerInfoByWebroot(cwd & "/public");
 				}
-			}
 
-			// If still no port, try to find any number after localhost or 127.0.0.1
-			if (serverPort == 0) {
-				if (findNoCase("localhost:", statusOutput) > 0) {
-					var localhostPos = findNoCase("localhost:", statusOutput);
-					var afterLocalhost = mid(statusOutput, localhostPos + 10, 10);
+				// If still not found, try parent directory (in case we're in /public)
+				if (serverInfo.isEmpty() && getFileFromPath(cwd) == "public") {
+					var parentDir = getDirectoryFromPath(cwd.substring(1, cwd.length() - 1));
+					serverInfo = serverService.getServerInfoByWebroot(parentDir);
+				}
 
-					var numberMatch = reFind("(\d+)", afterLocalhost, 1, true);
-					if (isStruct(numberMatch) && structKeyExists(numberMatch, "pos") && arrayLen(numberMatch.pos) > 1 && numberMatch.pos[2] > 0) {
-						serverPort = mid(afterLocalhost, numberMatch.pos[2], numberMatch.len[2]);
-						print.greenLine("✅ Detected server on port " & serverPort);
-					}
-				} else if (findNoCase("127.0.0.1:", statusOutput) > 0) {
-					var ipPos = findNoCase("127.0.0.1:", statusOutput);
-					var afterIP = mid(statusOutput, ipPos + 10, 10);
+				if (!serverInfo.isEmpty()) {
+					// Check if server is running
+					if (serverInfo.status == "running") {
+						// Get the port from the running server
+						if (structKeyExists(serverInfo, "port")) {
+							serverPort = serverInfo.port;
+							print.greenLine("✅ Detected running server on port " & serverPort);
+						} else if (structKeyExists(serverInfo, "web") &&
+								   structKeyExists(serverInfo.web, "http") &&
+								   structKeyExists(serverInfo.web.http, "port")) {
+							serverPort = serverInfo.web.http.port;
+							print.greenLine("✅ Detected running server on port " & serverPort);
+						}
+					} else if (serverInfo.status == "stopped") {
+						// Server exists but is stopped
+						print.yellowLine("⚠️  Server is configured but not running");
 
-					var numberMatch = reFind("(\d+)", afterIP, 1, true);
-					if (isStruct(numberMatch) && structKeyExists(numberMatch, "pos") && arrayLen(numberMatch.pos) > 1 && numberMatch.pos[2] > 0) {
-						serverPort = mid(afterIP, numberMatch.pos[2], numberMatch.len[2]);
-						print.greenLine("✅ Detected server on port " & serverPort);
+						// Try to get configured port even if stopped
+						if (structKeyExists(serverInfo, "port")) {
+							serverPort = serverInfo.port;
+							print.line("   Using configured port: " & serverPort);
+						}
 					}
 				}
+			} catch (any e) {
+				// Fallback if serverService fails
+				print.yellowLine("⚠️  Could not detect server via CommandBox service");
 			}
 		}
 
@@ -109,22 +110,26 @@ component extends="../base" {
 			print.line("No running server detected. Attempting to start server...");
 
 			try {
-				command("server start").params(getCWD()).run();
-				sleep(3000); // Wait for server to start
+				// Start the server using serverService
+				var serverInfo = serverService.start(
+					name = "",  // Use default name for current directory
+					directory = getCWD(),
+					saveSettings = true
+				);
 
-				// Try to detect port again
-				var serverStatusResult = command("server status").params(getCWD()).run(returnOutput=true);
-				var statusOutput = serverStatusResult;
+				sleep(3000); // Wait for server to fully start
 
-				var portPattern = "(?:localhost|127\.0\.0\.1):(\d+)";
-				var portMatch = reFind(portPattern, statusOutput, 1, true);
+				// Get the server info again after starting
+				serverInfo = serverService.getServerInfoByWebroot(getCWD());
 
-				if (isStruct(portMatch) && structKeyExists(portMatch, "pos") && arrayLen(portMatch.pos) > 1 && portMatch.pos[2] > 0) {
-					serverPort = mid(statusOutput, portMatch.pos[2], portMatch.len[2]);
-					print.greenLine("✅ Started server and detected port " & serverPort);
+				if (!serverInfo.isEmpty() && serverInfo.status == "running") {
+					if (structKeyExists(serverInfo, "port")) {
+						serverPort = serverInfo.port;
+						print.greenLine("✅ Started server on port " & serverPort);
+					}
 				}
 			} catch (any e) {
-				print.yellowLine("⚠️  Could not start server automatically");
+				print.yellowLine("⚠️  Could not start server automatically: " & e.message);
 			}
 		}
 

@@ -32,26 +32,12 @@ component extends="../base" {
 		print.line("=" .repeatString(50));
 		print.line();
 
-		// Installation Status
-		print.boldLine("Installation:");
-		if (status.installed) {
-			print.greenLine("✅ MCP is installed and ready");
-		} else {
-			print.yellowLine("⚠️  MCP is not fully installed");
-		}
-
-		print.indentedLine("Server file: " & (status.serverFile ? "✅ Installed" : "❌ Not found"));
-		print.indentedLine("Dependencies: " & (status.dependencies ? "✅ Installed" : "❌ Not installed"));
-		print.line();
-
-		// Node.js Information
-		print.boldLine("Environment:");
-		if (len(status.nodeVersion)) {
-			print.indentedLine("Node.js: " & status.nodeVersion);
-			print.indentedLine("npm: " & status.npmVersion);
-		} else {
-			print.indentedRedLine("Node.js: Not installed");
-		}
+		// MCP Server Status
+		print.boldLine("MCP Server:");
+		print.greenLine("✅ Native CFML MCP server (built into Wheels)");
+		print.indentedLine("Type: HTTP transport");
+		print.indentedLine("Endpoint: /wheels/mcp");
+		print.indentedLine("No Node.js required");
 		print.line();
 
 		// Server Configuration
@@ -118,30 +104,27 @@ component extends="../base" {
 		print.line();
 
 		// Quick Actions
-		if (!status.installed) {
-			print.boldLine("Quick Actions:");
-			print.indentedYellowLine("Run 'wheels mcp setup' to install MCP integration");
-		} else if (!status.configured) {
+		if (!status.configured) {
 			print.boldLine("Quick Actions:");
 			print.indentedYellowLine("Run 'wheels mcp setup' to configure your IDE");
 		} else {
 			print.boldLine("Quick Actions:");
 			print.indentedLine("wheels mcp test   - Test MCP connection");
-			print.indentedLine("wheels mcp update - Update MCP server");
-			print.indentedLine("wheels mcp remove - Remove MCP integration");
+			print.indentedLine("wheels mcp update - Update MCP configuration");
+			print.indentedLine("wheels mcp remove - Remove MCP configuration");
 		}
 		print.line();
 
 		// MCP Tools Available
-		if (status.installed && status.configured) {
+		if (status.configured) {
 			print.boldLine("Available MCP Tools (in your AI IDE):");
-			print.indentedLine("• wheels_generate - Generate code");
-			print.indentedLine("• wheels_migrate - Run migrations");
+			print.indentedLine("• wheels_generate - Generate models, controllers, migrations");
+			print.indentedLine("• wheels_analyze - Analyze project structure");
+			print.indentedLine("• wheels_validate - Validate models and schema");
+			print.indentedLine("• wheels_migrate - Run database migrations");
 			print.indentedLine("• wheels_test - Execute tests");
-			print.indentedLine("• wheels_server - Manage server");
-			print.indentedLine("• wheels_info - Get system info");
-			print.indentedLine("• wheels_routes - View routes");
-			print.indentedLine("• wheels_plugins - List plugins");
+			print.indentedLine("• wheels_server - Manage development server");
+			print.indentedLine("• wheels_reload - Reload application");
 		}
 		print.line();
 	}
