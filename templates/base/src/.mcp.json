@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "wheels": {
-      "type": "http",
-      "url": "http://localhost:60006/wheels/mcp"
-    }
-  }
-}
