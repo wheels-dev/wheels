@@ -413,8 +413,7 @@ function index() {
     // With search filtering
     if (StructKeyExists(params, "q") && len(params.q)) {
         products = model("Product").findAll(
-            where="name LIKE ? OR description LIKE ?",
-            whereParams=["%#params.q#%", "%#params.q#%"],
+            where="name LIKE '%#params.q#%' OR description LIKE '%#params.q#%'",
             page=params.page ?: 1,
             perPage=25
         );
@@ -508,25 +507,21 @@ function index() {
 #### Search and Filtering
 ```cfc
 function search() {
-    searchCriteria = {};
-    
-    // Build dynamic where clause
-    if (len(params.q ?: "")) {
-        searchCriteria.where = "name LIKE ? OR description LIKE ?";
-        searchCriteria.whereParams = ["%#params.q#%", "%#params.q#%"];
+    local.where = "";
+
+    // Build where clause
+    if (Len(params.q ?: "")) {
+        local.where = "name LIKE '%#params.q#%' OR description LIKE '%#params.q#%'";
     }
-    
-    if (isNumeric(params.categoryId ?: "")) {
-        local.where = searchCriteria.where ?: "";
-        if (len(local.where)) local.where &= " AND ";
-        local.where &= "categoryId = ?";
-        
-        searchCriteria.where = local.where;
-        searchCriteria.whereParams = searchCriteria.whereParams ?: [];
-        arrayAppend(searchCriteria.whereParams, params.categoryId);
+
+    if (IsNumeric(params.categoryId ?: "")) {
+        if (Len(local.where)) {
+            local.where &= " AND ";
+        }
+        local.where &= "categoryId = #params.categoryId#";
     }
-    
-    products = model("Product").findAll(argumentCollection=searchCriteria);
+
+    products = model("Product").findAll(where = local.where);
 }
 ```
 

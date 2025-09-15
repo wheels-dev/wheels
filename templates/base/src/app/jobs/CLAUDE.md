@@ -258,8 +258,7 @@ component extends="wheels.Job" {
                 
             // Get pending orders
             local.pendingOrders = model("Order").findAll(
-                where="status = ?",
-                whereParams=["pending"],
+                where="status = 'pending'",
                 order="createdAt",
                 maxRows=local.batchSize
             );
@@ -463,8 +462,7 @@ component extends="wheels.Job" {
     
     private numeric function cleanupAuditLogs(required date cutoffDate) {
         local.deleted = model("AuditLog").deleteAll(
-            where="createdAt < ?",
-            whereParams=[arguments.cutoffDate]
+            where="createdAt < '#arguments.cutoffDate#'"
         );
         
         logInfo("Deleted #local.deleted# old audit log entries");
@@ -677,8 +675,7 @@ function processJobQueue() {
     try {
         // Get jobs from database queue
         local.jobs = model("QueuedJob").findAll(
-            where="status = ? AND runAt <= ?",
-            whereParams=["pending", now()],
+            where="status = 'pending' AND runAt <= now()",
             order="priority DESC, createdAt",
             maxRows=10
         );
@@ -794,8 +791,7 @@ component {
     
     function processScheduledJobs() {
         local.dueJobs = model("ScheduledJob").findAll(
-            where="enabled = ? AND nextRun <= ?",
-            whereParams=[true, now()]
+            where="enabled = true AND nextRun <= now()"
         );
         
         for (local.job in local.dueJobs) {
