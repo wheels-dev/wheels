@@ -68,8 +68,6 @@
     * [wheels config check](command-line-tools/commands/config/config-check.md)
     * [wheels config diff](command-line-tools/commands/config/config-diff.md)
     * [wheels config dump](command-line-tools/commands/config/config-dump.md)
-  * CI/CD Commands
-    * [wheels ci init](command-line-tools/commands/ci/ci-init.md)
   * Docker Commands
     * [wheels docker init](command-line-tools/commands/docker/docker-init.md)
     * [wheels docker deploy](command-line-tools/commands/docker/docker-deploy.md)
