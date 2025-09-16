@@ -626,14 +626,14 @@ function reports() {
     averageOrderValue = model("Order").average("total", where="status = 'completed'");
     orderCount = model("Order").count(where="status = 'completed'");
     
-    topProducts = model("Product").findBySQL("
-        SELECT p.*, COUNT(oi.id) as orderCount
+    sql = "SELECT p.*, COUNT(oi.id) as orderCount
         FROM products p
         INNER JOIN orderItems oi ON p.id = oi.productId
         GROUP BY p.id
         ORDER BY orderCount DESC
-        LIMIT 10
-    ");
+        LIMIT 10";
+                
+    topProducts = queryExecute(sql, {}, { datasource = "yourDatasourceName" });
 }
 ```
 

@@ -1010,16 +1010,16 @@ component extends="Controller" {
 
     private function getFavoriteProducts(required numeric userid) {
         // Complex query to determine favorite products
-        return model("Product").findBySQL("
-            SELECT p.*, COUNT(oi.id) as orderCount
+        sql = "SELECT p.*, COUNT(oi.id) as orderCount
             FROM products p
             INNER JOIN orderitems oi ON p.id = oi.productId  
             INNER JOIN orders o ON oi.orderId = o.id
-            WHERE o.userid = ?
+            WHERE o.userid = :userid
             GROUP BY p.id
             ORDER BY orderCount DESC
-            LIMIT 10
-        ", [arguments.userid]);
+            LIMIT 10";
+
+        return queryExecute(sql, { userid = { value = arguments.userid, cfsqltype = "cf_sql_integer" } }, { datasource = "yourDatasourceName" });
     }
 }
 ```
@@ -1050,8 +1050,7 @@ component extends="Model" {
 
     function findTopCustomers(numeric limit = 10) {
         // Use raw SQL for complex aggregations
-        return findBySQL("
-            SELECT u.*, 
+        sql = "SELECT u.*, 
                    COUNT(o.id) as orderCount,
                    SUM(o.total) as totalSpent
             FROM users u
@@ -1059,8 +1058,8 @@ component extends="Model" {
             WHERE u.active = 1
             GROUP BY u.id
             ORDER BY totalSpent DESC
-            LIMIT ?
-        ", [arguments.limit]);
+            LIMIT :limit";
+        return queryExecute(sql, { limit = { value = arguments.limit, cfsqltype = "cf_sql_integer" } }, {datasource = yourDatasourceName});
     }
 }
 ```

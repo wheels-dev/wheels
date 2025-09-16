@@ -70,8 +70,8 @@ All models extend `wheels.Model`, which provides:
 - **`average(property)`** - Calculate average of property values  
 - **`minimum(property)`** - Find minimum property value
 - **`maximum(property)`** - Find maximum property value
-- **`findBySQL(sql)`** - Execute raw SQL queries
 - **`invokeWithTransaction()`** - Execute method within transaction
+<!-- There is not ORM method is wheels that accepts and executes raw queries -->
 
 #### Change Tracking Methods
 - **`hasChanged(property="")`** - Check if object/property has changed
@@ -2342,15 +2342,15 @@ activeUsers = model("User").findAll(where="deletedat IS NULL");
 ### Raw SQL Queries
 ```cfm
 // Execute custom SQL
-topCustomers = model("Customer").findBySQL("
-    SELECT c.*, COUNT(o.id) as orderCount, SUM(o.total) as totalSpent
+sql = "SELECT c.*, COUNT(o.id) as orderCount, SUM(o.total) as totalSpent
     FROM customers c
     INNER JOIN orders o ON c.id = o.customerId  
-    WHERE c.active = ?
+    WHERE c.active = :active
     GROUP BY c.id
     ORDER BY totalSpent DESC
-    LIMIT 10
-", [1]);
+    LIMIT 10";
+
+topCustomers = queryExecute(sql, { active = { value = "1", cfsqltype = "cf_sql_integer" } }, { datasource = "yourDatasourceName" });
 ```
 
 ### Boolean Existence Checks
