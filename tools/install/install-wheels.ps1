@@ -18,8 +18,6 @@
 .PARAMETER SkipPath
     Skip adding CommandBox to PATH
 
-.PARAMETER Mode
-    Installation mode: 'Standalone' (default) installs everything, 'Wrapper' only creates wrapper scripts
 
 .PARAMETER Quiet
     Suppress interactive prompts and use defaults
@@ -30,8 +28,6 @@
 .EXAMPLE
     .\install-wheels-universal.ps1
 
-.EXAMPLE
-    .\install-wheels-universal.ps1 -Mode Wrapper -Quiet
 
 .EXAMPLE
     .\install-wheels-universal.ps1 -InstallPath "C:\Tools\CommandBox" -Force -IncludeJava
@@ -47,10 +43,6 @@ param(
 
     [Parameter()]
     [switch]$SkipPath,
-
-    [Parameter()]
-    [ValidateSet("Standalone", "Wrapper")]
-    [string]$Mode = "Standalone",
 
     [Parameter()]
     [switch]$Quiet,
@@ -169,7 +161,6 @@ function Initialize-Environment {
         $Script:State.InstallPath = $InstallPath
     }
 
-    Write-Info "Mode: $Mode"
     Write-Info "Installation path: $($Script:State.InstallPath)"
     Write-Info "Administrator privileges: $(if ($Script:State.IsAdmin) { 'Yes' } else { 'No' })"
     Write-Info "Quiet mode: $(if ($Quiet) { 'Yes' } else { 'No' })"
@@ -624,157 +615,6 @@ function Install-WheelsPackages {
 
 #endregion
 
-#region Wrapper Creation
-
-function New-WrapperScripts {
-    param([string]$ToolsPath)
-
-    Write-Info "Creating Wheels wrapper scripts..."
-
-    # Create batch wrapper
-    $batchContent = @'
-@echo off
-REM Wheels CLI wrapper for CommandBox
-REM Passes all arguments to 'box wheels'
-
-REM Check if CommandBox is available
-where box >nul 2>nul
-if %ERRORLEVEL% neq 0 (
-    echo Error: CommandBox is required but not found in PATH
-    echo Please install CommandBox from https://www.ortussolutions.com/products/commandbox
-    echo Or run the Wheels installer: install-wheels-universal.ps1
-    exit /b 1
-)
-
-REM Install wheels-cli if not present
-box list | findstr "wheels-cli" >nul 2>nul
-if %ERRORLEVEL% neq 0 (
-    echo Installing wheels-cli package...
-    box install wheels-cli --force
-    if %ERRORLEVEL% neq 0 (
-        echo Failed to install wheels-cli package
-        exit /b 1
-    )
-)
-
-REM Convert common argument patterns to CommandBox format
-set "CONVERTED_ARGS="
-:loop
-if "%~1"=="" goto :done
-
-set "ARG=%~1"
-
-REM Handle --param=value format
-echo %ARG% | findstr "^--.*=" >nul
-if %ERRORLEVEL%==0 (
-    set "ARG=%ARG:~2%"
-    set "CONVERTED_ARGS=%CONVERTED_ARGS% %ARG%"
-    shift
-    goto :loop
-)
-
-REM Handle --flag format (convert to flag=true)
-echo %ARG% | findstr "^--[^=]*$" >nul
-if %ERRORLEVEL%==0 (
-    set "ARG=%ARG:~2%=true"
-    set "CONVERTED_ARGS=%CONVERTED_ARGS% %ARG%"
-    shift
-    goto :loop
-)
-
-REM Handle --noFlag format (convert to flag=false)
-echo %ARG% | findstr "^--no[A-Z]" >nul
-if %ERRORLEVEL%==0 (
-    set "FLAGNAME=%ARG:~4%"
-    set "FLAGNAME=%FLAGNAME:~0,1%%FLAGNAME:~1%"
-    call :lowercase FLAGNAME
-    set "ARG=%FLAGNAME%=false"
-    set "CONVERTED_ARGS=%CONVERTED_ARGS% %ARG%"
-    shift
-    goto :loop
-)
-
-REM Regular argument
-set "CONVERTED_ARGS=%CONVERTED_ARGS% %ARG%"
-shift
-goto :loop
-
-:lowercase
-for %%i in (A B C D E F G H I J K L M N O P Q R S T U V W X Y Z) do (
-    call set "%~1=%%%~1:%%i=%%i%%"
-)
-exit /b
-
-:done
-REM Pass all converted arguments to box wheels
-box wheels%CONVERTED_ARGS%
-'@
-
-    $batchFile = Join-Path $ToolsPath "wheels.bat"
-    $batchContent | Out-File -FilePath $batchFile -Encoding ASCII
-    Write-Success "Created wheels.bat wrapper"
-
-    # Create PowerShell wrapper
-    $psContent = @'
-# Wheels CLI wrapper for CommandBox
-# Passes all arguments to 'box wheels'
-param()
-
-# Check if CommandBox is available
-if (-not (Get-Command "box" -ErrorAction SilentlyContinue)) {
-    Write-Error "CommandBox is required but not found in PATH."
-    Write-Host "Please install CommandBox from https://www.ortussolutions.com/products/commandbox"
-    Write-Host "Or run the Wheels installer: install-wheels-universal.ps1"
-    exit 1
-}
-
-# Install wheels-cli if not present
-try {
-    $packages = & box list 2>$null
-    if ($packages -notmatch "wheels-cli") {
-        Write-Host "Installing wheels-cli package..."
-        & box install wheels-cli --force
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "Failed to install wheels-cli package"
-            exit 1
-        }
-    }
-} catch {
-    Write-Warning "Could not verify wheels-cli installation"
-}
-
-# Convert arguments to CommandBox format
-$convertedArgs = @()
-foreach ($arg in $args) {
-    if ($arg -match '^--(.+?)=(.+)$') {
-        # --param=value -> param=value
-        $convertedArgs += "$($matches[1])=$($matches[2])"
-    } elseif ($arg -match '^--no([A-Z].*)$') {
-        # --noFlag -> flag=false
-        $flagName = $matches[1].ToLower()
-        $convertedArgs += "$flagName=false"
-    } elseif ($arg -match '^--(.+)$') {
-        # --flag -> flag=true
-        $convertedArgs += "$($matches[1])=true"
-    } else {
-        # Regular argument
-        $convertedArgs += $arg
-    }
-}
-
-# Pass all converted arguments to box wheels
-& box wheels @convertedArgs
-'@
-
-    $psFile = Join-Path $ToolsPath "wheels.ps1"
-    $psContent | Out-File -FilePath $psFile -Encoding UTF8
-    Write-Success "Created wheels.ps1 wrapper"
-
-    return $true
-}
-
-#endregion
-
 #region Verification and Testing
 
 function Test-Installation {
@@ -791,44 +631,42 @@ function Test-Installation {
         return $false
     }
 
-    # Test packages (only in Standalone mode)
-    if ($Mode -eq "Standalone") {
-        try {
-            # Skip the package listing verification since it's unreliable
-            # CommandBox packages can be installed in different ways and may not show up in `box list`
-            Write-Info "Skipping package list verification (unreliable for CommandBox modules)"
-        } catch {
-            Write-Info "Package verification skipped"
-        }
+    # Test packages
+    try {
+        # Skip the package listing verification since it's unreliable
+        # CommandBox packages can be installed in different ways and may not show up in `box list`
+        Write-Info "Skipping package list verification (unreliable for CommandBox modules)"
+    } catch {
+        Write-Info "Package verification skipped"
+    }
 
-        # Test CLI functionality (more comprehensive check)
-        $wheelsWorking = $false
-        try {
-            # Try different ways to test wheels commands
-            $wheelsOutput = & $BoxPath wheels version 2>&1
-            if ($LASTEXITCODE -eq 0) {
-                Write-Success "Wheels CLI commands: Available"
+    # Test CLI functionality (more comprehensive check)
+    $wheelsWorking = $false
+    try {
+        # Try different ways to test wheels commands
+        $wheelsOutput = & $BoxPath wheels version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Wheels CLI commands: Available"
+            $wheelsWorking = $true
+        } else {
+            # Try alternative command
+            $helpOutput = & $BoxPath help 2>&1
+            if ($helpOutput -match "wheels") {
+                Write-Success "Wheels CLI commands: Available (detected in help)"
                 $wheelsWorking = $true
             } else {
-                # Try alternative command
-                $helpOutput = & $BoxPath help 2>&1
-                if ($helpOutput -match "wheels") {
-                    Write-Success "Wheels CLI commands: Available (detected in help)"
-                    $wheelsWorking = $true
-                } else {
-                    Write-Info "Wheels CLI commands: May require manual installation"
-                }
+                Write-Info "Wheels CLI commands: May require manual installation"
             }
-        } catch {
-            Write-Info "Wheels CLI commands: May require manual installation"
         }
+    } catch {
+        Write-Info "Wheels CLI commands: May require manual installation"
+    }
 
-        # Provide user guidance based on what's working
-        if (-not $wheelsWorking) {
-            Write-Info "If wheels commands don't work, you can:"
-            Write-Info "1. Try: box install wheels-cli --force"
-            Write-Info "2. Or use CommandBox for other CFML development"
-        }
+    # Provide user guidance based on what's working
+    if (-not $wheelsWorking) {
+        Write-Info "If wheels commands don't work, you can:"
+        Write-Info "1. Try: box install wheels-cli --force"
+        Write-Info "2. Or use CommandBox for other CFML development"
     }
 
     return $true
@@ -842,46 +680,28 @@ function Show-Summary {
     Write-ColorOutput "                          Installation Completed Successfully!                  " -ForegroundColor Green
     Write-ColorOutput "                                                                               " -ForegroundColor Green
     Write-ColorOutput "  Installation Summary:                                                        " -ForegroundColor Green
-    Write-ColorOutput "  • Mode: $Mode                                                   " -ForegroundColor Green
     Write-ColorOutput "  • CommandBox Path: $($Script:State.InstallPath)               " -ForegroundColor Green
     Write-ColorOutput "  • Java Installed: $(if ($Script:State.JavaInstalled) { 'Yes' } else { 'No (using embedded)' })                                      " -ForegroundColor Green
     Write-ColorOutput "  • Duration: $([int]$duration.TotalSeconds) seconds                                                 " -ForegroundColor Green
     Write-ColorOutput "                                                                               " -ForegroundColor Green
 
-    if ($Mode -eq "Standalone") {
-        Write-ColorOutput "  Next Steps:                                                                  " -ForegroundColor Green
-        Write-ColorOutput "  1. Open a new terminal/command prompt                                        " -ForegroundColor Green
-        Write-ColorOutput "  2. Create a new app: box wheels generate app myapp                          " -ForegroundColor Green
-        Write-ColorOutput "  3. Start developing: cd myapp; box server start                            " -ForegroundColor Green
-        Write-ColorOutput "                                                                               " -ForegroundColor Green
-        Write-ColorOutput "  Using CommandBox commands:                                                  " -ForegroundColor Green
-        Write-ColorOutput "  • box wheels generate app [name]  - Generate new Wheels app                " -ForegroundColor Green
-        Write-ColorOutput "  • box wheels generate model [name] - Generate model                        " -ForegroundColor Green
-        Write-ColorOutput "  • box wheels generate controller   - Generate controller                   " -ForegroundColor Green
-        Write-ColorOutput "  • box server start                 - Start development server             " -ForegroundColor Green
-        Write-ColorOutput "  • box wheels migrate up            - Run database migrations              " -ForegroundColor Green
-        Write-ColorOutput "                                                                               " -ForegroundColor Green
-        Write-ColorOutput "  Optional: Create a 'wheels.bat' wrapper in your PATH:                      " -ForegroundColor Green
-        Write-ColorOutput "    @echo off                                                                " -ForegroundColor Green
-        Write-ColorOutput "    box wheels %*                                                            " -ForegroundColor Green
-    } else {
-        Write-ColorOutput "  Next Steps:                                                                  " -ForegroundColor Green
-        Write-ColorOutput "  1. Ensure CommandBox is installed and in PATH                               " -ForegroundColor Green
-        Write-ColorOutput "  2. Use wheels command: wheels generate app myapp                            " -ForegroundColor Green
-        Write-ColorOutput "                                                                               " -ForegroundColor Green
-        Write-ColorOutput "  Available commands:                                                          " -ForegroundColor Green
-        Write-ColorOutput "  • wheels generate app [name]     - Generate new Wheels app                  " -ForegroundColor Green
-        Write-ColorOutput "  • wheels generate model [name]   - Generate model                           " -ForegroundColor Green
-        Write-ColorOutput "  • wheels generate controller     - Generate controller                       " -ForegroundColor Green
-        Write-ColorOutput "  • wheels server start            - Start development server                 " -ForegroundColor Green
-        Write-ColorOutput "  • wheels migrate up               - Run database migrations                  " -ForegroundColor Green
-    }
+    Write-ColorOutput "  Next Steps:                                                                  " -ForegroundColor Green
+    Write-ColorOutput "  1. Open a new terminal/command prompt                                        " -ForegroundColor Green
+    Write-ColorOutput "  2. Create a new app: box wheels generate app myapp                          " -ForegroundColor Green
+    Write-ColorOutput "  3. Start developing: cd myapp; box server start                            " -ForegroundColor Green
+    Write-ColorOutput "                                                                               " -ForegroundColor Green
+    Write-ColorOutput "  Using CommandBox commands:                                                  " -ForegroundColor Green
+    Write-ColorOutput "  • wheels generate app [name]  - Generate new Wheels app                " -ForegroundColor Green
+    Write-ColorOutput "  • wheels generate model [name] - Generate model                        " -ForegroundColor Green
+    Write-ColorOutput "  • wheels generate controller   - Generate controller                   " -ForegroundColor Green
+    Write-ColorOutput "  • server start                 - Start development server             " -ForegroundColor Green
+    Write-ColorOutput "  • wheels migrate up            - Run database migrations              " -ForegroundColor Green
     Write-ColorOutput "                                                                               " -ForegroundColor Green
     Write-ColorOutput "  Documentation: https://wheels.dev/guides                                    " -ForegroundColor Green
     Write-ColorOutput "=================================================================================" -ForegroundColor Green
     Write-Host ""
 
-    if (-not $SkipPath -and $Mode -eq "Standalone") {
+    if (-not $SkipPath) {
         Write-Warning "Please restart your terminal or run refreshenv to use the box command"
     }
 }
@@ -910,52 +730,32 @@ function Start-Installation {
             }
         }
 
-        if ($Mode -eq "Standalone") {
-            # Full installation mode
+        # Install CommandBox
+        $boxPath = Install-CommandBox
+        if (-not $boxPath) {
+            Write-Error "CommandBox installation failed. Aborting."
+            exit 1
+        }
 
-            # Install CommandBox
-            $boxPath = Install-CommandBox
-            if (-not $boxPath) {
-                Write-Error "CommandBox installation failed. Aborting."
-                exit 1
+        # Add to PATH
+        Add-CommandBoxToPath -BoxPath $boxPath
+
+        # Install Wheels packages
+        if (-not (Install-WheelsPackages -BoxPath $boxPath)) {
+            Write-Error "Wheels packages installation failed. Aborting."
+            exit 1
+        }
+
+        # Clean up any existing tools folder (from previous installations)
+        $toolsDir = Join-Path (Split-Path $boxPath -Parent) "tools"
+        if (Test-Path $toolsDir) {
+            Write-Info "Cleaning up unnecessary tools folder from previous installation..."
+            try {
+                Remove-Item $toolsDir -Recurse -Force
+                Write-Success "Tools folder cleaned up successfully"
+            } catch {
+                Write-Warning "Could not remove tools folder: $($_.Exception.Message)"
             }
-
-            # Add to PATH
-            Add-CommandBoxToPath -BoxPath $boxPath
-
-            # Install Wheels packages
-            if (-not (Install-WheelsPackages -BoxPath $boxPath)) {
-                Write-Error "Wheels packages installation failed. Aborting."
-                exit 1
-            }
-
-            # Clean up any existing tools folder (from previous installations)
-            $toolsDir = Join-Path (Split-Path $boxPath -Parent) "tools"
-            if (Test-Path $toolsDir) {
-                Write-Info "Cleaning up unnecessary tools folder from previous installation..."
-                try {
-                    Remove-Item $toolsDir -Recurse -Force
-                    Write-Success "Tools folder cleaned up successfully"
-                } catch {
-                    Write-Warning "Could not remove tools folder: $($_.Exception.Message)"
-                }
-            }
-
-        } elseif ($Mode -eq "Wrapper") {
-            # Wrapper-only mode (for Chocolatey package)
-
-            $currentDir = $PSScriptRoot
-            if ([string]::IsNullOrEmpty($currentDir)) {
-                $currentDir = Get-Location
-            }
-
-            $toolsDir = Join-Path $currentDir "tools"
-            if (-not (Test-Path $toolsDir)) {
-                New-Item -ItemType Directory -Path $toolsDir -Force | Out-Null
-            }
-
-            New-WrapperScripts -ToolsPath $toolsDir
-            $Script:State.BoxPath = "box" # Assume box is in PATH
         }
 
         # Verify installation

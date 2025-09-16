@@ -7,7 +7,6 @@ This directory contains installers for setting up the Wheels Framework on fresh 
 Each installer will install:
 
 1. **CommandBox 6.2.1** - The CFML CLI and development server
-2. **wheels** - Core Wheels framework package
 3. **wheels-cli** - Wheels CLI commands for generators and utilities
 
 ## Quick Installation
@@ -157,7 +156,6 @@ The installers automatically add CommandBox to your system PATH:
 All packages are installed from official sources:
 
 - **CommandBox**: Downloaded from [Ortus Solutions](https://downloads.ortussolutions.com/ortussolutions/commandbox/)
-- **wheels**: Installed from [ForgeBox](https://forgebox.io/view/wheels)
 - **wheels-cli**: Installed from [ForgeBox](https://forgebox.io/view/wheels-cli)
 
 ## Troubleshooting
@@ -220,7 +218,6 @@ If the automated installers don't work for your system, you can install manually
 
 2. **Install Wheels packages**:
    ```bash
-   box install wheels
    box install wheels-cli
    ```
 
