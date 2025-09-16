@@ -90,7 +90,7 @@ component extends="wheels.migrator.Migration" hint="create column phone in user 
 
     function up() {
         transaction {
-            addColumn(table="user", columnType="string", columnName="phone", null=true);
+            addColumn(table="user", columnType="string", columnName="phone", allowNull=true);
         }
     }
 

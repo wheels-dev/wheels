@@ -262,8 +262,8 @@ component extends="Model" {
 
     EXAMPLE:
       t = createTable(name='employees', force=false, id=true, primaryKey='empId');
-			t.string(columnNames='firstName,lastName', default='', null=true, limit='255');
-			t.text(columnNames='bio', default='', null=true);
+			t.string(columnNames='firstName,lastName', default='', allowNull=true, limit='255');
+			t.text(columnNames='bio', default='', allowNull=true);
 			t.timestamps();
 			t.create();
 */

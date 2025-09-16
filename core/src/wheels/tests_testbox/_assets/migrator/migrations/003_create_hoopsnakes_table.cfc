@@ -4,7 +4,7 @@ component extends="wheels.migrator.Migration" hint="create kangaroos table" {
 		transaction {
 			try {
 				t = createTable(name = "c_o_r_e_hoopsnakes");
-				t.string(columnNames = "name", default = "", null = true, limit = 255);
+				t.string(columnNames = "name", default = "", allowNull = true, limit = 255);
 				t.timestamps();
 				t.create();
 			} catch (any ex) {

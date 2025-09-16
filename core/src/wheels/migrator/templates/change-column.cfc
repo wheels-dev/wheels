@@ -22,7 +22,7 @@ component extends="[extends]" hint="[description]" {
 	function up() {
 		transaction {
 			try {
-				changeColumn(table = 'tableName', columnType = '', columnName = 'columnName', default = '', null = true);
+				changeColumn(table = 'tableName', columnType = '', columnName = 'columnName', default = '', allowNull = true);
 			} catch (any e) {
 				local.exception = e;
 			}

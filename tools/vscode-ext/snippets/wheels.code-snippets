@@ -30,7 +30,7 @@
     "prefix": "addColumn",
     "description": "adds a column to existing table Only available in a migration CFC",
     "body": [
-      "addColumn(table = ${1:\"\"}, columnType = ${2:\"\"}, columnName = ${3:\"\"}, afterColumn = ${4:\"\"}, referenceName = ${5:\"\"}, default = ${6:\"\"}, null = ${7:\"\"}, limit = ${8:\"\"}, precision = ${9:\"\"}, scale = ${10:\"\"})",
+      "addColumn(table = ${1:\"\"}, columnType = ${2:\"\"}, columnName = ${3:\"\"}, afterColumn = ${4:\"\"}, referenceName = ${5:\"\"}, default = ${6:\"\"}, allowNull = ${7:\"\"}, limit = ${8:\"\"}, precision = ${9:\"\"}, scale = ${10:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -588,7 +588,7 @@
     "prefix": "bigInteger",
     "description": "Adds integer columns to table definition.",
     "body": [
-      "bigInteger(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, null = ${4:\"\"})",
+      "bigInteger(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, allowNull = ${4:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -606,7 +606,7 @@
     "prefix": "binary",
     "description": "Adds binary columns to table definition.",
     "body": [
-      "binary(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"})",
+      "binary(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -624,7 +624,7 @@
     "prefix": "boolean",
     "description": "Adds boolean columns to table definition.",
     "body": [
-      "boolean(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"})",
+      "boolean(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -741,7 +741,7 @@
     "prefix": "changeColumn",
     "description": "changes a column definition Only available in a migration CFC",
     "body": [
-      "changeColumn(table = ${1:\"\"}, columnName = ${2:\"\"}, columnType = ${3:\"\"}, afterColumn = ${4:\"\"}, referenceName = ${5:\"\"}, default = ${6:\"\"}, null = ${7:\"\"}, limit = ${8:\"\"}, precision = ${9:\"\"}, scale = ${10:\"\"}, addColumns = ${11:\"false\"})",
+      "changeColumn(table = ${1:\"\"}, columnName = ${2:\"\"}, columnType = ${3:\"\"}, afterColumn = ${4:\"\"}, referenceName = ${5:\"\"}, default = ${6:\"\"}, allowNull = ${7:\"\"}, limit = ${8:\"\"}, precision = ${9:\"\"}, scale = ${10:\"\"}, addColumns = ${11:\"false\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -786,7 +786,7 @@
     "prefix": "char",
     "description": "adds char columns to table definition",
     "body": [
-      "char(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, null = ${4:\"\"})",
+      "char(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, allowNull = ${4:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -885,7 +885,7 @@
     "prefix": "column",
     "description": "Adds a column to table definition.",
     "body": [
-      "column(columnName = ${1:\"\"}, columnType = ${2:\"\"}, default = ${3:\"\"}, null = ${4:\"\"}, limit = ${5:\"\"}, precision = ${6:\"\"}, scale = ${7:\"\"})",
+      "column(columnName = ${1:\"\"}, columnType = ${2:\"\"}, default = ${3:\"\"}, allowNull = ${4:\"\"}, limit = ${5:\"\"}, precision = ${6:\"\"}, scale = ${7:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -1128,7 +1128,7 @@
     "prefix": "date",
     "description": "Adds date columns to table definition.",
     "body": [
-      "date(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"})",
+      "date(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -1182,7 +1182,7 @@
     "prefix": "datetime",
     "description": "adds datetime columns to table definition",
     "body": [
-      "datetime(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"})",
+      "datetime(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -1272,7 +1272,7 @@
     "prefix": "decimal",
     "description": "adds decimal columns to table definition",
     "body": [
-      "decimal(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"}, precision = ${4:\"\"}, scale = ${5:\"\"})",
+      "decimal(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"}, precision = ${4:\"\"}, scale = ${5:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -1902,7 +1902,7 @@
     "prefix": "float",
     "description": "adds float columns to table definition",
     "body": [
-      "float(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"true\"})",
+      "float(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"true\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -2316,7 +2316,7 @@
     "prefix": "integer",
     "description": "adds integer columns to table definition",
     "body": [
-      "integer(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, null = ${4:\"\"})",
+      "integer(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, allowNull = ${4:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -3243,7 +3243,7 @@
     "prefix": "references",
     "description": "adds integer reference columns to table definition and creates foreign key constraints",
     "body": [
-      "references(referenceNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"false\"}, polymorphic = ${4:\"false\"}, foreignKey = ${5:\"true\"}, onUpdate = ${6:\"\"}, onDelete = ${7:\"\"})",
+      "references(referenceNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"false\"}, polymorphic = ${4:\"false\"}, foreignKey = ${5:\"true\"}, onUpdate = ${6:\"\"}, onDelete = ${7:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -3783,7 +3783,7 @@
     "prefix": "string",
     "description": "adds string columns to table definition",
     "body": [
-      "string(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, null = ${4:\"\"})",
+      "string(columnNames = ${1:\"\"}, limit = ${2:\"\"}, default = ${3:\"\"}, allowNull = ${4:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -3927,7 +3927,7 @@
     "prefix": "text",
     "description": "adds text columns to table definition",
     "body": [
-      "text(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"})",
+      "text(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -4017,7 +4017,7 @@
     "prefix": "time",
     "description": "adds time columns to table definition",
     "body": [
-      "time(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"})",
+      "time(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -4089,7 +4089,7 @@
     "prefix": "timestamp",
     "description": "adds timestamp columns to table definition",
     "body": [
-      "timestamp(columnNames = ${1:\"\"}, default = ${2:\"\"}, null = ${3:\"\"}, columnType = ${4:\"datetime\"})",
+      "timestamp(columnNames = ${1:\"\"}, default = ${2:\"\"}, allowNull = ${3:\"\"}, columnType = ${4:\"datetime\"})",
       "$0"
     ],
     "scope": "cfml"
@@ -4179,7 +4179,7 @@
     "prefix": "uniqueidentifier",
     "description": "adds UUID columns to table definition",
     "body": [
-      "uniqueidentifier(columnNames = ${1:\"\"}, default = ${2:\"newid()\"}, null = ${3:\"\"})",
+      "uniqueidentifier(columnNames = ${1:\"\"}, default = ${2:\"newid()\"}, allowNull = ${3:\"\"})",
       "$0"
     ],
     "scope": "cfml"

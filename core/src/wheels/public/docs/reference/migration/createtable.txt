@@ -1,25 +1,25 @@
 // Example: create a users table
 t = createTable(name='users'); 
-	t.string(columnNames='firstname,lastname', default='', null=false, limit=50);
-	t.string(columnNames='email', default='', null=false, limit=255); 
-	t.string(columnNames='passwordHash', default='', null=true, limit=500);
-	t.string(columnNames='passwordResetToken,verificationToken', default='', null=true, limit=500);
+	t.string(columnNames='firstname,lastname', default='', allowNull=false, limit=50);
+	t.string(columnNames='email', default='', allowNull=false, limit=255); 
+	t.string(columnNames='passwordHash', default='', allowNull=true, limit=500);
+	t.string(columnNames='passwordResetToken,verificationToken', default='', allowNull=true, limit=500);
 	t.boolean(columnNames='passwordChangeRequired,verified', default=false); 
-	t.datetime(columnNames='passwordResetTokenAt,passwordResetAt,loggedinAt', default='', null=true); 
-	t.integer(columnNames='roleid', default=0, null=false, limit=3);
+	t.datetime(columnNames='passwordResetTokenAt,passwordResetAt,loggedinAt', default='', allowNull=true); 
+	t.integer(columnNames='roleid', default=0, allowNull=false, limit=3);
 	t.timestamps();
 t.create();
 
 // Example: Create a table with a different Primary Key
 t = createTable(name='tokens', id=false);
-	t.primaryKey(name='id', null=false, type="string", limit=35 );
-	t.datetime(columnNames="expiresAt", null=false);
-	t.integer(columnNames='requests', default=0, null=false);
+	t.primaryKey(name='id', allowNull=false, type="string", limit=35 );
+	t.datetime(columnNames="expiresAt", allowNull=false);
+	t.integer(columnNames='requests', default=0, allowNull=false);
 	t.timestamps();
 t.create();
 
 // Example: Create a Join Table with composite primary keys
 t = createTable(name='userkintins', id=false); 
-	t.primaryKey(name="userid", null=false, limit=11);
+	t.primaryKey(name="userid", allowNull=false, limit=11);
 	t.primaryKey(name='profileid', type="string", limit=11 );  
 t.create();

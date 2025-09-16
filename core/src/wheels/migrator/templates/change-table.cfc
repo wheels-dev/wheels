@@ -7,7 +7,7 @@
 
     EXAMPLE:
       t = changeTable(name='employees');
-      t.string(columnNames="fullName", default="", null=true, limit="255");
+      t.string(columnNames="fullName", default="", allowNull=true, limit="255");
       t.change();
 */
 component extends="[extends]" hint="[description]" {

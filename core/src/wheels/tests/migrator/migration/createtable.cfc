@@ -9,7 +9,7 @@ component extends="wheels.tests.Test" {
 		t = migration.createTable(name = tableName, force = true);
 		t.string(columnNames = 'stringcolumn, secondstringcolumn ', limit = 255); // notice the untrimmed column name
 		t.text(columnNames = 'textcolumn');
-		t.boolean(columnNames = 'booleancolumn', default = false, null = false);
+		t.boolean(columnNames = 'booleancolumn', default = false, allowNull = false);
 		t.integer(columnNames = 'integercolumn', default = 0);
 		t.binary(columnNames = "binarycolumn");
 		t.date(columnNames = "datecolumn");

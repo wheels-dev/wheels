@@ -70,7 +70,7 @@
 			}
 		}
 		if(structKeyExists(arguments,"null") && len(arguments.null) && isBoolean(arguments.null)){
-			arrayAppend(argumentArr, "null = #arguments.null#");
+			arrayAppend(argumentArr, "allowNull = #arguments.null#");
 		}
 		if(structKeyExists(arguments,"limit") && len(arguments.limit) && isnumeric(arguments.limit) && arguments.limit != 0){
 			arrayAppend(argumentArr, "limit = #arguments.limit#");

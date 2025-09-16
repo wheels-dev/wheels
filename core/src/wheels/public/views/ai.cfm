@@ -226,7 +226,7 @@ function getCommonPatterns() {
 		"migrationPatterns": [
 			{
 				"name": "Create Table Migration",
-				"code": "component extends='wheels.migrator.Migration' {\n  function up() {\n    t = createTable('users');\n    t.string('firstName,lastName', null=false);\n    t.string('email', limit=100, null=false);\n    t.boolean('active', default=true);\n    t.timestamps();\n    t.create();\n    \n    addIndex(table='users', columnNames='email', unique=true);\n  }\n  \n  function down() {\n    dropTable('users');\n  }\n}"
+				"code": "component extends='wheels.migrator.Migration' {\n  function up() {\n    t = createTable('users');\n    t.string('firstName,lastName', allowNull=false);\n    t.string('email', limit=100, allowNull=false);\n    t.boolean('active', default=true);\n    t.timestamps();\n    t.create();\n    \n    addIndex(table='users', columnNames='email', unique=true);\n  }\n  \n  function down() {\n    dropTable('users');\n  }\n}"
 			}
 		]
 	};

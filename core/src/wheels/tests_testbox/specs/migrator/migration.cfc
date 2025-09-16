@@ -642,7 +642,7 @@ component extends="testbox.system.BaseSpec" {
 				t.string(columnNames = "stringcolumn")
 				t.create()
 
-				migration.addColumn(table = tableName, columnType = 'integer', columnName = columnName, null = true)
+				migration.addColumn(table = tableName, columnType = 'integer', columnName = columnName, allowNull = true)
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns")
 				actual = ValueList(info.column_name)
 				expected = columnName
@@ -797,7 +797,7 @@ component extends="testbox.system.BaseSpec" {
 				columnName = "stringcolumn"
 
 				t = migration.createTable(name = tableName, force = true)
-				t.string(columnNames = columnName, limit = 10, null = true)
+				t.string(columnNames = columnName, limit = 10, allowNull = true)
 				t.create()
 
 				migration.changeColumn(
@@ -805,7 +805,7 @@ component extends="testbox.system.BaseSpec" {
 					columnName = columnName,
 					columnType = 'string',
 					limit = 50,
-					null = false,
+					allowNull = false,
 					default = "foo"
 				)
 
@@ -838,7 +838,7 @@ component extends="testbox.system.BaseSpec" {
 				t = migration.createTable(name = tableName, force = true)
 				t.string(columnNames = 'stringcolumn, secondstringcolumn ', limit = 255) // notice the untrimmed column name
 				t.text(columnNames = 'textcolumn')
-				t.boolean(columnNames = 'booleancolumn', default = false, null = false)
+				t.boolean(columnNames = 'booleancolumn', default = false, allowNull = false)
 				t.integer(columnNames = 'integercolumn', default = 0)
 				t.binary(columnNames = "binarycolumn")
 				t.date(columnNames = "datecolumn")

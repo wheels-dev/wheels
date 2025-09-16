@@ -181,9 +181,9 @@ component extends="testbox.system.BaseSpec" {
 
 				tableName = "dbm_mysql_text_tests";
 				t = migration.createTable(name = tableName, force = true);
-				t.text(columnName = "nullableText", null = true);
-				t.text(columnName = "mediumNullableText", null = true, size = "mediumtext");
-				t.text(columnName = "longNullableText", null = true, size = "longtext");
+				t.text(columnName = "nullableText", allowNull = true);
+				t.text(columnName = "mediumNullableText", allowNull = true, size = "mediumtext");
+				t.text(columnName = "longNullableText", allowNull = true, size = "longtext");
 				t.create();
 
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns");
@@ -210,9 +210,9 @@ component extends="testbox.system.BaseSpec" {
 
 				tableName = "dbm_mysql_text_tests";
 				t = migration.createTable(name = tableName, force = true);
-				t.text(columnName = "nonNullText", null = false);
-				t.text(columnName = "mediumNonNullText", null = false, size = "mediumtext");
-				t.text(columnName = "longNonNullText", null = false, size = "longtext");
+				t.text(columnName = "nonNullText", allowNull = false);
+				t.text(columnName = "mediumNonNullText", allowNull = false, size = "mediumtext");
+				t.text(columnName = "longNonNullText", allowNull = false, size = "longtext");
 				t.create();
 
 				info = g.$dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns");

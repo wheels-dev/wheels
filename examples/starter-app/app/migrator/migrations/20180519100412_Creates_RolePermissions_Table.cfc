@@ -10,18 +10,18 @@
 
     EXAMPLE:
       t = createTable(name='employees', force=false, id=true, primaryKey='empId');
-			t.string(columnNames='firstName,lastName', default='', null=true, limit='255');
-			t.text(columnNames='bio', default='', null=true);
+			t.string(columnNames='firstName,lastName', default='', allowNull=true, limit='255');
+			t.text(columnNames='bio', default='', allowNull=true);
 			t.binary(columnNames='credentials');
-			t.biginteger(columnNames='sinsCommitted', default='', null=true, limit='1');
-			t.char(columnNames='code', default='', null=true, limit='8');
-			t.decimal(columnNames='hourlyWage', default='', null=true, precision='1', scale='2');
-			t.date(columnNames='dateOfBirth', default='', null=true);
-			t.datetime(columnNames='employmentStarted', default='', null=true);
-			t.float(columnNames='height', default='', null=true);
-			t.integer(columnNames='age', default='', null=true, limit='1');
-      t.time(columnNames='lunchStarts', default='', null=true);
-			t.uniqueidentifier(columnNames='uid', default='newid()', null=false);
+			t.biginteger(columnNames='sinsCommitted', default='', allowNull=true, limit='1');
+			t.char(columnNames='code', default='', allowNull=true, limit='8');
+			t.decimal(columnNames='hourlyWage', default='', allowNull=true, precision='1', scale='2');
+			t.date(columnNames='dateOfBirth', default='', allowNull=true);
+			t.datetime(columnNames='employmentStarted', default='', allowNull=true);
+			t.float(columnNames='height', default='', allowNull=true);
+			t.integer(columnNames='age', default='', allowNull=true, limit='1');
+      t.time(columnNames='lunchStarts', default='', allowNull=true);
+			t.uniqueidentifier(columnNames='uid', default='newid()', allowNull=false);
 			t.references(referenceNames="vacation");
 			t.timestamps();
 			t.create();
@@ -32,8 +32,8 @@ component extends="wheels.migrator.Migration" hint="Creates RolePermissions Tabl
 		transaction {
 			try {
 				t = createTable(name='rolepermissions', id=false);
-				t.primaryKey(name="roleid", null=false, limit=11);
-				t.primaryKey(name="permissionid", null=false, limit=11);
+				t.primaryKey(name="roleid", allowNull=false, limit=11);
+				t.primaryKey(name="permissionid", allowNull=false, limit=11);
 				t.create();
 			} catch (any e) {
 				local.exception = e;

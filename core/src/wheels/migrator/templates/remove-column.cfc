@@ -32,7 +32,7 @@ component extends="[extends]" hint="[description]" {
 	function down() {
 		transaction {
 			try {
-				addColumn(table = 'tableName', columnType = '', columnName = 'columnName', default = '', null = true);
+				addColumn(table = 'tableName', columnType = '', columnName = 'columnName', default = '', allowNull = true);
 			} catch (any e) {
 				local.exception = e;
 			}

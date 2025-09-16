@@ -69,13 +69,13 @@ component extends="wheels.migrator.Migration" hint="Create users table" {
 		transaction {
 			try {
 				t = createTable(name='users', force=false, id=true, primaryKey='id');
-				t.string(columnNames='email', limit=255, null=false);
-				t.string(columnNames='password', limit=255, null=false);
-				t.string(columnNames='firstName,lastName', limit=100, null=true);
-				t.string(columnNames='role', limit=50, default='user', null=false);
-				t.boolean(columnNames='active', default=true, null=false);
-				t.integer(columnNames='loginCount', default=0, null=false);
-				t.datetime(columnNames='lastLoginAt', null=true);
+				t.string(columnNames='email', limit=255, allowNull=false);
+				t.string(columnNames='password', limit=255, allowNull=false);
+				t.string(columnNames='firstName,lastName', limit=100, allowNull=true);
+				t.string(columnNames='role', limit=50, default='user', allowNull=false);
+				t.boolean(columnNames='active', default=true, allowNull=false);
+				t.integer(columnNames='loginCount', default=0, allowNull=false);
+				t.datetime(columnNames='lastLoginAt', allowNull=true);
 				t.timestamps();
 				t.create();
 				
@@ -123,9 +123,9 @@ component extends="wheels.migrator.Migration" hint="Add profile fields to users"
 	function up() {
 		transaction {
 			try {
-				addColumn(table='users', columnName='bio', columnType='text', null=true);
-				addColumn(table='users', columnName='avatarUrl', columnType='string', limit=500, null=true);
-				addColumn(table='users', columnName='birthDate', columnType='date', null=true);
+				addColumn(table='users', columnName='bio', columnType='text', allowNull=true);
+				addColumn(table='users', columnName='avatarUrl', columnType='string', limit=500, allowNull=true);
+				addColumn(table='users', columnName='birthDate', columnType='date', allowNull=true);
 			} catch (any e) {
 				local.exception = e;
 			}
@@ -170,8 +170,8 @@ component extends="wheels.migrator.Migration" hint="Create posts_tags junction t
 		transaction {
 			try {
 				t = createTable(name='posts_tags', id=false);
-				t.integer(columnNames='postId', null=false);
-				t.integer(columnNames='tagId', null=false);
+				t.integer(columnNames='postId', allowNull=false);
+				t.integer(columnNames='tagId', allowNull=false);
 				t.timestamps();
 				t.create();
 				
@@ -282,12 +282,12 @@ component extends="wheels.migrator.Migration" hint="Migrate user roles to new fo
 
 ```cfml
 // String types
-t.string(columnNames='name', limit=255, null=true, default='');
+t.string(columnNames='name', limit=255, allowNull=true, default='');
 t.text(columnNames='description');
 t.char(columnNames='code', limit=10);
 
 // Numeric types
-t.integer(columnNames='age', limit=11, null=false, default=0);
+t.integer(columnNames='age', limit=11, allowNull=false, default=0);
 t.biginteger(columnNames='views', limit=20);
 t.decimal(columnNames='price', precision=10, scale=2);
 t.float(columnNames='rating');
@@ -332,7 +332,7 @@ addColumn(
 	table='posts',
 	columnName='viewCount',
 	columnType='integer',
-	null=false,
+	allowNull=false,
 	default=0
 );
 
@@ -341,7 +341,7 @@ changeColumn(
 	table='posts',
 	columnName='viewCount',
 	columnType='integer',
-	null=false
+	allowNull=false
 );
 ```
 

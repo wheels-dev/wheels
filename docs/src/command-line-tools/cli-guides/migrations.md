@@ -150,7 +150,7 @@ function up() {
             column="phoneNumber",
             type="string",
             limit=20,
-            null=true
+            allowNull=true
         );
         
         // Multiple columns
@@ -174,7 +174,7 @@ function up() {
             type="decimal",
             precision=12,
             scale=2,
-            null=false,
+            allowNull=false,
             default=0
         );
     }
@@ -557,13 +557,13 @@ wheels dbmigrate create blank fix_orders_status_column
 function up() {
     transaction {
         // Add nullable first
-        addColumn(table="users", column="role", type="string", null=true);
+        addColumn(table="users", column="role", type="string", allowNull=true);
         
         // Set default values
         updateRecord(table="users", where="1=1", values={role: "member"});
         
         // Make non-nullable
-        changeColumn(table="users", column="role", null=false);
+        changeColumn(table="users", column="role", allowNull=false);
     }
 }
 ```
