@@ -36,7 +36,7 @@ cp -r tests "${BUILD_DIR}/"
 # Copy AI documentation files
 echo "Copying AI documentation..."
 cp CLAUDE.md "${BUILD_DIR}/"
-cp -r /.ai "${BUILD_DIR}/"
+cp -r .ai "${BUILD_DIR}/"
 
 # Copy VS Code snippets
 echo "Copying VS Code snippets..."
