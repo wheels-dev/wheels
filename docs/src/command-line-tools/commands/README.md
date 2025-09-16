@@ -11,7 +11,7 @@ Complete reference for all Wheels CLI commands organized by category.
 | `wheels generate app [name]` | Create new application |
 | `wheels generate scaffold [name]` | Generate complete CRUD |
 | `wheels dbmigrate latest` | Run database migrations |
-| `wheels test` | Run application tests |
+| `wheels test run` | Run application tests |
 | `wheels reload` | Reload application |
 
 ## Core Commands
@@ -86,7 +86,12 @@ Commands for running and managing tests.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `wheels test` | Run framework tests | [Details](testing/test.md) |
+| `wheels test run` | Run tests | [Details](test/test-run.md) |
+| `wheels test all` | Run all test | [Details](test/test-advanced.md) |
+| `wheels test coverage` | Run coverage tests | [Details](test/test-advanced.md) |
+| `wheels test integration` | Run integration tests | [Details](test/test-advanced.md) |
+| `wheels test unit` | Run unit tests | [Details](test/test-advanced.md) |
+| `wheels test watch` | rerun tests on any change | [Details](test/test-advanced.md) |
 
 ## Environment Management
 
@@ -94,9 +99,11 @@ Commands for managing development environments and application context.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `wheels env` | Environment base command | [Details](environment/env.md) |
 | `wheels env setup [name]` | Setup environment | [Details](environment/env-setup.md) |
 | `wheels env list` | List environments | [Details](environment/env-list.md) |
+| `wheels env merge` | Merge env files | [Details](environment/env-list.md) |
+| `wheels env set` | set env variable | [Details](environment/env-list.md) |
+| `wheels env show` | show env variables | [Details](environment/env-list.md) |
 
 ## Code Analysis
 
@@ -104,18 +111,10 @@ Commands for analyzing code quality and patterns.
 
 | Command | Description | Documentation |
 |---------|-------------|---------------|
-| `wheels analyze` | Code analysis base command | [Details](analysis/analyze.md) |
 | `wheels analyze code` | Analyze code quality | [Details](analysis/analyze-code.md) |
 | `wheels analyze performance` | Performance analysis | [Details](analysis/analyze-performance.md) |
 | `wheels analyze security` | Security analysis | [Details](analysis/analyze-security.md) |
 
-## CI/CD Commands
-
-Commands for continuous integration and deployment workflows.
-
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels ci init` | Initialize CI/CD configuration | [Details](ci/ci-init.md) |
 
 ## Docker Commands
 
@@ -127,16 +126,6 @@ Commands for Docker container management and deployment.
 | `wheels docker deploy` | Deploy using Docker | [Details](docker/docker-deploy.md) |
 
 ## Command Patterns
-
-### Getting Help
-
-Every command supports `--help`:
-
-```bash
-wheels [command] --help
-wheels generate controller --help
-wheels dbmigrate create table --help
-```
 
 ### Command Aliases
 
@@ -154,18 +143,18 @@ wheels new myapp         # Same as: wheels generate app myapp
 ```bash
 wheels generate scaffold name=product properties=name:string,price:decimal
 wheels dbmigrate latest
-wheels test
+wheels test run
 ```
 
 **Starting development:**
 ```bash
 wheels reload            # Reload the application
-wheels test             # Run tests
+wheels test run          # Run tests
 ```
 
 **Deployment preparation:**
 ```bash
-wheels test
+wheels test run
 wheels analyze security
 wheels analyze performance
 wheels dbmigrate info

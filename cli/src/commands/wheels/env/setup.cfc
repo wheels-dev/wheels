@@ -10,25 +10,32 @@ component extends="../base" {
     property name="environmentService" inject="EnvironmentService@wheels-cli";
     
     /**
-     * @environment.hint Environment name (development, staging, production)
+     * @environment.hint Environment name (e.g. development, staging, production)
      * @environment.options development,staging,production
      * @template.hint Environment template (local, docker, vagrant)
      * @template.options local,docker,vagrant
-     * @database.hint Database type (h2, mysql, postgres, mssql)
-     * @database.options h2,mysql,postgres,mssql
+     * @dbtype.hint Database type (h2, mysql, postgres, mssql)
+     * @dbtype.options h2,mysql,postgres,mssql
      * @force.hint Overwrite existing configuration
      */
     function run(
-        string environment,
+        required string environment,
         string template = "local",
-        string dbtype = "h2",
-        boolean force = false
+        string dbtype = "H2",
+        string database = "",
+        string datasource = "",
+        boolean force = false,
+        string base = "",
+        boolean debug = false,
+        boolean cache = false,
+        string reloadPassword = "",
+        boolean help = false
     ) {
         var projectRoot = resolvePath(".");
         arguments = reconstructArgs(arguments);
 
         // Show help if requested
-        if ( structKeyExists(arguments, "help") ) {
+        if ( arguments.help == true) {
             return showSetupHelp();
         } else {
             while ( trim(arguments.environment) == "" ) {
@@ -42,7 +49,7 @@ component extends="../base" {
              .line();
         
         var result = environmentService.setup(argumentCollection = arguments, rootPath=projectRoot );
-        
+
         if (result.success) {
             print.greenLine("Environment setup complete!")
                  .line();
@@ -107,13 +114,13 @@ component extends="../base" {
             " & cyan & "--force" & reset & "         Overwrite existing environment " & dim & "(default: false)" & reset & "
             " & cyan & "--debug" & reset & "         Enable debug settings " & dim & "(default: false)" & reset & "
             " & cyan & "--cache" & reset & "         Enable cache settings " & dim & "(default: false)" & reset & "
-            " & cyan & "--reload-password" & reset & "  Custom reload password " & dim & "(optional)" & reset & "
+            " & cyan & "--reloadPassword" & reset & "  Custom reload password " & dim & "(optional)" & reset & "
             " & cyan & "--help" & reset & "          Show this help message
 
         " & bold & yellow & "EXAMPLES:" & reset & "
             " & green & "wheels env setup dev" & reset & " " & cyan & "--dbtype=mysql" & reset & " " & cyan & "--debug=true" & reset & "
             " & green & "wheels env setup prod" & reset & " " & cyan & "--dbtype=postgres" & reset & " " & cyan & "--cache=true" & reset & " " & cyan & "--debug=false" & reset & "
-            " & green & "wheels env setup test" & reset & " " & cyan & "--base=dev" & reset & " " & cyan & "--dbtype=h2" & reset & " " & cyan & "--reload-password=mypassword" & reset & "
+            " & green & "wheels env setup test" & reset & " " & cyan & "--base=dev" & reset & " " & cyan & "--dbtype=h2" & reset & " " & cyan & "--reloadPassword=mypassword" & reset & "
             " & green & "wheels env setup staging" & reset & " " & cyan & "--template=docker" & reset & " " & cyan & "--dbtype=mysql" & reset & " " & cyan & "--force" & reset & "
 
         " & bold & yellow & "TEMPLATES:" & reset & "

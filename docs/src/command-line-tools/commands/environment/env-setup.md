@@ -12,23 +12,19 @@ wheels env setup [name] [options]
 
 The `wheels env setup` command creates and configures new environments for your Wheels application. It generates environment-specific configuration files, database settings, and initializes the environment structure.
 
-## Arguments
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `name` | Environment name (e.g., staging, qa, production) | Required |
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
+| `--name` | Environment name (e.g., staging, qa, production) | `required` |
 | `--base` | Base environment to copy from | `development` |
 | `--database` | Database name | `wheels_[name]` |
+| `--dbtype` | Database type | `H2` |
 | `--datasource` | CF datasource name | `wheels_[name]` |
 | `--debug` | Enable debug mode | `false` |
 | `--cache` | Enable caching | Based on name |
-| `--reload-password` | Password for reload | Random |
-| `--skip-database` | Skip database creation | `false` |
+| `--reloadPassword` | Password for reload | Random |
 | `--force` | Overwrite existing environment | `false` |
 | `--help` | Show help information |
 
@@ -41,7 +37,7 @@ wheels env setup staging
 
 ### Setup with custom database
 ```bash
-wheels env setup qa --database=wheels_qa_db --datasource=qa_datasource
+wheels env setup qa --database=wheels_qa_db --datasource=qa_datasource --dbtype=mysql
 ```
 
 ### Copy from production settings
@@ -51,13 +47,9 @@ wheels env setup staging --base=production
 
 ### Setup with specific options
 ```bash
-wheels env setup production --debug=false --cache=true --reload-password=secret123
+wheels env setup production --debug=false --cache=true --reloadPassword=secret123
 ```
 
-### Skip database setup
-```bash
-wheels env setup testing --skip-database
-```
 
 ## What It Does
 
@@ -73,12 +65,7 @@ wheels env setup testing --skip-database
    - Debug and cache options
    - Security settings
 
-3. **Sets Up Database** (unless skipped):
-   - Creates database
-   - Configures datasource
-   - Tests connection
-
-4. **Updates Environment Registry**:
+3. **Updates Environment Registry**:
    - Adds to available environments
    - Sets up environment detection
 
@@ -154,28 +141,6 @@ Create specialized environments:
 wheels env setup performance-testing --base=production --cache=false
 ```
 
-## Database Configuration
-
-### Automatic Setup
-```bash
-wheels env setup staging
-# Creates: wheels_staging database
-# Datasource: wheels_staging
-```
-
-### Custom Database
-```bash
-wheels env setup staging \
-  --database=staging_db \
-  --datasource=myapp_staging
-```
-
-### Database URL
-```bash
-wheels env setup production \
-  --database-url="mysql://user:pass@host:3306/db"
-```
-
 ## Environment Variables
 
 The command sets up support for:
@@ -207,9 +172,8 @@ set(cacheQueries=false);
 After setup, the command validates:
 
 1. Configuration file syntax
-2. Database connectivity
-3. Directory permissions
-4. Environment detection
+2. Directory permissions
+3. Environment detection
 
 ## Environment Detection
 
@@ -234,21 +198,6 @@ if (cgi.server_name contains "staging") {
 4. **Documentation**: Document environment purposes
 5. **Testing**: Test configuration before use
 
-## Advanced Configuration
-
-### Multiple Databases
-```bash
-wheels env setup reporting \
-  --database=wheels_reporting \
-  --read-database=wheels_replica
-```
-
-### Load Balancing
-```bash
-wheels env setup production \
-  --servers=web1,web2,web3 \
-  --load-balancer=nginx
-```
 
 ### Feature Flags
 ```cfml
@@ -261,11 +210,6 @@ set(features={
 ```
 
 ## Troubleshooting
-
-### Database Creation Failed
-- Check database permissions
-- Verify connection settings
-- Use `--skip-database` and create manually
 
 ### Configuration Errors
 - Check syntax in settings.cfm
@@ -294,8 +238,5 @@ set(features={
 - Test thoroughly before using
 
 ## See Also
-
-- [wheels env](env.md) - Environment management overview
 - [wheels env list](env-list.md) - List environments
 - [wheels env switch](env-switch.md) - Switch environments
-- [wheels config](../config/config-env.md) - Configuration management

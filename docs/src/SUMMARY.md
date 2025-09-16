@@ -80,6 +80,8 @@
   * Plugins
     * [wheels plugin install](command-line-tools/commands/plugins/plugins-install.md)
     * [wheels plugin list](command-line-tools/commands/plugins/plugins-list.md)
+  * Asset Management
+    * [asset management commands](command-line-tools/commands/assets-cache-management.md)
 * CLI Development Guides
   * [Configuration Management](command-line-tools/configuration.md)
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)
