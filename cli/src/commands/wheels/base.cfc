@@ -648,12 +648,17 @@ component excludeFromHelp=true {
 
         for (local.key in arguments.argStruct) {
             if (find("=", local.key)) {
-                local.parts = listToArray(local.key, "=");
-                if (arrayLen(local.parts) == 2 && arguments.argStruct[local.key] == true) {
-                    local.result[local.parts[1]] = local.parts[2];
-                } else {
-                    local.result[local.parts[1]] = local.parts[2] ?: true;
+                // Split only on the first = to handle values with = signs
+                local.equalPos = find("=", local.key);
+                local.paramName = left(local.key, local.equalPos - 1);
+                local.paramValue = mid(local.key, local.equalPos + 1, len(local.key));
+                
+                // Remove surrounding quotes if present
+                if (left(local.paramValue, 1) == '"' && right(local.paramValue, 1) == '"') {
+                    local.paramValue = mid(local.paramValue, 2, len(local.paramValue) - 2);
                 }
+                
+                local.result[local.paramName] = local.paramValue;
             } else {
                 local.result[local.key] = arguments.argStruct[local.key];
             }

@@ -1,5 +1,4 @@
 # dbmigrate create table
-*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 Generate a migration file for creating a new database table.
 
