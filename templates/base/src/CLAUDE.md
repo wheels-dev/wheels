@@ -2,6 +2,34 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
 
+## ⚠️ MANDATORY: Pre-Implementation Documentation Check
+
+**Before implementing ANY code, AI assistants MUST:**
+
+1. **📖 Load Relevant .ai Documentation**
+   - Check if `.ai/` folder exists in project root
+   - Load appropriate documentation sections:
+     - For models: Read `.ai/wheels/database/` and `.ai/cfml/components/`
+     - For controllers: Read `.ai/wheels/controllers/` and `.ai/cfml/syntax/`
+     - For CFML syntax: Read `.ai/cfml/syntax/` and `.ai/cfml/best-practices/`
+     - For patterns: Read `.ai/wheels/patterns/` and `.ai/wheels/snippets/`
+
+2. **✅ Validate Against Standards**
+   - Confirm implementation matches patterns in `.ai/wheels/patterns/`
+   - Verify CFML syntax follows `.ai/cfml/best-practices/`
+   - Check security practices from `.ai/wheels/security/`
+   - Ensure naming conventions match `.ai/wheels/core-concepts/`
+
+3. **🔍 Use Established Code Examples**
+   - Reference code templates from `.ai/wheels/snippets/`
+   - Follow model patterns from `.ai/wheels/database/models/`
+   - Apply controller patterns from `.ai/wheels/controllers/`
+
+**If `.ai/` folder is not available, use the MCP resources:**
+- `wheels://.ai/cfml/syntax` - CFML language fundamentals
+- `wheels://.ai/wheels/patterns` - Framework patterns
+- `wheels://.ai/wheels/snippets` - Code examples
+
 ## Quick Start
 
 ### New to Wheels?

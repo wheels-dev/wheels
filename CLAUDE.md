@@ -2,7 +2,61 @@
 
 This file provides guidance to Claude Code (claude.ai/code) and other AI coding assistants when working with a Wheels application.
 
-## AI Documentation Endpoints
+## AI Documentation System
+
+### Comprehensive Documentation Structure
+
+This project includes an extensive **`.ai` documentation folder** with 80+ specialized documentation files organized for AI assistants. **Always consult the `.ai` folder before implementing any code** to ensure adherence to established patterns and best practices.
+
+**📁 Documentation Structure:**
+```
+.ai/
+├── README.md                     (Documentation overview and usage guide)
+├── cfml/                         (Core CFML language documentation)
+│   ├── syntax/                   (CFML syntax, CFScript vs tags)
+│   ├── data-types/               (Variables, arrays, structures, scopes)
+│   ├── control-flow/             (Conditionals, loops, error handling)
+│   ├── components/               (CFC development patterns)
+│   ├── database/                 (Query fundamentals)
+│   ├── advanced/                 (Closures, advanced features)
+│   └── best-practices/           (Modern CFML patterns)
+└── wheels/                       (Framework-specific documentation)
+    ├── cli/                      (Generator tools and commands)
+    ├── configuration/            (Framework and environment settings)
+    ├── controllers/              (Request handling patterns)
+    ├── core-concepts/            (MVC architecture, conventions)
+    ├── database/                 (ORM, migrations, validations)
+    ├── views/                    (Templates, layouts, helpers)
+    ├── communication/            (Email, HTTP, APIs)
+    ├── security/                 (Authentication, CSRF protection)
+    ├── patterns/                 (Development patterns)
+    └── snippets/                 (Code examples and references)
+```
+
+### Pre-Implementation Documentation Checklist
+
+**Before writing any code, AI assistants MUST:**
+
+1. **📖 Load Relevant Documentation**
+   ```bash
+   # For model work: Read .ai/wheels/database/
+   # For controller work: Read .ai/wheels/controllers/
+   # For CFML syntax: Read .ai/cfml/syntax/
+   # For patterns: Read .ai/wheels/patterns/
+   ```
+
+2. **✅ Validate Against Standards**
+   - Check `.ai/cfml/best-practices/` for CFML coding standards
+   - Verify patterns match `.ai/wheels/patterns/` examples
+   - Ensure security practices from `.ai/wheels/security/` are followed
+   - Confirm naming conventions from `.ai/wheels/core-concepts/`
+
+3. **🔍 Reference Code Examples**
+   - Use examples from `.ai/wheels/snippets/` as templates
+   - Follow established patterns in `.ai/wheels/database/` for models
+   - Apply controller patterns from `.ai/wheels/controllers/`
+
+### Live Documentation Endpoints
 
 When the development server is running, you can access enhanced documentation:
 - **Full Documentation**: `/wheels/ai` - Optimized for AI consumption

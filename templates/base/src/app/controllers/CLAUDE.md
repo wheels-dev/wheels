@@ -2,6 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with Wheels controllers.
 
+## ⚠️ MANDATORY: Controller Implementation Validation
+
+**Before implementing ANY controller code, AI assistants MUST:**
+
+1. **📖 Load Controller Documentation**
+   - Read `.ai/wheels/controllers/basics.md` for controller fundamentals
+   - Review `.ai/wheels/controllers/filters.md` for authentication patterns
+   - Check `.ai/wheels/controllers/parameters.md` for parameter handling
+   - Reference `.ai/wheels/controllers/rendering.md` for response patterns
+
+2. **✅ Validate Implementation Standards**
+   - Confirm controller uses **plural naming** (Users.cfc handles users resource)
+   - Verify extends "Controller" class (not "wheels.Controller")
+   - Ensure proper filter syntax: `filters(through="authenticate")`
+   - Check parameter verification: `verifies(params="key", paramsTypes="integer")`
+
+3. **🔒 Security Requirements**
+   - Implement CSRF protection: `protectsFromForgery()`
+   - Add parameter validation for all actions
+   - Use authentication filters where needed
+   - Sanitize user input properly
+
+4. **🔍 Code Example Reference**
+   - Use templates from `.ai/wheels/snippets/controllers/`
+   - Follow RESTful patterns from `.ai/wheels/patterns/`
+   - Apply security practices from `.ai/wheels/security/`
+
+5. **📝 RESTful Action Standards**
+   - `index()` - List resources (GET /users)
+   - `show()` - Display single resource (GET /users/12)
+   - `new()` - Show creation form (GET /users/new)
+   - `create()` - Process creation (POST /users)
+   - `edit()` - Show edit form (GET /users/12/edit)
+   - `update()` - Process updates (PUT /users/12)
+   - `delete()` - Remove resource (DELETE /users/12)
+
 ## Overview
 
 Controllers in Wheels handle incoming HTTP requests and coordinate between models (data) and views (presentation). They are the "C" in the MVC (Model-View-Controller) pattern and are responsible for:
