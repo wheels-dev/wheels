@@ -265,6 +265,32 @@ component extends="Controller" {
             redirectTo(controller="sessions", action="new");
         }
     }
+
+    function sendWelcomeEmail() {
+        sendEmail(
+            template="users/welcome",
+            from="noreply@myapp.com",
+            to=user.email,
+            subject="Welcome to MyApp!",
+            user=user
+        );
+    }
+
+    function downloadReport() {
+        sendFile(
+            file="report.pdf",
+            name="Monthly Report.pdf",
+            type="application/pdf",
+            disposition="attachment",
+            directory="/reports/"
+        );
+    }
+
+    function requireSSL() {
+        if (!isSecure()) {
+            redirectTo(protocol="https");
+        }
+    }
 }
 ```
 
@@ -285,17 +311,32 @@ component extends="Model" {
         // Callbacks
         beforeSave("hashPassword");
         afterCreate("sendWelcomeEmail");
-        
-        // Scopes
-        scope(name="active", where="active = 1");
+
+        // Nested properties for associations
+        nestedProperties(association="addresses", allowDelete=true, autoSave=true);
+
+        // Custom finder methods (CFWheels doesn't have scope() - use custom finder methods instead)
     }
 
     function findByEmail(required string email) {
         return findOne(where="email = '#arguments.email#'");
     }
 
+    function findActive() {
+        return findAll(where="active = 1");
+    }
+
+    function findFirst() {
+        return findFirst(property="createdAt");
+    }
+
     function fullName() {
         return trim("#firstname# #lastname#");
+    }
+
+    function reload() {
+        // Reload this model instance from the database
+        return super.reload();
     }
 }
 ```
@@ -393,15 +434,54 @@ component extends="wheels.migrator.Migration" {
 
 ### Column Types
 ```cfm
-t.string(columnNames="name", limit=255, null=false, default="");
-t.text(columnNames="description", null=true);
-t.integer(columnNames="count", null=false, default=0);
+t.string(columnNames="name", limit=255, allowNull=false, default="");
+t.text(columnNames="description", allowNull=true);
+t.integer(columnNames="count", allowNull=false, default=0);
 t.decimal(columnNames="price", precision=10, scale=2);
 t.boolean(columnNames="active", default=false);
 t.date(columnNames="eventDate");
-t.datetime(columnNames="createdAt");
+t.datetime(columnNames="createdAt"); // Use for createdAt/updatedAt only when not using timestamps(); OK for other columns
 t.timestamps();  // Creates createdAt and updatedAt
-t.integer(columnNames="userId", null=false);  // Foreign key
+t.integer(columnNames="userId", allowNull=false);  // Foreign key
+```
+
+### Advanced Migration Features
+
+```cfm
+// Create database views
+component extends="wheels.migrator.Migration" {
+    function up() {
+        v = createView(name="activeUsers");
+        v.sql("SELECT id, name, email FROM users WHERE active = 1");
+        v.create();
+    }
+}
+
+// Modify existing tables
+component extends="wheels.migrator.Migration" {
+    function up() {
+        t = changeTable(name="users");
+        t.string(columnNames="middleName", limit=100);
+        t.change();
+
+        // Add indexes
+        addIndex(table="users", columnNames="email", unique=true);
+        addIndex(table="users", columnNames="lastName,firstName");
+
+        // Rename tables
+        renameTable(oldName="user_profiles", newName="profiles");
+    }
+
+    function down() {
+        removeIndex(table="users", indexName="users_email");
+        removeIndex(table="users", indexName="users_lastName_firstName");
+        renameTable(oldName="profiles", newName="user_profiles");
+
+        t = changeTable(name="users");
+        t.removeColumn(columnNames="middleName");
+        t.change();
+    }
+}
 ```
 
 ## Testing
@@ -473,7 +553,7 @@ component extends="testbox.system.BaseSpec" {
 ```cfm
 // In controllers
 function config() {
-    protectFromForgery(); // Enable CSRF protection
+    protectsFromForgery(); // Enable CSRF protection
 }
 
 // In forms

@@ -383,9 +383,9 @@ component extends="wheels.migrator.Migration" {
     function up() {
         createTable(name="audit_logs") {
             t.increments("id");
-            t.string(columnNames="model_name", null=false);
-            t.integer(columnNames="record_id", null=false);
-            t.string(columnNames="action", null=false);
+            t.string(columnNames="model_name", allowNull=false);
+            t.integer(columnNames="record_id", allowNull=false);
+            t.string(columnNames="action", allowNull=false);
             t.text(columnNames="changes");
             t.integer(columnNames="user_id");
             t.string(columnNames="ip_address");

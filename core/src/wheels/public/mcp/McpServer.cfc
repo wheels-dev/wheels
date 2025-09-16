@@ -615,7 +615,7 @@ Key Wheels controller concepts:
 - Filters: filters(through='authenticate', except='index')
 - Rendering: renderView(), renderWith(), redirectTo()
 - Content types: provides('html,json')
-- CSRF: protectFromForgery()
+- CSRF: protectsFromForgery()
 
 Focus on RESTful patterns and Wheels conventions.",
 

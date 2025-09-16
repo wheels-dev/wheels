@@ -174,7 +174,7 @@ function up() {
             type="decimal",
             precision=12,
             scale=2,
-            null=false,
+            allowNull=false,
             default=0
         );
     }
@@ -563,7 +563,7 @@ function up() {
         updateRecord(table="users", where="1=1", values={role: "member"});
         
         // Make non-nullable
-        changeColumn(table="users", column="role", null=false);
+        changeColumn(table="users", column="role", allowNull=false);
     }
 }
 ```

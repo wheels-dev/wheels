@@ -17,11 +17,11 @@ function up() {
         t = createTable(name="products", force=false);
 
         // String types
-        t.string(columnNames="name", limit=100, null=false);
+        t.string(columnNames="name", limit=100, allowNull=false);
         t.text(columnNames="description");
 
         // Numeric types
-        t.integer(columnNames="quantity", null=false, default=0);
+        t.integer(columnNames="quantity", allowNull=false, default=0);
         t.bigInteger(columnNames="views");
         t.decimal(columnNames="price", precision=10, scale=2);
         t.float(columnNames="rating");
@@ -42,7 +42,7 @@ function up() {
 
 ## Usage
 - Use type methods on table builder: `t.string()`, `t.integer()`
-- Specify constraints: `null=false`, `default=value`
+- Specify constraints: `allowNull=false`, `default=value`
 - Set limits: `limit=255`, `precision=10, scale=2`
 - Use `timestamps()` for automatic audit fields
 

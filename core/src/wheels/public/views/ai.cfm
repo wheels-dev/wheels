@@ -147,9 +147,11 @@ function getEssentialFunctions(docs) {
 		// Model essentials
 		"findAll", "findOne", "findByKey", "new", "create", "update", "updateAll", "delete", "deleteAll", "save",
 		"valid", "errors", "hasMany", "belongsTo", "hasOne", "validatesPresenceOf", "validatesUniquenessOf",
+		"validatesFormatOf", "nestedProperties", "findFirst", "reload",
 
 		// Controller essentials
-		"renderView", "renderWith", "redirectTo", "params", "filters", "provides", "protectFromForgery",
+		"renderView", "renderWith", "redirectTo", "params", "filters", "provides", "protectsFromForgery",
+		"sendEmail", "sendFile", "isSecure", "authenticityToken",
 
 		// View essentials
 		"linkTo", "buttonTo", "startFormTag", "endFormTag", "textField", "submitTag", "selectTag",
@@ -157,6 +159,7 @@ function getEssentialFunctions(docs) {
 
 		// Migration essentials
 		"createTable", "changeTable", "addColumn", "removeColumn", "addIndex", "removeIndex",
+		"createView", "renameTable",
 
 		// Routing essentials
 		"mapper", "resources", "resource", "get", "post", "put", "patch", "delete", "root", "wildcard"
@@ -209,12 +212,28 @@ function getCommonPatterns() {
 			{
 				"name": "Model with Associations",
 				"code": "component extends='Model' {\n  function config() {\n    hasMany('orders');\n    belongsTo('role');\n  }\n}"
+			},
+			{
+				"name": "Model with Nested Properties",
+				"code": "component extends='Model' {\n  function config() {\n    hasMany('addresses');\n    nestedProperties(association='addresses', allowDelete=true, autoSave=true);\n  }\n}"
 			}
 		],
 		"controllerPatterns": [
 			{
 				"name": "RESTful Controller",
 				"code": "component extends='Controller' {\n  function config() {\n    filters(through='authenticate', except='index,show');\n    provides('html,json');\n  }\n  \n  function index() {\n    users = model('User').findAll();\n  }\n  \n  function create() {\n    user = model('User').create(params.user);\n    if (user.hasErrors()) {\n      renderView(action='new');\n    } else {\n      redirectTo(route='user', key=user.id);\n    }\n  }\n}"
+			},
+			{
+				"name": "Controller with Email",
+				"code": "component extends='Controller' {\n  function sendWelcomeEmail() {\n    sendEmail(\n      template='users/welcome',\n      from='noreply@myapp.com',\n      to=user.email,\n      subject='Welcome!',\n      user=user\n    );\n  }\n}"
+			},
+			{
+				"name": "Controller with File Download",
+				"code": "component extends='Controller' {\n  function downloadReport() {\n    sendFile(\n      file='report.pdf',\n      name='Monthly Report.pdf',\n      type='application/pdf',\n      disposition='attachment',\n      directory='/reports/'\n    );\n  }\n}"
+			},
+			{
+				"name": "Controller with HTTPS Check",
+				"code": "component extends='Controller' {\n  function config() {\n    filters(through='requireSSL');\n  }\n  \n  function requireSSL() {\n    if (!isSecure()) {\n      redirectTo(protocol='https');\n    }\n  }\n}"
 			}
 		],
 		"viewPatterns": [
@@ -226,7 +245,7 @@ function getCommonPatterns() {
 		"migrationPatterns": [
 			{
 				"name": "Create Table Migration",
-				"code": "component extends='wheels.migrator.Migration' {\n  function up() {\n    t = createTable('users');\n    t.string('firstName,lastName', null=false);\n    t.string('email', limit=100, null=false);\n    t.boolean('active', default=true);\n    t.timestamps();\n    t.create();\n    \n    addIndex(table='users', columnNames='email', unique=true);\n  }\n  \n  function down() {\n    dropTable('users');\n  }\n}"
+				"code": "component extends='wheels.migrator.Migration' {\n  function up() {\n    t = createTable('users');\n    t.string('firstName,lastName', allowNull=false);\n    t.string('email', limit=100, allowNull=false);\n    t.boolean('active', default=true);\n    t.timestamps();\n    t.create();\n    \n    addIndex(table='users', columnNames='email', unique=true);\n  }\n  \n  function down() {\n    dropTable('users');\n  }\n}"
 			}
 		]
 	};
@@ -394,6 +413,30 @@ function handleManifest() {
 				"endpoint": "/wheels/ai?mode=chunk&id=patterns",
 				"size": "medium",
 				"contexts": ["patterns", "bestpractices", "examples"]
+			},
+			{
+				"id": "security",
+				"name": "Security Features",
+				"description": "CSRF protection, HTTPS detection, and security best practices",
+				"endpoint": "/wheels/ai?mode=chunk&id=security",
+				"size": "small",
+				"contexts": ["security", "csrf", "authentication"]
+			},
+			{
+				"id": "email",
+				"name": "Email Functionality",
+				"description": "Email sending, mailer components, and email templates",
+				"endpoint": "/wheels/ai?mode=chunk&id=email",
+				"size": "small",
+				"contexts": ["email", "mailers", "notifications"]
+			},
+			{
+				"id": "files",
+				"name": "File Handling",
+				"description": "File uploads, downloads, and file management",
+				"endpoint": "/wheels/ai?mode=chunk&id=files",
+				"size": "small",
+				"contexts": ["files", "uploads", "downloads"]
 			}
 		],
 		"endpoints": {
@@ -600,6 +643,15 @@ function handleChunk() {
 		case "patterns":
 			local.chunk.content = getCommonPatterns();
 			break;
+		case "security":
+			local.chunk.content = getSecurityDocumentation();
+			break;
+		case "email":
+			local.chunk.content = getEmailDocumentation();
+			break;
+		case "files":
+			local.chunk.content = getFileHandlingDocumentation();
+			break;
 		default:
 			local.chunk.error = "Unknown chunk ID: " & request.wheels.params.id;
 	}
@@ -715,5 +767,155 @@ function handlePlugins() {
 			"statusCode": local.result.statusCode
 		}));
 	}
+}
+
+// Security-focused documentation
+function getSecurityDocumentation() {
+	return {
+		"title": "Wheels Security Documentation",
+		"description": "Security features and best practices for Wheels applications",
+		"sections": {
+			"csrf_protection": {
+				"title": "CSRF Protection",
+				"description": "Cross-site request forgery protection",
+				"methods": [
+					{
+						"name": "protectsFromForgery",
+						"description": "Enable CSRF protection for the controller",
+						"usage": "protectsFromForgery()",
+						"location": "controllers"
+					},
+					{
+						"name": "authenticityToken",
+						"description": "Generate CSRF token for forms",
+						"usage": "authenticityToken()",
+						"location": "controllers"
+					},
+					{
+						"name": "csrfMetaTags",
+						"description": "Generate CSRF meta tags for layout head",
+						"usage": "csrfMetaTags()",
+						"location": "views"
+					}
+				],
+				"patterns": [
+					{
+						"title": "Controller CSRF Setup",
+						"code": "component extends='Controller' {\n  function config() {\n    protectsFromForgery();\n  }\n}"
+					},
+					{
+						"title": "Form CSRF Token",
+						"code": "##startFormTag(route='user', method='put')##\n  ##hiddenFieldTag('authenticityToken', authenticityToken())##\n  <!-- form fields -->\n##endFormTag()##"
+					}
+				]
+			},
+			"https_detection": {
+				"title": "HTTPS Detection",
+				"description": "Check if request is secure",
+				"methods": [
+					{
+						"name": "isSecure",
+						"description": "Check if current request uses HTTPS",
+						"usage": "isSecure()",
+						"location": "controllers"
+					}
+				],
+				"patterns": [
+					{
+						"title": "Force HTTPS",
+						"code": "function config() {\n  filters(through='requireHTTPS');\n}\n\nfunction requireHTTPS() {\n  if (!isSecure()) {\n    redirectTo(protocol='https');\n  }\n}"
+					}
+				]
+			}
+		}
+	};
+}
+
+// Email-focused documentation
+function getEmailDocumentation() {
+	return {
+		"title": "Wheels Email Documentation",
+		"description": "Email functionality and mailer components",
+		"sections": {
+			"sending_email": {
+				"title": "Sending Email",
+				"description": "Send emails from controllers and models",
+				"methods": [
+					{
+						"name": "sendEmail",
+						"description": "Send email using configured mailer",
+						"usage": "sendEmail(to='user@example.com', subject='Welcome', template='welcome')",
+						"location": "controllers"
+					}
+				],
+				"patterns": [
+					{
+						"title": "Basic Email Sending",
+						"code": "function create() {\n  user = model('User').create(params.user);\n  if (user.valid()) {\n    sendEmail(\n      to=user.email,\n      subject='Welcome to our site!',\n      template='users/welcome',\n      user=user\n    );\n    redirectTo(route='user', key=user.id);\n  }\n}"
+					},
+					{
+						"title": "Email with Attachments",
+						"code": "sendEmail(\n  to='user@example.com',\n  subject='Your Report',\n  template='reports/monthly',\n  attachment='##expandPath('./reports/monthly.pdf')##'\n);"
+					}
+				]
+			},
+			"mailer_components": {
+				"title": "Mailer Components",
+				"description": "Dedicated mailer components for email logic",
+				"patterns": [
+					{
+						"title": "User Mailer Component",
+						"code": "// /app/mailers/UserMailer.cfc\ncomponent extends='Mailer' {\n  function welcome(user) {\n    set(\n      to=arguments.user.email,\n      subject='Welcome!',\n      template='users/welcome'\n    );\n  }\n}"
+					}
+				]
+			}
+		}
+	};
+}
+
+// File handling documentation
+function getFileHandlingDocumentation() {
+	return {
+		"title": "Wheels File Handling Documentation",
+		"description": "File upload, download, and management functionality",
+		"sections": {
+			"file_downloads": {
+				"title": "File Downloads",
+				"description": "Serve files for download",
+				"methods": [
+					{
+						"name": "sendFile",
+						"description": "Send file to browser for download",
+						"usage": "sendFile(file='path/to/file.pdf', name='report.pdf')",
+						"location": "controllers"
+					}
+				],
+				"patterns": [
+					{
+						"title": "Secure File Download",
+						"code": "function download() {\n  // Verify user has access\n  if (!session.authenticated) {\n    redirectTo(route='login');\n    return;\n  }\n  \n  local.filePath = expandPath('./files/secure/##params.filename##');\n  if (fileExists(local.filePath)) {\n    sendFile(\n      file=local.filePath,\n      name=params.filename,\n      type='application/pdf'\n    );\n  } else {\n    renderView(template='errors/404');\n  }\n}"
+					},
+					{
+						"title": "File Download with Custom Headers",
+						"code": "sendFile(\n  file=expandPath('./reports/monthly.pdf'),\n  name='Monthly_Report.pdf',\n  type='application/pdf',\n  disposition='attachment'\n);"
+					}
+				]
+			},
+			"file_uploads": {
+				"title": "File Uploads",
+				"description": "Handle file uploads in forms",
+				"patterns": [
+					{
+						"title": "Basic File Upload",
+						"code": "// Controller\nfunction create() {\n  if (structKeyExists(params, 'avatar') && len(params.avatar)) {\n    local.uploadResult = fileUpload(\n      expandPath('./public/uploads/'),\n      'avatar',\n      'image/*',\n      'MakeUnique'\n    );\n    params.user.avatarPath = '/uploads/' & local.uploadResult.serverFile;\n  }\n  user = model('User').create(params.user);\n}"
+					},
+					{
+						"title": "File Upload Form",
+						"code": "##startFormTag(enctype='multipart/form-data')##\n  ##fileField('avatar', label='Profile Picture')##\n  ##submitTag('Upload')##\n##endFormTag()##"
+					}
+				]
+			}
+		}
+	};
 }
 </cfscript>

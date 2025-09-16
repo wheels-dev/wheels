@@ -755,7 +755,7 @@ addColumn("users", "email", "string");
 removeColumn("users", "old_field");
 
 // ✅ All named arguments (correct)  
-addColumn(table="users", columnName="email", columnType="string", limit=255, null=false);
+addColumn(table="users", columnName="email", columnType="string", limit=255, allowNull=false);
 removeColumn(table="users", columnName="old_field");
 
 // ❌ Mixed arguments (CAUSES ERRORS - DON'T DO THIS!)

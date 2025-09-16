@@ -21,8 +21,8 @@ component extends="wheels.migrator.Migration" {
     function up() {
         transaction {
             t = createTable(name="users", force=false);
-            t.string(columnNames="firstName,lastName", null=false);
-            t.string(columnNames="email", limit=100, null=false);
+            t.string(columnNames="firstName,lastName", allowNull=false);
+            t.string(columnNames="email", limit=100, allowNull=false);
             t.boolean(columnNames="active", default=true);
             t.timestamps();
             t.create();

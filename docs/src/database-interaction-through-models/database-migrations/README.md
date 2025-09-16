@@ -96,7 +96,7 @@ Whilst we could execute this template in it's current state (we have an up funct
 t = createTable(name='users');
 t.string(
  columnNames='firstname,lastname,password',
- default='', null=false, limit='60');
+ default='', allowNull=false, limit='60');
 
 t.string(
  columnNames='username,passwordresettoken,apikey',
@@ -110,7 +110,7 @@ t.string(
  columnNames='title,postcode,lang,locale,timezone',
  default='', null=true, limit='15');
 
-t.integer(columnNames='roleid', default='0', null=false, limit='11');
+t.integer(columnNames='roleid', default='0', allowNull=false, limit='11');
 t.datetime(columnNames='pwresettokenat', default='', null=true);
 t.datetime(columnNames='pwlastresetat', default='', null=true);
 
@@ -131,8 +131,8 @@ While `t = createTable(name='users');` will create a standard auto-increment num
 
 ```javascript
 t = createTable(name='rolepermissions', id=false);
-t.primaryKey(name="roleid", null=false, limit=11);
-t.primaryKey(name="permissionid", null=false, limit=11);
+t.primaryKey(name="roleid", allowNull=false, limit=11);
+t.primaryKey(name="permissionid", allowNull=false, limit=11);
 t.create();
 ```
 
