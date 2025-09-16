@@ -698,11 +698,35 @@ function Show-Summary {
     Write-ColorOutput "  • wheels migrate up            - Run database migrations              " -ForegroundColor Green
     Write-ColorOutput "                                                                               " -ForegroundColor Green
     Write-ColorOutput "  Documentation: https://wheels.dev/guides                                    " -ForegroundColor Green
+    Write-ColorOutput "  Getting Started: https://wheels.dev/guides#start-a-new-application-using-the-command-line" -ForegroundColor Green
     Write-ColorOutput "=================================================================================" -ForegroundColor Green
     Write-Host ""
 
     if (-not $SkipPath) {
         Write-Warning "Please restart your terminal or run refreshenv to use the box command"
+    }
+
+    # Simple press any key to continue and open documentation
+    Write-Host ""
+    Write-ColorOutput "Press any key to continue..." -ForegroundColor Cyan
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+    # Open the Getting Started guide in default browser
+    Write-Host ""
+    Write-Info "Opening Wheels Getting Started Guide in your browser..."
+
+    if (-not $Quiet) {
+        try {
+            Start-Process "https://wheels.dev/guides#start-a-new-application-using-the-command-line"
+            Write-Success "Browser opened successfully!"
+            Start-Sleep -Seconds 2  # Give user time to see the success message
+        } catch {
+            Write-Warning "Could not open browser automatically."
+            Write-Info "Please visit: https://wheels.dev/guides#start-a-new-application-using-the-command-line"
+            Write-Host ""
+            Write-ColorOutput "Press any key to exit..." -ForegroundColor Gray
+            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        }
     }
 }
 
