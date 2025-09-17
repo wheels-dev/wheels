@@ -44,9 +44,8 @@ component extends="../base" {
 		print.boldGreenLine("==> Precompiling assets for #arguments.environment#...");
 		print.line();
 		
-		// Define asset directories
-		// var publicDir = fileSystemUtil.resolvePath("public");		
-		var publicDir = fileSystemUtil.resolvePath("\public");
+		// Define asset directories		
+		var publicDir = fileSystemUtil.resolvePath("public");
 
 		print.line(publicDir);
 		var assetsDir = publicDir & "/assets";
@@ -75,7 +74,8 @@ component extends="../base" {
 						source = file.directory & "/" & file.name,
 						target = compiledDir,
 						manifest = manifest,
-						force = arguments.force
+						force = arguments.force,
+						environment = arguments.environment
 					);
 				}
 			}
@@ -91,7 +91,8 @@ component extends="../base" {
 						source = file.directory & "/" & file.name,
 						target = compiledDir,
 						manifest = manifest,
-						force = arguments.force
+						force = arguments.force,
+						environment = arguments.environment
 					);
 				}
 			}
@@ -138,34 +139,31 @@ component extends="../base" {
 		required string source,
 		required string target,
 		required struct manifest,
-		required boolean force
+		required boolean force,
+		required string environment
 	) {
 		var fileName = getFileFromPath(arguments.source);
 		var content = fileRead(arguments.source);
 		var hash = hash(content, "MD5");
 		var targetFileName = replaceNoCase(fileName, ".js", "-#hash#.min.js");
 		var targetPath = arguments.target & "/" & targetFileName;
-		
+
 		// Check if file already exists and hasn't changed
 		if (!arguments.force && fileExists(targetPath)) {
 			print.line("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
-		
-		// Simple minification (remove comments and extra whitespace)
-		// In a real implementation, you'd use a proper JS minifier
-		content = reReplace(content, "/\*[\s\S]*?\*/", "", "all"); // Remove block comments
-		content = reReplace(content, "//[^\r\n]*", "", "all"); // Remove line comments
-		content = reReplace(content, "[\r\n]+", chr(10), "all"); // Normalize line endings
-		content = reReplace(content, "\s+", " ", "all"); // Collapse whitespace
-		content = trim(content);
-		
-		// Write minified file
+
+		// Apply environment-specific minification
+		content = minifyJavaScript(content, arguments.environment);
+
+		// Write processed file
 		fileWrite(targetPath, content);
 		arguments.manifest[fileName] = targetFileName;
-		
-		print.greenLine("#fileName# → #targetFileName#");
+
+		var processType = getProcessingDescription(arguments.environment);
+		print.greenLine("#fileName# -> #targetFileName# (#processType#)");
 		return 1;
 	}
 	
@@ -176,37 +174,31 @@ component extends="../base" {
 		required string source,
 		required string target,
 		required struct manifest,
-		required boolean force
+		required boolean force,
+		required string environment
 	) {
 		var fileName = getFileFromPath(arguments.source);
 		var content = fileRead(arguments.source);
 		var hash = hash(content, "MD5");
 		var targetFileName = replaceNoCase(fileName, ".css", "-#hash#.min.css");
 		var targetPath = arguments.target & "/" & targetFileName;
-		
+
 		// Check if file already exists and hasn't changed
 		if (!arguments.force && fileExists(targetPath)) {
 			print.line("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
-		
-		// Simple CSS minification
-		content = reReplace(content, "/\*[\s\S]*?\*/", "", "all"); // Remove comments
-		content = reReplace(content, "[\r\n]+", " ", "all"); // Remove line breaks
-		content = reReplace(content, "\s+", " ", "all"); // Collapse whitespace
-		content = reReplace(content, ";\s*}", "}", "all"); // Remove last semicolon
-		content = reReplace(content, ":\s+", ":", "all"); // Remove space after colon
-		content = reReplace(content, "\s*{\s*", "{", "all"); // Remove space around braces
-		content = reReplace(content, "\s*}\s*", "}", "all");
-		content = reReplace(content, "\s*;\s*", ";", "all"); // Remove space around semicolon
-		content = trim(content);
-		
-		// Write minified file
+
+		// Apply environment-specific minification
+		content = minifyCSS(content, arguments.environment);
+
+		// Write processed file
 		fileWrite(targetPath, content);
 		arguments.manifest[fileName] = targetFileName;
-		
-		print.greenLine("#fileName# → #targetFileName#");
+
+		var processType = getProcessingDescription(arguments.environment);
+		print.greenLine("#fileName# -> #targetFileName# (#processType#)");
 		return 1;
 	}
 	
@@ -238,7 +230,7 @@ component extends="../base" {
 		fileCopy(arguments.source, targetPath);
 		arguments.manifest[fileName] = targetFileName;
 		
-		print.greenLine("#fileName# → #targetFileName#");
+		print.greenLine("#fileName# -> #targetFileName#");
 		return 1;
 	}
 	
@@ -250,5 +242,91 @@ component extends="../base" {
 		var extension = lCase(listLast(arguments.fileName, "."));
 		return arrayContainsNoCase(imageExtensions, extension);
 	}
-	
+
+	/**
+	 * Minify JavaScript content based on environment
+	 */
+	private string function minifyJavaScript(required string content, required string environment) {
+		switch(lCase(arguments.environment)) {
+			case "dev":
+			case "development":
+				// No minification for development - keep code readable for debugging
+				return arguments.content;
+
+			case "staging":
+			case "stag":
+			case "test":
+				// Light minification - remove comments but preserve formatting
+				var result = arguments.content;
+				result = reReplace(result, "/\*[\s\S]*?\*/", "", "all"); // Remove block comments
+				result = reReplace(result, "//[^\r\n]*", "", "all"); // Remove line comments
+				result = reReplace(result, "[\r\n]{2,}", chr(10), "all"); // Remove excessive line breaks
+				return trim(result);
+
+			case "production":
+			case "prod":
+			default:
+				// Full minification - aggressive optimization
+				var result = arguments.content;
+				result = reReplace(result, "/\*[\s\S]*?\*/", "", "all"); // Remove block comments
+				result = reReplace(result, "//[^\r\n]*", "", "all"); // Remove line comments
+				result = reReplace(result, "[\r\n]+", chr(10), "all"); // Normalize line endings
+				result = reReplace(result, "\s+", " ", "all"); // Collapse whitespace
+				result = reReplace(result, ";\s*}", "}", "all"); // Remove unnecessary semicolons
+				result = reReplace(result, "\s*([{}();,])\s*", "\1", "all"); // Remove spaces around operators
+				return trim(result);
+		}
+	}
+
+	/**
+	 * Minify CSS content based on environment
+	 */
+	private string function minifyCSS(required string content, required string environment) {
+		switch(lCase(arguments.environment)) {
+			case "development":
+				// No minification for development - keep CSS readable
+				return arguments.content;
+
+			case "staging":
+			case "test":
+				// Light minification - remove comments and excessive whitespace
+				var result = arguments.content;
+				result = reReplace(result, "/\*[\s\S]*?\*/", "", "all"); // Remove comments
+				result = reReplace(result, "[\r\n]{2,}", chr(10), "all"); // Remove excessive line breaks
+				result = reReplace(result, "\s+", " ", "all"); // Collapse whitespace
+				return trim(result);
+
+			case "production":
+			default:
+				// Full minification - maximum compression
+				var result = arguments.content;
+				result = reReplace(result, "/\*[\s\S]*?\*/", "", "all"); // Remove comments
+				result = reReplace(result, "[\r\n]+", " ", "all"); // Remove line breaks
+				result = reReplace(result, "\s+", " ", "all"); // Collapse whitespace
+				result = reReplace(result, ";\s*}", "}", "all"); // Remove last semicolon
+				result = reReplace(result, ":\s+", ":", "all"); // Remove space after colon
+				result = reReplace(result, "\s*{\s*", "{", "all"); // Remove space around braces
+				result = reReplace(result, "\s*}\s*", "}", "all");
+				result = reReplace(result, "\s*;\s*", ";", "all"); // Remove space around semicolon
+				result = reReplace(result, "\s*,\s*", ",", "all"); // Remove space around commas
+				return trim(result);
+		}
+	}
+
+	/**
+	 * Get processing description for display
+	 */
+	private string function getProcessingDescription(required string environment) {
+		switch(lCase(arguments.environment)) {
+			case "development":
+				return "unminified";
+			case "staging":
+			case "test":
+				return "lightly minified";
+			case "production":
+			default:
+				return "fully minified";
+		}
+	}
+
 }
