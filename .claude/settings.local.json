@@ -112,7 +112,12 @@
       "Bash(WHEELS_DEV_SERVER=\"http://localhost:52905\" node mcp-server.js --test-connection)",
       "Bash(export WHEELS_DEV_SERVER=\"http://localhost:52905\")",
       "Read(//private/tmp/mcp-fix-test/**)",
-      "Read(//Users/peter/projects/ws/blog/**)"
+      "Read(//Users/peter/projects/ws/blog/**)",
+      "Read(//Users/peter/projects/cfdocs/.ai/**)",
+      "Read(//Users/peter/projects/Modern-ColdFusion-CFML-In-100-Minutes/.ai/**)",
+      "Bash(tree:*)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:helpx.adobe.com)"
     ],
     "deny": []
   }

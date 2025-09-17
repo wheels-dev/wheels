@@ -139,7 +139,7 @@ wheels dbmigrate create column name=user dataType=text columnName=bio --null=tru
 wheels dbmigrate create column name=user dataType=string columnName=status default="active"
 
 # Bad - will fail if table has data (not nullable, no default)
-wheels dbmigrate create column name=user dataType=string columnName=required_field --null=false
+wheels dbmigrate create column name=user dataType=string columnName=required_field --allowNull=false
 ```
 
 ### 2. Use Appropriate Types
@@ -196,7 +196,7 @@ wheels dbmigrate create blank name=add_user_preferences_json
 ### 1. Non-Nullable Without Default
 ```bash
 # This will fail if table has data
-wheels dbmigrate create column name=user dataType=string columnName=required_field --null=false
+wheels dbmigrate create column name=user dataType=string columnName=required_field --allowNull=false
 
 # Do this instead
 wheels dbmigrate create column name=user dataType=string columnName=required_field default="pending"

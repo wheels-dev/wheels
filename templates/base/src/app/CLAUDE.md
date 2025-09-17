@@ -797,7 +797,7 @@ component extends="Controller" {
         verifies(only="show,edit,update,delete", params="key", paramsTypes="integer");
         
         // CSRF protection
-        protectFromForgery();
+        protectsFromForgery();
     }
 
     function create() {

@@ -42,8 +42,9 @@ echo "Copying AI documentation..."
 cp templates/base/src/CLAUDE.md "${BUILD_DIR}/"
 # cp .ai-config.json "${BUILD_DIR}/"
 # cp design_docs/scratchpad/AI-*.md "${BUILD_DIR}/"
+cp -r .ai "${BUILD_DIR}/"
 
-# Copy Apache License
+# Copy Apache License how are you?
 cp LICENSE "${BUILD_DIR}/"
 
 # Copy VS Code snippets
@@ -86,3 +87,5 @@ fi
 
 echo "Wheels Base Template prepared for ForgeBox publishing!"
 echo "Directory: ${BUILD_DIR}/"
+cd "${BUILD_DIR}/"
+pwd

@@ -2,6 +2,33 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with Wheels model components.
 
+## ⚠️ MANDATORY: Model Implementation Validation
+
+**Before implementing ANY model code, AI assistants MUST:**
+
+1. **📖 Load Model Documentation**
+   - Read `.ai/wheels/database/models.md` for model patterns
+   - Review `.ai/wheels/database/associations.md` for relationships
+   - Check `.ai/wheels/database/validations.md` for validation patterns
+   - Reference `.ai/cfml/components/` for CFC fundamentals
+
+2. **✅ Validate Implementation Standards**
+   - Confirm model uses **singular naming** (User.cfc → users table)
+   - Verify extends "Model" class (not "wheels.Model")
+   - Ensure proper validation syntax: `validatesPresenceOf("property")`
+   - Check association syntax: `hasMany("orders")`, `belongsTo("user")`
+
+3. **⚠️ Critical Model Rules**
+   - **NO `scope()` function** - Wheels models don't have ActiveRecord scopes
+   - Use **custom finder methods** instead: `findByEmail()`, `findActive()`
+   - Follow **CFScript syntax** (modern CFML patterns)
+   - Implement proper **callbacks**: `beforeSave()`, `afterCreate()`
+
+4. **🔍 Code Example Reference**
+   - Use templates from `.ai/wheels/snippets/models/`
+   - Follow established patterns from `.ai/wheels/patterns/`
+   - Apply security practices from `.ai/wheels/security/`
+
 ## Overview
 
 The `/app/models/` folder contains model classes that represent your application's data layer and implement the Active Record pattern. Models in Wheels extend `Model.cfc` and provide object-relational mapping (ORM) between database tables and CFML objects.
