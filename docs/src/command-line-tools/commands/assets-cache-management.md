@@ -6,7 +6,7 @@ The Wheels CLI provides commands for managing static assets in your application,
 
 ```bash
 wheels assets precompile
-wheels assets clean  
+wheels assets clean
 wheels assets clobber
 ```
 
@@ -19,20 +19,38 @@ Prepares your assets for production deployment by minifying and optimizing them.
 #### Usage
 
 ```bash
-# Basic precompilation
+# Basic precompilation (defaults to production)
 wheels assets precompile
 
 # Force recompilation of all assets
 wheels assets precompile --force
 
-# Target specific environment
-wheels assets precompile --environment=production
+# Target specific environments (with aliases)
+wheels assets precompile --environment=production    # Full minification
+wheels assets precompile --environment=prod          # Alias for production
+wheels assets precompile --environment=staging       # Light minification
+wheels assets precompile --environment=stage         # Alias for staging
+wheels assets precompile --environment=testing       # Light minification
+wheels assets precompile --environment=test          # Alias for testing
+wheels assets precompile --environment=maintenance   # Light minification
+wheels assets precompile --environment=development   # No minification
+wheels assets precompile --environment=dev           # Alias for development
 ```
+
+#### Environment-Specific Processing
+
+The command applies different levels of asset optimization based on the target environment:
+
+- **Production** (`production`, `prod`): **Full minification** - Maximum compression, removes all comments and whitespace, optimizes code structure
+- **Staging** (`staging`, `stage`): **Light minification** - Removes comments and excessive whitespace but preserves some formatting for debugging
+- **Testing** (`testing`, `test`): **Light minification** - Same as staging, optimized for testing environments
+- **Maintenance** (`maintenance`): **Light minification** - Minimal processing for maintenance mode deployments
+- **Development** (`development`, `dev`): **No minification** - Preserves original formatting and comments for debugging
 
 #### What it does
 
-- **Minifies JavaScript files**: Removes comments, whitespace, and unnecessary characters
-- **Minifies CSS files**: Removes comments, whitespace, and optimizes CSS rules
+- **Minifies JavaScript files**: Removes comments, whitespace, and unnecessary characters (level depends on environment)
+- **Minifies CSS files**: Removes comments, whitespace, and optimizes CSS rules (level depends on environment)
 - **Generates cache-busted filenames**: Adds MD5 hashes to filenames (e.g., `application-a1b2c3d4.min.js`)
 - **Creates manifest.json**: Maps original filenames to compiled versions
 - **Processes images**: Copies images with cache-busted names

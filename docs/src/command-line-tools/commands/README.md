@@ -18,30 +18,54 @@ Complete reference for all Wheels CLI commands organized by category.
 
 Essential commands for managing your Wheels application.
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels init` | Bootstrap existing app for CLI | [Details](core/init.md) |
-| `wheels info` | Display version information | [Details](core/info.md) |
-| `wheels reload` | Reload application | [Details](core/reload.md) |
-| `wheels deps` | Manage dependencies | [Details](core/deps.md) |
-| `wheels destroy [type] [name]` | Remove generated code | [Details](core/destroy.md) |
+- **`wheels init`** - Bootstrap existing app for CLI
+  [Documentation](core/init.md)
+
+- **`wheels info`** - Display version information
+  [Documentation](core/info.md)
+
+- **`wheels reload`** - Reload application
+  [Documentation](core/reload.md)
+
+- **`wheels deps`** - Manage dependencies
+  [Documentation](core/deps.md)
+
+- **`wheels destroy [type] [name]`** - Remove generated code
+  [Documentation](core/destroy.md)
 
 ## Code Generation
 
 Commands for generating application code and resources.
 
-| Command | Alias | Description | Documentation |
-|---------|-------|-------------|---------------|
-| `wheels generate app` | `wheels new` | Create new application | [Details](generate/app.md) |
-| `wheels generate app-wizard` | | Interactive app creation | [Details](generate/app-wizard.md) |
-| `wheels generate controller` | `wheels g controller` | Generate controller | [Details](generate/controller.md) |
-| `wheels generate model` | `wheels g model` | Generate model | [Details](generate/model.md) |
-| `wheels generate view` | `wheels g view` | Generate view | [Details](generate/view.md) |
-| `wheels generate property` | | Add model property | [Details](generate/property.md) |
-| `wheels generate route` | | Generate route | [Details](generate/route.md) |
-| `wheels generate test` | | Generate tests | [Details](generate/test.md) |
-| `wheels generate snippets` | | Code snippets | [Details](generate/snippets.md) |
-| `wheels generate scaffold` | | Complete CRUD | [Details](generate/scaffold.md) |
+- **`wheels generate app`** (alias: `wheels new`) - Create new application
+  [Documentation](generate/app.md)
+
+- **`wheels generate app-wizard`** - Interactive app creation
+  [Documentation](generate/app-wizard.md)
+
+- **`wheels generate controller`** (alias: `wheels g controller`) - Generate controller
+  [Documentation](generate/controller.md)
+
+- **`wheels generate model`** (alias: `wheels g model`) - Generate model
+  [Documentation](generate/model.md)
+
+- **`wheels generate view`** (alias: `wheels g view`) - Generate view
+  [Documentation](generate/view.md)
+
+- **`wheels generate property`** - Add model property
+  [Documentation](generate/property.md)
+
+- **`wheels generate route`** - Generate route
+  [Documentation](generate/route.md)
+
+- **`wheels generate test`** - Generate tests
+  [Documentation](generate/test.md)
+
+- **`wheels generate snippets`** - Code snippets
+  [Documentation](generate/snippets.md)
+
+- **`wheels generate scaffold`** - Complete CRUD
+  [Documentation](generate/scaffold.md)
 
 ### Generator Options
 
@@ -55,75 +79,110 @@ Commands for managing database schema and migrations.
 
 ### Database Operations
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels db create` | Create database | [Details](database/db-create.md) |
-| `wheels db drop` | Drop database | [Details](database/db-drop.md) |
+- **`wheels db create`** - Create database
+  [Documentation](database/db-create.md)
+
+- **`wheels db drop`** - Drop database
+  [Documentation](database/db-drop.md)
 
 ### Migration Management
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels dbmigrate info` | Show migration status | [Details](database/dbmigrate-info.md) |
-| `wheels dbmigrate latest` | Run all pending migrations | [Details](database/dbmigrate-latest.md) |
-| `wheels dbmigrate up` | Run next migration | [Details](database/dbmigrate-up.md) |
-| `wheels dbmigrate down` | Rollback last migration | [Details](database/dbmigrate-down.md) |
-| `wheels dbmigrate reset` | Reset all migrations | [Details](database/dbmigrate-reset.md) |
-| `wheels dbmigrate exec [version]` | Run specific migration | [Details](database/dbmigrate-exec.md) |
+- **`wheels dbmigrate info`** - Show migration status
+  [Documentation](database/dbmigrate-info.md)
+
+- **`wheels dbmigrate latest`** - Run all pending migrations
+  [Documentation](database/dbmigrate-latest.md)
+
+- **`wheels dbmigrate up`** - Run next migration
+  [Documentation](database/dbmigrate-up.md)
+
+- **`wheels dbmigrate down`** - Rollback last migration
+  [Documentation](database/dbmigrate-down.md)
+
+- **`wheels dbmigrate reset`** - Reset all migrations
+  [Documentation](database/dbmigrate-reset.md)
+
+- **`wheels dbmigrate exec [version]`** - Run specific migration
+  [Documentation](database/dbmigrate-exec.md)
 
 ### Migration Creation
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels dbmigrate create blank [name]` | Create empty migration | [Details](database/dbmigrate-create-blank.md) |
-| `wheels dbmigrate create table [name]` | Create table migration | [Details](database/dbmigrate-create-table.md) |
-| `wheels dbmigrate create column [table] [column]` | Add column migration | [Details](database/dbmigrate-create-column.md) |
-| `wheels dbmigrate remove table [name]` | Drop table migration | [Details](database/dbmigrate-remove-table.md) |
+- **`wheels dbmigrate create blank [name]`** - Create empty migration
+  [Documentation](database/dbmigrate-create-blank.md)
+
+- **`wheels dbmigrate create table [name]`** - Create table migration
+  [Documentation](database/dbmigrate-create-table.md)
+
+- **`wheels dbmigrate create column [table] [column]`** - Add column migration
+  [Documentation](database/dbmigrate-create-column.md)
+
+- **`wheels dbmigrate remove table [name]`** - Drop table migration
+  [Documentation](database/dbmigrate-remove-table.md)
 
 ## Testing Commands
 
 Commands for running and managing tests.
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels test run` | Run tests | [Details](test/test-run.md) |
-| `wheels test all` | Run all test | [Details](test/test-advanced.md) |
-| `wheels test coverage` | Run coverage tests | [Details](test/test-advanced.md) |
-| `wheels test integration` | Run integration tests | [Details](test/test-advanced.md) |
-| `wheels test unit` | Run unit tests | [Details](test/test-advanced.md) |
-| `wheels test watch` | rerun tests on any change | [Details](test/test-advanced.md) |
+- **`wheels test run`** - Run tests
+  [Documentation](test/test-run.md)
+
+- **`wheels test all`** - Run all tests
+  [Documentation](test/test-advanced.md)
+
+- **`wheels test coverage`** - Run coverage tests
+  [Documentation](test/test-advanced.md)
+
+- **`wheels test integration`** - Run integration tests
+  [Documentation](test/test-advanced.md)
+
+- **`wheels test unit`** - Run unit tests
+  [Documentation](test/test-advanced.md)
+
+- **`wheels test watch`** - Rerun tests on any change
+  [Documentation](test/test-advanced.md)
 
 ## Environment Management
 
 Commands for managing development environments and application context.
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels env setup [name]` | Setup environment | [Details](environment/env-setup.md) |
-| `wheels env list` | List environments | [Details](environment/env-list.md) |
-| `wheels env merge` | Merge env files | [Details](environment/env-list.md) |
-| `wheels env set` | set env variable | [Details](environment/env-list.md) |
-| `wheels env show` | show env variables | [Details](environment/env-list.md) |
+- **`wheels env setup [name]`** - Setup environment
+  [Documentation](environment/env-setup.md)
+
+- **`wheels env list`** - List environments
+  [Documentation](environment/env-list.md)
+
+- **`wheels env merge`** - Merge env files
+  [Documentation](environment/env-merge.md)
+
+- **`wheels env set`** - Set env variable
+  [Documentation](environment/env-set.md)
+
+- **`wheels env show`** - Show env variables
+  [Documentation](environment/env-show.md)
 
 ## Code Analysis
 
 Commands for analyzing code quality and patterns.
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels analyze code` | Analyze code quality | [Details](analysis/analyze-code.md) |
-| `wheels analyze performance` | Performance analysis | [Details](analysis/analyze-performance.md) |
-| `wheels analyze security` | Security analysis | [Details](analysis/analyze-security.md) |
+- **`wheels analyze code`** - Analyze code quality
+  [Documentation](analysis/analyze-code.md)
+
+- **`wheels analyze performance`** - Performance analysis
+  [Documentation](analysis/analyze-performance.md)
+
+- **`wheels analyze security`** - Security analysis
+  [Documentation](analysis/analyze-security.md)
 
 
 ## Docker Commands
 
 Commands for Docker container management and deployment.
 
-| Command | Description | Documentation |
-|---------|-------------|---------------|
-| `wheels docker init` | Initialize Docker configuration | [Details](docker/docker-init.md) |
-| `wheels docker deploy` | Deploy using Docker | [Details](docker/docker-deploy.md) |
+- **`wheels docker init`** - Initialize Docker configuration
+  [Documentation](docker/docker-init.md)
+
+- **`wheels docker deploy`** - Deploy using Docker
+  [Documentation](docker/docker-deploy.md)
 
 ## Command Patterns
 

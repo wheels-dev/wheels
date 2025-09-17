@@ -31,12 +31,18 @@ component extends="../base" {
 	 * - Creates a manifest file for asset mapping
 	 * 
 	 * @force Force recompilation of all assets, even if unchanged
-	 * @environment Target environment (production, staging, etc.)
+	 * @environment Target environment (production, staging, development, test, maintenance, or aliases like prod, dev, stage)
 	 **/
 	function run(
 		boolean force = false,
 		string environment = "production"
 	) {
+		// Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+
+		// Normalize environment aliases
+		arguments.environment = normalizeEnvironment(arguments.environment);
+
 		if (!isWheelsApp()) {
 			error("This command must be run from a Wheels application root directory.");
 		}
@@ -248,14 +254,13 @@ component extends="../base" {
 	 */
 	private string function minifyJavaScript(required string content, required string environment) {
 		switch(lCase(arguments.environment)) {
-			case "dev":
 			case "development":
 				// No minification for development - keep code readable for debugging
 				return arguments.content;
 
 			case "staging":
-			case "stag":
 			case "test":
+			case "maintenance":
 				// Light minification - remove comments but preserve formatting
 				var result = arguments.content;
 				result = reReplace(result, "/\*[\s\S]*?\*/", "", "all"); // Remove block comments
@@ -264,7 +269,6 @@ component extends="../base" {
 				return trim(result);
 
 			case "production":
-			case "prod":
 			default:
 				// Full minification - aggressive optimization
 				var result = arguments.content;
@@ -289,6 +293,7 @@ component extends="../base" {
 
 			case "staging":
 			case "test":
+			case "maintenance":
 				// Light minification - remove comments and excessive whitespace
 				var result = arguments.content;
 				result = reReplace(result, "/\*[\s\S]*?\*/", "", "all"); // Remove comments
@@ -322,10 +327,45 @@ component extends="../base" {
 				return "unminified";
 			case "staging":
 			case "test":
+			case "maintenance":
 				return "lightly minified";
 			case "production":
 			default:
 				return "fully minified";
+		}
+	}
+
+	/**
+	 * Normalize environment aliases to standard names
+	 */
+	private string function normalizeEnvironment(required string environment) {
+		switch(lCase(trim(arguments.environment))) {
+			// Development aliases
+			case "dev":
+			case "development":
+				return "development";
+
+			// Testing aliases
+			case "test":
+			case "testing":
+				return "test";
+
+			// Staging aliases
+			case "stage":
+			case "staging":
+			case "stag":
+				return "staging";
+
+			// Maintenance aliases
+			case "maintenance":
+			case "maintainance": // Handle common misspelling
+				return "maintenance";
+
+			// Production aliases (default)
+			case "prod":
+			case "production":
+			default:
+				return "production";
 		}
 	}
 

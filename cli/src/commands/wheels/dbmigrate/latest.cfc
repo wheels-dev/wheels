@@ -8,6 +8,9 @@ component  aliases='wheels db latest,wheels db migrate'  extends="../base"  {
 	 * @help Migrate database to latest version or specified version
 	 **/
 	function run(string version = "") {
+		// Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+
 		// Support for wheels db migrate version=0 syntax
 		if (Len(arguments.version)) {
 			if (arguments.version == "0") {
