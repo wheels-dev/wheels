@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.0.4] - 2025-09-17
+
+### Changed
+- Updated migration function parameters: changed `null` to `allowNull` in migration functions for improved clarity and consistency
+
 ## [1.0.3] - 2025-09-10
 
 ### Changed
