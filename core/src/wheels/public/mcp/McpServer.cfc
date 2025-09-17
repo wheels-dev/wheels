@@ -846,8 +846,20 @@ Provide migration code following Wheels conventions."
 
 	private string function executeCommand(required string command) {
 		try {
-			// Get the current working directory (should be the app root)
+			// Get the application root directory
+			// The MCP server is located in vendor/wheels/public/mcp/ so we need to go up several levels
 			local.appPath = expandPath("/");
+
+			// Check if we're in a vendor/wheels/public directory and adjust path accordingly
+			if (findNoCase("vendor/wheels/public", local.appPath) || findNoCase("wheels/public", local.appPath)) {
+				// We're in the vendor wheels directory, go up to find the application root
+				local.appPath = expandPath("/../../../");
+
+				// If that doesn't work, try going up more levels to find box.json or Application.cfc
+				if (!fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "Application.cfc")) {
+					local.appPath = expandPath("/../../../../");
+				}
+			}
 
 			// Execute the command
 			cfexecute(
@@ -875,7 +887,7 @@ Provide migration code following Wheels conventions."
 					timeout = "30",
 					variable = "local.result",
 					errorVariable = "local.error",
-					directory = expandPath("/")
+					directory = local.appPath
 				);
 
 				if (len(local.error)) {
