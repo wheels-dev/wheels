@@ -46,7 +46,7 @@ cp -r .ai "${BUILD_DIR}/"
 
 # Copy Apache License how are you?
 cp LICENSE "${BUILD_DIR}/"
-Blue oh no, I just
+
 # Copy VS Code snippets
 echo "Copying VS Code snippets..."
 mkdir -p "${BUILD_DIR}/.vscode"
