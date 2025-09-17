@@ -225,11 +225,10 @@ mapper()
     // RESTful resources
     .resources("users")
     .resources("products", except="destroy")
-    
-    // Nested resources
-    .resources("users", function(nested) {
-        nested.resources("orders");
-    })
+
+    // Nested resources - use separate declarations
+    .resources("users")
+    .resources("orders")
     
     // Root route
     .root(to="home##index", method="get")
@@ -789,3 +788,80 @@ function onError(exception, eventname) {
     }
 }
 ```
+
+## Common Issues and Troubleshooting
+
+### Association Errors
+**"Missing argument name" in hasMany()**
+This error occurs when mixing positional and named parameters in CFWheels function calls:
+
+❌ **Incorrect (mixed parameter styles):**
+```cfm
+hasMany("comments", dependent="delete");  // Error: can't mix positional and named
+```
+
+✅ **Correct (consistent named parameters):**
+```cfm
+hasMany(name="comments", dependent="delete");
+```
+
+✅ **Also correct (all positional):**
+```cfm
+hasMany("comments");
+```
+
+CFWheels requires consistent parameter syntax - either all positional or all named parameters.
+
+### Routing Issues
+**Incorrect .resources() syntax**
+CFWheels resource routing syntax differs from Rails:
+
+❌ **Incorrect (Rails-style nested):**
+```cfm
+.resources("posts", function(nested) {
+    nested.resources("comments");
+})
+```
+
+✅ **Correct (separate declarations):**
+```cfm
+.resources("posts")
+.resources("comments")
+```
+
+**Route ordering matters:** resources → custom routes → root → wildcard
+
+### Form Helper Limitations
+CFWheels has more limited form helpers compared to Rails:
+
+❌ **Not available:**
+```cfm
+#emailField()#    // Doesn't exist
+#label(text="Name")#    // text parameter not supported
+```
+
+✅ **Use instead:**
+```cfm
+#textField(type="email")#
+<label>Name</label>
+```
+
+### Migration Data Seeding
+Parameter binding in migrations can be unreliable. Use direct SQL:
+
+❌ **Problematic:**
+```cfm
+execute(sql="INSERT INTO posts (title) VALUES (?)", parameters=[{value=title}]);
+```
+
+✅ **Reliable:**
+```cfm
+execute("INSERT INTO posts (title, createdAt, updatedAt) VALUES ('My Post', NOW(), NOW())");
+```
+
+### Debugging Tips
+1. Check CFWheels documentation - don't assume Rails conventions work
+2. Use simple patterns first, add complexity incrementally
+3. Test associations and routes in isolation
+4. Use `?reload=true` after configuration changes
+5. Check debug footer for route information

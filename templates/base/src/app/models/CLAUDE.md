@@ -1066,8 +1066,8 @@ component extends="Model" {
         // Category has many Products
         hasMany("products");
         
-        // Post has many Comments with dependency
-        hasMany("comments", dependent="delete");
+        // Post has many Comments - use named parameters for options
+        hasMany(name="comments", dependent="delete");
     }
 }
 ```
@@ -1076,8 +1076,8 @@ component extends="Model" {
 ```cfm
 component extends="Model" {
     function config() {
-        // User has one Profile
-        hasOne("profile", dependent="delete");
+        // User has one Profile - use named parameters for options
+        hasOne(name="profile", dependent="delete");
         
         // Product has one Inventory
         hasOne("inventory");
@@ -2423,7 +2423,8 @@ function findPublished() {
 }
 
 // Proper CFWheels associations:
-hasMany("posts", dependent="delete");               // ✅ Correct syntax
+hasMany("posts");                                   // ✅ Correct syntax - positional parameters
+hasMany(name="posts", dependent="delete");         // ✅ Correct syntax - named parameters with options
 ```
 
 ## Important Notes

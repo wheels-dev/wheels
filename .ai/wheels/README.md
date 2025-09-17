@@ -67,6 +67,13 @@ Code snippets and examples:
 - Quick reference examples
 - Copy-paste solutions
 
+### [Troubleshooting](./troubleshooting/)
+Common issues and debugging guides:
+- Framework-specific error solutions
+- Migration and database issues
+- Form helper problems and workarounds
+- Differences from Rails conventions
+
 ### [Views](./views/)
 Presentation layer documentation:
 - View templates and layouts

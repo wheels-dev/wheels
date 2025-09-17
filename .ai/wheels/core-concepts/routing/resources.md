@@ -44,9 +44,23 @@ mapper()
 - [MVC Controllers](../mvc-architecture/controllers.md)
 - [CRUD Patterns](../../patterns/crud.md)
 
+## Root Route Configuration
+To set a resource as the application's default page:
+
+```cfm
+mapper()
+    .resources("posts")
+    .resources("comments")
+    .root(to="posts##index", method="get")  // Sets blog as homepage
+.end();
+```
+
+The root route should come after resource definitions and before the wildcard route.
+
 ## Important Notes
 - Resources are the primary convention in Wheels
 - Controller names are always plural even for singular resources
 - Both PUT and PATCH map to update action
 - Use `except="destroy"` to exclude specific actions
-- Nested resources supported for associations
+- Nested resources: declare separately, syntax differs from Rails
+- Root route sets default homepage - place after resources, before wildcard

@@ -299,11 +299,8 @@ Define URL patterns and map them to controller actions:
     mapper()
         // Resource-based routing (recommended)
         .resources("users")
-        .resources("posts", {
-            nested: {
-                resources: "comments"
-            }
-        })
+        .resources("posts")
+        .resources("comments")  // Nested resources use separate declarations
         
         // Singular resource (no primary key in URL)
         .resource("profile")
@@ -336,11 +333,9 @@ Define URL patterns and map them to controller actions:
 // Creates: index, show, new, create, edit, update, delete actions
 
 .resources("categories", {
-    except: ["delete"],
-    nested: {
-        resources: "products"
-    }
+    except: ["delete"]
 })
+.resources("products")  // Nested resources declared separately
 ```
 
 #### Custom Routes
@@ -384,6 +379,67 @@ After defining routes, use them in views:
 <!--- With parameters --->
 #linkTo(route="userPosts", userId=user.id, postId=post.id)#
 ```
+
+### Routing Best Practices
+
+#### Route Ordering
+Routes are processed in order - first match wins. Order routes from most specific to most general:
+
+```cfm
+mapper()
+    // 1. Resource routes first
+    .resources("posts")
+    .resources("comments")
+
+    // 2. Custom routes
+    .get(name="search", pattern="search", to="search##index")
+    .get(name="admin", pattern="admin", to="admin##dashboard")
+
+    // 3. Root route
+    .root(to="posts##index", method="get")
+
+    // 4. Wildcard routing last
+    .wildcard()
+.end();
+```
+
+#### Common Routing Mistakes
+
+**❌ Incorrect nested resource syntax:**
+```cfm
+.resources("posts", function(nested) {
+    nested.resources("comments");  // This doesn't work in CFWheels
+})
+```
+
+**✅ Correct approach - separate declarations:**
+```cfm
+.resources("posts")
+.resources("comments")
+```
+
+**❌ Wrong route ordering:**
+```cfm
+mapper()
+    .wildcard()        // Too early - catches everything
+    .resources("posts") // Never reached
+.end();
+```
+
+**✅ Correct ordering:**
+```cfm
+mapper()
+    .resources("posts") // Specific routes first
+    .wildcard()         // Catch-all last
+.end();
+```
+
+#### Route Testing
+Always test routes after changes:
+1. Use `?reload=true` to reload configuration
+2. Check the debug footer "Routes" link to view all routes
+3. Test both positive and negative cases
+4. Verify route helpers generate correct URLs
 
 ## Environment-Specific Settings
 
