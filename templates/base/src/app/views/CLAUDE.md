@@ -2,9 +2,166 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with view files in a Wheels application.
 
+## 🚨 CRITICAL: PRE-VIEW IMPLEMENTATION CHECKLIST 🚨
+
+### 🛑 MANDATORY DOCUMENTATION READING (COMPLETE BEFORE ANY CODE)
+
+**YOU MUST READ THESE FILES IN ORDER:**
+
+✅ **Step 1: Error Prevention (ALWAYS FIRST)**
+- [ ] `.ai/wheels/troubleshooting/common-errors.md` - PREVENT FATAL ERRORS
+- [ ] `.ai/wheels/patterns/validation-templates.md` - VIEW CHECKLIST
+
+✅ **Step 2: View-Specific Documentation**
+- [ ] `.ai/wheels/views/layouts/structure.md` - Layout patterns
+- [ ] `.ai/cfml/control-flow/loops.md` - Loop syntax (QUERY vs ARRAY)
+- [ ] `.ai/wheels/views/helpers/forms.md` - Form helpers
+
+### 🔴 CRITICAL ANTI-PATTERN CHECK (MUST VERIFY BEFORE WRITING)
+
+**Before writing ANY view code, verify you will NOT:**
+- [ ] ❌ Use ArrayLen() on queries: `ArrayLen(posts)` or `ArrayLen(post.comments())`
+- [ ] ❌ Loop queries as arrays: `<cfloop array="#posts#" index="post">`
+- [ ] ❌ Treat model results as arrays in any context
+- [ ] ❌ Mix loop types (array syntax on queries)
+
+**And you WILL:**
+- [ ] ✅ Use .recordCount for query counts: `posts.recordCount`
+- [ ] ✅ Use query loops: `<cfloop query="posts">`
+- [ ] ✅ Understand associations return QUERIES
+- [ ] ✅ Check data types before processing
+
+### 📋 VIEW IMPLEMENTATION TEMPLATE (MANDATORY STARTING POINT)
+
+```cfm
+<cfparam name="posts">
+<cfoutput>
+
+<!-- Check record count correctly -->
+<cfif posts.recordCount gt 0>
+    <!-- Loop query correctly -->
+    <cfloop query="posts">
+        <h2>#posts.title#</h2>
+        <!-- Access associations correctly -->
+        <p>Comments: #posts.comments().recordCount#</p>
+
+        <!-- Loop nested associations correctly -->
+        <cfif posts.comments().recordCount gt 0>
+            <cfloop query="posts.comments()">
+                <div>#posts.comments().content#</div>
+            </cfloop>
+        </cfif>
+    </cfloop>
+<cfelse>
+    <p>No posts found.</p>
+</cfif>
+
+</cfoutput>
+```
+
+### 🔍 POST-IMPLEMENTATION VALIDATION (REQUIRED BEFORE COMPLETION)
+
+**After writing view code, you MUST run these checks:**
+
+```bash
+# 1. Syntax validation
+wheels server start --validate
+
+# 2. Anti-pattern detection
+grep -r "ArrayLen(" app/views/  # Check for array operations on queries
+grep -r "<cfloop array=" app/views/  # Check for array loops on queries
+```
+
+**Manual checklist verification:**
+- [ ] No ArrayLen() calls anywhere in views
+- [ ] No array loop syntax on query objects
+- [ ] All query counts use .recordCount
+- [ ] All loops use appropriate syntax for data type
+- [ ] Proper HTML escaping in output
+
 ## Overview
 
 Views in Wheels are template files that generate the HTML (or other content) that users see in their browsers. They follow the MVC (Model-View-Controller) pattern where the controller sets up data and the view handles presentation. Views are written in CFML and can include HTML, CSS, JavaScript, and any other content type.
+
+## 🚨 CRITICAL: CFWheels Data Types in Views
+
+**CFWheels associations and model methods return QUERIES, not ARRAYS. This is the #2 most common view error.**
+
+### ❌ WRONG - Treating Queries as Arrays
+```cfm
+<!--- Model associations return queries, NOT arrays --->
+<cfset commentCount = ArrayLen(post.comments())>  <!-- ERROR! -->
+<cfset userCount = ArrayLen(model("User").findAll())>  <!-- ERROR! -->
+
+<!--- Can't loop queries as arrays --->
+<cfloop array="#post.comments()#" index="comment">  <!-- ERROR! -->
+    #comment.content#
+</cfloop>
+```
+
+### ✅ CORRECT - Using Query Methods and Loops
+```cfm
+<!--- Use .recordCount for query record counts --->
+<cfset commentCount = post.comments().recordCount>
+<cfset userCount = model("User").findAll().recordCount>
+
+<!--- Loop queries with query="..." --->
+<cfset comments = post.comments()>
+<cfloop query="comments">
+    #comments.content#  <!--- Access fields directly from query --->
+</cfloop>
+
+<!--- Check if query has records --->
+<cfif post.comments().recordCount gt 0>
+    <cfloop query="post.comments()">
+        <p>#post.comments().content#</p>
+    </cfloop>
+<cfelse>
+    <p>No comments found.</p>
+</cfif>
+```
+
+### 📊 Query vs Array Reference
+
+| **Data Type** | **Count Method** | **Loop Method** | **Check if Empty** |
+|---------------|------------------|-----------------|-------------------|
+| **Query** | `.recordCount` | `<cfloop query="...">` | `query.recordCount gt 0` |
+| **Array** | `ArrayLen()` | `<cfloop array="...">` | `ArrayLen(array) gt 0` |
+
+### Common View Patterns - CORRECT Examples
+```cfm
+<!--- Association counts --->
+<cfset postCount = user.posts().recordCount>
+<cfset commentCount = post.comments().recordCount>
+
+<!--- Association loops --->
+<cfloop query="user.posts()">
+    <h3>#user.posts().title#</h3>
+</cfloop>
+
+<!--- Model finder results --->
+<cfset users = model("User").findAll()>
+<cfif users.recordCount gt 0>
+    <cfloop query="users">
+        <p>#users.name# - #users.email#</p>
+    </cfloop>
+</cfif>
+
+<!--- Conditional display based on associations --->
+<cfif post.comments().recordCount gt 0>
+    <h3>Comments (#post.comments().recordCount#)</h3>
+    <cfloop query="post.comments()">
+        <div class="comment">
+            <strong>#post.comments().author#:</strong>
+            #post.comments().content#
+        </div>
+    </cfloop>
+<cfelse>
+    <p>No comments yet.</p>
+</cfif>
+```
+
+**⚡ MEMORY RULE**: In CFWheels views, if it comes from a model (associations, finders), it's a QUERY. Use `.recordCount` and `<cfloop query="...">`.
 
 ## File Structure and Conventions
 

@@ -2,6 +2,83 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with configuration files in a Wheels application.
 
+## 🚨 CRITICAL: PRE-CONFIGURATION IMPLEMENTATION CHECKLIST 🚨
+
+### 🛑 MANDATORY DOCUMENTATION READING (COMPLETE BEFORE ANY CODE)
+
+**YOU MUST READ THESE FILES IN ORDER:**
+
+✅ **Step 1: Error Prevention (ALWAYS FIRST)**
+- [ ] `.ai/wheels/troubleshooting/common-errors.md` - PREVENT FATAL ERRORS
+- [ ] `.ai/wheels/patterns/validation-templates.md` - CONFIG CHECKLIST
+
+✅ **Step 2: Configuration-Specific Documentation**
+- [ ] `.ai/wheels/core-concepts/routing/basics.md` - Routing fundamentals
+- [ ] `.ai/wheels/core-concepts/routing/resources.md` - Resource routing
+- [ ] `.ai/wheels/configuration/environments.md` - Environment settings
+
+### 🔴 CRITICAL ROUTING ANTI-PATTERNS (MOST COMMON CONFIG ERRORS)
+
+**Before writing ANY routing code, verify you will NOT:**
+- [ ] ❌ Use Rails-style nested resources: `.resources("posts", function(nested) { nested.resources("comments"); })`
+- [ ] ❌ Put wildcard route before other routes
+- [ ] ❌ Mix argument styles in route definitions
+- [ ] ❌ Forget to call `.end()` to close mapper
+
+**And you WILL:**
+- [ ] ✅ Use separate resource declarations: `.resources("posts").resources("comments")`
+- [ ] ✅ Put routes in correct order: resources → custom → root → wildcard
+- [ ] ✅ Use consistent argument syntax throughout
+- [ ] ✅ Always close mapper with `.end()`
+
+### 📋 ROUTING IMPLEMENTATION TEMPLATE (MANDATORY STARTING POINT)
+
+```cfm
+<cfscript>
+mapper()
+    // 1. Resource routes FIRST
+    .resources("posts")
+    .resources("comments")
+    .resources("users")
+
+    // 2. Custom routes SECOND
+    .get(name="login", to="sessions##new")
+    .post(name="authenticate", to="sessions##create")
+    .delete(name="logout", to="sessions##delete")
+
+    // 3. Root route THIRD
+    .root(to="posts##index", method="get")
+
+    // 4. Wildcard route LAST (ALWAYS LAST)
+    .wildcard()
+.end(); // CRITICAL: Always end with .end()
+</cfscript>
+```
+
+### 🔍 POST-IMPLEMENTATION VALIDATION (REQUIRED BEFORE COMPLETION)
+
+**After writing configuration code, you MUST:**
+
+```bash
+# 1. Syntax validation
+wheels server start --validate
+
+# 2. Route testing
+wheels server start
+# Test routes in browser to ensure they work
+
+# 3. Manual verification
+# Check that routes.cfm follows correct ordering
+# Verify all mappers end with .end()
+```
+
+**Manual checklist verification:**
+- [ ] Resources declared separately (not nested)
+- [ ] Routes in correct order (resources, custom, root, wildcard)
+- [ ] Mapper closed with .end()
+- [ ] No mixed argument styles
+- [ ] Wildcard route is last
+
 ## Overview
 
 The `/config` directory contains all configuration files for your Wheels application. In Wheels 3.0.0+, configuration was moved from `/app/config` to the root-level `/config` directory for better organization and clearer separation of concerns. These files control application behavior, database connections, routing, environment settings, and framework-wide defaults.

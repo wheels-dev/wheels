@@ -2,9 +2,73 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with Wheels controllers.
 
-## ⚠️ MANDATORY: Controller Implementation Validation
+## 🚨 CRITICAL: PRE-CONTROLLER IMPLEMENTATION CHECKLIST 🚨
 
-**Before implementing ANY controller code, AI assistants MUST:**
+### 🛑 MANDATORY DOCUMENTATION READING (COMPLETE BEFORE ANY CODE)
+
+**YOU MUST READ THESE FILES IN ORDER:**
+
+✅ **Step 1: Error Prevention (ALWAYS FIRST)**
+- [ ] `.ai/wheels/troubleshooting/common-errors.md` - PREVENT FATAL ERRORS
+- [ ] `.ai/wheels/patterns/validation-templates.md` - CONTROLLER CHECKLIST
+
+✅ **Step 2: Controller-Specific Documentation**
+- [ ] `.ai/wheels/controllers/rendering/views.md` - View rendering patterns
+- [ ] `.ai/wheels/controllers/filters/authentication.md` - Authentication patterns
+- [ ] `.ai/wheels/controllers/params/verification.md` - Parameter handling
+- [ ] `.ai/cfml/syntax/cfscript-vs-tags.md` - CFScript syntax rules
+- [ ] `.ai/wheels/snippets/controller-snippets.md` - Code examples
+
+### 🔴 CRITICAL ANTI-PATTERN CHECK (MUST VERIFY BEFORE WRITING)
+
+**Before writing ANY controller code, verify you will NOT:**
+- [ ] ❌ Mix argument styles: `renderText("error", status=404)`
+- [ ] ❌ Use ArrayLen() on model results: `ArrayLen(posts)`
+- [ ] ❌ Loop queries as arrays in views
+- [ ] ❌ Use singular controller names: `PostController.cfc`
+
+**And you WILL:**
+- [ ] ✅ Use consistent argument style throughout
+- [ ] ✅ Use plural naming: `PostsController.cfc`
+- [ ] ✅ Use .recordCount for query counts
+- [ ] ✅ Handle 404s properly for missing records
+
+### 📋 CONTROLLER IMPLEMENTATION TEMPLATE (MANDATORY STARTING POINT)
+
+```cfm
+component extends="Controller" {
+    function config() {
+        // Choose ONE argument style and stick with it
+
+        // Option 1: ALL NAMED arguments (RECOMMENDED)
+        filters(through="authenticate");
+        verifies(params="key", paramsTypes="integer");
+
+        // Option 2: ALL POSITIONAL arguments
+        filters("authenticate");
+        verifies("key");
+
+        // NEVER mix styles within same component
+    }
+
+    function show() {
+        // ALL NAMED arguments pattern
+        post = model("Post").findByKey(key=params.key, include="comments");
+
+        if (!isObject(post)) {
+            renderText(text="Not found", status=404);
+            return;
+        }
+
+        // Association returns QUERY, not array
+        commentCount = post.comments().recordCount;
+    }
+}
+```
+
+### ⚠️ MANDATORY: Controller Implementation Validation
+
+**After reading documentation and completing checklist above, you must also:**
 
 1. **📖 Load Controller Documentation**
    - Read `.ai/wheels/controllers/basics.md` for controller fundamentals
@@ -37,6 +101,110 @@ This file provides guidance to Claude Code (claude.ai/code) when working with Wh
    - `edit()` - Show edit form (GET /users/12/edit)
    - `update()` - Process updates (PUT /users/12)
    - `delete()` - Remove resource (DELETE /users/12)
+
+## 🚨 CRITICAL: CFWheels Argument Mixing Rules
+
+**NEVER mix positional and named arguments in ANY CFWheels function call. This is the #1 cause of controller errors.**
+
+### ❌ WRONG - Mixed Arguments (WILL CAUSE ERRORS)
+```cfm
+// Model methods - MIXING CAUSES ERRORS
+post = model("Post").findByKey(params.key, include="comments"); // ERROR!
+users = model("User").findAll("active = 1", order="name"); // ERROR!
+user = model("User").findOne(params.email, include="profile"); // ERROR!
+
+// Rendering methods
+renderText("Not found", status=404); // ERROR!
+redirectTo("index", error="Failed"); // ERROR!
+
+// Helper methods
+linkTo("Home", controller="users"); // ERROR!
+```
+
+### ✅ CORRECT - All Named Arguments (RECOMMENDED)
+```cfm
+// Model methods - ALWAYS use named arguments for clarity
+post = model("Post").findByKey(key=params.key, include="comments");
+users = model("User").findAll(where="active = 1", order="name");
+user = model("User").findOne(where="email = '#params.email#'", include="profile");
+
+// Rendering methods
+renderText(text="Not found", status=404);
+redirectTo(action="index", error="Failed");
+
+// Helper methods
+linkTo(text="Home", controller="users");
+```
+
+### ✅ ALSO CORRECT - All Positional Arguments
+```cfm
+// Model methods - positional only when simple
+post = model("Post").findByKey(params.key);
+users = model("User").findAll();
+user = model("User").findOne();
+
+// But named arguments are clearer for multiple parameters
+```
+
+### Common Controller Patterns - CORRECT Examples
+```cfm
+function show() {
+    // ✅ CORRECT - All named
+    post = model("Post").findByKey(key=params.key, include="comments");
+
+    if (!isObject(post)) {
+        // ✅ CORRECT - All named
+        renderText(text="Post not found", status=404);
+        return;
+    }
+}
+
+function index() {
+    // ✅ CORRECT - All named
+    posts = model("Post").findAll(
+        where="published = 1",
+        order="createdAt DESC",
+        include="comments"
+    );
+}
+
+function create() {
+    post = model("Post").new(params.post);
+
+    if (post.save()) {
+        // ✅ CORRECT - All named
+        redirectTo(route="post", key=post.id, success="Created!");
+    } else {
+        // ✅ CORRECT - All named
+        renderView(action="new");
+    }
+}
+```
+
+**⚡ MEMORY RULE**: In CFWheels, consistency is king. Pick named OR positional arguments and stick with it throughout the entire function call.
+
+### 🔍 POST-IMPLEMENTATION VALIDATION (REQUIRED BEFORE COMPLETION)
+
+**After writing controller code, you MUST run these checks:**
+
+```bash
+# 1. Syntax validation
+wheels server start --validate
+
+# 2. Test validation
+wheels test run
+
+# 3. Anti-pattern detection
+grep -r "renderText(\"[^\"]*\",[[:space:]]*[a-zA-Z]" app/controllers/  # Check mixed args
+grep -r "ArrayLen(" app/controllers/  # Check query/array confusion
+```
+
+**Manual checklist verification:**
+- [ ] No mixed argument styles in any function calls
+- [ ] No ArrayLen() calls on model results or associations
+- [ ] Proper error handling for missing records (404s)
+- [ ] Consistent naming (plural controller names)
+- [ ] All model interactions use consistent argument syntax
 
 ## Overview
 
@@ -433,6 +601,10 @@ private function checkPermission(permission = "read") {
 ## Working with Models in Controllers
 
 Controllers primarily interact with models to retrieve, create, update, and delete data. This section covers common controller-model interaction patterns.
+
+> **🚨 REMINDER**: ALL model method calls in controllers MUST use consistent argument syntax - either all named OR all positional arguments. Mixed arguments will cause "Missing argument name" errors.
+
+> **🚨 REMINDER**: Model associations return QUERY objects, not arrays. Use `.recordCount` for counts and `<cfloop query="...">` for iteration in views.
 
 > **📚 For comprehensive model documentation**, see `/app/models/CLAUDE.md` which covers all model methods, associations, validations, callbacks, and advanced features like dirty tracking, dynamic finders, statistical functions, and more.
 

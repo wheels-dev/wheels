@@ -2,55 +2,145 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
 
-## 🛑 STOP: MANDATORY Documentation Check REQUIRED
+## 🚨 CRITICAL: MANDATORY PRE-CODE DOCUMENTATION PROTOCOL 🚨
 
-**⚠️ CRITICAL: AI assistants MUST NOT implement ANY Wheels code without first completing this checklist:**
+### ⛔ STOP! DO NOT WRITE ANY CODE UNTIL COMPLETING THIS CHECKLIST ⛔
 
-### 📋 Pre-Code Implementation Checklist
+**FAILURE TO FOLLOW THIS PROTOCOL WILL RESULT IN BROKEN CODE**
 
-**Step 1: Documentation Discovery (ALWAYS REQUIRED)**
-- [ ] ✅ **FIRST**: Use `ls -la` or `Glob` to verify `.ai/` directory exists in project root
-- [ ] ✅ **THEN**: Use `Read` tool to load task-specific documentation:
+### Phase 1: MANDATORY Documentation Loading (BEFORE ANY CODE)
 
-**For Model Development:**
-- [ ] Read `.ai/wheels/snippets/model-snippets.md` (REQUIRED for syntax patterns)
-- [ ] Read `.ai/wheels/database/associations/` files for relationships
-- [ ] Read `.ai/wheels/database/validations/` files for validation patterns
-- [ ] Read `.ai/cfml/components/component-basics.md` for CFC fundamentals
+**YOU MUST EXECUTE THESE STEPS IN ORDER:**
 
-**For Controller Development:**
-- [ ] Read `.ai/wheels/snippets/controller-snippets.md` (REQUIRED for syntax patterns)
-- [ ] Read `.ai/wheels/controllers/` files for request handling patterns
-- [ ] Read `.ai/wheels/patterns/` files for established conventions
+1. **🔴 DETERMINE TASK TYPE** (Check ALL that apply):
+   ```
+   □ Model work → MUST READ: .ai/wheels/database/associations/has-many.md, .ai/wheels/core-concepts/mvc-architecture/models.md
+   □ Controller work → MUST READ: .ai/wheels/controllers/rendering/views.md, .ai/cfml/syntax/cfscript-vs-tags.md
+   □ View work → MUST READ: .ai/wheels/views/layouts/structure.md, .ai/cfml/control-flow/loops.md
+   □ Migration work → MUST READ: .ai/wheels/database/migrations/creating-migrations.md
+   □ Form work → MUST READ: .ai/wheels/views/helpers/forms.md
+   □ Query work → MUST READ: .ai/cfml/database/query-basics.md
+   □ Association work → MUST READ: .ai/wheels/database/associations/has-many.md
+   ```
 
-**For View Development:**
-- [ ] Read `.ai/wheels/views/` documentation for template patterns
-- [ ] Read `.ai/wheels/snippets/` for view helper examples
+2. **🔴 LOAD ERROR PREVENTION DOCS** (ALWAYS FIRST):
+   ```bash
+   # CRITICAL: Load these FIRST to prevent common mistakes:
+   READ .ai/wheels/troubleshooting/common-errors.md
+   READ .ai/cfml/best-practices/modern-patterns.md
+   ```
 
-**Step 2: Pattern Validation (REQUIRED)**
-- [ ] ✅ Confirm code follows **exact syntax patterns** from `.ai/wheels/snippets/`
-- [ ] ✅ Verify **parameter consistency** (all named OR all positional, never mixed)
-- [ ] ✅ Check **naming conventions** match Wheels standards
-- [ ] ✅ Ensure **security practices** are implemented
+3. **🔴 LOAD TASK-SPECIFIC DOCUMENTATION**:
+   ```bash
+   # Based on task type checked above, load ALL relevant docs
+   # Example for controller work:
+   READ .ai/wheels/controllers/rendering/views.md
+   READ .ai/wheels/controllers/filters/authentication.md
+   READ .ai/wheels/controllers/params/verification.md
+   READ .ai/wheels/patterns/crud.md
+   READ .ai/wheels/snippets/controller-snippets.md
+   ```
 
-**Step 3: Example Reference (REQUIRED)**
-- [ ] ✅ Use code templates from `.ai/wheels/snippets/` as starting point
-- [ ] ✅ Adapt examples to specific requirements
-- [ ] ✅ Maintain established patterns and conventions
+### Phase 2: MANDATORY Pattern Validation (BEFORE WRITING CODE)
 
-### 🔥 **FAILURE TO COMPLETE CHECKLIST = IMPLEMENTATION ERROR**
+**CHECK THESE CRITICAL PATTERNS:**
 
-**If `.ai/` folder is not available (rare), use MCP resources:**
-- `wheels://.ai/cfml/syntax` - CFML language fundamentals
-- `wheels://.ai/wheels/patterns` - Framework patterns
-- `wheels://.ai/wheels/snippets` - Code examples
+✅ **CFWheels Argument Rules** (MOST COMMON ERROR):
+```cfm
+# WRONG - Mixed arguments (WILL BREAK):
+model("Post").findByKey(params.key, include="comments")
+hasMany("comments", dependent="delete")
+renderText("Not found", status=404)
 
-## Quick Start
+# CORRECT - All named arguments:
+model("Post").findByKey(key=params.key, include="comments")
+hasMany(name="comments", dependent="delete")
+renderText(text="Not found", status=404)
+```
 
-### New to Wheels?
+✅ **Query vs Array Distinction** (SECOND MOST COMMON ERROR):
+```cfm
+# WRONG - Treating query as array (WILL BREAK):
+ArrayLen(post.comments())
+<cfloop array="#comments#" index="comment">
+
+# CORRECT - Use query methods:
+post.comments().recordCount
+<cfloop query="comments">
+```
+
+✅ **Naming Conventions**:
+- Models: SINGULAR (User.cfc, Post.cfc)
+- Controllers: PLURAL (UsersController.cfc, PostsController.cfc)
+- Tables: PLURAL (users, posts)
+
+### Phase 3: Code Implementation Checklist
+
+**WHILE WRITING CODE, CONTINUOUSLY VERIFY:**
+
+□ All function calls use CONSISTENT argument style (all named OR all positional)
+□ Association methods return QUERIES not arrays
+□ Using correct loop syntax for data type (query vs array)
+□ Following naming conventions exactly
+□ Using examples from .ai/wheels/snippets/ as templates
+
+### Phase 4: MANDATORY Post-Implementation Validation
+
+**AFTER WRITING CODE, YOU MUST:**
+
+1. **Run Syntax Validation**:
+   ```bash
+   wheels server start --validate
+   ```
+
+2. **Check Against Common Errors**:
+   - [ ] No mixed argument styles
+   - [ ] No ArrayLen() on queries
+   - [ ] No array loops on queries
+   - [ ] Correct model/controller naming
+
+3. **Test the Implementation**:
+   ```bash
+   wheels test run
+   ```
+
+### Phase 5: Documentation Update Protocol
+
+**IF YOU ENCOUNTER A NEW ERROR PATTERN:**
+
+1. UPDATE `.ai/wheels/troubleshooting/common-errors.md`
+2. UPDATE relevant CLAUDE.md files
+3. ADD examples to `.ai/wheels/snippets/`
+
+### 🔥 ENFORCEMENT MECHANISM 🔥
+
+**THIS IS NOW YOUR WORKFLOW:**
+
+```
+1. READ documentation → 2. VALIDATE patterns → 3. WRITE code → 4. TEST code → 5. VERIFY standards
+```
+
+**YOU CANNOT SKIP STEPS. EACH STEP BLOCKS THE NEXT.**
+
+### Emergency Fallback
+
+**If `.ai/` folder is not accessible, use MCP resources:**
+```bash
+mcp resource read wheels://.ai/wheels/troubleshooting/common-errors
+mcp resource read wheels://.ai/cfml/best-practices/modern-patterns
+mcp resource read wheels://.ai/wheels/patterns/[relevant-pattern]
+```
+
+## ⚠️ BEFORE YOU START: READ THE DOCUMENTATION PROTOCOL ABOVE ⚠️
+
+### Quick Start (AFTER reading documentation protocol)
+
+#### New to Wheels?
 1. **Install Wheels CLI**: `brew install wheels` on Mac and `choco install wheels` on Windows
 2. **Generate an app**: `wheels g app myapp`
 3. **Start developing**: `wheels server start`
+
+#### 🚨 REMINDER: Before writing ANY code, complete the MANDATORY PRE-CODE DOCUMENTATION PROTOCOL above
 
 ### Common Development Tasks
 - **Create a model**: `wheels g model User name:string,email:string,active:boolean`
@@ -806,26 +896,54 @@ function onError(exception, eventname) {
 
 ## Common Issues and Troubleshooting
 
-### Association Errors
-**"Missing argument name" in hasMany()**
-This error occurs when mixing positional and named parameters in CFWheels function calls:
+### 🔴 CRITICAL ERROR #1: Argument Mixing (MOST COMMON)
+**"Missing argument name" Error**
 
-❌ **Incorrect (mixed parameter styles):**
+This is THE MOST COMMON CFWheels error. It occurs when mixing positional and named parameters:
+
+❌ **WRONG (mixed styles - WILL ALWAYS FAIL):**
 ```cfm
-hasMany("comments", dependent="delete");  // Error: can't mix positional and named
+hasMany("comments", dependent="delete");  // FATAL ERROR
+model("Post").findByKey(params.key, include="comments");  // FATAL ERROR
+renderText("Not found", status=404);  // FATAL ERROR
 ```
 
-✅ **Correct (consistent named parameters):**
+✅ **CORRECT (all named):**
 ```cfm
 hasMany(name="comments", dependent="delete");
+model("Post").findByKey(key=params.key, include="comments");
+renderText(text="Not found", status=404);
 ```
 
-✅ **Also correct (all positional):**
+✅ **ALSO CORRECT (all positional):**
 ```cfm
 hasMany("comments");
+model("Post").findByKey(params.key);
+renderText("Not found");
 ```
 
-CFWheels requires consistent parameter syntax - either all positional or all named parameters.
+**RULE: NEVER MIX ARGUMENT STYLES IN CFWHEELS - PICK ONE AND STICK WITH IT**
+
+### 🔴 CRITICAL ERROR #2: Query vs Array Confusion
+**"Can't cast Object type [Query] to a value of type [Array]" Error**
+
+Second most common error. CFWheels associations return QUERIES, not arrays:
+
+❌ **WRONG (treating query as array):**
+```cfm
+ArrayLen(post.comments())  // FATAL ERROR
+<cfloop array="#comments#" index="comment">  // FATAL ERROR
+for (comment in comments) {  // MAY FAIL
+```
+
+✅ **CORRECT (using query methods):**
+```cfm
+post.comments().recordCount  // Correct for count
+<cfloop query="comments">  // Correct for iteration
+<cfloop query="post.comments()">  // Also correct
+```
+
+**RULE: ASSOCIATIONS RETURN QUERIES - USE QUERY SYNTAX**
 
 ### Routing Issues
 **Incorrect .resources() syntax**

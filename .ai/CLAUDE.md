@@ -1,6 +1,10 @@
 # Claude Code Integration Guide
 
-This file provides specific instructions for Claude Code and other AI assistants to effectively use the comprehensive documentation in this `.ai` folder.
+🚨 **CRITICAL ENFORCEMENT DOCUMENT** 🚨
+
+This file provides MANDATORY instructions for Claude Code and other AI assistants to ensure they ALWAYS consult the comprehensive documentation in this `.ai` folder BEFORE writing any code.
+
+⛔ **VIOLATION OF THESE INSTRUCTIONS WILL RESULT IN BROKEN CODE** ⛔
 
 ## Documentation Integration Strategy
 
@@ -9,60 +13,71 @@ This file provides specific instructions for Claude Code and other AI assistants
 When working on specific tasks, AI assistants should load the following documentation in order:
 
 #### 🏗️ Model Development
-**Required Reading Order:**
-1. `.ai/cfml/components/` - CFC fundamentals
-2. `.ai/wheels/database/models.md` - Wheels model patterns
-3. `.ai/wheels/database/validations.md` - Model validation rules
-4. `.ai/wheels/database/associations.md` - Model relationships
-5. `.ai/wheels/snippets/models/` - Code examples
+**MANDATORY Reading Order (MUST READ ALL):**
+1. `.ai/wheels/troubleshooting/common-errors.md` - CRITICAL ERROR PREVENTION
+2. `.ai/wheels/database/associations/has-many.md` - Association patterns
+3. `.ai/wheels/core-concepts/mvc-architecture/models.md` - Model fundamentals
+4. `.ai/cfml/components/component-basics.md` - CFC basics
+5. `.ai/wheels/patterns/validation-templates.md` - Validation checklists
+6. `.ai/wheels/snippets/model-snippets.md` - Code examples
 
-**Validation Checklist:**
-- [ ] Uses CFScript syntax (not tag-based)
-- [ ] Extends "Model" class
-- [ ] Includes proper validation rules
-- [ ] Follows singular naming convention
-- [ ] Implements proper associations
+**CRITICAL Anti-Pattern Check (MUST VERIFY):**
+- [ ] ❌ NO mixed arguments: `hasMany("comments", dependent="delete")`
+- [ ] ✅ Consistent arguments: ALL named OR ALL positional
+- [ ] ❌ NO ArrayLen() on associations: `ArrayLen(model.comments())`
+- [ ] ✅ Use .recordCount: `model.comments().recordCount`
+- [ ] ✅ Singular naming: User.cfc (not Users.cfc)
+- [ ] ✅ Extends "Model" class
+- [ ] ✅ Proper associations and validations
 
 #### 🎮 Controller Development
-**Required Reading Order:**
-1. `.ai/wheels/controllers/basics.md` - Controller fundamentals
-2. `.ai/wheels/controllers/filters.md` - Authentication/authorization
-3. `.ai/wheels/controllers/parameters.md` - Parameter handling
-4. `.ai/wheels/controllers/rendering.md` - Response rendering
-5. `.ai/wheels/snippets/controllers/` - Code examples
+**MANDATORY Reading Order (MUST READ ALL):**
+1. `.ai/wheels/troubleshooting/common-errors.md` - CRITICAL ERROR PREVENTION
+2. `.ai/wheels/controllers/rendering/views.md` - View rendering
+3. `.ai/wheels/controllers/filters/authentication.md` - Authentication
+4. `.ai/wheels/controllers/params/verification.md` - Parameter handling
+5. `.ai/cfml/syntax/cfscript-vs-tags.md` - CFScript syntax
+6. `.ai/wheels/patterns/validation-templates.md` - Validation checklists
+7. `.ai/wheels/snippets/controller-snippets.md` - Code examples
 
-**Validation Checklist:**
-- [ ] Uses plural naming convention
-- [ ] Extends "Controller" class
-- [ ] Implements proper filters
-- [ ] Handles parameters securely
-- [ ] Follows RESTful patterns
+**CRITICAL Anti-Pattern Check (MUST VERIFY):**
+- [ ] ❌ NO mixed arguments: `renderText("error", status=404)`
+- [ ] ✅ Consistent arguments: ALL named OR ALL positional
+- [ ] ❌ NO ArrayLen() on model results
+- [ ] ✅ Use .recordCount on queries
+- [ ] ✅ Plural naming: PostsController.cfc (not PostController.cfc)
+- [ ] ✅ Extends "Controller" class
+- [ ] ✅ Proper parameter verification
 
 #### 📄 View Development
-**Required Reading Order:**
-1. `.ai/wheels/views/templates.md` - Template basics
-2. `.ai/wheels/views/layouts.md` - Layout patterns
-3. `.ai/wheels/views/helpers.md` - View helpers
-4. `.ai/wheels/views/forms.md` - Form handling
-5. `.ai/wheels/snippets/views/` - Code examples
+**MANDATORY Reading Order (MUST READ ALL):**
+1. `.ai/wheels/troubleshooting/common-errors.md` - CRITICAL ERROR PREVENTION
+2. `.ai/wheels/views/layouts/structure.md` - Layout basics
+3. `.ai/cfml/control-flow/loops.md` - Loop syntax (QUERY vs ARRAY)
+4. `.ai/wheels/views/helpers/forms.md` - Form helpers
+5. `.ai/wheels/patterns/validation-templates.md` - Validation checklists
 
-**Validation Checklist:**
-- [ ] Uses CFML template syntax
-- [ ] Implements proper escaping
-- [ ] Follows layout conventions
-- [ ] Uses appropriate helpers
+**CRITICAL Anti-Pattern Check (MUST VERIFY):**
+- [ ] ❌ NO array loops on queries: `<cfloop array="#query#">`
+- [ ] ✅ Use query loops: `<cfloop query="queryName">`
+- [ ] ❌ NO ArrayLen() on queries: `ArrayLen(posts)`
+- [ ] ✅ Use .recordCount: `posts.recordCount`
+- [ ] ✅ Proper HTML escaping in cfoutput
+- [ ] ✅ CSRF protection in forms
 
 #### 🗃️ Database Migration
-**Required Reading Order:**
-1. `.ai/wheels/database/migrations.md` - Migration fundamentals
-2. `.ai/wheels/cli/generators.md` - Generator usage
-3. `.ai/wheels/snippets/migrations/` - Code examples
+**MANDATORY Reading Order (MUST READ ALL):**
+1. `.ai/wheels/troubleshooting/common-errors.md` - CRITICAL ERROR PREVENTION
+2. `.ai/wheels/database/migrations/creating-migrations.md` - Migration basics
+3. `.ai/wheels/database/migrations/column-types.md` - Column types
+4. `.ai/wheels/patterns/validation-templates.md` - Validation checklists
 
-**Validation Checklist:**
-- [ ] Extends "Migration" class
-- [ ] Implements both up() and down()
-- [ ] Uses proper column types
-- [ ] Includes appropriate indexes
+**CRITICAL Anti-Pattern Check (MUST VERIFY):**
+- [ ] ❌ NO complex parameter binding for data seeding
+- [ ] ✅ Use direct SQL for data insertion
+- [ ] ✅ Wrap operations in transactions
+- [ ] ✅ Extends "Migration" class
+- [ ] ✅ Implements both up() and down()
 
 #### 🔧 Configuration
 **Required Reading Order:**
@@ -75,31 +90,55 @@ When working on specific tasks, AI assistants should load the following document
 - [ ] Follows security best practices
 - [ ] Implements appropriate routing
 
-### Pre-Implementation Workflow
+### 🚨 MANDATORY Pre-Implementation Workflow 🚨
 
-**Step 1: Context Assessment**
+**STEP 1: EMERGENCY ERROR PREVENTION (ALWAYS FIRST)**
 ```bash
-# Determine the type of work
-if [model_work]; then load .ai/wheels/database/
-if [controller_work]; then load .ai/wheels/controllers/
-if [view_work]; then load .ai/wheels/views/
-if [cfml_syntax_question]; then load .ai/cfml/
+# CRITICAL: Read this FIRST to prevent common errors
+READ .ai/wheels/troubleshooting/common-errors.md
+READ .ai/wheels/patterns/validation-templates.md
 ```
 
-**Step 2: Pattern Validation**
-- Read the relevant `.ai/wheels/patterns/` documentation
-- Compare planned implementation against established patterns
-- Ensure adherence to Wheels conventions
+**STEP 2: Task-Specific Documentation Loading**
+```bash
+# Load ALL relevant documentation based on task:
+if [model_work]; then
+    READ .ai/wheels/database/associations/has-many.md
+    READ .ai/wheels/core-concepts/mvc-architecture/models.md
+    READ .ai/cfml/components/component-basics.md
 
-**Step 3: Code Example Reference**
-- Check `.ai/wheels/snippets/` for relevant examples
-- Use established code patterns as templates
-- Adapt examples to specific requirements
+if [controller_work]; then
+    READ .ai/wheels/controllers/rendering/views.md
+    READ .ai/wheels/controllers/filters/authentication.md
+    READ .ai/cfml/syntax/cfscript-vs-tags.md
 
-**Step 4: Security Review**
-- Consult `.ai/wheels/security/` for security requirements
-- Implement CSRF protection where needed
-- Follow parameter validation patterns
+if [view_work]; then
+    READ .ai/wheels/views/layouts/structure.md
+    READ .ai/cfml/control-flow/loops.md
+    READ .ai/wheels/views/helpers/forms.md
+
+if [migration_work]; then
+    READ .ai/wheels/database/migrations/creating-migrations.md
+    READ .ai/wheels/database/migrations/column-types.md
+```
+
+**STEP 3: MANDATORY Anti-Pattern Validation**
+- ✅ Verify NO mixed argument styles
+- ✅ Verify NO ArrayLen() on queries
+- ✅ Verify correct naming conventions
+- ✅ Verify proper loop syntax for data types
+
+**STEP 4: Code Implementation with Continuous Checking**
+- Use code templates from `.ai/wheels/snippets/`
+- Follow patterns from `.ai/wheels/patterns/`
+- Check against validation templates while coding
+
+**STEP 5: MANDATORY Post-Implementation Validation**
+```bash
+wheels server start --validate
+wheels test run
+# Manual anti-pattern check against validation templates
+```
 
 ## Documentation Structure Guide
 
@@ -151,11 +190,13 @@ if [cfml_syntax_question]; then load .ai/cfml/
 
 ## AI Assistant Instructions
 
-### Mandatory Pre-Code Actions
-1. **Always** read the `.ai/README.md` first for context
-2. **Load** task-specific documentation before coding
-3. **Validate** against patterns and best practices
-4. **Reference** code examples from snippets
+### 🛑 MANDATORY Pre-Code Actions (NO EXCEPTIONS)
+1. **ALWAYS** read `.ai/wheels/troubleshooting/common-errors.md` FIRST
+2. **ALWAYS** read `.ai/wheels/patterns/validation-templates.md` SECOND
+3. **LOAD** ALL task-specific documentation (see mapping above)
+4. **VALIDATE** against anti-patterns before writing any code
+5. **REFERENCE** code examples from snippets as templates
+6. **CHECK** implementation against validation templates continuously
 
 ### Code Quality Assurance
 - **CFML Standards**: Follow `.ai/cfml/best-practices/`
@@ -170,29 +211,66 @@ When creating new patterns or solutions:
 3. Update relevant mapping files
 4. Test the documentation with other AI assistants
 
-## MCP Integration
+## MCP Integration (Emergency Fallback)
 
-The `.ai` documentation is designed to work with the native CFML MCP server at `/wheels/mcp`. Resources are available as:
+If `.ai/` folder is not accessible, use MCP resources from native CFML MCP server at `/wheels/mcp`:
 
-- `wheels://.ai/cfml/syntax` - CFML syntax documentation
-- `wheels://.ai/wheels/patterns` - Framework patterns
-- `wheels://.ai/wheels/snippets` - Code examples
+**CRITICAL Resources (Load These First):**
+```bash
+mcp resource read wheels://.ai/wheels/troubleshooting/common-errors
+mcp resource read wheels://.ai/wheels/patterns/validation-templates
+```
+
+**Task-Specific Resources:**
+```bash
+# For model work:
+mcp resource read wheels://.ai/wheels/database/associations/has-many
+mcp resource read wheels://.ai/wheels/core-concepts/mvc-architecture/models
+
+# For controller work:
+mcp resource read wheels://.ai/wheels/controllers/rendering/views
+mcp resource read wheels://.ai/wheels/controllers/filters/authentication
+
+# For view work:
+mcp resource read wheels://.ai/wheels/views/layouts/structure
+mcp resource read wheels://.ai/cfml/control-flow/loops
+
+# For migration work:
+mcp resource read wheels://.ai/wheels/database/migrations/creating-migrations
+```
+
+**Available MCP Resources:**
+- `wheels://.ai/cfml/syntax/*` - CFML syntax documentation
+- `wheels://.ai/wheels/patterns/*` - Framework patterns
+- `wheels://.ai/wheels/snippets/*` - Code examples
+- `wheels://.ai/wheels/troubleshooting/*` - Error prevention
 - `wheels://.ai/project/context` - Current project context
 
-## Validation Commands
+## MANDATORY Validation Commands
 
-After implementing code based on `.ai` documentation:
+**BEFORE committing ANY code, run these validation commands:**
 
 ```bash
-# Run tests to validate implementation
-wheels test run
-
-# Check for syntax errors
+# 1. Syntax validation
 wheels server start --validate
 
-# Review generated code against patterns
-# (Manual review using .ai documentation)
+# 2. Test validation
+wheels test run
+
+# 3. Anti-pattern detection (manual)
+grep -r "hasMany(\"[^\"]*\",[[:space:]]*[a-zA-Z]" app/models/  # Check mixed args
+grep -r "ArrayLen(" app/views/  # Check query/array confusion
+find app/models/ -name "*s.cfc"  # Check plural model names
+
+# 4. Manual review using validation templates
+# Check implementation against .ai/wheels/patterns/validation-templates.md
 ```
+
+**If ANY validation fails:**
+1. Consult `.ai/wheels/troubleshooting/common-errors.md`
+2. Review `.ai/wheels/patterns/validation-templates.md`
+3. Fix errors before proceeding
+4. Re-run validation until all checks pass
 
 ## Best Practices for AI Assistants
 

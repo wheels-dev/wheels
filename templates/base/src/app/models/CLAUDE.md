@@ -2,9 +2,76 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with Wheels model components.
 
-## ⚠️ MANDATORY: Model Implementation Validation
+## 🚨 CRITICAL: PRE-MODEL IMPLEMENTATION CHECKLIST 🚨
 
-**Before implementing ANY model code, AI assistants MUST:**
+### 🛑 MANDATORY DOCUMENTATION READING (COMPLETE BEFORE ANY CODE)
+
+**YOU MUST READ THESE FILES IN ORDER:**
+
+✅ **Step 1: Error Prevention (ALWAYS FIRST)**
+- [ ] `.ai/wheels/troubleshooting/common-errors.md` - PREVENT FATAL ERRORS
+- [ ] `.ai/wheels/patterns/validation-templates.md` - MODEL CHECKLIST
+
+✅ **Step 2: Model-Specific Documentation**
+- [ ] `.ai/wheels/database/associations/has-many.md` - Association patterns
+- [ ] `.ai/wheels/core-concepts/mvc-architecture/models.md` - Model fundamentals
+- [ ] `.ai/cfml/components/component-basics.md` - CFC syntax rules
+- [ ] `.ai/wheels/snippets/model-snippets.md` - Code examples
+
+### 🔴 CRITICAL ANTI-PATTERN CHECK (MUST VERIFY BEFORE WRITING)
+
+**Before writing ANY model code, verify you will NOT:**
+- [ ] ❌ Mix argument styles: `hasMany("comments", dependent="delete")`
+- [ ] ❌ Use ArrayLen() on associations: `ArrayLen(user.comments())`
+- [ ] ❌ Use plural model names: `Users.cfc`
+- [ ] ❌ Treat associations as arrays in any context
+
+**And you WILL:**
+- [ ] ✅ Use consistent argument style throughout
+- [ ] ✅ Use singular naming: `User.cfc` (maps to `users` table)
+- [ ] ✅ Use .recordCount for association counts
+- [ ] ✅ Understand associations return QUERIES
+- [ ] ✅ Extend "Model" class properly
+
+### 📋 MODEL IMPLEMENTATION TEMPLATE (MANDATORY STARTING POINT)
+
+```cfm
+component extends="Model" {
+    function config() {
+        // Choose ONE argument style and stick with it
+
+        // Option 1: ALL NAMED arguments (RECOMMENDED)
+        hasMany(name="comments", dependent="delete");
+        belongsTo(name="user");
+        validatesPresenceOf(properties="title,content");
+
+        // Option 2: ALL POSITIONAL arguments
+        hasMany("comments");
+        belongsTo("user");
+        validatesPresenceOf("title,content");
+
+        // NEVER mix styles within same component
+    }
+
+    // Custom finder methods (NO scope() function in Wheels)
+    function findBySlug(required string slug) {
+        return findOne(where="slug = '#arguments.slug#'");
+    }
+
+    function findActive() {
+        return findAll(where="active = 1");
+    }
+
+    // Instance methods
+    function fullTitle() {
+        return "#title# - #subtitle#";
+    }
+}
+```
+
+### ⚠️ MANDATORY: Model Implementation Validation
+
+**After reading documentation and completing checklist above, you must also:**
 
 1. **📖 Load Model Documentation**
    - Read `.ai/wheels/database/models.md` for model patterns
@@ -28,6 +95,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with Wh
    - Use templates from `.ai/wheels/snippets/models/`
    - Follow established patterns from `.ai/wheels/patterns/`
    - Apply security practices from `.ai/wheels/security/`
+
+### 🔍 POST-IMPLEMENTATION VALIDATION (REQUIRED BEFORE COMPLETION)
+
+**After writing model code, you MUST run these checks:**
+
+```bash
+# 1. Syntax validation
+wheels server start --validate
+
+# 2. Test validation
+wheels test run
+
+# 3. Anti-pattern detection
+grep -r "hasMany(\"[^\"]*\",[[:space:]]*[a-zA-Z]" app/models/  # Check mixed args
+find app/models/ -name "*s.cfc"  # Check plural model names
+```
+
+**Manual checklist verification:**
+- [ ] No mixed argument styles in any function calls
+- [ ] No ArrayLen() calls on associations
+- [ ] Singular model naming (User.cfc not Users.cfc)
+- [ ] Proper association definitions
+- [ ] Custom finder methods instead of scope() functions
 
 ## Overview
 
@@ -1037,6 +1127,33 @@ component extends="Model" {
 ```
 
 ## Model Associations
+
+**🚨 CRITICAL**: Association methods in CFWheels return QUERY objects, not arrays. This is essential to understand for views and controllers.
+
+### Association Return Types and Usage
+```cfm
+// All association methods return QUERIES
+user = model("User").findByKey(1);
+posts = user.posts();           // Returns QUERY, not array
+comments = post.comments();     // Returns QUERY, not array
+
+// Use query methods and properties
+postCount = user.posts().recordCount;        // ✅ CORRECT
+commentCount = post.comments().recordCount;  // ✅ CORRECT
+
+// NOT array methods
+postCount = ArrayLen(user.posts());          // ❌ ERROR!
+commentCount = ArrayLen(post.comments());    // ❌ ERROR!
+
+// Loop as queries, not arrays
+<cfloop query="user.posts()">               // ✅ CORRECT
+    #user.posts().title#
+</cfloop>
+
+<cfloop array="#user.posts()#" index="post"> // ❌ ERROR!
+    #post.title#
+</cfloop>
+```
 
 ### Association Types and Usage
 

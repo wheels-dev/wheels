@@ -9,6 +9,7 @@ Defines a one-to-many relationship where the current model owns multiple records
 - Foreign key assumed to be `modelName + "Id"`
 - Generates convenience methods for accessing related records
 - Supports through associations for many-to-many relationships
+- **CRITICAL**: Association methods return Query objects, not arrays
 
 ## Code Sample
 ```cfm
@@ -32,11 +33,21 @@ component extends="Model" {
 
 // Usage in controllers/views
 post = model("post").findByKey(1);
-comments = post.comments();              // Get all comments
+comments = post.comments();              // Returns QUERY object, not array
 newComment = post.newComment();          // Create associated comment
 post.addComment(comment);                // Add existing comment
 post.removeComment(comment);             // Remove association
 hasComments = post.hasComments();        // Check if has comments
+
+// ❌ WRONG - Treating query as array
+commentCount = ArrayLen(post.comments());  // ERROR!
+<cfloop array="#post.comments()#" index="comment">  // ERROR!
+
+// ✅ CORRECT - Using query methods
+commentCount = post.comments().recordCount;
+<cfloop query="post.comments()">
+    #post.comments().content#
+</cfloop>
 ```
 
 ## Usage

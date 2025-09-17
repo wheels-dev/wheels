@@ -44,6 +44,53 @@ component extends="Model" {
 
 **Related:** CFWheels requires consistent parameter syntax - either all positional or all named parameters, not mixed.
 
+### "Can't cast Object type [Query] to a value of type [Array]"
+**Error:**
+```
+Can't cast Object type [Query] to a value of type [Array]
+Detail: Java type of the object is lucee.runtime.type.QueryImpl
+```
+
+**Cause:** Treating CFWheels association results as arrays when they return query objects.
+
+**Bad Code:**
+```cfm
+<!-- In views or controllers -->
+<cfset commentCount = ArrayLen(post.comments())>  <!-- ERROR: comments() returns Query -->
+<cfloop array="#post.comments()#" index="comment"> <!-- ERROR: Can't loop Query as Array -->
+    #comment.content#
+</cfloop>
+```
+
+**Solutions:**
+```cfm
+<!-- Use query methods and properties -->
+<cfset commentCount = post.comments().recordCount>
+<cfset comments = post.comments()>
+
+<!-- Loop as query, not array -->
+<cfloop query="comments">
+    #comments.content#  <!-- Access fields directly from query -->
+</cfloop>
+
+<!-- Check if query has records -->
+<cfif post.comments().recordCount gt 0>
+    <cfloop query="post.comments()">
+        <p>#post.comments().author#: #post.comments().content#</p>
+    </cfloop>
+<cfelse>
+    <p>No comments found.</p>
+</cfif>
+```
+
+**Key Points:**
+- All CFWheels association methods return **Query objects**, not arrays
+- Use `.recordCount` for counts, not `ArrayLen()`
+- Use `<cfloop query="...">` for iteration, not `<cfloop array="...">`
+- Model finder methods also return queries: `model("User").findAll()` returns Query
+
+**Related:** This is the #2 most common CFWheels error after argument mixing.
+
 ## Form Helper Errors
 
 ### "No matching function [LABEL] found"
