@@ -449,7 +449,7 @@ component aliases='wheels g resource' extends="../base" {
             var belongsToList = listToArray(options.belongsTo);
             for (var parent in belongsToList) {
                 var parentObj = helpers.getNameVariants(trim(parent));
-                content &= '        t.integer(columnName="' & parentObj.objectNameSingular & 'Id", null=true);' & chr(10);
+                content &= '        t.integer(columnName="' & parentObj.objectNameSingular & 'Id", allowNull=true);' & chr(10);
             }
         }
 

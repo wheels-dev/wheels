@@ -136,7 +136,7 @@ function up() {
         t = createTable(name="products");
         
         // Column types - all named arguments
-        t.string(columnNames="name", limit=100, null=false);
+        t.string(columnNames="name", limit=100, allowNull=false);
         t.text(columnNames="description");
         t.text(columnNames="content", size="mediumtext"); // MySQL: 16MB
         t.text(columnNames="longDescription", size="longtext"); // MySQL: 4GB
@@ -175,8 +175,8 @@ function up() {
         // Table without auto-increment id - all named arguments
         t = createTable(name="user_roles", id=false);
         t.primaryKey(columnNames=["userid", "roleid"]); // Composite primary key
-        t.integer(columnNames="userid", null=false);
-        t.integer(columnNames="roleid", null=false);
+        t.integer(columnNames="userid", allowNull=false);
+        t.integer(columnNames="roleid", allowNull=false);
         t.create();
         
         // Table with custom options (MySQL) - all named arguments
@@ -203,7 +203,7 @@ function up() {
             columnName="phoneNumber", 
             columnType="string",
             limit=20,
-            null=true
+            allowNull=true
         );
         
         // Multiple columns using changeTable - all named arguments
@@ -239,7 +239,7 @@ function up() {
             columnType="decimal",
             precision=12,
             scale=2,
-            null=false,
+            allowNull=false,
             default=0
         );
     }
@@ -563,13 +563,13 @@ wheels dbmigrate create blank fix_users_email_column
 function up() {
     transaction {
         // Add nullable first - all named arguments
-        addColumn(table="users", columnName="role", columnType="string", null=true);
+        addColumn(table="users", columnName="role", columnType="string", allowNull=true);
         
         // Set default values - all named arguments
         updateRecord(table="users", where="1=1", values={role: "member"});
         
         // Make non-nullable - all named arguments
-        changeColumn(table="users", columnName="role", null=false);
+        changeColumn(table="users", columnName="role", allowNull=false);
     }
 }
 ```

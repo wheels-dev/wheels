@@ -159,7 +159,7 @@ component extends="testbox.system.BaseSpec" {
 
 				migration.dropTable(tableName)
 				t = migration.createTable(name = tableName)
-				t.string(columnNames = "name", default = "", null = true, limit = 255)
+				t.string(columnNames = "name", default = "", allowNull = true, limit = 255)
 				t.create()
 				migration.removeRecord(table = "c_o_r_e_migrator_versions")
 				migration.addRecord(table = "c_o_r_e_migrator_versions", version = "001")

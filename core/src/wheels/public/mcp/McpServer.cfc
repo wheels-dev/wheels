@@ -997,13 +997,13 @@ Provide migration code following Wheels conventions."
 				// Get all .md files in the directory
 				local.files = directoryList(local.fullPath, true, "name", "*.md");
 
-				local.aggregatedContent = "# " & arguments.folderPath & " Documentation" & chr(10) & chr(10);
+				local.aggregatedContent = "## " & arguments.folderPath & " Documentation" & chr(10) & chr(10);
 
 				for (local.file in local.files) {
 					local.filePath = local.fullPath & "/" & local.file;
 					if (fileExists(local.filePath)) {
 						local.fileContent = fileRead(local.filePath);
-						local.aggregatedContent &= "## " & local.file & chr(10) & chr(10);
+						local.aggregatedContent &= "#### " & local.file & chr(10) & chr(10);
 						local.aggregatedContent &= local.fileContent & chr(10) & chr(10);
 						local.aggregatedContent &= "---" & chr(10) & chr(10);
 					}

@@ -12,7 +12,7 @@ component extends="wheels.tests.Test" {
 		columnName = "stringcolumn";
 
 		t = migration.createTable(name = tableName, force = true);
-		t.string(columnNames = columnName, limit = 10, null = true);
+		t.string(columnNames = columnName, limit = 10, allowNull = true);
 		t.create();
 
 		migration.changeColumn(
@@ -20,7 +20,7 @@ component extends="wheels.tests.Test" {
 			columnName = columnName,
 			columnType = 'string',
 			limit = 50,
-			null = false,
+			allowNull = false,
 			default = "foo"
 		);
 

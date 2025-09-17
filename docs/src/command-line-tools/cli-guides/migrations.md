@@ -150,7 +150,7 @@ function up() {
             column="phoneNumber",
             type="string",
             limit=20,
-            null=true
+            allowNull=true
         );
         
         // Multiple columns
@@ -557,7 +557,7 @@ wheels dbmigrate create blank fix_orders_status_column
 function up() {
     transaction {
         // Add nullable first
-        addColumn(table="users", column="role", type="string", null=true);
+        addColumn(table="users", column="role", type="string", allowNull=true);
         
         // Set default values
         updateRecord(table="users", where="1=1", values={role: "member"});

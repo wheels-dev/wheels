@@ -15,7 +15,7 @@ component extends="wheels.tests.Test" {
 		t.string(
 			columnNames = "name",
 			default = "",
-			null = true,
+			allowNull = true,
 			limit = 255
 		);
 		t.create();

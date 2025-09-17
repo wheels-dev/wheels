@@ -22,7 +22,7 @@ component extends="wheels.tests.Test" {
 			table = tableName,
 			columnType = 'integer',
 			columnName = columnName,
-			null = true
+			allowNull = true
 		);
 		info = $dbinfo(datasource = application.wheels.dataSourceName, table = tableName, type = "columns");
 		actual = ValueList(info.column_name);

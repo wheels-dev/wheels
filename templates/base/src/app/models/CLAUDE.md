@@ -397,7 +397,7 @@ component extends="Model" {
         
         // Custom properties
         property(name="status", type="string", defaultValue="draft");
-        property(name="publishedAt", type="timestamp", null=true);
+        property(name="publishedAt", type="timestamp");
         property(name="wordCount", sql=false);
         property(name="readingTime", sql=false);
         property(name="isPublished", sql=false);
@@ -657,11 +657,11 @@ component extends="Model" {
         
         // Custom properties
         property(name="isactive", type="boolean", defaultValue=true);
-        property(name="lastloginat", type="timestamp", null=true);
+        property(name="lastloginat", type="timestamp");
         property(name="logincount", type="integer", defaultValue=0);
         property(name="failedloginattempts", type="integer", defaultValue=0);
-        property(name="lockeduntil", type="timestamp", null=true);
-        property(name="emailverifiedat", type="timestamp", null=true);
+        property(name="lockeduntil", type="timestamp");
+        property(name="emailverifiedat", type="timestamp");
         property(name="twofactorenabled", type="boolean", defaultValue=false);
         
         // Virtual properties

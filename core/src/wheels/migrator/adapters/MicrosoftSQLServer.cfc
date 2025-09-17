@@ -33,7 +33,7 @@ component extends="Abstract" {
 	}
 
 	public string function addPrimaryKeyOptions(required string sql, struct options = "#StructNew()#") {
-		if (StructKeyExists(arguments.options, "null") && arguments.options.null) {
+		if (StructKeyExists(arguments.options, "allowNull") && arguments.options.allowNull) {
 			arguments.sql = arguments.sql & " NULL";
 		} else {
 			arguments.sql = arguments.sql & " NOT NULL";
@@ -104,13 +104,13 @@ component extends="Abstract" {
 	 */
 	public string function changeColumnInTable(required string name, required any column) {
 		local.sql = "";
-		for (local.i in ["default", "null", "afterColumn"]) {
+		for (local.i in ["default", "allowNull", "afterColumn"]) {
 			if (StructKeyExists(arguments.column, local.i)) {
 				local.opts = {};
 				local.opts.type = arguments.column.type;
 				local.opts[local.i] = arguments.column[local.i];
 				local.columnSQL = addColumnOptions(sql = "", options = local.opts, alter = true);
-				if (local.i == "null") {
+				if (local.i == "allowNull") {
 					local.sql = local.sql & "ALTER TABLE #quoteTableName(arguments.name)# ALTER COLUMN #objectCase(arguments.column.name)# #arguments.column.sqlType()# #local.columnSQL#;";
 				} else if (local.i == "default") {
 					// SQL server will throw an exception if a default constraint exists

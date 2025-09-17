@@ -210,7 +210,7 @@ component extends="wheels.migrator.Migration" hint="Add properties to product" {
         transaction {
             addColumn(table="products", columnName="sku", columnType="string", limit=50, allowNull=false);
             addColumn(table="products", columnName="price", columnType="decimal", precision=10, scale=2, allowNull=false, default=0.00);
-            addColumn(table="products", columnName="stock", columnType="integer", null=true, default=0);
+            addColumn(table="products", columnName="stock", columnType="integer", allowNull=true, default=0);
             
             addIndex(table="products", columnNames="sku", unique=true);
         }
