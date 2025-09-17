@@ -2,7 +2,7 @@ component extends="wheels.Controller" {
 
     function init() {
         provides("json");
-				filters(through="setJsonResponse);
+				filters(through="setJsonResponse");
     }
 
     /**

@@ -257,6 +257,61 @@ component output="false" displayName="MCP Server" {
 				"name": "Wheels Guides",
 				"description": "All Wheels framework guides and tutorials",
 				"mimeType": "application/json"
+			},
+			// .ai folder documentation
+			{
+				"uri": "wheels://.ai/overview",
+				"name": ".ai Documentation Overview",
+				"description": "Complete overview of the .ai documentation structure and usage guide",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/cfml/syntax",
+				"name": "CFML Syntax Documentation",
+				"description": "Core CFML syntax, CFScript vs tags, and language fundamentals",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/cfml/best-practices",
+				"name": "CFML Best Practices",
+				"description": "Modern CFML development patterns and coding standards",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/wheels/models",
+				"name": "Wheels Model Patterns",
+				"description": "Comprehensive model development patterns from .ai documentation",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/wheels/controllers",
+				"name": "Wheels Controller Patterns",
+				"description": "Controller development patterns and conventions from .ai documentation",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/wheels/views",
+				"name": "Wheels View Patterns",
+				"description": "View and template patterns from .ai documentation",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/wheels/patterns",
+				"name": "Common Development Patterns",
+				"description": "Established development patterns and best practices from .ai documentation",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/wheels/snippets",
+				"name": "Code Examples and Snippets",
+				"description": "Ready-to-use code examples and templates from .ai documentation",
+				"mimeType": "text/markdown"
+			},
+			{
+				"uri": "wheels://.ai/wheels/security",
+				"name": "Security Guidelines",
+				"description": "Security patterns and practices from .ai documentation",
+				"mimeType": "text/markdown"
 			}
 		];
 
@@ -330,15 +385,49 @@ component output="false" displayName="MCP Server" {
 				case "wheels://guides/all":
 					local.content = fetchFromAIEndpoint("/wheels/guides?format=json");
 					break;
+				// .ai folder documentation
+				case "wheels://.ai/overview":
+					local.content = readAIDocumentation("README.md");
+					break;
+				case "wheels://.ai/cfml/syntax":
+					local.content = aggregateAIDocumentation(".ai/cfml/syntax/");
+					break;
+				case "wheels://.ai/cfml/best-practices":
+					local.content = aggregateAIDocumentation(".ai/cfml/best-practices/");
+					break;
+				case "wheels://.ai/wheels/models":
+					local.content = aggregateAIDocumentation(".ai/wheels/database/");
+					break;
+				case "wheels://.ai/wheels/controllers":
+					local.content = aggregateAIDocumentation(".ai/wheels/controllers/");
+					break;
+				case "wheels://.ai/wheels/views":
+					local.content = aggregateAIDocumentation(".ai/wheels/views/");
+					break;
+				case "wheels://.ai/wheels/patterns":
+					local.content = aggregateAIDocumentation(".ai/wheels/patterns/");
+					break;
+				case "wheels://.ai/wheels/snippets":
+					local.content = aggregateAIDocumentation(".ai/wheels/snippets/");
+					break;
+				case "wheels://.ai/wheels/security":
+					local.content = aggregateAIDocumentation(".ai/wheels/security/");
+					break;
 				default:
 					return createErrorResponse({"id": arguments.id}, -32602, "Invalid params", "Unknown resource URI: #local.uri#");
+			}
+
+			// Determine correct mime type based on URI
+			local.mimeType = "application/json";
+			if (find("wheels://.ai/", local.uri)) {
+				local.mimeType = "text/markdown";
 			}
 
 			return createSuccessResponse(arguments.id, {
 				"contents": [
 					{
 						"uri": local.uri,
-						"mimeType": "application/json",
+						"mimeType": local.mimeType,
 						"text": local.content
 					}
 				]
@@ -615,7 +704,7 @@ Key Wheels controller concepts:
 - Filters: filters(through='authenticate', except='index')
 - Rendering: renderView(), renderWith(), redirectTo()
 - Content types: provides('html,json')
-- CSRF: protectFromForgery()
+- CSRF: protectsFromForgery()
 
 Focus on RESTful patterns and Wheels conventions.",
 
@@ -881,6 +970,66 @@ Provide migration code following Wheels conventions."
 			return executeCommand(local.command);
 		} catch (any e) {
 			return "Validation failed: " & e.message;
+		}
+	}
+
+	// Helper functions for .ai documentation
+
+	private string function readAIDocumentation(required string filename) {
+		try {
+			local.filePath = expandPath(".ai/" & arguments.filename);
+			if (fileExists(local.filePath)) {
+				return fileRead(local.filePath);
+			} else {
+				return "Documentation file not found: " & arguments.filename;
+			}
+		} catch (any e) {
+			return "Error reading documentation: " & e.message;
+		}
+	}
+
+	private string function aggregateAIDocumentation(required string folderPath) {
+		try {
+			local.fullPath = expandPath(arguments.folderPath);
+			local.aggregatedContent = "";
+
+			if (directoryExists(local.fullPath)) {
+				// Get all .md files in the directory
+				local.files = directoryList(local.fullPath, true, "name", "*.md");
+
+				local.aggregatedContent = "# " & arguments.folderPath & " Documentation" & chr(10) & chr(10);
+
+				for (local.file in local.files) {
+					local.filePath = local.fullPath & "/" & local.file;
+					if (fileExists(local.filePath)) {
+						local.fileContent = fileRead(local.filePath);
+						local.aggregatedContent &= "## " & local.file & chr(10) & chr(10);
+						local.aggregatedContent &= local.fileContent & chr(10) & chr(10);
+						local.aggregatedContent &= "---" & chr(10) & chr(10);
+					}
+				}
+
+				// If no files found, list the directory structure
+				if (arrayLen(local.files) == 0) {
+					local.aggregatedContent &= "No markdown files found in: " & arguments.folderPath & chr(10);
+					local.aggregatedContent &= "Directory contents:" & chr(10);
+
+					try {
+						local.allFiles = directoryList(local.fullPath, true, "name");
+						for (local.item in local.allFiles) {
+							local.aggregatedContent &= "- " & local.item & chr(10);
+						}
+					} catch (any e2) {
+						local.aggregatedContent &= "Unable to list directory contents: " & e2.message;
+					}
+				}
+
+				return local.aggregatedContent;
+			} else {
+				return "Documentation folder not found: " & arguments.folderPath;
+			}
+		} catch (any e) {
+			return "Error aggregating documentation: " & e.message & " (Path: " & arguments.folderPath & ")";
 		}
 	}
 }
