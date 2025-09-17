@@ -794,8 +794,31 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameter 'action'";
 		}
 
-		local.command = "wheels dbmigrate " & arguments.args.action;
-		return executeCommand(local.command);
+		try {
+			local.currentPort = cgi.server_port;
+			if (local.currentPort == 0 || !len(local.currentPort)) {
+				local.currentPort = StructKeyExists(server, "lucee") ? "60000" : "8500";
+			}
+			local.baseUrl = "http://localhost:" & local.currentPort & "/wheels/migrator";
+
+			switch (arguments.args.action) {
+				case "info":
+					return getMigrationInfo(local.baseUrl);
+				case "latest":
+					return executeMigrationCommand(local.baseUrl, "migrateTolatest", "0");
+				case "up":
+					return executeMigrationUp(local.baseUrl);
+				case "down":
+					return executeMigrationDown(local.baseUrl);
+				case "reset":
+					return executeMigrationCommand(local.baseUrl, "migrateTo", "0");
+				default:
+					return "Error: Unknown migration action '" & arguments.args.action & "'. Supported actions: info, latest, up, down, reset";
+			}
+
+		} catch (any e) {
+			return "Error executing migration: " & e.message;
+		}
 	}
 
 	private string function executeWheelsTest(required struct args) {
@@ -970,6 +993,159 @@ Provide migration code following Wheels conventions."
 			return executeCommand(local.command);
 		} catch (any e) {
 			return "Validation failed: " & e.message;
+		}
+	}
+
+	// Helper functions for migration operations
+
+	private string function getMigrationInfo(required string baseUrl) {
+		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
+
+		if (local.httpResult.status_code == 200) {
+			local.data = deserializeJSON(local.httpResult.fileContent);
+			local.migrator = local.data.migrator;
+
+			if (structKeyExists(local.migrator, "error")) {
+				return "Database Error: " & local.migrator.error;
+			}
+
+			local.result = "Migration Status:" & chr(10);
+			local.result &= "Current Version: " & (structKeyExists(local.migrator, "currentVersion") ? local.migrator.currentVersion : "None") & chr(10);
+
+			if (structKeyExists(local.migrator, "latestVersion")) {
+				local.result &= "Latest Version: " & local.migrator.latestVersion & chr(10);
+			}
+
+			if (structKeyExists(local.migrator, "migrationsCount")) {
+				local.result &= "Total Migrations: " & local.migrator.migrationsCount & chr(10);
+			}
+
+			if (structKeyExists(local.migrator, "migratedCount")) {
+				local.result &= "Migrated: " & local.migrator.migratedCount & chr(10);
+			}
+
+			if (structKeyExists(local.migrator, "pendingCount")) {
+				local.result &= "Pending: " & local.migrator.pendingCount & chr(10);
+			}
+
+			if (structKeyExists(local.migrator, "migrations") && arrayLen(local.migrator.migrations) > 0) {
+				local.result &= chr(10) & "Available Migrations:" & chr(10);
+				for (local.mig in local.migrator.migrations) {
+					local.status = structKeyExists(local.mig, "status") ? local.mig.status : "unknown";
+					local.result &= "  " & local.mig.version & " - " & local.mig.name & " (" & local.status & ")" & chr(10);
+				}
+			}
+
+			return local.result;
+		} else {
+			return "Error: Failed to get migration info (HTTP " & local.httpResult.status_code & ")";
+		}
+	}
+
+	private string function executeMigrationCommand(required string baseUrl, required string command, required string version) {
+		local.url = arguments.baseUrl & "/" & arguments.command & "/" & arguments.version & "?confirm=1";
+
+		cfhttp(url=local.url, method="POST", timeout="30", result="local.httpResult");
+
+		if (local.httpResult.status_code == 200) {
+			// The response is HTML, but we need to extract meaningful information
+			// The actual migration result is in a <pre><code> block
+			local.content = local.httpResult.fileContent;
+
+			// Look for SQL output or success indicators
+			if (findNoCase("CREATE TABLE", local.content) ||
+				findNoCase("ALTER TABLE", local.content) ||
+				findNoCase("DROP TABLE", local.content) ||
+				findNoCase("INSERT INTO", local.content) ||
+				findNoCase("successfully", local.content)) {
+
+				// Extract content from <pre><code> tags if present
+				local.preStart = findNoCase("<pre>", local.content);
+				local.preEnd = findNoCase("</pre>", local.content);
+
+				if (local.preStart > 0 && local.preEnd > 0) {
+					local.extracted = mid(local.content, local.preStart + 5, local.preEnd - local.preStart - 5);
+					// Remove <code> tags if present
+					local.extracted = reReplace(local.extracted, "</?code[^>]*>", "", "all");
+					return "Migration executed successfully:" & chr(10) & trim(local.extracted);
+				} else {
+					return "Migration executed successfully";
+				}
+			} else if (findNoCase("error", local.content)) {
+				return "Migration failed - check application logs for details";
+			} else {
+				return "Migration command sent - check migration status for results";
+			}
+		} else {
+			return "Error: Migration failed (HTTP " & local.httpResult.status_code & ")";
+		}
+	}
+
+	private string function executeMigrationUp(required string baseUrl) {
+		// First get current migration info to determine next version
+		local.infoResult = getMigrationInfo(arguments.baseUrl);
+
+		if (findNoCase("error", local.infoResult)) {
+			return local.infoResult;
+		}
+
+		// Get full migration data to find next pending migration
+		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
+
+		if (local.httpResult.status_code == 200) {
+			local.data = deserializeJSON(local.httpResult.fileContent);
+			local.migrator = local.data.migrator;
+
+			if (!structKeyExists(local.migrator, "migrations")) {
+				return "Error: No migrations found";
+			}
+
+			// Find the first pending migration
+			for (local.mig in local.migrator.migrations) {
+				if (!structKeyExists(local.mig, "status") || local.mig.status != "migrated") {
+					return executeMigrationCommand(arguments.baseUrl, "migrateTo", local.mig.version);
+				}
+			}
+
+			return "No pending migrations to apply";
+		} else {
+			return "Error: Unable to get migration status";
+		}
+	}
+
+	private string function executeMigrationDown(required string baseUrl) {
+		// Get current migration info to determine previous version
+		cfhttp(url=arguments.baseUrl & "?format=json", method="GET", timeout="15", result="local.httpResult");
+
+		if (local.httpResult.status_code == 200) {
+			local.data = deserializeJSON(local.httpResult.fileContent);
+			local.migrator = local.data.migrator;
+
+			if (!structKeyExists(local.migrator, "currentVersion") || local.migrator.currentVersion == "0") {
+				return "Already at migration version 0 - cannot migrate down further";
+			}
+
+			if (!structKeyExists(local.migrator, "migrations")) {
+				return "Error: No migrations found";
+			}
+
+			// Find the previous migrated version
+			local.currentFound = false;
+			local.previousVersion = "0";
+
+			for (local.mig in local.migrator.migrations) {
+				if (local.mig.version == local.migrator.currentVersion) {
+					local.currentFound = true;
+					break;
+				}
+				if (structKeyExists(local.mig, "status") && local.mig.status == "migrated") {
+					local.previousVersion = local.mig.version;
+				}
+			}
+
+			return executeMigrationCommand(arguments.baseUrl, "migrateTo", local.previousVersion);
+		} else {
+			return "Error: Unable to get migration status";
 		}
 	}
 
