@@ -397,7 +397,7 @@ component extends="Base" {
 
 			// get all possible arguments for the column
 			local.columnArgs = {};
-			for (local.arg in ListToArray("columnType,default,null,limit,precision,scale"))
+			for (local.arg in ListToArray("columnType,default,allowNull,limit,precision,scale"))
 				if (StructKeyExists(arguments, local.arg)) local.columnArgs[local.arg] = arguments[local.arg];
 
 			// default the column to an integer if not provided

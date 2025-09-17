@@ -40,7 +40,7 @@ component extends="Abstract" {
 	 * generates sql for primary key options
 	 */
 	public string function addPrimaryKeyOptions(required string sql, struct options = {}) {
-		if (StructKeyExists(arguments.options, "null") && arguments.options.null) {
+		if (StructKeyExists(arguments.options, "allowNull") && arguments.options.allowNull) {
 			arguments.sql = arguments.sql & " NULL";
 		} else {
 			arguments.sql = arguments.sql & " NOT NULL";
