@@ -256,8 +256,8 @@ component {
         content &= chr(10);
         content &= '    EXAMPLE:' & chr(10);
         content &= '      t = createTable(name=''employees'', force=false, id=true, primaryKey=''empId'');' & chr(10);
-        content &= '			t.string(columnNames=''firstName,lastName'', default='''', null=true, limit=''255'');' & chr(10);
-        content &= '			t.text(columnNames=''bio'', default='''', null=true);' & chr(10);
+        content &= '			t.string(columnNames=''firstName,lastName'', default='''', allowNull=true, limit=''255'');' & chr(10);
+        content &= '			t.text(columnNames=''bio'', default='''', allowNull=true);' & chr(10);
         content &= '			t.timestamps();' & chr(10);
         content &= '			t.create();' & chr(10);
         content &= '*/' & chr(10);
@@ -279,7 +279,7 @@ component {
                 params &= ', default=''''';
             }
             
-            params &= ', null=' & (structKeyExists(prop, "required") && prop.required ? 'false' : 'true');
+            params &= ', allowNull=' & (structKeyExists(prop, "required") && prop.required ? 'false' : 'true');
             
             // Add type-specific parameters
             switch (cfType) {

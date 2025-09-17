@@ -60,14 +60,14 @@ component extends="Abstract" {
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
 				}
 			}
-			if (StructKeyExists(arguments.options, 'null')) {
+			if (StructKeyExists(arguments.options, 'allowNull')) {
 				if (arguments.alter) {
-					if (arguments.options.null) {
+					if (arguments.options.allowNull) {
 						arguments.sql = arguments.sql & " DROP NOT NULL";
 					} else {
 						arguments.sql = arguments.sql & " SET NOT NULL";
 					}
-				} else if (!arguments.options.null) {
+				} else if (!arguments.options.allowNull) {
 					arguments.sql = arguments.sql & " NOT NULL";
 				}
 			}
@@ -105,7 +105,7 @@ component extends="Abstract" {
 	 * Rails adaptor appears to be applying default/nulls in separate queries
 	 */
 	public string function changeColumnInTable(required string name, required any column) {
-		for (local.i in ["default", "null", "afterColumn"]) {
+		for (local.i in ["default", "allowNull", "afterColumn"]) {
 			if (StructKeyExists(arguments.column, local.i)) {
 				local.opts = {};
 				local.opts.type = arguments.column.type;

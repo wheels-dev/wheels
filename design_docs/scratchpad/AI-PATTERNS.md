@@ -364,9 +364,9 @@ component extends="wheels.migrator.Migration" {
   function up() {
     transaction {
       createTable(name="posts", id=true, force=true) {
-        t.string(columnNames="title", limit=255, null=false);
+        t.string(columnNames="title", limit=255, allowNull=false);
         t.text(columnNames="body");
-        t.integer(columnNames="userId", null=false);
+        t.integer(columnNames="userId", allowNull=false);
         t.string(columnNames="status", limit=20, default="draft");
         t.boolean(columnNames="published", default=false);
         t.timestamps();
@@ -395,14 +395,14 @@ component extends="wheels.migrator.Migration" {
         table="users",
         columnName="lastLoginAt",
         columnType="datetime",
-        null=true
+        allowNull=true
       );
       
       addColumn(
         table="users",
         columnName="loginCount",
         columnType="integer",
-        null=false,
+        allowNull=false,
         default=0
       );
     }

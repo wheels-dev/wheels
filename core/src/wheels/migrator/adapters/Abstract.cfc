@@ -88,8 +88,8 @@ component extends="wheels.migrator.Base"{
 					arguments.sql = arguments.sql & " DEFAULT #quote(value = arguments.options.default, options = arguments.options)#";
 				}
 			}
-			if (StructKeyExists(arguments.options, 'null')) {
-				if (arguments.options.null) {
+			if (StructKeyExists(arguments.options, 'allowNull')) {
+				if (arguments.options.allowNull) {
 					arguments.sql = arguments.sql & " NULL";
 				} else {
 					arguments.sql = arguments.sql & " NOT NULL";

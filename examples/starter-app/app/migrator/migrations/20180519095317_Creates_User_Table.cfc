@@ -10,18 +10,18 @@
 
     EXAMPLE:
       t = createTable(name='employees', force=false, id=true, primaryKey='empId');
-			t.string(columnNames='firstName,lastName', default='', null=true, limit='255');
-			t.text(columnNames='bio', default='', null=true);
+			t.string(columnNames='firstName,lastName', default='', allowNull=true, limit='255');
+			t.text(columnNames='bio', default='', allowNull=true);
 			t.binary(columnNames='credentials');
-			t.biginteger(columnNames='sinsCommitted', default='', null=true, limit='1');
-			t.char(columnNames='code', default='', null=true, limit='8');
-			t.decimal(columnNames='hourlyWage', default='', null=true, precision='1', scale='2');
-			t.date(columnNames='dateOfBirth', default='', null=true);
-			t.datetime(columnNames='employmentStarted', default='', null=true);
-			t.float(columnNames='height', default='', null=true);
-			t.integer(columnNames='age', default='', null=true, limit='1');
-      t.time(columnNames='lunchStarts', default='', null=true);
-			t.uniqueidentifier(columnNames='uid', default='newid()', null=false);
+			t.biginteger(columnNames='sinsCommitted', default='', allowNull=true, limit='1');
+			t.char(columnNames='code', default='', allowNull=true, limit='8');
+			t.decimal(columnNames='hourlyWage', default='', allowNull=true, precision='1', scale='2');
+			t.date(columnNames='dateOfBirth', default='', allowNull=true);
+			t.datetime(columnNames='employmentStarted', default='', allowNull=true);
+			t.float(columnNames='height', default='', allowNull=true);
+			t.integer(columnNames='age', default='', allowNull=true, limit='1');
+      t.time(columnNames='lunchStarts', default='', allowNull=true);
+			t.uniqueidentifier(columnNames='uid', default='newid()', allowNull=false);
 			t.references(referenceNames="vacation");
 			t.timestamps();
 			t.create();
@@ -33,17 +33,17 @@ component extends="wheels.migrator.Migration" hint="Creates User Table" {
 			try {
 				t = createTable(name='users');
 				// User properties
-				t.string(columnNames='firstname,lastname', default='', null=false, limit=50);
-				t.string(columnNames='email', default='', null=false, limit=255);
-				t.text(columnNames='adminNotes', default='', null=true);
+				t.string(columnNames='firstname,lastname', default='', allowNull=false, limit=50);
+				t.string(columnNames='email', default='', allowNull=false, limit=255);
+				t.text(columnNames='adminNotes', default='', allowNull=true);
 				// Password fields
-				t.string(columnNames='passwordHash', default='', null=true, limit=500);
-				t.string(columnNames='passwordResetToken,verificationToken', default='', null=true, limit=500);
+				t.string(columnNames='passwordHash', default='', allowNull=true, limit=500);
+				t.string(columnNames='passwordResetToken,verificationToken', default='', allowNull=true, limit=500);
 				t.boolean(columnNames='passwordChangeRequired,verified', default=false);
 				// Other useful timestamps
-				t.datetime(columnNames='passwordResetTokenAt,passwordResetAt,loggedinAt', default='', null=true);
+				t.datetime(columnNames='passwordResetTokenAt,passwordResetAt,loggedinAt', default='', allowNull=true);
 				// Role: assumes there won't be more than 999 roles(!)
-				t.integer(columnNames='roleid', default=0, null=false, limit=3);
+				t.integer(columnNames='roleid', default=0, allowNull=false, limit=3);
 				t.timestamps();
 				t.create();
 			} catch (any e) {

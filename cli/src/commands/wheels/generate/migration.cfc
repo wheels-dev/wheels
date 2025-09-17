@@ -245,7 +245,7 @@ component aliases='wheels g migration' extends="../base" {
                 content &= "columnName=""#column.name#""";
                 
                 if (structKeyExists(column, "null") && !column.null) {
-                    content &= ", null=false";
+                    content &= ", allowNull=false";
                 }
                 if (structKeyExists(column, "default")) {
                     content &= ", default=""#column.default#""";
@@ -414,7 +414,7 @@ component aliases='wheels g migration' extends="../base" {
             content &= "columnType=""#column.type#""";
             
             if (structKeyExists(column, "null") && !column.null) {
-                content &= ", null=false";
+                content &= ", allowNull=false";
             }
             if (structKeyExists(column, "default")) {
                 content &= ", default=""#column.default#""";
