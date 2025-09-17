@@ -1,77 +1,49 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) and other AI coding assistants when working with a Wheels application.
+This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
 
-## AI Documentation System
+## 🛑 STOP: MANDATORY Documentation Check REQUIRED
 
-### Comprehensive Documentation Structure
+**⚠️ CRITICAL: AI assistants MUST NOT implement ANY Wheels code without first completing this checklist:**
 
-This project includes an extensive **`.ai` documentation folder** with 80+ specialized documentation files organized for AI assistants. **Always consult the `.ai` folder before implementing any code** to ensure adherence to established patterns and best practices.
+### 📋 Pre-Code Implementation Checklist
 
-**📁 Documentation Structure:**
-```
-.ai/
-├── README.md                     (Documentation overview and usage guide)
-├── cfml/                         (Core CFML language documentation)
-│   ├── syntax/                   (CFML syntax, CFScript vs tags)
-│   ├── data-types/               (Variables, arrays, structures, scopes)
-│   ├── control-flow/             (Conditionals, loops, error handling)
-│   ├── components/               (CFC development patterns)
-│   ├── database/                 (Query fundamentals)
-│   ├── advanced/                 (Closures, advanced features)
-│   └── best-practices/           (Modern CFML patterns)
-└── wheels/                       (Framework-specific documentation)
-    ├── cli/                      (Generator tools and commands)
-    ├── configuration/            (Framework and environment settings)
-    ├── controllers/              (Request handling patterns)
-    ├── core-concepts/            (MVC architecture, conventions)
-    ├── database/                 (ORM, migrations, validations)
-    ├── views/                    (Templates, layouts, helpers)
-    ├── communication/            (Email, HTTP, APIs)
-    ├── security/                 (Authentication, CSRF protection)
-    ├── patterns/                 (Development patterns)
-    └── snippets/                 (Code examples and references)
-```
+**Step 1: Documentation Discovery (ALWAYS REQUIRED)**
+- [ ] ✅ **FIRST**: Use `ls -la` or `Glob` to verify `.ai/` directory exists in project root
+- [ ] ✅ **THEN**: Use `Read` tool to load task-specific documentation:
 
-### Pre-Implementation Documentation Checklist
+**For Model Development:**
+- [ ] Read `.ai/wheels/snippets/model-snippets.md` (REQUIRED for syntax patterns)
+- [ ] Read `.ai/wheels/database/associations/` files for relationships
+- [ ] Read `.ai/wheels/database/validations/` files for validation patterns
+- [ ] Read `.ai/cfml/components/component-basics.md` for CFC fundamentals
 
-**Before writing any code, AI assistants MUST:**
+**For Controller Development:**
+- [ ] Read `.ai/wheels/snippets/controller-snippets.md` (REQUIRED for syntax patterns)
+- [ ] Read `.ai/wheels/controllers/` files for request handling patterns
+- [ ] Read `.ai/wheels/patterns/` files for established conventions
 
-1. **📖 Load Relevant Documentation**
-   ```bash
-   # For model work: Read .ai/wheels/database/
-   # For controller work: Read .ai/wheels/controllers/
-   # For CFML syntax: Read .ai/cfml/syntax/
-   # For patterns: Read .ai/wheels/patterns/
-   ```
+**For View Development:**
+- [ ] Read `.ai/wheels/views/` documentation for template patterns
+- [ ] Read `.ai/wheels/snippets/` for view helper examples
 
-2. **✅ Validate Against Standards**
-   - Check `.ai/cfml/best-practices/` for CFML coding standards
-   - Verify patterns match `.ai/wheels/patterns/` examples
-   - Ensure security practices from `.ai/wheels/security/` are followed
-   - Confirm naming conventions from `.ai/wheels/core-concepts/`
+**Step 2: Pattern Validation (REQUIRED)**
+- [ ] ✅ Confirm code follows **exact syntax patterns** from `.ai/wheels/snippets/`
+- [ ] ✅ Verify **parameter consistency** (all named OR all positional, never mixed)
+- [ ] ✅ Check **naming conventions** match Wheels standards
+- [ ] ✅ Ensure **security practices** are implemented
 
-3. **🔍 Reference Code Examples**
-   - Use examples from `.ai/wheels/snippets/` as templates
-   - Follow established patterns in `.ai/wheels/database/` for models
-   - Apply controller patterns from `.ai/wheels/controllers/`
+**Step 3: Example Reference (REQUIRED)**
+- [ ] ✅ Use code templates from `.ai/wheels/snippets/` as starting point
+- [ ] ✅ Adapt examples to specific requirements
+- [ ] ✅ Maintain established patterns and conventions
 
-### Live Documentation Endpoints
+### 🔥 **FAILURE TO COMPLETE CHECKLIST = IMPLEMENTATION ERROR**
 
-When the development server is running, you can access enhanced documentation:
-- **Full Documentation**: `/wheels/ai` - Optimized for AI consumption
-- **Documentation Manifest**: `/wheels/ai?action=manifest` - Lists available documentation chunks
-- **Project Context**: `/wheels/ai?action=project` - Current project structure and configuration
-- **Specific Chunks**: `/wheels/ai?action=chunk&id=models` - Get focused documentation (models, controllers, views, etc.)
-
-### Available Documentation Contexts
-- `all` - Complete documentation (default)
-- `model` - Model-specific documentation
-- `controller` - Controller-specific documentation
-- `view` - View helpers and templating
-- `migration` - Database migration documentation
-- `routing` - URL routing and RESTful resources
-- `testing` - Testing framework documentation
+**If `.ai/` folder is not available (rare), use MCP resources:**
+- `wheels://.ai/cfml/syntax` - CFML language fundamentals
+- `wheels://.ai/wheels/patterns` - Framework patterns
+- `wheels://.ai/wheels/snippets` - Code examples
 
 ## Quick Start
 
@@ -127,6 +99,7 @@ Wheels follows the Model-View-Controller (MVC) architectural pattern:
 │   ├── images/           (Image assets)
 │   ├── javascripts/      (JavaScript files)
 │   ├── stylesheets/      (CSS files)
+│   ├── miscellaneous/    (Miscellaneous files)
 │   ├── Application.cfc   (Framework bootstrap)
 │   └── index.cfm         (Entry point)
 ├── tests/                (Test files)
@@ -267,11 +240,10 @@ mapper()
     // RESTful resources
     .resources("users")
     .resources("products", except="destroy")
-    
-    // Nested resources
-    .resources("users", function(nested) {
-        nested.resources("orders");
-    })
+
+    // Nested resources - use separate declarations
+    .resources("users")
+    .resources("orders")
     
     // Root route
     .root(to="home##index", method="get")
@@ -507,9 +479,9 @@ component extends="wheels.migrator.Migration" {
 t.string(columnNames="name", limit=255, allowNull=false, default="");
 t.text(columnNames="description", allowNull=true);
 t.integer(columnNames="count", allowNull=false, default=0);
-t.decimal("price", precision=10, scale=2);
+t.decimal(columnNames="price", precision=10, scale=2);
 t.boolean(columnNames="active", default=false);
-t.date("eventDate");
+t.date(columnNames="eventDate");
 t.datetime(columnNames="createdAt"); // Use for createdAt/updatedAt only when not using timestamps(); OK for other columns
 t.timestamps();  // Creates createdAt and updatedAt
 t.integer(columnNames="userId", allowNull=false);  // Foreign key
@@ -657,7 +629,7 @@ function config() {
 // Use model methods (automatically sanitized)
 users = model("User").findAll(where="email = '#params.email#'");
 
-// Or use cfqueryparam in raw queries
+// Or use cfqueryparam in custom queries
 sql = "SELECT * FROM users WHERE email = :email";
 users = queryExecute(sql, { email = { value = params.email, cfsqltype = "cf_sql_varchar" } }, {datasource = yourDatasourceName});
 ```
@@ -727,6 +699,53 @@ Access in configuration:
 </cfscript>
 ```
 
+## Native MCP Server
+
+This Wheels application includes a native CFML MCP (Model Context Protocol) server that eliminates the need for Node.js dependencies. The MCP server provides AI coding assistants with direct access to your Wheels application.
+
+### Accessing the MCP Server
+
+The MCP server is available at `/wheels/mcp` and supports:
+- **Resources**: Documentation, guides, project context, patterns
+- **Tools**: Code generation (models, controllers, views, migrations)
+- **Prompts**: Context-aware help for Wheels development
+
+### MCP Client Configuration
+
+Configure your AI coding assistant to use the native MCP server:
+
+```json
+{
+  "mcpServers": {
+    "wheels": {
+      "type": "http",
+      "url": "http://localhost:8080/wheels/mcp"
+    }
+  }
+}
+```
+
+Replace `8080` with your development server port.
+
+### Available Tools
+
+- `wheels_generate` - Generate components (models, controllers, etc.)
+- `wheels_migrate` - Run database migrations
+- `wheels_test` - Execute tests
+- `wheels_server` - Manage development server
+- `wheels_reload` - Reload application
+
+### Route Configuration
+
+The MCP server routes are pre-configured in `/config/routes.cfm`:
+
+```cfm
+.post(pattern="/wheels/mcp", to="##mcp")
+.get(pattern="/wheels/mcp", to="##mcp")
+```
+
+These routes must come before the `.wildcard()` route to function correctly.
+
 ## Common Patterns
 
 ### Service Layer Pattern
@@ -785,211 +804,79 @@ function onError(exception, eventname) {
 }
 ```
 
-## AI Agent Integration
+## Common Issues and Troubleshooting
 
-### MCP (Model Context Protocol) Support
-Wheels includes an MCP server for integration with AI coding assistants that support the protocol:
+### Association Errors
+**"Missing argument name" in hasMany()**
+This error occurs when mixing positional and named parameters in CFWheels function calls:
 
-1. **Installation**:
-   ```bash
-   cd /path/to/wheels
-   npm install @modelcontextprotocol/sdk
-   ```
-
-2. **Configuration**: Use `mcp-server-wheels.json` for Claude Code, Cursor, or Continue
-3. **Available Resources**: API docs, guides, project context, patterns
-4. **Available Tools**: Generate components, run migrations, manage server
-
-### Best Practices for AI-Assisted Development
-
-1. **Start with Context**: Always check `/wheels/ai?action=project` to understand the current project
-2. **Use Focused Documentation**: Request specific chunks (`/wheels/ai?action=chunk&id=models`) for the task at hand
-3. **Follow Conventions**: Wheels has strong conventions - models are singular, controllers are plural
-4. **Test Generated Code**: Always run `wheels test run` after generating code
-5. **Use Generators**: Prefer `wheels g` commands over manual file creation
-
-### Optimizing for Context Windows
-
-When working with limited context windows:
-1. Use the manifest endpoint to discover available chunks
-2. Load only relevant documentation chunks for your current task
-3. The project context endpoint provides a concise overview
-4. Common patterns are available separately for quick reference
-
-### Integration with Popular AI Tools
-
-#### Claude Code
-- This CLAUDE.md file is automatically loaded
-- Use the `/wheels/ai` endpoints when the dev server is running
-- MCP server provides deeper integration
-
-#### GitHub Copilot
-- Reference this file in your workspace
-- Comments referencing Wheels patterns help Copilot suggestions
-
-#### Cursor / Continue
-- Configure MCP server using the provided configuration
-- Access Wheels tools directly from the AI interface
-
-#### Custom Integration
-- All documentation endpoints return JSON
-- Use `/wheels/ai?action=manifest` to discover available resources
-- Implement your own MCP client using the provided server
-
-## Native CFML MCP Server
-
-Wheels now includes a native CFML implementation of the Model Context Protocol (MCP) server, eliminating the need for Node.js. This server runs directly within your Wheels application and provides full MCP functionality.
-
-### MCP Server Endpoint
-
-The MCP server is available at `/wheels/mcp` and supports:
-
-- **Streamable HTTP Transport**: Standard MCP transport over HTTP
-- **JSON-RPC 2.0 Protocol**: Full compliance with MCP specification
-- **Session Management**: Persistent sessions with `Mcp-Session-Id` headers
-- **CORS Support**: Cross-origin requests for web-based MCP clients
-
-### Supported Request Methods
-
-**Server-Sent Events (SSE)**:
-```bash
-curl -H "Accept: text/event-stream" http://localhost:8080/wheels/mcp
+❌ **Incorrect (mixed parameter styles):**
+```cfm
+hasMany("comments", dependent="delete");  // Error: can't mix positional and named
 ```
 
-**JSON-RPC Requests**:
-```bash
-curl -X POST http://localhost:8080/wheels/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"resources/list","params":{},"id":1}'
+✅ **Correct (consistent named parameters):**
+```cfm
+hasMany(name="comments", dependent="delete");
 ```
 
-**Testing via Query Parameters** (for environments with routing restrictions):
-```bash
-curl "http://localhost:8080/wheels/mcp?method=POST&body=..." \
-  -H "Accept: application/json"
+✅ **Also correct (all positional):**
+```cfm
+hasMany("comments");
 ```
 
-### Available MCP Methods
+CFWheels requires consistent parameter syntax - either all positional or all named parameters.
 
-#### Resources
-- `resources/list` - List all available Wheels resources
-- `resources/read` - Read specific resource content
+### Routing Issues
+**Incorrect .resources() syntax**
+CFWheels resource routing syntax differs from Rails:
 
-Available resources:
-- `wheels://api/documentation` - Complete API documentation
-- `wheels://guides/all` - All framework guides and tutorials
-- `wheels://project/context` - Current project structure and configuration
-- `wheels://patterns/common` - Common Wheels patterns and best practices
-
-#### Tools
-- `tools/list` - List all available Wheels tools
-- `tools/call` - Execute Wheels CLI commands
-
-Available tools:
-- `wheels_generate` - Generate models, controllers, views, migrations, etc.
-- `wheels_migrate` - Run database migrations (latest, up, down, reset, info)
-- `wheels_test` - Run Wheels tests
-- `wheels_server` - Manage development server (start, stop, restart, status)
-- `wheels_reload` - Reload the Wheels application
-
-#### Prompts
-- `prompts/list` - List all available prompts
-- `prompts/get` - Get specific prompt templates
-
-Available prompts:
-- `wheels_model_help` - Get help with Wheels model development
-- `wheels_controller_help` - Get help with Wheels controller development
-- `wheels_migration_help` - Get help with database migrations
-
-### MCP Client Configuration
-
-#### Claude Desktop
-```json
-{
-  "mcpServers": {
-    "wheels": {
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:8080/wheels/mcp"
-      }
-    }
-  }
-}
+❌ **Incorrect (Rails-style nested):**
+```cfm
+.resources("posts", function(nested) {
+    nested.resources("comments");
+})
 ```
 
-#### Continue / Cursor
-```json
-{
-  "mcpServers": {
-    "wheels": {
-      "transport": {
-        "type": "http",
-        "url": "http://localhost:8080/wheels/mcp"
-      }
-    }
-  }
-}
+✅ **Correct (separate declarations):**
+```cfm
+.resources("posts")
+.resources("comments")
 ```
 
-### Example Usage
+**Route ordering matters:** resources → custom routes → root → wildcard
 
-**Initialize MCP Connection**:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "initialize",
-  "params": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {"resources": {}, "tools": {}, "prompts": {}},
-    "clientInfo": {"name": "my-client", "version": "1.0.0"}
-  },
-  "id": 1
-}
+### Form Helper Limitations
+CFWheels has more limited form helpers compared to Rails:
+
+❌ **Not available:**
+```cfm
+#emailField()#    // Doesn't exist
+#label(text="Name")#    // text parameter not supported
 ```
 
-**List Available Resources**:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "resources/list",
-  "params": {},
-  "id": 2
-}
+✅ **Use instead:**
+```cfm
+#textField(type="email")#
+<label>Name</label>
 ```
 
-**Generate a Model**:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "tools/call",
-  "params": {
-    "name": "wheels_generate",
-    "arguments": {
-      "type": "model",
-      "name": "User",
-      "attributes": "name:string,email:string,active:boolean"
-    }
-  },
-  "id": 3
-}
+### Migration Data Seeding
+Parameter binding in migrations can be unreliable. Use direct SQL:
+
+❌ **Problematic:**
+```cfm
+execute(sql="INSERT INTO posts (title) VALUES (?)", parameters=[{value=title}]);
 ```
 
-### Architecture
+✅ **Reliable:**
+```cfm
+execute("INSERT INTO posts (title, createdAt, updatedAt) VALUES ('My Post', NOW(), NOW())");
+```
 
-The native CFML MCP server consists of:
-
-- **`/wheels/mcp` endpoint** - Main HTTP handler in `Public.cfc`
-- **`wheels.public.mcp.McpServer`** - Core JSON-RPC message processor
-- **`wheels.public.mcp.SessionManager`** - Session state management
-- **`wheels.public.views.mcp.cfm`** - Transport layer implementation
-
-### Benefits
-
-- **No Node.js Dependency**: Runs entirely within the CFML engine
-- **Integrated with Wheels**: Direct access to all framework functionality
-- **Standard Compliant**: Full MCP protocol implementation
-- **Easy to Deploy**: No additional processes or dependencies
-- **Secure**: Runs within your application's security context
-- **Performant**: Direct CFML execution without inter-process communication
-
-This native implementation provides the same functionality as the Node.js MCP server while being fully integrated with your Wheels application and eliminating external dependencies.
+### Debugging Tips
+1. Check CFWheels documentation - don't assume Rails conventions work
+2. Use simple patterns first, add complexity incrementally
+3. Test associations and routes in isolation
+4. Use `?reload=true` after configuration changes
+5. Check debug footer for route information
