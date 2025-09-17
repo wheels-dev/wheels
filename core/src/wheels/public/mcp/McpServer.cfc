@@ -846,18 +846,29 @@ Provide migration code following Wheels conventions."
 
 	private string function executeCommand(required string command) {
 		try {
-			// Get the application root directory
-			// The MCP server is located in vendor/wheels/public/mcp/ so we need to go up several levels
-			local.appPath = expandPath("/");
+			// Get the application root directory using Application.cfc mappings
+			// The /app mapping points to the application's app directory (e.g., /project/app/)
+			// So /app/../ gives us the project root directory
+			local.appPath = expandPath("/app/../");
 
-			// Check if we're in a vendor/wheels/public directory and adjust path accordingly
-			if (findNoCase("vendor/wheels/public", local.appPath) || findNoCase("wheels/public", local.appPath)) {
-				// We're in the vendor wheels directory, go up to find the application root
-				local.appPath = expandPath("/../../../");
+			// Fallback: If /app mapping doesn't exist or doesn't point to a valid location,
+			// use the traditional detection method
+			if (!directoryExists(local.appPath) || (!fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "public/Application.cfc"))) {
+				// Fallback to manual path detection from webroot
+				local.appPath = expandPath("/");
 
-				// If that doesn't work, try going up more levels to find box.json or Application.cfc
-				if (!fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "Application.cfc")) {
-					local.appPath = expandPath("/../../../../");
+				// Check if we're in a vendor/wheels/public directory and adjust path accordingly
+				if (findNoCase("vendor/wheels/public", local.appPath) || findNoCase("wheels/public", local.appPath)) {
+					// We're in the vendor wheels directory, go up to find the application root
+					local.appPath = expandPath("/../../../");
+
+					// If that doesn't work, try going up more levels to find box.json or Application.cfc
+					if (!fileExists(local.appPath & "box.json") && !fileExists(local.appPath & "Application.cfc")) {
+						local.appPath = expandPath("/../../../../");
+					}
+				} else {
+					// We're in the webroot (public/), go up one level to project root
+					local.appPath = expandPath("/../");
 				}
 			}
 

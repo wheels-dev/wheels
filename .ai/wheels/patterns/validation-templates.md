@@ -57,6 +57,7 @@ component extends="Model" {
 - [ ] Will NOT mix argument styles: `renderText("error", status=404)` ❌
 - [ ] Will use correct naming: Controller names are PLURAL
 - [ ] Will NOT treat model results as arrays
+- [ ] Will merge parameters for nested model creation ✅
 
 ✅ **Implementation Pattern:**
 ```cfm
@@ -75,6 +76,18 @@ component extends="Controller" {
             renderText(text="Not found", status=404);
         }
     }
+
+    function create() {
+        // For nested parameters, merge into structure first
+        commentData = params.comment;
+        commentData.postId = params.postId;
+
+        comment = model("Comment").new(commentData);
+
+        if (comment.save()) {
+            redirectTo(controller="posts", action="show", key=params.postId);
+        }
+    }
 }
 ```
 
@@ -90,6 +103,8 @@ component extends="Controller" {
 ✅ **Anti-Pattern Check:**
 - [ ] Will NOT loop queries as arrays: `<cfloop array="#query#">` ❌
 - [ ] Will NOT use `ArrayLen()` on queries: `ArrayLen(post.comments())` ❌
+- [ ] Will NOT call association methods inside loops: `post.comments().author` ❌
+- [ ] Will use null coalescing for new models: `post.title ?: ""` ✅
 - [ ] Will use correct query syntax
 
 ✅ **Implementation Pattern:**
@@ -101,11 +116,24 @@ component extends="Controller" {
     <!-- Loop queries correctly -->
     <cfloop query="posts">
         <h2>#posts.title#</h2>
-        <p>Comments: #posts.comments().recordCount#</p>
+        <!-- Store association result first -->
+        <cfset comments = posts.comments()>
+        <p>Comments: #comments.recordCount#</p>
+
+        <!-- Loop nested associations correctly -->
+        <cfloop query="comments">
+            <div>#comments.content#</div>  <!-- Access columns directly -->
+        </cfloop>
     </cfloop>
 <cfelse>
     <p>No posts found.</p>
 </cfif>
+
+<!-- For new models in forms, use null coalescing -->
+<div x-data="{
+    title: '#JSStringFormat(post.title ?: "")#',
+    content: '#JSStringFormat(post.content ?: "")#'
+}">
 </cfoutput>
 ```
 

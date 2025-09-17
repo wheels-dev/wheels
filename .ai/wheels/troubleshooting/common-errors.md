@@ -249,8 +249,83 @@ When migrations fail:
 - [Form Helpers](../views/helpers/forms.md)
 - [Database Migrations](../database/migrations/)
 
+## View Template Errors
+
+### \"Invalid variable declaration\" in Views
+**Error:** When accessing model properties in Alpine.js or other JavaScript contexts within CFML templates.
+
+**Cause:** Undefined properties being accessed without null safety in new model objects.
+
+**Bad Code:**
+```cfm
+<div x-data="{
+    title: '#JSStringFormat(post.title)#',
+    content: '#JSStringFormat(post.content)#'
+}">
+```
+
+**Solution:**
+```cfm
+<div x-data="{
+    title: '#JSStringFormat(post.title ?: "")#',
+    content: '#JSStringFormat(post.content ?: "")#'
+}">
+```
+
+**Key Points:**
+- Always use null coalescing operator (`?:`) for new model objects
+- Properties may be undefined until form is submitted and validated
+- Apply to all JavaScript contexts where model data is embedded
+
+### \"Invalid variable declaration [queryName.column()]\" in Query Loops
+**Error:** When calling association methods inside query loops.
+
+**Cause:** Trying to call association methods on query rows instead of storing query result first.
+
+**Bad Code:**
+```cfm
+<cfloop query="post.comments()">
+    <p>#post.comments().author#</p>  <!-- ERROR: Can't call method in loop -->
+</cfloop>
+```
+
+**Solution:**
+```cfm
+<cfset comments = post.comments()>
+<cfloop query="comments">
+    <p>#comments.author#</p>  <!-- CORRECT: Access column directly -->
+</cfloop>
+```
+
+**Key Points:**
+- Store association query result in variable before looping
+- Access columns directly from query variable, not association method
+- This is CFWheels-specific behavior - differs from Rails
+
+## Controller Parameter Handling
+
+### Comment/Nested Parameter Structure Issues
+**Problem:** Parameters not being properly structured for nested model creation.
+
+**Bad Code:**
+```cfm
+comment = model("Comment").new(params.comment);
+comment.postId = params.postId;  // Separate assignment can fail
+```
+
+**Solution:**
+```cfm
+commentData = params.comment;
+commentData.postId = params.postId;  // Merge into structure first
+comment = model("Comment").new(commentData);
+```
+
+**Best Practice:** Always merge related parameters into single structure before model creation.
+
 ## Important Notes
 - Always consult CFWheels documentation rather than assuming Rails conventions
 - Test association definitions in simple form before adding complexity
 - For migrations, prefer direct SQL over parameter binding for data seeding
 - CFWheels form helpers are more limited than Rails - supplement with HTML when needed
+- Use null coalescing operators (`?:`) when embedding model data in JavaScript/Alpine.js contexts
+- Store association query results in variables before looping to avoid method call errors
