@@ -122,6 +122,28 @@
 
 ## ⚠️ CRITICAL: Form Helper Limitations
 
+**Duplicate Label Prevention:**
+CFWheels form helpers automatically generate labels. When using custom HTML labels, you MUST disable automatic labels to prevent duplication.
+
+```cfm
+<!-- ❌ INCORRECT - Creates duplicate labels -->
+<div>
+    <label for="post-title">Title</label>
+    #textField(objectName="post", property="title")#  <!-- Also generates a label -->
+</div>
+
+<!-- ✅ CORRECT - Use label=false with custom labels -->
+<div>
+    <label for="post-title" class="custom-style">Title</label>
+    #textField(objectName="post", property="title", label=false)#
+</div>
+
+<!-- ✅ ALTERNATIVE - Use CFWheels' built-in labels -->
+<div>
+    #textField(objectName="post", property="title", label="Title")#
+</div>
+```
+
 **Label Helper Issues:**
 The `label()` helper in CFWheels does NOT accept a `text` parameter like in Rails:
 
@@ -129,9 +151,9 @@ The `label()` helper in CFWheels does NOT accept a `text` parameter like in Rail
 <!-- ❌ INCORRECT - This will cause errors -->
 #label(objectName="user", property="email", text="Email Address")#
 
-<!-- ✅ CORRECT - Use standard HTML labels instead -->
+<!-- ✅ CORRECT - Use standard HTML labels with label=false -->
 <label for="user-email">Email Address</label>
-#textField(objectName="user", property="email")#
+#textField(objectName="user", property="email", label=false)#
 ```
 
 **Email Field Limitation:**
@@ -161,34 +183,34 @@ CFWheels does NOT have a `passwordField()` helper:
 
 ## Recommended Form Helper Pattern
 
-For maximum compatibility, use this pattern:
+For maximum compatibility and to prevent duplicate labels, use this pattern:
 
 ```cfm
 <cfoutput>
 #startFormTag(route="users", method="post")#
 
-    <!-- Use HTML labels for reliability -->
+    <!-- Use HTML labels with label=false to prevent duplicates -->
     <div class="form-group">
         <label for="user-firstName">First Name *</label>
-        #textField(objectName="user", property="firstName", class="form-control")#
+        #textField(objectName="user", property="firstName", label=false, class="form-control")#
         #errorMessageOn(objectName="user", property="firstName")#
     </div>
 
     <div class="form-group">
         <label for="user-email">Email Address *</label>
-        #textField(objectName="user", property="email", type="email", class="form-control")#
+        #textField(objectName="user", property="email", label=false, type="email", class="form-control")#
         #errorMessageOn(objectName="user", property="email")#
     </div>
 
     <div class="form-group">
         <label for="user-password">Password *</label>
-        #textField(objectName="user", property="password", type="password", class="form-control")#
+        #textField(objectName="user", property="password", label=false, type="password", class="form-control")#
         #errorMessageOn(objectName="user", property="password")#
     </div>
 
     <div class="form-group">
         <label for="user-bio">Biography</label>
-        #textArea(objectName="user", property="bio", class="form-control", rows="5")#
+        #textArea(objectName="user", property="bio", label=false, class="form-control", rows="5")#
         #errorMessageOn(objectName="user", property="bio")#
     </div>
 

@@ -210,6 +210,41 @@ execute("INSERT INTO posts (title, slug, body, createdAt, updatedAt)
 
 **Best Practice:** For migrations, prefer simple direct SQL over complex parameter binding for reliability.
 
+## Form Helper Issues
+
+### Duplicate Labels in Forms
+**Symptom:** Form labels appear twice (e.g., "Title Title" or "Content Content")
+
+**Cause:** Using both manual HTML `<label>` tags AND CFWheels' automatic label generation in form helpers.
+
+**Bad Code:**
+```cfm
+<!-- This creates duplicate labels -->
+<div>
+    <label for="post-title">Title</label>
+    #textField(objectName="post", property="title")#  <!-- CFWheels also generates a label -->
+</div>
+```
+
+**Solution 1:** Disable CFWheels automatic labels with `label=false`:
+```cfm
+<!-- Use custom labels with label=false -->
+<div>
+    <label for="post-title" class="custom-label">Title</label>
+    #textField(objectName="post", property="title", label=false, class="form-control")#
+</div>
+```
+
+**Solution 2:** Use CFWheels built-in labels only:
+```cfm
+<!-- Let CFWheels handle labels automatically -->
+<div>
+    #textField(objectName="post", property="title", label="Title", class="form-control")#
+</div>
+```
+
+**Best Practice:** Choose one approach consistently throughout your application. If you need custom label styling, use Solution 1 with `label=false`.
+
 ## Debugging Tips
 
 ### Check Function Availability

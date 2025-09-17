@@ -19,6 +19,31 @@ cp -r public/app/controllers/* app/controllers/
 rm -rf public/app
 ```
 
+### CRITICAL DISCOVERY: Duplicate Labels in Forms
+**Issue:** Form labels appearing twice (e.g., "Title Title", "Content Content")
+
+**Root Cause:** Using both manual HTML `<label>` tags AND CFWheels' automatic label generation in form helpers.
+
+**Example of Problem:**
+```cfm
+<!-- This creates duplicate labels -->
+<div>
+    <label for="post-title">Title</label>
+    #textField(objectName="post", property="title")#  <!-- CFWheels also generates a label -->
+</div>
+```
+
+**Solution:** Add `label=false` to CFWheels form helpers when using custom labels:
+```cfm
+<!-- Correct approach -->
+<div>
+    <label for="post-title" class="custom-style">Title</label>
+    #textField(objectName="post", property="title", label=false, class="form-control")#
+</div>
+```
+
+**Key Learning:** CFWheels form helpers (`textField()`, `textArea()`, etc.) automatically generate labels unless explicitly disabled with `label=false`.
+
 ### Form Helper + Raw HTML Hybrid Pattern
 **Working Pattern for Complex Forms:**
 ```cfm
@@ -209,8 +234,15 @@ Comments: id, content, author, postId, createdAt, updatedAt
 - [Validation Templates](../patterns/validation-templates.md) - Checklists we followed
 - [Form Helpers](../views/helpers/forms.md) - Documents the limitations we encountered
 
+## Anti-Patterns Discovered and Fixed
+1. **Duplicate Labels:** Never use both manual `<label>` tags AND automatic CFWheels labels
+2. **Missing label=false:** Always add `label=false` when using custom HTML labels
+3. **Assumption of Computed Properties:** Don't assume CFWheels creates count properties automatically
+4. **Over-including Associations:** Don't include associations just for counting
+
 ## Important Notes
 - This session validated the existing documentation very well
 - The pre-implementation checklists would have prevented most errors
+- The duplicate labels issue is a common trap that should be emphasized in training
 - The hybrid HTML + form helper approach is worth documenting as a pattern
 - Modern frontend technologies integrate excellently with CFWheels
