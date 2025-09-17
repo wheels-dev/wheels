@@ -1,36 +1,26 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Universal Wheels Framework Installer for Windows
+    Wheels Installer
 
 .DESCRIPTION
-    This universal installer can install CommandBox, Wheels CLI, and all necessary dependencies
-    on Windows systems. It works both standalone and as part of package managers like Chocolatey.
+    Installs CommandBox, Java, and Wheels CLI with interactive prompts if parameters are not provided.
     Ensures compatibility by installing modern versions of all components.
 
 .PARAMETER InstallPath
-    Custom installation directory. Defaults to Program Files for admin installs,
-    user directory otherwise.
+    Custom installation directory. Defaults to Program Files for admin installs, user directory otherwise.
 
 .PARAMETER Force
-    Force reinstallation even if components already exist
+    Force reinstallation even if components already exist.
 
 .PARAMETER SkipPath
-    Skip adding CommandBox to PATH
-
+    Skip adding CommandBox to PATH.
 
 .PARAMETER Quiet
-    Suppress interactive prompts and use defaults
+    Suppress interactive prompts and use defaults.
 
 .PARAMETER IncludeJava
-    Install Java if not found (requires admin privileges)
-
-.EXAMPLE
-    .\install-wheels-universal.ps1
-
-
-.EXAMPLE
-    .\install-wheels-universal.ps1 -InstallPath "C:\Tools\CommandBox" -Force -IncludeJava
+    Install Java if not found (requires admin privileges).
 #>
 
 [CmdletBinding()]
@@ -54,7 +44,7 @@ param(
 # Configuration
 $Script:Config = @{
     CommandBoxVersion = "6.2.1"
-    MinimumJavaVersion = 11
+    MinimumJavaVersion = 17
     WheelsCliPackage = "wheels-cli"
     WheelsPackage = "wheels-framework"  # Changed from "wheels" to "wheels-framework"
     CommandBoxDownloadUrl = "https://www.ortussolutions.com/parent/download/commandbox/type/windows-jre64"
@@ -69,6 +59,7 @@ $Script:State = @{
     BoxPath = ""
     JavaInstalled = $false
     StartTime = Get-Date
+    AppConfig = @{}
 }
 
 #region Utility Functions
@@ -143,6 +134,248 @@ function Get-UserConfirmation {
 
 #endregion
 
+#region System Configuration and User Settings
+
+# --- Interactive prompts if parameters are missing ---
+Write-Header "Wheels Framework Universal Installer" "Let's configure your installation and application setup"
+
+# CommandBox Installation Configuration
+if (-not $InstallPath) {
+    Write-ColorOutput "CommandBox Installation Configuration:" -ForegroundColor Yellow
+    Write-Host ""
+    $defaultPath = if ([Security.Principal.WindowsIdentity]::GetCurrent().Groups -match "S-1-5-32-544") {
+        # Admin install → Program Files
+        "$env:ProgramFiles\CommandBox"
+    } else {
+        # User install → Local profile
+        "$env:USERPROFILE\CommandBox"
+    }
+    $InstallPath = Read-Host ("Enter CommandBox installation path [{0}]" -f $defaultPath)
+    if (-not $InstallPath) { $InstallPath = $defaultPath }
+}
+
+# Normalize CommandBox path
+
+if ($InstallPath -notmatch "CommandBox$") {
+    $InstallPath = Join-Path $InstallPath "CommandBox"
+}
+
+if (-not $PSBoundParameters.ContainsKey("Force")) {
+    $ForceResponse = Read-Host "Force reinstall CommandBox if already installed? (Y/n) [n]"
+    if ($ForceResponse -match "^[Yy]") { $Force = $true } else { $Force = $false }
+}
+
+if (-not $PSBoundParameters.ContainsKey("SkipPath")) {
+    $SkipPathResponse = Read-Host "Skip adding CommandBox to PATH? (Y/n) [y]"
+    if ($SkipPathResponse -match "^[Nn]") { $SkipPath = $false } else { $SkipPath = $true }
+}
+
+# Wheels Application Configuration
+Write-ColorOutput "Now let's configure your Wheels application:" -ForegroundColor Yellow
+Write-Host ""
+
+# Initialize AppConfig in State
+$Script:State.AppConfig = @{}
+
+# Application Name
+Write-ColorOutput "Step 1: Application Name" -ForegroundColor Cyan
+Write-ColorOutput "Enter a name for your application. A new directory will be created with this name." -ForegroundColor Gray
+Write-ColorOutput "Note: Names can only contain letters, numbers, underscores, and hyphens." -ForegroundColor Gray
+do {
+    $appName = Read-Host "Please enter a name for your application [MyWheelsApp]"
+    if ([string]::IsNullOrEmpty($appName)) {
+        $appName = "MyWheelsApp"
+    }
+    if ($appName -match '^[a-zA-Z0-9_-]+$') {
+        $Script:State.AppConfig.ApplicationName = $appName
+        Write-Success "Application name: $appName"
+        break
+    } else {
+        Write-Warning "Invalid application name. Please use only letters, numbers, underscores, and hyphens."
+    }
+} while ($true)
+
+# Template Selection
+Write-Host ""
+Write-ColorOutput "Step 2: Wheels Template Selection" -ForegroundColor Cyan
+Write-ColorOutput "Which Wheels Template shall we use?" -ForegroundColor Gray
+Write-Host ""
+$templates = @(
+    @{ Name = "3.0.x - Wheels Base Template - Bleeding Edge"; Value = "wheels-base-template@BE"; Default = $true }
+    @{ Name = "2.5.x - Wheels Base Template - Stable Release"; Value = "wheels-base-template@stable"; Default = $false }
+    @{ Name = "Wheels Template - HTMX - Alpine.js - Simple.css"; Value = "wheels-htmx-template"; Default = $false }
+    @{ Name = "Wheels Starter App"; Value = "wheels-starter-template"; Default = $false }
+    @{ Name = "Wheels - TodoMVC - HTMX - Demo App"; Value = "wheels-todomvc-template"; Default = $false }
+)
+for ($i = 0; $i -lt $templates.Count; $i++) {
+    $marker = if ($templates[$i].Default) { "[X]" } else { "[ ]" }
+    Write-Host "  $($i + 1). $marker $($templates[$i].Name)"
+}
+Write-Host ""
+$choice = Read-Host "Select template (1-5) [1]"
+if ([string]::IsNullOrEmpty($choice) -or $choice -eq "1") {
+    $selectedTemplate = $templates[0]
+} elseif ($choice -ge 2 -and $choice -le 5) {
+    $selectedTemplate = $templates[$choice - 1]
+} else {
+    Write-Warning "Invalid selection, using default template"
+    $selectedTemplate = $templates[0]
+}
+$Script:State.AppConfig.Template = $selectedTemplate.Value
+Write-Success "Template: $($selectedTemplate.Name)"
+
+# Reload Password
+Write-Host ""
+Write-ColorOutput "Step 3: Reload Password" -ForegroundColor Cyan
+Write-ColorOutput "Set a reload password to secure your app. This allows you to restart your app via URL." -ForegroundColor Gray
+$reloadPassword = Read-Host "Please enter a 'reload' password for your application [changeMe]"
+if ([string]::IsNullOrEmpty($reloadPassword)) {
+    $reloadPassword = "changeMe"
+}
+$Script:State.AppConfig.ReloadPassword = $reloadPassword
+Write-Success "Reload password configured"
+
+# Database Configuration
+Write-Host ""
+Write-ColorOutput "Step 4: Database Configuration" -ForegroundColor Cyan
+Write-ColorOutput "Enter a datasource name for your database. You'll need to configure this in your CFML server admin." -ForegroundColor Gray
+Write-ColorOutput "Tip: If using Lucee, we can auto-create an H2 database for development." -ForegroundColor Gray
+$datasourceName = Read-Host "Please enter a datasource name [$($Script:State.AppConfig.ApplicationName)]"
+if ([string]::IsNullOrEmpty($datasourceName)) {
+    $datasourceName = $Script:State.AppConfig.ApplicationName
+}
+$Script:State.AppConfig.DatasourceName = $datasourceName
+Write-Success "Datasource name: $datasourceName"
+
+# CFML Engine
+Write-Host ""
+Write-ColorOutput "Step 5: CFML Engine" -ForegroundColor Cyan
+Write-ColorOutput "Select the CFML engine for your application." -ForegroundColor Gray
+Write-Host ""
+$engines = @(
+    @{ Name = "Lucee (Latest)"; Value = "lucee"; Default = $true }
+    @{ Name = "Adobe ColdFusion (Latest)"; Value = "adobe"; Default = $false }
+    @{ Name = "Lucee 6.x"; Value = "lucee@6"; Default = $false }
+    @{ Name = "Lucee 5.x"; Value = "lucee@5"; Default = $false }
+    @{ Name = "Adobe ColdFusion 2023"; Value = "adobe@2023"; Default = $false }
+    @{ Name = "Adobe ColdFusion 2021"; Value = "adobe@2021"; Default = $false }
+    @{ Name = "Adobe ColdFusion 2018"; Value = "adobe@2018"; Default = $false }
+)
+for ($i = 0; $i -lt $engines.Count; $i++) {
+    $marker = if ($engines[$i].Default) { "[X]" } else { "[ ]" }
+    Write-Host "  $($i + 1). $marker $($engines[$i].Name)"
+}
+Write-Host ""
+$choice = Read-Host "Select CFML engine (1-7) [1]"
+if ([string]::IsNullOrEmpty($choice) -or $choice -eq "1") {
+    $selectedEngine = $engines[0]
+} elseif ($choice -ge 2 -and $choice -le 7) {
+    $selectedEngine = $engines[$choice - 1]
+} else {
+    Write-Warning "Invalid selection, using default engine"
+    $selectedEngine = $engines[0]
+}
+$Script:State.AppConfig.CFMLEngine = $selectedEngine.Value
+Write-Success "CFML Engine: $($selectedEngine.Name)"
+
+# H2 Database for Lucee
+if ($selectedEngine.Value -eq "lucee") {
+    $H2Response = Read-Host "As you are using Lucee, would you like to setup and use the H2 Java embedded SQL database for development? (Y/n) [n]"
+    if ($H2Response -match "^[Yy]") { $Script:State.AppConfig.UseH2Database = $true } else { $Script:State.AppConfig.UseH2Database = $false }
+    Write-Success "H2 Database setup: $(if ($Script:State.AppConfig.UseH2Database) { 'Yes' } else { 'No' })"
+} else {
+    $Script:State.AppConfig.UseH2Database = $false
+}
+
+# Bootstrap Configuration
+Write-Host ""
+Write-ColorOutput "========= Twitter Bootstrap ======================" -ForegroundColor Cyan
+$BootstrapResponse = Read-Host "Would you like us to setup some default Bootstrap settings? (Y/n) [y]"
+if ($BootstrapResponse -match "^[Nn]") { $Script:State.AppConfig.UseBootstrap = $false } else { $Script:State.AppConfig.UseBootstrap = $true }
+Write-Success "Bootstrap setup: $(if ($Script:State.AppConfig.UseBootstrap) { 'Yes' } else { 'No' })"
+
+# Package Configuration
+Write-Host ""
+$InitPkgResponse = Read-Host "Finally, shall we initialize your application as a package by creating a box.json file? (Y/n) [y]"
+if ($InitPkgResponse -match "^[Nn]") { $Script:State.AppConfig.InitializeAsPackage = $false } else { $Script:State.AppConfig.InitializeAsPackage = $true }
+Write-Success "Initialize as package: $(if ($Script:State.AppConfig.InitializeAsPackage) { 'Yes' } else { 'No' })"
+
+# Application Path Configuration
+Write-Host ""
+Write-ColorOutput "Step 6: Application Installation Path" -ForegroundColor Cyan
+Write-ColorOutput "Choose where to install your Wheels application." -ForegroundColor Gray
+Write-Host ""
+# Default application path based on CommandBox path
+$baseDir = Split-Path $InstallPath -Parent
+$defaultAppPath = Join-Path $baseDir "inetpub"
+Write-ColorOutput "Default application path: $defaultAppPath" -ForegroundColor Gray
+$customPath = Read-Host "Enter a different application directory path (leave empty for default) [$defaultAppPath]"
+if ([string]::IsNullOrEmpty($customPath)) {
+    $appBasePath = $defaultAppPath
+} else {
+    # Add inetpub to custom path
+    $appBasePath = Join-Path $customPath "inetpub"
+    Write-Info "Application base path will be: $appBasePath"
+}
+# Validate and create path if needed
+if (-not (Test-Path $appBasePath)) {
+    $createPath = Get-UserConfirmation "The path '$appBasePath' does not exist. Create it? (y/n) [y]" -DefaultYes $true
+    if ($createPath) {
+        try {
+            New-Item -ItemType Directory -Path $appBasePath -Force | Out-Null
+            Write-Success "Created application directory: $appBasePath"
+        } catch {
+            Write-Error "Failed to create application directory: $($_.Exception.Message)"
+            exit 1
+        }
+    } else {
+        Write-Error "Cannot proceed without a valid application directory."
+        exit 1
+    }
+} else {
+    Write-Success "Application directory verified: $appBasePath"
+}
+$Script:State.AppConfig.ApplicationPath = Join-Path $appBasePath $Script:State.AppConfig.ApplicationName
+Write-Success "Full application path: $($Script:State.AppConfig.ApplicationPath)"
+
+$bootstrapStatus  = if ($Script:State.AppConfig.UseBootstrap) { 'true' } else { 'false' }
+$h2Status         = if ($Script:State.AppConfig.UseH2Database) { 'true' } else { 'false' }
+$packageStatus    = if ($Script:State.AppConfig.InitializeAsPackage) { 'true' } else { 'false' }
+
+# Final Summary
+Write-Host ""
+Write-ColorOutput "+-----------------------------------------------------------------------------------+" -ForegroundColor Green
+Write-ColorOutput "| Configuration Summary - Please confirm your selections:                           |" -ForegroundColor Green
+Write-ColorOutput "+-----------------------+-----------------------------------------------------------+" -ForegroundColor Green
+Write-ColorOutput "| CommandBox Path       | $($InstallPath.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Template              | $($Script:State.AppConfig.Template.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Application Name      | $($Script:State.AppConfig.ApplicationName.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Install Directory     | $($Script:State.AppConfig.ApplicationPath.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Reload Password       | $($Script:State.AppConfig.ReloadPassword.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Datasource Name       | $($Script:State.AppConfig.DatasourceName.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| CF Engine             | $($Script:State.AppConfig.CFMLEngine.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Setup Bootstrap       | $($bootstrapStatus.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Setup H2 Database     | $($h2Status.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Initialize as Package | $($packageStatus.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Force Installation    | $($Force.ToString().ToLower().PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Skip add to PATH      | $($SkipPath.ToString().ToLower().PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "+-----------------------+-----------------------------------------------------------+" -ForegroundColor Green
+Write-Host ""
+
+$proceed = Get-UserConfirmation "Does this configuration look correct? Proceed with installation?" -DefaultYes $true
+if (-not $proceed) {
+    Write-Warning "Installation cancelled by user."
+    Write-Host ""
+    Write-Host "Press any key to close..."
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit 0
+}
+
+Write-Success "Configuration confirmed! Starting installation and application setup..."
+Write-Host ""
+
+#endregion
+
 #region System Detection and Validation
 
 function Initialize-Environment {
@@ -150,16 +383,8 @@ function Initialize-Environment {
 
     $Script:State.IsAdmin = Test-Administrator
 
-    # Determine installation path
-    if ([string]::IsNullOrEmpty($InstallPath)) {
-        if ($Script:State.IsAdmin) {
-            $Script:State.InstallPath = "$env:ProgramFiles\CommandBox"
-        } else {
-            $Script:State.InstallPath = "$env:USERPROFILE\.commandbox"
-        }
-    } else {
-        $Script:State.InstallPath = $InstallPath
-    }
+    # Set Installation path (already configured in the user prompts section)
+    $Script:State.InstallPath = $InstallPath
 
     Write-Info "Installation path: $($Script:State.InstallPath)"
     Write-Info "Administrator privileges: $(if ($Script:State.IsAdmin) { 'Yes' } else { 'No' })"
@@ -170,7 +395,7 @@ function Test-JavaInstallation {
     Write-Info "Checking Java installation..."
 
     try {
-        $javaOutput = java -version 2>&1
+        $javaOutput = & java -version *>&1
         if ($javaOutput -match 'version "(.+?)"') {
             $javaVersionString = $matches[1]
             Write-Success "Java found: $javaVersionString"
@@ -565,7 +790,6 @@ function Install-WheelsPackages {
 
     try {
         # Check if wheels-cli package is already installed
-        Write-Info "Checking existing packages..."
         $output = & $BoxPath list 2>&1
         $wheelsCliInstalled = $output -match $Script:Config.WheelsCliPackage
 
@@ -615,6 +839,140 @@ function Install-WheelsPackages {
 
 #endregion
 
+#region Wheels Application Creation
+
+function Create-WheelsApplication {
+    param([string]$BoxPath)
+
+    Write-Host ""
+    Write-ColorOutput "=================================================================================" -ForegroundColor Blue
+    Write-ColorOutput "                          Creating Wheels Application                           " -ForegroundColor Blue
+    Write-ColorOutput "=================================================================================" -ForegroundColor Blue
+    Write-Host ""
+
+    $appName = $Script:State.AppConfig.ApplicationName
+    $appPath = $Script:State.AppConfig.ApplicationPath
+    $template = $Script:State.AppConfig.Template
+
+    Write-Info "Creating Wheels application: $appName"
+    Write-Info "Location: $appPath"
+    Write-Info "Template: $template"
+
+    try {
+        # Change to the parent directory where the app will be created
+        $appParentDir = Split-Path $appPath -Parent
+        Push-Location $appParentDir
+
+        # Build the wheels generate app command
+        $generateCmd = @("wheels", "generate", "app", $appName, "--template=$template")
+
+        # Add additional parameters
+        if ($Script:State.AppConfig.ReloadPassword -ne "") {
+            $generateCmd += "--reloadPassword=$($Script:State.AppConfig.ReloadPassword)"
+        }
+
+        if ($Script:State.AppConfig.DatasourceName -ne $appName) {
+            $generateCmd += "--datasourceName=$($Script:State.AppConfig.DatasourceName)"
+        }
+
+        if ($Script:State.AppConfig.CFMLEngine -ne "lucee") {
+            $generateCmd += "--cfmlEngine=$($Script:State.AppConfig.CFMLEngine)"
+        }
+
+        if ($Script:State.AppConfig.UseH2Database) {
+            $generateCmd += "--setupH2=true"
+        }
+
+        if ($Script:State.AppConfig.UseBootstrap) {
+            $generateCmd += "--useBootstrap=true"
+        }
+
+        if ($Script:State.AppConfig.InitializeAsPackage) {
+            $generateCmd += "--initPackage=true"
+        }
+
+        Write-Info "Executing: box $($generateCmd -join ' ')"
+        Write-ColorOutput "Creating application, please wait..." -ForegroundColor Yellow
+
+        # Execute the command
+        $output = & $BoxPath $generateCmd 2>&1
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Wheels application created successfully!"
+        } else {
+            Write-Warning "Application creation may have completed with warnings."
+            Write-Info "Output: $($output -join ' ')"
+        }
+
+    } catch {
+        Write-Error "Failed to create Wheels application: $($_.Exception.Message)"
+        return $false
+    } finally {
+        Pop-Location
+    }
+
+    # Verify the application was created
+    if (Test-Path $appPath) {
+        Write-Success "Application directory verified: $appPath"
+        return $true
+    } else {
+        Write-Error "Application directory not found: $appPath"
+        return $false
+    }
+}
+
+function Start-WheelsServer {
+    param([string]$BoxPath)
+
+    Write-Host ""
+    Write-ColorOutput "=================================================================================" -ForegroundColor Blue
+    Write-ColorOutput "                            Starting Development Server                         " -ForegroundColor Blue
+    Write-ColorOutput "=================================================================================" -ForegroundColor Blue
+    Write-Host ""
+
+    $appPath = $Script:State.AppConfig.ApplicationPath
+
+    if (-not (Test-Path $appPath)) {
+        Write-Error "Application directory not found: $appPath"
+        return $false
+    }
+
+    try {
+        Push-Location $appPath
+
+        Write-Info "Starting development server for $($Script:State.AppConfig.ApplicationName)..."
+        Write-ColorOutput "Server is starting, please wait..." -ForegroundColor Yellow
+
+        # Start the server
+        $output = & $BoxPath server start 2>&1
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Development server started successfully!"
+
+            # Extract server URL if available in output
+            $urlMatch = $output | Select-String -Pattern "http://[^\\s]+"
+            if ($urlMatch) {
+                $serverUrl = $urlMatch.Matches[0].Value
+                Write-Success "Server URL: $serverUrl"
+                $Script:State.ServerUrl = $serverUrl
+            }
+        } else {
+            Write-Warning "Server start may have completed with issues."
+            Write-Info "Output: $($output -join ' ')"
+        }
+
+    } catch {
+        Write-Error "Failed to start development server: $($_.Exception.Message)"
+        return $false
+    } finally {
+        Pop-Location
+    }
+
+    return $true
+}
+
+#endregion
+
 #region Verification and Testing
 
 function Test-Installation {
@@ -629,15 +987,6 @@ function Test-Installation {
     } catch {
         Write-Error "CommandBox verification failed"
         return $false
-    }
-
-    # Test packages
-    try {
-        # Skip the package listing verification since it's unreliable
-        # CommandBox packages can be installed in different ways and may not show up in `box list`
-        Write-Info "Skipping package list verification (unreliable for CommandBox modules)"
-    } catch {
-        Write-Info "Package verification skipped"
     }
 
     # Test CLI functionality (more comprehensive check)
@@ -672,62 +1021,78 @@ function Test-Installation {
     return $true
 }
 
-function Show-Summary {
+function Show-CompletionSummary {
     $duration = (Get-Date) - $Script:State.StartTime
 
     Write-Host ""
     Write-ColorOutput "=================================================================================" -ForegroundColor Green
-    Write-ColorOutput "                          Installation Completed Successfully!                  " -ForegroundColor Green
-    Write-ColorOutput "                                                                               " -ForegroundColor Green
-    Write-ColorOutput "  Installation Summary:                                                        " -ForegroundColor Green
-    Write-ColorOutput "  • CommandBox Path: $($Script:State.InstallPath)               " -ForegroundColor Green
-    Write-ColorOutput "  • Java Installed: $(if ($Script:State.JavaInstalled) { 'Yes' } else { 'No (using embedded)' })                                      " -ForegroundColor Green
-    Write-ColorOutput "  • Duration: $([int]$duration.TotalSeconds) seconds                                                 " -ForegroundColor Green
-    Write-ColorOutput "                                                                               " -ForegroundColor Green
-
-    Write-ColorOutput "  Next Steps:                                                                  " -ForegroundColor Green
-    Write-ColorOutput "  1. Open a new terminal/command prompt                                        " -ForegroundColor Green
-    Write-ColorOutput "  2. Create a new app: box wheels generate app myapp                          " -ForegroundColor Green
-    Write-ColorOutput "  3. Start developing: cd myapp; box server start                            " -ForegroundColor Green
-    Write-ColorOutput "                                                                               " -ForegroundColor Green
-    Write-ColorOutput "  Using CommandBox commands:                                                  " -ForegroundColor Green
-    Write-ColorOutput "  • wheels generate app [name]  - Generate new Wheels app                " -ForegroundColor Green
-    Write-ColorOutput "  • wheels generate model [name] - Generate model                        " -ForegroundColor Green
-    Write-ColorOutput "  • wheels generate controller   - Generate controller                   " -ForegroundColor Green
-    Write-ColorOutput "  • server start                 - Start development server             " -ForegroundColor Green
-    Write-ColorOutput "  • wheels migrate up            - Run database migrations              " -ForegroundColor Green
-    Write-ColorOutput "                                                                               " -ForegroundColor Green
-    Write-ColorOutput "  Documentation: https://wheels.dev/guides                                    " -ForegroundColor Green
-    Write-ColorOutput "  Getting Started: https://wheels.dev/guides#start-a-new-application-using-the-command-line" -ForegroundColor Green
+    Write-ColorOutput "                    Installation and Setup Completed Successfully!             " -ForegroundColor Green
     Write-ColorOutput "=================================================================================" -ForegroundColor Green
     Write-Host ""
 
+    Write-ColorOutput "Installation Summary:" -ForegroundColor Green
+    Write-ColorOutput "• CommandBox Path: $($Script:State.InstallPath)" -ForegroundColor Green
+    Write-ColorOutput "• Java Installed: $(if ($Script:State.JavaInstalled) { 'Yes' } else { 'No (using embedded)' })" -ForegroundColor Green
+    Write-ColorOutput "• Application Name: $($Script:State.AppConfig.ApplicationName)" -ForegroundColor Green
+    Write-ColorOutput "• Application Path: $($Script:State.AppConfig.ApplicationPath)" -ForegroundColor Green
+    if ($Script:State.ServerUrl) {
+        Write-ColorOutput "• Server URL: $($Script:State.ServerUrl)" -ForegroundColor Green
+    }
+    Write-ColorOutput "• Total Duration: $([int]$duration.TotalSeconds) seconds" -ForegroundColor Green
+    Write-Host ""
+
+    Write-ColorOutput "Your Wheels application is ready! Here's what you can do:" -ForegroundColor Green
+    Write-Host ""
+    Write-ColorOutput "Development Commands (run from $($Script:State.AppConfig.ApplicationPath)):" -ForegroundColor Yellow
+    Write-ColorOutput "• box server start/stop/restart  - Manage development server" -ForegroundColor Gray
+    Write-ColorOutput "• box wheels generate model [name] - Generate model" -ForegroundColor Gray
+    Write-ColorOutput "• box wheels generate controller [name] - Generate controller" -ForegroundColor Gray
+    Write-ColorOutput "• box wheels generate view [name] - Generate view" -ForegroundColor Gray
+    Write-ColorOutput "• box wheels migrate up - Run database migrations" -ForegroundColor Gray
+    Write-Host ""
+
+    Write-ColorOutput "Resources:" -ForegroundColor Yellow
+    Write-ColorOutput "• Documentation: https://wheels.dev/guides" -ForegroundColor Gray
+    Write-ColorOutput "• Getting Started: https://wheels.dev/guides#start-a-new-application-using-the-command-line" -ForegroundColor Gray
+    Write-Host ""
+
     if (-not $SkipPath) {
-        Write-Warning "Please restart your terminal or run refreshenv to use the box command"
+        Write-Warning "Note: You may need to restart your terminal or run 'refreshenv' to use the 'box' command globally"
     }
 
-    # Simple press any key to continue and open documentation
     Write-Host ""
-    Write-ColorOutput "Press any key to continue..." -ForegroundColor Cyan
+    Write-ColorOutput "Press any key to open your application in the browser..." -ForegroundColor Cyan
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
-    # Open the Getting Started guide in default browser
-    Write-Host ""
-    Write-Info "Opening Wheels Getting Started Guide in your browser..."
-
-    if (-not $Quiet) {
+    # Open the application in browser if server is running
+    if ($Script:State.ServerUrl -and -not $Quiet) {
+        Write-Host ""
+        Write-Info "Opening your Wheels application in the browser..."
         try {
-            Start-Process "https://wheels.dev/guides#start-a-new-application-using-the-command-line"
+            Start-Process $Script:State.ServerUrl
             Write-Success "Browser opened successfully!"
-            Start-Sleep -Seconds 2  # Give user time to see the success message
+            Start-Sleep -Seconds 2
         } catch {
             Write-Warning "Could not open browser automatically."
-            Write-Info "Please visit: https://wheels.dev/guides#start-a-new-application-using-the-command-line"
-            Write-Host ""
-            Write-ColorOutput "Press any key to exit..." -ForegroundColor Gray
-            $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            Write-Info "Please visit: $($Script:State.ServerUrl)"
+        }
+    } else {
+        Write-Host ""
+        Write-Info "Opening Wheels Getting Started Guide in your browser..."
+        if (-not $Quiet) {
+            try {
+                Start-Process "https://wheels.dev/guides#start-a-new-application-using-the-command-line"
+                Write-Success "Browser opened successfully!"
+                Start-Sleep -Seconds 2
+            } catch {
+                Write-Warning "Could not open browser automatically."
+                Write-Info "Please visit: https://wheels.dev/guides#start-a-new-application-using-the-command-line"
+            }
         }
     }
+
+    Write-Host ""
+    Write-ColorOutput "Happy coding with Wheels!" -ForegroundColor Green
 }
 
 #endregion
@@ -736,7 +1101,7 @@ function Show-Summary {
 
 function Start-Installation {
     try {
-        Write-Header "Wheels Framework Universal Installer" "Installing CommandBox, Wheels, and CLI tools"
+        Write-Header "Wheels Framework Universal Installer" "Installing CommandBox, Wheels CLI, and creating your application"
 
         Initialize-Environment
 
@@ -787,7 +1152,20 @@ function Start-Installation {
             Write-Warning "Installation verification had issues, but installation may still be functional."
         }
 
-        Show-Summary
+        # Create Wheels application (configuration already collected at startup)
+        if (-not (Create-WheelsApplication -BoxPath $Script:State.BoxPath)) {
+            Write-Error "Failed to create Wheels application. Installation completed but app creation failed."
+            exit 1
+        }
+
+        # Start development server
+        if (-not (Start-WheelsServer -BoxPath $Script:State.BoxPath)) {
+            Write-Warning "Application created successfully, but server failed to start."
+            Write-Info "You can manually start the server by running 'box server start' in your app directory."
+        }
+
+        # Show completion summary
+        Show-CompletionSummary
 
     } catch {
         Write-Error "Installation failed with error: $($_.Exception.Message)"
