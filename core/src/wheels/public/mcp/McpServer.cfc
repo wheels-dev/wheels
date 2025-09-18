@@ -445,7 +445,7 @@ component output="false" displayName="MCP Server" {
 
 		local.tools = [
 			{
-				"name": "wheels_generate",
+				"name": "generate",
 				"description": "Generate Wheels components (models, controllers, views, migrations, etc.)",
 				"inputSchema": {
 					"type": "object",
@@ -472,7 +472,7 @@ component output="false" displayName="MCP Server" {
 				}
 			},
 			{
-				"name": "wheels_analyze",
+				"name": "analyze",
 				"description": "Analyze project structure and provide insights",
 				"inputSchema": {
 					"type": "object",
@@ -491,7 +491,7 @@ component output="false" displayName="MCP Server" {
 				}
 			},
 			{
-				"name": "wheels_validate",
+				"name": "validate",
 				"description": "Validate models and database schema",
 				"inputSchema": {
 					"type": "object",
@@ -504,7 +504,7 @@ component output="false" displayName="MCP Server" {
 				}
 			},
 			{
-				"name": "wheels_migrate",
+				"name": "migrate",
 				"description": "Run database migrations",
 				"inputSchema": {
 					"type": "object",
@@ -519,7 +519,7 @@ component output="false" displayName="MCP Server" {
 				}
 			},
 			{
-				"name": "wheels_test",
+				"name": "test",
 				"description": "Run Wheels tests",
 				"inputSchema": {
 					"type": "object",
@@ -536,7 +536,7 @@ component output="false" displayName="MCP Server" {
 				}
 			},
 			{
-				"name": "wheels_server",
+				"name": "server",
 				"description": "Manage Wheels development server",
 				"inputSchema": {
 					"type": "object",
@@ -551,7 +551,7 @@ component output="false" displayName="MCP Server" {
 				}
 			},
 			{
-				"name": "wheels_reload",
+				"name": "reload",
 				"description": "Reload the Wheels application",
 				"inputSchema": {
 					"type": "object",
@@ -609,25 +609,25 @@ component output="false" displayName="MCP Server" {
 			local.result = "";
 
 			switch (local.toolName) {
-				case "wheels_generate":
+				case "generate":
 					local.result = executeWheelsGenerate(local.args);
 					break;
-				case "wheels_migrate":
+				case "migrate":
 					local.result = executeWheelsMigrate(local.args);
 					break;
-				case "wheels_test":
+				case "test":
 					local.result = executeWheelsTest(local.args);
 					break;
-				case "wheels_server":
+				case "server":
 					local.result = executeWheelsServer(local.args);
 					break;
-				case "wheels_reload":
+				case "reload":
 					local.result = executeWheelsReload(local.args);
 					break;
-				case "wheels_analyze":
+				case "analyze":
 					local.result = executeWheelsAnalyze(local.args);
 					break;
-				case "wheels_validate":
+				case "validate":
 					local.result = executeWheelsValidate(local.args);
 					break;
 				case "develop":
@@ -658,7 +658,7 @@ component output="false" displayName="MCP Server" {
 
 		local.prompts = [
 			{
-				"name": "wheels-develop",
+				"name": "develop",
 				"description": "Complete Wheels development workflow with natural language task description",
 				"arguments": [
 					{
@@ -679,7 +679,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels-generate",
+				"name": "generate",
 				"description": "Generate Wheels components (models, controllers, views, etc.)",
 				"arguments": [
 					{
@@ -705,7 +705,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels-migrate",
+				"name": "migrate",
 				"description": "Run database migrations",
 				"arguments": [
 					{
@@ -716,7 +716,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels-test",
+				"name": "test",
 				"description": "Run Wheels tests",
 				"arguments": [
 					{
@@ -732,7 +732,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels-server",
+				"name": "server",
 				"description": "Manage Wheels development server",
 				"arguments": [
 					{
@@ -743,7 +743,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels-reload",
+				"name": "reload",
 				"description": "Reload the Wheels application",
 				"arguments": [
 					{
@@ -754,7 +754,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels-analyze",
+				"name": "analyze",
 				"description": "Analyze project structure and provide insights",
 				"arguments": [
 					{
@@ -770,7 +770,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels_model_help",
+				"name": "model-help",
 				"description": "Get help with Wheels model development",
 				"arguments": [
 					{
@@ -781,7 +781,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels_controller_help",
+				"name": "controller-help",
 				"description": "Get help with Wheels controller development",
 				"arguments": [
 					{
@@ -792,7 +792,7 @@ component output="false" displayName="MCP Server" {
 				]
 			},
 			{
-				"name": "wheels_migration_help",
+				"name": "migration-help",
 				"description": "Get help with database migrations",
 				"arguments": [
 					{
@@ -823,7 +823,7 @@ component output="false" displayName="MCP Server" {
 
 		// Handle slash command prompts by executing the corresponding tools
 		switch (local.promptName) {
-			case "wheels-develop":
+			case "develop":
 				local.toolArgs = {"task": local.args.task};
 				if (structKeyExists(local.args, "skip_browser_test")) {
 					local.toolArgs.skip_browser_test = local.args.skip_browser_test;
@@ -834,7 +834,7 @@ component output="false" displayName="MCP Server" {
 				local.result = executeWheelsDevelop(local.toolArgs);
 				break;
 
-			case "wheels-generate":
+			case "generate":
 				local.toolArgs = {"type": local.args.type, "name": local.args.name};
 				if (structKeyExists(local.args, "attributes")) {
 					local.toolArgs.attributes = local.args.attributes;
@@ -845,11 +845,11 @@ component output="false" displayName="MCP Server" {
 				local.result = executeWheelsGenerate(local.toolArgs);
 				break;
 
-			case "wheels-migrate":
+			case "migrate":
 				local.result = executeWheelsMigrate({"action": local.args.action});
 				break;
 
-			case "wheels-test":
+			case "test":
 				local.toolArgs = {};
 				if (structKeyExists(local.args, "target")) {
 					local.toolArgs.target = local.args.target;
@@ -860,11 +860,11 @@ component output="false" displayName="MCP Server" {
 				local.result = executeWheelsTest(local.toolArgs);
 				break;
 
-			case "wheels-server":
+			case "server":
 				local.result = executeWheelsServer({"action": local.args.action});
 				break;
 
-			case "wheels-reload":
+			case "reload":
 				local.toolArgs = {};
 				if (structKeyExists(local.args, "password")) {
 					local.toolArgs.password = local.args.password;
@@ -872,7 +872,7 @@ component output="false" displayName="MCP Server" {
 				local.result = executeWheelsReload(local.toolArgs);
 				break;
 
-			case "wheels-analyze":
+			case "analyze":
 				local.toolArgs = {"target": local.args.target};
 				if (structKeyExists(local.args, "verbose")) {
 					local.toolArgs.verbose = local.args.verbose;
@@ -881,9 +881,9 @@ component output="false" displayName="MCP Server" {
 				break;
 
 			default:
-				// Handle legacy help prompts
+				// Handle help prompts
 				local.prompts = {
-					"wheels_model_help": "You are helping with Wheels model development. The user needs assistance with: #local.args.task#.
+					"model-help": "You are helping with Wheels model development. The user needs assistance with: #local.args.task#.
 
 Key Wheels model concepts:
 - Models extend the Model component
@@ -895,7 +895,7 @@ Key Wheels model concepts:
 
 Provide specific code examples using Wheels conventions.",
 
-					"wheels_controller_help": "You are helping with Wheels controller development. The user needs assistance with: #local.args.task#.
+					"controller-help": "You are helping with Wheels controller development. The user needs assistance with: #local.args.task#.
 
 Key Wheels controller concepts:
 - Controllers extend the Controller component
@@ -907,7 +907,7 @@ Key Wheels controller concepts:
 
 Focus on RESTful patterns and Wheels conventions.",
 
-					"wheels_migration_help": "You are helping with Wheels database migrations. The user needs to: #local.args.task#.
+					"migration-help": "You are helping with Wheels database migrations. The user needs to: #local.args.task#.
 
 Key migration concepts:
 - Migrations extend wheels.migrator.Migration
@@ -991,6 +991,11 @@ Provide migration code following Wheels conventions."
 			return "Error: Missing required parameters 'type' and 'name'";
 		}
 
+		// Handle test generation to ensure proper directory structure
+		if (arguments.args.type == "test") {
+			return generateTestFile(arguments.args);
+		}
+
 		local.command = "wheels g " & arguments.args.type & " " & arguments.args.name;
 
 		if (structKeyExists(arguments.args, "attributes") && len(arguments.args.attributes)) {
@@ -1002,6 +1007,135 @@ Provide migration code following Wheels conventions."
 		}
 
 		return executeCommand(local.command);
+	}
+
+	private string function generateTestFile(required struct args) {
+		if (!structKeyExists(arguments.args, "name")) {
+			return "Error: Missing required parameter 'name' for test generation";
+		}
+
+		try {
+			// Determine test type and target directory
+			local.testName = arguments.args.name;
+			local.testType = "model"; // default
+			local.targetDir = "";
+
+			// Determine what type of test based on name or explicit type
+			if (structKeyExists(arguments.args, "testType")) {
+				local.testType = arguments.args.testType;
+			} else if (findNoCase("controller", local.testName)) {
+				local.testType = "controller";
+			} else if (findNoCase("model", local.testName)) {
+				local.testType = "model";
+			}
+
+			// Set target directory following TestBox convention
+			switch (local.testType) {
+				case "controller":
+					local.targetDir = "tests/specs/controllers/";
+					break;
+				case "model":
+					local.targetDir = "tests/specs/models/";
+					break;
+				default:
+					local.targetDir = "tests/specs/";
+			}
+
+			// Ensure directory exists - use application root path
+			// Get public directory and manually go up one level to reach application root
+			local.publicDir = expandPath("/");  // Gets /Users/peter/projects/ws/blog/public/
+			// Remove trailing slash and get parent directory
+			local.publicDirClean = reReplace(local.publicDir, "[/\\]+$", "");
+			local.appRoot = getDirectoryFromPath(local.publicDirClean) & "/";
+			local.fullTargetDir = local.appRoot & local.targetDir;
+
+			// Debug logging removed - path resolution working correctly
+
+			// Clean up path separators
+			local.fullTargetDir = replace(local.fullTargetDir, "\\", "/", "all");
+			local.fullTargetDir = replace(local.fullTargetDir, "//", "/", "all");
+
+			if (!directoryExists(local.fullTargetDir)) {
+				directoryCreate(local.fullTargetDir, true);
+			}
+
+			// Generate test file content
+			local.testFileName = local.testName & "Test.cfc";
+			local.testFilePath = local.fullTargetDir & local.testFileName;
+
+			// Create test file with proper TestBox structure
+			local.testContent = createTestFileContent(local.testName, local.testType);
+
+			fileWrite(local.testFilePath, local.testContent);
+
+			return "✅ Test file created: " & local.targetDir & local.testFileName & " (Full path: " & local.testFilePath & ")";
+
+		} catch (any e) {
+			return "❌ Error creating test file: " & e.message;
+		}
+	}
+
+	private string function createTestFileContent(required string testName, required string testType) {
+		local.className = arguments.testName;
+		local.componentType = arguments.testType;
+
+		// Remove "Test" suffix if present to get clean component name
+		if (right(local.className, 4) == "Test") {
+			local.cleanName = left(local.className, len(local.className) - 4);
+		} else {
+			local.cleanName = local.className;
+		}
+
+		local.content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
+		local.content &= '	function beforeAll() {' & chr(10);
+		local.content &= '		// Setup for all tests in this spec' & chr(10);
+		local.content &= '	}' & chr(10) & chr(10);
+
+		local.content &= '	function afterAll() {' & chr(10);
+		local.content &= '		// Cleanup after all tests' & chr(10);
+		local.content &= '	}' & chr(10) & chr(10);
+
+		local.content &= '	function beforeEach() {' & chr(10);
+		local.content &= '		// Setup before each test' & chr(10);
+		local.content &= '	}' & chr(10) & chr(10);
+
+		local.content &= '	function afterEach() {' & chr(10);
+		local.content &= '		// Cleanup after each test' & chr(10);
+		local.content &= '	}' & chr(10) & chr(10);
+
+		local.content &= '	function run() {' & chr(10);
+
+		if (local.componentType == "model") {
+			local.content &= '		describe("' & local.cleanName & ' Model", function() {' & chr(10) & chr(10);
+			local.content &= '			it("should create a new instance", function() {' & chr(10);
+			local.content &= '				var ' & lCase(local.cleanName) & ' = model("' & local.cleanName & '").new();' & chr(10);
+			local.content &= '				expect(' & lCase(local.cleanName) & ').toBeInstanceOf("' & local.cleanName & '");' & chr(10);
+			local.content &= '			});' & chr(10) & chr(10);
+
+			local.content &= '			it("should validate required properties", function() {' & chr(10);
+			local.content &= '				var ' & lCase(local.cleanName) & ' = model("' & local.cleanName & '").new();' & chr(10);
+			local.content &= '				expect(' & lCase(local.cleanName) & '.valid()).toBeFalse("Should be invalid without required data");' & chr(10);
+			local.content &= '			});' & chr(10) & chr(10);
+
+		} else if (local.componentType == "controller") {
+			local.content &= '		describe("' & local.cleanName & ' Controller", function() {' & chr(10) & chr(10);
+			local.content &= '			it("should handle index action", function() {' & chr(10);
+			local.content &= '				// Test index action functionality' & chr(10);
+			local.content &= '				expect(true).toBeTrue("Add your controller tests here");' & chr(10);
+			local.content &= '			});' & chr(10) & chr(10);
+
+		} else {
+			local.content &= '		describe("' & local.cleanName & ' Tests", function() {' & chr(10) & chr(10);
+			local.content &= '			it("should pass basic test", function() {' & chr(10);
+			local.content &= '				expect(true).toBeTrue("Add your tests here");' & chr(10);
+			local.content &= '			});' & chr(10) & chr(10);
+		}
+
+		local.content &= '		});' & chr(10);
+		local.content &= '	}' & chr(10) & chr(10);
+		local.content &= '}' & chr(10);
+
+		return local.content;
 	}
 
 	private string function executeWheelsMigrate(required struct args) {
@@ -1143,33 +1277,36 @@ Provide migration code following Wheels conventions."
 				return "Failed to reload application: Invalid reload password";
 			}
 
-			// Use Wheels internal reload mechanism
-			// This approach is safer than HTTP calls back to the same server
+			// Use proper Wheels reload mechanism
+			// Instead of manually clearing caches, trigger proper Wheels reload
 			if (structKeyExists(application, "wheels")) {
 				try {
-					// Clear Wheels framework cached data to force reload
-					if (structKeyExists(application.wheels, "cache")) {
-						application.wheels.cache = {};
-					}
-					if (structKeyExists(application.wheels, "models")) {
-						application.wheels.models = {};
-					}
-					if (structKeyExists(application.wheels, "controllers")) {
-						application.wheels.controllers = {};
-					}
-					if (structKeyExists(application.wheels, "routes")) {
-						application.wheels.routes = {};
-					}
-
-					// Clear MCP server cache
+					// Clear only our MCP-specific caches
 					if (structKeyExists(application, "mcpServer")) {
 						structDelete(application, "mcpServer");
 					}
 					if (structKeyExists(application, "mcpSessionManager")) {
 						structDelete(application, "mcpSessionManager");
 					}
+					if (structKeyExists(application, "wheelsMcpDocCache")) {
+						structClear(application.wheelsMcpDocCache);
+					}
 
-					return "Application reload completed successfully - framework caches cleared";
+					// Use Wheels' internal reload mechanism instead of manually clearing caches
+					// This approach properly reloads routes and framework components
+					if (structKeyExists(application.wheels, "dispatch") &&
+						isObject(application.wheels.dispatch) &&
+						structKeyExists(application.wheels.dispatch, "$clearCachedModelClassDefinitions")) {
+
+						// Use Wheels' built-in cache clearing methods
+						application.wheels.dispatch.$clearCachedModelClassDefinitions();
+
+						if (structKeyExists(application.wheels.dispatch, "$clearCachedControllerClassDefinitions")) {
+							application.wheels.dispatch.$clearCachedControllerClassDefinitions();
+						}
+					}
+
+					return "Application reload completed successfully - MCP caches cleared, Wheels reload triggered";
 				} catch (any e) {
 					return "Application reload partially completed with warnings: " & e.message;
 				}
@@ -1414,7 +1551,14 @@ Provide migration code following Wheels conventions."
 
 	private string function readAIDocumentation(required string filename) {
 		try {
-			local.filePath = expandPath(".ai/" & arguments.filename);
+			// Ensure path is relative to application root
+			local.basePath = expandPath("/");
+			local.filePath = local.basePath & ".ai/" & arguments.filename;
+
+			// Clean up path separators
+			local.filePath = replace(local.filePath, "\\", "/", "all");
+			local.filePath = replace(local.filePath, "//", "/", "all");
+
 			if (fileExists(local.filePath)) {
 				return fileRead(local.filePath);
 			} else {
@@ -1427,7 +1571,14 @@ Provide migration code following Wheels conventions."
 
 	private string function aggregateAIDocumentation(required string folderPath) {
 		try {
-			local.fullPath = expandPath(arguments.folderPath);
+			// Ensure path is relative to application root
+			local.basePath = expandPath("/");
+			local.fullPath = local.basePath & arguments.folderPath;
+
+			// Clean up path separators
+			local.fullPath = replace(local.fullPath, "\\", "/", "all");
+			local.fullPath = replace(local.fullPath, "//", "/", "all");
+
 			local.aggregatedContent = "";
 
 			if (directoryExists(local.fullPath)) {
@@ -1502,12 +1653,21 @@ Provide migration code following Wheels conventions."
 			// 3. Load relevant documentation
 			if (local.verbose) local.result &= "• Loading Wheels documentation..." & chr(10);
 			local.docsLoaded = loadRelevantDocumentation(local.task);
-			if (local.verbose) local.result &= "  📚 Documentation loaded" & chr(10);
+			if (local.verbose) {
+				local.result &= local.docsLoaded & chr(10);
+			} else {
+				local.result &= "  📚 Documentation loaded" & chr(10);
+			}
 
-			// 4. Parse task and create plan
-			local.result &= "• Creating implementation plan..." & chr(10);
-			local.plan = parseTaskAndCreatePlan(local.task);
-			local.result &= local.plan.description & chr(10) & chr(10);
+			// 4. Parse task and create plan with documentation context
+			local.result &= "• Creating implementation plan with documentation guidance..." & chr(10);
+			local.plan = parseTaskAndCreatePlan(local.task, local.docsLoaded);
+			local.result &= local.plan.description & chr(10);
+			if (structKeyExists(local.plan, "documentation_guidance") && len(local.plan.documentation_guidance)) {
+				local.result &= chr(10) & "📖 Documentation Guidance:" & chr(10);
+				local.result &= local.plan.documentation_guidance & chr(10);
+			}
+			local.result &= chr(10);
 
 			// Phase 2: Implementation
 			local.result &= "🛠️ PHASE 2: Implementation" & chr(10);
@@ -1590,13 +1750,19 @@ Provide migration code following Wheels conventions."
 		}
 	}
 
-	private struct function parseTaskAndCreatePlan(required string task) {
+	private struct function parseTaskAndCreatePlan(required string task, string documentation = "") {
 		local.plan = {
 			"description": "",
-			"steps": []
+			"steps": [],
+			"documentation_guidance": ""
 		};
 
-		// Simple task parsing - can be enhanced with more sophisticated NLP
+		// Analyze documentation for patterns and best practices
+		if (len(arguments.documentation)) {
+			local.plan.documentation_guidance = extractDocumentationGuidance(arguments.task, arguments.documentation);
+		}
+
+		// Enhanced task parsing with documentation context
 		local.taskLower = lCase(arguments.task);
 
 		// Blog with posts and comments example
@@ -1660,10 +1826,295 @@ Provide migration code following Wheels conventions."
 		return local.plan;
 	}
 
+	private array function analyzeTaskForDocumentation(required string task) {
+		// Analyze task description and return relevant documentation categories
+		local.taskLower = lCase(arguments.task);
+		local.relevantDocs = [];
+
+		// Always include overview
+		arrayAppend(local.relevantDocs, {
+			"category": "overview",
+			"path": ".ai/README.md",
+			"reason": "General guidance"
+		});
+
+		// CFML syntax and fundamentals
+		if (reFindNoCase("\b(cfml|coldfusion|cfscript|component|function|struct|array|query)\b", local.taskLower)) {
+			arrayAppend(local.relevantDocs, {
+				"category": "cfml-syntax",
+				"path": ".ai/cfml/",
+				"reason": "CFML syntax and fundamentals"
+			});
+		}
+
+		// Model-related tasks
+		if (reFindNoCase("\b(model|database|crud|table|migration|validation|association|belongsto|hasmany|hasone)\b", local.taskLower)) {
+			arrayAppend(local.relevantDocs, {
+				"category": "models",
+				"path": ".ai/wheels/database/",
+				"reason": "Model and database patterns"
+			});
+			arrayAppend(local.relevantDocs, {
+				"category": "cfml-components",
+				"path": ".ai/cfml/components/",
+				"reason": "CFML component patterns"
+			});
+		}
+
+		// Controller-related tasks
+		if (reFindNoCase("\b(controller|action|filter|route|request|response|session|redirect|render)\b", local.taskLower)) {
+			arrayAppend(local.relevantDocs, {
+				"category": "controllers",
+				"path": ".ai/wheels/controllers/",
+				"reason": "Controller patterns and conventions"
+			});
+		}
+
+		// View-related tasks
+		if (reFindNoCase("\b(view|template|form|helper|layout|partial|css|javascript|asset)\b", local.taskLower)) {
+			arrayAppend(local.relevantDocs, {
+				"category": "views",
+				"path": ".ai/wheels/views/",
+				"reason": "View and template patterns"
+			});
+		}
+
+		// Security-related tasks
+		if (reFindNoCase("\b(security|authentication|authorization|csrf|sql injection|xss|sanitize)\b", local.taskLower)) {
+			arrayAppend(local.relevantDocs, {
+				"category": "security",
+				"path": ".ai/wheels/security/",
+				"reason": "Security best practices"
+			});
+		}
+
+		// Blog-specific tasks
+		if (reFindNoCase("\b(blog|post|comment|article|publish)\b", local.taskLower)) {
+			arrayAppend(local.relevantDocs, {
+				"category": "patterns",
+				"path": ".ai/wheels/patterns/",
+				"reason": "Common application patterns"
+			});
+			arrayAppend(local.relevantDocs, {
+				"category": "snippets",
+				"path": ".ai/wheels/snippets/",
+				"reason": "Code examples and templates"
+			});
+		}
+
+		// Testing tasks
+		if (reFindNoCase("\b(test|testing|testbox|spec|mock)\b", local.taskLower)) {
+			arrayAppend(local.relevantDocs, {
+				"category": "testing",
+				"path": ".ai/wheels/testing/",
+				"reason": "Testing patterns and examples"
+			});
+		}
+
+		return local.relevantDocs;
+	}
+
+	private string function extractDocumentationGuidance(required string task, required string documentation) {
+		// Extract key guidance points from loaded documentation
+		local.guidance = "";
+		local.taskLower = lCase(arguments.task);
+
+		try {
+			// Use session-stored documentation if available for more comprehensive analysis
+			local.fullDocs = arguments.documentation;
+			if (structKeyExists(session, "wheelsDocsContent") && len(session.wheelsDocsContent)) {
+				local.fullDocs &= chr(10) & session.wheelsDocsContent;
+			}
+
+			// Look for common patterns in the documentation
+			if (findNoCase("model", local.taskLower)) {
+				if (findNoCase("validatesPresenceOf", local.fullDocs)) {
+					local.guidance &= "• Use validatesPresenceOf() for required fields" & chr(10);
+				}
+				if (findNoCase("belongsTo", local.fullDocs)) {
+					local.guidance &= "• Define associations with belongsTo() and hasMany()" & chr(10);
+				}
+				if (findNoCase("nestedProperties", local.fullDocs)) {
+					local.guidance &= "• Use nestedProperties() for complex form handling" & chr(10);
+				}
+			}
+
+			if (findNoCase("controller", local.taskLower)) {
+				if (findNoCase("filters", local.fullDocs)) {
+					local.guidance &= "• Use filters for authentication and parameter verification" & chr(10);
+				}
+				if (findNoCase("provides", local.fullDocs)) {
+					local.guidance &= "• Use provides() for API content type support" & chr(10);
+				}
+			}
+
+			if (findNoCase("view", local.taskLower)) {
+				if (findNoCase("linkTo", local.fullDocs)) {
+					local.guidance &= "• Use linkTo() and formTag() helpers for consistent URLs" & chr(10);
+				}
+				if (findNoCase("contentFor", local.fullDocs)) {
+					local.guidance &= "• Use contentFor() for dynamic page titles and sections" & chr(10);
+				}
+			}
+
+			if (findNoCase("migration", local.taskLower) || findNoCase("database", local.taskLower)) {
+				if (findNoCase("createTable", local.fullDocs)) {
+					local.guidance &= "• Use createTable() with proper column types" & chr(10);
+				}
+				if (findNoCase("timestamps", local.fullDocs)) {
+					local.guidance &= "• Use timestamps() for automatic createdAt/updatedAt" & chr(10);
+				}
+				if (findNoCase("addIndex", local.fullDocs)) {
+					local.guidance &= "• Add indexes for foreign keys and search fields" & chr(10);
+				}
+			}
+
+			// Security guidance
+			if (findNoCase("security", local.taskLower) || findNoCase("csrf", local.fullDocs)) {
+				local.guidance &= "• Enable CSRF protection with protectsFromForgery()" & chr(10);
+			}
+
+			// Blog-specific guidance
+			if (findNoCase("blog", local.taskLower)) {
+				local.guidance &= "• Follow RESTful conventions for blog resources" & chr(10);
+				local.guidance &= "• Use nested resources for posts/comments relationship" & chr(10);
+				local.guidance &= "• Implement proper validation for content fields" & chr(10);
+				if (findNoCase("publishedAt", local.fullDocs) || findNoCase("published", local.fullDocs)) {
+					local.guidance &= "• Include published status and date fields" & chr(10);
+				}
+			}
+
+			// General best practices from documentation
+			if (findNoCase("cfscript", local.fullDocs)) {
+				local.guidance &= "• Use CFScript syntax consistently" & chr(10);
+			}
+
+			if (findNoCase("component extends", local.fullDocs)) {
+				local.guidance &= "• Follow proper component inheritance patterns" & chr(10);
+			}
+
+			return len(local.guidance) ? local.guidance : "• Follow Wheels conventions and patterns from loaded documentation";
+
+		} catch (any e) {
+			return "• Documentation guidance extraction failed: " & e.message;
+		}
+	}
+
 	private string function loadRelevantDocumentation(required string task) {
-		// Load relevant .ai documentation based on task
-		// This could be enhanced to dynamically load specific docs
-		return "Documentation loaded for: " & arguments.task;
+		local.result = "📚 Loading relevant documentation for task: " & arguments.task & chr(10) & chr(10);
+
+		try {
+			// Analyze task to determine relevant documentation
+			local.relevantDocs = analyzeTaskForDocumentation(arguments.task);
+			local.loadedContent = "";
+			local.cacheHits = 0;
+			local.cacheKey = "";
+
+			for (local.doc in local.relevantDocs) {
+				local.result &= "Loading " & local.doc.category & " documentation (" & local.doc.reason & ")..." & chr(10);
+
+				try {
+					// Check cache first
+					local.cacheKey = "wheels_docs_" & local.doc.category;
+					local.content = getCachedDocumentation(local.cacheKey, local.doc);
+
+					if (local.content == "CACHE_MISS") {
+						// Load from file system
+						if (local.doc.category == "overview") {
+							local.content = readAIDocumentation(local.doc.path);
+						} else {
+							local.content = aggregateAIDocumentation(local.doc.path);
+						}
+						// Cache the content
+						setCachedDocumentation(local.cacheKey, local.content);
+					} else {
+						local.cacheHits++;
+					}
+
+					if (len(local.content) > 0 && local.content != "Documentation file not found: " & local.doc.path) {
+						local.loadedContent &= "## " & local.doc.category & " Documentation" & chr(10);
+						local.loadedContent &= local.content & chr(10) & chr(10);
+						local.result &= "  ✅ Loaded " & local.doc.category & " documentation" & (local.cacheHits > 0 ? " (cached)" : "") & chr(10);
+					} else {
+						local.result &= "  ⚠️ " & local.doc.category & " documentation not found" & chr(10);
+					}
+				} catch (any e) {
+					local.result &= "  ❌ Error loading " & local.doc.category & ": " & e.message & chr(10);
+				}
+			}
+
+			// Store loaded documentation for use in planning
+			if (len(local.loadedContent) > 0) {
+				local.result &= chr(10) & "📋 Documentation Summary:" & chr(10);
+				local.result &= "- Loaded " & arrayLen(local.relevantDocs) & " documentation categories" & chr(10);
+				local.result &= "- Cache hits: " & local.cacheHits & "/" & arrayLen(local.relevantDocs) & chr(10);
+				local.result &= "- Total content: " & len(local.loadedContent) & " characters" & chr(10);
+				local.result &= "- Ready for implementation planning" & chr(10);
+
+				// Store aggregated content in session for planning function to use
+				session.wheelsDocsContent = local.loadedContent;
+			}
+
+			return local.result;
+
+		} catch (any e) {
+			return "❌ Error loading documentation: " & e.message;
+		}
+	}
+
+	private string function getCachedDocumentation(required string cacheKey, required struct docInfo) {
+		// Simple application-scoped caching with timestamp validation
+		try {
+			if (!structKeyExists(application, "wheelsMcpDocCache")) {
+				application.wheelsMcpDocCache = {};
+			}
+
+			local.cache = application.wheelsMcpDocCache;
+
+			if (structKeyExists(local.cache, arguments.cacheKey)) {
+				local.cacheEntry = local.cache[arguments.cacheKey];
+
+				// Check if cache is still valid (5 minutes)
+				if (structKeyExists(local.cacheEntry, "timestamp") &&
+					dateDiff("n", local.cacheEntry.timestamp, now()) < 5) {
+					return local.cacheEntry.content;
+				} else {
+					// Cache expired, remove entry
+					structDelete(local.cache, arguments.cacheKey);
+				}
+			}
+
+			return "CACHE_MISS";
+
+		} catch (any e) {
+			return "CACHE_MISS";
+		}
+	}
+
+	private void function setCachedDocumentation(required string cacheKey, required string content) {
+		try {
+			if (!structKeyExists(application, "wheelsMcpDocCache")) {
+				application.wheelsMcpDocCache = {};
+			}
+
+			application.wheelsMcpDocCache[arguments.cacheKey] = {
+				"content": arguments.content,
+				"timestamp": now()
+			};
+
+		} catch (any e) {
+			// Silently fail if caching doesn't work
+		}
+	}
+
+	private void function clearDocumentationCache() {
+		try {
+			if (structKeyExists(application, "wheelsMcpDocCache")) {
+				structClear(application.wheelsMcpDocCache);
+			}
+		} catch (any e) {
+			// Silently fail
+		}
 	}
 
 	private string function performBrowserTesting(required struct plan) {
