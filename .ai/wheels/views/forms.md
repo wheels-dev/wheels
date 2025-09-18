@@ -181,6 +181,25 @@ CFWheels does NOT have a `passwordField()` helper:
 #textField(objectName="user", property="password", type="password")#
 ```
 
+## 🚨 CRITICAL: HTML Encoding in Form Labels
+
+**When adding HTML content to form labels (icons, styling, etc.), use `encode=false`:**
+
+```cfm
+<!-- ❌ WRONG: Shows literal HTML text -->
+#textField(objectName="user", property="email", label="<i class='icon-email'></i> Email Address")#
+<!-- Output label: <i class='icon-email'></i> Email Address -->
+
+<!-- ✅ CORRECT: Renders HTML in label -->
+#textField(objectName="user", property="email", label="<i class='icon-email'></i> Email Address", encode=false)#
+<!-- Output label: [EMAIL_ICON] Email Address -->
+```
+
+**This applies to ALL form helpers with labels:**
+- `textField()`, `textArea()`, `checkBox()`, `radioButton()`, `select()`, etc.
+
+**See complete documentation:** [View Helpers - HTML Encoding](./helpers.md#🚨-critical-html-encoding-in-view-helpers)
+
 ## Recommended Form Helper Pattern
 
 For maximum compatibility and to prevent duplicate labels, use this pattern:
@@ -269,3 +288,57 @@ For maximum compatibility and to prevent duplicate labels, use this pattern:
 ```
 
 This is a Wheels framework requirement that applies to all helper functions including form helpers, link helpers, and custom application helpers.
+
+## 🚨 CRITICAL: buttonTo() HTTP Method Requirements
+
+**The `buttonTo()` helper REQUIRES explicit `method` parameter for non-GET requests to generate proper HTTP verbs.**
+
+### Common Delete Button Error Pattern
+
+**❌ INCORRECT - Missing method parameter (causes RouteNotFound errors):**
+```cfm
+<!-- This generates POST request, not DELETE -->
+#buttonTo(controller="posts", action="delete", key=post.id, text="Delete", confirm="Are you sure?")#
+
+<!-- Error: "Wheels.RouteNotFound - path does not allow POST requests, only GET, PATCH, PUT, DELETE" -->
+```
+
+**✅ CORRECT - Include method="delete" parameter:**
+```cfm
+<!-- This generates proper DELETE request -->
+#buttonTo(controller="posts", action="delete", method="delete", key=post.id, text="Delete", confirm="Are you sure?")#
+```
+
+### HTTP Method Requirements for buttonTo()
+
+```cfm
+<!-- POST requests (default if no method specified) -->
+#buttonTo(controller="posts", action="create", text="Create Post")#
+
+<!-- PUT/PATCH requests -->
+#buttonTo(controller="posts", action="update", method="put", key=post.id, text="Update")#
+#buttonTo(controller="posts", action="update", method="patch", key=post.id, text="Update")#
+
+<!-- DELETE requests -->
+#buttonTo(controller="posts", action="delete", method="delete", key=post.id, text="Delete")#
+#buttonTo(controller="comments", action="delete", method="delete", key=comment.id, text="Delete")#
+```
+
+### Why This Matters
+
+CFWheels resource routing expects specific HTTP methods:
+- `GET /posts` → `index()` action
+- `POST /posts` → `create()` action
+- `GET /posts/1` → `show()` action
+- `PUT/PATCH /posts/1` → `update()` action
+- `DELETE /posts/1` → `delete()` action
+
+**Without the `method` parameter, `buttonTo()` defaults to POST, causing route mismatches.**
+
+### Testing Delete Functionality
+
+Always test delete functionality in the browser to ensure:
+- [ ] No "RouteNotFound" errors occur
+- [ ] Proper flash messages appear ("Post deleted successfully!")
+- [ ] Correct redirects happen (back to index or show page)
+- [ ] Confirmation dialogs work (`confirm="Are you sure?"` parameter)
