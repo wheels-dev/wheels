@@ -2,7 +2,7 @@
 	"name": "wheels-vscode",
 	"displayName": "Wheels VS Code",
 	"description": "Enhance your Wheels development workflow with intelligent code snippets for all framework functions, offered in both minimal (required-only) and comprehensive (all-parameters) variants, plus built-in function documentation.",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"engines": {
 		"vscode": "^1.80.0"
 	},

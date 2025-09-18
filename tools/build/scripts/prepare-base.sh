@@ -54,6 +54,7 @@ cp .vscode/wheels.code-snippets "${BUILD_DIR}/.vscode/"
 cp .vscode/wheels-test.code-snippets "${BUILD_DIR}/.vscode/"
 
 # Copy template files, overwriting defaults
+cp tools/build/base/.gitignore "${BUILD_DIR}/.gitignore"
 cp tools/build/base/box.json "${BUILD_DIR}/box.json"
 cp tools/build/base/README.md "${BUILD_DIR}/README.md"
 cp tools/build/base/server.json "${BUILD_DIR}/server.json"

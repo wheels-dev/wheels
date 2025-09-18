@@ -51,8 +51,32 @@ component extends="wheels.migrator.Migration" {
 - [Running Migrations](./running-migrations.md)
 - [Rollback](./rollback.md)
 
+## Data Seeding in Migrations
+Migrations can also be used for data seeding, especially for initial application data:
+
+```cfm
+function up() {
+    transaction {
+        // Create table first
+        t = createTable(name="posts", force=false);
+        t.string(columnNames="title", limit=255, allowNull=false);
+        t.text(columnNames="body", allowNull=false);
+        t.timestamps();
+        t.create();
+
+        // Seed initial data - use direct SQL for reliability
+        execute("INSERT INTO posts (title, body, createdAt, updatedAt)
+                 VALUES ('Sample Post', 'This is sample content.', NOW(), NOW())");
+    }
+}
+```
+
+**Note:** For complex data seeding, use direct SQL statements with `execute()` rather than parameter binding, which can be unreliable in migration context.
+
 ## Important Notes
 - One logical change per migration
 - Never modify completed migrations
 - Test both up and down operations
 - Always use transactions for atomicity
+- For data seeding, prefer direct SQL over complex parameter binding
+- Can combine schema creation and data seeding in single migration

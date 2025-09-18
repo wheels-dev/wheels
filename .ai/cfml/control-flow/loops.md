@@ -331,6 +331,62 @@ for (var item in data) {
 }
 ```
 
+## CFWheels Query Loops (CRITICAL)
+
+**⚠️ CFWheels associations return Query objects, not arrays. This is essential for proper iteration.**
+
+### CFWheels Association Loops
+```cfm
+<!-- In CFWheels views/controllers -->
+<cfset post = model("Post").findByKey(1)>
+
+<!-- ❌ WRONG - Treating association as array -->
+<cfloop array="#post.comments()#" index="comment">  <!-- ERROR! -->
+    #comment.content#
+</cfloop>
+
+<!-- ✅ CORRECT - Using query loop -->
+<cfloop query="post.comments()">
+    #post.comments().content#  <!-- Access fields directly -->
+</cfloop>
+
+<!-- ✅ ALSO CORRECT - Assign to variable first -->
+<cfset comments = post.comments()>
+<cfloop query="comments">
+    #comments.author#: #comments.content#
+</cfloop>
+
+<!-- Check if query has records -->
+<cfif post.comments().recordCount gt 0>
+    <cfloop query="post.comments()">
+        <p>#post.comments().content#</p>
+    </cfloop>
+<cfelse>
+    <p>No comments found.</p>
+</cfif>
+```
+
+### CFWheels Model Finder Loops
+```cfm
+<!-- Model finders also return queries -->
+<cfset users = model("User").findAll()>
+<cfloop query="users">
+    #users.name# - #users.email#
+</cfloop>
+
+<!-- With conditions -->
+<cfset activeUsers = model("User").findAll(where="active = 1")>
+<cfloop query="activeUsers">
+    #activeUsers.name#
+</cfloop>
+```
+
+**Key CFWheels Points:**
+- All association methods return Query objects: `post.comments()`, `user.orders()`
+- All model finders return Query objects: `model("User").findAll()`
+- Use `.recordCount` for counts, not `ArrayLen()`
+- Use `<cfloop query="...">` syntax, not `<cfloop array="...">`
+
 ## Key Points
 
 - Use CFScript syntax for modern loop constructs
@@ -340,6 +396,7 @@ for (var item in data) {
 - Consider functional approaches (`each`, `map`, `filter`) for data processing
 - Always handle potential errors in loops processing external data
 - Cache array lengths and expensive calculations outside loops
+- **CFWheels**: Always treat model results as queries, not arrays
 
 ## Related Concepts
 
