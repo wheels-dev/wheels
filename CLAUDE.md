@@ -1,219 +1,860 @@
-# CLAUDE.md - CFWheels Documentation Dispatcher
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
 
-## 🚨 MANDATORY: Pre-Implementation Documentation Check
+## 🚨 MANDATORY: Pre-Implementation Workflow
 
-**BEFORE implementing ANY code, AI assistants MUST follow this workflow:**
+**AI ASSISTANTS MUST FOLLOW THIS EXACT ORDER:**
 
-### 🛑 STEP 1: Critical Error Prevention (ALWAYS FIRST)
-- [ ] **READ** `.ai/wheels/troubleshooting/common-errors.md` - PREVENT FATAL ERRORS
-- [ ] **READ** `.ai/wheels/patterns/validation-templates.md` - VALIDATION CHECKLISTS
-
-### 📋 STEP 2: Task-Specific Documentation Loading
-
-#### 🏗️ For Model Development
-**MANDATORY Reading Order:**
-- [ ] `.ai/wheels/models/data-handling.md` - Critical query vs array patterns
-- [ ] `.ai/wheels/models/architecture.md` - Model fundamentals and structure
-- [ ] `.ai/wheels/models/associations.md` - Relationship patterns (CRITICAL)
-- [ ] `.ai/wheels/models/validations.md` - Validation methods and patterns
-- [ ] `.ai/wheels/models/best-practices.md` - Model development guidelines
-
-#### 🎮 For Controller Development
-**MANDATORY Reading Order:**
-- [ ] `.ai/wheels/controllers/architecture.md` - Controller fundamentals and CRUD
-- [ ] `.ai/wheels/controllers/rendering.md` - View rendering and responses
-- [ ] `.ai/wheels/controllers/filters.md` - Authentication and authorization
-- [ ] `.ai/wheels/controllers/model-interactions.md` - Controller-model patterns
-- [ ] `.ai/wheels/controllers/best-practices.md` - Controller development guidelines
-
-#### 📄 For View Development
-**MANDATORY Reading Order:**
-- [ ] `.ai/wheels/views/data-handling.md` - CRITICAL query vs array patterns
-- [ ] `.ai/wheels/views/architecture.md` - View structure and conventions
-- [ ] `.ai/wheels/views/forms.md` - Form helpers and limitations (CRITICAL)
-- [ ] `.ai/wheels/views/layouts.md` - Layout patterns and inheritance
-- [ ] `.ai/wheels/views/best-practices.md` - View implementation checklist
-
-#### ⚙️ For Configuration Work
-**MANDATORY Reading Order:**
-- [ ] `.ai/wheels/configuration/routing.md` - CRITICAL routing anti-patterns
-- [ ] `.ai/wheels/configuration/environments.md` - Environment settings
-- [ ] `.ai/wheels/configuration/framework-settings.md` - Global settings
-- [ ] `.ai/wheels/configuration/best-practices.md` - Configuration guidelines
-
-### 🔍 STEP 3: Anti-Pattern Validation (BEFORE WRITING CODE)
-- [ ] **Verify** NO mixed argument styles in CFWheels functions
-- [ ] **Verify** NO ArrayLen() usage on model associations (use .recordCount)
-- [ ] **Verify** NO Rails-style nested resource routing
-- [ ] **Verify** proper query vs array handling in views
-
-### ✅ STEP 4: Implementation Using Documentation Patterns
-- Use code templates from `.ai/wheels/` directories
-- Follow established patterns from the loaded documentation
-- Validate implementation against the read documentation
-
-### 🚀 STEP 5: Post-Implementation Validation
-- Run `wheels server start --validate` to check syntax
-- Test functionality with sample data
-- Verify all anti-patterns are avoided
-
-## 📚 Documentation Index - Quick Reference
-
-### Core Framework Documentation
-- **Models**: `.ai/wheels/models/` - Data layer, ORM, associations, validations
-- **Controllers**: `.ai/wheels/controllers/` - Request handling, filters, rendering
-- **Views**: `.ai/wheels/views/` - Templates, layouts, forms, helpers
-- **Configuration**: `.ai/wheels/configuration/` - Settings, routing, environments
-
-### Critical Anti-Pattern Prevention
-- **Common Errors**: `.ai/wheels/troubleshooting/common-errors.md`
-- **Validation Templates**: `.ai/wheels/patterns/validation-templates.md`
-- **Best Practices**: Each component directory contains `best-practices.md`
-
-### MCP Server Integration (Fallback)
-**If `.ai/` folder is not accessible, use MCP resources:**
-- `wheels://.ai/wheels/models` - Model documentation
-- `wheels://.ai/wheels/controllers` - Controller documentation
-- `wheels://.ai/wheels/views` - View documentation
-- `wheels://.ai/wheels/configuration` - Configuration documentation
-
-## ⚡ Quick Start Guide
-
-### New to Wheels?
-1. **Install Wheels CLI**: `brew install wheels` on Mac and `choco install wheels` on Windows
-2. **Generate an app**: `wheels g app myapp`
-3. **Start developing**: `wheels server start`
-
-### 🔥 Common Development Tasks
-- **Create a model**: `wheels g model User name:string,email:string,active:boolean`
-- **Create a controller**: `wheels g controller Users index,show,new,create,edit,update,delete`
-- **Create full scaffold**: `wheels g scaffold Product name:string,price:decimal,instock:boolean`
-- **Run migrations**: `wheels dbmigrate latest` `wheels dbmigrate up` `wheels dbmigrate down`
-- **Run tests**: `wheels test run`
-- **Reload application**: Visit `/?reload=true&password=yourpassword`
-
-### 📖 For Detailed Implementation Guidance
-**After using generators, ALWAYS consult the appropriate .ai documentation:**
-- **Models**: Read `.ai/wheels/models/` for proper associations, validations, and patterns
-- **Controllers**: Read `.ai/wheels/controllers/` for filters, rendering, and CRUD patterns
-- **Views**: Read `.ai/wheels/views/` for templates, forms, and data handling
-- **Configuration**: Read `.ai/wheels/configuration/` for routing and environment setup
-
-## 🏗️ Application Architecture Overview
-
-**For detailed architecture documentation, see:**
-- **Models**: `.ai/wheels/models/architecture.md` - Data layer structure and ORM patterns
-- **Controllers**: `.ai/wheels/controllers/architecture.md` - Request handling and MVC patterns
-- **Views**: `.ai/wheels/views/architecture.md` - Template structure and conventions
-- **Configuration**: `.ai/wheels/configuration/overview.md` - Settings and environment structure
-
-### Quick MVC Reference
-- **Models** (`/app/models/`): Data layer with ActiveRecord ORM → See `.ai/wheels/models/`
-- **Views** (`/app/views/`): Templates and presentation → See `.ai/wheels/views/`
-- **Controllers** (`/app/controllers/`): Request handling → See `.ai/wheels/controllers/`
-- **Configuration** (`/config/`): App settings and routing → See `.ai/wheels/configuration/`
-
-## 🛠️ Development Commands Reference
-
-### Code Generation (CLI Commands)
+### 🛑 STEP 1: CHECK MCP TOOLS AVAILABILITY (ALWAYS FIRST)
 ```bash
-# Models, Controllers, Views
+# Check if .mcp.json exists - if YES, MCP tools are MANDATORY
+ls .mcp.json
+```
+
+**If `.mcp.json` exists, YOU MUST:**
+- ✅ Use `mcp__wheels__*` tools for ALL development tasks
+- ❌ NEVER use CLI commands (`wheels g`, `wheels test`, etc.)
+- ❌ NEVER use bash/curl for Wheels operations
+
+### 🛑 STEP 2: VERIFY MCP TOOLS WORK
+```javascript
+// Test MCP server connection BEFORE any development
+mcp__wheels__wheels_server(action="status")
+```
+
+### 🛑 STEP 3: Load Documentation
+1. **📖 Load Relevant .ai Documentation**
+   - Check if `.ai/` folder exists in project root
+   - Load appropriate documentation sections:
+     - For models: Read `.ai/wheels/database/` and `.ai/cfml/components/`
+     - For controllers: Read `.ai/wheels/controllers/` and `.ai/cfml/syntax/`
+     - For CFML syntax: Read `.ai/cfml/syntax/` and `.ai/cfml/best-practices/`
+     - For patterns: Read `.ai/wheels/patterns/` and `.ai/wheels/snippets/`
+
+2. **✅ Validate Against Standards**
+   - Confirm implementation matches patterns in `.ai/wheels/patterns/`
+   - Verify CFML syntax follows `.ai/cfml/best-practices/`
+   - Check security practices from `.ai/wheels/security/`
+   - Ensure naming conventions match `.ai/wheels/core-concepts/`
+
+3. **🔍 Use Established Code Examples**
+   - Reference code templates from `.ai/wheels/snippets/`
+   - Follow model patterns from `.ai/wheels/database/models/`
+   - Apply controller patterns from `.ai/wheels/controllers/`
+
+**If `.ai/` folder is not available, use the MCP resources:**
+- `wheels://.ai/cfml/syntax` - CFML language fundamentals
+- `wheels://.ai/wheels/patterns` - Framework patterns
+- `wheels://.ai/wheels/snippets` - Code examples
+
+## 🎯 Slash Commands (NEW!)
+
+**The Wheels MCP server now supports slash commands for faster development workflows!**
+
+### ✅ Available Slash Commands
+
+Use these slash commands in supported MCP clients:
+
+- **`/wheels-develop`** - Complete end-to-end development workflow
+  - Example: `/wheels-develop create a blog with posts and comments`
+  - Parameters: `task` (required), `verbose` (optional), `skip_browser_test` (optional)
+
+- **`/wheels-generate`** - Generate Wheels components
+  - Example: `/wheels-generate model User name:string,email:string`
+  - Parameters: `type` (required), `name` (required), `attributes` (optional), `actions` (optional)
+
+- **`/wheels-migrate`** - Run database migrations
+  - Example: `/wheels-migrate latest`
+  - Parameters: `action` (required: latest, up, down, reset, info)
+
+- **`/wheels-test`** - Run tests
+  - Example: `/wheels-test`
+  - Parameters: `target` (optional), `verbose` (optional)
+
+- **`/wheels-server`** - Manage development server
+  - Example: `/wheels-server status`
+  - Parameters: `action` (required: start, stop, restart, status)
+
+- **`/wheels-reload`** - Reload application
+  - Example: `/wheels-reload`
+  - Parameters: `password` (optional)
+
+- **`/wheels-analyze`** - Analyze project structure
+  - Example: `/wheels-analyze all`
+  - Parameters: `target` (required: models, controllers, routes, migrations, tests, all), `verbose` (optional)
+
+### 🚀 Slash Command Benefits
+
+- **Faster workflows** - Single command for complex operations
+- **Natural language** - Describe what you want to build
+- **Integrated testing** - Automatic validation and browser testing
+- **Documentation loading** - Auto-loads relevant .ai docs
+- **Error handling** - Intelligent error recovery
+
+## Quick Start
+
+### MCP-Enabled Wheels Development
+
+**🚨 CRITICAL: If `.mcp.json` exists, use MCP tools exclusively**
+
+### ✅ Common Development Tasks (MCP Tools)
+- **Create a model**: `mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string,active:boolean")`
+- **Create a controller**: `mcp__wheels__wheels_generate(type="controller", name="Users", actions="index,show,new,create,edit,update,delete")`
+- **Create full scaffold**: `mcp__wheels__wheels_generate(type="scaffold", name="Product", attributes="name:string,price:decimal,instock:boolean")`
+- **Run migrations**: `mcp__wheels__wheels_migrate(action="latest")` or `mcp__wheels__wheels_migrate(action="up")` or `mcp__wheels__wheels_migrate(action="down")`
+- **Run tests**: `mcp__wheels__wheels_test()`
+- **Reload application**: `mcp__wheels__wheels_reload()`
+- **Check server status**: `mcp__wheels__wheels_server(action="status")`
+- **Analyze project**: `mcp__wheels__wheels_analyze(target="all")`
+
+### ❌ Legacy CLI Commands (DO NOT USE if .mcp.json exists)
+~~- Create a model: `wheels g model User name:string,email:string,active:boolean`~~
+~~- Create a controller: `wheels g controller Users index,show,new,create,edit,update,delete`~~
+~~- Create full scaffold: `wheels g scaffold Product name:string,price:decimal,instock:boolean`~~
+~~- Run migrations: `wheels dbmigrate latest` `wheels dbmigrate up` `wheels dbmigrate down`~~
+~~- Run tests: `wheels test run`~~
+~~- Reload application: Visit `/?reload=true&password=yourpassword`~~
+
+**⚠️ Only use CLI commands if:**
+1. `.mcp.json` does not exist
+2. MCP tools are not available
+3. You are setting up a new Wheels project from scratch
+
+## 🔍 MCP Workflow Validation
+
+**Before proceeding with ANY development task, AI assistants MUST verify:**
+
+### ✅ MCP Tools Checklist
+1. **Check MCP availability**: `ls .mcp.json` (if exists → MCP is mandatory)
+2. **Test MCP connection**: `mcp__wheels__wheels_server(action="status")`
+3. **Verify MCP tools list**: `ListMcpResourcesTool(server="wheels")`
+
+### 🚨 Enforcement Rules
+- **If ANY of the following are detected, STOP and use MCP tools instead:**
+  - Using `wheels g` commands
+  - Using `wheels dbmigrate` commands
+  - Using `wheels test` commands
+  - Using `wheels server` commands
+  - Using `curl` for Wheels operations
+  - Using bash commands for Wheels development
+
+### 🔄 Correct MCP Usage Pattern
+```javascript
+// 1. Always check server status first
+mcp__wheels__wheels_server(action="status")
+
+// 2. Use MCP tools for all operations
+mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string")
+mcp__wheels__wheels_migrate(action="latest")
+mcp__wheels__wheels_test()
+mcp__wheels__wheels_reload()
+
+// 3. Analyze results
+mcp__wheels__wheels_analyze(target="all")
+```
+
+## 📚 MCP Tool Usage Examples
+
+### 🎯 Complete Development Workflow Example
+```javascript
+// 1. Start every session by checking MCP availability
+mcp__wheels__wheels_server(action="status")
+
+// 2. Create a complete blog system
+mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text,published:boolean")
+mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create,edit,update,delete")
+mcp__wheels__wheels_migrate(action="latest")
+
+// 3. Test and validate
+mcp__wheels__wheels_test()
+mcp__wheels__wheels_analyze(target="all")
+
+// 4. Reload when making configuration changes
+mcp__wheels__wheels_reload()
+```
+
+### ❌ WRONG: CLI-Based Approach (DO NOT USE)
+```bash
+# These commands are FORBIDDEN when .mcp.json exists
+wheels g model Post title:string,content:text,published:boolean
+wheels g controller Posts index,show,new,create,edit,update,delete
+wheels dbmigrate latest
+wheels test run
+curl "http://localhost:8080/?reload=true"
+```
+
+### ✅ CORRECT: MCP-Based Approach (MANDATORY)
+```javascript
+// Always use MCP tools - they provide better integration and error handling
+mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text,published:boolean")
+mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create,edit,update,delete")
+mcp__wheels__wheels_migrate(action="latest")
+mcp__wheels__wheels_test()
+mcp__wheels__wheels_reload()
+```
+
+### 🔍 Debugging with MCP Tools
+```javascript
+// Check project status
+mcp__wheels__wheels_analyze(target="all", verbose=true)
+
+// Check migrations
+mcp__wheels__wheels_migrate(action="info")
+
+// Validate models
+mcp__wheels__wheels_validate(model="all")
+
+// Check server status
+mcp__wheels__wheels_server(action="status")
+```
+
+## Application Architecture
+
+### MVC Framework Structure
+Wheels follows the Model-View-Controller (MVC) architectural pattern:
+
+- **Models** (`/app/models/`): Data layer with ActiveRecord ORM, validation, associations
+- **Views** (`/app/views/`): Presentation layer with CFML templates, layouts, partials
+- **Controllers** (`/app/controllers/`): Request handling, business logic coordination
+- **Configuration** (`/config/`): Application settings, routes, environment configurations
+- **Database** (`/app/migrator/migrations/`): Version-controlled schema changes
+- **Assets** (`/public/`): Static files, CSS, JavaScript, images
+- **Tests** (`/tests/`): TestBox unit and integration tests
+
+### Directory Structure
+```
+/
+├── app/                  (Application code)
+│   ├── controllers/      (Request handlers)
+│   ├── models/           (Data layer)
+│   ├── views/            (Templates)
+│   ├── migrator/         (Database migrations)
+│   ├── events/           (Application events)
+│   ├── global/           (Global functions)
+│   ├── mailers/          (Email components)
+│   ├── jobs/             (Background jobs)
+│   ├── lib/              (Custom libraries)
+│   ├── plugins/          (Third-party plugins)
+│   └── snippets/         (Code templates)
+├── config/               (Configuration files)
+│   ├── app.cfm           (Application.cfc this scope settings)
+│   ├── environment.cfm   (Current environment)
+│   ├── routes.cfm        (URL routing)
+│   ├── settings.cfm      (Framework settings)
+│   └── [environment]/    (Environment-specific overrides)
+├── public/               (Web-accessible files)
+│   ├── files/            (User uploads, sendFile() content)
+│   ├── images/           (Image assets)
+│   ├── javascripts/      (JavaScript files)
+│   ├── stylesheets/      (CSS files)
+│   ├── miscellaneous/    (Miscellaneous files)
+│   ├── Application.cfc   (Framework bootstrap)
+│   └── index.cfm         (Entry point)
+├── tests/                (Test files)
+├── vendor/               (Dependencies)
+├── .env                  (Environment variables - NEVER commit)
+├── box.json              (Package configuration)
+└── server.json           (CommandBox server configuration)
+```
+
+## Development Commands
+
+### Code Generation
+```bash
+# Generate MVC components
 wheels g model User name:string,email:string,active:boolean
 wheels g controller Users index,show,new,create,edit,update,delete
+wheels g view users/dashboard
+
+# Generate full CRUD scaffold
 wheels g scaffold Product name:string,price:decimal,instock:boolean
 
-# Database migrations
+# Generate database migrations
 wheels g migration CreateUsersTable
+wheels g migration AddEmailToUsers --attributes="email:string:index"
+
+# Generate other components
+wheels g mailer UserNotifications --methods="welcome,passwordReset"
+wheels g job ProcessOrders --queue=high
+wheels g test model User
+wheels g helper StringUtils
+```
+
+### Migration Management
+```bash
+# Check migration status
+wheels dbmigrate info
+
+# Migration to Latest
 wheels dbmigrate latest
 
-# Server management
+# Migration to version 0
+wheels dbmigrate reset
+
+# Migration one version UP
+wheels dbmigrate up
+
+# Migration one version DOWN
+wheels dbmigrate down
+```
+
+### Server Management
+```bash
+# Start/stop development server
 wheels server start
+wheels server stop
+wheels server restart
+
+# View server status
+wheels server status
+
+# View server logs
+wheels server log --follow
+```
+
+### Testing
+```bash
+# Run all tests
 wheels test run
 ```
 
-**⚠️ CRITICAL: After using generators, ALWAYS read the corresponding .ai documentation:**
-- **After generating models**: Read `.ai/wheels/models/`
-- **After generating controllers**: Read `.ai/wheels/controllers/`
-- **After generating views**: Read `.ai/wheels/views/`
+## Configuration Management
 
-## ⚙️ Configuration Quick Reference
+### Environment Settings
+Set your environment in `/config/environment.cfm`:
+```cfm
+<cfscript>
+    set(environment="development");
+</cfscript>
+```
 
-**For complete configuration documentation:**
-- **Environment Setup**: `.ai/wheels/configuration/environments.md`
-- **Framework Settings**: `.ai/wheels/configuration/framework-settings.md`
-- **Routing Configuration**: `.ai/wheels/configuration/routing.md` (CRITICAL)
+**Available Environments:**
+- `development` - Local development with debug info
+- `testing` - Automated testing environment  
+- `maintenance` - Maintenance mode with limited access
+- `production` - Live production environment
 
-### Essential Configuration Files
-- `/config/environment.cfm` - Set current environment
-- `/config/settings.cfm` - Global framework settings
-- `/config/routes.cfm` - URL routing (see routing.md for anti-patterns)
-- `/config/[environment]/settings.cfm` - Environment overrides
+### Framework Settings
+Configure global settings in `/config/settings.cfm`:
+```cfm
+<cfscript>
+    // Database configuration
+    set(dataSourceName="myapp-dev");
+    set(dataSourceUserName="username");
+    set(dataSourcePassword="password");
+    
+    // URL rewriting
+    set(URLRewriting="On");
+    
+    // Reload password
+    set(reloadPassword="mypassword");
+    
+    // Error handling
+    set(showErrorInformation=true);
+    set(sendEmailOnError=false);
+</cfscript>
+```
 
-## 🏗️ MVC Implementation Patterns
+### Environment-Specific Overrides
+Create environment-specific settings in `/config/[environment]/settings.cfm`:
+```cfm
+// /config/production/settings.cfm
+<cfscript>
+    set(dataSourceName="myapp-prod");
+    set(showErrorInformation=false);
+    set(sendEmailOnError=true);
+    set(cachePages=true);
+</cfscript>
+```
 
-**⚠️ CRITICAL: Do NOT copy code examples from this file. Always read the full documentation first:**
+## URL Routing
 
-### Controller Development
-**See:** `.ai/wheels/controllers/architecture.md` for complete controller patterns
-- CRUD actions and REST patterns
-- Filter implementation (authentication, authorization)
-- Parameter verification and validation
-- Rendering and response handling
+### Default Route Pattern
+URLs follow the pattern: `[controller]/[action]/[key]`
 
-### Model Development
-**See:** `.ai/wheels/models/architecture.md` for complete model patterns
-- Associations and relationships (CRITICAL: returns QUERIES not arrays)
-- Validation methods and rules
-- Callbacks and lifecycle hooks
-- Custom finder methods
+**Examples:**
+- `/users` → `Users.cfc`, `index()` action
+- `/users/show/12` → `Users.cfc`, `show()` action, `params.key = 12`
 
-### View Development
-**See:** `.ai/wheels/views/architecture.md` for complete view patterns
-- Layout and template structure
-- Query handling (CRITICAL: use .recordCount, not ArrayLen())
-- Form helpers and limitations
-- Partial and content rendering
+### Custom Routes
+Define custom routes in `/config/routes.cfm`:
+```cfm
+<cfscript>
+mapper()
+    // Named routes
+    .get(name="login", to="sessions##new")
+    .post(name="authenticate", to="sessions##create")
+    
+    // RESTful resources
+    .resources("users")
+    .resources("products", except="destroy")
 
-## 🗄️ Database and Testing
+    // Nested resources - use separate declarations
+    .resources("users")
+    .resources("orders")
+    
+    // Root route
+    .root(to="home##index", method="get")
+    
+    // Wildcard (keep last)
+    .wildcard()
+.end();
+</cfscript>
+```
 
-### Database Migrations
-**See:** `.ai/wheels/database/migrations/` for complete migration documentation
-- Migration creation and workflow
-- Column types and constraints
-- Index management and advanced features
+### Route Helpers
+```cfm
+// Link generation
+#linkTo(route="user", key=user.id, text="View User")#
+#linkTo(controller="products", action="index", text="All Products")#
 
-### Testing
-**See:** `.ai/wheels/testing/` for complete testing documentation
-- Model testing patterns
-- Controller testing patterns
-- Test structure and organization
+// Form generation
+#startFormTag(route="user", method="put", key=user.id)#
 
-## 🔒 Security and Performance
+// URL generation
+#urlFor(route="users")#
 
-### Security Practices
-**See:** `.ai/wheels/security/` for complete security documentation
-- CSRF protection implementation
-- Input validation and sanitization
-- SQL injection prevention
+// Redirects in controllers
+redirectTo(route="user", key=user.id);
+```
 
-### Performance Optimization
-**See:** `.ai/wheels/performance/` for complete performance documentation
-- Caching strategies
-- Database query optimization
-- Production configuration
+## Model-View-Controller Patterns
 
-## 🚀 Deployment
+### Controller Structure
+```cfm
+component extends="Controller" {
 
-**See:** `.ai/wheels/deployment/` for complete deployment documentation
-- Production configuration
-- Environment variable management
-- Security hardening
+    function config() {
+        // Filters for authentication/authorization
+        filters(through="authenticate", except="index");
+        filters(through="findUser", only="show,edit,update,delete");
+        
+        // Parameter verification
+        verifies(except="index,new,create", params="key", paramsTypes="integer");
+        
+        // Content type support
+        provides("html,json");
+    }
 
-## Native MCP Server
+    function index() {
+        users = model("User").findAll(order="createdat DESC");
+    }
 
-This Wheels application includes a native CFML MCP (Model Context Protocol) server that eliminates the need for Node.js dependencies. The MCP server provides AI coding assistants with direct access to your Wheels application.
+    function create() {
+        user = model("User").new(params.user);
+        
+        if (user.save()) {
+            redirectTo(route="user", key=user.id, success="User created!");
+        } else {
+            renderView(action="new");
+        }
+    }
+
+    private function authenticate() {
+        if (!session.authenticated) {
+            redirectTo(controller="sessions", action="new");
+        }
+    }
+
+    function sendWelcomeEmail() {
+        sendEmail(
+            template="users/welcome",
+            from="noreply@myapp.com",
+            to=user.email,
+            subject="Welcome to MyApp!",
+            user=user
+        );
+    }
+
+    function downloadReport() {
+        sendFile(
+            file="report.pdf",
+            name="Monthly Report.pdf",
+            type="application/pdf",
+            disposition="attachment",
+            directory="/reports/"
+        );
+    }
+
+    function requireSSL() {
+        if (!isSecure()) {
+            redirectTo(protocol="https");
+        }
+    }
+}
+```
+
+### Model Structure
+```cfm
+component extends="Model" {
+
+    function config() {
+        // Associations
+        hasMany("orders");
+        belongsTo("role");
+        
+        // Validations
+        validatesPresenceOf("firstname,lastname,email");
+        validatesUniquenessOf(property="email");
+        validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
+        
+        // Callbacks
+        beforeSave("hashPassword");
+        afterCreate("sendWelcomeEmail");
+
+        // Nested properties for associations
+        nestedProperties(association="addresses", allowDelete=true, autoSave=true);
+
+        // Custom finder methods (CFWheels doesn't have scope() - use custom finder methods instead)
+    }
+
+    function findByEmail(required string email) {
+        return findOne(where="email = '#arguments.email#'");
+    }
+
+    function findActive() {
+        return findAll(where="active = 1");
+    }
+
+    function findFirst() {
+        return findFirst(property="createdAt");
+    }
+
+    function fullName() {
+        return trim("#firstname# #lastname#");
+    }
+
+    function reload() {
+        // Reload this model instance from the database
+        return super.reload();
+    }
+}
+```
+
+### View Structure
+```cfm
+<!-- Layout: /app/views/layout.cfm -->
+<cfoutput>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    #csrfMetaTags()#
+    <title>#contentFor("title", "MyApp")#</title>
+    #styleSheetLinkTag("application")#
+</head>
+<body>
+    <main>
+        #flashMessages()#
+        #includeContent()#
+    </main>
+    #javaScriptIncludeTag("application")#
+</body>
+</html>
+</cfoutput>
+
+<!-- View: /app/views/users/index.cfm -->
+<cfparam name="users">
+<cfoutput>
+#contentFor("title", "Users")#
+
+<h1>Users</h1>
+#linkTo(route="newUser", text="New User", class="btn btn-primary")#
+
+<cfif users.recordCount>
+    <table class="table">
+        <cfloop query="users">
+        <tr>
+            <td>#linkTo(route="user", key=users.id, text=users.firstname)#</td>
+            <td>#users.email#</td>
+            <td>
+                #linkTo(route="editUser", key=users.id, text="Edit")#
+                #buttonTo(route="user", method="delete", key=users.id, 
+                         text="Delete", confirm="Are you sure?")#
+            </td>
+        </tr>
+        </cfloop>
+    </table>
+<cfelse>
+    <p>No users found.</p>
+</cfif>
+</cfoutput>
+```
+
+## Database Migrations
+
+### Migration Workflow
+```bash
+# Generate new migration
+wheels g migration CreateUsersTable
+
+# Generate migration with attributes
+wheels g migration AddEmailToUsers --attributes="email:string:index"
+
+# Run pending migrations
+wheels dbmigrate latest
+
+# Rollback migrations
+wheels dbmigrate down
+```
+
+### Migration Example
+```cfm
+component extends="wheels.migrator.Migration" {
+
+    function up() {
+        transaction {
+            t = createTable(name="users", force=false);
+            t.string(columnNames="firstName,lastName", allowNull=false);
+            t.string(columnNames="email", limit=100, allowNull=false);
+            t.boolean(columnNames="active", default=true);
+            t.timestamps();
+            t.create();
+            
+            addIndex(table="users", columnNames="email", unique=true);
+        }
+    }
+
+    function down() {
+        dropTable("users");
+    }
+}
+```
+
+### Column Types
+```cfm
+t.string(columnNames="name", limit=255, allowNull=false, default="");
+t.text(columnNames="description", allowNull=true);
+t.integer(columnNames="count", allowNull=false, default=0);
+t.decimal(columnNames="price", precision=10, scale=2);
+t.boolean(columnNames="active", default=false);
+t.date(columnNames="eventDate");
+t.datetime(columnNames="createdAt"); // Use for createdAt/updatedAt only when not using timestamps(); OK for other columns
+t.timestamps();  // Creates createdAt and updatedAt
+t.integer(columnNames="userId", allowNull=false);  // Foreign key
+```
+
+### Advanced Migration Features
+
+```cfm
+// Create database views
+component extends="wheels.migrator.Migration" {
+    function up() {
+        v = createView(name="activeUsers");
+        v.sql("SELECT id, name, email FROM users WHERE active = 1");
+        v.create();
+    }
+}
+
+// Modify existing tables
+component extends="wheels.migrator.Migration" {
+    function up() {
+        t = changeTable(name="users");
+        t.string(columnNames="middleName", limit=100);
+        t.change();
+
+        // Add indexes
+        addIndex(table="users", columnNames="email", unique=true);
+        addIndex(table="users", columnNames="lastName,firstName");
+
+        // Rename tables
+        renameTable(oldName="user_profiles", newName="profiles");
+    }
+
+    function down() {
+        removeIndex(table="users", indexName="users_email");
+        removeIndex(table="users", indexName="users_lastName_firstName");
+        renameTable(oldName="profiles", newName="user_profiles");
+
+        t = changeTable(name="users");
+        t.removeColumn(columnNames="middleName");
+        t.change();
+    }
+}
+```
+
+## Testing
+
+### Test Structure
+```
+tests/
+├── Test.cfc               (Base test component)
+├── controllers/           (Controller tests)
+├── models/                (Model tests)
+└── integration/           (Integration tests)
+```
+
+### Model Testing
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function beforeAll() {
+        // Setup for all tests in this spec
+        variables.testData = {};
+    }
+
+    function afterAll() {
+        // Cleanup after all tests
+    }
+
+    function beforeEach() {
+        // Setup before each test
+        variables.user = "";
+    }
+
+    function afterEach() {
+        // Cleanup after each test
+        if (isObject(variables.user)) {
+            variables.user.delete();
+        }
+    }
+
+    function run() {
+        describe("User Model", function() {
+            
+            it("should be invalid when no data provided", function() {
+                var user = model("User").new();
+                expect(user.valid()).toBeFalse("User should be invalid without data");
+                expect(arrayLen(user.allErrors())).toBeGT(0, "Should have validation errors");
+            });
+
+            it("should create user with valid data", function() {
+                var userData = {
+                    firstname = "John",
+                    lastname = "Doe", 
+                    email = "john@example.com"
+                };
+                
+                var user = model("User").create(userData);
+                
+                expect(isObject(user)).toBeTrue("Should return user object");
+                expect(user.valid()).toBeTrue("User should be valid");
+                expect(user.firstname).toBe("John", "Should set firstname correctly");
+            });
+        });
+    }
+}
+```
+
+## Security Best Practices
+
+### CSRF Protection
+```cfm
+// In controllers
+function config() {
+    protectsFromForgery(); // Enable CSRF protection
+}
+
+// In forms
+#startFormTag(route="user", method="put", key=user.id)#
+    #hiddenFieldTag("authenticityToken", authenticityToken())#
+    <!-- form fields -->
+#endFormTag()#
+
+// In layout head
+#csrfMetaTags()#
+```
+
+### Input Validation
+```cfm
+// Parameter verification
+function config() {
+    verifies(only="show,edit,update,delete", params="key", paramsTypes="integer");
+    verifies(only="create,update", params="user", paramsTypes="struct");
+}
+
+// Model validation
+function config() {
+    validatesPresenceOf("firstname,lastname,email");
+    validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
+    validatesLengthOf(property="password", minimum=8);
+}
+```
+
+### SQL Injection Prevention
+```cfm
+// Use model methods (automatically sanitized)
+users = model("User").findAll(where="email = '#params.email#'");
+
+// Or use cfqueryparam in custom queries
+sql = "SELECT * FROM users WHERE email = :email";
+users = queryExecute(sql, { email = { value = params.email, cfsqltype = "cf_sql_varchar" } }, {datasource = yourDatasourceName});
+```
+
+## Performance Optimization
+
+### Caching
+```cfm
+// Page caching
+function config() {
+    caches(action="index", time=30); // Cache for 30 minutes
+}
+
+// Query caching
+users = model("User").findAll(cache=60); // Cache for 60 minutes
+```
+
+### Database Optimization
+```cfm
+// Use includes to avoid N+1 queries
+users = model("User").findAll(include="role,orders");
+
+// Use select to limit columns
+users = model("User").findAll(select="id,firstname,lastname,email");
+
+// Use pagination
+users = model("User").findAll(page=params.page, perPage=25);
+```
+
+## Deployment
+
+### Production Configuration
+```cfm
+// /config/production/settings.cfm
+<cfscript>
+    // Database
+    set(dataSourceName="myapp-prod");
+    
+    // Security
+    set(showErrorInformation=false);
+    set(sendEmailOnError=true);
+    
+    // Performance
+    set(cachePages=true);
+    set(cachePartials=true);
+    set(cacheQueries=true);
+</cfscript>
+```
+
+### Environment Variables
+Use `.env` file for sensitive configuration (never commit to version control):
+```bash
+# .env
+DATABASE_URL=mysql://user:pass@localhost:3306/myapp_prod
+SMTP_HOST=smtp.example.com
+API_KEY=your-secret-api-key
+```
+
+Access in configuration:
+```cfm
+<cfscript>
+    if (FileExists(ExpandPath("/.env"))) {
+        set(dataSourceName=GetEnv("DATABASE_NAME"));
+        set(dataSourceUserName=GetEnv("DATABASE_USER"));
+        set(dataSourcePassword=GetEnv("DATABASE_PASSWORD"));
+    }
+</cfscript>
+```
+
+## 🚨 MANDATORY: Native MCP Server
+
+**This Wheels application includes a native CFML MCP (Model Context Protocol) server that MUST be used by AI assistants for all development tasks.**
+
+**🔴 CRITICAL RULE: If `.mcp.json` exists, ALL development MUST use MCP tools - no exceptions.**
+
+The MCP server eliminates the need for Node.js dependencies and provides AI coding assistants with direct, integrated access to your Wheels application.
 
 ### Accessing the MCP Server
 
@@ -316,22 +957,79 @@ function onError(exception, eventname) {
 }
 ```
 
-## 🐛 Troubleshooting and Common Issues
+## Common Issues and Troubleshooting
 
-**⚠️ CRITICAL: For complete troubleshooting guidance, see:**
-- **Common Errors**: `.ai/wheels/troubleshooting/common-errors.md` - PREVENT FATAL ERRORS
-- **Configuration Issues**: `.ai/wheels/configuration/troubleshooting.md`
-- **Model Issues**: `.ai/wheels/models/troubleshooting.md`
-- **View Issues**: `.ai/wheels/views/troubleshooting.md`
+### Association Errors
+**"Missing argument name" in hasMany()**
+This error occurs when mixing positional and named parameters in CFWheels function calls:
 
-### ⚡ Quick Error Prevention Checklist
-- [ ] ❌ **NO** mixed argument styles: `hasMany("comments", dependent="delete")`
-- [ ] ❌ **NO** ArrayLen() on model associations: `ArrayLen(user.posts())`
-- [ ] ❌ **NO** Rails-style nested resources: `.resources("posts", function(nested) {...})`
-- [ ] ❌ **NO** emailField() or passwordField() helpers (don't exist)
-- [ ] ✅ **YES** use consistent arguments: ALL named OR ALL positional
-- [ ] ✅ **YES** use .recordCount: `user.posts().recordCount`
-- [ ] ✅ **YES** separate resource declarations: `.resources("posts").resources("comments")`
-- [ ] ✅ **YES** use textField() with type attribute: `textField(type="email")`
+❌ **Incorrect (mixed parameter styles):**
+```cfm
+hasMany("comments", dependent="delete");  // Error: can't mix positional and named
+```
 
-**⚠️ When you encounter errors, ALWAYS check `.ai/wheels/troubleshooting/common-errors.md` first!**
+✅ **Correct (consistent named parameters):**
+```cfm
+hasMany(name="comments", dependent="delete");
+```
+
+✅ **Also correct (all positional):**
+```cfm
+hasMany("comments");
+```
+
+CFWheels requires consistent parameter syntax - either all positional or all named parameters.
+
+### Routing Issues
+**Incorrect .resources() syntax**
+CFWheels resource routing syntax differs from Rails:
+
+❌ **Incorrect (Rails-style nested):**
+```cfm
+.resources("posts", function(nested) {
+    nested.resources("comments");
+})
+```
+
+✅ **Correct (separate declarations):**
+```cfm
+.resources("posts")
+.resources("comments")
+```
+
+**Route ordering matters:** resources → custom routes → root → wildcard
+
+### Form Helper Limitations
+CFWheels has more limited form helpers compared to Rails:
+
+❌ **Not available:**
+```cfm
+#emailField()#    // Doesn't exist
+#label(text="Name")#    // text parameter not supported
+```
+
+✅ **Use instead:**
+```cfm
+#textField(type="email")#
+<label>Name</label>
+```
+
+### Migration Data Seeding
+Parameter binding in migrations can be unreliable. Use direct SQL:
+
+❌ **Problematic:**
+```cfm
+execute(sql="INSERT INTO posts (title) VALUES (?)", parameters=[{value=title}]);
+```
+
+✅ **Reliable:**
+```cfm
+execute("INSERT INTO posts (title, createdAt, updatedAt) VALUES ('My Post', NOW(), NOW())");
+```
+
+### Debugging Tips
+1. Check CFWheels documentation - don't assume Rails conventions work
+2. Use simple patterns first, add complexity incrementally
+3. Test associations and routes in isolation
+4. Use `?reload=true` after configuration changes
+5. Check debug footer for route information

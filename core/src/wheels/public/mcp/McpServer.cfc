@@ -658,6 +658,118 @@ component output="false" displayName="MCP Server" {
 
 		local.prompts = [
 			{
+				"name": "wheels-develop",
+				"description": "Complete Wheels development workflow with natural language task description",
+				"arguments": [
+					{
+						"name": "task",
+						"description": "Natural language description of what to build (e.g., 'create a blog with posts and comments')",
+						"required": true
+					},
+					{
+						"name": "skip_browser_test",
+						"description": "Skip browser testing phase (default: false)",
+						"required": false
+					},
+					{
+						"name": "verbose",
+						"description": "Show detailed steps and documentation loading (default: true)",
+						"required": false
+					}
+				]
+			},
+			{
+				"name": "wheels-generate",
+				"description": "Generate Wheels components (models, controllers, views, etc.)",
+				"arguments": [
+					{
+						"name": "type",
+						"description": "Component type (model, controller, view, migration, scaffold, mailer, job, test, helper)",
+						"required": true
+					},
+					{
+						"name": "name",
+						"description": "Component name",
+						"required": true
+					},
+					{
+						"name": "attributes",
+						"description": "Attributes for the component (e.g., 'name:string,email:string')",
+						"required": false
+					},
+					{
+						"name": "actions",
+						"description": "Actions for controllers (e.g., 'index,show,new,create,edit,update,delete')",
+						"required": false
+					}
+				]
+			},
+			{
+				"name": "wheels-migrate",
+				"description": "Run database migrations",
+				"arguments": [
+					{
+						"name": "action",
+						"description": "Migration action (latest, up, down, reset, info)",
+						"required": true
+					}
+				]
+			},
+			{
+				"name": "wheels-test",
+				"description": "Run Wheels tests",
+				"arguments": [
+					{
+						"name": "target",
+						"description": "Test target (optional)",
+						"required": false
+					},
+					{
+						"name": "verbose",
+						"description": "Verbose output (default: false)",
+						"required": false
+					}
+				]
+			},
+			{
+				"name": "wheels-server",
+				"description": "Manage Wheels development server",
+				"arguments": [
+					{
+						"name": "action",
+						"description": "Server action (start, stop, restart, status)",
+						"required": true
+					}
+				]
+			},
+			{
+				"name": "wheels-reload",
+				"description": "Reload the Wheels application",
+				"arguments": [
+					{
+						"name": "password",
+						"description": "Reload password (if required)",
+						"required": false
+					}
+				]
+			},
+			{
+				"name": "wheels-analyze",
+				"description": "Analyze project structure and provide insights",
+				"arguments": [
+					{
+						"name": "target",
+						"description": "What to analyze (models, controllers, routes, migrations, tests, all)",
+						"required": true
+					},
+					{
+						"name": "verbose",
+						"description": "Include detailed analysis (default: false)",
+						"required": false
+					}
+				]
+			},
+			{
 				"name": "wheels_model_help",
 				"description": "Get help with Wheels model development",
 				"arguments": [
@@ -709,8 +821,69 @@ component output="false" displayName="MCP Server" {
 		local.promptName = arguments.params.name;
 		local.args = structKeyExists(arguments.params, "arguments") ? arguments.params.arguments : {};
 
-		local.prompts = {
-			"wheels_model_help": "You are helping with Wheels model development. The user needs assistance with: #local.args.task#.
+		// Handle slash command prompts by executing the corresponding tools
+		switch (local.promptName) {
+			case "wheels-develop":
+				local.toolArgs = {"task": local.args.task};
+				if (structKeyExists(local.args, "skip_browser_test")) {
+					local.toolArgs.skip_browser_test = local.args.skip_browser_test;
+				}
+				if (structKeyExists(local.args, "verbose")) {
+					local.toolArgs.verbose = local.args.verbose;
+				}
+				local.result = executeWheelsDevelop(local.toolArgs);
+				break;
+
+			case "wheels-generate":
+				local.toolArgs = {"type": local.args.type, "name": local.args.name};
+				if (structKeyExists(local.args, "attributes")) {
+					local.toolArgs.attributes = local.args.attributes;
+				}
+				if (structKeyExists(local.args, "actions")) {
+					local.toolArgs.actions = local.args.actions;
+				}
+				local.result = executeWheelsGenerate(local.toolArgs);
+				break;
+
+			case "wheels-migrate":
+				local.result = executeWheelsMigrate({"action": local.args.action});
+				break;
+
+			case "wheels-test":
+				local.toolArgs = {};
+				if (structKeyExists(local.args, "target")) {
+					local.toolArgs.target = local.args.target;
+				}
+				if (structKeyExists(local.args, "verbose")) {
+					local.toolArgs.verbose = local.args.verbose;
+				}
+				local.result = executeWheelsTest(local.toolArgs);
+				break;
+
+			case "wheels-server":
+				local.result = executeWheelsServer({"action": local.args.action});
+				break;
+
+			case "wheels-reload":
+				local.toolArgs = {};
+				if (structKeyExists(local.args, "password")) {
+					local.toolArgs.password = local.args.password;
+				}
+				local.result = executeWheelsReload(local.toolArgs);
+				break;
+
+			case "wheels-analyze":
+				local.toolArgs = {"target": local.args.target};
+				if (structKeyExists(local.args, "verbose")) {
+					local.toolArgs.verbose = local.args.verbose;
+				}
+				local.result = executeWheelsAnalyze(local.toolArgs);
+				break;
+
+			default:
+				// Handle legacy help prompts
+				local.prompts = {
+					"wheels_model_help": "You are helping with Wheels model development. The user needs assistance with: #local.args.task#.
 
 Key Wheels model concepts:
 - Models extend the Model component
@@ -722,7 +895,7 @@ Key Wheels model concepts:
 
 Provide specific code examples using Wheels conventions.",
 
-			"wheels_controller_help": "You are helping with Wheels controller development. The user needs assistance with: #local.args.task#.
+					"wheels_controller_help": "You are helping with Wheels controller development. The user needs assistance with: #local.args.task#.
 
 Key Wheels controller concepts:
 - Controllers extend the Controller component
@@ -734,7 +907,7 @@ Key Wheels controller concepts:
 
 Focus on RESTful patterns and Wheels conventions.",
 
-			"wheels_migration_help": "You are helping with Wheels database migrations. The user needs to: #local.args.task#.
+					"wheels_migration_help": "You are helping with Wheels database migrations. The user needs to: #local.args.task#.
 
 Key migration concepts:
 - Migrations extend wheels.migrator.Migration
@@ -745,22 +918,38 @@ Key migration concepts:
 - Indexes: addIndex(), removeIndex()
 
 Provide migration code following Wheels conventions."
-		};
+				};
 
-		if (structKeyExists(local.prompts, local.promptName)) {
+				if (structKeyExists(local.prompts, local.promptName)) {
+					return createSuccessResponse(arguments.id, {
+						"messages": [
+							{
+								"role": "user",
+								"content": {
+									"type": "text",
+									"text": local.prompts[local.promptName]
+								}
+							}
+						]
+					});
+				} else {
+					return createErrorResponse({"id": arguments.id}, -32602, "Invalid params", "Unknown prompt: #local.promptName#");
+				}
+		}
+
+		// For slash command prompts that execute tools, return the result as a text message
+		if (structKeyExists(local, "result")) {
 			return createSuccessResponse(arguments.id, {
 				"messages": [
 					{
-						"role": "user",
+						"role": "assistant",
 						"content": {
 							"type": "text",
-							"text": local.prompts[local.promptName]
+							"text": local.result
 						}
 					}
 				]
 			});
-		} else {
-			return createErrorResponse({"id": arguments.id}, -32602, "Invalid params", "Unknown prompt: #local.promptName#");
 		}
 	}
 
