@@ -1263,58 +1263,95 @@ Provide migration code following Wheels conventions."
 	}
 
 	private string function executeWheelsReload(required struct args) {
-		// Implement application reload using Wheels internal reload mechanism
+		// Use the proper Wheels reload endpoint via HTTP request
 		try {
-			// Check reload password if required
-			local.reloadPassword = "";
-			if (structKeyExists(application, "wheels") && structKeyExists(application.wheels, "reloadPassword")) {
-				local.reloadPassword = application.wheels.reloadPassword;
-			}
-			local.providedPassword = structKeyExists(arguments.args, "password") ? arguments.args.password : "";
+			// Get the current port from HTTP_HOST header (most reliable)
+			local.currentPort = cgi.server_port;
 
-			// Validate password if one is set
-			if (len(local.reloadPassword) && local.providedPassword != local.reloadPassword) {
-				return "Failed to reload application: Invalid reload password";
-			}
-
-			// Use proper Wheels reload mechanism
-			// Instead of manually clearing caches, trigger proper Wheels reload
-			if (structKeyExists(application, "wheels")) {
-				try {
-					// Clear only our MCP-specific caches
-					if (structKeyExists(application, "mcpServer")) {
-						structDelete(application, "mcpServer");
-					}
-					if (structKeyExists(application, "mcpSessionManager")) {
-						structDelete(application, "mcpSessionManager");
-					}
-					if (structKeyExists(application, "wheelsMcpDocCache")) {
-						structClear(application.wheelsMcpDocCache);
-					}
-
-					// Use Wheels' internal reload mechanism instead of manually clearing caches
-					// This approach properly reloads routes and framework components
-					if (structKeyExists(application.wheels, "dispatch") &&
-						isObject(application.wheels.dispatch) &&
-						structKeyExists(application.wheels.dispatch, "$clearCachedModelClassDefinitions")) {
-
-						// Use Wheels' built-in cache clearing methods
-						application.wheels.dispatch.$clearCachedModelClassDefinitions();
-
-						if (structKeyExists(application.wheels.dispatch, "$clearCachedControllerClassDefinitions")) {
-							application.wheels.dispatch.$clearCachedControllerClassDefinitions();
-						}
-					}
-
-					return "Application reload completed successfully - MCP caches cleared, Wheels reload triggered";
-				} catch (any e) {
-					return "Application reload partially completed with warnings: " & e.message;
+			// Try HTTP_HOST if server_port is not available
+			if (!len(local.currentPort) || local.currentPort == 0) {
+				if (structKeyExists(cgi, "http_host") && find(":", cgi.http_host)) {
+					local.currentPort = listLast(cgi.http_host, ":");
+				} else if (structKeyExists(cgi, "http_host")) {
+					local.currentPort = "80"; // Default HTTP port
+				} else {
+					local.currentPort = "8080"; // Default dev port
 				}
-			} else {
-				return "Failed to reload application: Wheels application scope not found";
 			}
+
+			// Use the MCP endpoint itself with ?reload=true parameter - much simpler!
+			local.reloadUrl = "http://localhost:" & local.currentPort & "/wheels/mcp?reload=true";
+
+			// Add password parameter if provided
+			if (structKeyExists(arguments.args, "password") && len(arguments.args.password)) {
+				local.reloadUrl &= "&password=" & urlEncodedFormat(arguments.args.password);
+			}
+
+			// Since reload is triggered by URL parameter, we can simply call our own endpoint
+			local.reloadSuccess = false;
+
+			// Method 1: HTTP request to /wheels/mcp?reload=true (cleanest approach)
+			try {
+				cfhttp(url=local.reloadUrl, method="GET", timeout="10", result="local.httpResult");
+
+				if (structKeyExists(local.httpResult, "status_code") &&
+					(local.httpResult.status_code == 200 || local.httpResult.status_code == 302)) {
+					local.reloadSuccess = true;
+					local.reloadMethod = "MCP endpoint with ?reload=true";
+				} else {
+					local.httpStatus = structKeyExists(local.httpResult, "status_code") ? local.httpResult.status_code : 0;
+				}
+			} catch (any e) {
+				local.httpError = e.message;
+			}
+
+			// Method 2: Fallback to dispatch reset if HTTP failed
+			if (!local.reloadSuccess) {
+				try {
+					if (structKeyExists(application, "wheels") &&
+						structKeyExists(application.wheels, "dispatch")) {
+						// Reset dispatch object which triggers reload
+						application.wheels.dispatch = "";
+						local.reloadSuccess = true;
+						local.reloadMethod = "dispatch reset fallback";
+					}
+				} catch (any e) {
+					// Fallback failed
+				}
+			}
+
+			// Clear our own MCP-specific caches after reload
+			try {
+				if (structKeyExists(application, "mcpServer")) {
+					structDelete(application, "mcpServer");
+				}
+				if (structKeyExists(application, "mcpSessionManager")) {
+					structDelete(application, "mcpSessionManager");
+				}
+				if (structKeyExists(application, "wheelsMcpDocCache")) {
+					structClear(application.wheelsMcpDocCache);
+				}
+			} catch (any e) {
+				// Ignore cache clearing errors
+			}
+
+			// Return appropriate response
+			if (local.reloadSuccess) {
+				return "Application reload completed successfully via " & local.reloadMethod & " (Port: " & local.currentPort & ")";
+			} else {
+				local.errorMsg = "Failed to reload application. ";
+				if (structKeyExists(local, "httpStatus")) {
+					local.errorMsg &= "HTTP returned status " & local.httpStatus & " (URL: " & local.reloadUrl & "). ";
+				}
+				if (structKeyExists(local, "httpError")) {
+					local.errorMsg &= "HTTP error: " & local.httpError & ". ";
+				}
+				local.errorMsg &= "Check if server is running on port " & local.currentPort;
+				return local.errorMsg;
+			}
+
 		} catch (any e) {
-			return "Failed to reload application: " & e.message;
+			return "Failed to reload application via HTTP endpoint: " & e.message;
 		}
 	}
 
