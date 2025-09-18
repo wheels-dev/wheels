@@ -38,27 +38,53 @@ component extends="wheels-cli.models.BaseCommand" {
         if(!isWheelsApp(resolvePath("."))){
            error("This command must be run from a Wheels application root directory.");
         }
-        print.yellowLine("Analyzing code quality...")
-             .line();
+        if (arguments.verbose) {
+            print.yellowLine("Analyzing code quality with verbose output...")
+                 .line()
+                 .line("Configuration:")
+                 .line("  Path: #resolvePath(arguments.path)#")
+                 .line("  Severity filter: #arguments.severity#")
+                 .line("  Fix mode: #(arguments.fix ? 'enabled' : 'disabled')#")
+                 .line("  Output format: #arguments.format#")
+                 .line("  Report generation: #(arguments.report ? 'enabled' : 'disabled')#")
+                 .line();
+        } else {
+            print.yellowLine("Analyzing code quality...")
+                 .line();
+        }
+
         // Pass the print object to the service
         var results = analysisService.analyze(
             path = resolvePath(arguments.path),
             severity = arguments.severity,
-            printer = print  // Pass the print object here
+            printer = print,
+            verbose = arguments.verbose  // Pass verbose flag to service
         );
         
         if (arguments.fix) {
             print.line().yellowLine("Applying automatic fixes...");
             var fixed = analysisService.autoFix(results, print); // Pass print here too
             print.greenLine("Fixed #fixed.count# issues automatically");
+
+            if (arguments.verbose && arrayLen(fixed.files) > 0) {
+                print.line("Files modified:");
+                for (var file in fixed.files) {
+                    print.line("  * #file#");
+                }
+            }
             print.line();
 
             // Re-analyze after fixes
-            print.yellowLine("Re-analyzing after fixes...");
+            if (arguments.verbose) {
+                print.yellowLine("Re-analyzing after fixes with verbose output...");
+            } else {
+                print.yellowLine("Re-analyzing after fixes...");
+            }
             results = analysisService.analyze(
                 path = resolvePath(arguments.path),
                 severity = arguments.severity,
-                printer = print
+                printer = print,
+                verbose = arguments.verbose
             );
         }
         
@@ -114,10 +140,10 @@ component extends="wheels-cli.models.BaseCommand" {
     private function displayResults(results, format) {
         switch (format) {
             case "json":
-                print.line(serializeJSON(results, true));
+                print.line(generateBeautifiedJSON(results));
                 break;
             case "junit":
-                print.line(generateJUnitXML(results));
+                print.line(generateBeautifiedJUnitXML(results));
                 break;
             default:
                 displayConsoleResults(results);
@@ -366,29 +392,166 @@ component extends="wheels-cli.models.BaseCommand" {
         return str;
     }
     
-    private function generateJUnitXML(results) {
-        var xml = '<?xml version="1.0" encoding="UTF-8"?>';
-        xml &= '<testsuites name="Wheels Code Analysis">';
-        
+    /**
+     * Generate beautified JSON output
+     */
+    private function generateBeautifiedJSON(results) {
+        // Clean up results for better JSON output
+        var cleanResults = {
+            "summary": {
+                "totalIssues": results.totalIssues,
+                "hasErrors": results.hasErrors,
+                "hasWarnings": results.hasWarnings,
+                "executionTime": results.executionTime
+            },
+            "metrics": results.metrics,
+            "issueSummary": results.summary,
+            "files": {},
+            "complexFunctions": results.complexFunctions,
+            "duplicates": results.duplicates
+        };
+
+        // Clean up file issues for better readability
+        for (var filePath in results.files) {
+            var relativePath = replace(filePath, getCWD(), ".");
+            cleanResults.files[relativePath] = results.files[filePath];
+        }
+
+        // Use basic JSON serialization
+        var jsonOutput = serializeJSON(cleanResults);
+
+        // Add manual indentation for better readability
+        return formatJSON(jsonOutput);
+    }
+
+    /**
+     * Format JSON with proper indentation
+     */
+    private function formatJSON(required string jsonString) {
+        var formatted = "";
+        var indentLevel = 0;
+        var inString = false;
+        var chars = listToArray(arguments.jsonString, "");
+
+        for (var i = 1; i <= arrayLen(chars); i++) {
+            var char = chars[i];
+            var prevChar = i > 1 ? chars[i-1] : "";
+
+            if (char == '"' && prevChar != '\') {
+                inString = !inString;
+            }
+
+            if (!inString) {
+                switch (char) {
+                    case "{":
+                    case "[":
+                        formatted &= char & chr(10) & repeatString("  ", ++indentLevel);
+                        break;
+                    case "}":
+                    case "]":
+                        formatted = rtrim(formatted);
+                        formatted &= chr(10) & repeatString("  ", --indentLevel) & char;
+                        break;
+                    case ",":
+                        formatted &= char & chr(10) & repeatString("  ", indentLevel);
+                        break;
+                    default:
+                        formatted &= char;
+                }
+            } else {
+                formatted &= char;
+            }
+        }
+
+        return formatted;
+    }
+
+    /**
+     * Generate beautified JUnit XML output
+     */
+    private function generateBeautifiedJUnitXML(results) {
+        var xml = [];
+        var indent = "  ";
+
+        arrayAppend(xml, '<?xml version="1.0" encoding="UTF-8"?>');
+        arrayAppend(xml, '<testsuites name="Wheels Code Analysis"
+                          tests="#results.totalIssues#"
+                          failures="#results.summary.errors#"
+                          errors="0"
+                          time="#numberFormat(results.executionTime, '0.000')#">');
+
+        // Add summary as properties
+        arrayAppend(xml, '#indent#<properties>');
+        arrayAppend(xml, '#indent##indent#<property name="totalFiles" value="#results.metrics.totalFiles#"/>');
+        arrayAppend(xml, '#indent##indent#<property name="totalLines" value="#results.metrics.totalLines#"/>');
+        arrayAppend(xml, '#indent##indent#<property name="healthScore" value="#results.metrics.healthScore#"/>');
+        arrayAppend(xml, '#indent##indent#<property name="grade" value="#results.metrics.grade#"/>');
+        arrayAppend(xml, '#indent#</properties>');
+
+        // Generate test suites for each file
         for (var filePath in results.files) {
             var fileIssues = results.files[filePath];
-            xml &= '<testsuite name="#xmlFormat(filePath)#" tests="#arrayLen(fileIssues)#">';
-            
+            var relativePath = replace(filePath, getCWD(), ".");
+            var failures = 0;
+            var warnings = 0;
+
+            // Count failures and warnings
             for (var issue in fileIssues) {
-                xml &= '<testcase name="#xmlFormat(issue.rule)#" classname="#xmlFormat(filePath)#">';
-                if (issue.severity == "error") {
-                    xml &= '<failure message="#xmlFormat(issue.message)#" type="#issue.severity#">';
-                    xml &= 'Line #issue.line#, Column #issue.column#';
-                    xml &= '</failure>';
-                }
-                xml &= '</testcase>';
+                if (issue.severity == "error") failures++;
+                if (issue.severity == "warning") warnings++;
             }
-            
-            xml &= '</testsuite>';
+
+            arrayAppend(xml, '');
+            arrayAppend(xml, '#indent#<testsuite name="#xmlFormat(relativePath)#"
+                              tests="#arrayLen(fileIssues)#"
+                              failures="#failures#"
+                              errors="#warnings#"
+                              time="0.000">');
+
+            // Add each issue as a test case
+            for (var issue in fileIssues) {
+                var testName = "#issue.rule# (Line #issue.line#)";
+
+                arrayAppend(xml, '#indent##indent#<testcase name="#xmlFormat(testName)#"
+                                  classname="#xmlFormat(relativePath)#"
+                                  time="0.000">');
+
+                if (issue.severity == "error") {
+                    arrayAppend(xml, '#indent##indent##indent#<failure message="#xmlFormat(issue.message)#" type="#issue.severity#">');
+                    arrayAppend(xml, '#indent##indent##indent##indent#File: #xmlFormat(relativePath)#');
+                    arrayAppend(xml, '#indent##indent##indent##indent#Line: #issue.line#, Column: #issue.column#');
+                    arrayAppend(xml, '#indent##indent##indent##indent#Rule: #xmlFormat(issue.rule)#');
+                    if (issue.fixable) {
+                        arrayAppend(xml, '#indent##indent##indent##indent#Fixable: Yes');
+                    }
+                    arrayAppend(xml, '#indent##indent##indent#</failure>');
+                } else if (issue.severity == "warning") {
+                    arrayAppend(xml, '#indent##indent##indent#<error message="#xmlFormat(issue.message)#" type="#issue.severity#">');
+                    arrayAppend(xml, '#indent##indent##indent##indent#File: #xmlFormat(relativePath)#');
+                    arrayAppend(xml, '#indent##indent##indent##indent#Line: #issue.line#, Column: #issue.column#');
+                    arrayAppend(xml, '#indent##indent##indent##indent#Rule: #xmlFormat(issue.rule)#');
+                    if (issue.fixable) {
+                        arrayAppend(xml, '#indent##indent##indent##indent#Fixable: Yes');
+                    }
+                    arrayAppend(xml, '#indent##indent##indent#</error>');
+                } else {
+                    // Info level - add as system-out
+                    arrayAppend(xml, '#indent##indent##indent#<system-out>');
+                    arrayAppend(xml, '#indent##indent##indent##indent#INFO: #xmlFormat(issue.message)#');
+                    arrayAppend(xml, '#indent##indent##indent##indent#Line: #issue.line#, Column: #issue.column#');
+                    arrayAppend(xml, '#indent##indent##indent##indent#Rule: #xmlFormat(issue.rule)#');
+                    arrayAppend(xml, '#indent##indent##indent#</system-out>');
+                }
+
+                arrayAppend(xml, '#indent##indent#</testcase>');
+            }
+
+            arrayAppend(xml, '#indent#</testsuite>');
         }
-        
-        xml &= '</testsuites>';
-        return xml;
+
+        arrayAppend(xml, '</testsuites>');
+
+        return arrayToList(xml, chr(10));
     }
     
     private function generateReport(results) {

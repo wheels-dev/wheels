@@ -16,7 +16,8 @@ component {
     function analyze(
         required string path,
         string severity = "warning",
-        any printer = ""
+        any printer = "",
+        boolean verbose = false
     ) {
         var startTime = getTickCount();
         
@@ -50,18 +51,24 @@ component {
         // Collect all files first
         var allFiles = [];
         if (directoryExists(fullPath)) {
-            allFiles = collectFiles(fullPath, arguments.printer);
+            allFiles = collectFiles(fullPath, arguments.printer, arguments.verbose);
         } else if (fileExists(fullPath)) {
             allFiles = [fullPath];
+            if (arguments.verbose && isObject(arguments.printer)) {
+                arguments.printer.line("Analyzing single file: #fullPath#");
+            }
         } else {
             throw("Path not found: #arguments.path#");
         }
         
         // Analyze files
-        analyzeFiles(allFiles, results, arguments.severity, arguments.printer);
-        
+        analyzeFiles(allFiles, results, arguments.severity, arguments.printer, arguments.verbose);
+
         // Detect duplicates across all files
         if (variables.config.features.duplicateDetection) {
+            if (arguments.verbose && isObject(arguments.printer)) {
+                arguments.printer.line("Starting duplicate code detection...");
+            }
             detectDuplicates(allFiles, results, arguments.printer);
         }
         
@@ -171,7 +178,7 @@ component {
     /**
      * Collect all files to analyze
      */
-    private function collectFiles(required string path, any printer = "") {
+    private function collectFiles(required string path, any printer = "", boolean verbose = false) {
         var files = [];
         
         if (isObject(arguments.printer)) {
@@ -189,11 +196,21 @@ component {
         for (var file in allFiles) {
             if (!isExcluded(file)) {
                 arrayAppend(files, file);
+                if (arguments.verbose && isObject(arguments.printer)) {
+                    arguments.printer.line("  + #file#").toConsole();
+                }
+            } else {
+                if (arguments.verbose && isObject(arguments.printer)) {
+                    arguments.printer.line("  - #file# (excluded)").toConsole();
+                }
             }
         }
-        
+
         if (isObject(arguments.printer)) {
             arguments.printer.greenLine("Found #arrayLen(files)# files to analyze").toConsole();
+            if (arguments.verbose && arrayLen(allFiles) > arrayLen(files)) {
+                arguments.printer.line("Excluded #arrayLen(allFiles) - arrayLen(files)# files based on config").toConsole();
+            }
         }
         
         return files;
@@ -206,25 +223,30 @@ component {
         required array files,
         required struct results,
         required string severity,
-        any printer = ""
+        any printer = "",
+        boolean verbose = false
     ) {
         var totalFiles = arrayLen(arguments.files);
         var currentFile = 0;
         
         for (var file in arguments.files) {
             currentFile++;
-            
+
             // Progress indicator
             if (isObject(arguments.printer)) {
-                var percentage = int((currentFile / totalFiles) * 100);
-                arguments.printer.text(chr(13) & "Analyzing: [")
-                    .text(repeatString("=", int(percentage/2)))
-                    .text(repeatString(" ", 50 - int(percentage/2)))
-                    .text("] #percentage#% (#currentFile#/#totalFiles#)")
-                    .toConsole();
+                if (arguments.verbose) {
+                    arguments.printer.line("Analyzing file #currentFile#/#totalFiles#: #file#").toConsole();
+                } else {
+                    var percentage = int((currentFile / totalFiles) * 100);
+                    arguments.printer.text(chr(13) & "Analyzing: [")
+                        .text(repeatString("=", int(percentage/2)))
+                        .text(repeatString(" ", 50 - int(percentage/2)))
+                        .text("] #percentage#% (#currentFile#/#totalFiles#)")
+                        .toConsole();
+                }
             }
-            
-            analyzeFile(file, arguments.results, arguments.severity);
+
+            analyzeFile(file, arguments.results, arguments.severity, arguments.verbose, arguments.printer);
         }
         
         if (isObject(arguments.printer)) {
@@ -238,7 +260,9 @@ component {
     private function analyzeFile(
         required string path,
         required struct results,
-        required string severity
+        required string severity,
+        boolean verbose = false,
+        any printer = ""
     ) {
         var issues = [];
         var content = fileRead(arguments.path);
@@ -247,39 +271,75 @@ component {
         // Update metrics
         arguments.results.metrics.totalFiles++;
         arguments.results.metrics.totalLines += arrayLen(lines);
-        
+
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  File has #arrayLen(lines)# lines").toConsole();
+            arguments.printer.line("  Running code style checks...").toConsole();
+        }
+
         // Run all checks - Pass results to functions that need it
         issues.addAll(checkCodeStyle(arguments.path, lines));
+
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  Running security checks...").toConsole();
+        }
         issues.addAll(checkSecurity(arguments.path, lines));
+
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  Running performance checks...").toConsole();
+        }
         issues.addAll(checkPerformance(arguments.path, lines));
+
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  Running best practice checks...").toConsole();
+        }
         issues.addAll(checkBestPractices(arguments.path, lines));
         
         // These functions need results for metrics
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  Running complexity analysis...").toConsole();
+        }
         var complexityIssues = checkComplexity(arguments.path, content, arguments.results);
         issues.addAll(complexityIssues);
-        
+
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  Checking naming conventions...").toConsole();
+        }
         issues.addAll(checkNamingConventions(arguments.path, content));
-        
+
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  Detecting code smells...").toConsole();
+        }
         var smellIssues = checkCodeSmells(arguments.path, content, arguments.results);
         issues.addAll(smellIssues);
-        
+
         if (variables.config.wheels["check-deprecated"]) {
+            if (arguments.verbose && isObject(arguments.printer)) {
+                arguments.printer.line("  Checking for deprecated functions...").toConsole();
+            }
             var deprecatedIssues = checkDeprecatedFunctions(arguments.path, content, arguments.results);
             issues.addAll(deprecatedIssues);
         }
-        
+
         if (variables.config.wheels["enforce-conventions"]) {
+            if (arguments.verbose && isObject(arguments.printer)) {
+                arguments.printer.line("  Checking Wheels conventions...").toConsole();
+            }
             issues.addAll(checkWheelsConventions(arguments.path, content));
         }
         
         // Filter by severity
-        issues = filterBySeverity(issues, arguments.severity);
-        
-        if (arrayLen(issues)) {
-            arguments.results.files[arguments.path] = issues;
-            
+        var filteredIssues = filterBySeverity(issues, arguments.severity);
+
+        if (arguments.verbose && isObject(arguments.printer)) {
+            arguments.printer.line("  Found #arrayLen(issues)# issues total, #arrayLen(filteredIssues)# after severity filter").toConsole();
+        }
+
+        if (arrayLen(filteredIssues)) {
+            arguments.results.files[arguments.path] = filteredIssues;
+
             // Update summary
-            for (var issue in issues) {
+            for (var issue in filteredIssues) {
                 if (structKeyExists(arguments.results.summary, issue.severity)) {
                     arguments.results.summary[issue.severity]++;
                 }
@@ -1091,8 +1151,10 @@ component {
                 
             case "trim":
                 var lines = listToArray(fixedContent, chr(10));
-                lines[arguments.issue.line] = rtrim(lines[arguments.issue.line]);
-                fixedContent = arrayToList(lines, chr(10));
+                if (arguments.issue.line > 0 && arguments.issue.line <= arrayLen(lines)) {
+                    lines[arguments.issue.line] = rtrim(lines[arguments.issue.line]);
+                    fixedContent = arrayToList(lines, chr(10));
+                }
                 break;
                 
             case "addVar":
@@ -1128,10 +1190,12 @@ component {
                     match = mid(arguments.text, result.pos[1], result.len[1])
                 };
                 
-                if (arguments.includeGroups && arrayLen(result.match) > 1) {
+                if (arguments.includeGroups && arrayLen(result.pos) > 1) {
                     matchData.groups = [];
-                    for (var i = 2; i <= arrayLen(result.match); i++) {
-                        arrayAppend(matchData.groups, result.match[i]);
+                    for (var i = 2; i <= arrayLen(result.pos); i++) {
+                        if (i <= arrayLen(result.pos) && result.pos[i] > 0) {
+                            arrayAppend(matchData.groups, mid(arguments.text, result.pos[i], result.len[i]));
+                        }
                     }
                 }
                 

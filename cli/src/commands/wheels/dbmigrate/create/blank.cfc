@@ -31,7 +31,7 @@ component aliases='wheels db create blank' extends="../../base"  {
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
 		// Output detail header
-		details.header("🗛️", "Migration Generation");
+		details.header("", "Migration Generation");
 
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/blank.txt")); 

@@ -134,7 +134,8 @@ component {
 	 * @message The header message
 	 */
 	function header(required string emoji, required string message) {
-		print.line().line(arguments.emoji & " " & arguments.message).line().toConsole();
+		var headerText = len(trim(arguments.emoji)) ? arguments.emoji & " " & arguments.message : arguments.message;
+		print.line().line(headerText).line().toConsole();
 	}
 
 	/**
@@ -142,7 +143,7 @@ component {
 	 * @message The success message
 	 */
 	function success(required string message) {
-		print.line().greenBoldLine("✅ " & arguments.message).toConsole();
+		print.line().greenBoldLine(arguments.message).toConsole();
 	}
 
 	/**
@@ -150,7 +151,7 @@ component {
 	 * @message The error message
 	 */
 	function error(required string message) {
-		print.line().redBoldLine("❌ " & arguments.message).toConsole();
+		print.line().redBoldLine(arguments.message).toConsole();
 	}
 
 	/**
@@ -162,7 +163,7 @@ component {
 			return;
 		}
 		
-		print.line().line().yellowLine("📋 Next steps:");
+		print.line().line().yellowLine("Next steps:");
 		
 		for (var i = 1; i <= arguments.steps.len(); i++) {
 			print.line("   " & i & ". " & arguments.steps[i]);
