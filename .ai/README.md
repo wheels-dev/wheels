@@ -43,21 +43,35 @@ Framework-specific patterns, conventions, and features:
 2. **Learn Wheels Conventions**: Review [MVC architecture](./wheels/core-concepts/) patterns
 3. **Use CLI Tools**: Leverage [generators](./wheels/cli/) for rapid development
 
-### Common Development Tasks
+### 🚨 CRITICAL: MCP Tools Required
+**If `.mcp.json` exists, use MCP tools exclusively - CLI commands are FORBIDDEN**
+
+### ✅ MCP Development Tasks (MANDATORY when .mcp.json exists)
+```javascript
+// Generate application components
+mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string,active:boolean")
+mcp__wheels__wheels_generate(type="controller", name="Users", actions="index,show,new,create,edit,update,delete")
+mcp__wheels__wheels_generate(type="migration", name="CreateUsersTable")
+
+// Database operations
+mcp__wheels__wheels_migrate(action="latest")
+mcp__wheels__wheels_migrate(action="up")
+mcp__wheels__wheels_migrate(action="down")
+
+// Server management
+mcp__wheels__wheels_server(action="start")
+mcp__wheels__wheels_server(action="stop")
+mcp__wheels__wheels_test()
+mcp__wheels__wheels_reload()
+```
+
+### ❌ Legacy CLI Commands (DO NOT USE if .mcp.json exists)
 ```bash
-# Generate application components
+# These are FORBIDDEN when MCP tools are available
 wheels g model User name:string,email:string,active:boolean
 wheels g controller Users index,show,new,create,edit,update,delete
-wheels g migration CreateUsersTable
-
-# Database operations
 wheels dbmigrate latest
-wheels dbmigrate up
-wheels dbmigrate down
-
-# Server management
 wheels server start
-wheels server stop
 wheels test run
 ```
 
