@@ -43,6 +43,7 @@ cp templates/base/src/CLAUDE.md "${BUILD_DIR}/"
 # cp .ai-config.json "${BUILD_DIR}/"
 # cp design_docs/scratchpad/AI-*.md "${BUILD_DIR}/"
 cp -r .ai "${BUILD_DIR}/"
+cp -r .claude "${BUILD_DIR}/"
 
 # Copy Apache License how are you?
 cp LICENSE "${BUILD_DIR}/"
