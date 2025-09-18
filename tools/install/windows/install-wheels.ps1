@@ -137,7 +137,7 @@ function Get-UserConfirmation {
 #region System Configuration and User Settings
 
 # --- Interactive prompts if parameters are missing ---
-Write-Header "Wheels Framework Universal Installer" "Let's configure your installation and application setup"
+Write-Header "Wheels Framework Installer" "Let's configure your installation and application setup"
 
 # CommandBox Installation Configuration
 if (-not $InstallPath) {
@@ -396,7 +396,8 @@ function Test-JavaInstallation {
 
     try {
         $javaOutput = & java -version *>&1
-        if ($javaOutput -match 'version "(.+?)"') {
+        $javaLine = $javaOutput | Select-Object -First 1
+        if ($javaLine -match 'version "(.+?)"') {
             $javaVersionString = $matches[1]
             Write-Success "Java found: $javaVersionString"
 
@@ -864,31 +865,31 @@ function Create-WheelsApplication {
         Push-Location $appParentDir
 
         # Build the wheels generate app command
-        $generateCmd = @("wheels", "generate", "app", $appName, "--template=$template")
+        $generateCmd = @("wheels", "generate", "app", "name=$appName", "template=$template")
 
         # Add additional parameters
         if ($Script:State.AppConfig.ReloadPassword -ne "") {
-            $generateCmd += "--reloadPassword=$($Script:State.AppConfig.ReloadPassword)"
+            $generateCmd += "reloadPassword=$($Script:State.AppConfig.ReloadPassword)"
         }
 
         if ($Script:State.AppConfig.DatasourceName -ne $appName) {
-            $generateCmd += "--datasourceName=$($Script:State.AppConfig.DatasourceName)"
+            $generateCmd += "datasourceName=$($Script:State.AppConfig.DatasourceName)"
         }
 
         if ($Script:State.AppConfig.CFMLEngine -ne "lucee") {
-            $generateCmd += "--cfmlEngine=$($Script:State.AppConfig.CFMLEngine)"
+            $generateCmd += "cfmlEngine=$($Script:State.AppConfig.CFMLEngine)"
         }
 
         if ($Script:State.AppConfig.UseH2Database) {
-            $generateCmd += "--setupH2=true"
+            $generateCmd += "setupH2=true"
         }
 
         if ($Script:State.AppConfig.UseBootstrap) {
-            $generateCmd += "--useBootstrap=true"
+            $generateCmd += "useBootstrap=true"
         }
 
         if ($Script:State.AppConfig.InitializeAsPackage) {
-            $generateCmd += "--initPackage=true"
+            $generateCmd += "initPackage=true"
         }
 
         Write-Info "Executing: box $($generateCmd -join ' ')"
@@ -921,6 +922,24 @@ function Create-WheelsApplication {
     }
 }
 
+function Get-WheelsServerStatus {
+    param([string]$BoxPath)
+
+    Push-Location $Script:State.AppConfig.ApplicationPath
+    try {
+        $statusJson = & $BoxPath server status --json 2>$null
+        if ($statusJson) {
+            $status = $statusJson | ConvertFrom-Json
+            if ($status.status -eq "running") {
+                return $status.defaultBaseURL
+            }
+        }
+        return $null
+    } finally {
+        Pop-Location
+    }
+}
+
 function Start-WheelsServer {
     param([string]$BoxPath)
 
@@ -940,25 +959,59 @@ function Start-WheelsServer {
     try {
         Push-Location $appPath
 
-        Write-Info "Starting development server for $($Script:State.AppConfig.ApplicationName)..."
+        Write-Info "Checking development server for $($Script:State.AppConfig.ApplicationName)..."
         Write-ColorOutput "Server is starting, please wait..." -ForegroundColor Yellow
 
-        # Start the server
-        $output = & $BoxPath server start 2>&1
+        # Step 1: Check if server already running
+        $statusJson = & $BoxPath server status --json *>&1
+        $isRunning = $false
+        $serverUrl = $null
 
-        if ($LASTEXITCODE -eq 0) {
-            Write-Success "Development server started successfully!"
-
-            # Extract server URL if available in output
-            $urlMatch = $output | Select-String -Pattern "http://[^\\s]+"
-            if ($urlMatch) {
-                $serverUrl = $urlMatch.Matches[0].Value
-                Write-Success "Server URL: $serverUrl"
-                $Script:State.ServerUrl = $serverUrl
+        if ($statusJson) {
+            try {
+                $status = $statusJson | ConvertFrom-Json -ErrorAction Stop
+                if ($status.status -eq "running") {
+                    $isRunning = $true
+                    $serverUrl = $status.defaultBaseURL
+                    if (-not $serverUrl -and $status.port) {
+                        $serverUrl = "http://localhost:$($status.port)"
+                    }
+                }
+            } catch {
+                Write-Warning "Could not parse server status JSON: $statusJson"
             }
+        }
+
+        # Step 2: If not running, try to start
+        if (-not $isRunning) {
+            Write-Info "Server not running, starting now..."
+            $output = & $BoxPath server start 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Server start may have completed with issues."
+                Write-Info "Output: $($output -join ' ')"
+            }
+
+            # Check status again after start
+            $statusJson = & $BoxPath server status --json 2>$null
+            if ($statusJson) {
+                $status = $statusJson | ConvertFrom-Json
+                if ($status.status -eq "running") {
+                    $isRunning = $true
+                    $serverUrl = $status.defaultBaseURL
+                    if (-not $serverUrl -and $status.port) {
+                        $serverUrl = "http://localhost:$($status.port)"
+                    }
+                }
+            }
+        }
+
+        # Step 3: Report result
+        if ($isRunning -and $serverUrl) {
+            Write-Success "Development server is running!"
+            Write-Success "Server URL: $serverUrl"
+            $Script:State.ServerUrl = $serverUrl
         } else {
-            Write-Warning "Server start may have completed with issues."
-            Write-Info "Output: $($output -join ' ')"
+            Write-Warning "Could not determine server status or URL."
         }
 
     } catch {
@@ -978,7 +1031,7 @@ function Start-WheelsServer {
 function Test-Installation {
     param([string]$BoxPath)
 
-    Write-Info "Verifying installation..."
+    Write-Info "Verifying commandBox installation..."
 
     # Test CommandBox
     try {
@@ -989,40 +1042,30 @@ function Test-Installation {
         return $false
     }
 
-    # Test CLI functionality (more comprehensive check)
-    $wheelsWorking = $false
-    try {
-        # Try different ways to test wheels commands
-        $wheelsOutput = & $BoxPath wheels version 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            Write-Success "Wheels CLI commands: Available"
-            $wheelsWorking = $true
-        } else {
-            # Try alternative command
-            $helpOutput = & $BoxPath help 2>&1
-            if ($helpOutput -match "wheels") {
-                Write-Success "Wheels CLI commands: Available (detected in help)"
-                $wheelsWorking = $true
-            } else {
-                Write-Info "Wheels CLI commands: May require manual installation"
-            }
-        }
-    } catch {
-        Write-Info "Wheels CLI commands: May require manual installation"
-    }
-
-    # Provide user guidance based on what's working
-    if (-not $wheelsWorking) {
-        Write-Info "If wheels commands don't work, you can:"
-        Write-Info "1. Try: box install wheels-cli --force"
-        Write-Info "2. Or use CommandBox for other CFML development"
-    }
-
     return $true
 }
 
 function Show-CompletionSummary {
     $duration = (Get-Date) - $Script:State.StartTime
+
+    # Ensure we have a server URL
+    if (-not $Script:State.ServerUrl) {
+        try {
+            Push-Location $Script:State.AppConfig.ApplicationPath
+            $statusJson = & $Script:State.InstallPath\box.exe server status --json 2>$null
+            if ($statusJson) {
+                $status = $statusJson | ConvertFrom-Json
+                if ($status.running) {
+                    $Script:State.ServerUrl = $status.serverInfo.url
+                    if (-not $Script:State.ServerUrl -and $status.serverInfo.ports.http) {
+                        $Script:State.ServerUrl = "http://localhost:$($status.serverInfo.ports.http)"
+                    }
+                }
+            }
+        } finally {
+            Pop-Location
+        }
+    }
 
     Write-Host ""
     Write-ColorOutput "=================================================================================" -ForegroundColor Green
@@ -1037,6 +1080,8 @@ function Show-CompletionSummary {
     Write-ColorOutput "• Application Path: $($Script:State.AppConfig.ApplicationPath)" -ForegroundColor Green
     if ($Script:State.ServerUrl) {
         Write-ColorOutput "• Server URL: $($Script:State.ServerUrl)" -ForegroundColor Green
+    } else {
+        Write-ColorOutput "• Server URL: Not available (server not running)" -ForegroundColor Yellow
     }
     Write-ColorOutput "• Total Duration: $([int]$duration.TotalSeconds) seconds" -ForegroundColor Green
     Write-Host ""
@@ -1054,6 +1099,9 @@ function Show-CompletionSummary {
     Write-ColorOutput "Resources:" -ForegroundColor Yellow
     Write-ColorOutput "• Documentation: https://wheels.dev/guides" -ForegroundColor Gray
     Write-ColorOutput "• Getting Started: https://wheels.dev/guides#start-a-new-application-using-the-command-line" -ForegroundColor Gray
+    if ($Script:State.ServerUrl) {
+        Write-ColorOutput "• Application: $($Script:State.ServerUrl)" -ForegroundColor Gray
+    }
     Write-Host ""
 
     if (-not $SkipPath) {
@@ -1061,7 +1109,11 @@ function Show-CompletionSummary {
     }
 
     Write-Host ""
-    Write-ColorOutput "Press any key to open your application in the browser..." -ForegroundColor Cyan
+    if ($Script:State.ServerUrl) {
+        Write-ColorOutput "Press any key to open your application in the browser..." -ForegroundColor Cyan
+    } else {
+        Write-ColorOutput "Press any key to finish..." -ForegroundColor Cyan
+    }
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
     # Open the application in browser if server is running
@@ -1077,18 +1129,7 @@ function Show-CompletionSummary {
             Write-Info "Please visit: $($Script:State.ServerUrl)"
         }
     } else {
-        Write-Host ""
-        Write-Info "Opening Wheels Getting Started Guide in your browser..."
-        if (-not $Quiet) {
-            try {
-                Start-Process "https://wheels.dev/guides#start-a-new-application-using-the-command-line"
-                Write-Success "Browser opened successfully!"
-                Start-Sleep -Seconds 2
-            } catch {
-                Write-Warning "Could not open browser automatically."
-                Write-Info "Please visit: https://wheels.dev/guides#start-a-new-application-using-the-command-line"
-            }
-        }
+        Write-Warning "No server URL available. Please start the server first."
     }
 
     Write-Host ""
@@ -1101,7 +1142,7 @@ function Show-CompletionSummary {
 
 function Start-Installation {
     try {
-        Write-Header "Wheels Framework Universal Installer" "Installing CommandBox, Wheels CLI, and creating your application"
+        Write-Header "Wheels Framework Installer" "Installing CommandBox, Wheels CLI, and creating your application"
 
         Initialize-Environment
 
@@ -1158,9 +1199,10 @@ function Start-Installation {
             exit 1
         }
 
-        # Start development server
-        if (-not (Start-WheelsServer -BoxPath $Script:State.BoxPath)) {
-            Write-Warning "Application created successfully, but server failed to start."
+        # Server should already be running, just check status
+        $Script:State.ServerUrl = Get-WheelsServerStatus -BoxPath $Script:State.BoxPath
+        if (-not $Script:State.ServerUrl) {
+            Write-Warning "Application created successfully, but server does not appear to be running."
             Write-Info "You can manually start the server by running 'box server start' in your app directory."
         }
 
