@@ -42,7 +42,7 @@ Follow these conventions:
 
 ```cfc
 // tests/unit/models/UserTest.cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("User Model", function() {
@@ -77,7 +77,7 @@ component extends="testbox.system.BaseSpec" {
 ### Model Testing
 
 ```cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Product Model", function() {
@@ -128,7 +128,7 @@ component extends="testbox.system.BaseSpec" {
 ### Controller Testing
 
 ```cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         // Setup test request context
@@ -197,7 +197,7 @@ component extends="testbox.system.BaseSpec" {
 ### Integration Testing
 
 ```cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("User Registration Flow", function() {

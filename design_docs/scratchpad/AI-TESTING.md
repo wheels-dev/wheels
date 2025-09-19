@@ -28,7 +28,7 @@ Wheels follows BDD (Behavior Driven Development) principles using TestBox:
 ### Basic Test File Structure
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     function run() {
         describe("Component Being Tested", () => {
             beforeEach(() => {
@@ -75,12 +75,12 @@ component extends="testbox.system.BaseSpec" {
 
 ## Common Testing Patterns
 
-### Testing with BaseSpec
+### Testing with wheels.Testbox
 
-Always extend BaseSpec for Wheels integration:
+Always extend wheels.Testbox for Wheels integration:
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     // Provides reload(), processRequest(), and other helpers
 }
 ```
@@ -126,7 +126,7 @@ expect(array).notToContain("value");
 ### Basic Model Test
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     function run() {
         describe("User Model", () => {
             it("should validate required fields", () => {
@@ -247,7 +247,7 @@ describe("User validations", () => {
 ### Basic Controller Test
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     function run() {
         describe("UsersController", () => {
             it("should show index page", () => {
@@ -388,7 +388,7 @@ describe("API responses", () => {
 ### Full Request Cycle Test
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     function run() {
         describe("User Registration Flow", () => {
             it("should complete full registration process", () => {
@@ -473,7 +473,7 @@ component {
 ### Using Factories in Tests
 
 ```cfscript
-// In BaseSpec.cfc
+// In wheels/Testbox.cfc
 function createTestUser(struct attributes = {}) {
     return new tests.helpers.factories.UserFactory().create(attributes);
 }

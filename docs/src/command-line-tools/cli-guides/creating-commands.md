@@ -417,7 +417,7 @@ private function error(required string message) {
 
 ```cfc
 // tests/commands/HelloTest.cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
     function run() {
         describe("Hello Command", function() {

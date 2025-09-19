@@ -95,7 +95,7 @@ Standard test directory layout:
 
 ### Model Test Example
 ```cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("User Model", function() {
@@ -145,7 +145,7 @@ component extends="testbox.system.BaseSpec" {
 
 ### Controller Test Example
 ```cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Products Controller", function() {

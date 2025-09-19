@@ -425,7 +425,7 @@ component extends="wheels.test" {
 }
 
 // For BDD-style tests
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
   // Use with TestBox runner
   // Describe/it syntax
   // Lifecycle methods

@@ -1086,7 +1086,7 @@ Provide migration code following Wheels conventions."
 			local.cleanName = local.className;
 		}
 
-		local.content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
+		local.content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
 		local.content &= '	function beforeAll() {' & chr(10);
 		local.content &= '		// Setup for all tests in this spec' & chr(10);
 		local.content &= '	}' & chr(10) & chr(10);

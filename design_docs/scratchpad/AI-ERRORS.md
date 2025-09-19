@@ -497,19 +497,19 @@ Invalid route pattern: '/users/:id'
 
 ## Testing Errors
 
-### Error: "BaseSpec not found"
+### Error: "wheels.Testbox not found"
 
 **Symptoms:**
 ```
-Could not find the ColdFusion component or interface testbox.system.BaseSpec
+Could not find the ColdFusion component or interface wheels.Testbox
 ```
 
-**Cause:** Test not extending BaseSpec or path issue
+**Cause:** Test not extending wheels.Testbox or path issue
 
 **Solution:**
 ```cfscript
 // Correct test setup
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     function run() {
         describe("My Test", () => {
             it("should work", () => {
@@ -548,8 +548,8 @@ Cannot rollback transaction, no transaction active
 
 **Solution:**
 ```cfscript
-// Tests automatically use transactions when extending BaseSpec
-component extends="testbox.system.BaseSpec" {
+// Tests automatically use transactions when extending wheels.Testbox
+component extends="wheels.Testbox" {
     // Don't manually manage transactions
 }
 ```
@@ -685,7 +685,7 @@ component extends="Migration" {
 
 ### Always:
 - Use `config()` not `init()` for initialization
-- Extend BaseSpec for tests
+- Extend wheels.Testbox for tests
 - Check `$performedRenderOrRedirect()` before rendering
 - Use proper Wheels syntax for routes `[param]` not `:param`
 - Run migrations before testing

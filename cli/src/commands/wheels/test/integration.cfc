@@ -107,7 +107,7 @@ component aliases='wheels test:integration' extends="../base" {
      * Create a sample integration test file
      */
     private void function createSampleIntegrationTest(required string directory) {
-        var sampleTest = 'component extends="testbox.system.BaseSpec" {
+        var sampleTest = 'component extends="wheels.Testbox" {
     
     function beforeAll() {
         // Setup test database or test data

@@ -1,4 +1,4 @@
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     // Use datasource defined in settings.cfm
     variables.datasource = application.wheels.dataSourceName;

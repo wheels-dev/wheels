@@ -284,7 +284,7 @@ Update `tests/populate.cfm` for test database setup:
 
 ## Writing Controller Tests
 
-TestBox 5 test bundles should extend `testbox.system.BaseSpec` and use BDD syntax with `describe()`, `it()`, and `expect()`.
+TestBox 5 test bundles should extend `wheels.Testbox` and use BDD syntax with `describe()`, `it()`, and `expect()`.
 
 For comprehensive information on TestBox BDD syntax and expectations, see the [TestBox BDD documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer) and [TestBox Expectations documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer/expectations).
 
@@ -293,7 +293,7 @@ For comprehensive information on TestBox BDD syntax and expectations, see the [T
 Create `tests/specs/controllers/ExampleControllerSpec.cfc`:
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -330,7 +330,7 @@ component extends="testbox.system.BaseSpec" {
 Create `tests/specs/controllers/ApiControllerSpec.cfc`:
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -403,7 +403,7 @@ component extends="testbox.system.BaseSpec" {
 Create `tests/specs/controllers/AuthenticationControllerSpec.cfc`:
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -482,7 +482,7 @@ component extends="testbox.system.BaseSpec" {
 Create `tests/specs/controllers/PostControllerSpec.cfc`:
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -550,7 +550,7 @@ For detailed information on testing functions and utility methods, refer to the 
 Create `tests/specs/functions/ExampleSpec.cfc`:
 
 ```cfscript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
     function run() {
             
@@ -1109,7 +1109,7 @@ When migrating from the legacy RocketUnit system to TestBox 5, consider the foll
 
 - `tests/functions/` → `tests/specs/functions/`
 - `tests/requests/` → `tests/specs/controllers/`
-- Component extensions change from `app.tests.Test` to `testbox.system.BaseSpec`
+- Component extensions change from `app.tests.Test` to `wheels.Testbox`
 
 #### Lifecycle Migration
 

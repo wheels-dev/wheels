@@ -1,4 +1,4 @@
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
 	function beforeAll() {
 		params = {controller = "dummy", action = "dummy"}

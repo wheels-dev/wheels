@@ -2143,7 +2143,7 @@ component extends="controllers.base.SecureController" {
 
 ### Test Structure
 ```javascript
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         // Set up test environment
@@ -2409,7 +2409,7 @@ Create a base test class for all command tests:
 
 ```javascript
 // tests/specs/BaseCommandSpec.cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     // Properties
     property name="originalCWD";

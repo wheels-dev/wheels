@@ -212,7 +212,7 @@ component extends="commandbox.system.BaseCommand" {
             fileWrite(pluginDir & "/commands/hello.cfc", exampleCommand);
             
             // Create test file
-            var testFile = 'component extends="testbox.system.BaseSpec" {
+            var testFile = 'component extends="wheels.Testbox" {
     
     function run() {
         describe("#pluginName# Tests", function() {

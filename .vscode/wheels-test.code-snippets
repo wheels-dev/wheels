@@ -3,7 +3,7 @@
 	"TestBox Spec": {
 		"prefix": "tbspec",
 		"body": [
-			"component extends=\"testbox.system.BaseSpec\" {",
+			"component extends=\"wheels.Testbox\" {",
 			"\t",
 			"\tfunction run() {",
 			"\t\t",
@@ -28,7 +28,7 @@
 	"Model Test": {
 		"prefix": "tbmodel",
 		"body": [
-			"component extends=\"testbox.system.BaseSpec\" {",
+			"component extends=\"wheels.Testbox\" {",
 			"\t",
 			"\tfunction run() {",
 			"\t\t",
@@ -61,7 +61,7 @@
 	"Controller Test": {
 		"prefix": "tbcontroller",
 		"body": [
-			"component extends=\"testbox.system.BaseSpec\" {",
+			"component extends=\"wheels.Testbox\" {",
 			"\t",
 			"\tfunction run() {",
 			"\t\t",
@@ -93,7 +93,7 @@
 	"API Test": {
 		"prefix": "tbapi",
 		"body": [
-			"component extends=\"testbox.system.BaseSpec\" {",
+			"component extends=\"wheels.Testbox\" {",
 			"\t",
 			"\tfunction run() {",
 			"\t\t",
@@ -129,7 +129,7 @@
 	"Integration Test": {
 		"prefix": "tbintegration",
 		"body": [
-			"component extends=\"testbox.system.BaseSpec\" {",
+			"component extends=\"wheels.Testbox\" {",
 			"\t",
 			"\tfunction run() {",
 			"\t\t",

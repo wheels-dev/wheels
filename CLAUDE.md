@@ -688,7 +688,7 @@ tests/
 
 ### Model Testing
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         // Setup for all tests in this spec
