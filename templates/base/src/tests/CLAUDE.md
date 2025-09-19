@@ -44,10 +44,10 @@ tests/
 
 ### Basic Test Structure
 
-All test components extend `testbox.system.BaseSpec`:
+All test components extend `wheels.Testbox`:
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         // Setup once for all tests in this component
@@ -88,7 +88,7 @@ component extends="testbox.system.BaseSpec" {
 Focus on validations, associations, callbacks, scopes, and custom methods:
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         // Setup test data once for all tests in this component
@@ -189,7 +189,7 @@ component extends="testbox.system.BaseSpec" {
 Test actions, responses, parameters, authentication, and redirects:
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -277,7 +277,7 @@ component extends="testbox.system.BaseSpec" {
 Test JSON responses, status codes, and API-specific functionality:
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         variables.apiUrl = "http://localhost:8080/api/v1";
@@ -335,7 +335,7 @@ component extends="testbox.system.BaseSpec" {
 Test complete workflows and user interactions:
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -392,7 +392,7 @@ component extends="testbox.system.BaseSpec" {
 Test utility functions and global helpers:
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("String Helper Functions", function() {
@@ -548,7 +548,7 @@ describe("User Registration", function() {
 
 // PREFERRED: Performance-optimized approach
 // /tests/specs/models/ProductModelTest.cfc
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
     function beforeAll() {
         // Expensive setup once per component - much faster
@@ -804,7 +804,7 @@ If you have legacy RocketUnit tests, you can migrate them:
 
 ### Structure Changes
 - Move tests to `/tests/specs/` directory
-- Change component extension from `app.tests.Test` to `testbox.system.BaseSpec`
+- Change component extension from `app.tests.Test` to `wheels.Testbox`
 - Wrap individual test methods in `it()` blocks within `describe()` blocks
 
 ## Using application.wo in Tests
@@ -825,7 +825,7 @@ The `application.wo` object is the global Wheels framework instance that provide
 #### Accessing Models Directly
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("User Model via application.wo", function() {
@@ -857,7 +857,7 @@ component extends="testbox.system.BaseSpec" {
 #### Framework Configuration Access
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Framework Configuration", function() {
@@ -892,7 +892,7 @@ component extends="testbox.system.BaseSpec" {
 #### Testing Controllers Through Framework
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Controllers via application.wo", function() {
@@ -937,7 +937,7 @@ component extends="testbox.system.BaseSpec" {
 #### Database and Migration Testing
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Database Operations", function() {
@@ -970,7 +970,7 @@ component extends="testbox.system.BaseSpec" {
 #### Template and Include Testing
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Template System", function() {
@@ -998,7 +998,7 @@ component extends="testbox.system.BaseSpec" {
 #### Route Testing
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Routing System", function() {
@@ -1035,7 +1035,7 @@ component extends="testbox.system.BaseSpec" {
 #### Test Data Management
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         // Store original test environment state
@@ -1075,7 +1075,7 @@ component extends="testbox.system.BaseSpec" {
 #### Transaction-Based Testing
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Transaction Testing", function() {
@@ -1115,7 +1115,7 @@ component extends="testbox.system.BaseSpec" {
 #### Framework State Inspection
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Framework Debugging", function() {
@@ -1185,7 +1185,7 @@ component {
 #### Configuration Testing Pattern
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Configuration Testing", function() {
@@ -1218,7 +1218,7 @@ component extends="testbox.system.BaseSpec" {
 #### Query Performance Testing
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Performance Testing", function() {
@@ -1312,7 +1312,7 @@ function run() {
 #### Test Environment Validation
 
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("CI/CD Environment", function() {
