@@ -138,7 +138,15 @@ component {
         } else {
             processed = replace(processed, "|Actions|", "", "all");
         }
-        
+
+        // Process description comment for controllers
+        if (structKeyExists(arguments.context, "description") && len(trim(arguments.context.description))) {
+            var descriptionComment = "/**" & chr(10) & " * " & arguments.context.description & chr(10) & " */" & chr(10);
+            processed = replace(processed, "|DescriptionComment|", descriptionComment, "all");
+        } else {
+            processed = replace(processed, "|DescriptionComment|", "", "all");
+        }
+
         // Process form fields if properties are provided (must happen before object name replacements)
         if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
             var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName);

@@ -28,6 +28,10 @@ component aliases="wheels g controller" extends="../base" {
         string description = "",
         boolean force = false
     ) {
+
+        // Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+
         // Handle API flag implies REST
         if (arguments.api) {
             arguments.rest = true;
@@ -40,7 +44,7 @@ component aliases="wheels g controller" extends="../base" {
             return;
         }
         
-        detailOutput.header("🎮", "Generating controller: #arguments.name#");
+        detailOutput.header("", "Generating controller: #arguments.name#");
         
         // Parse actions
         var actionList = [];
