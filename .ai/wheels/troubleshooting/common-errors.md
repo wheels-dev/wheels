@@ -185,6 +185,41 @@ mapper()
 
 **Note:** CFWheels routing syntax differs from Rails - always check the CFWheels documentation for exact syntax rather than assuming Rails patterns work.
 
+### buttonTo() HTTP Method Routing Errors
+**Error:**
+```
+Wheels.RouteNotFound - Incorrect HTTP Verb for route
+The posts/1 path does not allow POST requests, only GET, PATCH, PUT, DELETE, GET requests.
+Ensure you are using the correct HTTP Verb and that your config/routes.cfm file is configured correctly.
+```
+
+**Cause:** Missing `method` parameter in `buttonTo()` helper for DELETE, PUT, or PATCH actions.
+
+**Bad Code:**
+```cfm
+<!-- This generates POST request, not DELETE -->
+#buttonTo(controller="posts", action="delete", key=post.id, text="Delete", confirm="Are you sure?")#
+#buttonTo(controller="comments", action="delete", key=comment.id, text="Delete")#
+```
+
+**Solution:** Add explicit `method` parameter to match the intended HTTP verb:
+```cfm
+<!-- DELETE requests -->
+#buttonTo(controller="posts", action="delete", method="delete", key=post.id, text="Delete", confirm="Are you sure?")#
+#buttonTo(controller="comments", action="delete", method="delete", key=comment.id, text="Delete")#
+
+<!-- PUT/PATCH requests -->
+#buttonTo(controller="posts", action="update", method="put", key=post.id, text="Update")#
+#buttonTo(controller="posts", action="update", method="patch", key=post.id, text="Update")#
+```
+
+**Key Points:**
+- `buttonTo()` defaults to POST method if no `method` parameter is specified
+- CFWheels resource routing expects specific HTTP methods for each action
+- DELETE actions MUST use `method="delete"`
+- PUT/PATCH actions MUST use `method="put"` or `method="patch"`
+- Always test delete functionality in browser to catch these errors early
+
 ## Migration Errors
 
 ### Parameter Binding Issues in Migrations

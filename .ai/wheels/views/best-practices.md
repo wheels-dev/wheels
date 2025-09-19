@@ -22,12 +22,16 @@
 - [ ] ❌ Loop queries as arrays: `<cfloop array="#posts#" index="post">`
 - [ ] ❌ Treat model results as arrays in any context
 - [ ] ❌ Mix loop types (array syntax on queries)
+- [ ] ❌ Add HTML to view helper text without `encode=false`: `linkTo(text="<span>Blog</span>")`
+- [ ] ❌ Use buttonTo() for DELETE without method parameter: `buttonTo(action="delete", key=id)`
 
 **And you WILL:**
 - [ ] ✅ Use .recordCount for query counts: `posts.recordCount`
 - [ ] ✅ Use query loops: `<cfloop query="posts">`
 - [ ] ✅ Understand associations return QUERIES
 - [ ] ✅ Check data types before processing
+- [ ] ✅ Use method parameter for buttonTo() HTTP verbs: `buttonTo(action="delete", method="delete", key=id)`
+- [ ] ✅ Use `encode=false` for HTML in helpers: `linkTo(text="<span>Blog</span>", encode=false)`
 
 ### 📋 VIEW IMPLEMENTATION TEMPLATE (MANDATORY STARTING POINT)
 

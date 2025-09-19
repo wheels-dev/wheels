@@ -48,6 +48,104 @@ mcp__wheels__wheels_server(action="status")
 - `wheels://.ai/wheels/patterns` - Framework patterns
 - `wheels://.ai/wheels/snippets` - Code examples
 
+## 🚨 MANDATORY: Browser Testing Workflow
+
+**🔴 CRITICAL: ALL development tasks MUST include comprehensive browser testing - NO EXCEPTIONS**
+
+### 🛑 STEP 4: MANDATORY BROWSER TESTING (ALWAYS REQUIRED)
+
+**After ANY development work (models, views, controllers, routes), you MUST:**
+
+1. **📋 Verify Server Status**
+   ```javascript
+   mcp__wheels__wheels_server(action="status")
+   ```
+
+2. **🌐 Navigate to Application**
+   ```javascript
+   mcp__puppeteer__puppeteer_navigate(url="http://localhost:[PORT]")
+   ```
+
+3. **📸 Take Homepage Screenshot**
+   ```javascript
+   mcp__puppeteer__puppeteer_screenshot(name="homepage_test", width=1200, height=800)
+   ```
+
+4. **🧪 Test Core User Flows (MANDATORY)**
+   - **Navigation Testing**: Click all main navigation links
+   - **CRUD Operations**: Test create, read, update, delete flows
+   - **Form Interactions**: Test all forms and validation
+   - **Interactive Elements**: Test JavaScript/Alpine.js/HTMX functionality
+   - **Responsive Design**: Test on different viewport sizes
+
+5. **🔍 Verify Key Features Work**
+   ```javascript
+   // Example: Test clicking first post
+   mcp__puppeteer__puppeteer_click(selector="article:first-child h2 a")
+   mcp__puppeteer__puppeteer_screenshot(name="post_detail", width=1200, height=800)
+
+   // Example: Test interactive elements
+   mcp__puppeteer__puppeteer_click(selector="button[contains-class='btn']")
+   mcp__puppeteer__puppeteer_screenshot(name="interaction_test", width=1200, height=800)
+   ```
+
+6. **📊 Document Test Results**
+   - Confirm all screenshots show expected UI
+   - Verify no JavaScript errors in console
+   - Document any issues found
+   - Ensure responsive design works
+
+### ❌ DEVELOPMENT IS NOT COMPLETE WITHOUT BROWSER TESTING
+
+**If you skip browser testing, the implementation is INCOMPLETE and UNACCEPTABLE.**
+
+**Browser testing must verify:**
+- [ ] All pages load correctly
+- [ ] Navigation works
+- [ ] Forms submit properly
+- [ ] Interactive elements (Alpine.js/HTMX) function
+- [ ] Responsive design displays correctly
+- [ ] No JavaScript errors in console
+- [ ] All CRUD operations work end-to-end
+
+### 🚀 Browser Testing Templates
+
+**For Blog Applications:**
+```javascript
+// Test homepage
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:PORT")
+mcp__puppeteer__puppeteer_screenshot(name="blog_homepage")
+
+// Test post detail
+mcp__puppeteer__puppeteer_click(selector="article:first-child h2 a")
+mcp__puppeteer__puppeteer_screenshot(name="post_detail")
+
+// Test comment form interaction
+mcp__puppeteer__puppeteer_click(selector="button:contains('Add Comment')")
+mcp__puppeteer__puppeteer_screenshot(name="comment_form")
+
+// Test create post
+mcp__puppeteer__puppeteer_click(selector="a:contains('Write Post')")
+mcp__puppeteer__puppeteer_screenshot(name="create_post")
+```
+
+**For Admin Applications:**
+```javascript
+// Test admin dashboard
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:PORT/admin")
+mcp__puppeteer__puppeteer_screenshot(name="admin_dashboard")
+
+// Test admin CRUD operations
+// ... specific admin testing flows
+```
+
+**For API Applications:**
+```javascript
+// Test API endpoints
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:PORT/api/endpoint")
+mcp__puppeteer__puppeteer_screenshot(name="api_response")
+```
+
 ## Quick Start
 
 ### MCP-Enabled Wheels Development
@@ -846,14 +944,29 @@ Replace `8080` with your development server port.
 
 ### Route Configuration
 
-The MCP server routes are pre-configured in `/config/routes.cfm`:
+The MCP server routes are pre-configured in the Wheels framework at `/vendor/wheels/public/routes.cfm`:
 
 ```cfm
-.post(pattern="/wheels/mcp", to="##mcp")
-.get(pattern="/wheels/mcp", to="##mcp")
+// Framework routes in wheels namespace
+.get(name = "mcp", pattern = "mcp", to = "public##mcp")
+.post(name = "mcpPost", pattern = "mcp", to = "public##mcp")
 ```
 
-These routes must come before the `.wildcard()` route to function correctly.
+**IMPORTANT:** These are framework routes (in the `wheels` namespace) and should **NOT** be added to your application's `/config/routes.cfm`. The MCP server is automatically available at `/wheels/mcp` without any application configuration needed.
+
+#### Framework vs Application Routes
+
+**Framework Routes** (`/vendor/wheels/public/routes.cfm`):
+- Pre-configured routes for Wheels internal functionality
+- Include: `/wheels/mcp`, `/wheels/migrator`, `/wheels/api`, `/wheels/info`, etc.
+- Automatically available in all Wheels applications
+- Should NOT be duplicated in application routes
+
+**Application Routes** (`/config/routes.cfm`):
+- Your custom application routes
+- Business logic controllers and actions
+- Custom API endpoints and resource routes
+- This is where you define your application-specific routing
 
 ## Common Patterns
 
