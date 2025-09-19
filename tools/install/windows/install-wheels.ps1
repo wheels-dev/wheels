@@ -16,8 +16,32 @@
 .PARAMETER SkipPath
     Skip adding CommandBox to PATH.
 
-.PARAMETER Quiet
-    Suppress interactive prompts and use defaults.
+.PARAMETER AppName
+    Name for the Wheels application.
+
+.PARAMETER Template
+    Wheels template to use.
+
+.PARAMETER ReloadPassword
+    Reload password for the application.
+
+.PARAMETER DatasourceName
+    Datasource name for the database.
+
+.PARAMETER CFMLEngine
+    CFML engine to use.
+
+.PARAMETER UseH2
+    Use H2 database for Lucee.
+
+.PARAMETER UseBootstrap
+    Setup Bootstrap CSS framework.
+
+.PARAMETER InitializeAsPackage
+    Initialize application as a package.
+
+.PARAMETER ApplicationBasePath
+    Base path for the application installation.
 
 .PARAMETER IncludeJava
     Install Java if not found (requires admin privileges).
@@ -35,11 +59,47 @@ param(
     [switch]$SkipPath,
 
     [Parameter()]
-    [switch]$Quiet,
+    [string]$AppName = "MyWheelsApp",
+
+    [Parameter()]
+    [string]$Template = "wheels-base-template@BE",
+
+    [Parameter()]
+    [string]$ReloadPassword = "changeMe",
+
+    [Parameter()]
+    [string]$DatasourceName = "",
+
+    [Parameter()]
+    [string]$CFMLEngine = "lucee",
+
+    [Parameter()]
+    [switch]$UseH2,
+
+    [Parameter()]
+    [switch]$UseBootstrap,
+
+    [Parameter()]
+    [switch]$InitializeAsPackage,
+
+    [Parameter()]
+    [string]$ApplicationBasePath = "",
 
     [Parameter()]
     [switch]$IncludeJava
 )
+
+# =============================
+# Standard small console setup
+# =============================
+try {
+    $Host.UI.RawUI.WindowSize = New-Object System.Management.Automation.Host.Size (120, 35)
+    $Host.UI.RawUI.BufferSize = New-Object System.Management.Automation.Host.Size (120, 1000)
+} catch {
+    # Console resizing failed - continue without resizing
+    # This is common in some terminal emulators or restricted environments
+}
+
 
 # Configuration
 $Script:Config = @{
@@ -60,9 +120,67 @@ $Script:State = @{
     JavaInstalled = $false
     StartTime = Get-Date
     AppConfig = @{}
+    TempFiles = @()
+    InterruptHandlerRegistered = $false
 }
 
 #region Utility Functions
+
+function Stop-WithCriticalError {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ErrorMessage,
+        [string]$Details = ""
+    )
+
+    Write-Host ""
+    Write-ColorOutput "=================================================================================" -ForegroundColor Red
+    Write-ColorOutput "                              CRITICAL ERROR                                    " -ForegroundColor Red
+    Write-ColorOutput "=================================================================================" -ForegroundColor Red
+    Write-Host ""
+
+    Write-Error $ErrorMessage
+
+    if ($Details) {
+        Write-Host ""
+        Write-ColorOutput "Error Details:" -ForegroundColor Yellow
+        Write-Host $Details -ForegroundColor Gray
+    }
+
+    Write-Host ""
+    Write-ColorOutput "The installation cannot continue. Please resolve the error and try again." -ForegroundColor Yellow
+    Write-Host ""
+    Write-ColorOutput "Press any key to exit..." -ForegroundColor Cyan
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+    Cleanup-TempFiles
+    exit 1
+}
+
+function Add-TempFile {
+    param([string]$FilePath)
+    if ($FilePath -and -not ($Script:State.TempFiles -contains $FilePath)) {
+        $Script:State.TempFiles += $FilePath
+    }
+}
+
+function Cleanup-TempFiles {
+    Write-Info "Cleaning up temporary files..."
+
+    foreach ($tempFile in $Script:State.TempFiles) {
+        if ($tempFile -and (Test-Path $tempFile)) {
+            try {
+                Remove-Item $tempFile -Force -Recurse -ErrorAction SilentlyContinue
+                Write-Info "Removed: $tempFile"
+            } catch {
+                Write-Warning "Could not remove temporary file: $tempFile"
+            }
+        }
+    }
+
+    $Script:State.TempFiles = @()
+}
+
 
 function Write-ColorOutput {
     param(
@@ -73,8 +191,6 @@ function Write-ColorOutput {
         [Parameter(Position=2)]
         [switch]$NoNewline
     )
-
-    if ($Quiet -and $ForegroundColor -eq [ConsoleColor]::Cyan) { return }
 
     $currentColor = $Host.UI.RawUI.ForegroundColor
     $Host.UI.RawUI.ForegroundColor = $ForegroundColor
@@ -96,15 +212,21 @@ function Write-Error { param([string]$Message) Write-ColorOutput "ERROR: $Messag
 function Write-Header {
     param([string]$Title, [string]$Subtitle = "")
 
-    if ($Quiet) { return }
-
+    $width = 81   # match the border length
     Write-Host ""
-    Write-ColorOutput "=================================================================================" -ForegroundColor Magenta
-    Write-ColorOutput "                           $Title" -ForegroundColor Magenta
+    Write-ColorOutput ("=" * $width) -ForegroundColor Magenta
+
+    # Center Title
+    $titleLine = $Title.PadLeft(([math]::Floor(($width + $Title.Length) / 2)), " ")
+    Write-ColorOutput $titleLine -ForegroundColor Magenta
+
+    # Center Subtitle (if provided)
     if ($Subtitle) {
-        Write-ColorOutput "                           $Subtitle" -ForegroundColor Magenta
+        $subtitleLine = $Subtitle.PadLeft(([math]::Floor(($width + $Subtitle.Length) / 2)), " ")
+        Write-ColorOutput $subtitleLine -ForegroundColor Magenta
     }
-    Write-ColorOutput "=================================================================================" -ForegroundColor Magenta
+
+    Write-ColorOutput ("=" * $width) -ForegroundColor Magenta
     Write-Host ""
 }
 
@@ -114,35 +236,16 @@ function Test-Administrator {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Get-UserConfirmation {
-    param(
-        [string]$Message,
-        [bool]$DefaultYes = $false
-    )
-
-    if ($Quiet) { return $DefaultYes }
-
-    $default = if ($DefaultYes) { "Y/n" } else { "y/N" }
-    $response = Read-Host "$Message ($default)"
-
-    if ([string]::IsNullOrEmpty($response)) {
-        return $DefaultYes
-    }
-
-    return $response -match "^[yY]"
-}
 
 #endregion
 
 #region System Configuration and User Settings
 
-# --- Interactive prompts if parameters are missing ---
-Write-Header "Wheels Framework Installer" "Let's configure your installation and application setup"
+# --- Configuration using passed parameters ---
+Write-Header "Wheels Installer" "Configuring installation and application setup"
 
-# CommandBox Installation Configuration
+# Set default InstallPath if not provided
 if (-not $InstallPath) {
-    Write-ColorOutput "CommandBox Installation Configuration:" -ForegroundColor Yellow
-    Write-Host ""
     $defaultPath = if ([Security.Principal.WindowsIdentity]::GetCurrent().Groups -match "S-1-5-32-544") {
         # Admin install → Program Files
         "$env:ProgramFiles\CommandBox"
@@ -150,228 +253,89 @@ if (-not $InstallPath) {
         # User install → Local profile
         "$env:USERPROFILE\CommandBox"
     }
-    $InstallPath = Read-Host ("Enter CommandBox installation path [{0}]" -f $defaultPath)
-    if (-not $InstallPath) { $InstallPath = $defaultPath }
+    $InstallPath = $defaultPath
 }
 
 # Normalize CommandBox path
-
 if ($InstallPath -notmatch "CommandBox$") {
     $InstallPath = Join-Path $InstallPath "CommandBox"
 }
 
-if (-not $PSBoundParameters.ContainsKey("Force")) {
-    $ForceResponse = Read-Host "Force reinstall CommandBox if already installed? (Y/n) [n]"
-    if ($ForceResponse -match "^[Yy]") { $Force = $true } else { $Force = $false }
+# Set default DatasourceName if not provided
+if (-not $DatasourceName) {
+    $DatasourceName = $AppName
 }
 
-if (-not $PSBoundParameters.ContainsKey("SkipPath")) {
-    $SkipPathResponse = Read-Host "Skip adding CommandBox to PATH? (Y/n) [y]"
-    if ($SkipPathResponse -match "^[Nn]") { $SkipPath = $false } else { $SkipPath = $true }
+# Set default ApplicationBasePath if not provided
+if (-not $ApplicationBasePath) {
+    $baseDir = Split-Path $InstallPath -Parent
+    $ApplicationBasePath = Join-Path $baseDir "inetpub"
 }
 
-# Wheels Application Configuration
-Write-ColorOutput "Now let's configure your Wheels application:" -ForegroundColor Yellow
-Write-Host ""
-
-# Initialize AppConfig in State
-$Script:State.AppConfig = @{}
-
-# Application Name
-Write-ColorOutput "Step 1: Application Name" -ForegroundColor Cyan
-Write-ColorOutput "Enter a name for your application. A new directory will be created with this name." -ForegroundColor Gray
-Write-ColorOutput "Note: Names can only contain letters, numbers, underscores, and hyphens." -ForegroundColor Gray
-do {
-    $appName = Read-Host "Please enter a name for your application [MyWheelsApp]"
-    if ([string]::IsNullOrEmpty($appName)) {
-        $appName = "MyWheelsApp"
-    }
-    if ($appName -match '^[a-zA-Z0-9_-]+$') {
-        $Script:State.AppConfig.ApplicationName = $appName
-        Write-Success "Application name: $appName"
-        break
-    } else {
-        Write-Warning "Invalid application name. Please use only letters, numbers, underscores, and hyphens."
-    }
-} while ($true)
-
-# Template Selection
-Write-Host ""
-Write-ColorOutput "Step 2: Wheels Template Selection" -ForegroundColor Cyan
-Write-ColorOutput "Which Wheels Template shall we use?" -ForegroundColor Gray
-Write-Host ""
-$templates = @(
-    @{ Name = "3.0.x - Wheels Base Template - Bleeding Edge"; Value = "wheels-base-template@BE"; Default = $true }
-    @{ Name = "2.5.x - Wheels Base Template - Stable Release"; Value = "wheels-base-template@stable"; Default = $false }
-    @{ Name = "Wheels Template - HTMX - Alpine.js - Simple.css"; Value = "wheels-htmx-template"; Default = $false }
-    @{ Name = "Wheels Starter App"; Value = "wheels-starter-template"; Default = $false }
-    @{ Name = "Wheels - TodoMVC - HTMX - Demo App"; Value = "wheels-todomvc-template"; Default = $false }
-)
-for ($i = 0; $i -lt $templates.Count; $i++) {
-    $marker = if ($templates[$i].Default) { "[X]" } else { "[ ]" }
-    Write-Host "  $($i + 1). $marker $($templates[$i].Name)"
-}
-Write-Host ""
-$choice = Read-Host "Select template (1-5) [1]"
-if ([string]::IsNullOrEmpty($choice) -or $choice -eq "1") {
-    $selectedTemplate = $templates[0]
-} elseif ($choice -ge 2 -and $choice -le 5) {
-    $selectedTemplate = $templates[$choice - 1]
-} else {
-    Write-Warning "Invalid selection, using default template"
-    $selectedTemplate = $templates[0]
-}
-$Script:State.AppConfig.Template = $selectedTemplate.Value
-Write-Success "Template: $($selectedTemplate.Name)"
-
-# Reload Password
-Write-Host ""
-Write-ColorOutput "Step 3: Reload Password" -ForegroundColor Cyan
-Write-ColorOutput "Set a reload password to secure your app. This allows you to restart your app via URL." -ForegroundColor Gray
-$reloadPassword = Read-Host "Please enter a 'reload' password for your application [changeMe]"
-if ([string]::IsNullOrEmpty($reloadPassword)) {
-    $reloadPassword = "changeMe"
-}
-$Script:State.AppConfig.ReloadPassword = $reloadPassword
-Write-Success "Reload password configured"
-
-# Database Configuration
-Write-Host ""
-Write-ColorOutput "Step 4: Database Configuration" -ForegroundColor Cyan
-Write-ColorOutput "Enter a datasource name for your database. You'll need to configure this in your CFML server admin." -ForegroundColor Gray
-Write-ColorOutput "Tip: If using Lucee, we can auto-create an H2 database for development." -ForegroundColor Gray
-$datasourceName = Read-Host "Please enter a datasource name [$($Script:State.AppConfig.ApplicationName)]"
-if ([string]::IsNullOrEmpty($datasourceName)) {
-    $datasourceName = $Script:State.AppConfig.ApplicationName
-}
-$Script:State.AppConfig.DatasourceName = $datasourceName
-Write-Success "Datasource name: $datasourceName"
-
-# CFML Engine
-Write-Host ""
-Write-ColorOutput "Step 5: CFML Engine" -ForegroundColor Cyan
-Write-ColorOutput "Select the CFML engine for your application." -ForegroundColor Gray
-Write-Host ""
-$engines = @(
-    @{ Name = "Lucee (Latest)"; Value = "lucee"; Default = $true }
-    @{ Name = "Adobe ColdFusion (Latest)"; Value = "adobe"; Default = $false }
-    @{ Name = "Lucee 6.x"; Value = "lucee@6"; Default = $false }
-    @{ Name = "Lucee 5.x"; Value = "lucee@5"; Default = $false }
-    @{ Name = "Adobe ColdFusion 2023"; Value = "adobe@2023"; Default = $false }
-    @{ Name = "Adobe ColdFusion 2021"; Value = "adobe@2021"; Default = $false }
-    @{ Name = "Adobe ColdFusion 2018"; Value = "adobe@2018"; Default = $false }
-)
-for ($i = 0; $i -lt $engines.Count; $i++) {
-    $marker = if ($engines[$i].Default) { "[X]" } else { "[ ]" }
-    Write-Host "  $($i + 1). $marker $($engines[$i].Name)"
-}
-Write-Host ""
-$choice = Read-Host "Select CFML engine (1-7) [1]"
-if ([string]::IsNullOrEmpty($choice) -or $choice -eq "1") {
-    $selectedEngine = $engines[0]
-} elseif ($choice -ge 2 -and $choice -le 7) {
-    $selectedEngine = $engines[$choice - 1]
-} else {
-    Write-Warning "Invalid selection, using default engine"
-    $selectedEngine = $engines[0]
-}
-$Script:State.AppConfig.CFMLEngine = $selectedEngine.Value
-Write-Success "CFML Engine: $($selectedEngine.Name)"
-
-# H2 Database for Lucee
-if ($selectedEngine.Value -eq "lucee") {
-    $H2Response = Read-Host "As you are using Lucee, would you like to setup and use the H2 Java embedded SQL database for development? (Y/n) [n]"
-    if ($H2Response -match "^[Yy]") { $Script:State.AppConfig.UseH2Database = $true } else { $Script:State.AppConfig.UseH2Database = $false }
-    Write-Success "H2 Database setup: $(if ($Script:State.AppConfig.UseH2Database) { 'Yes' } else { 'No' })"
-} else {
-    $Script:State.AppConfig.UseH2Database = $false
+# Initialize AppConfig in State with passed parameters
+$Script:State.AppConfig = @{
+    ApplicationName = $AppName
+    Template = $Template
+    ReloadPassword = $ReloadPassword
+    DatasourceName = $DatasourceName
+    CFMLEngine = $CFMLEngine
+    UseH2Database = $UseH2
+    UseBootstrap = $UseBootstrap
+    InitializeAsPackage = $InitializeAsPackage
 }
 
-# Bootstrap Configuration
-Write-Host ""
-Write-ColorOutput "========= Twitter Bootstrap ======================" -ForegroundColor Cyan
-$BootstrapResponse = Read-Host "Would you like us to setup some default Bootstrap settings? (Y/n) [y]"
-if ($BootstrapResponse -match "^[Nn]") { $Script:State.AppConfig.UseBootstrap = $false } else { $Script:State.AppConfig.UseBootstrap = $true }
-Write-Success "Bootstrap setup: $(if ($Script:State.AppConfig.UseBootstrap) { 'Yes' } else { 'No' })"
-
-# Package Configuration
-Write-Host ""
-$InitPkgResponse = Read-Host "Finally, shall we initialize your application as a package by creating a box.json file? (Y/n) [y]"
-if ($InitPkgResponse -match "^[Nn]") { $Script:State.AppConfig.InitializeAsPackage = $false } else { $Script:State.AppConfig.InitializeAsPackage = $true }
-Write-Success "Initialize as package: $(if ($Script:State.AppConfig.InitializeAsPackage) { 'Yes' } else { 'No' })"
-
-# Application Path Configuration
-Write-Host ""
-Write-ColorOutput "Step 6: Application Installation Path" -ForegroundColor Cyan
-Write-ColorOutput "Choose where to install your Wheels application." -ForegroundColor Gray
-Write-Host ""
-# Default application path based on CommandBox path
-$baseDir = Split-Path $InstallPath -Parent
-$defaultAppPath = Join-Path $baseDir "inetpub"
-Write-ColorOutput "Default application path: $defaultAppPath" -ForegroundColor Gray
-$customPath = Read-Host "Enter a different application directory path (leave empty for default) [$defaultAppPath]"
-if ([string]::IsNullOrEmpty($customPath)) {
-    $appBasePath = $defaultAppPath
-} else {
-    # Add inetpub to custom path
-    $appBasePath = Join-Path $customPath "inetpub"
-    Write-Info "Application base path will be: $appBasePath"
-}
-# Validate and create path if needed
-if (-not (Test-Path $appBasePath)) {
-    $createPath = Get-UserConfirmation "The path '$appBasePath' does not exist. Create it? (y/n) [y]" -DefaultYes $true
-    if ($createPath) {
-        try {
-            New-Item -ItemType Directory -Path $appBasePath -Force | Out-Null
-            Write-Success "Created application directory: $appBasePath"
-        } catch {
-            Write-Error "Failed to create application directory: $($_.Exception.Message)"
-            exit 1
-        }
-    } else {
-        Write-Error "Cannot proceed without a valid application directory."
-        exit 1
+# Validate and create CommandBox installation directory
+if (-not (Test-Path $InstallPath)) {
+    try {
+        New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
+        Write-Success "Created CommandBox installation directory: $InstallPath"
+    } catch {
+        Stop-WithCriticalError "Failed to create CommandBox installation directory" "Path: $InstallPath`nError: $($_.Exception.Message)`n`nThis could be due to insufficient permissions or invalid path."
     }
 } else {
-    Write-Success "Application directory verified: $appBasePath"
+    Write-Success "CommandBox installation directory verified: $InstallPath"
 }
-$Script:State.AppConfig.ApplicationPath = Join-Path $appBasePath $Script:State.AppConfig.ApplicationName
+
+# Validate and create application path
+if (-not (Test-Path $ApplicationBasePath)) {
+    try {
+        New-Item -ItemType Directory -Path $ApplicationBasePath -Force | Out-Null
+        Write-Success "Created application directory: $ApplicationBasePath"
+    } catch {
+        Stop-WithCriticalError "Failed to create application directory" "Path: $ApplicationBasePath`nError: $($_.Exception.Message)`n`nThis could be due to insufficient permissions or invalid path."
+    }
+} else {
+    Write-Success "Application directory verified: $ApplicationBasePath"
+}
+$Script:State.AppConfig.ApplicationPath = Join-Path $ApplicationBasePath $AppName
+Write-Success "Application base path: $ApplicationBasePath"
 Write-Success "Full application path: $($Script:State.AppConfig.ApplicationPath)"
 
-$bootstrapStatus  = if ($Script:State.AppConfig.UseBootstrap) { 'true' } else { 'false' }
-$h2Status         = if ($Script:State.AppConfig.UseH2Database) { 'true' } else { 'false' }
-$packageStatus    = if ($Script:State.AppConfig.InitializeAsPackage) { 'true' } else { 'false' }
+$bootstrapStatus  = if ($UseBootstrap) { 'true' } else { 'false' }
+$h2Status         = if ($UseH2) { 'true' } else { 'false' }
+$packageStatus    = if ($InitializeAsPackage) { 'true' } else { 'false' }
 
-# Final Summary
+# Configuration Summary
 Write-Host ""
 Write-ColorOutput "+-----------------------------------------------------------------------------------+" -ForegroundColor Green
-Write-ColorOutput "| Configuration Summary - Please confirm your selections:                           |" -ForegroundColor Green
+Write-ColorOutput "| Configuration Summary:                                                            |" -ForegroundColor Green
 Write-ColorOutput "+-----------------------+-----------------------------------------------------------+" -ForegroundColor Green
 Write-ColorOutput "| CommandBox Path       | $($InstallPath.PadRight(57)) |" -ForegroundColor Green
-Write-ColorOutput "| Template              | $($Script:State.AppConfig.Template.PadRight(57)) |" -ForegroundColor Green
-Write-ColorOutput "| Application Name      | $($Script:State.AppConfig.ApplicationName.PadRight(57)) |" -ForegroundColor Green
-Write-ColorOutput "| Install Directory     | $($Script:State.AppConfig.ApplicationPath.PadRight(57)) |" -ForegroundColor Green
-Write-ColorOutput "| Reload Password       | $($Script:State.AppConfig.ReloadPassword.PadRight(57)) |" -ForegroundColor Green
-Write-ColorOutput "| Datasource Name       | $($Script:State.AppConfig.DatasourceName.PadRight(57)) |" -ForegroundColor Green
-Write-ColorOutput "| CF Engine             | $($Script:State.AppConfig.CFMLEngine.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Template              | $($Template.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Application Name      | $($AppName.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Application Directory | $($Script:State.AppConfig.ApplicationPath.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Reload Password       | $($ReloadPassword.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Datasource Name       | $($DatasourceName.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| CF Engine             | $($CFMLEngine.PadRight(57)) |" -ForegroundColor Green
 Write-ColorOutput "| Setup Bootstrap       | $($bootstrapStatus.PadRight(57)) |" -ForegroundColor Green
 Write-ColorOutput "| Setup H2 Database     | $($h2Status.PadRight(57)) |" -ForegroundColor Green
-Write-ColorOutput "| Initialize as Package | $($packageStatus.PadRight(57)) |" -ForegroundColor Green
+Write-ColorOutput "| Initialize box.json   | $($packageStatus.PadRight(57)) |" -ForegroundColor Green
 Write-ColorOutput "| Force Installation    | $($Force.ToString().ToLower().PadRight(57)) |" -ForegroundColor Green
 Write-ColorOutput "| Skip add to PATH      | $($SkipPath.ToString().ToLower().PadRight(57)) |" -ForegroundColor Green
 Write-ColorOutput "+-----------------------+-----------------------------------------------------------+" -ForegroundColor Green
 Write-Host ""
 
-$proceed = Get-UserConfirmation "Does this configuration look correct? Proceed with installation?" -DefaultYes $true
-if (-not $proceed) {
-    Write-Warning "Installation cancelled by user."
-    Write-Host ""
-    Write-Host "Press any key to close..."
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    exit 0
-}
-
-Write-Success "Configuration confirmed! Starting installation and application setup..."
+Write-Success "Configuration set! Starting installation and application setup..."
 Write-Host ""
 
 #endregion
@@ -388,7 +352,6 @@ function Initialize-Environment {
 
     Write-Info "Installation path: $($Script:State.InstallPath)"
     Write-Info "Administrator privileges: $(if ($Script:State.IsAdmin) { 'Yes' } else { 'No' })"
-    Write-Info "Quiet mode: $(if ($Quiet) { 'Yes' } else { 'No' })"
 }
 
 function Test-JavaInstallation {
@@ -442,6 +405,7 @@ function Install-Java {
     Write-Info "Installing Java (Temurin JDK 17)..."
 
     $tempMsi = Join-Path $env:TEMP "temurin-jdk-17.msi"
+    Add-TempFile -FilePath $tempMsi
 
     try {
         # Download Java installer
@@ -467,8 +431,7 @@ function Install-Java {
             return $false
         }
     } catch {
-        Write-Error "Java installation failed: $($_.Exception.Message)"
-        return $false
+        Stop-WithCriticalError "Java installation failed" "Error: $($_.Exception.Message)`n`nJava installation failed. This is required for optimal CommandBox performance.`nYou may need to download and install Java manually from: $($Script:Config.JavaCheckUrl)"
     } finally {
         if (Test-Path $tempMsi) {
             Remove-Item $tempMsi -Force -ErrorAction SilentlyContinue
@@ -489,43 +452,41 @@ function Download-File {
 
     Write-Info "Downloading $Description..."
     Write-Info "From: $Url"
+    Write-Info "Saving to: $OutputPath"
+    Write-Info "Starting download, please wait..."
 
-    if (-not $Quiet) {
-        Write-Info "Saving to: $OutputPath"
-        Write-Info "Starting download, please wait..."
-    }
+    # Track this temporary file for cleanup
+    Add-TempFile -FilePath $OutputPath
 
     try {
         # Use WebClient for better progress reporting
         $webClient = New-Object System.Net.WebClient
         $startTime = Get-Date
 
-        if (-not $Quiet) {
-            # Register progress event with enhanced status
-            Register-ObjectEvent -InputObject $webClient -EventName DownloadProgressChanged -Action {
-                $elapsed = (Get-Date) - $using:startTime
-                $bytesReceived = $Event.SourceEventArgs.BytesReceived
-                $totalBytes = $Event.SourceEventArgs.TotalBytesToReceive
-                $percent = $Event.SourceEventArgs.ProgressPercentage
+        # Register progress event with enhanced status
+        Register-ObjectEvent -InputObject $webClient -EventName DownloadProgressChanged -Action {
+            $elapsed = (Get-Date) - $using:startTime
+            $bytesReceived = $Event.SourceEventArgs.BytesReceived
+            $totalBytes = $Event.SourceEventArgs.TotalBytesToReceive
+            $percent = $Event.SourceEventArgs.ProgressPercentage
 
-                $speed = if ($elapsed.TotalSeconds -gt 0) {
-                    [math]::Round(($bytesReceived / $elapsed.TotalSeconds) / 1MB, 2)
-                } else { 0 }
+            $speed = if ($elapsed.TotalSeconds -gt 0) {
+                [math]::Round(($bytesReceived / $elapsed.TotalSeconds) / 1MB, 2)
+            } else { 0 }
 
-                $eta = if ($speed -gt 0 -and $totalBytes -gt 0) {
-                    $remainingBytes = $totalBytes - $bytesReceived
-                    $etaSeconds = [math]::Round(($remainingBytes / 1MB) / $speed)
-                    if ($etaSeconds -lt 60) { "$etaSeconds sec" }
-                    else { "$([math]::Round($etaSeconds / 60)) min" }
-                } else { "calculating..." }
+            $eta = if ($speed -gt 0 -and $totalBytes -gt 0) {
+                $remainingBytes = $totalBytes - $bytesReceived
+                $etaSeconds = [math]::Round(($remainingBytes / 1MB) / $speed)
+                if ($etaSeconds -lt 60) { "$etaSeconds sec" }
+                else { "$([math]::Round($etaSeconds / 60)) min" }
+            } else { "calculating..." }
 
-                $status = "Progress: $percent% | Speed: $speed MB/s | ETA: $eta"
-                Write-Progress -Activity "Downloading $using:Description" -Status $status -PercentComplete $percent
-            } | Out-Null
+            $status = "Progress: $percent% | Speed: $speed MB/s | ETA: $eta"
+            Write-Progress -Activity "Downloading $using:Description" -Status $status -PercentComplete $percent
+        } | Out-Null
 
-            # Show initial status
-            Write-ColorOutput "Download in progress..." -ForegroundColor Yellow
-        }
+        # Show initial status
+        Write-ColorOutput "Download in progress..." -ForegroundColor Yellow
 
         # Start the download
         $webClient.DownloadFile($Url, $OutputPath)
@@ -536,19 +497,13 @@ function Download-File {
         $fileSize = (Get-Item $OutputPath).Length
         $avgSpeed = [math]::Round(($fileSize / $elapsed.TotalSeconds) / 1MB, 2)
 
-        if (-not $Quiet) {
-            Write-Progress -Activity "Downloading $description" -Completed
-        }
+        Write-Progress -Activity "Downloading $description" -Completed
 
         Write-Success "Download completed successfully!"
-        if (-not $Quiet) {
-            Write-Info "Downloaded $([math]::Round($fileSize / 1MB, 1)) MB in $([math]::Round($elapsed.TotalSeconds, 1)) seconds (avg: $avgSpeed MB/s)"
-        }
+        Write-Info "Downloaded $([math]::Round($fileSize / 1MB, 1)) MB in $([math]::Round($elapsed.TotalSeconds, 1)) seconds (avg: $avgSpeed MB/s)"
 
         return $true
     } catch {
-        Write-Error "Download failed: $($_.Exception.Message)"
-
         # Clean up partial download
         if (Test-Path $OutputPath) {
             try {
@@ -559,7 +514,7 @@ function Download-File {
             }
         }
 
-        return $false
+        Stop-WithCriticalError "Download failed: $Description" "URL: $Url`nDestination: $OutputPath`nError: $($_.Exception.Message)`n`nThis could be due to network connectivity issues or invalid download URL."
     }
 }
 
@@ -590,13 +545,9 @@ function Install-CommandBox {
         }
 
         if (-not $Force) {
-            if (Get-UserConfirmation "CommandBox already exists. Reinstall?" -DefaultYes $false) {
-                # Continue with installation
-            } else {
-                Write-Info "Using existing CommandBox installation"
-                $Script:State.BoxPath = $boxExePath
-                return $boxExePath
-            }
+            Write-Info "Using existing CommandBox installation"
+            $Script:State.BoxPath = $boxExePath
+            return $boxExePath
         }
     }
 
@@ -606,16 +557,17 @@ function Install-CommandBox {
         try {
             New-Item -ItemType Directory -Path $Script:State.InstallPath -Force | Out-Null
         } catch {
-            Write-Error "Failed to create installation directory: $($_.Exception.Message)"
-            return $null
+            Stop-WithCriticalError "Failed to create CommandBox installation directory during setup" "Path: $($Script:State.InstallPath)`nError: $($_.Exception.Message)`n`nThis could be due to insufficient permissions."
         }
     }
 
     # Download CommandBox (Windows JRE64 version)
     $tempZip = Join-Path $env:TEMP "commandbox-windows-jre64.zip"
+    Add-TempFile -FilePath $tempZip
 
     if (-not (Download-File -Url $Script:Config.CommandBoxDownloadUrl -OutputPath $tempZip -Description "CommandBox (Windows JRE64)")) {
-        return $null
+        # Download-File now handles critical errors, so this line should not be reached
+        Stop-WithCriticalError "CommandBox download failed" "Unable to download CommandBox from ForgeBox. Please check your internet connection."
     }
 
     # Extract CommandBox
@@ -627,6 +579,7 @@ function Install-CommandBox {
 
         # Create a temporary extraction directory first
         $tempExtractPath = Join-Path $env:TEMP "commandbox-extract-$(Get-Random)"
+        Add-TempFile -FilePath $tempExtractPath
         New-Item -ItemType Directory -Path $tempExtractPath -Force | Out-Null
 
         # Extract to temp directory first
@@ -666,7 +619,7 @@ function Install-CommandBox {
         }
 
         if (-not $sourcePath) {
-            throw "Could not locate CommandBox executable in the downloaded package"
+            Stop-WithCriticalError "CommandBox executable not found in downloaded package" "The downloaded CommandBox package does not contain the expected box.exe file.`nThis could be due to a corrupted download or changes in the CommandBox distribution format."
         }
 
         Write-Info "Found CommandBox files in: $(Split-Path $sourcePath -Leaf)"
@@ -679,7 +632,7 @@ function Install-CommandBox {
 
             foreach ($item in $items) {
                 $currentItem++
-                if (-not $Quiet -and ($currentItem % 10 -eq 0 -or $currentItem -eq $totalItems)) {
+                if ($currentItem % 10 -eq 0 -or $currentItem -eq $totalItems) {
                     $percent = [math]::Round(($currentItem / $totalItems) * 100)
                     Write-Progress -Activity "Extracting CommandBox" -Status "Processing files: $currentItem/$totalItems" -PercentComplete $percent
                 }
@@ -702,9 +655,7 @@ function Install-CommandBox {
                 }
             }
 
-            if (-not $Quiet) {
-                Write-Progress -Activity "Extracting CommandBox" -Completed
-            }
+            Write-Progress -Activity "Extracting CommandBox" -Completed
         }
 
         # Clean up temp extraction directory
@@ -719,8 +670,7 @@ function Install-CommandBox {
         }
 
     } catch {
-        Write-Error "Failed to extract CommandBox: $($_.Exception.Message)"
-        return $null
+        Stop-WithCriticalError "Failed to extract CommandBox" "Error: $($_.Exception.Message)`n`nThis could be due to a corrupted download or insufficient disk space."
     } finally {
         # Clean up temp files
         if (Test-Path $tempZip) {
@@ -737,8 +687,7 @@ function Install-CommandBox {
         $Script:State.BoxPath = $boxExePath
         return $boxExePath
     } else {
-        Write-Error "CommandBox installation verification failed"
-        return $null
+        Stop-WithCriticalError "CommandBox installation verification failed" "The CommandBox executable was not found at the expected location: $boxExePath`nThe installation may have been incomplete or corrupted."
     }
 }
 
@@ -794,14 +743,12 @@ function Install-WheelsPackages {
         $output = & $BoxPath list 2>&1
         $wheelsCliInstalled = $output -match $Script:Config.WheelsCliPackage
 
-        if ($wheelsCliInstalled -and -not $Force) {
-            Write-Success "Wheels CLI package already installed"
-
-            if (-not $Force -and -not $Quiet) {
-                if (-not (Get-UserConfirmation "Reinstall Wheels CLI package?" -DefaultYes $false)) {
-                    return $true
-                }
+        if ($wheelsCliInstalled) {
+            if (-not $Force) {
+                Write-Success "Wheels CLI package already installed (skipping re-install)"
+                return $true
             }
+            Write-Info "Force flag detected, re-installing Wheels CLI package..."
         }
 
         # Install wheels-cli package (this is the only package we need)
@@ -833,8 +780,7 @@ function Install-WheelsPackages {
         Write-Success "Package installation completed!"
         return $true
     } catch {
-        Write-Error "Failed to install Wheels CLI package: $($_.Exception.Message)"
-        return $false
+        Stop-WithCriticalError "Failed to install Wheels CLI package" "Error: $($_.Exception.Message)`n`nThis could be due to network connectivity issues or ForgeBox being unavailable.`nCommandBox is installed but Wheels CLI tools are not available."
     }
 }
 
@@ -855,6 +801,35 @@ function Create-WheelsApplication {
     $appPath = $Script:State.AppConfig.ApplicationPath
     $template = $Script:State.AppConfig.Template
 
+    Write-Info "Checking if server already exists for: $appName"
+
+    try {
+        # Get list of all servers
+        $serversJson = & $BoxPath server list --json 2>$null
+        if ($serversJson) {
+            $servers = $serversJson | ConvertFrom-Json
+
+            # Check if server with this name already exists
+            $existing = $servers | Where-Object { $_.name -eq $appName }
+
+            if ($existing) {
+                $serverDetails = "Name: $($existing.name)"
+                if ($existing.weburl) {
+                    $serverDetails += "`nURL: $($existing.weburl)"
+                } elseif ($existing.host -and $existing.port) {
+                    $serverDetails += "`nURL: http://$($existing.host):$($existing.port)"
+                }
+                if ($existing.webroot) {
+                    $serverDetails += "`nWebroot: $($existing.webroot)"
+                }
+
+                Stop-WithCriticalError "A CommandBox server already exists with this name" "$serverDetails`n`nThis could cause conflicts during application creation.`nPlease choose a different application name or remove the existing server first using 'box server stop $appName' and 'box server forget $appName'."
+            }
+        }
+    } catch {
+        Stop-WithCriticalError "Failed to check existing servers" "Application Name: $appName`nError: $($_.Exception.Message)`n`nThis could be due to CommandBox not being properly installed or network connectivity issues preventing server list retrieval."
+    }
+
     Write-Info "Creating Wheels application: $appName"
     Write-Info "Location: $appPath"
     Write-Info "Template: $template"
@@ -865,7 +840,7 @@ function Create-WheelsApplication {
         Push-Location $appParentDir
 
         # Build the wheels generate app command
-        $generateCmd = @("wheels", "generate", "app", "name=$appName", "template=$template")
+        $generateCmd = @("wheels", "generate", "app", "name=$appName", "template=$template", "force=true")
 
         # Add additional parameters
         if ($Script:State.AppConfig.ReloadPassword -ne "") {
@@ -897,6 +872,33 @@ function Create-WheelsApplication {
 
         # Execute the command
         $output = & $BoxPath $generateCmd 2>&1
+        # # Execute the command
+        # # Start CommandBox process and stream its output in real-time
+        # $psi = New-Object System.Diagnostics.ProcessStartInfo
+        # $psi.FileName = $BoxPath
+        # $psi.Arguments = $generateCmd -join " "
+        # $psi.RedirectStandardOutput = $true
+        # $psi.RedirectStandardError = $true
+        # $psi.UseShellExecute = $false
+        # $psi.CreateNoWindow = $true
+
+        # $process = New-Object System.Diagnostics.Process
+        # $process.StartInfo = $psi
+
+        # # Register event handlers to print output asynchronously
+        # $process.add_OutputDataReceived({
+        #     if ($_.Data) { Write-Host $_.Data }
+        # })
+        # $process.add_ErrorDataReceived({
+        #     if ($_.Data) { Write-Host $_.Data -ForegroundColor Red }
+        # })
+
+        # $process.Start() | Out-Null
+        # $process.BeginOutputReadLine()
+        # $process.BeginErrorReadLine()
+
+        # $process.WaitForExit()
+        # $LASTEXITCODE = $process.ExitCode
 
         if ($LASTEXITCODE -eq 0) {
             Write-Success "Wheels application created successfully!"
@@ -906,8 +908,7 @@ function Create-WheelsApplication {
         }
 
     } catch {
-        Write-Error "Failed to create Wheels application: $($_.Exception.Message)"
-        return $false
+        Stop-WithCriticalError "Failed to create Wheels application" "Application Name: $appName`nApplication Path: $appPath`nTemplate: $template`nError: $($_.Exception.Message)`n`nThis could be due to insufficient permissions, invalid template, or CommandBox configuration issues."
     } finally {
         Pop-Location
     }
@@ -917,8 +918,7 @@ function Create-WheelsApplication {
         Write-Success "Application directory verified: $appPath"
         return $true
     } else {
-        Write-Error "Application directory not found: $appPath"
-        return $false
+        Stop-WithCriticalError "Application directory not found after creation" "Expected Path: $appPath`n`nThe Wheels application generation appeared to complete but the application directory was not created.`nThis could indicate a problem with the template or CommandBox configuration."
     }
 }
 
@@ -952,8 +952,7 @@ function Start-WheelsServer {
     $appPath = $Script:State.AppConfig.ApplicationPath
 
     if (-not (Test-Path $appPath)) {
-        Write-Error "Application directory not found: $appPath"
-        return $false
+        Stop-WithCriticalError "Application directory not found for server startup" "Expected Path: $appPath`n`nThe application directory does not exist. This should not happen if the application was created successfully."
     }
 
     try {
@@ -1015,8 +1014,7 @@ function Start-WheelsServer {
         }
 
     } catch {
-        Write-Error "Failed to start development server: $($_.Exception.Message)"
-        return $false
+        Stop-WithCriticalError "Failed to start development server" "Application Path: $appPath`nError: $($_.Exception.Message)`n`nThis could be due to port conflicts, Java issues, or application configuration problems."
     } finally {
         Pop-Location
     }
@@ -1031,15 +1029,17 @@ function Start-WheelsServer {
 function Test-Installation {
     param([string]$BoxPath)
 
-    Write-Info "Verifying commandBox installation..."
+    Write-Info "Verifying CommandBox installation..."
 
-    # Test CommandBox
+    # Test CommandBox basic functionality
     try {
         $boxVersion = & $BoxPath version 2>$null
+        if (-not $boxVersion) {
+            Stop-WithCriticalError "CommandBox executable not responding" "The CommandBox executable exists but does not respond to version command.`nThis could indicate a corrupted installation or missing dependencies."
+        }
         Write-Success "CommandBox: $boxVersion"
     } catch {
-        Write-Error "CommandBox verification failed"
-        return $false
+        Stop-WithCriticalError "CommandBox verification failed" "Error: $($_.Exception.Message)`n`nCommandBox executable failed to run. This could be due to:`n- Missing Java runtime`n- Corrupted installation`n- Antivirus interference`n- Insufficient permissions"
     }
 
     return $true
@@ -1116,17 +1116,17 @@ function Show-CompletionSummary {
     }
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
-    # Open the application in browser if server is running
-    if ($Script:State.ServerUrl -and -not $Quiet) {
+    # Open Wheels Guides in browser if server is running
+    if ($Script:State.ServerUrl) {
         Write-Host ""
-        Write-Info "Opening your Wheels application in the browser..."
+        Write-Info "Opening Wheels Guides in the browser..."
         try {
-            Start-Process $Script:State.ServerUrl
-            Write-Success "Browser opened successfully!"
+            Start-Process "https://wheels.dev/guides"
+            Write-Success "Documentation opened successfully!"
             Start-Sleep -Seconds 2
         } catch {
-            Write-Warning "Could not open browser automatically."
-            Write-Info "Please visit: $($Script:State.ServerUrl)"
+            Write-Warning "Could not open documentation automatically."
+            Write-Info "Please visit: https://wheels.dev/guides"
         }
     } else {
         Write-Warning "No server URL available. Please start the server first."
@@ -1142,7 +1142,7 @@ function Show-CompletionSummary {
 
 function Start-Installation {
     try {
-        Write-Header "Wheels Framework Installer" "Installing CommandBox, Wheels CLI, and creating your application"
+        Write-Header "Wheels Installer" "Installing CommandBox, Wheels CLI, and Application"
 
         Initialize-Environment
 
@@ -1163,18 +1163,11 @@ function Start-Installation {
         # Install CommandBox
         $boxPath = Install-CommandBox
         if (-not $boxPath) {
-            Write-Error "CommandBox installation failed. Aborting."
-            exit 1
+            Stop-WithCriticalError "CommandBox installation failed" "The CommandBox installation process failed. Please check the error messages above."
         }
 
         # Add to PATH
         Add-CommandBoxToPath -BoxPath $boxPath
-
-        # Install Wheels packages
-        if (-not (Install-WheelsPackages -BoxPath $boxPath)) {
-            Write-Error "Wheels packages installation failed. Aborting."
-            exit 1
-        }
 
         # Clean up any existing tools folder (from previous installations)
         $toolsDir = Join-Path (Split-Path $boxPath -Parent) "tools"
@@ -1188,15 +1181,19 @@ function Start-Installation {
             }
         }
 
-        # Verify installation
+        # Verify CommandBox installation
         if (-not (Test-Installation -BoxPath $Script:State.BoxPath)) {
-            Write-Warning "Installation verification had issues, but installation may still be functional."
+            Stop-WithCriticalError "CommandBox installation verification failed" "CommandBox was installed but verification failed. The installation may be corrupted."
+        }
+
+        # Install Wheels packages
+        if (-not (Install-WheelsPackages -BoxPath $boxPath)) {
+            Stop-WithCriticalError "Wheels packages installation failed" "The Wheels CLI package installation failed. Please check the error messages above."
         }
 
         # Create Wheels application (configuration already collected at startup)
         if (-not (Create-WheelsApplication -BoxPath $Script:State.BoxPath)) {
-            Write-Error "Failed to create Wheels application. Installation completed but app creation failed."
-            exit 1
+            Stop-WithCriticalError "Failed to create Wheels application" "Installation of CommandBox completed successfully but application creation failed. Please check the error messages above."
         }
 
         # Server should already be running, just check status
@@ -1206,15 +1203,14 @@ function Start-Installation {
             Write-Info "You can manually start the server by running 'box server start' in your app directory."
         }
 
+        # Clean up temporary files on successful completion
+        Cleanup-TempFiles
+
         # Show completion summary
         Show-CompletionSummary
 
     } catch {
-        Write-Error "Installation failed with error: $($_.Exception.Message)"
-        if (-not $Quiet) {
-            Write-Error $_.ScriptStackTrace
-        }
-        exit 1
+        Stop-WithCriticalError "Installation failed with unexpected error" "Error: $($_.Exception.Message)`n`nStack Trace:`n$($_.ScriptStackTrace)`n`nThis is an unexpected error. Please report this issue."
     }
 }
 
