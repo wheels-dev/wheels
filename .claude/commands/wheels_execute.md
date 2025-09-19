@@ -19,14 +19,15 @@ Execute a complete, systematic CFWheels development workflow that implements fea
 
 ## Workflow Overview
 
-The `/wheels_execute` command implements a comprehensive 6-phase development workflow:
+The `/wheels_execute` command implements a comprehensive 7-phase development workflow:
 
 1. **Pre-Flight Documentation Loading** - Systematically load relevant patterns from `.ai` folder
 2. **Intelligent Analysis & Planning** - Parse requirements and create detailed implementation plan
 3. **Template-Driven Implementation** - Generate code using established patterns with error recovery
-4. **Multi-Level Testing** - Unit tests, integration tests, and validation
-5. **Comprehensive Browser Testing** - Test every button, form, and link automatically
-6. **Quality Assurance & Reporting** - Anti-pattern detection and final validation
+4. **TestBox BDD Test Suite Creation** - Write comprehensive BDD tests before marking complete
+5. **Multi-Level Testing Execution** - Run unit tests, integration tests, and validation
+6. **Comprehensive Browser Testing** - Test every button, form, and link automatically
+7. **Quality Assurance & Reporting** - Anti-pattern detection and final validation
 
 ## Phase Details
 
@@ -50,13 +51,22 @@ The `/wheels_execute` command implements a comprehensive 6-phase development wor
 - **Consistency Enforcement**: Ensure patterns match existing codebase
 - **Security Integration**: Add CSRF protection, validation, authentication
 
-### Phase 4: Multi-Level Testing (3-8 minutes)
-- **Unit Testing**: Test individual models, controllers, and their methods
-- **Integration Testing**: Test component interactions and CRUD operations
-- **Migration Testing**: Verify database changes work correctly
-- **Syntax Validation**: Check CFWheels-specific syntax patterns
+### Phase 4: TestBox BDD Test Suite Creation (10-20 minutes)
+- **Model Tests**: Write BDD specs for all model functionality, validations, and associations
+- **Controller Tests**: Write BDD specs for all controller actions and security filters
+- **Integration Tests**: Write BDD specs for complete user workflows and CRUD operations
+- **Test Data Setup**: Create fixtures and test data for comprehensive testing
+- **Validation Testing**: Write BDD specs for all form validation scenarios
+- **Security Testing**: Write BDD specs for authentication, authorization, and CSRF protection
 
-### Phase 5: Comprehensive Browser Testing (5-10 minutes)
+### Phase 5: Multi-Level Testing Execution (3-8 minutes)
+- **Unit Test Execution**: Run all model and controller BDD specs
+- **Integration Test Execution**: Run all workflow and CRUD BDD specs
+- **Migration Testing**: Verify database changes work correctly
+- **Test Coverage Analysis**: Ensure all code paths are tested
+- **Test Failure Resolution**: Fix any failing tests before proceeding
+
+### Phase 6: Comprehensive Browser Testing (5-10 minutes)
 - **Server Verification**: Ensure development server is running
 - **Navigation Testing**: Test all menu links, buttons, and navigation paths
 - **CRUD Flow Testing**: Test complete create, read, update, delete operations
@@ -65,12 +75,13 @@ The `/wheels_execute` command implements a comprehensive 6-phase development wor
 - **Responsive Testing**: Validate mobile, tablet, desktop layouts
 - **Error Scenario Testing**: Test 404s, validation failures, edge cases
 
-### Phase 6: Quality Assurance & Reporting (2-3 minutes)
+### Phase 7: Quality Assurance & Reporting (2-3 minutes)
 - **Anti-Pattern Detection**: Scan for mixed arguments, query/array confusion
 - **Security Review**: Verify CSRF, authentication, input validation
 - **Performance Analysis**: Check for N+1 queries, optimization opportunities
 - **Documentation Compliance**: Validate against `.ai` documentation patterns
-- **Comprehensive Reporting**: Generate detailed results with screenshots
+- **Test Coverage Report**: Generate detailed test coverage analysis
+- **Comprehensive Reporting**: Generate detailed results with screenshots and test results
 
 ## Anti-Pattern Prevention
 
@@ -113,8 +124,11 @@ model("Post").findByKey(params.key);
 A feature is only considered complete when ALL of the following are true:
 - [ ] ✅ All relevant `.ai` documentation was consulted
 - [ ] ✅ No anti-patterns detected in generated code
-- [ ] ✅ All unit tests pass
-- [ ] ✅ All integration tests pass
+- [ ] ✅ **Comprehensive TestBox BDD test suite written and passing**
+- [ ] ✅ **All model BDD specs pass (validations, associations, methods)**
+- [ ] ✅ **All controller BDD specs pass (actions, filters, security)**
+- [ ] ✅ **All integration BDD specs pass (user workflows, CRUD)**
+- [ ] ✅ **Test coverage >= 90% for all components**
 - [ ] ✅ All browser tests pass
 - [ ] ✅ Every button, form, and link has been tested
 - [ ] ✅ Responsive design works on mobile, tablet, desktop
@@ -175,6 +189,9 @@ The workflow automatically tests:
 Code will be automatically rejected if:
 - Any mixed argument styles are detected
 - Any `ArrayLen()` calls on model associations exist
+- **Any TestBox BDD spec fails**
+- **Test coverage is below 90%**
+- **Missing BDD specs for any component**
 - Any browser test fails
 - Any security check fails
 - Any anti-pattern is detected
@@ -192,6 +209,304 @@ Code will be automatically rejected if:
 - Authentication filters must be present
 - Input validation must be implemented
 - SQL injection prevention must be verified
+
+## TestBox BDD Testing Requirements
+
+### Mandatory BDD Test Structure
+
+Every component MUST have comprehensive TestBox BDD specs using the following structure:
+
+#### Model Specs (`/tests/specs/models/`)
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function beforeAll() {
+        // Setup database and test environment
+        application.testbox = new testbox.system.TestBox();
+    }
+
+    function afterAll() {
+        // Cleanup test data
+    }
+
+    function run() {
+        describe("Post Model", function() {
+
+            beforeEach(function() {
+                variables.post = model("Post").new();
+            });
+
+            afterEach(function() {
+                if (isObject(variables.post) && variables.post.isPersisted()) {
+                    variables.post.delete();
+                }
+            });
+
+            describe("Validations", function() {
+                it("should require title", function() {
+                    variables.post.title = "";
+                    expect(variables.post.valid()).toBeFalse();
+                    expect(variables.post.allErrors()).toHaveKey("title");
+                });
+
+                it("should require content", function() {
+                    variables.post.content = "";
+                    expect(variables.post.valid()).toBeFalse();
+                    expect(variables.post.allErrors()).toHaveKey("content");
+                });
+
+                it("should require unique slug", function() {
+                    var existingPost = model("Post").create({
+                        title: "Test Post",
+                        content: "Test content",
+                        slug: "test-slug",
+                        published: false
+                    });
+
+                    variables.post.slug = "test-slug";
+                    expect(variables.post.valid()).toBeFalse();
+                    expect(variables.post.allErrors()).toHaveKey("slug");
+
+                    existingPost.delete();
+                });
+            });
+
+            describe("Associations", function() {
+                it("should have many comments", function() {
+                    expect(variables.post.comments()).toBeQuery();
+                });
+
+                it("should delete associated comments", function() {
+                    var savedPost = model("Post").create({
+                        title: "Test Post",
+                        content: "Test content",
+                        published: false
+                    });
+
+                    var comment = model("Comment").create({
+                        content: "Test comment",
+                        authorName: "Test Author",
+                        authorEmail: "test@example.com",
+                        postId: savedPost.id
+                    });
+
+                    expect(savedPost.comments().recordCount).toBe(1);
+                    savedPost.delete();
+                    expect(model("Comment").findByKey(comment.id)).toBeFalse();
+                });
+            });
+
+            describe("Methods", function() {
+                it("should generate excerpt", function() {
+                    variables.post.content = "<p>This is a long content that should be truncated at some point for the excerpt.</p>";
+                    expect(len(variables.post.excerpt(20))).toBeLTE(23); // 20 + "..."
+                });
+
+                it("should auto-generate slug from title", function() {
+                    variables.post.title = "This is a Test Title!";
+                    variables.post.setSlugAndPublishDate();
+                    expect(variables.post.slug).toBe("this-is-a-test-title");
+                });
+            });
+        });
+    }
+}
+```
+
+#### Controller Specs (`/tests/specs/controllers/`)
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function beforeAll() {
+        application.testbox = new testbox.system.TestBox();
+    }
+
+    function run() {
+        describe("Posts Controller", function() {
+
+            beforeEach(function() {
+                // Setup test data
+                variables.testPost = model("Post").create({
+                    title: "Test Post",
+                    content: "Test content for controller testing",
+                    published: true,
+                    publishedAt: now()
+                });
+            });
+
+            afterEach(function() {
+                if (isObject(variables.testPost)) {
+                    variables.testPost.delete();
+                }
+            });
+
+            describe("index action", function() {
+                it("should load published posts", function() {
+                    var controller = controller("Posts");
+                    controller.index();
+
+                    expect(controller.posts).toBeQuery();
+                    expect(controller.posts.recordCount).toBeGTE(1);
+                });
+
+                it("should order posts by publishedAt DESC", function() {
+                    var newerPost = model("Post").create({
+                        title: "Newer Post",
+                        content: "Newer content",
+                        published: true,
+                        publishedAt: dateAdd("h", 1, now())
+                    });
+
+                    var controller = controller("Posts");
+                    controller.index();
+
+                    expect(controller.posts.title[1]).toBe("Newer Post");
+                    newerPost.delete();
+                });
+            });
+
+            describe("show action", function() {
+                it("should load post and comments", function() {
+                    var controller = controller("Posts");
+                    controller.params.key = variables.testPost.id;
+                    controller.show();
+
+                    expect(controller.post.id).toBe(variables.testPost.id);
+                    expect(controller.comments).toBeQuery();
+                });
+            });
+
+            describe("create action", function() {
+                it("should create valid post", function() {
+                    var controller = controller("Posts");
+                    controller.params.post = {
+                        title: "New Test Post",
+                        content: "New test content",
+                        published: true
+                    };
+
+                    var initialCount = model("Post").count();
+                    controller.create();
+
+                    expect(model("Post").count()).toBe(initialCount + 1);
+
+                    // Cleanup
+                    var newPost = model("Post").findOne(where="title = 'New Test Post'");
+                    if (isObject(newPost)) {
+                        newPost.delete();
+                    }
+                });
+
+                it("should handle validation errors", function() {
+                    var controller = controller("Posts");
+                    controller.params.post = {
+                        title: "", // Invalid - empty title
+                        content: "Test content"
+                    };
+
+                    controller.create();
+                    expect(controller.post.hasErrors()).toBeTrue();
+                });
+            });
+        });
+    }
+}
+```
+
+#### Integration Specs (`/tests/specs/integration/`)
+```cfm
+component extends="testbox.system.BaseSpec" {
+
+    function run() {
+        describe("Blog Workflow Integration", function() {
+
+            beforeEach(function() {
+                // Setup clean test environment
+            });
+
+            afterEach(function() {
+                // Cleanup test data
+            });
+
+            describe("Complete post lifecycle", function() {
+                it("should create, publish, and delete post", function() {
+                    // Create post
+                    var post = model("Post").create({
+                        title: "Integration Test Post",
+                        content: "Integration test content",
+                        published: false
+                    });
+
+                    expect(post.isNew()).toBeFalse();
+                    expect(post.published).toBeFalse();
+
+                    // Publish post
+                    post.update({published: true, publishedAt: now()});
+                    expect(post.published).toBeTrue();
+
+                    // Add comment
+                    var comment = model("Comment").create({
+                        content: "Integration test comment",
+                        authorName: "Test Author",
+                        authorEmail: "test@example.com",
+                        postId: post.id
+                    });
+
+                    expect(post.comments().recordCount).toBe(1);
+
+                    // Delete post (should cascade delete comments)
+                    post.delete();
+                    expect(model("Comment").findByKey(comment.id)).toBeFalse();
+                });
+            });
+
+            describe("Form validation workflow", function() {
+                it("should prevent invalid post creation", function() {
+                    var post = model("Post").new({
+                        title: "", // Invalid
+                        content: "x" // Too short
+                    });
+
+                    expect(post.save()).toBeFalse();
+                    expect(post.allErrors()).toHaveKey("title");
+                    expect(post.allErrors()).toHaveKey("content");
+                });
+            });
+        });
+    }
+}
+```
+
+### Test Execution Requirements
+
+#### Mandatory Test Commands
+All tests MUST be executed and pass before completion:
+
+```bash
+# Run all model specs
+wheels test model --reporter=json
+
+# Run all controller specs
+wheels test controller --reporter=json
+
+# Run all integration specs
+wheels test integration --reporter=json
+
+# Run complete test suite with coverage
+wheels test all --coverage --reporter=json
+```
+
+#### Test Coverage Requirements
+- **Models**: 100% coverage of all public methods, validations, and associations
+- **Controllers**: 100% coverage of all actions and filters
+- **Integration**: 90% coverage of complete user workflows
+- **Overall**: Minimum 90% total coverage across all components
+
+#### Test Data Management
+- Use TestBox's `beforeEach()` and `afterEach()` for test isolation
+- Create test fixtures for complex scenarios
+- Always clean up test data to prevent test pollution
+- Use database transactions for faster test execution
 
 ## Error Recovery System
 
@@ -221,6 +536,24 @@ Error: ArrayLen() on query object detected
 → Fix: Use .recordCount and proper loop syntax
 → Retry: View generation with correct patterns
 → Validate: Browser test confirms functionality
+```
+
+#### TestBox BDD Test Failure Recovery
+```
+Error: BDD specs failing or missing
+→ Load: .ai/wheels/testing/ documentation
+→ Fix: Write comprehensive BDD specs for all components
+→ Retry: Run complete test suite
+→ Validate: All tests pass with 90%+ coverage
+```
+
+#### Test Coverage Insufficient Recovery
+```
+Error: Test coverage below 90%
+→ Analyze: Identify untested code paths
+→ Fix: Add BDD specs for missing scenarios
+→ Retry: Run test suite with coverage analysis
+→ Validate: Coverage meets minimum requirements
 ```
 
 ## Implementation Strategy
@@ -262,8 +595,10 @@ Based on application type detected:
 - **Flexibility**: Claude Code can adapt the workflow dynamically
 - **Error Handling**: Better error recovery and human-readable feedback
 - **Documentation Integration**: Direct access to `.ai` folder without MCP resource limitations
-- **Browser Testing**: Full Puppeteer integration for comprehensive testing
-- **Reporting**: Rich, detailed reporting with screenshots and explanations
+- **Comprehensive Testing**: TestBox BDD specs + Browser testing + Integration testing
+- **Test Coverage**: Mandatory 90%+ coverage with detailed analysis
+- **Quality Assurance**: No feature complete without passing test suite
+- **Reporting**: Rich, detailed reporting with screenshots, test results, and coverage analysis
 - **Learning**: Users see the complete process and can learn from it
 
 ### Testing Strategy
