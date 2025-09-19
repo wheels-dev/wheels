@@ -8,25 +8,30 @@
  * wheels mcp setup
  * wheels mcp setup --port=8080
  * wheels mcp setup --ide=claude
+ * wheels mcp setup --ide=opencode
  * wheels mcp setup --all
  * wheels mcp setup --force
+ * wheels mcp setup --browserMcp
+ * wheels mcp setup --browserMcp --all
  * {code}
  **/
 component extends="../base" {
 
 	/**
 	 * @port Port number for Wheels server (auto-detected if not provided)
-	 * @ide Specific IDE to configure (claude, cursor, continue, windsurf)
+	 * @ide Specific IDE to configure (claude, cursor, continue, windsurf, opencode)
 	 * @all Configure all detected IDEs
 	 * @force Overwrite existing configuration
 	 * @noAutoStart Don't automatically start server if not running
+	 * @browserMcp Include Browser MCP server in configuration
 	 **/
 	function run(
 		numeric port,
 		string ide,
 		boolean all = false,
 		boolean force = false,
-		boolean noAutoStart = false
+		boolean noAutoStart = false,
+		boolean browserMcp = false
 	) {
 		print.line();
 		print.boldYellowLine("🤖 Setting up MCP Integration for Wheels");
@@ -152,22 +157,58 @@ component extends="../base" {
 		print.boldLine("Configuring MCP Integration...");
 
 		try {
-			// Create .mcp.json for Claude Code project-level configuration
-			// This points to the native CFML MCP server endpoint
 			var mcpConfigPath = getCWD() & "/.mcp.json";
-			if (!fileExists(mcpConfigPath) || arguments.force) {
-				var mcpConfig = {
-					"mcpServers": {
-						"wheels": {
-							"type": "http",
-							"url": "http://localhost:" & serverPort & "/wheels/mcp"
-						}
-					}
+			var mcpConfig = {};
+			var configUpdated = false;
+
+			// Read existing configuration if it exists
+			if (fileExists(mcpConfigPath) && !arguments.force) {
+				try {
+					mcpConfig = deserializeJSON(fileRead(mcpConfigPath));
+					print.line("Found existing .mcp.json, merging configuration...");
+				} catch (any e) {
+					print.yellowLine("⚠️  Existing .mcp.json has invalid JSON, creating new configuration");
+					mcpConfig = {};
+				}
+			}
+
+			// Ensure mcpServers structure exists
+			if (!structKeyExists(mcpConfig, "mcpServers")) {
+				mcpConfig.mcpServers = {};
+			}
+
+			// Add/update Wheels MCP server if not present or force flag is set
+			if (!structKeyExists(mcpConfig.mcpServers, "wheels") || arguments.force) {
+				mcpConfig.mcpServers.wheels = {
+					"type": "http",
+					"url": "http://localhost:" & serverPort & "/wheels/mcp"
 				};
-				fileWrite(mcpConfigPath, serializeJSON(mcpConfig));
-				print.greenLine("✅ Created .mcp.json for project-level configuration");
+				configUpdated = true;
+				print.greenLine("✅ Added Wheels MCP server configuration");
 			} else {
-				print.yellowLine("⚠️  .mcp.json already exists (use --force to overwrite)");
+				print.line("Wheels MCP server already configured");
+			}
+
+			// Add Browser MCP server if requested and not present
+			if (arguments.browserMcp && (!structKeyExists(mcpConfig.mcpServers, "browsermcp") || arguments.force)) {
+				mcpConfig.mcpServers.browsermcp = {
+					"command": "npx",
+					"args": ["@browsermcp/mcp@latest"]
+				};
+				configUpdated = true;
+				print.greenLine("✅ Added Browser MCP server configuration");
+			} else if (arguments.browserMcp) {
+				print.line("Browser MCP server already configured");
+			}
+
+			// Write configuration file if updated or new
+			if (configUpdated || !fileExists(mcpConfigPath)) {
+				fileWrite(mcpConfigPath, serializeJSON(mcpConfig));
+				if (fileExists(mcpConfigPath) && configUpdated) {
+					print.greenLine("✅ Updated .mcp.json with new MCP servers");
+				} else {
+					print.greenLine("✅ Created .mcp.json for project-level configuration");
+				}
 			}
 
 			print.greenLine("✅ MCP configuration completed");
@@ -211,6 +252,13 @@ component extends="../base" {
 		if (directoryExists(windsurfDir)) {
 			detectedIDEs.windsurf = true;
 			arrayAppend(ideList, "windsurf");
+		}
+
+		// OpenCode
+		var opencodeDir = homeDir & "/.opencode";
+		if (directoryExists(opencodeDir)) {
+			detectedIDEs.opencode = true;
+			arrayAppend(ideList, "opencode");
 		}
 
 		if (arrayLen(ideList) == 0) {
@@ -268,16 +316,19 @@ component extends="../base" {
 				try {
 					switch (ideToConfig) {
 						case "claude":
-							configured = configureClaudeCode(serverPort, arguments.force);
+							configured = configureClaudeCode(serverPort, arguments.force, arguments.browserMcp);
 							break;
 						case "cursor":
-							configured = configureCursor(serverPort, arguments.force);
+							configured = configureCursor(serverPort, arguments.force, arguments.browserMcp);
 							break;
 						case "continue":
-							configured = configureContinue(serverPort, arguments.force);
+							configured = configureContinue(serverPort, arguments.force, arguments.browserMcp);
 							break;
 						case "windsurf":
-							configured = configureWindsurf(serverPort, arguments.force);
+							configured = configureWindsurf(serverPort, arguments.force, arguments.browserMcp);
+							break;
+						case "opencode":
+							configured = configureOpenCode(serverPort, arguments.force, arguments.browserMcp);
 							break;
 					}
 
@@ -297,8 +348,12 @@ component extends="../base" {
 		print.boldGreenLine("✨ MCP Integration Setup Complete!");
 		print.line();
 		print.boldLine("Configuration Summary:");
-		print.indentedLine("MCP Endpoint: http://localhost:" & serverPort & "/wheels/mcp");
+		print.indentedLine("Wheels MCP Endpoint: http://localhost:" & serverPort & "/wheels/mcp");
 		print.indentedLine("Server Type: Native CFML (no Node.js required)");
+
+		if (arguments.browserMcp) {
+			print.indentedLine("Browser MCP: @browsermcp/mcp@latest (via npx)");
+		}
 
 		if (arrayLen(idesToConfigure) > 0) {
 			print.indentedLine("Configured IDEs: " & arrayToList(idesToConfigure, ", "));
@@ -317,16 +372,20 @@ component extends="../base" {
 		print.indentedLine("wheels mcp remove  - Remove MCP integration");
 		print.line();
 
-		print.yellowLine("💡 The native MCP server provides AI assistants with:");
+		print.yellowLine("💡 The MCP integration provides AI assistants with:");
 		print.indentedLine("• Real-time access to your Wheels project structure");
 		print.indentedLine("• Complete API documentation and guides");
 		print.indentedLine("• Ability to generate models, controllers, and migrations");
 		print.indentedLine("• Direct execution of tests and server commands");
 		print.indentedLine("• Project analysis and validation tools");
+
+		if (arguments.browserMcp) {
+			print.indentedLine("• Browser automation capabilities (via Browser MCP)");
+		}
 		print.line();
 	}
 
-	private function configureClaudeCode(required numeric port, required boolean force) {
+	private function configureClaudeCode(required numeric port, required boolean force, boolean browserMcp = false) {
 		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
 		var configDir = homeDir & "/.config/claude";
 		var configFile = configDir & "/claude_desktop_config.json";
@@ -336,6 +395,8 @@ component extends="../base" {
 		}
 
 		var config = {};
+		var configUpdated = false;
+
 		if (fileExists(configFile) && !arguments.force) {
 			try {
 				config = deserializeJSON(fileRead(configFile));
@@ -349,13 +410,25 @@ component extends="../base" {
 			config.mcpServers = {};
 		}
 
+		// Add/update Wheels MCP server
 		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
 			config.mcpServers.wheels = {
 				"type": "http",
 				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
+			configUpdated = true;
+		}
 
+		// Add Browser MCP server if requested and not already present
+		if (arguments.browserMcp && (!structKeyExists(config.mcpServers, "browsermcp") || arguments.force)) {
+			config.mcpServers.browsermcp = {
+				"command": "npx",
+				"args": ["@browsermcp/mcp@latest"]
+			};
+			configUpdated = true;
+		}
+
+		if (configUpdated) {
 			fileWrite(configFile, serializeJSON(config));
 			return true;
 		}
@@ -363,7 +436,7 @@ component extends="../base" {
 		return false;
 	}
 
-	private function configureCursor(required numeric port, required boolean force) {
+	private function configureCursor(required numeric port, required boolean force, boolean browserMcp = false) {
 		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
 		var configDir = homeDir & "/.cursor";
 		var configFile = configDir & "/mcp_servers.json";
@@ -373,6 +446,8 @@ component extends="../base" {
 		}
 
 		var config = {};
+		var configUpdated = false;
+
 		if (fileExists(configFile) && !arguments.force) {
 			try {
 				config = deserializeJSON(fileRead(configFile));
@@ -385,13 +460,25 @@ component extends="../base" {
 			config.mcpServers = {};
 		}
 
+		// Add/update Wheels MCP server
 		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
 			config.mcpServers.wheels = {
 				"type": "http",
 				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
+			configUpdated = true;
+		}
 
+		// Add Browser MCP server if requested and not already present
+		if (arguments.browserMcp && (!structKeyExists(config.mcpServers, "browsermcp") || arguments.force)) {
+			config.mcpServers.browsermcp = {
+				"command": "npx",
+				"args": ["@browsermcp/mcp@latest"]
+			};
+			configUpdated = true;
+		}
+
+		if (configUpdated) {
 			fileWrite(configFile, serializeJSON(config));
 			return true;
 		}
@@ -399,7 +486,7 @@ component extends="../base" {
 		return false;
 	}
 
-	private function configureContinue(required numeric port, required boolean force) {
+	private function configureContinue(required numeric port, required boolean force, boolean browserMcp = false) {
 		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
 		var configDir = homeDir & "/.continue";
 		var configFile = configDir & "/config.json";
@@ -409,6 +496,8 @@ component extends="../base" {
 		}
 
 		var config = {};
+		var configUpdated = false;
+
 		if (fileExists(configFile) && !arguments.force) {
 			try {
 				config = deserializeJSON(fileRead(configFile));
@@ -425,13 +514,25 @@ component extends="../base" {
 			config.experimental.modelContextProtocol = {};
 		}
 
+		// Add/update Wheels MCP server
 		if (!structKeyExists(config.experimental.modelContextProtocol, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
 			config.experimental.modelContextProtocol.wheels = {
 				"type": "http",
 				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
+			configUpdated = true;
+		}
 
+		// Add Browser MCP server if requested and not already present
+		if (arguments.browserMcp && (!structKeyExists(config.experimental.modelContextProtocol, "browsermcp") || arguments.force)) {
+			config.experimental.modelContextProtocol.browsermcp = {
+				"command": "npx",
+				"args": ["@browsermcp/mcp@latest"]
+			};
+			configUpdated = true;
+		}
+
+		if (configUpdated) {
 			fileWrite(configFile, serializeJSON(config));
 			return true;
 		}
@@ -439,7 +540,7 @@ component extends="../base" {
 		return false;
 	}
 
-	private function configureWindsurf(required numeric port, required boolean force) {
+	private function configureWindsurf(required numeric port, required boolean force, boolean browserMcp = false) {
 		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
 		var configDir = homeDir & "/.windsurf";
 		var configFile = configDir & "/mcp_servers.json";
@@ -449,6 +550,8 @@ component extends="../base" {
 		}
 
 		var config = {};
+		var configUpdated = false;
+
 		if (fileExists(configFile) && !arguments.force) {
 			try {
 				config = deserializeJSON(fileRead(configFile));
@@ -461,13 +564,77 @@ component extends="../base" {
 			config.mcpServers = {};
 		}
 
+		// Add/update Wheels MCP server
 		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
 			config.mcpServers.wheels = {
 				"type": "http",
 				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
 			};
+			configUpdated = true;
+		}
 
+		// Add Browser MCP server if requested and not already present
+		if (arguments.browserMcp && (!structKeyExists(config.mcpServers, "browsermcp") || arguments.force)) {
+			config.mcpServers.browsermcp = {
+				"command": "npx",
+				"args": ["@browsermcp/mcp@latest"]
+			};
+			configUpdated = true;
+		}
+
+		if (configUpdated) {
+			fileWrite(configFile, serializeJSON(config));
+			return true;
+		}
+
+		return false;
+	}
+
+	private function configureOpenCode(required numeric port, required boolean force, boolean browserMcp = false) {
+		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
+		var configDir = homeDir & "/.opencode";
+		var configFile = configDir & "/opencode.json";
+
+		if (!directoryExists(configDir)) {
+			directoryCreate(configDir, true);
+		}
+
+		var config = {};
+		var configUpdated = false;
+
+		if (fileExists(configFile) && !arguments.force) {
+			try {
+				config = deserializeJSON(fileRead(configFile));
+			} catch (any e) {
+				config = {};
+			}
+		}
+
+		if (!structKeyExists(config, "mcp")) {
+			config.mcp = {};
+		}
+
+		// Add/update Wheels MCP server
+		if (!structKeyExists(config.mcp, "wheels") || arguments.force) {
+			config.mcp.wheels = {
+				"type": "remote",
+				"url": "http://localhost:" & arguments.port & "/wheels/mcp",
+				"enabled": true
+			};
+			configUpdated = true;
+		}
+
+		// Add Browser MCP server if requested and not already present
+		if (arguments.browserMcp && (!structKeyExists(config.mcp, "browsermcp") || arguments.force)) {
+			config.mcp.browsermcp = {
+				"type": "local",
+				"command": ["npx", "@browsermcp/mcp@latest"],
+				"enabled": true
+			};
+			configUpdated = true;
+		}
+
+		if (configUpdated) {
 			fileWrite(configFile, serializeJSON(config));
 			return true;
 		}
