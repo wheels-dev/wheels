@@ -135,7 +135,7 @@ component {
         boolean crud = false,
         boolean mock = false
     ) {
-        var content = 'component extends="testbox.system.BaseSpec" {' & chr(10) & chr(10);
+        var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
         
         // Add any required properties for mocking
         if (arguments.mock) {

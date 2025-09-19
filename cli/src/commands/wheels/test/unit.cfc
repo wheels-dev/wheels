@@ -107,7 +107,7 @@ component aliases='wheels test:unit' extends="../base" {
      * Create a sample unit test file
      */
     private void function createSampleUnitTest(required string directory) {
-        var sampleTest = 'component extends="testbox.system.BaseSpec" {
+        var sampleTest = 'component extends="wheels.Testbox" {
     
     function run() {
         describe("Sample Unit Test", function() {

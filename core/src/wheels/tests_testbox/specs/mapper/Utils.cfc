@@ -1,7 +1,7 @@
 /**
  * This tests Wheels Application Bootstrapping
  */
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
 
 	function run() {

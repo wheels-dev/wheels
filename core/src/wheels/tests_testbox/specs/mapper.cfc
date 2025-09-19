@@ -1,4 +1,4 @@
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
 	function beforeAll() {
 		config = {path = "wheels", fileName = "Mapper", method = "$init"}

@@ -1,4 +1,4 @@
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
 	/**
 	 * Note, when testing headers, the result from getPageContext().getResponse().getHeader
