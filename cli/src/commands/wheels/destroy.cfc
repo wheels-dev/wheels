@@ -15,11 +15,34 @@ component aliases='wheels d'  extends="base"  {
 	 * @type.hint Type of component to destroy (resource, controller, model, view). Default is resource
 	 * @name.hint Name of object to destroy
 	 **/
-	function run(string type="resource", required string name) {
-		
+	function run(required string name, string type="resource") {
+
+		// Validate that name is not empty
+		arguments.name = trim(arguments.name);
+		if (len(arguments.name) == 0) {
+			print.redBoldLine("Error: Name argument cannot be empty.")
+				 .line("Please provide a name for the component to destroy.")
+				 .line()
+				 .line("Examples:")
+				 .line("  wheels destroy User")
+				 .line("  wheels destroy controller Products")
+				 .line("  wheels destroy model Product")
+				 .line("  wheels destroy view products/index")
+				 .line();
+			return;
+		}
+
 		// Normalize the type parameter
 		arguments.type = lCase(trim(arguments.type));
-		
+
+		// Validate that type is not empty (though it has a default)
+		if (len(arguments.type) == 0) {
+			print.redBoldLine("Error: Type argument cannot be empty.")
+				 .line("Valid types: resource, controller, model, view")
+				 .line();
+			return;
+		}
+
 		// Handle different destroy types
 		switch(arguments.type) {
 			case "controller":
@@ -168,8 +191,18 @@ component aliases='wheels d'  extends="base"  {
 		// Check if name contains a slash (specific view like products/index)
 		if(find("/", arguments.name)) {
 			var parts = listToArray(arguments.name, "/");
-			var controllerName = parts[1];
-			var viewName = parts[2];
+
+			// Validate that we have both controller and view parts
+			if(arrayLen(parts) != 2 || len(trim(parts[1])) == 0 || len(trim(parts[2])) == 0) {
+				print.redBoldLine("Error: Invalid view path format.")
+					 .line("When destroying a specific view, use format: controller/view")
+					 .line("Example: wheels destroy view products/index")
+					 .line();
+				return;
+			}
+
+			var controllerName = trim(parts[1]);
+			var viewName = trim(parts[2]);
 			var viewFile = fileSystemUtil.resolvePath("app/views/#controllerName#/#viewName#.cfm");
 			
 			print.redBoldLine("================================================")

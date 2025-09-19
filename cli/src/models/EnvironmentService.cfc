@@ -534,7 +534,10 @@ component {
             arrayAppend(envContent, "DB_TYPE=#arguments.config.dbtype#");
             arrayAppend(envContent, "DB_DRIVER=#arguments.config.datasourceInfo.driver#");
             arrayAppend(envContent, "DB_HOST=#arguments.config.datasourceInfo.host#");
-            arrayAppend(envContent, "DB_PORT=#arguments.config.datasourceInfo.port#");
+            // Only add port if it's not empty (H2 doesn't use ports)
+            if (len(trim(arguments.config.datasourceInfo.port))) {
+                arrayAppend(envContent, "DB_PORT=#arguments.config.datasourceInfo.port#");
+            }
             arrayAppend(envContent, "DB_NAME=#arguments.config.datasourceInfo.database#");
             arrayAppend(envContent, "DB_USER=#arguments.config.datasourceInfo.username#");
             arrayAppend(envContent, "DB_PASSWORD=#arguments.config.datasourceInfo.password#");
@@ -660,7 +663,10 @@ component {
             serverJson.env[arguments.environment]["DB_TYPE"] = arguments.config.dbtype;
             serverJson.env[arguments.environment]["DB_DRIVER"] = ds.driver;
             serverJson.env[arguments.environment]["DB_HOST"] = ds.host;
-            serverJson.env[arguments.environment]["DB_PORT"] = ds.port;
+            // Only add port if it's not empty (H2 doesn't use ports)
+            if (len(trim(ds.port))) {
+                serverJson.env[arguments.environment]["DB_PORT"] = ds.port;
+            }
             serverJson.env[arguments.environment]["DB_NAME"] = ds.database;
             serverJson.env[arguments.environment]["DB_USER"] = ds.username;
             serverJson.env[arguments.environment]["DB_PASSWORD"] = ds.password;
@@ -853,7 +859,8 @@ box server start port=8080 host=0.0.0.0";
             case "mysql": return 3306;
             case "postgres": return 5432;
             case "mssql": return 1433;
-            default: return 9092;
+            case "h2": return ""; // H2 is embedded, no port
+            default: return "";
         }
     }
 
@@ -952,7 +959,7 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
     ) {
         try {
             var projectRoot = arguments.rootPath;
-            var baseEnvFile = projectRoot & ".env." & arguments.base;
+            var baseEnvFile = projectRoot & "/.env." & arguments.base;
             
             // Check if base environment exists
             if (!fileExists(baseEnvFile)) {
@@ -983,7 +990,7 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         } catch (any e) {
             return {
                 success: false,
-                error: e
+                error: "Error setting up environment from base '" & arguments.base & "': " & e.message
             };
         }
     }
@@ -1027,60 +1034,69 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         string database = ""
     ) {
         var config = {};
-        
+
+        // Set template type (default to local for base environments)
+        config["template"] = "local";
+
         // Set database type and name
         config["dbtype"] = arguments.dbtype;
-        
-        // Use provided database name or fall back to environment-based naming
-        var databaseName = len(trim(arguments.database)) ? 
-            arguments.database : 
-            (structKeyExists(arguments.envConfig, "DB_NAME") ? 
-                arguments.envConfig["DB_NAME"] : 
-                arguments.environment & "_db");
-                
-        config["database"] = databaseName;
-        
-        // Set port from SERVER_PORT or default
-        config["port"] = structKeyExists(arguments.envConfig, "SERVER_PORT") ? 
-            val(arguments.envConfig["SERVER_PORT"]) : 8080;
-        
-        // Add unique offset to avoid port conflicts
-        var envHash = 0;
-        for (var i = 1; i <= len(arguments.environment); i++) {
-            envHash += asc(mid(arguments.environment, i, 1));
+
+        // Use provided database name or fall back to base environment's name, then environment-based naming
+        var databaseName = "";
+        if (len(trim(arguments.database))) {
+            databaseName = arguments.database;
+        } else if (structKeyExists(arguments.envConfig, "DB_NAME")) {
+            // Modify the base database name for the new environment
+            var baseName = arguments.envConfig["DB_NAME"];
+            // Replace any existing environment references with new environment
+            if (find("_", baseName)) {
+                databaseName = "wheels_" & arguments.environment;
+            } else {
+                databaseName = baseName & "_" & arguments.environment;
+            }
+        } else {
+            databaseName = "wheels_" & arguments.environment;
         }
-        envHash = envHash mod 1000;
-        config["port"] = config["port"] + envHash;
-        
+
+        config["database"] = databaseName;
+
+        // Set port from SERVER_PORT or default
+        config["port"] = structKeyExists(arguments.envConfig, "SERVER_PORT") ?
+            val(arguments.envConfig["SERVER_PORT"]) : 8080;
+
         // Set cfengine if exists
         if (structKeyExists(arguments.envConfig, "SERVER_CFENGINE")) {
             config["cfengine"] = arguments.envConfig["SERVER_CFENGINE"];
         }
-        
-        // Create datasource structure if database keys exist
-        if (structKeyExists(arguments.envConfig, "DB_DRIVER") || 
+
+        // Create datasourceInfo structure (not "datasource") to match expected format
+        if (structKeyExists(arguments.envConfig, "DB_DRIVER") ||
             structKeyExists(arguments.envConfig, "DB_HOST")) {
-            
-            config["datasource"] = {};
-            config["datasource"]["driver"] = getDatabaseDriver(arguments.dbtype);
-            config["datasource"]["host"] = structKeyExists(arguments.envConfig, "DB_HOST") ? 
+
+            config["datasourceInfo"] = {};
+            config["datasourceInfo"]["driver"] = getDatabaseDriver(arguments.dbtype);
+            config["datasourceInfo"]["host"] = structKeyExists(arguments.envConfig, "DB_HOST") ?
                 arguments.envConfig["DB_HOST"] : "localhost";
-            config["datasource"]["port"] = getDatabasePort(arguments.dbtype);
-            config["datasource"]["database"] = databaseName;
-            config["datasource"]["username"] = structKeyExists(arguments.envConfig, "DB_USER") ? 
+            config["datasourceInfo"]["port"] = getDatabasePort(arguments.dbtype);
+            config["datasourceInfo"]["database"] = databaseName;
+            config["datasourceInfo"]["datasource"] = "wheels_" & arguments.environment;
+            config["datasourceInfo"]["username"] = structKeyExists(arguments.envConfig, "DB_USER") ?
                 arguments.envConfig["DB_USER"] : "wheels";
-            config["datasource"]["password"] = structKeyExists(arguments.envConfig, "DB_PASSWORD") ? 
+            config["datasourceInfo"]["password"] = structKeyExists(arguments.envConfig, "DB_PASSWORD") ?
                 arguments.envConfig["DB_PASSWORD"] : "wheels_password";
+        } else {
+            // Create default datasource info based on dbtype
+            config["datasourceInfo"] = {
+                driver: getDatabaseDriver(arguments.dbtype),
+                host: "localhost",
+                port: getDatabasePort(arguments.dbtype),
+                database: databaseName,
+                datasource: "wheels_" & arguments.environment,
+                username: "wheels",
+                password: "wheels_password"
+            };
         }
-        
-        // Add any other keys that don't follow the standard patterns
-        for (var key in arguments.envConfig) {
-            // Skip keys we've already processed
-            if (!listFindNoCase("SERVER_PORT,SERVER_CFENGINE,DB_TYPE,DB_DRIVER,DB_HOST,DB_PORT,DB_NAME,DB_USER,DB_PASSWORD,WHEELS_ENV,WHEELS_RELOAD_PASSWORD", key)) {
-                config[key] = arguments.envConfig[key];
-            }
-        }
-        
+
         return config;
     }
 

@@ -23,6 +23,7 @@ component extends="base" {
         string version="",
         boolean dev=false
     ) {
+        arguments = reconstructArgs(arguments);
         // Welcome message
         print.line();
         print.boldMagentaLine("Wheels Dependency Manager");
@@ -154,7 +155,7 @@ component extends="base" {
             }
             
             if (arguments.dev) {
-                local.installCmd &= " --dev";
+                local.installCmd &= " --saveDev";
             }
             
             // Run CommandBox install
@@ -324,7 +325,7 @@ component extends="base" {
                 "timestamp": now(),
                 "project": "",
                 "wheelsVersion": "",
-                "cfmlEngine": server.coldfusion.productName & " " & server.coldfusion.productVersion,
+                "cfmlEngine": getCFMLEngineInfo(),
                 "dependencies": {},
                 "devDependencies": {},
                 "installedModules": [],
@@ -362,8 +363,20 @@ component extends="base" {
                         local.report.wheelsVersion = local.wheelsBox.version;
                     }
                 } catch (any e) {
-                    // Ignore errors
-                } 
+                    // Try fallback method
+                    try {
+                        local.report.wheelsVersion = $getWheelsVersion();
+                    } catch (any e2) {
+                        local.report.wheelsVersion = "Unknown";
+                    }
+                }
+            } else {
+                // Try fallback method
+                try {
+                    local.report.wheelsVersion = $getWheelsVersion();
+                } catch (any e) {
+                    local.report.wheelsVersion = "Unknown";
+                }
             }
             
             // Check installed modules
@@ -487,34 +500,57 @@ component extends="base" {
     }
     
     /**
+     * Get CFML engine information
+     */
+    private string function getCFMLEngineInfo() {
+        try {
+            if (StructKeyExists(server, "lucee")) {
+                return "Lucee " & server.lucee.version;
+            } else if (StructKeyExists(server, "coldfusion")) {
+                return server.coldfusion.productname & " " & server.coldfusion.productversion;
+            }
+        } catch (any e) {
+            // Continue to fallback
+        }
+        return "Unknown";
+    }
+
+    /**
      * Check if a module is installed
      */
     private boolean function checkIfInstalled(required string packageName) {
-        // Check modules directory
-        local.modulesPath = fileSystemUtil.resolvePath("core");
-        if (directoryExists(local.modulesPath)) {
-            // Simple name check
-            local.simpleName = listLast(arguments.packageName, ":");
-            local.modulePath = local.modulesPath & "/" & local.simpleName;
-            if (directoryExists(local.modulePath)) {
-                return true;
-            }
-            
-            // Check with package name variations
-            local.variations = [
-                arguments.packageName,
-                replace(arguments.packageName, ":", "-", "all"),
-                replace(arguments.packageName, "@", "-", "all")
-            ];
-            
-            for (local.variation in local.variations) {
-                local.modulePath = local.modulesPath & "/" & local.variation;
-                if (directoryExists(local.modulePath)) {
-                    return true;
+        // First check if we have install paths in box.json
+        try {
+            local.boxJsonPath = fileSystemUtil.resolvePath("box.json");
+            if (fileExists(local.boxJsonPath)) {
+                local.boxJson = deserializeJSON(fileRead(local.boxJsonPath));
+
+                // Check installPaths first (most reliable)
+                if (structKeyExists(local.boxJson, "installPaths") &&
+                    structKeyExists(local.boxJson.installPaths, arguments.packageName)) {
+                    local.installPath = fileSystemUtil.resolvePath(local.boxJson.installPaths[arguments.packageName]);
+                    return directoryExists(local.installPath);
                 }
             }
+        } catch (any e) {
+            // Continue to fallback methods
         }
-        
+
+        // Fallback: Check standard locations
+        local.standardPaths = [
+            "modules/#arguments.packageName#",
+            "modules/#listLast(arguments.packageName, ':')#",
+            arguments.packageName,
+            listLast(arguments.packageName, ":")
+        ];
+
+        for (local.path in local.standardPaths) {
+            local.fullPath = fileSystemUtil.resolvePath(local.path);
+            if (directoryExists(local.fullPath)) {
+                return true;
+            }
+        }
+
         return false;
     }
 }
