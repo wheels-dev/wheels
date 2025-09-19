@@ -246,7 +246,7 @@ If you are adding in the already created test files, then you have to add in the
 2. Follow the TestBox syntax for your tests:
 
 ```cfml
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
     
    function run() {
 

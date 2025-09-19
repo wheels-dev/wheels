@@ -3116,9 +3116,9 @@ wheels test app tests/specs/models/UserTest.cfc
 # Fix: Install TestBox
 box install testbox --saveDev
 
-# Error: BaseSpec not found
-# Fix: Ensure test extends correct path
-# component extends="testbox.system.BaseSpec"
+# Error: wheels.Testbox not found
+# Fix: Ensure test extends correct path and that wheels is installed
+# component extends="wheels.Testbox"
 ```
 
 ### CLI Module Issues
