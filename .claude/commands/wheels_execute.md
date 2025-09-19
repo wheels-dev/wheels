@@ -218,7 +218,7 @@ Every component MUST have comprehensive TestBox BDD specs using the following st
 
 #### Model Specs (`/tests/specs/models/`)
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         // Setup database and test environment
@@ -315,7 +315,7 @@ component extends="testbox.system.BaseSpec" {
 
 #### Controller Specs (`/tests/specs/controllers/`)
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function beforeAll() {
         application.testbox = new testbox.system.TestBox();
@@ -415,7 +415,7 @@ component extends="testbox.system.BaseSpec" {
 
 #### Integration Specs (`/tests/specs/integration/`)
 ```cfm
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.Testbox" {
 
     function run() {
         describe("Blog Workflow Integration", function() {
