@@ -6,6 +6,8 @@ Generate a controller with actions and optional views.
 
 ```bash
 wheels generate controller name=<controllerName> [options]
+
+#Can also be used as:
 wheels g controller name=<controllerName> [options]
 ```
 
