@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with a Wheels application.
+This file provides guidance to AI Agents when working with a Wheels application.
 
 ## 🚨 MANDATORY: Pre-Implementation Workflow
 
