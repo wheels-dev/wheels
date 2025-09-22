@@ -122,7 +122,120 @@ $Script:State = @{
     AppConfig = @{}
     TempFiles = @()
     InterruptHandlerRegistered = $false
+    LogFile = ""
 }
+
+#region Logging Functions
+
+function Initialize-Logging {
+    # Create log file in temp directory with timestamp
+    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $Script:State.LogFile = Join-Path $env:TEMP "WheelsInstaller_$timestamp.log"
+
+    try {
+        # Initialize log file with header
+        $logHeader = @"
+================================================================================
+Wheels Installer Log
+================================================================================
+Start Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+PowerShell Version: $($PSVersionTable.PSVersion)
+Windows Version: $([System.Environment]::OSVersion.VersionString)
+User: $($env:USERNAME)
+Computer: $($env:COMPUTERNAME)
+Working Directory: $($PWD.Path)
+Parameters:
+  InstallPath: $InstallPath
+  Force: $Force
+  SkipPath: $SkipPath
+  AppName: $AppName
+  Template: $Template
+  CFMLEngine: $CFMLEngine
+  UseH2: $UseH2
+  UseBootstrap: $UseBootstrap
+  InitializeAsPackage: $InitializeAsPackage
+  ApplicationBasePath: $ApplicationBasePath
+================================================================================
+
+"@
+        $logHeader | Out-File -FilePath $Script:State.LogFile -Encoding UTF8
+        Write-Info "Log file created: $($Script:State.LogFile)"
+    } catch {
+        Write-Warning "Could not create log file: $($_.Exception.Message)"
+        $Script:State.LogFile = ""
+    }
+}
+
+function Write-Log {
+    param(
+        [Parameter(Mandatory=$true)]
+        [AllowEmptyString()]
+        [string]$Message,
+        [string]$Level = "INFO"
+    )
+
+    if (-not $Script:State.LogFile) { return }
+
+    try {
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+        if ($Message -eq "") {
+            $logEntry = ""
+        } else {
+            $logEntry = "[$timestamp] [$Level] $Message"
+        }
+        $logEntry | Out-File -FilePath $Script:State.LogFile -Append -Encoding UTF8
+    } catch {
+        # Silently fail if logging doesn't work
+    }
+}
+
+function Write-LogSection {
+    param([string]$SectionName)
+
+    $separator = "=" * 80
+    Write-Log ""
+    Write-Log $separator
+    Write-Log "SECTION: $SectionName"
+    Write-Log $separator
+}
+
+function Write-LogError {
+    param(
+        [string]$Message,
+        [System.Management.Automation.ErrorRecord]$ErrorRecord = $null
+    )
+
+    Write-Log $Message "ERROR"
+    if ($ErrorRecord) {
+        Write-Log "Exception Type: $($ErrorRecord.Exception.GetType().FullName)" "ERROR"
+        Write-Log "Exception Message: $($ErrorRecord.Exception.Message)" "ERROR"
+        Write-Log "Script Stack Trace: $($ErrorRecord.ScriptStackTrace)" "ERROR"
+        Write-Log "Category Info: $($ErrorRecord.CategoryInfo.ToString())" "ERROR"
+        Write-Log "Fully Qualified Error ID: $($ErrorRecord.FullyQualifiedErrorId)" "ERROR"
+    }
+}
+
+function Show-LogLocation {
+    if ($Script:State.LogFile -and (Test-Path $Script:State.LogFile)) {
+        Write-Host ""
+        Write-ColorOutput "Installation log saved to:" -ForegroundColor Yellow
+        Write-ColorOutput $Script:State.LogFile -ForegroundColor Green
+        Write-Host ""
+
+        # Show last few lines of the log for immediate feedback
+        try {
+            $lastLines = Get-Content $Script:State.LogFile -Tail 10
+            Write-ColorOutput "Last 10 log entries:" -ForegroundColor Yellow
+            foreach ($line in $lastLines) {
+                Write-Host $line -ForegroundColor Gray
+            }
+        } catch {
+            Write-Warning "Could not read log file tail"
+        }
+    }
+}
+
+#endregion
 
 #region Utility Functions
 
@@ -132,6 +245,11 @@ function Stop-WithCriticalError {
         [string]$ErrorMessage,
         [string]$Details = ""
     )
+
+    Write-LogError "CRITICAL ERROR: $ErrorMessage"
+    if ($Details) {
+        Write-Log "Error Details: $Details" "ERROR"
+    }
 
     Write-Host ""
     Write-ColorOutput "=================================================================================" -ForegroundColor Red
@@ -150,10 +268,15 @@ function Stop-WithCriticalError {
     Write-Host ""
     Write-ColorOutput "The installation cannot continue. Please resolve the error and try again." -ForegroundColor Yellow
     Write-Host ""
+
+    # Show log location before exiting
+    Show-LogLocation
+
     Write-ColorOutput "Press any key to exit..." -ForegroundColor Cyan
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
     Cleanup-TempFiles
+    Write-Log "Installation terminated with critical error" "ERROR"
     exit 1
 }
 
@@ -204,10 +327,26 @@ function Write-ColorOutput {
     $Host.UI.RawUI.ForegroundColor = $currentColor
 }
 
-function Write-Info { param([string]$Message) Write-ColorOutput "INFO: $Message" -ForegroundColor Cyan }
-function Write-Success { param([string]$Message) Write-ColorOutput "SUCCESS: $Message" -ForegroundColor Green }
-function Write-Warning { param([string]$Message) Write-ColorOutput "WARNING: $Message" -ForegroundColor Yellow }
-function Write-Error { param([string]$Message) Write-ColorOutput "ERROR: $Message" -ForegroundColor Red }
+function Write-Info {
+    param([string]$Message)
+    Write-ColorOutput "INFO: $Message" -ForegroundColor Cyan
+    Write-Log $Message "INFO"
+}
+function Write-Success {
+    param([string]$Message)
+    Write-ColorOutput "SUCCESS: $Message" -ForegroundColor Green
+    Write-Log $Message "SUCCESS"
+}
+function Write-Warning {
+    param([string]$Message)
+    Write-ColorOutput "WARNING: $Message" -ForegroundColor Yellow
+    Write-Log $Message "WARNING"
+}
+function Write-Error {
+    param([string]$Message)
+    Write-ColorOutput "ERROR: $Message" -ForegroundColor Red
+    Write-Log $Message "ERROR"
+}
 
 function Write-Header {
     param([string]$Title, [string]$Subtitle = "")
@@ -343,6 +482,7 @@ Write-Host ""
 #region System Detection and Validation
 
 function Initialize-Environment {
+    Write-LogSection "ENVIRONMENT INITIALIZATION"
     Write-Info "Initializing installation environment..."
 
     $Script:State.IsAdmin = Test-Administrator
@@ -355,6 +495,7 @@ function Initialize-Environment {
 }
 
 function Test-JavaInstallation {
+    Write-LogSection "JAVA DETECTION"
     Write-Info "Checking Java installation..."
 
     try {
@@ -371,6 +512,7 @@ function Test-JavaInstallation {
                 $javaMajorVersion = [int]$matches[1]
             } else {
                 Write-Warning "Unable to parse Java version: $javaVersionString"
+                Write-Info "Will install Java $($Script:Config.MinimumJavaVersion) to ensure compatibility"
                 return $false
             }
 
@@ -380,11 +522,13 @@ function Test-JavaInstallation {
                 return $true
             } else {
                 Write-Warning "Java version $javaMajorVersion is below minimum requirement ($($Script:Config.MinimumJavaVersion))"
+                Write-Info "Will upgrade to Java $($Script:Config.MinimumJavaVersion) for optimal performance"
                 return $false
             }
         }
     } catch {
-        Write-Warning "Java not found in PATH"
+        Write-Info "Java not found in PATH"
+        Write-Info "Will install Java $($Script:Config.MinimumJavaVersion) for optimal performance"
         return $false
     }
 
@@ -392,46 +536,47 @@ function Test-JavaInstallation {
 }
 
 function Install-Java {
-    if (-not $IncludeJava) {
-        Write-Warning "Java installation skipped. Use -IncludeJava to install automatically."
-        return $false
-    }
+    Write-Info "Installing Java (Temurin JDK $($Script:Config.MinimumJavaVersion)) for optimal performance..."
 
     if (-not $Script:State.IsAdmin) {
-        Write-Warning "Java installation requires administrator privileges."
+        Write-Warning "Administrator privileges required for Java installation."
+        Write-Info "Continuing with CommandBox embedded Java (performance may be reduced)."
         return $false
     }
 
-    Write-Info "Installing Java (Temurin JDK 17)..."
-
-    $tempMsi = Join-Path $env:TEMP "temurin-jdk-17.msi"
+    $tempMsi = Join-Path $env:TEMP "temurin-jdk-$($Script:Config.MinimumJavaVersion).msi"
     Add-TempFile -FilePath $tempMsi
 
     try {
         # Download Java installer
-        Write-Info "Downloading Java installer..."
-        $webClient = New-Object System.Net.WebClient
-        $webClient.DownloadFile($Script:Config.JavaDownloadUrl, $tempMsi)
-        $webClient.Dispose()
+        Write-Info "Downloading Java installer (this may take a few minutes)..."
+        if (-not (Download-File -Url $Script:Config.JavaDownloadUrl -OutputPath $tempMsi -Description "Java JDK $($Script:Config.MinimumJavaVersion)")) {
+            Write-Warning "Java download failed. Continuing with CommandBox embedded Java."
+            return $false
+        }
 
-        # Install Java
-        Write-Info "Installing Java (this may take a few minutes)..."
+        # Install Java silently
+        Write-Info "Installing Java (this may take several minutes)..."
         $installProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", $tempMsi, "/quiet", "/norestart" -Wait -PassThru
 
         if ($installProcess.ExitCode -eq 0) {
-            Write-Success "Java installed successfully"
+            Write-Success "Java $($Script:Config.MinimumJavaVersion) installed successfully"
 
             # Refresh environment variables
             $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
 
             # Test installation
+            Start-Sleep -Seconds 2  # Give system time to update
             return Test-JavaInstallation
         } else {
-            Write-Error "Java installation failed with exit code: $($installProcess.ExitCode)"
+            Write-Warning "Java installation completed with exit code: $($installProcess.ExitCode)"
+            Write-Info "Continuing with CommandBox embedded Java."
             return $false
         }
     } catch {
-        Stop-WithCriticalError "Java installation failed" "Error: $($_.Exception.Message)`n`nJava installation failed. This is required for optimal CommandBox performance.`nYou may need to download and install Java manually from: $($Script:Config.JavaCheckUrl)"
+        Write-Warning "Java installation failed: $($_.Exception.Message)"
+        Write-Info "Continuing with CommandBox embedded Java (performance may be reduced)."
+        return $false
     } finally {
         if (Test-Path $tempMsi) {
             Remove-Item $tempMsi -Force -ErrorAction SilentlyContinue
@@ -519,6 +664,7 @@ function Download-File {
 }
 
 function Install-CommandBox {
+    Write-LogSection "COMMANDBOX INSTALLATION"
     Write-Info "Installing CommandBox..."
 
     # Check if CommandBox already exists
@@ -790,6 +936,8 @@ function Install-WheelsPackages {
 
 function Create-WheelsApplication {
     param([string]$BoxPath)
+
+    Write-LogSection "WHEELS APPLICATION CREATION"
 
     Write-Host ""
     Write-ColorOutput "=================================================================================" -ForegroundColor Blue
@@ -1074,33 +1222,33 @@ function Show-CompletionSummary {
     Write-Host ""
 
     Write-ColorOutput "Installation Summary:" -ForegroundColor Green
-    Write-ColorOutput "• CommandBox Path: $($Script:State.InstallPath)" -ForegroundColor Green
-    Write-ColorOutput "• Java Installed: $(if ($Script:State.JavaInstalled) { 'Yes' } else { 'No (using embedded)' })" -ForegroundColor Green
-    Write-ColorOutput "• Application Name: $($Script:State.AppConfig.ApplicationName)" -ForegroundColor Green
-    Write-ColorOutput "• Application Path: $($Script:State.AppConfig.ApplicationPath)" -ForegroundColor Green
+    Write-ColorOutput "CommandBox Path: $($Script:State.InstallPath)" -ForegroundColor Green
+    Write-ColorOutput "Java Installed: $(if ($Script:State.JavaInstalled) { 'Yes' } else { 'No (using embedded)' })" -ForegroundColor Green
+    Write-ColorOutput "Application Name: $($Script:State.AppConfig.ApplicationName)" -ForegroundColor Green
+    Write-ColorOutput "Application Path: $($Script:State.AppConfig.ApplicationPath)" -ForegroundColor Green
     if ($Script:State.ServerUrl) {
-        Write-ColorOutput "• Server URL: $($Script:State.ServerUrl)" -ForegroundColor Green
+        Write-ColorOutput "Server URL: $($Script:State.ServerUrl)" -ForegroundColor Green
     } else {
-        Write-ColorOutput "• Server URL: Not available (server not running)" -ForegroundColor Yellow
+        Write-ColorOutput "Server URL: Not available (server not running)" -ForegroundColor Yellow
     }
-    Write-ColorOutput "• Total Duration: $([int]$duration.TotalSeconds) seconds" -ForegroundColor Green
+    Write-ColorOutput "Total Duration: $([int]$duration.TotalSeconds) seconds" -ForegroundColor Green
     Write-Host ""
 
     Write-ColorOutput "Your Wheels application is ready! Here's what you can do:" -ForegroundColor Green
     Write-Host ""
     Write-ColorOutput "Development Commands (run from $($Script:State.AppConfig.ApplicationPath)):" -ForegroundColor Yellow
-    Write-ColorOutput "• box server start/stop/restart  - Manage development server" -ForegroundColor Gray
-    Write-ColorOutput "• box wheels generate model [name] - Generate model" -ForegroundColor Gray
-    Write-ColorOutput "• box wheels generate controller [name] - Generate controller" -ForegroundColor Gray
-    Write-ColorOutput "• box wheels generate view [name] - Generate view" -ForegroundColor Gray
-    Write-ColorOutput "• box wheels migrate up - Run database migrations" -ForegroundColor Gray
+    Write-ColorOutput "box server start/stop/restart  - Manage development server" -ForegroundColor Gray
+    Write-ColorOutput "box wheels generate model [name] - Generate model" -ForegroundColor Gray
+    Write-ColorOutput "box wheels generate controller [name] - Generate controller" -ForegroundColor Gray
+    Write-ColorOutput "box wheels generate view [name] - Generate view" -ForegroundColor Gray
+    Write-ColorOutput "box wheels migrate up - Run database migrations" -ForegroundColor Gray
     Write-Host ""
 
     Write-ColorOutput "Resources:" -ForegroundColor Yellow
-    Write-ColorOutput "• Documentation: https://wheels.dev/guides" -ForegroundColor Gray
-    Write-ColorOutput "• Getting Started: https://wheels.dev/guides#start-a-new-application-using-the-command-line" -ForegroundColor Gray
+    Write-ColorOutput "Documentation: https://wheels.dev/guides" -ForegroundColor Gray
+    Write-ColorOutput "Getting Started: https://wheels.dev/guides#start-a-new-application-using-the-command-line" -ForegroundColor Gray
     if ($Script:State.ServerUrl) {
-        Write-ColorOutput "• Application: $($Script:State.ServerUrl)" -ForegroundColor Gray
+        Write-ColorOutput "Application: $($Script:State.ServerUrl)" -ForegroundColor Gray
     }
     Write-Host ""
 
@@ -1132,6 +1280,9 @@ function Show-CompletionSummary {
         Write-Warning "No server URL available. Please start the server first."
     }
 
+    # Show log file location
+    Show-LogLocation
+
     Write-Host ""
     Write-ColorOutput "Happy coding with Wheels!" -ForegroundColor Green
 }
@@ -1142,21 +1293,19 @@ function Show-CompletionSummary {
 
 function Start-Installation {
     try {
+        # Initialize logging first
+        Initialize-Logging
+        Write-LogSection "INSTALLATION START"
+
         Write-Header "Wheels Installer" "Installing CommandBox, Wheels CLI, and Application"
 
         Initialize-Environment
 
-        # Check Java (required for CommandBox)
+        # Check Java and auto-install/upgrade if needed
         if (-not (Test-JavaInstallation)) {
-            Write-Warning "Java $($Script:Config.MinimumJavaVersion)+ is recommended for optimal performance"
-
-            if ($IncludeJava) {
-                if (-not (Install-Java)) {
-                    Write-Warning "Java installation failed. Continuing with CommandBox embedded Java..."
-                }
-            } else {
-                Write-Info "You can download Java from: $($Script:Config.JavaCheckUrl)"
-                Write-Info "Continuing with installation (CommandBox includes embedded Java)..."
+            # Automatically attempt to install/upgrade Java
+            if (-not (Install-Java)) {
+                Write-Info "Continuing with CommandBox embedded Java..."
             }
         }
 
@@ -1206,10 +1355,15 @@ function Start-Installation {
         # Clean up temporary files on successful completion
         Cleanup-TempFiles
 
+        # Log completion
+        Write-LogSection "INSTALLATION COMPLETED SUCCESSFULLY"
+        Write-Log "Total installation time: $([int]((Get-Date) - $Script:State.StartTime).TotalSeconds) seconds" "SUCCESS"
+
         # Show completion summary
         Show-CompletionSummary
 
     } catch {
+        Write-LogError "Installation failed with unexpected error" $_
         Stop-WithCriticalError "Installation failed with unexpected error" "Error: $($_.Exception.Message)`n`nStack Trace:`n$($_.ScriptStackTrace)`n`nThis is an unexpected error. Please report this issue."
     }
 }

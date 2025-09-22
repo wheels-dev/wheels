@@ -4,7 +4,7 @@ AppVersion=1.0
 DefaultDirName={tmp}
 DisableDirPage=yes
 DisableProgramGroupPage=yes
-OutputDir=dist
+OutputDir=installer
 OutputBaseFilename=wheels-installer
 Compression=lzma
 SolidCompression=yes
@@ -15,10 +15,26 @@ Uninstallable=no
 Source: "install-wheels.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall ignoreversion
 
 [Run]
+; Try PowerShell Core first
+Filename: "pwsh.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-wheels.ps1"" -InstallPath ""{code:GetInstallPath}"" {code:GetForceParam} {code:GetSkipPathParam} -AppName ""{code:GetAppName}"" -Template ""{code:GetTemplate}"" -ReloadPassword ""{code:GetReloadPassword}"" -DatasourceName ""{code:GetDatasource}"" -CFMLEngine ""{code:GetEngine}"" {code:GetUseH2Param} {code:GetBootstrapParam} {code:GetInitPkgParam} -ApplicationBasePath ""{code:GetAppBasePath}"""; \
+  StatusMsg: "Running Wheels installer script with PowerShell Core..."; \
+  Flags: waituntilterminated; \
+  Check: PowerShellCoreExists
+
+; Fallback to Windows PowerShell
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
+  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-wheels.ps1"" -InstallPath ""{code:GetInstallPath}"" {code:GetForceParam} {code:GetSkipPathParam} -AppName ""{code:GetAppName}"" -Template ""{code:GetTemplate}"" -ReloadPassword ""{code:GetReloadPassword}"" -DatasourceName ""{code:GetDatasource}"" -CFMLEngine ""{code:GetEngine}"" {code:GetUseH2Param} {code:GetBootstrapParam} {code:GetInitPkgParam} -ApplicationBasePath ""{code:GetAppBasePath}"""; \
+  StatusMsg: "Running Wheels installer script with Windows PowerShell..."; \
+  Flags: waituntilterminated; \
+  Check: not PowerShellCoreExists and WindowsPowerShellExists
+
+; Final fallback to powershell.exe in PATH
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-wheels.ps1"" -InstallPath ""{code:GetInstallPath}"" {code:GetForceParam} {code:GetSkipPathParam} -AppName ""{code:GetAppName}"" -Template ""{code:GetTemplate}"" -ReloadPassword ""{code:GetReloadPassword}"" -DatasourceName ""{code:GetDatasource}"" -CFMLEngine ""{code:GetEngine}"" {code:GetUseH2Param} {code:GetBootstrapParam} {code:GetInitPkgParam} -ApplicationBasePath ""{code:GetAppBasePath}"""; \
-  StatusMsg: "Running Wheels installer script..."; \
-  Flags: waituntilterminated
+  StatusMsg: "Running Wheels installer script with PowerShell from PATH..."; \
+  Flags: waituntilterminated; \
+  Check: not PowerShellCoreExists and not WindowsPowerShellExists
 
 [Code]
 var
@@ -36,6 +52,11 @@ var
   // Radio buttons
   TemplateRadio1, TemplateRadio2, TemplateRadio3, TemplateRadio4, TemplateRadio5: TRadioButton;
   EngineRadio1, EngineRadio2, EngineRadio3, EngineRadio4, EngineRadio5, EngineRadio6, EngineRadio7: TRadioButton;
+
+  LogMemo: TMemo;
+  LogTimer: Integer;
+  LogFilePath: String;
+  LastLogSize: Integer;
 
 procedure InitializeWizard();
 var
@@ -307,4 +328,19 @@ begin
       Result := False;
     end;
   end;
+end;
+
+// --- PowerShell detection functions ---
+function PowerShellCoreExists(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  // Check if PowerShell Core (pwsh.exe) is available
+  Result := Exec('pwsh.exe', '-Version', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+end;
+
+function WindowsPowerShellExists(): Boolean;
+begin
+  // Check if Windows PowerShell exists at the standard location
+  Result := FileExists(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'));
 end;
