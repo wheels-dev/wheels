@@ -208,11 +208,12 @@ component {
     public function createMigrationWithProperties(
         required string name,
         required array properties,
-        string baseDirectory = ""
+        string baseDirectory = "",
+        string tableName = ""
     ) {
         var timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
-        var tableName = variables.helpers.pluralize(lCase(arguments.name));
-        var className = "create_#tableName#_table";
+        var actualTableName = len(arguments.tableName) ? arguments.tableName : variables.helpers.pluralize(lCase(arguments.name));
+        var className = "create_#actualTableName#_table";
         var fileName = timestamp & "_" & className & ".cfc";
         var migrationDir = resolvePath("app/migrator/migrations", arguments.baseDirectory);
         
@@ -226,7 +227,7 @@ component {
         // Generate migration content with properties
         var content = generateMigrationContentWithProperties(
             className = className,
-            tableName = tableName,
+            tableName = actualTableName,
             properties = arguments.properties
         );
         
@@ -268,19 +269,29 @@ component {
         content &= '			try {' & chr(10);
         content &= '				t = createTable(name = ''#arguments.tableName#'', force=''false'', id=''true'', primaryKey=''id'');' & chr(10);
         
-        // Add properties
+        // Add properties (skip association properties that don't have database columns)
         for (var prop in arguments.properties) {
+            // Skip association properties - they're for model relationships, not database columns
+            if (structKeyExists(prop, "association")) {
+                continue;
+            }
+
+            // Make sure this property has a type (database column properties should have one)
+            if (!structKeyExists(prop, "type")) {
+                continue;
+            }
+
             var cfType = mapToCFWheelsType(prop.type);
             var params = 'columnNames=''#prop.name#''';
-            
+
             if (structKeyExists(prop, "default") && prop.default != "") {
                 params &= ', default=''#prop.default#''';
             } else {
                 params &= ', default=''''';
             }
-            
+
             params &= ', allowNull=' & (structKeyExists(prop, "required") && prop.required ? 'false' : 'true');
-            
+
             // Add type-specific parameters
             switch (cfType) {
                 case "string":
@@ -293,7 +304,7 @@ component {
                     params &= ', limit=''11''';
                     break;
             }
-            
+
             content &= '				t.#cfType#(#params#);' & chr(10);
         }
         

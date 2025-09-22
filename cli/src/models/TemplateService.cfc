@@ -147,6 +147,14 @@ component {
             processed = replace(processed, "|DescriptionComment|", "", "all");
         }
 
+        // Process custom table name for models
+        if (structKeyExists(arguments.context, "tableName") && len(trim(arguments.context.tableName))) {
+            var tableNameCall = 'table("' & arguments.context.tableName & '");' & chr(10) & chr(9) & chr(9);
+            processed = replace(processed, "|TableName|", tableNameCall, "all");
+        } else {
+            processed = replace(processed, "|TableName|", "", "all");
+        }
+
         // Process form fields if properties are provided (must happen before object name replacements)
         if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
             var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName);

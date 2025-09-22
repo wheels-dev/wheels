@@ -35,7 +35,6 @@ The `wheels generate app` command creates a new Wheels application with a comple
 | `--setupH2` | Setup H2 embedded database | `true` |
 | `--init` | Initialize as CommandBox package | `false` |
 | `--force` | Overwrite existing directory | `false` |
-| `--help` | Show help information | |
 
 ## Available Templates
 

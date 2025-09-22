@@ -657,8 +657,15 @@ component excludeFromHelp=true {
                 if (left(local.paramValue, 1) == '"' && right(local.paramValue, 1) == '"') {
                     local.paramValue = mid(local.paramValue, 2, len(local.paramValue) - 2);
                 }
-                
-                local.result[local.paramName] = local.paramValue;
+
+                // Convert string boolean values to actual booleans
+                if (lCase(local.paramValue) == "true") {
+                    local.result[local.paramName] = true;
+                } else if (lCase(local.paramValue) == "false") {
+                    local.result[local.paramName] = false;
+                } else {
+                    local.result[local.paramName] = local.paramValue;
+                }
             } else {
                 local.result[local.key] = arguments.argStruct[local.key];
             }

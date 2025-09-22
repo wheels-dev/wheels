@@ -62,6 +62,7 @@ component aliases="wheels g app" extends="../base" {
    * @setupH2        Setup the H2 database for development
    * @init           "init" the directory as a package if it isn't already
    * @force          Force installation into an none empty directory
+   * @skipInstall    Skip dependency installation after app creation
    **/
   function run(
     name     = 'MyApp',
@@ -73,8 +74,13 @@ component aliases="wheels g app" extends="../base" {
     boolean useBootstrap = false,
     boolean setupH2 = true,
     boolean init    = false,
-    boolean force   = false
+    boolean force   = false,
+    boolean skipInstall = false
   ) {
+
+		// Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+
     // Initialize detail service
     var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 
@@ -90,7 +96,7 @@ component aliases="wheels g app" extends="../base" {
     arguments.directory = resolvePath( arguments.directory );
 
     // Output detail header
-    details.header("🚀", "Creating new Wheels application: #arguments.name#");
+    details.header("", "Creating new Wheels application: #arguments.name#");
 
     // Validate directory, if it doesn't exist, create it.
     if ( !directoryExists( arguments.directory ) ) {
@@ -113,7 +119,7 @@ component aliases="wheels g app" extends="../base" {
 
     // Install the template
     details.line();
-    details.getPrint().yellowLine( "📦 Installing application template: #arguments.template#" );
+    details.getPrint().yellowLine( "Installing application template: #arguments.template#" );
     packageService.installPackage(
       ID                      = arguments.template,
       directory               = arguments.directory,
@@ -128,7 +134,7 @@ component aliases="wheels g app" extends="../base" {
 
     // Setting Application Name
     details.line();
-    details.getPrint().yellowLine( "🔧 Configuring application..." );
+    details.getPrint().yellowLine( "Configuring application..." );
     command( 'tokenReplace' ).params( path = 'config/app.cfm', token = '|appName|', replacement = arguments.name ).run();
     details.update("config/app.cfm", true);
     command( 'tokenReplace' ).params( path = 'server.json', token = '|appName|', replacement = arguments.name ).run();
@@ -156,7 +162,7 @@ component aliases="wheels g app" extends="../base" {
     // Create h2 embedded db by adding an application.cfc level datasource
     if ( arguments.setupH2 ) {
       details.line();
-      details.getPrint().yellowLine( "🗝️ Database Configuration" );
+      details.getPrint().yellowLine( "Database Configuration" );
       var datadirectory = fileSystemUtil.resolvePath( 'db/h2/' );
 
       if ( !directoryExists( datadirectory ) ) {
@@ -222,7 +228,7 @@ component aliases="wheels g app" extends="../base" {
     // Definitely refactor this into some sort of templating system?
     if(useBootstrap){
       details.line();
-      details.getPrint().yellowLine( "🎨 Installing Bootstrap..." );
+      details.getPrint().yellowLine( "Installing Bootstrap..." );
 
       // Replace Default Template with something more sensible
       var bsLayout=fileRead( getTemplate('/bootstrap/layout.cfm' ) );
@@ -239,7 +245,12 @@ component aliases="wheels g app" extends="../base" {
       details.update("config/settings.cfm (Bootstrap settings)", true);
 
       // New Flashwrapper Plugin needed - install it via Forgebox
-      command( 'install cfwheels-flashmessages-bootstrap' ).run();
+      if (!arguments.skipInstall) {
+        command( 'install cfwheels-flashmessages-bootstrap' ).run();
+      } else {
+        details.getPrint().yellowLine( "Skipping Bootstrap plugin installation (--skipInstall flag)" );
+        arrayAppend(nextSteps, "Install Bootstrap plugin: install cfwheels-flashmessages-bootstrap");
+      }
 
       }
 
@@ -252,10 +263,16 @@ component aliases="wheels g app" extends="../base" {
     arrayAppend(nextSteps, "cd #arguments.name#");
 
     if ( arguments.setupH2 ) {
-      arrayAppend(nextSteps, "Start server and install H2 extension: start && install && restart");
-      details.line();
-      details.getPrint().yellowLine("🛠️ Installing H2 database extension...");
-      command( 'start && install && restart' ).run();
+      if (!arguments.skipInstall) {
+        arrayAppend(nextSteps, "Start server and install H2 extension: start && install && restart");
+        details.line();
+        details.getPrint().yellowLine("Installing H2 database extension...");
+        command( 'start && install && restart' ).run();
+      } else {
+        details.line();
+        details.getPrint().yellowLine("Skipping H2 extension installation (--skipInstall flag)");
+        arrayAppend(nextSteps, "Install H2 extension manually: start && install && restart");
+      }
     } else {
       arrayAppend(nextSteps, "Configure your datasource in Lucee/ACF admin");
       arrayAppend(nextSteps, "Start the server: server start");
