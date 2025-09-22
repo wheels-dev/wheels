@@ -1,14 +1,12 @@
 /**
  * Set up MCP (Model Context Protocol) integration for AI IDE support
- * Configures your Wheels project to work with AI coding assistants like Claude Code, Cursor, and Continue
+ * Creates .mcp.json and .opencode.json configuration files in your project root
  * Uses the native CFML MCP server built into Wheels (no Node.js required)
  *
  * Examples:
  * {code:bash}
  * wheels mcp setup
  * wheels mcp setup --port=8080
- * wheels mcp setup --ide=claude
- * wheels mcp setup --all
  * wheels mcp setup --force
  * {code}
  **/
@@ -16,15 +14,11 @@ component extends="../base" {
 
 	/**
 	 * @port Port number for Wheels server (auto-detected if not provided)
-	 * @ide Specific IDE to configure (claude, cursor, continue, windsurf)
-	 * @all Configure all detected IDEs
-	 * @force Overwrite existing configuration
+	 * @force Overwrite existing configuration files
 	 * @noAutoStart Don't automatically start server if not running
 	 **/
 	function run(
-		numeric port,
-		string ide,
-		boolean all = false,
+		numeric port = 0,
 		boolean force = false,
 		boolean noAutoStart = false
 	) {
@@ -44,14 +38,82 @@ component extends="../base" {
 			print.greenLine("✅ Wheels application detected");
 		}
 
-		// Note: No Node.js required anymore!
 		print.greenLine("✅ Using native CFML MCP server (no Node.js required)");
 
 		// Detect or use provided port
+		var serverPort = detectServerPort(arguments.port, arguments.noAutoStart);
+		print.line();
+
+		// Create configuration files
+		print.boldLine("Creating MCP configuration files...");
+
+		try {
+			var projectRoot = getCWD();
+
+			// Create .mcp.json
+			var mcpConfigPath = projectRoot & "/.mcp.json";
+			if (!fileExists(mcpConfigPath) || arguments.force) {
+				var mcpTemplate = fileRead(expandPath("/wheels-cli/templates/McpConfig.json"));
+				var mcpContent = replace(mcpTemplate, "{PORT}", serverPort, "ALL");
+				fileWrite(mcpConfigPath, mcpContent);
+				print.greenLine("✅ Created .mcp.json");
+			} else {
+				print.yellowLine("⚠️  .mcp.json already exists (use --force to overwrite)");
+			}
+
+			// Create .opencode.json
+			var opencodeConfigPath = projectRoot & "/.opencode.json";
+			if (!fileExists(opencodeConfigPath) || arguments.force) {
+				var opencodeTemplate = fileRead(expandPath("/wheels-cli/templates/OpenCodeConfig.json"));
+				var opencodeContent = replace(opencodeTemplate, "{PORT}", serverPort, "ALL");
+				fileWrite(opencodeConfigPath, opencodeContent);
+				print.greenLine("✅ Created .opencode.json");
+			} else {
+				print.yellowLine("⚠️  .opencode.json already exists (use --force to overwrite)");
+			}
+
+			print.greenLine("✅ MCP configuration files created");
+		} catch (any e) {
+			print.redLine("❌ Configuration failed: " & e.message);
+			return;
+		}
+		print.line();
+
+		// Summary
+		print.boldGreenLine("✨ MCP Integration Setup Complete!");
+		print.line();
+		print.boldLine("Configuration Summary:");
+		print.indentedLine("Wheels MCP Endpoint: http://localhost:" & serverPort & "/wheels/mcp");
+		print.indentedLine("Server Type: Native CFML (no Node.js required)");
+		print.indentedLine("Files Created: .mcp.json, .opencode.json");
+		print.line();
+
+		print.boldLine("Next Steps:");
+		print.indentedLine("1. Ensure your Wheels server is running on port " & serverPort);
+		print.indentedLine("2. Configure your AI IDE to use the generated configuration files");
+		print.indentedLine("3. Test the connection: wheels mcp test");
+		print.line();
+
+		print.boldLine("Available MCP Commands:");
+		print.indentedLine("wheels mcp status  - Check MCP configuration");
+		print.indentedLine("wheels mcp test    - Test MCP connection");
+		print.indentedLine("wheels mcp remove  - Remove MCP integration");
+		print.line();
+
+		print.yellowLine("💡 The generated files provide AI assistants with:");
+		print.indentedLine("• Real-time access to your Wheels project structure");
+		print.indentedLine("• Complete API documentation and guides");
+		print.indentedLine("• Ability to generate models, controllers, and migrations");
+		print.indentedLine("• Direct execution of tests and server commands");
+		print.indentedLine("• Browser automation capabilities (via Browser MCP)");
+		print.line();
+	}
+
+	private function detectServerPort(port, noAutoStart) {
 		var serverPort = 0;
 
-		if (!isNull(arguments.port)) {
-			serverPort = arguments.port;
+		if (!isNull(port) && port > 0) {
+			serverPort = port;
 			print.line("Using specified port: " & serverPort);
 		} else {
 			print.line("Detecting Wheels server port...");
@@ -106,7 +168,7 @@ component extends="../base" {
 		}
 
 		// If no server detected and auto-start enabled, try to start server
-		if (serverPort == 0 && !arguments.noAutoStart) {
+		if (serverPort == 0 && !noAutoStart) {
 			print.line("No running server detected. Attempting to start server...");
 
 			try {
@@ -146,334 +208,8 @@ component extends="../base" {
 			var userPort = ask("Enter your Wheels server port (or press Enter to use 60000): ");
 			serverPort = len(trim(userPort)) ? userPort : 60000;
 		}
-		print.line();
 
-		// Configure MCP project file
-		print.boldLine("Configuring MCP Integration...");
-
-		try {
-			// Create .mcp.json for Claude Code project-level configuration
-			// This points to the native CFML MCP server endpoint
-			var mcpConfigPath = getCWD() & "/.mcp.json";
-			if (!fileExists(mcpConfigPath) || arguments.force) {
-				var mcpConfig = {
-					"mcpServers": {
-						"wheels": {
-							"type": "http",
-							"url": "http://localhost:" & serverPort & "/wheels/mcp"
-						}
-					}
-				};
-				fileWrite(mcpConfigPath, serializeJSON(mcpConfig));
-				print.greenLine("✅ Created .mcp.json for project-level configuration");
-			} else {
-				print.yellowLine("⚠️  .mcp.json already exists (use --force to overwrite)");
-			}
-
-			print.greenLine("✅ MCP configuration completed");
-		} catch (any e) {
-			print.redLine("❌ Configuration failed: " & e.message);
-			return;
-		}
-		print.line();
-
-		// Detect IDEs
-		print.boldLine("Detecting AI IDEs...");
-		var detectedIDEs = {};
-		var ideList = [];
-
-		// Check for IDE configuration directories
-		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
-
-		// Claude Code
-		var claudeDir = homeDir & "/.claude";
-		if (directoryExists(claudeDir)) {
-			detectedIDEs.claude = true;
-			arrayAppend(ideList, "claude");
-		}
-
-		// Cursor
-		var cursorDir = homeDir & "/.cursor";
-		if (directoryExists(cursorDir)) {
-			detectedIDEs.cursor = true;
-			arrayAppend(ideList, "cursor");
-		}
-
-		// Continue
-		var continueDir = homeDir & "/.continue";
-		if (directoryExists(continueDir)) {
-			detectedIDEs.continue = true;
-			arrayAppend(ideList, "continue");
-		}
-
-		// Windsurf
-		var windsurfDir = homeDir & "/.windsurf";
-		if (directoryExists(windsurfDir)) {
-			detectedIDEs.windsurf = true;
-			arrayAppend(ideList, "windsurf");
-		}
-
-		if (arrayLen(ideList) == 0) {
-			print.yellowLine("⚠️  No AI IDE configuration folders detected.");
-			print.line("   You can still configure an IDE manually.");
-		} else {
-			print.line("Detected IDE folders:");
-			for (var detectedIDE in ideList) {
-				print.indentedGreenLine("• " & uCase(left(detectedIDE, 1)) & mid(detectedIDE, 2, len(detectedIDE)));
-			}
-		}
-		print.line();
-
-		// Configure IDEs
-		var idesToConfigure = [];
-
-		if (!isNull(arguments.ide)) {
-			// Specific IDE requested
-			idesToConfigure = [arguments.ide];
-		} else if (arguments.all) {
-			// Configure all detected IDEs
-			idesToConfigure = ideList;
-		} else if (arrayLen(ideList) > 0) {
-			// Ask which IDEs to configure
-			print.line("Which IDEs would you like to configure?");
-			print.indentedLine("1. All detected IDEs");
-
-			var i = 2;
-			for (var availableIDE in ideList) {
-				print.indentedLine(i & ". " & uCase(left(availableIDE, 1)) & mid(availableIDE, 2, len(availableIDE)));
-				i++;
-			}
-			print.indentedLine(i & ". Skip IDE configuration");
-			print.line();
-
-			var choice = ask("Enter your choice (1-" & i & "): ");
-
-			if (choice == "1") {
-				idesToConfigure = ideList;
-			} else if (choice == toString(i)) {
-				// Skip
-				idesToConfigure = [];
-			} else if (isNumeric(choice) && choice > 1 && choice < i) {
-				idesToConfigure = [ideList[choice - 1]];
-			}
-		}
-
-		// Configure selected IDEs
-		if (arrayLen(idesToConfigure) > 0) {
-			print.boldLine("Configuring IDEs...");
-
-			for (var ideToConfig in idesToConfigure) {
-				var configured = false;
-
-				try {
-					switch (ideToConfig) {
-						case "claude":
-							configured = configureClaudeCode(serverPort, arguments.force);
-							break;
-						case "cursor":
-							configured = configureCursor(serverPort, arguments.force);
-							break;
-						case "continue":
-							configured = configureContinue(serverPort, arguments.force);
-							break;
-						case "windsurf":
-							configured = configureWindsurf(serverPort, arguments.force);
-							break;
-					}
-
-					if (configured) {
-						print.greenLine("✅ Configured " & uCase(left(ideToConfig, 1)) & mid(ideToConfig, 2, len(ideToConfig)));
-					} else {
-						print.yellowLine("⚠️  " & uCase(left(ideToConfig, 1)) & mid(ideToConfig, 2, len(ideToConfig)) & " already configured (use --force to overwrite)");
-					}
-				} catch (any e) {
-					print.redLine("❌ Failed to configure " & ideToConfig & ": " & e.message);
-				}
-			}
-			print.line();
-		}
-
-		// Summary
-		print.boldGreenLine("✨ MCP Integration Setup Complete!");
-		print.line();
-		print.boldLine("Configuration Summary:");
-		print.indentedLine("MCP Endpoint: http://localhost:" & serverPort & "/wheels/mcp");
-		print.indentedLine("Server Type: Native CFML (no Node.js required)");
-
-		if (arrayLen(idesToConfigure) > 0) {
-			print.indentedLine("Configured IDEs: " & arrayToList(idesToConfigure, ", "));
-		}
-		print.line();
-
-		print.boldLine("Next Steps:");
-		print.indentedLine("1. Ensure your Wheels server is running on port " & serverPort);
-		print.indentedLine("2. Restart your AI IDE to connect to the MCP server");
-		print.indentedLine("3. Test the connection: wheels mcp test");
-		print.line();
-
-		print.boldLine("Available MCP Commands:");
-		print.indentedLine("wheels mcp status  - Check MCP configuration");
-		print.indentedLine("wheels mcp test    - Test MCP connection");
-		print.indentedLine("wheels mcp remove  - Remove MCP integration");
-		print.line();
-
-		print.yellowLine("💡 The native MCP server provides AI assistants with:");
-		print.indentedLine("• Real-time access to your Wheels project structure");
-		print.indentedLine("• Complete API documentation and guides");
-		print.indentedLine("• Ability to generate models, controllers, and migrations");
-		print.indentedLine("• Direct execution of tests and server commands");
-		print.indentedLine("• Project analysis and validation tools");
-		print.line();
+		return serverPort;
 	}
-
-	private function configureClaudeCode(required numeric port, required boolean force) {
-		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
-		var configDir = homeDir & "/.config/claude";
-		var configFile = configDir & "/claude_desktop_config.json";
-
-		if (!directoryExists(configDir)) {
-			directoryCreate(configDir, true);
-		}
-
-		var config = {};
-		if (fileExists(configFile) && !arguments.force) {
-			try {
-				config = deserializeJSON(fileRead(configFile));
-			} catch (any e) {
-				// Invalid JSON, start fresh
-				config = {};
-			}
-		}
-
-		if (!structKeyExists(config, "mcpServers")) {
-			config.mcpServers = {};
-		}
-
-		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
-			config.mcpServers.wheels = {
-				"type": "http",
-				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
-			};
-
-			fileWrite(configFile, serializeJSON(config));
-			return true;
-		}
-
-		return false;
-	}
-
-	private function configureCursor(required numeric port, required boolean force) {
-		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
-		var configDir = homeDir & "/.cursor";
-		var configFile = configDir & "/mcp_servers.json";
-
-		if (!directoryExists(configDir)) {
-			directoryCreate(configDir, true);
-		}
-
-		var config = {};
-		if (fileExists(configFile) && !arguments.force) {
-			try {
-				config = deserializeJSON(fileRead(configFile));
-			} catch (any e) {
-				config = {};
-			}
-		}
-
-		if (!structKeyExists(config, "mcpServers")) {
-			config.mcpServers = {};
-		}
-
-		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
-			config.mcpServers.wheels = {
-				"type": "http",
-				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
-			};
-
-			fileWrite(configFile, serializeJSON(config));
-			return true;
-		}
-
-		return false;
-	}
-
-	private function configureContinue(required numeric port, required boolean force) {
-		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
-		var configDir = homeDir & "/.continue";
-		var configFile = configDir & "/config.json";
-
-		if (!directoryExists(configDir)) {
-			directoryCreate(configDir, true);
-		}
-
-		var config = {};
-		if (fileExists(configFile) && !arguments.force) {
-			try {
-				config = deserializeJSON(fileRead(configFile));
-			} catch (any e) {
-				config = {};
-			}
-		}
-
-		if (!structKeyExists(config, "experimental")) {
-			config.experimental = {};
-		}
-
-		if (!structKeyExists(config.experimental, "modelContextProtocol")) {
-			config.experimental.modelContextProtocol = {};
-		}
-
-		if (!structKeyExists(config.experimental.modelContextProtocol, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
-			config.experimental.modelContextProtocol.wheels = {
-				"type": "http",
-				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
-			};
-
-			fileWrite(configFile, serializeJSON(config));
-			return true;
-		}
-
-		return false;
-	}
-
-	private function configureWindsurf(required numeric port, required boolean force) {
-		var homeDir = createObject("java", "java.lang.System").getProperty("user.home");
-		var configDir = homeDir & "/.windsurf";
-		var configFile = configDir & "/mcp_servers.json";
-
-		if (!directoryExists(configDir)) {
-			directoryCreate(configDir, true);
-		}
-
-		var config = {};
-		if (fileExists(configFile) && !arguments.force) {
-			try {
-				config = deserializeJSON(fileRead(configFile));
-			} catch (any e) {
-				config = {};
-			}
-		}
-
-		if (!structKeyExists(config, "mcpServers")) {
-			config.mcpServers = {};
-		}
-
-		if (!structKeyExists(config.mcpServers, "wheels") || arguments.force) {
-			// Use HTTP transport for native CFML MCP server
-			config.mcpServers.wheels = {
-				"type": "http",
-				"url": "http://localhost:" & arguments.port & "/wheels/mcp"
-			};
-
-			fileWrite(configFile, serializeJSON(config));
-			return true;
-		}
-
-		return false;
-	}
-
 
 }

@@ -117,7 +117,8 @@
       "Read(//Users/peter/projects/Modern-ColdFusion-CFML-In-100-Minutes/.ai/**)",
       "Bash(tree:*)",
       "WebFetch(domain:stackoverflow.com)",
-      "WebFetch(domain:helpx.adobe.com)"
+      "WebFetch(domain:helpx.adobe.com)",
+      "WebFetch(domain:opencode.ai)"
     ],
     "deny": []
   }

@@ -39,11 +39,11 @@ cp -r templates/base/src/vendor "${BUILD_DIR}/"
 
 # Copy AI documentation files
 echo "Copying AI documentation..."
-cp templates/base/src/CLAUDE.md "${BUILD_DIR}/"
-# cp .ai-config.json "${BUILD_DIR}/"
-# cp design_docs/scratchpad/AI-*.md "${BUILD_DIR}/"
 cp -r .ai "${BUILD_DIR}/"
+cp templates/base/src/CLAUDE.md "${BUILD_DIR}/"
+cp templates/base/src/AGENTS.md "${BUILD_DIR}/"
 cp -r .claude "${BUILD_DIR}/"
+cp -r .opencode "${BUILD_DIR}/"
 
 # Copy Apache License how are you?
 cp LICENSE "${BUILD_DIR}/"
