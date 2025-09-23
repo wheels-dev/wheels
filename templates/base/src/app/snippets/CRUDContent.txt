@@ -1,4 +1,4 @@
-component extends="Controller" {
+|DescriptionComment|component extends="Controller" {
 
 	function config() {
 		verifies(except="index,new,create", params="key", paramsTypes="integer", handler="objectNotFound");
