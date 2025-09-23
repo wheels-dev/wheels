@@ -20,21 +20,24 @@ Filename: "pwsh.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-wheels.ps1"" -InstallPath ""{code:GetInstallPath}"" {code:GetForceParam} {code:GetSkipPathParam} -AppName ""{code:GetAppName}"" -Template ""{code:GetTemplate}"" -ReloadPassword ""{code:GetReloadPassword}"" -DatasourceName ""{code:GetDatasource}"" -CFMLEngine ""{code:GetEngine}"" {code:GetUseH2Param} {code:GetBootstrapParam} {code:GetInitPkgParam} -ApplicationBasePath ""{code:GetAppBasePath}"""; \
   StatusMsg: "Running Wheels installer script with PowerShell Core..."; \
   Flags: waituntilterminated; \
-  Check: PowerShellCoreExists
+  Check: PowerShellCoreExists; \
+  AfterInstall: CheckInstallResult
 
 ; Fallback to Windows PowerShell
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-wheels.ps1"" -InstallPath ""{code:GetInstallPath}"" {code:GetForceParam} {code:GetSkipPathParam} -AppName ""{code:GetAppName}"" -Template ""{code:GetTemplate}"" -ReloadPassword ""{code:GetReloadPassword}"" -DatasourceName ""{code:GetDatasource}"" -CFMLEngine ""{code:GetEngine}"" {code:GetUseH2Param} {code:GetBootstrapParam} {code:GetInitPkgParam} -ApplicationBasePath ""{code:GetAppBasePath}"""; \
   StatusMsg: "Running Wheels installer script with Windows PowerShell..."; \
   Flags: waituntilterminated; \
-  Check: not PowerShellCoreExists and WindowsPowerShellExists
+  Check: not PowerShellCoreExists and WindowsPowerShellExists; \
+  AfterInstall: CheckInstallResult
 
 ; Final fallback to powershell.exe in PATH
 Filename: "powershell.exe"; \
   Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{tmp}\install-wheels.ps1"" -InstallPath ""{code:GetInstallPath}"" {code:GetForceParam} {code:GetSkipPathParam} -AppName ""{code:GetAppName}"" -Template ""{code:GetTemplate}"" -ReloadPassword ""{code:GetReloadPassword}"" -DatasourceName ""{code:GetDatasource}"" -CFMLEngine ""{code:GetEngine}"" {code:GetUseH2Param} {code:GetBootstrapParam} {code:GetInitPkgParam} -ApplicationBasePath ""{code:GetAppBasePath}"""; \
   StatusMsg: "Running Wheels installer script with PowerShell from PATH..."; \
   Flags: waituntilterminated; \
-  Check: not PowerShellCoreExists and not WindowsPowerShellExists
+  Check: not PowerShellCoreExists and not WindowsPowerShellExists; \
+  AfterInstall: CheckInstallResult
 
 [Code]
 var
@@ -53,15 +56,17 @@ var
   TemplateRadio1, TemplateRadio2, TemplateRadio3, TemplateRadio4, TemplateRadio5: TRadioButton;
   EngineRadio1, EngineRadio2, EngineRadio3, EngineRadio4, EngineRadio5, EngineRadio6, EngineRadio7: TRadioButton;
 
-  LogMemo: TMemo;
-  LogTimer: Integer;
-  LogFilePath: String;
-  LastLogSize: Integer;
+  // Installation result tracking
+  InstallationResult: Integer;
+  InstallationMessage: String;
 
 procedure InitializeWizard();
 var
   topPos: Integer;
 begin
+  // Initialize installation result tracking
+  InstallationResult := -1;
+  InstallationMessage := '';
   { === Page 1: CommandBox directory === }
   InstallDirPage := CreateInputDirPage(
     wpWelcome,
@@ -245,38 +250,6 @@ begin
   else Result := 'adobe@2018';
 end;
 
-procedure CurPageChanged(CurPageID: Integer);
-begin
-  { Dynamically update AppBaseDir default path based on selected CommandBox path }
-  if CurPageID = AppBaseDirPage.ID then
-  begin
-    if AppBaseDirPage.Values[0] = ExpandConstant('{pf}\inetpub') then
-      AppBaseDirPage.Values[0] := ExtractFileDir(GetInstallPath('')) + '\inetpub';
-  end;
-
-  { Populate summary page }
-  if CurPageID = SummaryPage.ID then
-  begin
-    SummaryMemo.Lines.Clear;
-    SummaryMemo.Lines.Add('Configuration summary:');
-    SummaryMemo.Lines.Add('----------------------------------------');
-    SummaryMemo.Lines.Add('CommandBox path: ' + InstallDirPage.Values[0]);
-    if ForceCheck.Checked then SummaryMemo.Lines.Add('Force reinstall CommandBox: Yes') else SummaryMemo.Lines.Add('Force reinstall CommandBox: No');
-    if SkipPathCheck.Checked then SummaryMemo.Lines.Add('Skip adding CommandBox to PATH: Yes') else SummaryMemo.Lines.Add('Skip adding CommandBox to PATH: No');
-    SummaryMemo.Lines.Add('');
-    SummaryMemo.Lines.Add('Application name: ' + AppNameEdit.Text);
-    SummaryMemo.Lines.Add('Reload password: ' + ReloadPwdEdit.Text);
-    SummaryMemo.Lines.Add('Datasource name: ' + DSNEdit.Text);
-    SummaryMemo.Lines.Add('Template: ' + GetTemplate(''));
-    SummaryMemo.Lines.Add('CFML Engine: ' + GetEngine(''));
-    if H2Check.Checked then SummaryMemo.Lines.Add('Use H2 DB: Yes') else SummaryMemo.Lines.Add('Use H2 DB: No');
-    if BootstrapCheck.Checked then SummaryMemo.Lines.Add('Setup Bootstrap: Yes') else SummaryMemo.Lines.Add('Setup Bootstrap: No');
-    if InitPkgCheck.Checked then SummaryMemo.Lines.Add('Initialize as package: Yes') else SummaryMemo.Lines.Add('Initialize as package: No');
-    SummaryMemo.Lines.Add('');
-    SummaryMemo.Lines.Add('Application base path: ' + AppBaseDirPage.Values[0]);
-    SummaryMemo.Lines.Add('----------------------------------------');
-  end;
-end;
 
 // --- Validation helper ---
 function IsValidIdentifier(const S: String): Boolean;
@@ -330,6 +303,97 @@ begin
   end;
 end;
 
+// --- Installation result checking ---
+procedure CheckInstallResult();
+var
+  TempDir: String;
+  StatusFile1, StatusFile2: String;
+  Lines: TArrayOfString;
+  LogFilePath: String;
+begin
+  // Initialize with unknown status
+  InstallationResult := -1;
+  LogFilePath := '';
+
+  // Try to read exit code from status files created by PowerShell
+  // Check multiple locations
+  TempDir := ExpandConstant('{tmp}');
+  StatusFile1 := TempDir + '\wheels-install-status.txt';
+  StatusFile2 := ExpandConstant('{%TEMP|{tmp}}\wheels-install-status.txt');
+
+  // Try first location
+  if FileExists(StatusFile1) then begin
+    if LoadStringsFromFile(StatusFile1, Lines) then begin
+      if GetArrayLength(Lines) > 0 then begin
+        try
+          InstallationResult := StrToInt(Lines[0]);
+          // Check if log file path is included
+          if GetArrayLength(Lines) > 1 then begin
+            LogFilePath := Lines[1];
+          end;
+        except
+          InstallationResult := -1;
+        end;
+      end;
+    end;
+    DeleteFile(StatusFile1);
+  end
+  // Try second location if first didn't work
+  else if FileExists(StatusFile2) then begin
+    if LoadStringsFromFile(StatusFile2, Lines) then begin
+      if GetArrayLength(Lines) > 0 then begin
+        try
+          InstallationResult := StrToInt(Lines[0]);
+          // Check if log file path is included
+          if GetArrayLength(Lines) > 1 then begin
+            LogFilePath := Lines[1];
+          end;
+        except
+          InstallationResult := -1;
+        end;
+      end;
+    end;
+    DeleteFile(StatusFile2);
+  end;
+         
+  case InstallationResult of
+    -1: begin
+      InstallationMessage := 'Installation was interrupted or cancelled.' + #13#10#13#10 +
+                           'The PowerShell window was closed before the installation could complete. ' +
+                           'This typically happens when the user closes the window manually or the process was terminated unexpectedly.';
+    end;
+    0: begin
+      InstallationMessage := 'Wheels installation completed successfully!' + #13#10#13#10 +
+                           'Your Wheels application has been created and the development server should be running. ' +
+                           'Check the PowerShell output for the server URL.';
+      if LogFilePath <> '' then
+        InstallationMessage := InstallationMessage + #13#10#13#10 + 'Installation log: ' + LogFilePath;
+    end;
+    1: begin
+      InstallationMessage := 'Installation failed due to an error.' + #13#10#13#10 +
+                           'Please check the log file for detailed error information. ' +
+                           'Common issues include network connectivity problems or insufficient permissions.';
+      if LogFilePath <> '' then
+        InstallationMessage := InstallationMessage + #13#10#13#10 + 'Error log: ' + LogFilePath;
+    end;
+    2: begin
+      InstallationMessage := 'Installation was cancelled by the user.' + #13#10#13#10 +
+                           'The installation process was interrupted. You can run the installer again when ready.';
+      if LogFilePath <> '' then
+        InstallationMessage := InstallationMessage + #13#10#13#10 + 'Installation log: ' + LogFilePath;
+    end;
+    3: begin
+      InstallationMessage := 'Installation failed due to an unexpected error.' + #13#10#13#10 +
+                           'An unexpected error occurred during installation. Please try again or contact support if the problem persists.';
+      if LogFilePath <> '' then
+        InstallationMessage := InstallationMessage + #13#10#13#10 + 'Error log: ' + LogFilePath;
+    end;
+  else
+    InstallationMessage := 'Installation completed with unknown status.' + #13#10#13#10 +
+                           'The installer finished but could not determine the final status. Check the PowerShell output and log files for more information.';
+  end;
+end;
+
 // --- PowerShell detection functions ---
 function PowerShellCoreExists(): Boolean;
 var
@@ -343,4 +407,65 @@ function WindowsPowerShellExists(): Boolean;
 begin
   // Check if Windows PowerShell exists at the standard location
   Result := FileExists(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'));
+end;
+
+// --- Finish page customization ---
+function IsInstallationSuccessful(): Boolean;
+begin
+  Result := (InstallationResult = 0);
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  { Dynamically update AppBaseDir default path based on selected CommandBox path }
+  if CurPageID = AppBaseDirPage.ID then
+  begin
+    if AppBaseDirPage.Values[0] = ExpandConstant('{pf}\inetpub') then
+      AppBaseDirPage.Values[0] := ExtractFileDir(GetInstallPath('')) + '\inetpub';
+  end;
+
+  { Populate summary page }
+  if CurPageID = SummaryPage.ID then
+  begin
+    SummaryMemo.Lines.Clear;
+    SummaryMemo.Lines.Add('Configuration summary:');
+    SummaryMemo.Lines.Add('----------------------------------------');
+    SummaryMemo.Lines.Add('CommandBox path: ' + InstallDirPage.Values[0]);
+    if ForceCheck.Checked then SummaryMemo.Lines.Add('Force reinstall CommandBox: Yes') else SummaryMemo.Lines.Add('Force reinstall CommandBox: No');
+    if SkipPathCheck.Checked then SummaryMemo.Lines.Add('Skip adding CommandBox to PATH: Yes') else SummaryMemo.Lines.Add('Skip adding CommandBox to PATH: No');
+    SummaryMemo.Lines.Add('');
+    SummaryMemo.Lines.Add('Application name: ' + AppNameEdit.Text);
+    SummaryMemo.Lines.Add('Reload password: ' + ReloadPwdEdit.Text);
+    SummaryMemo.Lines.Add('Datasource name: ' + DSNEdit.Text);
+    SummaryMemo.Lines.Add('Template: ' + GetTemplate(''));
+    SummaryMemo.Lines.Add('CFML Engine: ' + GetEngine(''));
+    if H2Check.Checked then SummaryMemo.Lines.Add('Use H2 DB: Yes') else SummaryMemo.Lines.Add('Use H2 DB: No');
+    if BootstrapCheck.Checked then SummaryMemo.Lines.Add('Setup Bootstrap: Yes') else SummaryMemo.Lines.Add('Setup Bootstrap: No');
+    if InitPkgCheck.Checked then SummaryMemo.Lines.Add('Initialize as package: Yes') else SummaryMemo.Lines.Add('Initialize as package: No');
+    SummaryMemo.Lines.Add('');
+    SummaryMemo.Lines.Add('Application base path: ' + AppBaseDirPage.Values[0]);
+    SummaryMemo.Lines.Add('----------------------------------------');
+  end;
+
+  { Customize finish page based on installation result }
+  if CurPageID = wpFinished then
+  begin
+    // Check installation result when finish page loads
+    CheckInstallResult();
+
+    if InstallationMessage <> '' then
+    begin
+      WizardForm.FinishedLabel.Caption := InstallationMessage;
+
+      // Change the finish page title based on result
+      if IsInstallationSuccessful() then
+      begin
+        WizardForm.FinishedHeadingLabel.Caption := 'Wheels Installation Completed Successfully';
+      end
+      else
+      begin
+        WizardForm.FinishedHeadingLabel.Caption := 'Wheels Installation Did Not Complete Successfully';
+      end;
+    end;
+  end;
 end;

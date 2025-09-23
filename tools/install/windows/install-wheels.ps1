@@ -123,6 +123,7 @@ $Script:State = @{
     TempFiles = @()
     InterruptHandlerRegistered = $false
     LogFile = ""
+    InstallationSucceeded = $false
 }
 
 #region Logging Functions
@@ -239,17 +240,48 @@ function Show-LogLocation {
 
 #region Utility Functions
 
+function Write-InstallationStatus {
+    param([int]$ExitCode)
+
+    try {
+        # Write to both locations to ensure installer can find it
+        $statusFile1 = Join-Path $env:TEMP "wheels-install-status.txt"
+        $statusFile2 = Join-Path ([System.IO.Path]::GetTempPath()) "wheels-install-status.txt"
+
+        $ExitCode | Out-File -FilePath $statusFile1 -Encoding ASCII -Force
+        $ExitCode | Out-File -FilePath $statusFile2 -Encoding ASCII -Force
+
+        # Also include the log file path in the status
+        if ($Script:State.LogFile) {
+            $statusInfo = @"
+$ExitCode
+$($Script:State.LogFile)
+"@
+            $statusInfo | Out-File -FilePath $statusFile1 -Encoding ASCII -Force
+            $statusInfo | Out-File -FilePath $statusFile2 -Encoding ASCII -Force
+        }
+
+        Write-Log "Installation status written to: $statusFile1 and $statusFile2 (Exit Code: $ExitCode)" "INFO"
+    } catch {
+        Write-Log "Failed to write installation status file: $($_.Exception.Message)" "WARNING"
+    }
+}
+
 function Stop-WithCriticalError {
     param(
         [Parameter(Mandatory=$true)]
         [string]$ErrorMessage,
-        [string]$Details = ""
+        [string]$Details = "",
+        [int]$ExitCode = 1
     )
 
     Write-LogError "CRITICAL ERROR: $ErrorMessage"
     if ($Details) {
         Write-Log "Error Details: $Details" "ERROR"
     }
+
+    # Write status for installer
+    Write-InstallationStatus -ExitCode $ExitCode
 
     Write-Host ""
     Write-ColorOutput "=================================================================================" -ForegroundColor Red
@@ -276,14 +308,56 @@ function Stop-WithCriticalError {
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
     Cleanup-TempFiles
-    Write-Log "Installation terminated with critical error" "ERROR"
-    exit 1
+    Write-Log "Installation terminated with critical error. Exit code: $ExitCode" "ERROR"
+    exit $ExitCode
 }
 
 function Add-TempFile {
     param([string]$FilePath)
     if ($FilePath -and -not ($Script:State.TempFiles -contains $FilePath)) {
         $Script:State.TempFiles += $FilePath
+    }
+}
+
+function Register-InterruptHandler {
+    if ($Script:State.InterruptHandlerRegistered) {
+        return
+    }
+
+    try {
+        # Register Ctrl+C handler - use $Script: scope for cross-scope access
+        $interruptHandler = {
+            param($sender, $e)
+
+            Write-Host ""
+            Write-Host "Installation interrupted by user" -ForegroundColor Yellow
+
+            # Prevent immediate termination to allow cleanup
+            $e.Cancel = $true
+
+            # Write cancellation status using our function
+            try {
+                # Call the Write-InstallationStatus function with proper scoping
+                $statusFile1 = Join-Path $env:TEMP "wheels-install-status.txt"
+                $statusFile2 = Join-Path ([System.IO.Path]::GetTempPath()) "wheels-install-status.txt"
+
+                "2" | Out-File -FilePath $statusFile1 -Encoding ASCII -Force
+                "2" | Out-File -FilePath $statusFile2 -Encoding ASCII -Force
+
+                Write-Host "Cleanup completed." -ForegroundColor Gray
+            } catch {
+                # Silent fail for status file
+            }
+
+            exit 2  # Exit code 2 for user cancellation
+        }
+
+        [Console]::CancelKeyPress.Add($interruptHandler)
+
+        $Script:State.InterruptHandlerRegistered = $true
+        Write-Log "Interrupt handler registered successfully" "INFO"
+    } catch {
+        Write-Log "Failed to register interrupt handler: $($_.Exception.Message)" "WARNING"
     }
 }
 
@@ -1297,6 +1371,9 @@ function Start-Installation {
         Initialize-Logging
         Write-LogSection "INSTALLATION START"
 
+        # Register interrupt handler early
+        Register-InterruptHandler
+
         Write-Header "Wheels Installer" "Installing CommandBox, Wheels CLI, and Application"
 
         Initialize-Environment
@@ -1359,12 +1436,22 @@ function Start-Installation {
         Write-LogSection "INSTALLATION COMPLETED SUCCESSFULLY"
         Write-Log "Total installation time: $([int]((Get-Date) - $Script:State.StartTime).TotalSeconds) seconds" "SUCCESS"
 
+        # Mark installation as successful
+        $Script:State.InstallationSucceeded = $true
+        Write-Log "Installation completed successfully" "SUCCESS"
+
+        # Write success status for installer
+        Write-InstallationStatus -ExitCode 0
+
         # Show completion summary
         Show-CompletionSummary
 
+        # Exit with success code
+        exit 0
+
     } catch {
         Write-LogError "Installation failed with unexpected error" $_
-        Stop-WithCriticalError "Installation failed with unexpected error" "Error: $($_.Exception.Message)`n`nStack Trace:`n$($_.ScriptStackTrace)`n`nThis is an unexpected error. Please report this issue."
+        Stop-WithCriticalError "Installation failed with unexpected error" "Error: $($_.Exception.Message)`n`nStack Trace:`n$($_.ScriptStackTrace)`n`nThis is an unexpected error. Please report this issue." -ExitCode 3
     }
 }
 
