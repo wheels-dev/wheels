@@ -5698,3 +5698,1700 @@ userHasProfile = user.hasProfile(); // internally calls exists on profile
 // hasMany association example
 post = model("post").findByKey(params.postId);
 postHasComments = post.hasComments(); // internally calls exists on comment
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````fail:
+Forces a test to fail intentionally.
+You can call fail() inside a test when you want to:
+
+Stop execution and explicitly mark the test as failed.
+
+Highlight cases that should never happen.
+
+Ensure unimplemented test logic is flagged until completed.
+
+When called, it throws an exception that results in a test failure. You can optionally pass a custom message to clarify why the failure occurred.
+
+1. Simple fail with no message
+it("should fail on purpose", function() {
+    fail();
+});
+
+
+👉 Marks the test as failed without explanation.
+
+2. Fail with a custom message
+it("should fail with a message", function() {
+    fail("This path should never be reached!");
+});
+
+
+👉 Produces a failure with the message This path should never be reached!.
+
+3. Guarding unexpected conditions
+it("should not allow null users", function() {
+    var user = getUserById(123);
+    if (isNull(user)) {
+        fail("Expected user with ID 123 to exist but got null.");
+    }
+});
+
+
+👉 Test fails only if the condition is unexpected.
+
+4. Marking incomplete tests (TDD style)
+it("should calculate user score correctly", function() {
+    fail("Not implemented yet");
+});
+
+
+👉 Ensures you don’t forget to implement this test later.
+
+5. Fail inside a conditional branch
+it("should only accept active users", function() {
+    var user = createUser(isActive=false);
+    
+    if (!user.isActive) {
+        fail("Inactive user slipped through validation.");
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````fileField:
+Generates a file upload input (<input type="file">) tied to an object’s property.
+It automatically integrates with Wheels’ form and validation system, including:
+
+Using labels (before, after, or around the field).
+
+Handling nested associations (hasMany / belongsTo).
+
+Displaying validation errors with wrapping elements.
+
+Allowing HTML attributes (e.g., class, id, rel).
+
+This helper is most often used inside a formFor() block to ensu
+
+1. Basic usage with a label
+#fileField(label="Profile Picture", objectName="user", property="avatar")#
+
+
+👉 Renders:
+
+<label for="user-avatar">Profile Picture</label>
+<input type="file" id="user-avatar" name="user[avatar]">
+
+2. Adding custom attributes
+#fileField(
+    label="Upload Resume", 
+    objectName="jobApplication", 
+    property="resumeFile", 
+    class="upload-input", 
+    accept=".pdf,.docx"
+)#
+
+
+👉 Adds CSS class and restricts file types.
+
+3. Custom label placement
+#fileField(
+    label="Select File", 
+    objectName="document", 
+    property="attachment", 
+    labelPlacement="before"
+)#
+
+
+👉 Places label before the <input> instead of wrapping.
+
+4. Prepending/Appending extra markup
+#fileField(
+    label="Photo", 
+    objectName="gallery", 
+    property="image", 
+    prepend='<div class="field-wrapper">', 
+    append='</div>'
+)#
+
+
+👉 Wraps the input in custom markup.
+
+5. Nested association with hasMany
+<fieldset>
+    <legend>Screenshots</legend>
+    <cfloop from="1" to="#ArrayLen(site.screenshots)#" index="i">
+        #fileField(
+            label="File ##i#", 
+            objectName="site", 
+            association="screenshots", 
+            position=i, 
+            property="file"
+        )#
+        #textField(
+            label="Caption ##i#", 
+            objectName="site", 
+            association="screenshots", 
+            position=i, 
+            property="caption"
+        )#
+    </cfloop>
+</fieldset>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````fileFieldTag:
+Creates a file upload field (<input type="file">) using a supplied name.
+This helper is lower-level than fileField() — it does not bind to a model object but still provides:
+
+Optional label generation (before, after, or wrapping).
+
+Easy customization with prepend / append.
+
+Safe encoding to prevent XSS.
+
+Pass-through for any additional HTML attributes (e.g., class, id, accept).
+
+Useful when you want quick form fields without object binding.
+
+1. Basic usage with label
+#fileFieldTag(label="Upload Photo", name="photo")#
+
+
+👉 Output:
+
+<label for="photo">Upload Photo</label>
+<input type="file" id="photo" name="photo">
+
+2. With custom attributes
+#fileFieldTag(
+    label="Resume", 
+    name="resume", 
+    class="upload", 
+    id="resume-upload", 
+    accept=".pdf,.docx"
+)#
+
+
+👉 Adds CSS class, ID, and file type restrictions.
+
+3. Label placement options
+#fileFieldTag(label="Avatar", name="avatar", labelPlacement="before")#
+#fileFieldTag(label="Attachment", name="attachment", labelPlacement="after")#
+
+
+👉 Moves the label before or after the <input> instead of wrapping.
+
+4. Prepending/Appending markup
+#fileFieldTag(
+    label="Select File", 
+    name="document", 
+    prepend='<div class="field-wrapper">', 
+    append='</div>'
+)#
+
+
+👉 Wraps the input inside a custom <div>.
+
+5. Label customization with prepend/append
+#fileFieldTag(
+    label="Profile Photo", 
+    name="profile", 
+    prependToLabel='<span class="required">*</span>', 
+    appendToLabel=' <small>(max 2MB)</small>'
+)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````filterChain:
+The filterChain() function returns an array of all filters that are set on the current controller in the order they will be executed. By default, it includes both before and after filters, but you can specify the type argument if you want to return only one type. For example, setting type="after" will return only the filters that run after the controller action.
+
+1. Get the complete filter chain
+// In a controller with both before and after filters
+filters(through="requireLogin");
+filters(through="logAction", type="after");
+
+myFilterChain = filterChain();
+// => ["requireLogin", "logAction"]
+
+2. Only before filters
+filters(through="authenticateUser");
+filters(through="checkPermissions");
+filters(through="cleanupSession", type="after");
+
+beforeFilters = filterChain(type="before");
+// => ["authenticateUser", "checkPermissions"]
+
+3. Only after filters
+filters(through="trackAnalytics", type="after");
+filters(through="logPerformance", type="after");
+
+afterFilters = filterChain(type="after");
+// => ["trackAnalytics", "logPerformance"]
+
+4. Mixed filters with execution order
+filters(through="requireLogin");               // before
+filters(through="checkSubscription");          // before
+filters(through="auditTrail", type="after");   // after
+
+writeDump(filterChain());
+// => ["requireLogin", "checkSubscription", "auditTrail"]
+
+
+👉 Shows how order is preserved: all before filters first, followed by after filters.
+
+5. Using filterChain in debugging
+// In ApplicationController.cfc
+function debugFilters() {
+    writeDump(var=filterChain(), label="Filter Chain for #getController()#");
+}
+
+
+👉 Useful for debugging which filters are active for a given controller.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````filters:
+The filters() function lets you specify methods in your controller that should run automatically either before or after certain actions. Filters are useful for handling cross-cutting concerns such as authentication, authorization, logging, or cleanup, without having to repeat the same code inside each action. By default, filters run before the action, but you can configure them to run after, limit them to specific actions, exclude them from others, or control their placement in the filter chain.
+
+1. Run a filter before all actions
+// Always execute restrictAccess before every action
+filters("restrictAccess");
+
+2. Multiple filters before all actions
+// Run both isLoggedIn and checkIPAddress before all actions
+filters(through="isLoggedIn, checkIPAddress");
+
+3. Exclude specific actions
+// Run filters before all actions, except home and login
+filters(through="isLoggedIn, checkIPAddress", except="home, login");
+
+4. Limit filters to specific actions
+// Only run ensureAdmin before the delete action
+filters(through="ensureAdmin", only="delete");
+
+5. Run filters after an action
+// Run logAction after every action
+filters(through="logAction", type="after");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````findAll:
+The findAll() function retrieves records from a model’s database table based on the conditions you provide. You can filter results using the where argument, order them with order, group them with group, or limit them with maxRows. For more advanced queries, you can include associations with include, return only certain columns with select, or even enable pagination using page and perPage. The results can be returned as a query, an array of objects, an array of structs, or just the SQL string itself (using the returnAs argument). This makes findAll() a flexible tool for fetching multiple records in different formats and contexts.
+
+1. Get all users created recently (simple filter + order):
+
+recentUsers = model("user").findAll(
+    where="createdAt >= '2025-01-01'",
+    order="createdAt DESC"
+);
+
+
+Fetches all users created since Jan 1st, ordered with the most recent first.
+
+2. Limit results (top 5 users, random order):
+
+fiveRandomUsers = model("user").findAll(
+    maxRows=5,
+    order="random"
+);
+
+
+Returns 5 random users.
+
+3. Include associations (articles with their author):
+
+articles = model("article").findAll(
+    include="author",
+    where="published=1",
+    order="createdAt DESC"
+);
+
+
+Fetches published articles and also joins the related author records.
+
+4. Paginated results (songs, page 2):
+
+songs = model("song").findAll(
+    include="album(artist)",
+    page=2,
+    perPage=25
+);
+
+
+Gets 25 songs for page 2 (records 26–50), including album and artist details.
+
+5. Dynamic finder shortcut (books by year):
+
+books = model("book").findAllByReleaseYear(params.year);
+
+
+Equivalent to filtering with where="releaseYear=#params.year#".
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````findAllKeys:
+The findAllKeys() function retrieves all primary key values for a model’s records and returns them as a list. By default, the values are separated with commas, but you can change the delimiter with the delimiter argument or add single quotes around each value with the quoted argument. Since findAllKeys() accepts all arguments that findAll() does, you can also filter results with where, control ordering with order, or even include associations when filtering. This makes it useful when you need just the IDs of records without fetching full objects or rows.
+
+1. Get all IDs for a model (basic usage):
+
+artistIds = model("artist").findAllKeys();
+
+
+Returns a comma-delimited list of all artist IDs.
+
+2. Get active artist IDs with custom delimiter and quotes:
+
+artistIds = model("artist").findAllKeys(
+    quoted=true,
+    delimiter="|",
+    where="active=1"
+);
+
+
+Returns only active artist IDs, quoted and separated with |.
+
+3. Limit results (top 10 user IDs):
+
+userIds = model("user").findAllKeys(
+    maxRows=10,
+    order="createdAt DESC"
+);
+
+
+Returns the 10 most recently created user IDs.
+
+4. Paginated IDs (books, second page):
+
+bookIds = model("book").findAllKeys(
+    page=2,
+    perPage=20,
+    order="title ASC"
+);
+
+
+Fetches IDs for books on page 2 (records 21–40), ordered alphabetically.
+
+5. Grouped query with HAVING (order IDs by sales total):
+
+orderIds = model("order").findAllKeys(
+    group="productId",
+    where="totalAmount > 500"
+);
+
+
+Returns order IDs for products that generated more than $500 in sales.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````findByKey:
+The findByKey() function retrieves a single record from the database using its primary key value and returns it as an object by default. If the record is not found, it returns false, making it easy to handle missing data gracefully. You can also control what columns are returned using the select argument, include related associations, or override the return format to a query, struct, or even raw SQL. Since it accepts the same options as other read functions like findOne(), you can apply caching, indexing, and even include soft-deleted records when needed.
+
+1. Fetch a single record by ID (basic usage):
+
+author = model("author").findByKey(99);
+
+
+Returns the author with primary key 99 as an object.
+
+2. Fetch a record dynamically (from form/URL param):
+
+author = model("author").findByKey(params.key);
+if (!isObject(author)) {
+    flashInsert(message="Author #params.key# was not found");
+    redirectTo(back=true);
+}
+
+
+Safely checks if the author exists before continuing.
+
+3. Select only specific columns:
+
+user = model("user").findByKey(42, select="firstName,lastName,email");
+
+
+Fetches only the given fields for the user with ID 42.
+
+4. Include associations (eager loading):
+
+article = model("article").findByKey(
+    params.articleId,
+    include="author,comments"
+);
+
+
+Returns an article along with its associated author and comments in a single query.
+
+5. Return as query instead of object:
+
+productQuery = model("product").findByKey(
+    10,
+    returnAs="query"
+);
+
+
+Fetches the product record as a standard ColdFusion query result set.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````findFirst:
+The findFirst() function fetches the first record from the database table mapped to the model, ordered by the primary key value by default. You can customize the ordering by passing a property name through the property argument, which is also aliased as properties. This makes it useful when you want the "first" record based on a specific field (e.g., earliest created date, alphabetically first name, lowest price, etc.). The result is returned as a model object.
+
+1. Get the first record by primary key (default behavior):
+
+firstUser = model("user").findFirst();
+
+
+Fetches the user with the lowest primary key value.
+
+2. Get the first record alphabetically by name:
+
+firstAuthor = model("author").findFirst(property="lastName");
+
+
+Fetches the author with the alphabetically first last name.
+
+3. Get the earliest created record (using a timestamp column):
+
+firstArticle = model("article").findFirst(property="createdAt");
+
+
+Fetches the oldest article based on creation date.
+
+4. Get the cheapest product:
+
+cheapestProduct = model("product").findFirst(property="price");
+
+
+Fetches the product with the lowest price.
+
+5. Use alias properties instead of property:
+
+firstComment = model("comment").findFirst(properties="createdAt");
+
+
+Works the same as property — useful when you prefer the plural alias.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````findLastOne:
+The findLastOne() function fetches the last record from the database table mapped to the model, ordered by the primary key value by default. You can override this ordering by passing a property name through the property argument (also aliased as properties). This is useful when you want to retrieve the "last" record based on something other than the primary key, such as the most recently created entry, the highest price, or the latest updated timestamp. The result is returned as a model object. This function was formerly known as findLast.
+
+1. Get the last record by primary key (default behavior):
+
+lastUser = model("user").findLastOne();
+
+
+Fetches the user with the highest primary key value.
+
+2. Get the last record alphabetically by name:
+
+lastAuthor = model("author").findLastOne(property="lastName");
+
+
+Fetches the author with the alphabetically last last name.
+
+3. Get the most recently created record:
+
+lastArticle = model("article").findLastOne(property="createdAt");
+
+
+Fetches the article with the latest creation date.
+
+4. Get the most expensive product:
+
+priciestProduct = model("product").findLastOne(property="price");
+
+
+Fetches the product with the highest price.
+
+5. Use alias properties instead of property:
+
+lastComment = model("comment").findLastOne(properties="createdAt");
+
+
+Works the same as property — useful when you prefer the plural alias.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````findOne:
+The findOne() function retrieves the first record that matches the given search criteria. By default, this is determined by the WHERE and ORDER BY clauses that you pass in. If no criteria are provided, Wheels will return the first record it finds in the table (ordered by the primary key unless otherwise specified). When returnAs is set to object (the default), the function will return a model object if a record is found, or false if no record matches the conditions. For cleaner and more expressive code, Wheels supports Dynamic Finders, which allow you to call findOneBy... methods instead of writing explicit where clauses. This function is commonly used when you need only a single record — for example, the latest order, the first matching user, or a related object via an association.
+
+1. Get the most recent order:
+
+order = model("order").findOne(order="datePurchased DESC");
+
+
+Fetches the latest order based on the purchase date.
+
+2. Use a dynamic finder to locate a user by last name:
+
+person = model("user").findOneByLastName("Smith");
+
+
+Equivalent to findOne(where="lastName='Smith'").
+
+3. Use a dynamic finder with multiple conditions:
+
+user = model("user").findOneByEmailAndPassword("someone@somewhere.com,mypass");
+
+
+Equivalent to findOne(where="email='someone@somewhere.com' AND password='mypass'").
+
+4. Use associations with scoped calls (hasOne):
+
+user = model("user").findByKey(params.userId);
+profile = user.profile();
+
+
+Internally runs model("profile").findOne(where="userId=#user.id#").
+
+5. Use associations with scoped calls (hasMany):
+
+post = model("post").findByKey(params.postId);
+comment = post.findOneComment(where="text='I Love Wheels!'");
+
+
+Internally runs model("comment").findOne(where="postId=#post.id#").
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flash:
+The flash() function is used in controllers to access data stored in the Flash scope. Flash is a temporary storage mechanism that lets you persist values across the next request (often after a redirect). You can use it to retrieve a specific key or the entire Flash struct. If you pass in a key, it returns the value associated with it; if no key is passed, it returns all the Flash contents as a struct.
+
+Examples
+// Get a specific Flash value (commonly used for notifications or messages)
+notice = flash("notice");
+
+// Get another value stored in Flash, e.g., an error message
+errorMsg = flash("error");
+
+// Retrieve the entire Flash scope as a struct
+allFlash = flash();
+
+Example Usage in a Redirect Flow
+// In one action: set a flash message before redirect
+flashInsert(message="Profile updated successfully", key="notice");
+redirectTo(action="show");
+
+// In the redirected action: retrieve the message
+notice = flash("notice"); // "Profile updated successfully"
+
+Example with Conditional Check
+if (structKeyExists(flash(), "error")) {
+    writeOutput("Error: " & flash("error"));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashClear:
+The flashClear() function removes all keys and values from the Flash scope. This is useful when you want to reset or clear out any temporary messages or data that were carried over from a previous request. After calling flashClear(), the Flash will be empty for the remainder of the request and any future requests until new values are inserted.
+
+Examples
+// Clear all flash values at the start of an action
+flashClear();
+
+// Example flow: clear messages after they've been displayed
+notice = flash("notice");
+if (len(notice)) {
+    writeOutput(notice);
+    flashClear(); // reset Flash so it doesn't show again
+}
+
+// Use before redirecting if you want to ensure no old flash values remain
+flashClear();
+redirectTo(action="index");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashCount:
+The flashCount() function returns the number of keys currently stored in the Flash scope. This is useful to check whether there are any flash messages or temporary data before attempting to read or display them. It helps in conditionally rendering notifications or determining if the Flash is empty.
+
+Examples
+// Get the number of items in Flash
+count = flashCount();
+
+// Check if there are any flash messages before displaying
+if (flashCount() > 0) {
+    writeOutput("You have " & flashCount() & " messages in Flash.");
+}
+
+// Example flow: only display notice if Flash is not empty
+if (flashCount() > 0 && structKeyExists(flash(), "notice")) {
+    writeOutput(flash("notice"));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashDelete:
+The flashDelete() function removes a specific key from the Flash scope. It is useful when you want to delete a particular temporary message or piece of data without clearing the entire Flash. The function returns true if the key existed and was deleted, or false if the key was not present.
+
+Examples
+// Delete a single flash message
+flashDelete(key="errorMessage");
+
+// Delete another key and check if it existed
+if (flashDelete(key="notice")) {
+    writeOutput("Notice deleted from Flash.");
+} else {
+    writeOutput("Notice key did not exist.");
+}
+
+// Conditional usage before displaying flash
+if (structKeyExists(flash(), "warning")) {
+    warningMsg = flash("warning");
+    flashDelete(key="warning"); // remove after reading
+    writeOutput(warningMsg);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashInsert:
+The flashInsert() function adds a new key-value pair to the Flash scope. This is useful for storing temporary messages or data that you want to persist across the next request, typically after a redirect. You can insert any type of value, such as strings, numbers, or structs, and later retrieve it using flash().
+
+Examples
+// Insert a simple flash message
+flashInsert(msg="It Worked!");
+
+// Insert multiple types of data
+flashInsert(userId=123);
+flashInsert(errorMessage="Something went wrong");
+
+// Typical usage: insert a message before redirecting
+flashInsert(notice="Profile updated successfully");
+redirectTo(action="show");
+
+// Insert a structured value
+flashInsert(userStruct={id=42, name="Alice"});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashIsEmpty:
+The flashIsEmpty() function checks whether the Flash scope contains any keys. It returns true if the Flash is empty and false if it contains one or more keys. This is useful for conditionally displaying messages or deciding whether to process Flash data before reading or clearing it.
+
+Examples
+// Check if the Flash is empty
+if (flashIsEmpty()) {
+    writeOutput("No messages to display.");
+} else {
+    writeOutput("There are messages in Flash.");
+}
+
+// Use before reading a specific key
+if (!flashIsEmpty() && structKeyExists(flash(), "notice")) {
+    writeOutput(flash("notice"));
+}
+
+// Typical flow: after clearing Flash
+flashClear();
+writeOutput(flashIsEmpty()); // true
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashKeep:
+The flashKeep() function allows you to preserve Flash data for one additional request. By default, Flash values are only available for the very next request; calling flashKeep() prevents them from being cleared after the current request. You can choose to keep the entire Flash or only specific keys. This is useful when you want messages or temporary data to persist through multiple redirects or page loads.
+
+Examples
+// Keep the entire Flash for the next request
+flashKeep();
+
+// Keep a specific key, e.g., "error"
+flashKeep("error");
+
+// Keep multiple keys, e.g., "error" and "success"
+flashKeep("error,success");
+
+// Typical usage: keep a flash message after a redirect chain
+flashInsert(notice="Profile saved successfully");
+flashKeep("notice");
+redirectTo(action="nextStep");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashKeyExists:
+The flashKeyExists() function checks whether a specific key is present in the Flash scope. It returns true if the key exists and false if it does not. This is useful for conditionally displaying or processing Flash messages or data before attempting to read them.
+
+Examples
+// Check if the "error" key exists
+errorExists = flashKeyExists("error");
+
+// Conditional display based on key existence
+if (flashKeyExists("notice")) {
+    writeOutput(flash("notice"));
+}
+
+// Example usage in a form flow
+if (flashKeyExists("validationErrors")) {
+    errors = flash("validationErrors");
+    // Process or display errors
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````flashMessages:
+The flashMessages() function generates a formatted HTML output of messages stored in the Flash scope. It is typically used in views or layouts to display temporary notifications like success messages, alerts, or errors. You can choose to display all messages, a specific key, or multiple keys in a defined order. Additional options let you customize the container’s HTML class, include an empty container if no messages exist, and control whether the message content is URL-encoded.
+
+Examples
+// Insert messages into the Flash in a controller
+flashInsert(success="Your post was successfully submitted.");
+flashInsert(alert="Don't forget to tweet about this post!");
+flashInsert(error="This is an error message.");
+
+<!--- In the layout or view, show all messages --->
+#flashMessages()#
+/* Generates:
+<div class="flashMessages">
+    <p class="alertMessage">Don't forget to tweet about this post!</p>
+    <p class="errorMessage">This is an error message.</p>
+    <p class="successMessage">Your post was successfully submitted.</p>
+</div>
+*/
+
+// Show only the "success" message
+#flashMessages(key="success")#
+/* Generates:
+<div class="flashMessage">
+    <p class="successMessage">Your post was successfully submitted.</p>
+</div>
+*/
+
+// Show both "success" and "alert" messages in that order
+#flashMessages(keys="success,alert")#
+/* Generates:
+<div class="flashMessages">
+    <p class="successMessage">Your post was successfully submitted.</p>
+    <p class="alertMessage">Don't forget to tweet about this post!</p>
+</div>
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````float:
+The float() function is used in a table definition during a migration to add one or more float-type columns to a database table. You can specify column names, default values, and whether the columns allow NULL. This helps define numeric columns with decimal values in your schema.
+
+Examples
+// Basic usage: add a single float column
+table.float("price");
+
+// Add multiple float columns at once
+table.float("length,width,height");
+
+// Add a float column with a default value
+table.float("discount", default="0.0");
+
+// Add a float column that cannot be null
+table.float("taxRate", null=false);
+
+// Add multiple float columns with defaults
+table.float("latitude,longitude", default="0.0");
+
+// Combine default value and null constraint
+table.float("weight", default="1.0", null=false);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````get:
+The get() function defines a route that only responds to HTTP GET requests. This is typically used for actions that display data, like listing resources or showing a single record. You can configure the route’s URL pattern, the controller and action it maps to, and optionally a name, package, or nested scope. It is recommended to only use get() for retrieving data; for routes that modify data, use post(), put(), patch(), or delete().
+
+Examples
+<cfscript>
+mapper()
+    // Basic GET route using "to"
+    .get(name="post", pattern="posts/[slug]", to="posts##show")
+
+    // GET route using controller and action separately
+    .get(name="posts", controller="posts", action="index")
+
+    // Custom URL pattern
+    .get(name="authors", pattern="the-scribes", to="authors##index")
+
+    // Namespaced controller
+    .get(name="cart", to="carts##show", package="commerce")
+
+    // Nested GET route within another package
+    .get(name="editProfile", pattern="profile/edit", to="profiles##edit", package="extranet")
+
+    // Nested resource routes
+    .resources(name="users", nested=true)
+        // Collection route (no ID in URL)
+        .get(name="activated", to="users##activated", on="collection")
+        // Member route (includes resource ID)
+        .get(name="preferences", to="preferences##index", on="member")
+    .end()
+.end();
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````get:
+The get() function returns the current value of a Wheels configuration setting or the default value for a specific function argument. It can be used to inspect global Wheels settings (like table name prefixes, pagination defaults, or other configuration values) or to check what the default argument would be for a particular Wheels function.
+
+Examples
+// Get the current value of a global Wheels setting
+tablePrefix = get("tableNamePrefix");
+
+// Get the default message for the `validatesConfirmationOf` function
+confirmationMessageDefault = get(functionName="validatesConfirmationOf", name="message");
+
+// Check the default value for the "null" argument in migrations
+allowNullDefault = get(functionName="float", name="null");
+
+// Retrieve the current default number of rows per page in pagination
+perPageDefault = get("perPage");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````getAvailableMigrations:
+The getAvailableMigrations() function scans the migration folder (by default /migrator/migrations/) and returns an array of all migration files it finds. Each item in the array contains information about the migration, including its version. While this function can be called from within your application, it is primarily intended for use via the Wheels CLI or GUI tools. It is useful for programmatically determining which migrations are available and what the latest migration version is.
+
+Examples
+// Get all available migrations in the default folder
+migrations = application.wheels.migrator.getAvailableMigrations();
+
+// Determine the latest migration version
+if (ArrayLen(migrations)) {
+    latestVersion = migrations[ArrayLen(migrations)].version;
+} else {
+    latestVersion = 0;
+}
+
+// Get available migrations from a custom folder
+customMigrations = application.wheels.migrator.getAvailableMigrations(path="/custom/migrations");
+
+// Loop through migrations and display their versions
+for (var m in migrations) {
+    writeOutput("Migration version: " & m.version & "<br>");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````getCurrentMigrationVersion:
+The getCurrentMigrationVersion() function returns the version number of the latest migration that has been applied to the database. This is useful for determining the current schema state programmatically, though it is primarily intended for use via the Wheels CLI or GUI interface. You can use this function within your application to perform conditional logic based on the database version or to verify that the database is up-to-date.
+
+Examples
+// Get the current database migration version
+currentVersion = application.wheels.migrator.getCurrentMigrationVersion();
+writeOutput("Current DB version: " & currentVersion);
+
+// Compare with the latest available migration version
+migrations = application.wheels.migrator.getAvailableMigrations();
+if (ArrayLen(migrations)) {
+    latestVersion = migrations[ArrayLen(migrations)].version;
+    if (currentVersion LT latestVersion) {
+        writeOutput("Database is behind the latest migration.");
+    } else {
+        writeOutput("Database is up-to-date.");
+    }
+}
+
+// Conditional logic based on migration version
+if (currentVersion EQ "2023091501") {
+    // perform tasks specific to this version
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````getEmails:
+The getEmails() function is primarily used in testing scenarios to retrieve information about the emails that were sent during the current request. It returns an array containing details of all sent emails, which allows you to verify the content, recipients, and other properties of the emails in your automated tests. This is especially useful for unit or functional tests where you want to assert that specific emails are being triggered by certain actions without actually sending them.
+
+// Get all emails sent during the current request
+emails = getEmails();
+
+// Check if an email was sent to a specific recipient
+for (var email in emails) {
+    if (email.to EQ "user@example.com") {
+        writeOutput("Email sent to user@example.com<br>");
+    }
+}
+
+// Verify the subject of the last sent email
+lastEmail = emails[ArrayLen(emails)];
+writeOutput("Last email subject: " & lastEmail.subject);
+
+// In a test case, assert that an email was sent
+assertTrue(arrayLen(emails) GT 0, "No emails were sent during this request.");
+assertEquals(lastEmail.to, "user@example.com", "Email recipient does not match expected value.");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````getFiles:
+The getFiles() function is primarily used in testing scenarios to retrieve information about files sent during the current request. It returns an array containing details of all files handled in the request, such as uploaded attachments or generated files. This allows you to inspect and verify file-related operations in automated tests without needing to access the file system directly.
+
+// Get all files sent during the current request
+files = getFiles();
+
+// Check if a specific file was sent
+for (var file in files) {
+    if (file.name EQ "report.pdf") {
+        writeOutput("File 'report.pdf' was sent.<br>");
+    }
+}
+
+// Inspect properties of the last file sent
+lastFile = files[ArrayLen(files)];
+writeOutput("Last file name: " & lastFile.name);
+writeOutput("Last file size: " & lastFile.size);
+
+// In a test case, assert that at least one file was sent
+assertTrue(arrayLen(files) GT 0, "No files were sent during this request.");
+assertEquals(lastFile.name, "report.pdf", "Last file sent does not match expected file.");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````getRedirect:
+The getRedirect() function is primarily used in testing scenarios to determine whether the current request has performed a redirect. It returns a structure containing information about the redirect, such as the target URL and the HTTP status code. This allows you to verify redirect behavior in automated tests without actually sending the user to another page.
+
+// Get redirect information for the current request
+redirectInfo = getRedirect();
+
+// Check if a redirect occurred
+if (structKeyExists(redirectInfo, "url")) {
+    writeOutput("Redirected to: " & redirectInfo.url);
+    writeOutput("HTTP status: " & redirectInfo.status);
+} else {
+    writeOutput("No redirect occurred.");
+}
+
+// In a test case, assert that a redirect happened
+assertTrue(structKeyExists(redirectInfo, "url"), "Expected a redirect but none occurred.");
+assertEquals(redirectInfo.url, "/login", "Redirect URL does not match expected URL.");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````getRoutes:
+The getRoutes() function returns all the routes that have been defined in the application via the mapper() function. It provides a programmatic way to inspect the routing table, including route names, URL patterns, controllers, actions, and other metadata. This is useful for debugging, generating dynamic links, or performing logic based on the routes that exist in your application.
+
+// Get all defined routes
+allRoutes = getRoutes();
+
+// Loop through routes and display their patterns
+for (var r in allRoutes) {
+    writeOutput("Route name: " & r.name & "<br>");
+    writeOutput("Pattern: " & r.pattern & "<br>");
+    writeOutput("Controller: " & r.controller & "<br>");
+    writeOutput("Action: " & r.action & "<br><br>");
+}
+
+// Get a specific route by name
+postRoute = allRoutes["post"];
+writeOutput("Post route URL pattern: " & postRoute.pattern);
+
+// Debugging: list all routes in JSON format
+writeOutput(serializeJson(allRoutes));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````getTableNamePrefix:
+The getTableNamePrefix() function returns the table name prefix that is set for the current model. This is useful when your database tables share a common prefix, and you need to construct queries dynamically or perform operations that require the full table name. By using this function, you ensure consistency and avoid hardcoding table prefixes in your queries.
+
+// Get the table name prefix for the current model
+prefix = model("user").getTableNamePrefix();
+writeOutput("Table prefix: " & prefix);
+
+// Use the table prefix in a custom query
+<cffunction name="getDisabledUsers" returntype="query">
+    <cfquery datasource="#get('dataSourceName')#" name="local.disabledUsers">
+        SELECT *
+        FROM #model("user").getTableNamePrefix()#users
+        WHERE disabled = 1
+    </cfquery>
+    <cfreturn local.disabledUsers>
+</cffunction>
+
+// Another example: dynamically construct table name
+tableName = model("order").getTableNamePrefix() & "orders";
+writeOutput("Full table name: " & tableName);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````globalHelperFunction:
+Remove this function as it is only an asset function in the core tests.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hasChanged:
+The hasChanged() function checks whether a property (or any property if none is specified) on a model object has been modified since it was last loaded from the database. It returns true if the property has been changed but not yet saved, or if the object is new and does not yet exist in the database. This is useful for detecting unsaved changes and conditionally performing logic before persisting the object.
+
+// Get a member object and change the email property
+member = model("member").findByKey(params.memberId);
+member.email = params.newEmail;
+
+// Check if the email property has changed
+if (member.hasChanged("email")) {
+    writeOutput("Email has changed. Updating database...");
+}
+
+// Check if any property has changed
+if (member.hasChanged()) {
+    writeOutput("There are unsaved changes in this member object.");
+}
+
+// Using a dynamic helper function
+if (member.emailHasChanged()) {
+    writeOutput("Email was modified using the dynamic helper method.");
+}
+
+// New object example
+newMember = model("member").init();
+newMember.firstName = "Alice";
+if (newMember.hasChanged()) {
+    writeOutput("This is a new member and changes exist that are not yet saved.");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hasErrors:
+The hasErrors() function checks whether a model object has any validation or other errors. It returns true if the object contains errors, or if a specific property or named error is provided, it checks only that subset. This is useful for validating objects before saving them to the database or displaying error messages to the user.
+
+// Get a post object
+post = model("post").findByKey(params.postId);
+
+// Check if the object has any errors
+if (post.hasErrors()) {
+    writeOutput("There are errors. Redirecting to the edit form...");
+    redirectTo(action="edit", id=post.id);
+}
+
+// Check if a specific property has errors
+if (post.hasErrors("title")) {
+    writeOutput("The title field contains errors.");
+}
+
+// Check if a specific named error exists
+if (post.hasErrors(name="requiredTitle")) {
+    writeOutput("The post is missing a required title.");
+}
+
+// Conditional save only if no errors exist
+if (!post.hasErrors()) {
+    post.save();
+    writeOutput("Post saved successfully.");
+}
