@@ -54,10 +54,12 @@ component aliases='wheels g property'  extends="../base"  {
 		number precision=0,
 		number scale=0
 	){
+		// Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
 
     	var obj = helpers.getNameVariants(arguments.name);
 
-    	detailOutput.header("🏗️", "Generating property: #arguments.columnName# for #arguments.name#");
+    	detailOutput.header("", "Generating property: #arguments.columnName# for #arguments.name#");
 
     	// Quick Sanity Checks: are we actually adding a property to an existing model?
     	// Check for existence of model file: NB, DB columns can of course exist without a model file,

@@ -1,15 +1,25 @@
 # wheels generate model
-*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
-
 
 Generate a model with properties, validations, and associations.
 
 ## Synopsis
 
 ```bash
-wheels generate model [name] [options]
-wheels g model [name] [options]
+wheels generate model name=<modelName> [options]
+
+#Can also be used as:
+wheels g model name=<modelName> [options]
 ```
+
+## Parameter Syntax
+
+CommandBox supports multiple parameter formats:
+
+- **Named parameters**: `name=value` (e.g., `name=User`, `properties=name:string,email:string`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--migration` equals `migration=true`)
+- **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--primaryKey=uuid`)
+
+**Note**: Flag syntax (`--flag`) avoids positional/named parameter conflicts and is recommended for boolean options.
 
 ## Description
 
@@ -23,23 +33,57 @@ The `wheels generate model` command creates a new model CFC file with optional p
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--migration` | Generate database migration | `true` |
-| `properties` | Model properties (format: name:type,name2:type2) | |
-| `belongs-to` | Parent model relationships (comma-separated) | |
-| `has-many` | Child model relationships (comma-separated) | |
-| `has-one` | One-to-one relationships (comma-separated) | |
-| `primary-key` | Primary key column name(s) | `id` |
-| `table-name` | Custom database table name | |
-| `description` | Model description | |
-| `--force` | Overwrite existing files | `false` |
+| Option | Description | Valid Values | Default |
+|--------|-------------|--------------|---------|
+| `properties` | Model properties (format: name:type,name2:type2) | Property format: `name:type[,name2:type2]` where type is valid column type | `""` |
+| `belongsTo` | Parent model relationships (comma-separated) | Valid model names (PascalCase), comma-separated | `""` |
+| `hasMany` | Child model relationships (comma-separated) | Valid model names (PascalCase), comma-separated | `""` |
+| `hasOne` | One-to-one relationships (comma-separated) | Valid model names (PascalCase), comma-separated | `""` |
+| `primaryKey` | Primary key column name(s) | Valid column name (alphanumeric, underscore) | `id` |
+| `tableName` | Custom database table name | Valid table name (alphanumeric, underscore) | `""` |
+| `description` | Model description | Any descriptive text | `""` |
+| `migration` | Generate database migration | `true`, `false` | `true` |
+| `force` | Overwrite existing files | `true`, `false` | `false` |
+
+## Parameter Validation
+
+### Required Parameters
+- **`name`**: Cannot be empty, must be valid CFML component name (alphanumeric, starts with letter)
+
+### Property Types Validation
+Valid property types for the `properties` parameter:
+
+| Type | Database Type | Validation |
+|------|---------------|------------|
+| `string` | VARCHAR(255) | Default string type |
+| `text` | TEXT | For longer text content |
+| `integer` | INTEGER | Whole numbers |
+| `biginteger` | BIGINT | Large whole numbers |
+| `float` | FLOAT | Decimal numbers |
+| `decimal` | DECIMAL(10,2) | Precise decimal numbers |
+| `boolean` | BOOLEAN | true/false values |
+| `date` | DATE | Date values |
+| `datetime` | DATETIME | Date and time values |
+| `timestamp` | TIMESTAMP | Timestamp values |
+| `binary` | BLOB | Binary data |
+| `uuid` | VARCHAR(35) | UUID strings |
+
+### Model Name Validation
+- Must be singular (User, not Users)
+- Must be PascalCase (User, BlogPost)
+- Cannot contain spaces or special characters
+- Must be valid CFML component name
+
+### Relationship Validation
+- Relationship model names must follow model naming conventions
+- Models referenced in relationships should exist or be created
+- Comma-separated values cannot contain spaces around commas
 
 ## Examples
 
 ### Basic model
 ```bash
-wheels generate model user
+wheels generate model name=User
 ```
 Creates:
 - `/models/User.cfc`
@@ -47,25 +91,75 @@ Creates:
 
 ### Model with properties
 ```bash
-wheels generate model user properties="firstName:string,lastName:string,email:string,age:integer"
+wheels generate model name=User --properties="firstName:string,lastName:string,email:string,age:integer"
 ```
 
 ### Model with associations
 ```bash
-wheels generate model post belongs-to="user" has-many="comments"
+wheels generate model name=Post --belongsTo="User" --hasMany="Comments"
 ```
 
 ### Model without migration
 ```bash
-wheels generate model setting --migration=false
+wheels generate model name=Setting --migration=false
 ```
 
 ### Complex model
 ```bash
-wheels generate model product \
-  properties="name:string,price:decimal,stock:integer,active:boolean" \
-  belongs-to="category,brand" \
-  has-many="reviews,orderItems"
+wheels generate model name=Product --properties="name:string,price:decimal,stock:integer,active:boolean" --belongsTo="Category,Brand" --hasMany="Reviews,OrderItems"
+```
+
+## Validation Examples
+
+### ✅ Valid Examples
+```bash
+# Valid model name and properties
+wheels generate model name=User --properties="firstName:string,lastName:string,email:string,age:integer"
+
+# Valid relationships
+wheels generate model name=Post --belongsTo="User,Category" --hasMany="Comments,Tags"
+
+# Valid property types
+wheels generate model name=Product --properties="name:string,description:text,price:decimal,inStock:boolean,createdAt:datetime"
+```
+
+### ❌ Invalid Examples and Errors
+
+#### Invalid Model Names
+```bash
+# Error: Model name cannot be empty
+wheels generate model name=""
+# Result: Invalid model name error
+
+# Error: Model name should be singular
+wheels generate model name=Users
+# Result: Warning about plural name
+
+# Error: Invalid characters
+wheels generate model name="Blog Post"
+# Result: Invalid model name error
+```
+
+#### Invalid Property Types
+```bash
+# Error: Invalid property type
+wheels generate model name=User --properties="name:varchar,age:int"
+# Result: Use 'string' instead of 'varchar', 'integer' instead of 'int'
+
+# Error: Missing property type
+wheels generate model name=User --properties="name,email:string"
+# Result: Property format must be 'name:type'
+```
+
+#### Invalid Relationships
+```bash
+# Error: Invalid model name format
+wheels generate model name=Post --belongsTo="user,blog_category"
+# Result: Use PascalCase: 'User,BlogCategory'
+
+# Error: Spaces in comma-separated values
+wheels generate model name=Post --belongsTo="User, Category"
+# Result: Remove spaces: 'User,Category'
 ```
 
 ## Property Types
@@ -266,14 +360,38 @@ component extends="wheels.migrator.Migration" {
 }
 ```
 
+## Common Validation Errors
+
+### Model Name Errors
+- **Empty name**: `name=""` → Provide a valid model name
+- **Plural names**: `name=Users` → Use singular form: `name=User`
+- **Invalid characters**: `name="Blog Post"` → Use PascalCase: `name=BlogPost`
+- **Lowercase**: `name=user` → Use PascalCase: `name=User`
+
+### Property Format Errors
+- **Missing colon**: `properties="name,email:string"` → `properties="name:string,email:string"`
+- **Invalid types**: `properties="name:varchar"` → `properties="name:string"`
+- **Extra spaces**: `properties="name: string"` → `properties="name:string"`
+- **Missing type**: `properties="name:"` → `properties="name:string"`
+
+### Boolean Parameter Errors
+- **Invalid boolean**: `--migration=yes` → `--migration=true` or `--migration=false`
+- **Mixed syntax**: `migration=true --force` → `--migration=true --force`
+
+### Relationship Format Errors
+- **Lowercase models**: `belongsTo="user"` → `belongsTo="User"`
+- **Extra spaces**: `belongsTo="User, Category"` → `belongsTo="User,Category"`
+- **Invalid separators**: `belongsTo="User;Category"` → `belongsTo="User,Category"`
+
 ## Best Practices
 
 1. **Naming**: Use singular names (User, not Users)
-2. **Properties**: Define all database columns
-3. **Validations**: Add comprehensive validations
-4. **Associations**: Define all relationships
+2. **Properties**: Define all database columns with correct types
+3. **Validations**: Add comprehensive validations in model code
+4. **Associations**: Define all relationships using PascalCase
 5. **Callbacks**: Use for automatic behaviors
 6. **Indexes**: Add to migration for performance
+7. **Validation**: Always validate parameters before running command
 
 ## Common Patterns
 
@@ -322,9 +440,38 @@ private function setDefaults() {
 
 Generate model tests:
 ```bash
-wheels generate model user properties="email:string,name:string"
-wheels generate test model user
+wheels generate model name=User --properties="email:string,name:string"
+wheels generate test model name=User
 ```
+
+## Troubleshooting
+
+### Command Fails with "Invalid model name"
+1. Check that name is not empty: `name=User`
+2. Ensure PascalCase format: `name=User` (not `name=user`)
+3. Use singular form: `name=User` (not `name=Users`)
+4. Remove special characters: `name=BlogPost` (not `name="Blog Post"`)
+
+### Properties Not Generated in Migration
+1. Check property format: `properties="name:string,email:string"`
+2. Ensure valid property types (see Property Types table above)
+3. Remove extra spaces: `name:string` (not `name: string`)
+4. Use comma separators: `name:string,email:string`
+
+### Relationships Not Working
+1. Use PascalCase model names: `belongsTo="User"` (not `belongsTo="user"`)
+2. Remove spaces after commas: `belongsTo="User,Category"`
+3. Ensure referenced models exist or will be created
+
+### Migration Not Generated
+1. Check `--migration=false` wasn't set
+2. Ensure you have write permissions in the directory
+3. Verify migration directory exists: `/app/migrator/migrations/`
+
+### Boolean Parameters Not Working
+1. Use `--flag` for `flag=true`: `--force` equals `force=true`
+2. Use `--flag=false` for false values: `--migration=false`
+3. Don't mix syntaxes: Use all flags or all named parameters
 
 ## See Also
 

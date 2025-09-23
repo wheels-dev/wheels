@@ -4,13 +4,15 @@
  *
  * This command will ask for:
  *
- *  - An Application Name (a new directoery will be created with this name)
+ *  - An Application Name (a new directory will be created with this name)
  *  - Template to use
  *  - A reload Password
  *  - A datasource name
  *  - What local cfengine you want to run
- *  - If using Lucee, do you want to setup a local h2 dev database
- *  - Do you want to initialize the app as a ForgBox opbject
+ *  - Database and dependencies configuration - only if skipInstall=false:
+ *    - If using Lucee, do you want to setup a local H2 dev database
+ *    - Bootstrap and other dependencies
+ *  - Do you want to initialize the app as a ForgeBox object
  *
  * {code:bash}
  * wheels new
@@ -48,6 +50,8 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
    * @init           "init" the directory as a package if it isn't already
    * @force          Force installation into an none empty directory
    * @nonInteractive Run without prompts, using provided options or defaults
+   * @expert         Show advanced options and configurations
+   * @skipInstall    Skip dependency installation after app creation
    **/
   function run(
     string name = '',
@@ -60,7 +64,9 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
     boolean setupH2 = true,
     boolean init = false,
     boolean force = false,
-    boolean nonInteractive = false
+    boolean nonInteractive = false,
+    boolean expert = false,
+    boolean skipInstall = false
    ) {
     // Initialize detail service
     var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
@@ -89,20 +95,21 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
         setupH2         = arguments.setupH2,
         init            = arguments.init,
         force           = arguments.force,
+        skipInstall     = arguments.skipInstall,
         initWizard      = true
       ).run();
       return;
     }
 
     // ---------------- Welcome
-    details.header("🧿", "Wheels Application Wizard");
+    details.header("", "Wheels Application Wizard");
     print.line()
       .cyanLine( "Welcome to the Wheels app wizard!" )
       .cyanLine( "I'll help you create a new Wheels application." )
       .line();
 
     // ---------------- Set an app Name
-    print.yellowBoldLine( "📝 Step 1: Application Name" )
+    print.yellowBoldLine( "Step 1: Application Name" )
       .line()
       .text( "Enter a name for your application. " )
       .line( "A new directory will be created with this name." )
@@ -138,7 +145,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
     print.line().toConsole();
 
     // ---------------- Template
-    print.yellowBoldLine( "🎭 Step 2: Choose a Template" )
+    print.yellowBoldLine( "Step 2: Choose a Template" )
       .line()
       .text( "Select a template to use as the starting point for your application." )
       .line();
@@ -161,7 +168,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
     print.line().toConsole();
 
     // ---------------- Set reload Password
-    print.yellowBoldLine( "🔒 Step 3: Reload Password" )
+    print.yellowBoldLine( "Step 3: Reload Password" )
       .line()
       .text( "Set a reload password to secure your app. " )
       .line( "This allows you to restart your app via URL." )
@@ -174,7 +181,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
     print.line();
 
     // ---------------- Set datasource Name
-    print.yellowBoldLine( "🗝️ Step 4: Database Configuration" )
+    print.yellowBoldLine( "Step 4: Database Configuration" )
       .line()
       .text( "Enter a datasource name for your database. " )
       .line( "You'll need to configure this in your CFML server admin." )
@@ -193,7 +200,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
     print.line();
 
     // ---------------- Set default server.json engine
-    print.yellowBoldLine( "⚙️ Step 5: CFML Engine" )
+    print.yellowBoldLine( "Step 5: CFML Engine" )
       .line()
       .text( "Select the CFML engine for your application." )
       .line();
@@ -221,27 +228,96 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
       allowH2Creation = true;
     }
 
-    // ---------------- Test H2 Database?
-    if ( allowH2Creation ) {
+    // ---------------- Test H2 Database? (only ask if not skipping installations)
+    var createH2Embedded = false;
+    if ( allowH2Creation && !arguments.skipInstall ) {
       print.line();
       print.Line( 'As you are using Lucee, would you like to setup and use the' ).toConsole();
-      var createH2Embedded = confirm( 'H2 Java embedded SQL database for development? [y,n]' );
-    } else {
-      createH2Embedded = false;
+      createH2Embedded = confirm( 'H2 Java embedded SQL database for development? [y,n]' );
     }
 
-    //---------------- This is just an idea at the moment really.
-    print.line();
-    print.greenBoldLine( "========= Twitter Bootstrap ======================" ).toConsole();
-    var useBootstrap=false;
+    //---------------- Ask about dependencies only if we're not skipping installation
+    var useBootstrap = false;
+    if (!arguments.skipInstall) {
+      print.line();
+      print.greenBoldLine( "========= Dependencies ======================" ).toConsole();
+      print.line( "Configure dependencies and plugins for your application." ).toConsole();
+
       if(confirm("Would you like us to setup some default Bootstrap settings? [y/n]")){
         useBootstrap = true;
       }
+    } else {
+      print.line();
+      print.cyanLine( "========= Dependencies Skipped ================" ).toConsole();
+      print.line( "Dependency installation is disabled (skipInstall=true)." ).toConsole();
+      print.line( "Dependencies like Bootstrap and H2 database will not be configured or installed." ).toConsole();
+    }
 
     // ---------------- Initialize as a package
     print.line();
     print.line( 'Finally, shall we initialize your application as a package' ).toConsole();
     var initPackage = confirm( 'by creating a box.json file? [y,n]' );
+
+    // ---------------- Expert Mode Options
+    var serverPort = 8080;
+    var jvmSettings = "";
+    var customEnvConfigs = false;
+    var advancedRouting = false;
+    var customPluginRepos = "";
+    var buildToolIntegration = "";
+
+    if (arguments.expert) {
+      print.line();
+      print.yellowBoldLine( "Expert Mode: Advanced Configuration" )
+        .line()
+        .text( "Configure advanced options for your application." )
+        .line();
+
+      // Custom server port
+      serverPort = ask(
+        message         = 'Custom server port (leave empty for default 8080): ',
+        defaultResponse = '8080'
+      );
+      if (!isNumeric(serverPort)) {
+        serverPort = 8080;
+      }
+
+      // JVM Settings
+      jvmSettings = ask(
+        message         = 'Custom JVM settings (e.g. -Xmx512m -Xms256m): ',
+        defaultResponse = ''
+      );
+
+      // Environment-specific configurations
+      print.line();
+      customEnvConfigs = confirm( 'Setup custom environment configurations (dev, staging, production)? [y,n]' );
+
+      // Advanced routing options
+      print.line();
+      advancedRouting = confirm( 'Enable advanced routing features (nested resources, constraints)? [y,n]' );
+
+      // Custom plugin repositories
+      customPluginRepos = ask(
+        message         = 'Custom plugin repositories (comma-separated URLs): ',
+        defaultResponse = ''
+      );
+
+      // Build tool integration
+      if (len(customPluginRepos)) {
+        print.line();
+        buildToolIntegration = multiselect( 'Build tool integration? ' )
+          .options( [
+            {value: 'none', display: 'None', selected: true},
+            {value: 'ant', display: 'Apache Ant'},
+            {value: 'gradle', display: 'Gradle'},
+            {value: 'maven', display: 'Maven'},
+            {value: 'npm', display: 'NPM Scripts'}
+          ] )
+          .ask();
+      }
+
+      print.line();
+    }
 
     print.line();
     print.line();
@@ -255,11 +331,40 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
          .greenBoldLine( '| Reload Password       | #ljustify(reloadPassword,57)# |' )
          .greenBoldLine( '| Datasource Name       | #ljustify(datasourceName,57)# |' )
          .greenBoldLine( '| CF Engine             | #ljustify(cfmlEngine,57)# |' )
-         .greenBoldLine( '| Setup Bootstrap       | #ljustify(useBootstrap,57)# |' )
-         .greenBoldLine( '| Setup H2 Database     | #ljustify(createH2Embedded,57)# |' )
          .greenBoldLine( '| Initialize as Package | #ljustify(initPackage,57)# |' )
          .greenBoldLine( '| Force Installation    | #ljustify(force,57)# |' )
-         .greenBoldLine( "+-----------------------+-----------------------------------------------------------+" )
+         .greenBoldLine( '| Skip Dependency Install | #ljustify(arguments.skipInstall,57)# |' );
+
+    // Only show dependency settings if dependencies will be installed
+    if (!arguments.skipInstall) {
+      if (allowH2Creation) {
+        print.greenBoldLine( '| Setup H2 Database     | #ljustify(createH2Embedded,57)# |' );
+      }
+      print.greenBoldLine( '| Setup Bootstrap       | #ljustify(useBootstrap,57)# |' );
+    }
+
+    // Show expert mode options if enabled
+    if (arguments.expert) {
+      print.greenBoldLine( '| Expert Mode           | #ljustify("Enabled",57)# |' )
+           .greenBoldLine( '| Server Port           | #ljustify(serverPort,57)# |' );
+
+      if (len(jvmSettings)) {
+        print.greenBoldLine( '| JVM Settings          | #ljustify(left(jvmSettings, 57),57)# |' );
+      }
+
+      print.greenBoldLine( '| Custom Env Configs    | #ljustify(customEnvConfigs,57)# |' )
+           .greenBoldLine( '| Advanced Routing      | #ljustify(advancedRouting,57)# |' );
+
+      if (len(customPluginRepos)) {
+        print.greenBoldLine( '| Plugin Repositories   | #ljustify(left(customPluginRepos, 57),57)# |' );
+      }
+
+      if (len(buildToolIntegration) && buildToolIntegration != "none") {
+        print.greenBoldLine( '| Build Tool            | #ljustify(buildToolIntegration,57)# |' );
+      }
+    }
+
+    print.greenBoldLine( "+-----------------------+-----------------------------------------------------------+" )
          .toConsole();
 
     print.line();
@@ -279,6 +384,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
         setupH2         = #createH2Embedded#,
         init            = #initPackage#,
         force           = #force#,
+        skipInstall     = #arguments.skipInstall#,
         initWizard      = true).run();
 
     } else {
