@@ -36,6 +36,9 @@ component  aliases='wheels g route' extends="../base"  {
 		boolean resources = false,
 		string root = ""
 	) {
+		// Reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+		
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 
@@ -134,7 +137,7 @@ component  aliases='wheels g route' extends="../base"  {
 		file action='write' file='#target#' mode='777' output='#trim(content)#';
 
 		// Output detail message
-		details.header("🛤️", "Route Generation");
+		details.header("", "Route Generation");
 		details.route(inject);
 		details.update("config/routes.cfm");
 		details.success("Route added successfully!");

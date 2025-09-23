@@ -47,6 +47,9 @@ component aliases='wheels g model' extends="../base" {
         boolean migration = true,
         boolean force = false
     ) {
+        // Reconstruct arguments for handling --prefixed options
+        arguments = reconstructArgs(arguments);
+
         // Support positional parameter for name
         if (structKeyExists(arguments, "1") && !structKeyExists(arguments, "name")) {
             arguments.name = arguments["1"];
@@ -58,7 +61,7 @@ component aliases='wheels g model' extends="../base" {
             return;
         }
 
-        detailOutput.header("🏗️", "Generating model: #arguments.name#");
+        detailOutput.header("", "Generating model: #arguments.name#");
 
         // Parse properties
         var parsedProperties = parseProperties(arguments.properties);
@@ -99,12 +102,14 @@ component aliases='wheels g model' extends="../base" {
                         migrationPath = scaffoldService.createMigrationWithProperties(
                             name = arguments.name,
                             properties = parsedProperties,
-                            baseDirectory = getCWD()
+                            baseDirectory = getCWD(),
+                            tableName = arguments.tableName
                         );
                     } else {
+                        var actualTableName = len(arguments.tableName) ? arguments.tableName : helpers.pluralize(lCase(arguments.name));
                         migrationPath = migrationService.createMigration(
-                            name = "create_#helpers.pluralize(lCase(arguments.name))#_table",
-                            table = helpers.pluralize(lCase(arguments.name)),
+                            name = "create_#actualTableName#_table",
+                            table = actualTableName,
                             model = arguments.name,
                             type = "create",
                             baseDirectory = getCWD()
