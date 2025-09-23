@@ -1,136 +1,156 @@
 # Controller Testing
 
 ## Description
-Comprehensive guide to testing CFWheels controllers, including unit testing, integration testing, testing patterns, and best practices for ensuring controller reliability.
+Comprehensive guide to testing CFWheels controllers using TestBox 5 with modern BDD (Behavior Driven Development) syntax. Wheels 3.0 uses TestBox integration for testing controllers with `describe()`, `it()`, and `expect()` patterns.
 
-## Basic Controller Testing
+## TestBox BDD Testing Structure
 
-### Test Structure
+### Modern Test Structure (TestBox 5)
 ```cfm
-// tests/specs/controllers/ProductsTest.cfc
-component extends="tests.BaseTest" {
+// tests/specs/controllers/ProductsControllerSpec.cfc
+component extends="wheels.Testbox" {
 
-    function setup() {
-        super.setup();
+    function beforeAll() {
+        // Setup once before all tests
+        variables.baseUrl = "http://localhost:8080";
+    }
 
-        // Create test data
-        testProduct = model("Product").create({
-            name: "Test Product",
-            price: 99.99,
-            active: true
+    function run() {
+        describe("Products Controller", () => {
+
+            beforeEach(() => {
+                // Setup before each test
+                variables.testProduct = model("Product").create({
+                    name: "Test Product",
+                    price: 99.99,
+                    active: true
+                });
+            });
+
+            afterEach(() => {
+                // Clean up after each test
+                if (structKeyExists(variables, "testProduct") && isObject(variables.testProduct)) {
+                    variables.testProduct.delete();
+                }
+            });
+
+            // Test specs go here
         });
     }
-
-    function teardown() {
-        super.teardown();
-
-        // Clean up test data
-        if (IsObject(testProduct)) {
-            testProduct.delete();
-        }
-    }
-
-    // Test methods go here
 }
 ```
 
-### Testing Actions
+### Testing Controller Actions with BDD
 
 #### Testing Index Action
 ```cfm
-function testIndex() {
-    params = {};
-    result = processAction(controller="products", action="index", params=params);
+it("should display products index page", () => {
+    cfhttp(url=variables.baseUrl & "/products", method="GET", result="response");
 
-    assert("StructKeyExists(variables, 'products')");
-    assert("IsQuery(products)");
-    assert("products.recordCount >= 1"); // At least our test product
-}
+    expect(response.status_code).toBe(200);
+    expect(response.filecontent).toInclude("products");
+    expect(response.responseheader["Content-Type"]).toInclude("text/html");
+});
 
-function testIndexWithPagination() {
+it("should handle pagination correctly", () => {
     // Create multiple products for pagination testing
-    for (local.i = 1; local.i <= 30; local.i++) {
+    for (var i = 1; i <= 30; i++) {
         model("Product").create({
-            name: "Product #local.i#",
-            price: local.i * 10
+            name: "Product #i#",
+            price: i * 10
         });
     }
 
-    params = {page: 2, perPage: 10};
-    result = processAction(controller="products", action="index", params=params);
+    cfhttp(
+        url=variables.baseUrl & "/products?page=2&perPage=10",
+        method="GET",
+        result="response"
+    );
 
-    assert("StructKeyExists(variables, 'products')");
-    assert("products.recordCount <= 10");
-    assert("products.currentPage == 2");
-}
+    expect(response.status_code).toBe(200);
+    expect(response.filecontent).toInclude("page 2");
+});
 ```
 
 #### Testing Show Action
 ```cfm
-function testShowWithValidKey() {
-    params = {key: testProduct.id};
-    result = processAction(controller="products", action="show", params=params);
+it("should display specific product when ID is valid", () => {
+    cfhttp(
+        url=variables.baseUrl & "/products/" & variables.testProduct.id,
+        method="GET",
+        result="response"
+    );
 
-    assert("StructKeyExists(variables, 'product')");
-    assert("IsObject(product)");
-    assert("product.id == #testProduct.id#");
-}
+    expect(response.status_code).toBe(200);
+    expect(response.filecontent).toInclude(variables.testProduct.name);
+    expect(response.filecontent).toInclude("Test Product");
+});
 
-function testShowWithInvalidKey() {
-    params = {key: 99999};
-    result = processAction(controller="products", action="show", params=params);
+it("should handle invalid product ID gracefully", () => {
+    cfhttp(
+        url=variables.baseUrl & "/products/99999",
+        method="GET",
+        result="response"
+    );
 
-    // Should redirect to index with error
-    assert("IsRedirect()");
-    assert("flashKeyExists('error')");
-}
+    // Either 404 or redirect depending on implementation
+    expect([404, 302]).toInclude(response.status_code);
+});
 
-function testShowWithNonNumericKey() {
-    params = {key: "invalid"};
+it("should reject non-numeric product ID", () => {
+    cfhttp(
+        url=variables.baseUrl & "/products/invalid",
+        method="GET",
+        result="response"
+    );
 
-    // Should trigger verification failure
-    expectException("VerificationException");
-    processAction(controller="products", action="show", params=params);
-}
+    expect([400, 404]).toInclude(response.status_code);
+});
 ```
 
 #### Testing Create Action
 ```cfm
-function testCreateWithValidData() {
-    params = {
-        product: {
-            name: "New Test Product",
-            price: 149.99,
-            categoryId: 1
-        }
+it("should create new product with valid data", () => {
+    var productData = {
+        name: "New Test Product",
+        price: 149.99,
+        categoryId: 1
     };
 
-    result = processAction(controller="products", action="create", params=params);
+    cfhttp(
+        url=variables.baseUrl & "/products/create",
+        method="POST",
+        result="response"
+    ) {
+        cfhttpparam(type="formfield", name="name", value=productData.name);
+        cfhttpparam(type="formfield", name="price", value=productData.price);
+        cfhttpparam(type="formfield", name="categoryId", value=productData.categoryId);
+        cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+    }
 
-    // Should redirect to show action
-    assert("IsRedirect()");
-    assert("result.location CONTAINS 'show'");
-    assert("flashKeyExists('success')");
+    // Should redirect after successful creation
+    expect([201, 302]).toInclude(response.status_code);
 
     // Verify product was created
-    newProduct = model("Product").findOne(where="name = 'New Test Product'");
-    assert("IsObject(newProduct)");
-}
+    var newProduct = model("Product").findOne(where="name = 'New Test Product'");
+    expect(newProduct).toBeInstanceOf("Product");
+    expect(newProduct.name).toBe(productData.name);
+});
 
-function testCreateWithInvalidData() {
-    params = {
-        product: {
-            name: "", // Invalid - name required
-            price: "invalid"
-        }
-    };
+it("should reject invalid product data", () => {
+    cfhttp(
+        url=variables.baseUrl & "/products/create",
+        method="POST",
+        result="response"
+    ) {
+        cfhttpparam(type="formfield", name="name", value=""); // Invalid
+        cfhttpparam(type="formfield", name="price", value="invalid"); // Invalid
+        cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+    }
 
-    result = processAction(controller="products", action="create", params=params);
-
-    // Should render new action again
-    assert("!IsRedirect()");
-    assert("result.view == 'products/new'");
-}
+    expect(response.status_code).toBe(200); // Should render form again
+    expect(response.filecontent).toInclude("error");
+});
 ```
 
 #### Testing Update Action
@@ -192,30 +212,46 @@ function testDelete() {
 }
 ```
 
-## Testing Authentication and Authorization
+## Testing Authentication and Authorization with BDD
 
-### Testing Authentication Filters
+### Testing Authentication Requirements
 ```cfm
-function testRequiresAuthentication() {
-    // Test without session
-    params = {controller: "products", action: "edit", key: 1};
-    result = processAction(params);
+describe("Authentication Requirements", () => {
 
-    // Should redirect to login
-    assert("IsRedirect()");
-    assert("result.location CONTAINS 'sessions'");
-}
+    it("should redirect to login when not authenticated", () => {
+        cfhttp(
+            url=variables.baseUrl & "/products/edit/1",
+            method="GET",
+            result="response"
+        );
 
-function testAuthenticationFilterWithValidSession() {
-    // Set up valid session
-    session.userId = createTestUser().id;
+        expect(response.status_code).toBe(302);
+        expect(response.responseheader).toHaveKey("Location");
+        expect(response.responseheader.Location).toInclude("login");
+    });
 
-    params = {controller: "products", action: "edit", key: testProduct.id};
-    result = processAction(params);
+    it("should allow access when authenticated", () => {
+        // First login
+        cfhttp(
+            url=variables.baseUrl & "/auth/login",
+            method="POST",
+            result="loginResponse"
+        ) {
+            cfhttpparam(type="formfield", name="username", value="testuser");
+            cfhttpparam(type="formfield", name="password", value="password123");
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+        }
 
-    // Should proceed normally
-    assert("!IsRedirect()");
-}
+        // Then access protected resource
+        cfhttp(
+            url=variables.baseUrl & "/products/edit/" & variables.testProduct.id,
+            method="GET",
+            result="response"
+        );
+
+        expect(response.status_code).toBe(200);
+        expect(response.filecontent).toInclude("edit");
+    });
 
 function testSessionTimeout() {
     // Set up expired session
@@ -312,25 +348,37 @@ function testCSRFWithValidToken() {
 }
 ```
 
-## Testing API Controllers
+## Testing API Controllers with BDD
 
-### JSON Response Testing
+### JSON API Response Testing
 ```cfm
-function testApiIndexReturnsJson() {
-    params = {
-        controller: "api.products",
-        action: "index",
-        format: "json"
-    };
+describe("Products API", () => {
 
-    result = processAction(params);
+    beforeEach(() => {
+        variables.apiUrl = variables.baseUrl & "/api";
+        variables.headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        };
+    });
 
-    assert("result.contentType == 'application/json'");
-    assert("isJSON(result.content)");
+    it("should return JSON response for products list", () => {
+        cfhttp(
+            url=variables.apiUrl & "/products",
+            method="GET",
+            result="response"
+        ) {
+            cfhttpparam(type="header", name="Content-Type", value="application/json");
+            cfhttpparam(type="header", name="Accept", value="application/json");
+        }
 
-    data = deserializeJSON(result.content);
-    assert("StructKeyExists(data, 'products')");
-}
+        expect(response.status_code).toBe(200);
+        expect(response.responseheader["Content-Type"]).toInclude("application/json");
+
+        var jsonResponse = deserializeJSON(response.filecontent);
+        expect(jsonResponse).toBeStruct();
+        expect(jsonResponse).toHaveKey("data");
+    });
 
 function testApiShowWithValidId() {
     params = {
@@ -550,25 +598,37 @@ function testInvalidFileType() {
 }
 ```
 
-## Testing Flash Messages
+## Testing Flash Messages with BDD
 
-### Flash Message Testing
+### Flash Message Validation
 ```cfm
-function testSuccessFlashMessage() {
-    params = {
-        controller: "products",
-        action: "create",
-        product: {
-            name: "Flash Test Product",
-            price: 99.99
+describe("Flash Messages", () => {
+
+    it("should display success message after product creation", () => {
+        cfhttp(
+            url=variables.baseUrl & "/products/create",
+            method="POST",
+            result="response"
+        ) {
+            cfhttpparam(type="formfield", name="name", value="Flash Test Product");
+            cfhttpparam(type="formfield", name="price", value="99.99");
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
         }
-    };
 
-    result = processAction(params);
+        expect([201, 302]).toInclude(response.status_code);
 
-    assert("flashKeyExists('success')");
-    assert("findNoCase('created', flash('success'))");
-}
+        // Follow redirect to see flash message
+        if (response.status_code == 302) {
+            cfhttp(
+                url=response.responseheader.Location,
+                method="GET",
+                result="followUpResponse"
+            );
+
+            expect(followUpResponse.filecontent).toInclude("success");
+            expect(followUpResponse.filecontent).toInclude("created");
+        }
+    });
 
 function testErrorFlashMessage() {
     params = {
@@ -586,66 +646,79 @@ function testErrorFlashMessage() {
 }
 ```
 
-## Integration Testing
+## Integration Testing with BDD
 
-### Full Workflow Testing
+### Complete Workflow Testing
 ```cfm
-function testCompleteProductWorkflow() {
-    // 1. Create user and authenticate
-    user = createTestUser();
-    session.userId = user.id;
+describe("Complete Product Workflow", () => {
 
-    // 2. Navigate to new product form
-    params = {controller: "products", action: "new"};
-    result = processAction(params);
-    assert("!IsRedirect()");
+    var workflowProduct;
 
-    // 3. Create product
-    params = {
-        controller: "products",
-        action: "create",
-        product: {
-            name: "Workflow Test Product",
-            price: 199.99
+    it("should handle complete product CRUD workflow", () => {
+        // 1. Login first
+        cfhttp(
+            url=variables.baseUrl & "/auth/login",
+            method="POST",
+            result="loginResponse"
+        ) {
+            cfhttpparam(type="formfield", name="username", value="testuser");
+            cfhttpparam(type="formfield", name="password", value="password123");
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
         }
-    };
-    result = processAction(params);
-    assert("IsRedirect()");
 
-    // 4. Verify product was created
-    newProduct = model("Product").findOne(where="name = 'Workflow Test Product'");
-    assert("IsObject(newProduct)");
+        expect(loginResponse.status_code).toBe(302); // Redirect after login
 
-    // 5. Edit the product
-    params = {
-        controller: "products",
-        action: "update",
-        key: newProduct.id,
-        product: {
-            name: "Updated Workflow Product",
-            price: 249.99
+        // 2. Create product
+        cfhttp(
+            url=variables.baseUrl & "/products/create",
+            method="POST",
+            result="createResponse"
+        ) {
+            cfhttpparam(type="formfield", name="name", value="Workflow Test Product");
+            cfhttpparam(type="formfield", name="price", value="199.99");
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
         }
-    };
-    result = processAction(params);
-    assert("IsRedirect()");
 
-    // 6. Verify update
-    newProduct.reload();
-    assert("newProduct.name == 'Updated Workflow Product'");
+        expect([201, 302]).toInclude(createResponse.status_code);
 
-    // 7. Delete the product
-    params = {
-        controller: "products",
-        action: "delete",
-        key: newProduct.id
-    };
-    result = processAction(params);
-    assert("IsRedirect()");
+        // 3. Verify product was created
+        workflowProduct = model("Product").findOne(where="name = 'Workflow Test Product'");
+        expect(workflowProduct).toBeInstanceOf("Product");
+        expect(workflowProduct.name).toBe("Workflow Test Product");
 
-    // 8. Verify deletion
-    deletedProduct = model("Product").findByKey(newProduct.id);
-    assert("!IsObject(deletedProduct)");
-}
+        // 4. Update the product
+        cfhttp(
+            url=variables.baseUrl & "/products/" & workflowProduct.id & "/update",
+            method="POST",
+            result="updateResponse"
+        ) {
+            cfhttpparam(type="formfield", name="name", value="Updated Workflow Product");
+            cfhttpparam(type="formfield", name="price", value="249.99");
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+        }
+
+        expect([200, 302]).toInclude(updateResponse.status_code);
+
+        // 5. Verify update
+        workflowProduct.reload();
+        expect(workflowProduct.name).toBe("Updated Workflow Product");
+        expect(workflowProduct.price).toBe(249.99);
+
+        // 6. Delete the product
+        cfhttp(
+            url=variables.baseUrl & "/products/" & workflowProduct.id & "/delete",
+            method="POST",
+            result="deleteResponse"
+        ) {
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+        }
+
+        expect([200, 302]).toInclude(deleteResponse.status_code);
+
+        // 7. Verify deletion
+        var deletedProduct = model("Product").findByKey(workflowProduct.id);
+        expect(deletedProduct).toBeFalse(); // Should not exist
+    });
 ```
 
 ## Testing Helpers and Utilities
@@ -789,68 +862,118 @@ function setupTestData() {
 }
 ```
 
-## Best Practices
+## TestBox BDD Best Practices
 
-### 1. Test One Thing at a Time
+### 1. Write Focused, Descriptive Tests
 ```cfm
-// Good - focused test
-function testCreateRedirectsOnSuccess() {
-    params = getValidProductParams();
-    result = processAction(controller="products", action="create", params=params);
+// Good - focused BDD test
+it("should redirect after successful product creation", () => {
+    cfhttp(
+        url=variables.baseUrl & "/products/create",
+        method="POST",
+        result="response"
+    ) {
+        cfhttpparam(type="formfield", name="name", value="Valid Product");
+        cfhttpparam(type="formfield", name="price", value="99.99");
+        cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+    }
 
-    assert("IsRedirect()");
-}
+    expect([201, 302]).toInclude(response.status_code);
+});
 
-// Avoid - testing multiple concerns
-function testCreateEverything() {
-    // Testing validation, success, database, flash messages, etc.
-}
+// Avoid - testing multiple concerns in one test
+// Instead, break into separate it() blocks
 ```
 
-### 2. Use Descriptive Test Names
+### 2. Use Descriptive BDD Descriptions
 ```cfm
-// Good - clear intent
-function testCreateWithValidDataRedirectsToShow() { }
-function testCreateWithInvalidDataRendersNewAction() { }
-function testUpdateRequiresAuthentication() { }
+// Good - clear BDD descriptions
+describe("Product Creation", () => {
+    it("should redirect to product detail after successful creation", () => { ... });
+    it("should display validation errors when data is invalid", () => { ... });
+    it("should require authentication for product creation", () => { ... });
+});
 
-// Avoid - unclear purpose
-function testCreate() { }
-function testUpdate() { }
-function testAuth() { }
+// Avoid - vague descriptions
+describe("Products", () => {
+    it("should work", () => { ... });
+    it("should do stuff", () => { ... });
+});
 ```
 
-### 3. Test Error Conditions
+### 3. Test Error Conditions with BDD
 ```cfm
-function testErrorConditions() {
-    // Test missing data
-    // Test invalid data
-    // Test unauthorized access
-    // Test server errors
-}
+describe("Error Handling", () => {
+
+    it("should handle missing data gracefully", () => {
+        cfhttp(
+            url=variables.baseUrl & "/products/create",
+            method="POST",
+            result="response"
+        ) {
+            // Send empty data
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+        }
+
+        expect(response.status_code).toBe(400);
+    });
+
+    it("should reject unauthorized access", () => {
+        // Don't login first
+        cfhttp(
+            url=variables.baseUrl & "/products/create",
+            method="GET",
+            result="response"
+        );
+
+        expect(response.status_code).toBe(302); // Redirect to login
+    });
+});
 ```
 
-### 4. Use Test Doubles When Appropriate
+### 4. Use MockBox for External Dependencies
 ```cfm
-function testEmailSending() {
-    // Mock email service to avoid sending real emails
-    mockEmailService = createMock("EmailService");
-    mockEmailService.sendWelcomeEmail().returns(true);
+describe("Email Integration", () => {
 
-    // Inject mock
-    controller.setEmailService(mockEmailService);
+    beforeEach(() => {
+        // Create mock email service
+        variables.mockEmailService = createMock("EmailService");
+        variables.mockEmailService.$(
+            method="sendWelcomeEmail",
+            returns=true
+        );
 
-    // Test action
-    params = getValidUserParams();
-    result = processAction(controller="users", action="create", params=params);
+        // Inject mock into application
+        application.emailService = variables.mockEmailService;
+    });
 
-    // Verify mock was called
-    mockEmailService.verify().sendWelcomeEmail();
-}
+    it("should send welcome email after user creation", () => {
+        cfhttp(
+            url=variables.baseUrl & "/users/create",
+            method="POST",
+            result="response"
+        ) {
+            cfhttpparam(type="formfield", name="username", value="newuser");
+            cfhttpparam(type="formfield", name="email", value="new@example.com");
+            cfhttpparam(type="formfield", name="csrf_token", value=session.csrf_token);
+        }
+
+        expect([201, 302]).toInclude(response.status_code);
+        expect(variables.mockEmailService.$once("sendWelcomeEmail")).toBeTrue();
+    });
+});
 ```
+
+## Modern TestBox Resources
+
+For comprehensive TestBox 5 documentation:
+- [TestBox BDD Documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer)
+- [TestBox Expectations](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer/expectations)
+- [MockBox Documentation](https://testbox.ortusbooks.com/v5.x/mocking/mockbox)
+- [TestBox Life-cycle Methods](https://testbox.ortusbooks.com/v5.x/digging-deeper/life-cycle-methods)
 
 ## Related Documentation
 - [Controller Architecture](./architecture.md)
 - [Controller Security](./security.md)
 - [Model Testing](../models/testing.md)
-- [Testing Best Practices](../../testing/best-practices.md)
+- [View Testing](../views/testing.md)

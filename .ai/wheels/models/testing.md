@@ -1,103 +1,119 @@
 # Model Testing
 
 ## Description
-Comprehensive guide to testing CFWheels models, including validation testing, association testing, business logic testing, and callback testing.
+Comprehensive guide to testing CFWheels models using TestBox 5 with modern BDD (Behavior Driven Development) syntax. This guide covers validation testing, association testing, business logic testing, and callback testing using `describe()`, `it()`, and `expect()` patterns.
 
-## Model Test Structure
+## TestBox BDD Model Test Structure
 
-### Basic Test Template
+### Modern Test Template (TestBox 5)
 ```cfm
 /**
- * UserTest - Test User model functionality
+ * UserModelSpec - Test User model functionality using BDD
  */
-component extends="wheels.Test" {
+component extends="wheels.Testbox" {
 
-    function setup() {
-        // Set up test data before each test
-        variables.validUserData = {
-            username = "testuser",
-            email = "test@example.com",
-            firstname = "Test",
-            lastname = "User",
-            password = "SecurePass123!",
-            passwordConfirmation = "SecurePass123!"
-        };
+    function run() {
+        describe("User Model", () => {
+
+            beforeEach(() => {
+                // Set up test data before each test
+                variables.validUserData = {
+                    username: "testuser_" & createUUID(),
+                    email: "test_" & createUUID() & "@example.com",
+                    firstname: "Test",
+                    lastname: "User",
+                    password: "SecurePass123!",
+                    passwordConfirmation: "SecurePass123!"
+                };
+            });
+
+            afterEach(() => {
+                // Clean up test data after each test
+                model("User").deleteAll(where="email LIKE '%test_%@example.com'");
+            });
+
+            // BDD test specs go here
+        });
     }
-
-    function teardown() {
-        // Clean up test data after each test
-        model("User").deleteAll(where="email LIKE '%test%'");
-    }
-
-    // Test methods go here
 }
 ```
 
-### Test Organization
+### TestBox BDD Test Organization
 ```
 tests/
-├── models/
-│   ├── UserTest.cfc
-│   ├── PostTest.cfc
-│   ├── OrderTest.cfc
-│   └── ProductTest.cfc
-├── fixtures/
-│   ├── users.yml
-│   └── posts.yml
-└── support/
-    └── TestHelper.cfc
+├── specs/
+│   ├── models/
+│   │   ├── UserModelSpec.cfc
+│   │   ├── PostModelSpec.cfc
+│   │   ├── OrderModelSpec.cfc
+│   │   └── ProductModelSpec.cfc
+│   ├── controllers/
+│   └── functions/
+├── _assets/
+├── populate.cfm
+├── routes.cfm
+└── runner.cfm
 ```
 
-## Validation Testing
+## Validation Testing with BDD
 
 ### Testing Presence Validations
 ```cfm
-function test_user_requires_email() {
-    local.user = model("User").new(variables.validUserData);
-    local.user.email = "";
+describe("User Presence Validations", () => {
 
-    assert(!local.user.valid(), "User should be invalid without email");
-    assert(local.user.hasErrors("email"), "User should have email error");
+    it("should be invalid without email", () => {
+        var user = model("User").new(variables.validUserData);
+        user.email = "";
 
-    // Test specific error message
-    local.errors = local.user.errorsOn("email");
-    assert(arrayLen(local.errors) > 0, "Should have email errors");
-}
+        expect(user.valid()).toBeFalse();
+        expect(user.hasErrors("email")).toBeTrue();
 
-function test_user_requires_username() {
-    local.user = model("User").new(variables.validUserData);
-    local.user.username = "";
+        var errors = user.errorsOn("email");
+        expect(arrayLen(errors)).toBeGT(0);
+    });
 
-    assert(!local.user.valid(), "User should be invalid without username");
-    assert(local.user.hasErrors("username"), "User should have username error");
-}
+    it("should be invalid without username", () => {
+        var user = model("User").new(variables.validUserData);
+        user.username = "";
 
-function test_user_valid_with_all_required_fields() {
-    local.user = model("User").new(variables.validUserData);
+        expect(user.valid()).toBeFalse();
+        expect(user.hasErrors("username")).toBeTrue();
+    });
 
-    assert(local.user.valid(), "User should be valid with all required fields");
-    assert(!local.user.hasErrors(), "User should have no errors");
-}
+    it("should be valid with all required fields", () => {
+        var user = model("User").new(variables.validUserData);
+
+        expect(user.valid()).toBeTrue();
+        expect(user.hasErrors()).toBeFalse();
+    });
+
+});
 ```
 
 ### Testing Format Validations
 ```cfm
-function test_validates_email_format() {
-    local.user = model("User").new(variables.validUserData);
+describe("Email Format Validation", () => {
 
-    // Test invalid email formats
-    local.invalidEmails = ["invalid", "test@", "@example.com", "test.example.com"];
+    it("should reject invalid email formats", () => {
+        var user = model("User").new(variables.validUserData);
+        var invalidEmails = ["invalid", "test@", "@example.com", "test.example.com"];
 
-    for (local.email in local.invalidEmails) {
-        local.user.email = local.email;
-        assert(!local.user.valid(), "User should be invalid with email: #local.email#");
-        assert(local.user.hasErrors("email"), "User should have email error for: #local.email#");
-    }
+        for (var email in invalidEmails) {
+            user.email = email;
+            expect(user.valid()).toBeFalse("Email '#email#' should be invalid");
+            expect(user.hasErrors("email")).toBeTrue("Should have error for email: #email#");
+        }
+    });
 
-    // Test valid email
-    local.user.email = "valid@example.com";
-    assert(local.user.valid(), "User should be valid with correct email format");
-}
+    it("should accept valid email format", () => {
+        var user = model("User").new(variables.validUserData);
+        user.email = "valid@example.com";
+
+        expect(user.valid()).toBeTrue();
+        expect(user.hasErrors("email")).toBeFalse();
+    });
+
+});
 
 function test_validates_phone_format() {
     local.user = model("User").new(variables.validUserData);
@@ -117,18 +133,22 @@ function test_validates_phone_format() {
 
 ### Testing Uniqueness Validations
 ```cfm
-function test_user_requires_unique_email() {
-    // Create first user
-    local.firstUser = model("User").create(variables.validUserData);
-    assert(local.firstUser.valid(), "First user should be valid");
+describe("Email Uniqueness Validation", () => {
 
-    // Try to create second user with same email
-    variables.validUserData.username = "testuser2";
-    local.secondUser = model("User").new(variables.validUserData);
+    it("should reject duplicate email addresses", () => {
+        // Create first user
+        var firstUser = model("User").create(variables.validUserData);
+        expect(firstUser.valid()).toBeTrue();
 
-    assert(!local.secondUser.valid(), "Second user should be invalid with duplicate email");
-    assert(local.secondUser.hasErrors("email"), "User should have email uniqueness error");
-}
+        // Try to create second user with same email
+        variables.validUserData.username = "testuser2_" & createUUID();
+        var secondUser = model("User").new(variables.validUserData);
+
+        expect(secondUser.valid()).toBeFalse();
+        expect(secondUser.hasErrors("email")).toBeTrue();
+    });
+
+});
 
 function test_user_requires_unique_username() {
     // Create first user
@@ -247,22 +267,34 @@ function test_username_format_validation() {
 }
 ```
 
-## Association Testing
+## Association Testing with BDD
 
 ### Testing hasMany Associations
 ```cfm
-function test_user_has_many_posts() {
-    local.user = model("User").create(variables.validUserData);
-    local.post1 = model("Post").create(title="Post 1", content="Content 1", authorid=local.user.id);
-    local.post2 = model("Post").create(title="Post 2", content="Content 2", authorid=local.user.id);
+describe("User Post Associations", () => {
 
-    local.posts = local.user.posts();
-    assert(local.posts.recordCount == 2, "User should have 2 posts");
+    it("should have many posts", () => {
+        var user = model("User").create(variables.validUserData);
+        var post1 = model("Post").create({
+            title: "Post 1",
+            content: "Content 1",
+            authorId: user.id
+        });
+        var post2 = model("Post").create({
+            title: "Post 2",
+            content: "Content 2",
+            authorId: user.id
+        });
 
-    // Test association methods
-    assert(local.user.hasPost(), "User should have posts");
-    assert(local.user.postCount() == 2, "User post count should be 2");
-}
+        var posts = user.posts();
+        expect(posts.recordCount).toBe(2);
+
+        // Test association methods
+        expect(user.hasPost()).toBeTrue();
+        expect(user.postCount()).toBe(2);
+    });
+
+});
 
 function test_user_has_many_comments() {
     local.user = model("User").create(variables.validUserData);
@@ -277,15 +309,23 @@ function test_user_has_many_comments() {
 
 ### Testing belongsTo Associations
 ```cfm
-function test_post_belongs_to_user() {
-    local.user = model("User").create(variables.validUserData);
-    local.post = model("Post").create(title="My Post", content="Content", authorid=local.user.id);
+describe("Post User Associations", () => {
 
-    local.author = local.post.author();
-    assert(isObject(local.author), "Post should have an author");
-    assert(local.author.id == local.user.id, "Post author should be the correct user");
-    assert(local.author.username == local.user.username, "Author username should match");
-}
+    it("should belong to a user", () => {
+        var user = model("User").create(variables.validUserData);
+        var post = model("Post").create({
+            title: "My Post",
+            content: "Content",
+            authorId: user.id
+        });
+
+        var author = post.author();
+        expect(author).toBeInstanceOf("User");
+        expect(author.id).toBe(user.id);
+        expect(author.username).toBe(user.username);
+    });
+
+});
 
 function test_comment_belongs_to_post_and_user() {
     local.user = model("User").create(variables.validUserData);
@@ -333,30 +373,47 @@ function test_user_can_have_roles() {
 }
 ```
 
-## Business Logic Testing
+## Business Logic Testing with BDD
 
 ### Testing Model Methods
 ```cfm
-function test_full_name_generation() {
-    local.user = model("User").new(variables.validUserData);
-    local.fullName = local.user.getFullName();
+describe("User Business Logic", () => {
 
-    assert(local.fullName == "Test User", "Full name should combine first and last name");
+    describe("Full Name Generation", () => {
 
-    // Test with missing last name
-    local.user.lastname = "";
-    assert(local.user.getFullName() == "Test", "Should return first name only when last name missing");
+        it("should combine first and last name", () => {
+            var user = model("User").new(variables.validUserData);
+            var fullName = user.getFullName();
 
-    // Test with missing first name
-    local.user.firstname = "";
-    local.user.lastname = "User";
-    assert(local.user.getFullName() == "User", "Should return last name only when first name missing");
+            expect(fullName).toBe("Test User");
+        });
 
-    // Test fallback to username
-    local.user.firstname = "";
-    local.user.lastname = "";
-    assert(local.user.getFullName() == local.user.username, "Should fallback to username");
-}
+        it("should return first name only when last name is missing", () => {
+            var user = model("User").new(variables.validUserData);
+            user.lastname = "";
+
+            expect(user.getFullName()).toBe("Test");
+        });
+
+        it("should return last name only when first name is missing", () => {
+            var user = model("User").new(variables.validUserData);
+            user.firstname = "";
+            user.lastname = "User";
+
+            expect(user.getFullName()).toBe("User");
+        });
+
+        it("should fallback to username when both names are missing", () => {
+            var user = model("User").new(variables.validUserData);
+            user.firstname = "";
+            user.lastname = "";
+
+            expect(user.getFullName()).toBe(user.username);
+        });
+
+    });
+
+});
 
 function test_is_admin_method() {
     local.user = model("User").create(variables.validUserData);
@@ -373,37 +430,39 @@ function test_is_admin_method() {
 }
 ```
 
-### Testing Authentication Methods
-```cfm
-function test_authenticate_with_valid_credentials() {
-    // Create user (password will be hashed by callback)
-    local.user = model("User").create(variables.validUserData);
+    describe("Authentication", () => {
 
-    // Test authentication
-    local.result = model("User").authenticate("test@example.com", "SecurePass123!");
+        it("should authenticate with valid credentials", () => {
+            // Create user (password will be hashed by callback)
+            var user = model("User").create(variables.validUserData);
 
-    assert(local.result.success, "Authentication should succeed with valid credentials");
-    assert(isObject(local.result.user), "Result should include user object");
-    assert(local.result.user.id == local.user.id, "Should return correct user");
-}
+            // Test authentication
+            var result = model("User").authenticate(user.email, "SecurePass123!");
 
-function test_authenticate_with_invalid_password() {
-    // Create user
-    local.user = model("User").create(variables.validUserData);
+            expect(result.success).toBeTrue();
+            expect(result.user).toBeInstanceOf("User");
+            expect(result.user.id).toBe(user.id);
+        });
 
-    // Test with wrong password
-    local.result = model("User").authenticate("test@example.com", "WrongPassword");
+        it("should reject invalid password", () => {
+            // Create user
+            var user = model("User").create(variables.validUserData);
 
-    assert(!local.result.success, "Authentication should fail with invalid password");
-    assert(structKeyExists(local.result, "error"), "Result should include error message");
-}
+            // Test with wrong password
+            var result = model("User").authenticate(user.email, "WrongPassword");
 
-function test_authenticate_with_nonexistent_user() {
-    local.result = model("User").authenticate("nonexistent@example.com", "AnyPassword");
+            expect(result.success).toBeFalse();
+            expect(result).toHaveKey("error");
+        });
 
-    assert(!local.result.success, "Authentication should fail for nonexistent user");
-    assert(structKeyExists(local.result, "error"), "Result should include error message");
-}
+        it("should reject nonexistent user", () => {
+            var result = model("User").authenticate("nonexistent@example.com", "AnyPassword");
+
+            expect(result.success).toBeFalse();
+            expect(result).toHaveKey("error");
+        });
+
+    });
 
 function test_password_verification() {
     local.user = model("User").create(variables.validUserData);
@@ -413,21 +472,25 @@ function test_password_verification() {
 }
 ```
 
-## Callback Testing
+## Callback Testing with BDD
 
 ### Testing Creation Callbacks
 ```cfm
-function test_password_encryption_on_save() {
-    local.user = model("User").new(variables.validUserData);
-    local.originalPassword = local.user.password;
+describe("User Creation Callbacks", () => {
 
-    local.user.save();
+    it("should encrypt password on save", () => {
+        var user = model("User").new(variables.validUserData);
+        var originalPassword = user.password;
 
-    // Password should be cleared and hash should be set
-    assert(local.user.password == "", "Plain text password should be cleared");
-    assert(len(local.user.passwordHash) > 0, "Password hash should be set");
-    assert(local.user.passwordHash != local.originalPassword, "Hash should be different from original");
-}
+        user.save();
+
+        // Password should be cleared and hash should be set
+        expect(user.password).toBe("");
+        expect(len(user.passwordHash)).toBeGT(0);
+        expect(user.passwordHash).notToBe(originalPassword);
+    });
+
+});
 
 function test_email_verification_token_generation() {
     local.user = model("User").create(variables.validUserData);
@@ -574,26 +637,26 @@ function test_account_locking_after_failed_attempts() {
 }
 ```
 
-## Test Utilities and Helpers
+## TestBox BDD Test Utilities and Helpers
 
-### Test Data Factory
+### BDD Test Data Factory
 ```cfm
-// /tests/support/TestHelper.cfc
+// /tests/_assets/TestHelper.cfc
 component {
 
     function createUser(struct overrides = {}) {
-        local.defaultData = {
-            username = "testuser" & randRange(1000, 9999),
-            email = "test#randRange(1000, 9999)#@example.com",
-            firstname = "Test",
-            lastname = "User",
-            password = "SecurePass123!",
-            passwordConfirmation = "SecurePass123!"
+        var defaultData = {
+            username: "testuser_" & createUUID(),
+            email: "test_" & createUUID() & "@example.com",
+            firstname: "Test",
+            lastname: "User",
+            password: "SecurePass123!",
+            passwordConfirmation: "SecurePass123!"
         };
 
-        structAppend(local.defaultData, arguments.overrides);
+        structAppend(defaultData, arguments.overrides, true);
 
-        return model("User").create(local.defaultData);
+        return model("User").create(defaultData);
     }
 
     function createPost(struct overrides = {}) {
@@ -615,32 +678,42 @@ component {
 }
 ```
 
-### Using Test Fixtures
-```yml
-# /tests/fixtures/users.yml
-john:
-  username: johndoe
-  email: john@example.com
-  firstname: John
-  lastname: Doe
-
-jane:
-  username: janedoe
-  email: jane@example.com
-  firstname: Jane
-  lastname: Doe
-```
-
+### Using BDD Test Data Setup
 ```cfm
-// Load fixtures in test
-function setup() {
-    fixtures("users");
-}
+// Modern approach using beforeEach/afterEach
+describe("User Tests with Test Data", () => {
 
-function test_something() {
-    local.john = users("john");
-    // Test using john fixture
-}
+    beforeEach(() => {
+        // Create test data for each test
+        variables.testUsers = {
+            john: createUser({
+                username: "johndoe",
+                email: "john@example.com",
+                firstname: "John",
+                lastname: "Doe"
+            }),
+            jane: createUser({
+                username: "janedoe",
+                email: "jane@example.com",
+                firstname: "Jane",
+                lastname: "Doe"
+            })
+        };
+    });
+
+    afterEach(() => {
+        // Clean up test data
+        for (var user in variables.testUsers) {
+            variables.testUsers[user].delete();
+        }
+    });
+
+    it("should work with test data", () => {
+        var john = variables.testUsers.john;
+        expect(john.firstname).toBe("John");
+    });
+
+});
 ```
 
 ## Performance Testing
@@ -673,15 +746,69 @@ function test_eager_loading_performance() {
 }
 ```
 
-## Test Organization Best Practices
+## TestBox BDD Test Organization Best Practices
 
-1. **Group Related Tests**: Use descriptive test method names and group related functionality
-2. **Use Setup/Teardown**: Clean up test data to avoid test interdependencies
-3. **Test Edge Cases**: Include boundary conditions and error scenarios
-4. **Mock External Dependencies**: Don't test external services in unit tests
-5. **Use Factories**: Create consistent test data with factories
-6. **Test Business Logic**: Focus on testing the model's business logic, not framework features
-7. **Performance Awareness**: Include performance tests for critical operations
+### 1. Use Descriptive BDD Structure
+```cfm
+describe("User Model", () => {
+    describe("Validation", () => {
+        it("should require email address", () => { ... });
+        it("should validate email format", () => { ... });
+    });
+
+    describe("Authentication", () => {
+        it("should authenticate valid credentials", () => { ... });
+        it("should reject invalid passwords", () => { ... });
+    });
+});
+```
+
+### 2. Use Lifecycle Methods for Clean Tests
+```cfm
+beforeEach(() => {
+    // Fresh data for each test
+    variables.testUser = createUser();
+});
+
+afterEach(() => {
+    // Clean up after each test
+    if (structKeyExists(variables, "testUser")) {
+        variables.testUser.delete();
+    }
+});
+```
+
+### 3. Test Edge Cases with Clear Expectations
+```cfm
+it("should handle edge case with null values", () => {
+    var user = model("User").new({ email: null });
+    expect(user.valid()).toBeFalse();
+    expect(user.hasErrors("email")).toBeTrue();
+});
+```
+
+### 4. Use MockBox for External Dependencies
+```cfm
+beforeEach(() => {
+    variables.mockEmailService = createMock("EmailService");
+    variables.mockEmailService.$("sendEmail").returns(true);
+    application.emailService = variables.mockEmailService;
+});
+```
+
+### 5. Focus on Business Logic
+- Test model methods, not framework features
+- Test validations, associations, and custom logic
+- Use clear, readable expectations
+- Group related functionality with nested describe blocks
+
+## Modern TestBox Resources
+
+For comprehensive TestBox 5 documentation:
+- [TestBox BDD Documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer)
+- [TestBox Expectations](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer/expectations)
+- [MockBox Documentation](https://testbox.ortusbooks.com/v5.x/mocking/mockbox)
+- [TestBox Life-cycle Methods](https://testbox.ortusbooks.com/v5.x/digging-deeper/life-cycle-methods)
 
 ## Related Documentation
 - [Model Architecture](./architecture.md)
