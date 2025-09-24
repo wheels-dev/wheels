@@ -14,7 +14,7 @@ A **GUI Windows installer** built with **Inno Setup** that wraps a **PowerShell 
 ## File Overview
 
 ```
-tools/install/windows/
+tools/installer/windows/
 ├── install-wheels.iss          # Inno Setup GUI installer (Pascal)
 ├── install-wheels.ps1          # PowerShell installation engine script
 ├── installer/                  # Build output directory
