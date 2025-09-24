@@ -306,8 +306,7 @@ end;
 // --- Installation result checking ---
 procedure CheckInstallResult();
 var
-  TempDir: String;
-  StatusFile1, StatusFile2: String;
+  StatusFile: String;
   Lines: TArrayOfString;
   LogFilePath: String;
 begin
@@ -315,15 +314,12 @@ begin
   InstallationResult := -1;
   LogFilePath := '';
 
-  // Try to read exit code from status files created by PowerShell
-  // Check multiple locations
-  TempDir := ExpandConstant('{tmp}');
-  StatusFile1 := TempDir + '\wheels-install-status.txt';
-  StatusFile2 := ExpandConstant('{%TEMP|{tmp}}\wheels-install-status.txt');
+  // Read exit code from single status file created by PowerShell
+  StatusFile := ExpandConstant('{%TEMP|{tmp}}\wheels-install-status.txt');
 
-  // Try first location
-  if FileExists(StatusFile1) then begin
-    if LoadStringsFromFile(StatusFile1, Lines) then begin
+  // Try to read the status file
+  if FileExists(StatusFile) then begin
+    if LoadStringsFromFile(StatusFile, Lines) then begin
       if GetArrayLength(Lines) > 0 then begin
         try
           InstallationResult := StrToInt(Lines[0]);
@@ -336,26 +332,10 @@ begin
         end;
       end;
     end;
-    DeleteFile(StatusFile1);
-  end
-  // Try second location if first didn't work
-  else if FileExists(StatusFile2) then begin
-    if LoadStringsFromFile(StatusFile2, Lines) then begin
-      if GetArrayLength(Lines) > 0 then begin
-        try
-          InstallationResult := StrToInt(Lines[0]);
-          // Check if log file path is included
-          if GetArrayLength(Lines) > 1 then begin
-            LogFilePath := Lines[1];
-          end;
-        except
-          InstallationResult := -1;
-        end;
-      end;
-    end;
-    DeleteFile(StatusFile2);
+    // Don't delete the file immediately - let it persist for debugging
+    // DeleteFile(StatusFile);
   end;
-         
+  
   case InstallationResult of
     -1: begin
       InstallationMessage := 'Installation was interrupted or cancelled.' + #13#10#13#10 +
@@ -364,8 +344,7 @@ begin
     end;
     0: begin
       InstallationMessage := 'Wheels installation completed successfully!' + #13#10#13#10 +
-                           'Your Wheels application has been created and the development server should be running. ' +
-                           'Check the PowerShell output for the server URL.';
+                           'Your Wheels application has been created and the development server should be running.';
       if LogFilePath <> '' then
         InstallationMessage := InstallationMessage + #13#10#13#10 + 'Installation log: ' + LogFilePath;
     end;

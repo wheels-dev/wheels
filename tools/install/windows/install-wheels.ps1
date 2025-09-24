@@ -100,6 +100,25 @@ try {
     # This is common in some terminal emulators or restricted environments
 }
 
+# =============================
+# Global error handling trap
+# =============================
+trap {
+    # Handle unexpected script termination (window close, etc.)
+    if ($Script:State -and -not $Script:State.StatusWritten) {
+        try {
+            $statusFile = Join-Path $env:TEMP "wheels-install-status.txt"
+            if (Test-Path $statusFile) {
+                Remove-Item $statusFile -Force -ErrorAction SilentlyContinue
+            }
+            "-1" | Out-File -FilePath $statusFile -Encoding ASCII -Force
+        } catch {
+            # Silent fail
+        }
+    }
+    continue
+}
+
 
 # Configuration
 $Script:Config = @{
@@ -121,29 +140,43 @@ $Script:State = @{
     StartTime = Get-Date
     AppConfig = @{}
     TempFiles = @()
-    InterruptHandlerRegistered = $false
     LogFile = ""
     InstallationSucceeded = $false
+    StatusWritten = $false
 }
 
 #region Logging Functions
 
 function Initialize-Logging {
-    # Create log file in temp directory with timestamp
-    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $Script:State.LogFile = Join-Path $env:TEMP "WheelsInstaller_$timestamp.log"
+    # Use a persistent log file name (no timestamp) so it continues across runs
+    $Script:State.LogFile = Join-Path $env:TEMP "wheels-installation.log"
 
     try {
-        # Initialize log file with header
-        $logHeader = @"
+        # Check if log file exists and append to it, or create new one
+        $isNewLog = -not (Test-Path $Script:State.LogFile)
+
+        if ($isNewLog) {
+            Write-Info "Creating new log file: $($Script:State.LogFile)"
+            # Create new log file with header
+            $logHeader = @"
 ================================================================================
 Wheels Installer Log
 ================================================================================
-Start Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-PowerShell Version: $($PSVersionTable.PSVersion)
-Windows Version: $([System.Environment]::OSVersion.VersionString)
-User: $($env:USERNAME)
-Computer: $($env:COMPUTERNAME)
+Log Created: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+================================================================================
+
+"@
+            $logHeader | Out-File -FilePath $Script:State.LogFile -Encoding UTF8
+        } else {
+            Write-Info "Continuing existing log file: $($Script:State.LogFile)"
+            # Append new session marker to existing log
+            $sessionHeader = @"
+
+
+================================================================================
+NEW INSTALLATION SESSION
+================================================================================
+Session Start: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 Working Directory: $($PWD.Path)
 Parameters:
   InstallPath: $InstallPath
@@ -159,10 +192,12 @@ Parameters:
 ================================================================================
 
 "@
-        $logHeader | Out-File -FilePath $Script:State.LogFile -Encoding UTF8
-        Write-Info "Log file created: $($Script:State.LogFile)"
+            $sessionHeader | Out-File -FilePath $Script:State.LogFile -Append -Encoding UTF8
+        }
+
+        Write-Info "Log file initialized: $($Script:State.LogFile)"
     } catch {
-        Write-Warning "Could not create log file: $($_.Exception.Message)"
+        Write-Warning "Could not initialize log file: $($_.Exception.Message)"
         $Script:State.LogFile = ""
     }
 }
@@ -194,10 +229,10 @@ function Write-LogSection {
     param([string]$SectionName)
 
     $separator = "=" * 80
-    Write-Log ""
-    Write-Log $separator
-    Write-Log "SECTION: $SectionName"
-    Write-Log $separator
+    Write-Log "" "INFO"
+    Write-Log $separator "INFO"
+    Write-Log "SECTION: $SectionName" "INFO"
+    Write-Log $separator "INFO"
 }
 
 function Write-LogError {
@@ -243,25 +278,49 @@ function Show-LogLocation {
 function Write-InstallationStatus {
     param([int]$ExitCode)
 
+    # Guard against multiple status writes
+    if ($Script:State.StatusWritten) {
+        Write-Log "Status already written, skipping duplicate write" "INFO"
+        return
+    }
+
     try {
-        # Write to both locations to ensure installer can find it
-        $statusFile1 = Join-Path $env:TEMP "wheels-install-status.txt"
-        $statusFile2 = Join-Path ([System.IO.Path]::GetTempPath()) "wheels-install-status.txt"
+        # Delete any existing status file first to prevent stale data
+        $statusFile = Join-Path $env:TEMP "wheels-install-status.txt"
+        if (Test-Path $statusFile) {
+            Remove-Item $statusFile -Force -ErrorAction SilentlyContinue
+            Write-Log "Removed existing status file" "INFO"
+        }
 
-        $ExitCode | Out-File -FilePath $statusFile1 -Encoding ASCII -Force
-        $ExitCode | Out-File -FilePath $statusFile2 -Encoding ASCII -Force
-
-        # Also include the log file path in the status
-        if ($Script:State.LogFile) {
-            $statusInfo = @"
+        # Create status info with log file path
+        $statusInfo = if ($Script:State.LogFile) {
+            @"
 $ExitCode
 $($Script:State.LogFile)
 "@
-            $statusInfo | Out-File -FilePath $statusFile1 -Encoding ASCII -Force
-            $statusInfo | Out-File -FilePath $statusFile2 -Encoding ASCII -Force
+        } else {
+            "$ExitCode"
         }
 
-        Write-Log "Installation status written to: $statusFile1 and $statusFile2 (Exit Code: $ExitCode)" "INFO"
+        # Write atomically to single file
+        $statusInfo | Out-File -FilePath $statusFile -Encoding ASCII -Force
+
+        Write-Log "Installation status written to: $statusFile (Exit Code: $ExitCode)" "INFO"
+
+        # Also write final status to log file
+        Write-Log "=== FINAL INSTALLATION STATUS ===" "STATUS"
+        $statusMessage = switch ($ExitCode) {
+            0 { "SUCCESS - Installation completed successfully" }
+            1 { "ERROR - Installation failed due to an error" }
+            2 { "CANCELLED - Installation was cancelled by user" }
+            3 { "ERROR - Installation failed due to unexpected error" }
+            default { "UNKNOWN - Installation completed with unknown status ($ExitCode)" }
+        }
+        Write-Log $statusMessage "STATUS"
+        Write-Log "=== END INSTALLATION STATUS ===" "STATUS"
+
+        # Mark status as written
+        $Script:State.StatusWritten = $true
     } catch {
         Write-Log "Failed to write installation status file: $($_.Exception.Message)" "WARNING"
     }
@@ -319,47 +378,6 @@ function Add-TempFile {
     }
 }
 
-function Register-InterruptHandler {
-    if ($Script:State.InterruptHandlerRegistered) {
-        return
-    }
-
-    try {
-        # Register Ctrl+C handler - use $Script: scope for cross-scope access
-        $interruptHandler = {
-            param($sender, $e)
-
-            Write-Host ""
-            Write-Host "Installation interrupted by user" -ForegroundColor Yellow
-
-            # Prevent immediate termination to allow cleanup
-            $e.Cancel = $true
-
-            # Write cancellation status using our function
-            try {
-                # Call the Write-InstallationStatus function with proper scoping
-                $statusFile1 = Join-Path $env:TEMP "wheels-install-status.txt"
-                $statusFile2 = Join-Path ([System.IO.Path]::GetTempPath()) "wheels-install-status.txt"
-
-                "2" | Out-File -FilePath $statusFile1 -Encoding ASCII -Force
-                "2" | Out-File -FilePath $statusFile2 -Encoding ASCII -Force
-
-                Write-Host "Cleanup completed." -ForegroundColor Gray
-            } catch {
-                # Silent fail for status file
-            }
-
-            exit 2  # Exit code 2 for user cancellation
-        }
-
-        [Console]::CancelKeyPress.Add($interruptHandler)
-
-        $Script:State.InterruptHandlerRegistered = $true
-        Write-Log "Interrupt handler registered successfully" "INFO"
-    } catch {
-        Write-Log "Failed to register interrupt handler: $($_.Exception.Message)" "WARNING"
-    }
-}
 
 function Cleanup-TempFiles {
     Write-Info "Cleaning up temporary files..."
@@ -1370,9 +1388,6 @@ function Start-Installation {
         # Initialize logging first
         Initialize-Logging
         Write-LogSection "INSTALLATION START"
-
-        # Register interrupt handler early
-        Register-InterruptHandler
 
         Write-Header "Wheels Installer" "Installing CommandBox, Wheels CLI, and Application"
 
