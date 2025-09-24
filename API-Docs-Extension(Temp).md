@@ -7395,3 +7395,4125 @@ if (!post.hasErrors()) {
     post.save();
     writeOutput("Post saved successfully.");
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hasMany:
+The hasMany() function sets up a one-to-many association between the current model and another model. This allows you to easily fetch, join, and manage related records in a relational way while following Wheels conventions.
+
+// Basic one-to-many association
+// A Post has many Comments
+hasMany("comments");
+
+// Specifying a shortcut for a many-to-many relationship
+// A Reader has many Subscriptions and a shortcut to Publications
+hasMany(name="subscriptions", shortcut="publications");
+
+// Dependent delete: remove all associated comments when the post is deleted
+hasMany(name="comments", dependent="deleteAll");
+
+// Non-conventional shortcut through associations
+// In models/Customer.cfc
+hasMany(name="subscriptions", shortcut="magazines", through="publication,subscriptions");
+
+// In models/Subscription.cfc
+belongsTo("customer");
+belongsTo("publication");
+
+// In models/Publication.cfc
+hasMany("subscriptions");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hasManyCheckBox:
+The hasManyCheckBox() helper generates the correct form elements for managing a hasMany or many-to-many association. It creates checkboxes for linking records together (e.g., a Book with many Authors).
+
+You can also pass styling, labels, wrappers, and error handling arguments to customize the output.
+
+1. Basic usage (Books → Authors)
+
+Loop through all authors and render checkboxes for associating them with the current book.
+
+<cfloop query="authors">
+    #hasManyCheckBox(
+        objectName="book",
+        association="bookAuthors",
+        keys="#book.key()#,#authors.id#",
+        label=authors.fullName
+    )#
+</cfloop>
+
+2. Custom label placement
+
+Place the label after the checkbox instead of before.
+
+<cfloop query="categories">
+    #hasManyCheckBox(
+        objectName="post",
+        association="postCategories",
+        keys="#post.key()#,#categories.id#",
+        label=categories.name,
+        labelPlacement="after"
+    )#
+</cfloop>
+
+3. Wrapping checkboxes in extra HTML (prepend/append)
+
+Use prepend and append to wrap checkboxes in a <div> with a custom class.
+
+<cfloop query="tags">
+    #hasManyCheckBox(
+        objectName="article",
+        association="articleTags",
+        keys="#article.key()#,#tags.id#",
+        label=tags.name,
+        prepend='<div class="tag-option">',
+        append='</div>'
+    )#
+</cfloop>
+
+4. Styling error states
+
+Highlight checkboxes when validation fails (e.g., at least one must be selected).
+
+<cfloop query="roles">
+    #hasManyCheckBox(
+        objectName="user",
+        association="userRoles",
+        keys="#user.key()#,#roles.id#",
+        label=roles.name,
+        errorElement="span",
+        errorClass="error-highlight"
+    )#
+</cfloop>
+
+5. Nested associations with shortcuts
+
+When you have a many-to-many shortcut (e.g., Student → Courses through Enrollments).
+
+<cfloop query="courses">
+    #hasManyCheckBox(
+        objectName="student",
+        association="enrollments",
+        keys="#student.key()#,#courses.id#",
+        label=courses.title
+    )#
+</cfloop>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hasManyRadioButton:
+This helper generates radio buttons for managing a hasMany or one-to-many association, where you want the user to pick one option (e.g., default address, primary contact method, preferred category).
+
+1. Basic usage (Author → Default Address)
+
+Pick one address as the author’s default.
+
+<cfloop query="addresses">
+    #hasManyRadioButton(
+        objectName="author",
+        association="authorsDefaultAddresses",
+        property="defaultAddressId",
+        keys="#author.key()#,#addresses.id#",
+        tagValue="#addresses.id#",
+        label=addresses.title
+    )#
+</cfloop>
+
+2. Pre-check default radio if property is blank
+
+If no address is selected yet, pre-check the "Home" option.
+
+<cfloop query="addresses">
+    #hasManyRadioButton(
+        objectName="author",
+        association="authorsDefaultAddresses",
+        property="defaultAddressId",
+        keys="#author.key()#,#addresses.id#",
+        tagValue="#addresses.id#",
+        label=addresses.title,
+        checkIfBlank=(addresses.title EQ "Home")
+    )#
+</cfloop>
+
+3. Style with extra HTML attributes
+
+Add class and id for custom styling.
+
+<cfloop query="paymentMethods">
+    #hasManyRadioButton(
+        objectName="user",
+        association="userPaymentMethods",
+        property="defaultPaymentMethodId",
+        keys="#user.key()#,#paymentMethods.id#",
+        tagValue="#paymentMethods.id#",
+        label=paymentMethods.name,
+        class="radio-option",
+        id="paymentMethod_#paymentMethods.id#"
+    )#
+</cfloop>
+
+4. Radio buttons for selecting preferred language
+
+Force one choice for localization settings.
+
+<cfloop query="languages">
+    #hasManyRadioButton(
+        objectName="profile",
+        association="profileLanguages",
+        property="preferredLanguageId",
+        keys="#profile.key()#,#languages.id#",
+        tagValue="#languages.id#",
+        label=languages.name
+    )#
+</cfloop>
+
+5. Inline labels with icons
+
+Add icons to labels with HTML.
+
+<cfloop query="themes">
+    #hasManyRadioButton(
+        objectName="account",
+        association="accountThemes",
+        property="themeId",
+        keys="#account.key()#,#themes.id#",
+        tagValue="#themes.id#",
+        label='<i class="fa fa-paint-brush"></i> #themes.displayName#',
+        encode=false
+    )#
+</cfloop>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hasOne:
+The hasOne() function defines a one-to-one relationship between two models.
+It means each instance of this model is linked to exactly one record in another model.
+By default, Wheels infers table and key names, but you can customize them with arguments like foreignKey, joinKey, and joinType.
+
+1. Basic one-to-one association
+
+A User has one Profile.
+The profiles table has userId as the foreign key.
+
+// In models/User.cfc
+hasOne("profile");
+
+
+Usage:
+
+user = model("user").findByKey(1);
+profile = user.profile; // fetches the profile linked to the user
+
+2. Strict inner join
+
+Force that every Employee must have one PayrollRecord.
+
+// In models/Employee.cfc
+hasOne(name="payrollRecord", joinType="inner");
+
+
+If there is no matching payrollRecord, the employee will not appear in queries using this association.
+
+3. Auto-delete dependent record
+
+Delete the Profile when the User is deleted.
+
+// In models/User.cfc
+hasOne(name="profile", dependent="delete");
+
+
+Usage:
+
+user = model("user").findByKey(2);
+user.delete(); // also deletes the associated profile
+
+4. Custom foreign key
+
+If the foreign key doesn’t follow Wheels’ naming conventions.
+For example, Driver has one License, but the foreign key column is driver_ref.
+
+// In models/Driver.cfc
+hasOne(name="license", foreignKey="driver_ref");
+
+5. Using joinKey for non-standard PK
+
+If the Company table uses companyCode instead of id as the primary key, and the Address table has companyCode as the foreign key:
+
+// In models/Company.cfc
+hasOne(name="address", joinKey="companyCode");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hasProperty:
+The hasProperty() function checks if a given property exists on a model object.
+It’s useful for safely validating whether a field is defined before accessing it, especially in dynamic code or when working with user input.
+
+This method also provides dynamic helpers (e.g., object.hasEmail()) for convenience.
+
+1. Basic usage with existing property
+employee = model("employee").new();
+employee.firstName = "Alice";
+
+writeOutput(employee.hasProperty("firstName")); // true
+
+2. Checking a property that does not exist
+employee = model("employee").new();
+
+writeOutput(employee.hasProperty("middleName")); // false
+
+3. Using the dynamic helper
+employee = model("employee").new();
+employee.email = "alice@example.com";
+
+// Equivalent to hasProperty("email")
+if (employee.hasEmail()) {
+    writeOutput("Email property exists!");
+}
+
+4. Before using a property safely
+user = model("user").findByKey(1);
+
+// Avoid runtime errors by checking
+if (user.hasProperty("phoneNumber")) {
+    writeOutput(user.phoneNumber);
+} else {
+    writeOutput("No phone number property defined.");
+}
+
+5. Iterating over user input safely
+formFields = ["firstName", "lastName", "unknownField"];
+employee = model("employee").new();
+
+for (field in formFields) {
+    if (employee.hasProperty(field)) {
+        writeOutput("Property exists: #field#<br>");
+    } else {
+        writeOutput("Invalid property: #field#<br>");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hiddenField:
+The hiddenField() function generates a hidden <input type="hidden"> tag for a given model object and property.
+It’s commonly used to store identifiers or other values that need to persist across form submissions without being visible to the user.
+
+You can also pass extra HTML attributes such as id, class, or rel for customization.
+
+1. Basic usage with object and property
+<!--- Hidden field for user.id --->
+#hiddenField(objectName="user", property="id")#
+
+
+Generates something like:
+
+<input id="user-id" name="user.id" type="hidden" value="123">
+
+2. Adding extra HTML attributes
+#hiddenField(
+    objectName="user",
+    property="sessionToken",
+    id="custom-token",
+    class="hidden-tracker"
+)#
+
+<input id="custom-token" name="user.sessionToken" type="hidden" value="abc123" class="hidden-tracker">
+
+3. Nested association (hasOne or belongsTo)
+#hiddenField(
+    objectName="order",
+    property="id",
+    association="customer"
+)#
+
+
+If an order has a customer, this binds the hidden field to order.customer.id.
+
+4. Nested hasMany with position
+#hiddenField(
+    objectName="order",
+    property="id",
+    association="items",
+    position="1"
+)#
+
+
+Binds to the id of the second item in the order’s items collection.
+
+5. Explicitly disabling encoding
+#hiddenField(
+    objectName="search",
+    property="redirectUrl",
+    encode=false
+)#
+
+
+Useful if you’re storing raw values (e.g., URLs) that shouldn’t be URL-encoded.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hiddenFieldTag:
+The hiddenFieldTag() function generates a hidden <input type="hidden"> tag using a plain name/value pair.
+Unlike hiddenField(), this helper does not tie to a model object — it’s meant for raw form fields where you control the name and value manually.
+
+You can also pass extra attributes (id, class, rel, etc.), which will be included in the generated HTML tag.
+
+1. Basic usage
+#hiddenFieldTag(name="userId", value=user.id)#
+
+
+Generates:
+
+<input id="userId" name="userId" type="hidden" value="123">
+
+2. With additional attributes
+#hiddenFieldTag(
+    name="sessionToken",
+    value="abc123",
+    id="token-field",
+    class="hidden-tracker"
+)#
+
+<input id="token-field" name="sessionToken" type="hidden" value="abc123" class="hidden-tracker">
+
+3. Without specifying a value (empty by default)
+#hiddenFieldTag(name="csrfToken")#
+
+<input id="csrfToken" name="csrfToken" type="hidden" value="">
+
+4. Disabling encoding
+#hiddenFieldTag(
+    name="redirectUrl",
+    value="https://example.com/?a=1&b=2",
+    encode=false
+)#
+
+<input id="redirectUrl" name="redirectUrl" type="hidden" value="https://example.com/?a=1&b=2">
+
+5. Inside a form
+#startFormTag(action="processLogin")#
+    #hiddenFieldTag(name="returnTo", value="/dashboard")#
+    <input type="text" name="username">
+    <input type="password" name="password">
+    <input type="submit" value="Login">
+#endFormTag()#
+
+
+Ensures the returnTo value is silently submitted along with the login form.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````highlight:
+The highlight() helper searches the given text for one or more phrases and wraps all matches in an HTML tag (default: <span>). This is useful for search results or emphasizing certain keywords dynamically.
+
+1. Basic usage (default <span class="highlight">)
+#highlight(text="You searched for: Wheels", phrases="Wheels")#
+
+
+Output:
+
+You searched for: <span class="highlight">Wheels</span>
+
+2. Highlight multiple phrases
+#highlight(
+    text="ColdFusion and Wheels make development fun.",
+    phrases="ColdFusion,Wheels"
+)#
+
+
+Output:
+
+<span class="highlight">ColdFusion</span> and <span class="highlight">Wheels</span> make development fun.
+
+3. Use a custom delimiter for multiple phrases
+#highlight(
+    text="Apples | Oranges | Bananas",
+    phrases="Apples|Bananas",
+    delimiter="|"
+)#
+
+
+Output:
+
+<span class="highlight">Apples</span> | Oranges | <span class="highlight">Bananas</span>
+
+4. Use a different HTML tag
+#highlight(
+    text="Important: Read the documentation carefully.",
+    phrases="Important",
+    tag="strong"
+)#
+
+
+Output:
+
+<strong class="highlight">Important</strong>: Read the documentation carefully.
+
+5. Custom CSS class
+#highlight(
+    text="This is critical information.",
+    phrases="critical",
+    class="alert-text"
+)#
+
+
+Output:
+
+This is <span class="alert-text">critical</span> information.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hourSelectTag:
+Builds and returns a <select> form control for choosing an hour of the day. By default, hours are shown in 24-hour format (00–23), but you can switch to 12-hour format with an accompanying AM/PM dropdown.
+
+1. Basic 24-hour select
+#hourSelectTag(name="meetingHour")#
+
+
+Output (simplified):
+
+<select name="meetingHour">
+  <option value="00">00</option>
+  <option value="01">01</option>
+  ...
+  <option value="23">23</option>
+</select>
+
+2. Pre-select an hour
+#hourSelectTag(name="meetingHour", selected="14")#
+
+
+Output (simplified):
+
+<option value="14" selected="selected">14</option>
+
+3. Include a blank option
+#hourSelectTag(name="meetingHour", includeBlank="- Select Hour -")#
+
+
+Output (simplified):
+
+<option value="">- Select Hour -</option>
+<option value="00">00</option>
+...
+
+4. Use 12-hour format with AM/PM
+#hourSelectTag(name="meetingHour", twelveHour=true, selected="3")#
+
+
+Output (simplified):
+
+<select name="meetingHour">
+  <option value="01">01</option>
+  <option value="02">02</option>
+  <option value="03" selected="selected">03</option>
+  ...
+  <option value="12">12</option>
+</select>
+
+<select name="meetingHourMeridian">
+  <option value="AM">AM</option>
+  <option value="PM">PM</option>
+</select>
+
+5. Add a label before the field
+#hourSelectTag(name="meetingHour", label="Select Hour", labelPlacement="before")#
+
+
+Output (simplified):
+
+<label for="meetingHour">Select Hour</label>
+<select name="meetingHour">...</select>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````humanize:
+Converts a camel-cased or underscored string into more readable, human-friendly text by inserting spaces and capitalizing words. You can also specify words that should be replaced or kept in a specific format.
+
+1. Basic camelCase conversion
+#humanize("wheelsIsAFramework")#
+
+
+Output:
+
+Wheels Is A Framework
+
+2. Handle acronyms with except
+#humanize("wheelsIsACfmlFramework", "CFML")#
+
+
+Output:
+
+Wheels Is A CFML Framework
+
+3. Underscore-separated strings
+#humanize("user_profile_settings")#
+
+
+Output:
+
+User Profile Settings
+
+4. PascalCase strings
+#humanize("ThisIsPascalCase")#
+
+
+Output:
+
+This Is Pascal Case
+
+5. Multiple exceptions
+#humanize("apiResponseForJsonAndXml", "API JSON XML")#
+
+
+Output:
+
+API Response For JSON And XML
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````hyphenize:
+Converts camelCase or PascalCase strings into lowercase hyphen-separated strings.
+Useful for generating URL-friendly slugs, CSS class names, or readable identifiers.
+
+1. Basic camelCase string
+#hyphenize("myBlogPost")#
+
+
+Output:
+
+my-blog-post
+
+2. PascalCase string
+#hyphenize("UserProfileSettings")#
+
+
+Output:
+
+user-profile-settings
+
+3. Single word (no change)
+#hyphenize("Dashboard")#
+
+
+Output:
+
+dashboard
+
+4. Already hyphenated string (stays lowercase)
+#hyphenize("already-hyphenized")#
+
+
+Output:
+
+already-hyphenized
+
+5. Underscore-separated string
+#hyphenize("user_profile_settings")#
+
+
+Output:
+
+user-profile-settings
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````imageTag:
+Generates an HTML <img> tag.
+
+If the image exists in the local images folder, Wheels will automatically include width, height, and alt attributes.
+
+If the image is remote (full URL provided), Wheels uses the given path as-is.
+
+Any extra arguments (e.g. class, id, data-*) will be added as HTML attributes.
+
+1. Basic usage (local image)
+#imageTag("logo.png")#
+
+
+Output:
+
+<img src="/images/logo.png" alt="Logo" width="120" height="40">
+
+
+(Width, height, and alt are auto-detected if the file exists locally.)
+
+2. Remote image with custom alt text
+#imageTag(source="http://cfwheels.org/images/logo.png", alt="ColdFusion on Wheels")#
+
+
+Output:
+
+<img src="http://cfwheels.org/images/logo.png" alt="ColdFusion on Wheels">
+
+3. Adding CSS classes
+#imageTag(source="logo.png", class="brand-logo")#
+
+
+Output:
+
+<img src="/images/logo.png" alt="Logo" width="120" height="40" class="brand-logo">
+
+4. With explicit host and protocol
+#imageTag(source="logo.png", onlyPath=false, host="cdn.myapp.com", protocol="https")#
+
+
+Output:
+
+<img src="https://cdn.myapp.com/images/logo.png" alt="Logo" width="120" height="40">
+
+5. Custom HTML attributes (data attribute, id)
+#imageTag(source="avatar.png", id="userAvatar", data-userid="42")#
+
+
+Output:
+
+<img src="/images/avatar.png" alt="Avatar" width="80" height="80" id="userAvatar" data-userid="42">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````includeContent:
+Outputs the content for a specific section in a layout.
+
+Works together with contentFor() to define and then inject content into layouts.
+
+Typically used for head, sidebar, footer, or other pluggable layout sections.
+
+If the requested section hasn’t been defined, it will either return nothing or the provided defaultValue.
+
+1. Basic usage with contentFor() in a view
+<!--- views/blog/post.cfm --->
+<cfoutput>
+    <h1>#post.title#</h1>
+    <p>#post.body#</p>
+    <!--- Define extra metadata for the layout --->
+    #contentFor(head='<meta name="robots" content="noindex,nofollow">')#
+</cfoutput>
+
+<!--- views/layout.cfm --->
+<html>
+  <head>
+    <title>My Blog</title>
+    #includeContent("head")#
+  </head>
+  <body>
+    #includeContent()#
+  </body>
+</html>
+
+
+Result:
+
+The <meta> tag is injected into the <head> of the layout.
+
+The body content is output where #includeContent()# appears.
+
+2. Multiple contentFor() definitions for the same section
+<!--- views/blog/post.cfm --->
+#contentFor(head='<meta name="robots" content="noindex,nofollow">')#
+#contentFor(head='<meta name="author" content="wheelsdude@wheelsify.com">')#
+
+<!--- layout --->
+<head>
+  <title>My Blog</title>
+  #includeContent("head")#
+</head>
+
+
+Result:
+
+<head>
+  <title>My Blog</title>
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="author" content="wheelsdude@wheelsify.com">
+</head>
+
+3. Using defaultValue when section is not defined
+<!--- layout --->
+<head>
+  <title>My Blog</title>
+  #includeContent(name="head", defaultValue="<meta name='description' content='Default description'>")#
+</head>
+
+
+If no view sets contentFor("head"), the layout will output:
+
+<meta name='description' content='Default description'>
+
+4. Custom sections (sidebar)
+<!--- views/blog/post.cfm --->
+#contentFor(sidebar='<p>Related Posts:</p><ul><li>Another post</li></ul>')#
+
+<!--- layout --->
+<body>
+  <main>
+    #includeContent()#
+  </main>
+  <aside>
+    #includeContent("sidebar", defaultValue="<p>No related posts</p>")#
+  </aside>
+</body>
+
+
+Result:
+
+If a sidebar is defined, it’s shown.
+
+If not, the fallback text appears.
+
+5. Nested layout usage
+
+If you’re using multiple layouts, includeContent() can bubble up content defined in views to the correct parent layout section.
+
+<!--- child layout --->
+<div class="page">
+  #includeContent()#
+</div>
+
+<!--- parent layout --->
+<html>
+  <head>
+    <title>Nested Layout Example</title>
+    #includeContent("head")#
+  </head>
+  <body>
+    #includeContent()#
+  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````includedInObject:
+Checks if the specified IDs are part of a hasMany association on the given parent object.
+
+Useful in forms or conditionals when you need to determine if an associated record already exists.
+
+Works by comparing the given keys against the parent’s association join records.
+
+The order of keys must match the database column order in the join table.
+
+1. Basic subscription check (join table)
+// Check if the customer is subscribed to the Swimsuit Edition
+if (!includedInObject(
+    objectName="customer",
+    association="subscriptions",
+    keys="#customer.key()#,#swimsuitEdition.id#"
+)) {
+    assignSalesman(customer);
+}
+
+
+Use case: Before assigning a salesman, confirm that the customer isn’t already subscribed.
+
+2. Pre-checking a checkbox in a form
+<!--- views/customers/edit.cfm --->
+<cfoutput>
+  <label>
+    <input type="checkbox" 
+           name="customer[subscriptionIds]" 
+           value="#magazine.id#" 
+           <cfif includedInObject(objectName="customer", association="subscriptions", keys="#customer.id#,#magazine.id#")>checked</cfif>> 
+    #magazine.title#
+  </label>
+</cfoutput>
+
+
+Use case: Automatically check boxes for subscriptions the customer already has.
+
+3. Handling many-to-many relationships (tags example)
+<!--- views/posts/_form.cfm --->
+<cfloop array="#allTags#" index="tag">
+  <label>
+    <input type="checkbox" 
+           name="post[tagIds]" 
+           value="#tag.id#" 
+           <cfif includedInObject(objectName="post", association="tags", keys="#post.id#,#tag.id#")>checked</cfif>> 
+    #tag.name#
+  </label>
+</cfloop>
+
+
+Use case: In a blog post form, show all available tags and pre-check the ones already linked to the post.
+
+4. Custom business logic (prevent duplicate assignment)
+// Only assign mentor if the student isn't already enrolled in the course
+if (!includedInObject(
+    objectName="student",
+    association="courses",
+    keys="#student.id#,#course.id#"
+)) {
+    student.assignMentor(mentor);
+}
+
+
+Use case: Prevents duplicate course enrollment.
+
+5. Nested forms with hasMany association
+<!--- views/orders/_form.cfm --->
+<cfloop array="#products#" index="product">
+  <label>
+    <input type="checkbox" 
+           name="order[productIds]" 
+           value="#product.id#" 
+           <cfif includedInObject(objectName="order", association="products", keys="#order.id#,#product.id#")>checked</cfif>> 
+    #product.name#
+  </label>
+</cfloop>
+
+
+Use case: Editing an order while automatically reflecting products already linked to it.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````includeLayout:
+Includes the contents of another layout file. Typically used when a child layout wants to include a parent layout, or to nest layouts for consistent site structure.
+
+Basic Example
+
+Include a parent layout from within a child layout:
+
+<!--- In a child layout, e.g., views/layouts/admin.cfm --->
+<cfsavecontent variable="sidebarContent">
+    <ul>
+        #includePartial("adminSidebar")#
+    </ul>
+</cfsavecontent>
+
+<!--- Pass content to the layout --->
+contentFor(sidebar=sidebarContent);
+
+<!--- Include the main site layout --->
+#includeLayout("/layout.cfm")#
+
+
+Explanation:
+
+cfsavecontent captures content into a variable.
+
+contentFor maps that content to a named section in the layout.
+
+includeLayout then renders the parent layout, which can include #includeContent("sidebar")# to output the child-provided content.
+
+Example with Default Layout
+<!--- Child layout does not specify a layout, so it uses the default --->
+#includeLayout()#
+
+
+Explanation:
+
+If no name argument is provided, Wheels defaults to including views/layout.cfm.
+
+Example for Nested Layouts
+<!--- In views/layouts/dashboard.cfm --->
+<cfsavecontent variable="headerContent">
+    <h1>Dashboard</h1>
+</cfsavecontent>
+
+contentFor(header=headerContent);
+
+<!--- Include the site-wide parent layout --->
+#includeLayout("/layout.cfm")#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````includePartial:
+Includes a partial view file in the current view. Works similarly to <cfinclude> but with Wheels-specific lookups, caching, and support for passing model objects, queries, or arrays.
+
+Basic Examples
+
+Include a partial in the current controller’s view folder
+
+<!--- If in "sessions" controller, includes views/sessions/_login.cfm --->
+#includePartial("login")#
+
+
+Include a partial from the shared folder
+
+<!--- Includes views/shared/_button.cfm --->
+#includePartial(partial="/shared/button")#
+
+Using Queries or Arrays
+
+Loop through a query and render partial for each record
+
+<cfset posts = model("post").findAll()>
+#includePartial(posts)#
+
+
+Override template file for a query
+
+#includePartial(partial="/shared/post", query=posts)#
+
+
+Pass a single model instance
+
+<cfset post = model("post").findByKey(params.key)>
+#includePartial(post)#
+#includePartial(partial="/shared/post", object=post)#
+
+
+Pass an array of model objects
+
+<cfset posts = model("post").findAll(returnAs="objects")>
+#includePartial(posts)#
+#includePartial(partial="/shared/post", objects=posts)#
+
+Advanced Usage
+
+Grouped query with spacer
+
+<cfset posts = model("post").findAll()>
+#includePartial(posts, group="category", spacer="<hr>")#
+
+
+Cache the partial for 30 minutes
+
+#includePartial(partial="login", cache=30)#
+
+
+Render partial without a layout
+
+#includePartial(partial="/shared/post", layout=false)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````integer:
+Adds one or more integer columns to a table definition during a migration. You can optionally specify a limit, default value, and whether the column allows NULL.
+
+Examples
+
+Add a single integer column age
+
+<cfset t.integer("age")>
+
+
+Add multiple integer columns height and weight
+
+<cfset t.integer("height,weight")>
+
+
+Add an integer column quantity with a default value of 0
+
+<cfset t.integer("quantity", default=0)>
+
+
+Add an integer column priority that cannot be null
+
+<cfset t.integer("priority", null=false)>
+
+
+Add an integer column rating with a limit of 2 digits (smallint)
+
+<cfset t.integer("rating", limit=2)>
+
+
+Add multiple columns with different limits (comma-separated)
+
+<cfset t.integer("smallValue,mediumValue,bigValue", limit=1)> <!--- All columns share same limit --->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````invokeWithTransaction:
+Runs a specified model method inside a single database transaction. This ensures that all database operations within the method are treated as a single atomic unit: either all succeed or all fail.
+
+1. Define a method to run inside a transaction
+
+public boolean function transferFunds(
+    required any personFrom,
+    required any personTo,
+    required numeric amount
+) {
+    if (arguments.personFrom.withdraw(arguments.amount) 
+        && arguments.personTo.deposit(arguments.amount)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+2. Execute it within a transaction
+
+local.david = model("Person").findOneByName("David");
+local.mary = model("Person").findOneByName("Mary");
+
+// Run transferFunds inside a transaction and commit changes
+invokeWithTransaction(
+    method="transferFunds",
+    personFrom=local.david,
+    personTo=local.mary,
+    amount=100
+);
+
+Variations
+
+Rollback instead of committing
+
+invokeWithTransaction(
+    method="transferFunds",
+    personFrom=local.david,
+    personTo=local.mary,
+    amount=100,
+    transaction="rollback"
+);
+
+
+This runs all database operations but does not persist changes.
+
+Skip transaction handling
+
+invokeWithTransaction(
+    method="transferFunds",
+    personFrom=local.david,
+    personTo=local.mary,
+    amount=100,
+    transaction="none"
+);
+
+
+Executes the method without wrapping it in a transaction.
+
+Custom isolation level
+
+invokeWithTransaction(
+    method="transferFunds",
+    personFrom=local.david,
+    personTo=local.mary,
+    amount=100,
+    isolation="serializable"
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isAjax:
+Checks if the current request was made via JavaScript (AJAX) rather than a standard browser page load. This is useful when you want to return JSON or partial content instead of a full HTML page.
+
+Usage
+<cfif isAjax()>
+    <!--- Return JSON response for AJAX requests --->
+    <cfset returnJSON({ success = true, message = "This is an AJAX request" })>
+<cfelse>
+    <!--- Render full HTML page for normal requests --->
+    <cfset view("fullPage")>
+</cfif>
+
+Example in a Controller Action
+component extends="Controller" {
+
+    function checkStatus() {
+        if (isAjax()) {
+            returnJSON({ status = "ok", time = now() });
+        } else {
+            flashInsert(msg="Page loaded normally");
+            redirectTo("home");
+        }
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isClass:
+Determines whether the method is being called at the class level (on the model itself) or on an instance of the model. This is useful when the same function can be invoked either on a model object or directly on the model class.
+
+Example Usage
+component extends="Model" {
+
+    // Determine if a member is an admin
+    public boolean function memberIsAdmin(required numeric id) {
+        if (isClass()) {
+            // Called on the model class, fetch instance by id
+            return this.findByKey(arguments.id).admin;
+        } else {
+            // Called on an instance of the model
+            return this.admin;
+        }
+    }
+
+}
+
+How It Works
+// Class-level call
+isAdmin = model("Member").memberIsAdmin(id=5); // isClass() = true
+
+// Instance-level call
+member = model("Member").findByKey(5);
+isAdmin = member.memberIsAdmin(); // isClass() = false
+
+
+Class-level (isClass() = true): The method is called directly on the model, so you might need to fetch a specific instance using a primary key.
+
+Instance-level (isClass() = false): The method is called on an object instance, so you can directly use instance properties.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isDelete:
+Checks if the current HTTP request method is DELETE. This is useful for RESTful controllers where different logic is executed based on the request type.
+
+Example Usage
+component extends="Controller" {
+
+    public void function destroy() {
+        if (isDelete()) {
+            // Perform deletion logic
+            model("Post").deleteByKey(params.id);
+            flashInsert(success="Post deleted successfully.");
+            redirectTo(action="index");
+        } else {
+            // Handle non-DELETE request
+            flashInsert(error="Invalid request method.");
+            redirectTo(action="index");
+        }
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isGet:
+Checks if the current HTTP request method is GET. Useful for controlling logic depending on whether a page is being displayed or data is being requested via GET.
+
+component extends="Controller" {
+
+    public void function show() {
+        if (isGet()) {
+            // Display a form or data
+            post = model("Post").findByKey(params.id);
+            render(view="show", post=post);
+        } else {
+            // Handle non-GET request (e.g., POST, DELETE)
+            flashInsert(error="Invalid request method.");
+            redirectTo(action="index");
+        }
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isHead:
+Checks if the current HTTP request method is HEAD. HEAD requests are similar to GET requests but do not return a message body, only the headers. This is often used for checking metadata like content length or existence without transferring the actual content.
+
+component extends="Controller" {
+
+    public void function checkFile() {
+        if (isHead()) {
+            // Respond with headers only, no content
+            setResponseHeader("Content-Length", "1234");
+        } else {
+            // Handle normal GET or other requests
+            fileData = model("File").findByKey(params.id);
+            render(view="show", file=fileData);
+        }
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isInstance:
+Checks whether the current context is an instance of a model object rather than a class-level context. This is useful when a method could be called either on a class or an instance, and you want to behave differently depending on which it is.
+
+component extends="Model" {
+
+    // Determine if a member is an admin
+    public boolean function memberIsAdmin(required numeric id) {
+        if (isInstance()) {
+            // Called on an instance, use its own properties
+            return this.admin;
+        } else {
+            // Called on the class, fetch the object by id
+            return this.findByKey(arguments.id).admin;
+        }
+    }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isNew:
+Determines whether the current model object represents a new record (not yet saved to the database) or an existing record. This is useful for conditional logic in callbacks, validation, or saving routines.
+
+Example Usage
+<cfscript>
+    // Create a new employee object (not saved yet)
+    employee = model("employee").new();
+
+    // Check if the object is new
+    if (employee.isNew()) {
+        writeOutput("This employee has not been saved to the database yet.");
+    } else {
+        writeOutput("This employee already exists in the database.");
+    }
+</cfscript>
+
+
+Behavior:
+
+Returns true if the object does not have a matching database record yet.
+
+Returns false if the object corresponds to an existing record in the database.
+
+Typical Use Case:
+
+In beforeSave callbacks, to perform actions only when creating a new record, not updating an existing one.
+
+Example:
+
+public void function beforeSave() {
+    if (isNew()) {
+        // Set default properties only for new records
+        this.joinedDate = now();
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isOptions:
+Checks whether the current HTTP request was made using the OPTIONS method. Useful in REST APIs or CORS preflight requests.
+
+<cfscript>
+if (isOptions()) {
+    // Handle CORS preflight or respond to OPTIONS request
+    writeOutput("This is an OPTIONS request.");
+} else {
+    writeOutput("This is a different type of request.");
+}
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isPatch:
+Checks whether the current HTTP request was made using the PATCH method. Useful when building RESTful APIs where PATCH is used to partially update resources.
+
+<cfscript>
+if (isPatch()) {
+    // Handle partial update logic
+    writeOutput("This is a PATCH request.");
+} else {
+    writeOutput("This is a different type of request.");
+}
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isPersisted:
+Determines whether a model object already exists in the database or has been loaded from the database. This is different from isNew(), which checks if an object has never been saved.
+
+<cfscript>
+employee = model("employee").findByKey(123);
+
+if (employee.isPersisted()) {
+    writeOutput("This employee exists in the database.");
+} else {
+    writeOutput("This employee has not been saved yet.");
+}
+
+// Creating a new object
+newEmployee = model("employee").new();
+
+if (!newEmployee.isPersisted()) {
+    writeOutput("This is a new object, not yet persisted.");
+}
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isPost:
+Checks whether the current HTTP request is a POST request (usually from a form submission).
+
+<cfscript>
+if (isPost()) {
+    writeOutput("This request was submitted via POST.");
+} else {
+    writeOutput("This request is not a POST request.");
+}
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isPut:
+Checks whether the current HTTP request is a PUT request. PUT requests are typically used to update existing resources in RESTful APIs.
+
+<cfscript>
+if (isPut()) {
+    writeOutput("This request is a PUT request.");
+} else {
+    writeOutput("This request is not a PUT request.");
+}
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````isSecure:
+Checks whether the current request is made over a secure connection (HTTPS). Returns true if the connection is secure, otherwise false.
+
+<cfscript>
+// Redirect non-secure requests to HTTPS
+if (!isSecure()) {
+    redirectTo(protocol="https");
+} else {
+    writeOutput("You are on a secure connection.");
+}
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````javaScriptIncludeTag:
+Generates <script> tags for including JavaScript files. Can handle local files in the javascripts folder or external URLs. Supports multiple files and optional placement in the HTML <head>.
+
+<head>
+    <!--- Single local file --->
+    #javaScriptIncludeTag("main")#
+
+    <!--- Multiple local files --->
+    #javaScriptIncludeTag("blog,accordion")#
+
+    <!--- External JavaScript file --->
+    #javaScriptIncludeTag("https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js")#
+
+    <!--- Force a script to appear in the head --->
+    #javaScriptIncludeTag(source="tabs", head=true)#
+</head>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````key:
+Returns the value of the primary key for a model object. Useful for dynamic programming or when working with composite keys.
+
+If the model has a single primary key (e.g., id), object.key() is equivalent to object.id.
+
+For composite keys, it returns a list of all primary key values.
+
+1. Single Primary Key
+<!--- Assume Employee model has primary key `id` --->
+employee = model("employee").findByKey(42);
+
+<cfoutput>
+Employee ID: #employee.key()# <!--- Equivalent to employee.id --->
+</cfoutput>
+
+2. Dynamic Key Retrieval
+<!--- Useful when you don’t know the name of the primary key --->
+anyEmployee = model("employee").findByKey(params.key);
+
+primaryKey = anyEmployee.key();
+writeOutput("Primary key value is: " & primaryKey);
+
+3. Composite Primary Key
+<!--- Assume Subscription model has composite keys: customerId, publicationId --->
+subscription = model("subscription").findByKey(customerId=3, publicationId=7);
+
+<cfoutput>
+Composite Keys: #subscription.key()# <!--- Outputs: "3,7" --->
+</cfoutput>
+
+4. Use in Links or Forms
+<cfset employee = model("employee").findByKey(42)>
+
+<!--- Generate a link with dynamic primary key --->
+<a href="#linkTo(action='edit', id=employee.key())#">Edit Employee</a>
+
+<!--- Hidden field for a form --->
+#hiddenField(objectName="employee", property="id")#
+
+5. Passing Keys in Nested Relationships
+<!--- Suppose a `bookAuthors` association exists --->
+book = model("book").findByKey(15);
+
+<cfloop array="#book.bookAuthors#" index="author">
+    <cfoutput>
+        Author Key: #author.key()# <br>
+    </cfoutput>
+</cfloop>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````linkTo:
+Creates an <a> link to another page in your application. Can use routes or controller/action/key combinations. Supports external URLs, query parameters, anchors, and HTML attributes.
+
+1. Basic link using controller/action
+#linkTo(text="Log Out", controller="account", action="logout")#
+<!--- Outputs: <a href="/account/logout">Log Out</a> --->
+
+2. Current controller shortcut
+#linkTo(text="Log Out", action="logout")#
+<!--- If already in account controller, outputs: <a href="/account/logout">Log Out</a> --->
+
+3. Link with a key
+#linkTo(text="View Post", controller="blog", action="post", key=99)#
+<!--- Outputs: <a href="/blog/post/99">View Post</a> --->
+
+4. Link with query parameters
+#linkTo(text="View Settings", action="settings", params="show=all&sort=asc")#
+<!--- Outputs: <a href="/account/settings?show=all&amp;sort=asc">View Settings</a> --->
+
+5. Using a named route
+#linkTo(text="Joe's Profile", route="userProfile", userName="joe")#
+<!--- Outputs: <a href="/user/joe">Joe's Profile</a> --->
+
+6. External link
+#linkTo(text="ColdFusion Framework", href="http://cfwheels.org/")#
+<!--- Outputs: <a href="http://cfwheels.org/">ColdFusion Framework</a> --->
+
+7. Adding HTML attributes
+#linkTo(text="Delete Post", action="delete", key=99, class="delete", id="delete-99")#
+<!--- Outputs: <a class="delete" href="/blog/delete/99" id="delete-99">Delete Post</a> --->
+
+8. Adding an anchor
+#linkTo(text="Go to Section", controller="blog", action="post", key=42, anchor="comments")#
+<!--- Outputs: <a href="/blog/post/42#comments">Go to Section</a> --->
+
+9. Override protocol, host, or port
+#linkTo(text="Secure Link", controller="account", action="login", protocol="https", host="example.com", port=443)#
+<!--- Outputs: <a href="https://example.com:443/account/login">Secure Link</a> --->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````mailTo:
+Creates a clickable mailto: link for sending an email. The link text defaults to the email address unless a name is provided.
+
+1. Basic mailto link
+#mailTo(emailAddress="webmaster@yourdomain.com")#
+<!--- Outputs: <a href="mailto:webmaster@yourdomain.com">webmaster@yourdomain.com</a> --->
+
+2. Mailto link with custom name
+#mailTo(emailAddress="webmaster@yourdomain.com", name="Contact our Webmaster")#
+<!--- Outputs: <a href="mailto:webmaster@yourdomain.com">Contact our Webmaster</a> --->
+
+3. Mailto link with special characters (encoding)
+#mailTo(emailAddress="support+help@yourdomain.com", name="Support Team")#
+<!--- Outputs: <a href="mailto:support+help@yourdomain.com">Support Team</a> --->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````mapper:
+Returns the mapper object used to configure your application’s routes. This is typically used in config/routes.cfm to define all routes for your application via chained methods such as .resources(), .namespace(), .get(), .post(), etc.
+
+Example: Basic Usage
+<cfscript>
+mapper()
+    .resources("posts")  // generates standard RESTful routes for posts
+    .get(name="about", pattern="about-us", to="pages##about") // custom GET route
+    .namespace("admin") // group routes under admin namespace
+        .resources("users") // RESTful routes for admin users
+    .end();
+</cfscript>
+
+
+.resources() – Automatically generates RESTful routes for a resource (index, show, create, update, delete).
+
+.get() / .post() / .put() / .delete() – Custom HTTP method routes.
+
+.namespace() – Allows grouping routes under a URL prefix and controller subfolder.
+
+Example: Disable format mapping
+mapper(mapFormat=false)
+    .resources("reports");
+
+
+This will prevent automatic generation of .json or .xml endpoints for the resource.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````maximum:
+Calculates the maximum value of a numeric property in a model. Internally uses the SQL MAX() function. If no records match the query, you can use the ifNull argument to return a default value instead of null or blank.
+
+1. Maximum value for all records:
+
+highestSalary = model("employee").maximum("salary");
+
+
+2. Maximum value with a WHERE condition:
+
+highestSalary = model("employee").maximum(
+    property="salary", 
+    where="departmentId=#params.departmentId#"
+);
+
+
+3. Maximum value with a default if no records found:
+
+highestSalary = model("employee").maximum(
+    property="salary", 
+    where="salary > #params.minSalary#", 
+    ifNull=0
+);
+
+
+4. Maximum value including associations (example with nested join):
+
+highestAlbumSales = model("album").maximum(
+    property="sales",
+    include="artist(genre)"
+);
+
+
+5. Maximum value grouped by a column:
+
+maxSalaryByDept = model("employee").maximum(
+    property="salary",
+    group="departmentId"
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````member:
+Scopes routes within a nested resource that require the primary key as part of the URL pattern.
+
+A member route always acts on a specific resource instance, so the generated URL will contain the resource’s ID.
+
+Example
+<cfscript>
+mapper()
+    // Standard RESTful routes for photos
+    .resources(name="photos", nested=true)
+        // Create a member route that requires an ID
+        .member()
+            .get("preview") // maps GET /photos/:id/preview → photos.preview
+        .end()
+    .end()
+.end();
+</cfscript>
+
+
+Resulting Route:
+
+GET /photos/1/preview → calls the preview action in the photos controller.
+
+More Examples
+
+1. Adding multiple member actions:
+
+<cfscript>
+mapper()
+    .resources(name="articles")
+        .member()
+            .get("share")     // GET /articles/:id/share
+            .post("publish")  // POST /articles/:id/publish
+        .end()
+    .end()
+.end();
+</cfscript>
+
+
+2. Member route inside a nested resource:
+
+<cfscript>
+mapper()
+    .resources(name="users", nested=true)
+        .resources(name="orders")
+            .member()
+                .get("invoice") // GET /users/:userId/orders/:id/invoice
+            .end()
+        .end()
+    .end()
+.end();
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````migrateTo:
+Migrates the database schema to a specified version.
+
+This function is primarily intended for programmatic database migrations, but the recommended usage is via the CLI or Wheels GUI interface.
+
+<cfscript>
+// Migrate database to a specific version
+result = application.wheels.migrator.migrateTo("2025092401");
+
+// Output the result message
+writeOutput(result);
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````migrateToLatest:
+Migrates the database schema to the latest available migration version.
+
+This is a shortcut for migrateTo(version) without needing to specify a version explicitly.
+
+<cfscript>
+// Migrate database to the latest version
+result = application.wheels.migrator.migrateToLatest();
+
+// Output the result message
+writeOutput(result);
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````mimeTypes:
+Returns the associated MIME type for a given file extension. Useful when serving files dynamically or setting response headers.
+
+1. Basic Known Extension
+<cfscript>
+// Get the MIME type for a known extension
+mimeType = mimeTypes("jpg");
+writeOutput(mimeType); // Outputs: "image/jpeg"
+</cfscript>
+
+2. Unknown Extension With Fallback
+<cfscript>
+// Use a fallback for unknown file types
+mimeType = mimeTypes("abc", fallback="text/plain");
+writeOutput(mimeType); // Outputs: "text/plain"
+</cfscript>
+
+3. Dynamic Extension From User Input
+<cfscript>
+params.type = "pdf";
+mimeType = mimeTypes(extension=params.type);
+writeOutput(mimeType); // Outputs: "application/pdf"
+</cfscript>
+
+4. Serving a File Download
+<cfscript>
+fileName = "report.xlsx";
+fileExt = listLast(fileName, ".");
+cfheader(name="Content-Disposition", value="attachment; filename=#fileName#");
+cfcontent(type=mimeTypes(fileExt), file="#expandPath('./files/' & fileName)#");
+</cfscript>
+
+
+Automatically sets the correct MIME type when serving a file.
+
+5. Conditional Logic Based on MIME Type
+<cfscript>
+fileExt = "mp3";
+mimeType = mimeTypes(fileExt);
+
+if (left(mimeType, 5) == "audio") {
+    writeOutput("Playing audio file...");
+} else {
+    writeOutput("Cannot play this file type.");
+}
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````minimum:
+Calculates the minimum value for a specified property in a model using SQL's MIN() function. This can be used to find the lowest value of a numeric property across all records or with conditions. You can also include associations, handle soft-deleted records, provide fallback values, and group results.
+
+1. Basic Minimum Value
+<cfscript>
+// Get the lowest salary among all employees
+lowestSalary = model("employee").minimum("salary");
+writeOutput("Lowest Salary: " & lowestSalary);
+</cfscript>
+
+
+Explanation:
+Finds the lowest value of the salary property across all employees.
+
+2. Minimum Value with Condition
+<cfscript>
+// Get the lowest salary for employees in a specific department
+deptId = 5;
+lowestSalary = model("employee").minimum(
+    property="salary",
+    where="departmentId=#deptId#"
+);
+writeOutput("Lowest Salary in Department #deptId#: " & lowestSalary);
+</cfscript>
+
+
+Explanation:
+Filters the query using the where clause to only consider employees in department 5.
+
+3. Minimum Value with Range and Fallback
+<cfscript>
+// Get the lowest salary within a range and fallback to 0 if no records
+lowestSalary = model("employee").minimum(
+    property="salary",
+    where="salary BETWEEN #params.min# AND #params.max#",
+    ifNull=0
+);
+writeOutput("Lowest Salary in range: " & lowestSalary);
+</cfscript>
+
+
+Explanation:
+Returns 0 if there are no employees with a salary in the specified range.
+
+4. Including Associations
+<cfscript>
+// Get the lowest product price including related categories
+lowestPrice = model("product").minimum(
+    property="price",
+    include="category"
+);
+writeOutput("Lowest Product Price: " & lowestPrice);
+</cfscript>
+
+
+Explanation:
+Includes the category association in the SQL query to allow filtering or joining data from related tables.
+
+5. Include Soft-Deleted Records
+<cfscript>
+// Include soft-deleted employees in the calculation
+lowestSalary = model("employee").minimum(
+    property="salary",
+    includeSoftDeletes=true
+);
+writeOutput("Lowest Salary including soft-deleted employees: " & lowestSalary);
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````minuteSelectTag:
+Builds and returns a <select> dropdown for the minutes of an hour (0–59). You can customize the selected value, increment steps (e.g., 5, 10, 15 minutes), label placement, and include a blank option. Useful for forms where users pick a time.
+
+1. Basic Minute Select
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", selected=params.minuteOfMeeting)#
+</cfoutput>
+
+
+Explanation:
+Generates a standard minute dropdown (0–59) and pre-selects the value from params.minuteOfMeeting.
+
+2. 15-Minute Intervals
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", selected=params.minuteOfMeeting, minuteStep=15)#
+</cfoutput>
+
+
+Explanation:
+Only shows 0, 15, 30, 45 as minute options.
+
+3. Include Blank Option
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", includeBlank="- Select Minute -")#
+</cfoutput>
+
+
+Explanation:
+Adds a blank option at the top with custom text "- Select Minute -".
+
+4. Using Label
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", label="Select Minute")#
+</cfoutput>
+
+
+Explanation:
+Adds a label Select Minute around the select field (default placement is around).
+
+5. Custom Label Placement
+<cfoutput>
+    #minuteSelectTag(name="minuteOfMeeting", label="Minute", labelPlacement="after")#
+</cfoutput>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````model:
+The model() function returns a reference to a specific model defined in your application, allowing you to call class-level methods on it. This is useful when you want to access database records or invoke model methods without instantiating a new object first.
+
+1. Find a record by primary key
+<cfset authorObject = model("author").findByKey(1)>
+<cfoutput>
+    Author Name: #authorObject.name#
+</cfoutput>
+
+
+Explanation:
+Retrieves the author record with primary key 1 and stores it in authorObject.
+
+2. Find all records
+<cfset allAuthors = model("author").findAll()>
+<cfloop array="#allAuthors#" index="author">
+    #author.name#<br>
+</cfloop>
+
+
+Explanation:
+Gets all authors from the database and loops through them.
+
+3. Using dynamic finders
+<cfset author = model("author").findOneByEmail("joe@example.com")>
+<cfoutput>
+    Author ID: #author.key()#
+</cfoutput>
+
+
+Explanation:
+Uses a dynamic finder method findOneByEmail to get a single record by email.
+
+4. Calling class-level custom methods
+<cfset topAuthors = model("author").getTopAuthors(5)>
+<cfloop array="#topAuthors#" index="author">
+    #author.name# (#author.postsCount# posts)<br>
+</cfloop>
+
+
+Explanation:
+Calls a custom class-level method getTopAuthors that returns the top 5 authors with the most posts.
+
+5. Accessing associations
+<cfset author = model("author").findByKey(1, include="posts")>
+<cfoutput>
+    #author.name# wrote #arrayLen(author.posts)# posts.
+</cfoutput>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````monthSelectTag:
+The monthSelectTag() helper generates a <select> dropdown for selecting a month. You can customize its options, labels, and display format. Unlike dateSelect, this function focuses only on the month portion.
+
+1. Basic usage
+<cfoutput>
+    #monthSelectTag(name="monthOfBirthday", selected=params.monthOfBirthday)#
+</cfoutput>
+
+
+Explanation:
+Displays a standard month dropdown with full month names and selects the month stored in params.monthOfBirthday.
+
+2. Display months as numbers
+<cfoutput>
+    #monthSelectTag(name="monthOfHire", selected=3, monthDisplay="numbers")#
+</cfoutput>
+
+
+Explanation:
+Dropdown shows 1–12 instead of month names, pre-selecting March.
+
+3. Display months as abbreviations
+<cfoutput>
+    #monthSelectTag(name="monthOfEvent", selected="Jun", monthDisplay="abbreviations")#
+</cfoutput>
+
+
+Explanation:
+Dropdown shows Jan, Feb, Mar, …, Dec, with June pre-selected.
+
+4. Include a blank option
+<cfoutput>
+    #monthSelectTag(name="monthOfAppointment", includeBlank="- Select Month -")#
+</cfoutput>
+
+
+Explanation:
+Adds a first option as - Select Month - so the user can leave it empty.
+
+5. Custom label and wrapping
+<cfoutput>
+    #monthSelectTag(
+        name="monthOfSubscription",
+        label="Subscription Month:",
+        labelPlacement="before"
+    )#
+</cfoutput>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````namespace:
+The namespace() function in Wheels is used to group controllers and routes under a specific namespace (subfolder/package). It also prepends the namespace to route names and can modify the URL path. This is useful for organizing APIs, versioning, or modular applications.
+
+Namespaces can be nested for hierarchical routing, e.g., /api/v1/... and /api/v2/....
+
+1. Nested API versioning
+<cfscript>
+mapper()
+    .namespace("api")
+        .namespace("v2")
+            // Route name: apiV2Products
+            // URL: /api/v2/products/1234
+            // Controller: api.v2.Products
+            .resources("products")
+        .end()
+
+        .namespace("v1")
+            // Route name: apiV1Users
+            // URL: /api/v1/users
+            // Controller: api.v1.Users
+            .get(name="users", to="users##index")
+        .end()
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+
+/api/v2/products/1234 → api.v2.Products controller, RESTful resource route.
+
+/api/v1/users → api.v1.Users controller, GET action index.
+
+Namespaces help version APIs cleanly and avoid route conflicts.
+
+2. Custom package and path
+<cfscript>
+mapper()
+    .namespace(name="foo", package="foos", path="foose")
+        // Route name: fooBars
+        // URL: /foose/bars
+        // Controller: foos.Bars
+        .post(name="bars", to="bars##create")
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+
+package="foos" tells Wheels to look for the Bars.cfc controller inside the foos folder.
+
+path="foose" changes the URL path prefix. The route URL becomes /foose/bars instead of /foo/bars.
+
+The route name becomes fooBars for programmatic reference.
+
+3. Combining multiple namespaces
+<cfscript>
+mapper()
+    .namespace("admin")
+        .get(name="dashboard", to="dashboard##index") // /admin/dashboard
+        .namespace("users")
+            .resources("accounts") // /admin/users/accounts/...
+        .end()
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+
+/admin/dashboard → admin dashboard page.
+
+/admin/users/accounts/123 → admin.users.Accounts controller, RESTful routes.
+
+Nested namespaces allow for logical grouping and modular URLs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````nestedProperties:
+The nestedProperties() method allows nested objects, arrays, or structs associated with a model to be automatically set from incoming params or other generated data. This is particularly useful when you have hasMany or belongsTo associations and want to manage them directly when saving the parent object.
+
+Using nestedProperties(), you can:
+
+Automatically save child objects when the parent object is saved.
+
+Allow deletion of nested objects via a _delete flag.
+
+Reject saving if specific properties in the nested object are blank.
+
+Sort nested objects by a numeric property
+
+1. Basic nested association with auto-save
+// models/User.cfc
+function config(){
+    hasMany("groupEntitlements");
+
+    // Allow nested save of `groupEntitlements` when user is saved
+    nestedProperties(association="groupEntitlements");
+}
+
+// Controller code
+user = model("User").findByKey(1);
+user.groupEntitlements = [
+    {groupId=1, role="admin"},
+    {groupId=2, role="editor"}
+];
+user.save(); 
+// Both the user and nested groupEntitlements are saved automatically
+
+2. Allow deletion of nested objects
+function config(){
+    hasMany("groupEntitlements");
+
+    // Enable deletion via `_delete` flag
+    nestedProperties(association="groupEntitlements", allowDelete=true);
+}
+
+// Example params
+params.user.groupEntitlements = [
+    {id=10, _delete=true},
+    {groupId=3, role="viewer"}
+];
+
+user = model("User").findByKey(params.user.id);
+user.setProperties(params.user);
+user.save();
+// The first nested object (id=10) is deleted, the second is saved
+
+3. Reject if blank
+function config(){
+    hasMany("addresses");
+
+    // Reject saving any address that has blank 'city' or 'zip'
+    nestedProperties(association="addresses", rejectIfBlank="city,zip");
+}
+
+// Example
+params.user.addresses = [
+    {street="123 Main St", city="", zip="90210"}
+];
+
+user = model("User").findByKey(1);
+user.setProperties(params.user);
+user.save(); 
+// Save fails because 'city' is blank
+
+4. Sorting nested objects
+function config(){
+    hasMany("tasks");
+
+    // Use 'position' property to sort tasks
+    nestedProperties(association="tasks", sortProperty="position");
+}
+
+// Example
+params.user.tasks = [
+    {name="Task 1", position=2},
+    {name="Task 2", position=1}
+];
+
+user = model("User").findByKey(1);
+user.setProperties(params.user);
+user.save(); 
+// Tasks will be stored sorted by position: Task 2, Task 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````new:
+The new() method creates a new instance of a model in memory based on the supplied properties. The object is not saved to the database—it only exists in memory until you call .save() on it.
+
+You can pass properties to new() in two ways:
+
+As a struct using the properties argument.
+
+As named arguments directly in the method call.
+
+You can also control behavior such as whether callbacks are triggered or explicit timestamps are allowed.
+
+1. Create a new object with no properties
+// Creates a new author object in memory
+newAuthor = model("author").new();
+writeDump(newAuthor); // object exists, not saved to database
+
+2. Create a new object from a struct
+authorStruct = {
+    firstName = "Jane",
+    lastName = "Smith",
+    email = "jane.smith@example.com"
+};
+
+// Pass the struct to `new()`
+newAuthor = model("author").new(authorStruct);
+writeDump(newAuthor);
+
+3. Create a new object using named arguments
+// Directly pass properties as arguments
+newAuthor = model("author").new(
+    firstName="John",
+    lastName="Doe",
+    email="john.doe@example.com"
+);
+writeDump(newAuthor);
+
+4. Scoped creation for associations
+// If a customer has many orders, you can create a new order scoped to that customer
+aCustomer = model("customer").findByKey(params.customerId);
+
+// newOrder internally calls model("order").new(customerId=aCustomer.id)
+anOrder = aCustomer.newOrder(shipping="express");
+writeDump(anOrder);
+
+5. Disable callbacks
+// Create object without triggering callbacks
+newAuthor = model("author").new(firstName="Alice", lastName="Wonder", callbacks=false);
+
+6. Allow explicit timestamps
+// You can manually set createdAt and updatedAt fields
+newAuthor = model("author").new(
+    firstName="Bob",
+    lastName="Builder",
+    allowExplicitTimestamps=true,
+    createdAt=createDate(2025,9,24),
+    updatedAt=createDate(2025,9,24)
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````obfuscateParam:
+The obfuscateParam() method obfuscates a value, typically used to hide sensitive information like primary key IDs when passing them in URLs. This helps prevent users from easily guessing sequential IDs or sensitive values.
+
+1. Obfuscate a numeric primary key
+// Primary key value
+id = 99;
+
+// Obfuscate it before sending in the URL
+obfuscatedId = obfuscateParam(id);
+writeOutput(obfuscatedId); 
+// Output: (some encoded string, e.g., "a9f3d2")
+
+2. Obfuscate a string value
+// Obfuscate an email address
+email = "user@example.com";
+obfuscatedEmail = obfuscateParam(email);
+writeOutput(obfuscatedEmail); 
+// Output: (obfuscated string)
+
+3. Use obfuscated value in a link
+// Pass obfuscated ID in a linkTo helper
+userId = 42;
+#linkTo(text="View Profile", controller="user", action="profile", key=obfuscateParam(userId))#
+
+
+Output:
+
+<a href="/user/profile/a1b2c3d4">View Profile</a>
+
+4. Obfuscate values for forms
+// Include obfuscated value as a hidden form field
+userId = 17;
+#hiddenFieldTag(name="userId", value=obfuscateParam(userId))#
+
+
+Output:
+
+<input type="hidden" name="userId" value="x9y8z7">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````onlyProvides:
+The onlyProvides() method is used in a controller action to specify which formats the action should respond with. This allows you to restrict the response types for a particular action, even if a global provides() setting exists in the controller's config() function.
+
+1. Restrict an action to HTML only
+function show() {
+    // This action will only respond with HTML
+    onlyProvides("html");
+
+    // normal processing
+    user = model("user").findByKey(params.id);
+    set("user", user);
+}
+
+2. Restrict an action to JSON and XML
+function data() {
+    // Only allow JSON or XML responses
+    onlyProvides("json,xml");
+
+    records = model("order").findAll();
+    set("orders", records);
+}
+
+3. Override global provides setting
+component extends="Controller" {
+
+    function config() {
+        // Globally allow HTML and JSON
+        provides("html,json");
+    }
+
+    function exportCsv() {
+        // Override global, allow only CSV for this action
+        onlyProvides("csv");
+
+        orders = model("order").findAll();
+        set("orders", orders);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````onMissingMethod:
+The onMissingMethod() method is not intended to be called directly. It is used internally by the model system to handle dynamic finders and other dynamic method calls on model objects. For example, methods like:
+
+findOneByEmail("test@example.com")
+findAllByStatus("active")
+
+do not exist explicitly in the model class but are interpreted dynamically via onMissingMethod().
+
+1. Dynamic finder: findOneByEmail
+user = model("user").findOneByEmail("joe@example.com");
+
+
+Internally, Wheels interprets this as:
+
+onMissingMethod(
+    missingMethodName="findOneByEmail",
+    missingMethodArguments={arg1="joe@example.com"}
+);
+
+2. Dynamic finder with multiple fields: findAllByStatusAndRole
+admins = model("user").findAllByStatusAndRole("active","admin");
+
+
+Internally, Wheels interprets this as:
+
+onMissingMethod(
+    missingMethodName="findAllByStatusAndRole",
+    missingMethodArguments={arg1="active", arg2="admin"}
+);
+
+3. Custom handling (advanced)
+
+You can override onMissingMethod() in your model to provide custom dynamic behavior if needed:
+
+component extends="Model" {
+
+    public any function onMissingMethod(required string missingMethodName, required struct missingMethodArguments) {
+        if (listFirst(missingMethodName,"By")=="findCustom") {
+            return "Handled dynamically: " & missingMethodName;
+        }
+        return super.onMissingMethod(missingMethodName, missingMethodArguments);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````package:
+The package() method scopes the controllers for any routes defined inside its block to a specific subfolder (package) without adding the package name to the URL. This is useful for organizing your controllers in subfolders while keeping the URL structure clean.
+
+1. Simple package
+<cfscript>
+mapper()
+    .package("public")
+        // Example URL: /products/1234
+        // Controller:  public.Products
+        .resources("products")
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+All routes inside .package("public") will point to controllers inside the public folder (e.g., public.Products). The URL does not include public; /products/1234 is clean.
+
+2. Nested package
+<cfscript>
+mapper()
+    .resources(name="users", nested=true)
+        // Nested routes scoped to the `users` package
+        .package("users")
+            // Example URL: /users/4321/profile
+            // Controller:  users.Profiles
+            .resource("profile")
+        .end()
+    .end()
+.end();
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````packageSetup:
+The packageSetup() function is a callback in Wheels’ legacy testing framework. It runs once before the first test case in the test package. Use it to perform setup tasks that are shared across all tests in the package, such as initializing data, creating test records, or configuring environment settings.
+
+component extends="WheelsTestCase" {
+
+    function packageSetup() {
+        // Run once before any test in this package
+        
+        // Create a test user
+        model("user").new(username="testuser", email="test@example.com").save();
+
+        // Initialize test data
+        application.testConfig = {
+            siteName: "Wheels Test"
+        };
+    }
+
+    function testUserCreation() {
+        var user = model("user").findOneByUsername("testuser");
+        assertNotNull(user, "Test user should exist");
+    }
+
+    function testConfigValue() {
+        assertEquals(application.testConfig.siteName, "Wheels Test");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````packageTeardown:
+The packageTeardown() function is a callback in Wheels’ legacy testing framework. It runs once after the last test case in the test package. Use it to perform cleanup tasks that are shared across all tests in the package, such as deleting test records, resetting application state, or clearing cached data.
+
+component extends="WheelsTestCase" {
+
+    function packageSetup() {
+        // Run once before any test in this package
+        model("user").new(username="testuser", email="test@example.com").save();
+    }
+
+    function packageTeardown() {
+        // Run once after all tests in this package
+
+        // Delete test user
+        var user = model("user").findOneByUsername("testuser");
+        if (user) {
+            user.delete();
+        }
+
+        // Clear test configuration
+        structClear(application.testConfig);
+    }
+
+    function testUserExists() {
+        var user = model("user").findOneByUsername("testuser");
+        assertNotNull(user, "Test user should exist");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````pagination:
+The pagination() function returns metadata about a paginated query. It provides information such as the current page, total number of pages, and total number of records. This is useful when building paginated listings in your views.
+
+Example 1: Basic Pagination
+<!--- Retrieve paginated authors --->
+<cfset allAuthors = model("author").findAll(page=1, perPage=25, order="lastName", handle="authorsData")>
+
+<!--- Get pagination info --->
+<cfset paginationData = pagination("authorsData")>
+
+<cfoutput>
+    Current Page: #paginationData.currentPage#<br>
+    Total Pages: #paginationData.totalPages#<br>
+    Total Records: #paginationData.totalRecords#
+</cfoutput>
+
+
+Output:
+
+Current Page: 1
+Total Pages: 10
+Total Records: 250
+
+Example 2: Using default handle
+<cfset allPosts = model("post").findAll(page=2, perPage=10)>
+
+<!--- Uses default handle 'query' --->
+<cfset paginationData = pagination()>
+
+<cfoutput>
+    Current Page: #paginationData.currentPage#<br>
+    Total Pages: #paginationData.totalPages#<br>
+    Total Records: #paginationData.totalRecords#
+</cfoutput>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````paginationLinks:
+paginationLinks() generates HTML links for paginated queries, making it easy to navigate between pages. It uses linkTo() internally, so you can pass route names or controller/action/key combinations along with any other HTML attributes. If multiple paginated queries exist, use the handle argument to specify which one to generate links for.
+
+Example 1: Basic Pagination Links
+<!--- Controller --->
+param name="params.page" type="integer" default="1";
+authors = model("author").findAll(page=params.page, perPage=25, order="lastName");
+
+<!--- View --->
+<ul>
+    <cfoutput query="authors">
+        <li>#EncodeForHtml(firstName)# #EncodeForHtml(lastName)#</li>
+    </cfoutput>
+</ul>
+
+<cfoutput>
+    #paginationLinks(route="authors")#
+</cfoutput>
+
+
+This will display links to navigate through author pages.
+
+Example 2: Custom Window Size
+<cfoutput>
+    #paginationLinks(route="authors", windowSize=5)#
+</cfoutput>
+
+
+Shows 5 pages before and after the current page instead of the default 2.
+
+Example 3: Multiple Paginated Queries
+<!--- Controller --->
+authors = model("author").findAll(handle="authQuery", page=5, order="id");
+
+<!--- View --->
+<ul>
+    <cfoutput>
+        #paginationLinks(
+            route="authors",
+            handle="authQuery",
+            prependToLink="<li>",
+            appendToLink="</li>"
+        )#
+    </cfoutput>
+</ul>
+
+
+If multiple paginated queries exist, handle ensures the correct one is used.
+
+Example 4: Pagination with Routes
+<!--- Route setup in config/routes.cfm --->
+mapper()
+    .get(name="paginatedCommentListing", pattern="blog/[year]/[month]/[day]/[page]", to="blogs##stats")
+    .get(name="commentListing", pattern="blog/[year]/[month]/[day]", to="blogs##stats")
+.end();
+
+<!--- Controller --->
+param name="params.page" type="integer" default="1";
+comments = model("comment").findAll(page=params.page, order="createdAt");
+
+<!--- View --->
+<ul>
+    <cfoutput>
+        #paginationLinks(
+            route="paginatedCommentListing",
+            year=2009,
+            month="feb",
+            day=10
+        )#
+    </cfoutput>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````passwordField:
+passwordField() generates an HTML <input type="password"> field bound to a model object. It is useful for creating forms that are tied directly to model properties. This helper automatically handles associations, nested properties, labels, and error styling, reducing manual markup.
+
+Example 1: Basic Password Field
+<cfoutput>
+    #passwordField(label="Password", objectName="user", property="password")#
+</cfoutput>
+
+
+Output:
+
+<label>Password</label>
+<input type="password" name="user[password]" id="user_password">
+
+Example 2: Password Field for a Nested Association
+<fieldset>
+    <legend>Passwords</legend>
+    <cfloop from="1" to="#ArrayLen(user.passwords)#" index="i">
+        #passwordField(
+            label="Password ##i#", 
+            objectName="user", 
+            association="passwords", 
+            position=i, 
+            property="password"
+        )#
+    </cfloop>
+</fieldset>
+
+
+This generates password fields for each associated password object within user.passwords.
+
+Output (simplified for 2 items):
+
+<fieldset>
+    <legend>Passwords</legend>
+    <label>Password 1</label>
+    <input type="password" name="user[passwords][1][password]" id="user_passwords_1_password">
+
+    <label>Password 2</label>
+    <input type="password" name="user[passwords][2][password]" id="user_passwords_2_password">
+</fieldset>
+
+Example 3: Custom Label Placement and Error Handling
+<cfoutput>
+    #passwordField(
+        label="Enter Your Password",
+        objectName="user",
+        property="password",
+        labelPlacement="before",
+        errorClass="input-error",
+        prepend="<div class='input-group'>",
+        append="</div>"
+    )#
+</cfoutput>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````passwordFieldTag:
+passwordFieldTag() generates an HTML <input type="password"> field for use in forms. Unlike passwordField(), which is bound to a model object, this helper works with a simple name and value. It supports labels, custom HTML wrapping, and XSS-safe encoding.
+
+Example 1: Basic Password Field
+<cfoutput>
+    #passwordFieldTag(label="Password", name="password", value="")#
+</cfoutput>
+
+
+Output:
+
+<label>Password</label>
+<input type="password" name="password" value="">
+
+Example 2: Label Placement Before Input
+<cfoutput>
+    #passwordFieldTag(label="Password", name="password", labelPlacement="before")#
+</cfoutput>
+
+
+Output:
+
+<label>Password</label>
+<input type="password" name="password">
+
+Example 3: Wrapping Input with Custom HTML
+<cfoutput>
+    #passwordFieldTag(
+        label="Enter Password",
+        name="password",
+        prepend="<div class='input-group'>",
+        append="</div>"
+    )#
+</cfoutput>
+
+
+Output:
+
+<div class='input-group'>
+    <label>Enter Password</label>
+    <input type="password" name="password">
+</div>
+
+Example 4: Custom Label Decoration
+<cfoutput>
+    #passwordFieldTag(
+        label="Password",
+        name="password",
+        prependToLabel="<strong>",
+        appendToLabel="</strong>"
+    )#
+</cfoutput>
+
+
+Output:
+
+<label><strong>Password</strong></label>
+<input type="password" name="password">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````patch:
+patch() creates a route that responds to the HTTP PATCH method, which is typically used to partially update resources. This is ideal for actions that modify specific attributes of a record rather than replacing it entirely (which would normally use PUT).
+
+It works like other route helpers (get(), post(), put(), etc.) but restricts the route to PATCH requests.
+
+1. Basic PATCH Route
+mapper()
+    .patch(name="updateBlogPost", controller="blog", action="update")
+.end();
+
+
+URL: /update-blog-post
+
+Controller: Blog.cfc
+
+Action: update
+
+HTTP Method: PATCH
+
+2. Route with Dynamic URL Segments
+mapper()
+    .patch(name="ghostStory", pattern="ghosts/[ghostKey]/stories/[key]", to="stories##update")
+.end();
+
+
+URL Example: /ghosts/666/stories/616
+
+Controller: Stories.cfc
+
+Action: update
+
+Segments: ghostKey and key are dynamic and passed to the action as params.ghostKey and params.key.
+
+3. Route in a Package/Subfolder
+mapper()
+    .patch(name="preferences", to="preferences##update", package="users")
+.end();
+
+
+URL: /preferences
+
+Controller: users.Preferences.cfc
+
+Action: update
+
+4. Nested Resource – Collection PATCH
+mapper()
+    .resources(name="subscribers", nested=true)
+        .patch(name="launch", to="subscribers##update", on="collection")
+    .end()
+.end();
+
+
+URL Example: /subscribers/3209/launch
+
+Controller: Subscribers.cfc
+
+Action: update
+
+Purpose: Operates on the entire collection of subscribers, not an individual member.
+
+5. Nested Resource – Member PATCH
+mapper()
+    .resources(name="subscribers", nested=true)
+        .patch(name="discontinue", to="subscribers##discontinue", on="member")
+    .end()
+.end();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````pluginNames:
+pluginNames() returns a list of all installed Wheels plugins in your application. This can be useful if you want to check for the presence of a plugin before calling its functionality, or to display available plugins dynamically.
+
+1. Check if a specific plugin is installed
+<cfif ListFindNoCase("scaffold", pluginNames())>
+    <cfoutput>
+        The Scaffold plugin is installed!
+    </cfoutput>
+<cfelse>
+    <cfoutput>
+        Scaffold plugin is not installed.
+    </cfoutput>
+</cfif>
+
+2. List all installed plugins
+<cfoutput>
+Installed Plugins: #pluginNames()#
+</cfoutput>
+
+
+Output Example:
+
+Installed Plugins: scaffold, admin, seo, blog
+
+3. Loop through all installed plugins
+<cfloop list="#pluginNames()#" index="plugin">
+    <cfoutput>
+        Plugin: #plugin#<br>
+    </cfoutput>
+</cfloop>
+
+
+Output Example:
+
+Plugin: scaffold
+Plugin: admin
+Plugin: seo
+Plugin: blog
+
+4. Conditional logic based on multiple plugins
+<cfset plugins = pluginNames()>
+
+<cfif ListFindNoCase("scaffold", plugins) AND ListFindNoCase("seo", plugins)>
+    <cfoutput>
+        Both Scaffold and SEO plugins are installed.
+    </cfoutput>
+</cfif>
