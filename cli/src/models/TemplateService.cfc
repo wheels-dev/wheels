@@ -170,17 +170,22 @@ component {
                 var theadCode = generateIndexTableHeaders(arguments.context.properties);
                 processed = replace(processed, "<!--- CLI-Appends-thead-Here --->", theadCode, "all");
             }
-            
+
             // Process index view table body
             if (find("<!--- CLI-Appends-tbody-Here --->", processed)) {
                 var tbodyCode = generateIndexTableBody(arguments.context.properties);
                 processed = replace(processed, "<!--- CLI-Appends-tbody-Here --->", tbodyCode, "all");
             }
-            
-            // Process show view properties
+
+            // Process show view properties - only for show.txt template, not for form templates
             if (find("<!--- CLI-Appends-Here --->", processed)) {
-                var showCode = generateShowViewProperties(arguments.context.properties, arguments.context.modelName);
-                processed = replace(processed, "<!--- CLI-Appends-Here --->", showCode, "all");
+                if (structKeyExists(arguments.context, "action") && arguments.context.action == "show") {
+                    var showCode = generateShowViewProperties(arguments.context.properties, arguments.context.modelName);
+                    processed = replace(processed, "<!--- CLI-Appends-Here --->", showCode, "all");
+                } else {
+                    // Remove the marker from non-show templates (like forms) without adding content
+                    processed = replace(processed, "<!--- CLI-Appends-Here --->", "", "all");
+                }
             }
         }
         
