@@ -11517,3 +11517,4264 @@ Plugin: blog
         Both Scaffold and SEO plugins are installed.
     </cfoutput>
 </cfif>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````pluralize:
+The pluralize() function is used to generate the plural form of a given word. If only a word is passed in, it will return the plural version according to the built-in rules of Wheels. You can also pass in a numeric count to decide whether the word should be pluralized or left in singular form. By default, when a count is provided, the returned value will include both the number and the correct form of the word. Wheels automatically handles irregular words (like "child" → "children", "foot" → "feet") and uncountable words (like "equipment" or "information") that do not follow standard pluralization rules. If needed, you can customize or extend the rules using get("uncountables") / set("uncountables", newList) and get("irregulars") / set("irregulars", newList).
+
+<!--- Basic pluralization --->
+#pluralize("person")#
+<!--- Returns: "people" --->
+
+<!--- Pluralization with count (count = 1, so singular is returned) --->
+#pluralize(word="car", count=1)#
+<!--- Returns: "1 car" --->
+
+<!--- Pluralization with count (count = 5, so plural is returned) --->
+#pluralize(word="car", count=5)#
+<!--- Returns: "5 cars" --->
+
+<!--- Suppressing the count in the result --->
+#pluralize(word="dog", count=3, returnCount=false)#
+<!--- Returns: "dogs" --->
+
+<!--- Irregular plural (child → children) --->
+#pluralize("child")#
+<!--- Returns: "children" --->
+
+<!--- Uncountable word stays the same --->
+#pluralize("equipment")#
+<!--- Returns: "equipment" --->
+
+<!--- With count and uncountable word --->
+#pluralize(word="equipment", count=2)#
+<!--- Returns: "2 equipment" --->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````post:
+The post() function defines a route that responds only to HTTP POST requests. It is most commonly used to handle actions that create database records, such as creating users, orders, or other resources. You can define the route with a simple controller and action combination or use the to argument for shorthand. Routes can be customized further with a name (for referencing in helpers), a pattern (to override the generated URL), or a package (to scope the controller without affecting the URL). Nested resources are supported, and you can distinguish between member and collection routes using the on argument. In cases where you want the route to redirect rather than process through a controller, you can set the redirect argument.
+
+<cfscript>
+mapper()
+    // Basic route with "to"
+    // Example URL: /posts
+    // Controller:  Posts
+    // Action:      create
+    .post(name="posts", to="posts##create")
+
+    // Route with explicit controller/action
+    // Example URL: /articles
+    // Controller:  Articles
+    // Action:      create
+    .post(name="articles", controller="articles", action="create")
+
+    // Custom pattern
+    // Example URL: /oauth/token.json
+    // Controller:  Tokens
+    // Action:      create
+    .post(name="authenticate", pattern="oauth/token.json", to="tokens##create")
+
+    // Using a package (controller is users/Preferences.cfc)
+    // Example URL: /preferences
+    .post(name="preferences", to="preferences##create", package="users")
+
+    // Example with redirect (bypasses controller/action)
+    // Example URL: /legacy-create
+    .post(name="legacyCreate", pattern="legacy-create", redirect="/new-endpoint")
+
+    // Nested resources (collection-level route)
+    .resources(name="customers", nested=true)
+        // Example URL: /customers/leads
+        // Controller:  Leads
+        // Action:      create
+        .post(name="leads", to="leads##create", on="collection")
+
+        // Example URL: /customers/3209/cancel
+        // Controller:  Cancellations
+        // Action:      create
+        .post(name="cancel", to="cancellations##create", on="member")
+    .end()
+.end();
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````primaryKey:
+The primaryKey() function returns the name of the primary key column for the table mapped to a given model. Wheels determines this automatically by introspecting the database. If the table uses a single primary key, the function returns that key’s name as a string. For tables with composite primary keys, the function will return a list of all keys. You can optionally pass in the position argument to retrieve a specific key from a composite set. This function is also available as the alias primaryKeys().
+
+// Example 1: Get the primary key of a simple table
+// For employees table with id as primary key
+keyName = model("employee").primaryKey();
+// Returns: "id"
+
+// Example 2: Alias usage
+keyName = model("employee").primaryKeys();
+// Returns: "id"
+
+// Example 3: Composite primary key table (e.g., order_products with order_id + product_id)
+keys = model("orderProduct").primaryKey();
+// Returns: "order_id,product_id"
+
+// Example 4: Fetching just the first key in a composite set
+firstKey = model("orderProduct").primaryKey(position=1);
+// Returns: "order_id"
+
+// Example 5: Fetching the second key in a composite set
+secondKey = model("orderProduct").primaryKey(position=2);
+// Returns: "product_id"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````primaryKey:
+The primaryKey() function is used inside migration table definitions to define a primary key for the table. By default, it creates a single-column integer primary key, but you can customize the data type, size, precision, and whether it should auto-increment. If you need composite primary keys, you can call this method multiple times within the same table definition. Additionally, you can configure references to other tables, along with cascading behaviors for updates and deletes.
+
+migrate = {
+
+    up = function() {
+        createTable("users", function(table) {
+            // Basic auto-incrementing integer primary key
+            table.primaryKey(name="id", autoIncrement=true);
+            table.string("email");
+        });
+
+        createTable("products", function(table) {
+            // Primary key with custom type
+            table.primaryKey(name="sku", type="string", limit=20);
+            table.string("title");
+        });
+
+        createTable("order_items", function(table) {
+            // Composite primary keys (order_id + product_id)
+            table.primaryKey(name="order_id", type="integer");
+            table.primaryKey(name="product_id", type="integer");
+            table.integer("quantity");
+        });
+
+        createTable("sessions", function(table) {
+            // UUID primary key
+            table.primaryKey(name="session_id", type="uuid");
+            table.datetime("created_at");
+        });
+
+        createTable("payments", function(table) {
+            // Primary key with foreign key reference
+            table.primaryKey(name="payment_id", autoIncrement=true);
+            table.integer("order_id", references="orders.id", onDelete="cascade");
+        });
+    },
+
+    down = function() {
+        dropTable("users");
+        dropTable("products");
+        dropTable("order_items");
+        dropTable("sessions");
+        dropTable("payments");
+    }
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````primaryKeys:
+The primaryKeys() function is an alias for primaryKey(). While both functions behave the same way, primaryKeys() is especially useful for readability when working with tables that use composite primary keys. It returns the name of the primary key column for the model’s underlying table. If the table uses multiple keys, a comma-delimited list of all keys is returned. You can also pass in the optional position argument to fetch a single key from a composite set.
+
+// Example 1: Get the primary key of a simple table
+// Employees table has "id" as primary key
+keyNames = model("employee").primaryKeys();
+// Returns: "id"
+
+// Example 2: Composite primary keys (order_products table with order_id + product_id)
+keys = model("orderProduct").primaryKeys();
+// Returns: "order_id,product_id"
+
+// Example 3: Get only the first key in a composite primary key
+firstKey = model("orderProduct").primaryKeys(position=1);
+// Returns: "order_id"
+
+// Example 4: Get only the second key in a composite primary key
+secondKey = model("orderProduct").primaryKeys(position=2);
+// Returns: "product_id"
+
+// Example 5: Using alias for clarity in multi-key situations
+// This makes it more obvious the table has multiple keys
+keys = model("orderProduct").primaryKeys();
+// Easier to read than using model("orderProduct").primaryKey()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````processAction:
+The processAction() function executes a specific action within the controller. While it is technically available in all controllers, it is primarily intended for testing purposes. In normal application flow, Wheels handles action execution automatically via processRequest(), so developers rarely need to call processAction() directly. However, in unit tests, it can be useful for simulating controller behavior, verifying filters, or isolating action logic without going through the full request lifecycle.
+
+The optional includeFilters argument allows you to control whether before filters, after filters, or no filters at all should run when invoking the action. By default, all filters execute unless explicitly restricted.
+
+// Example 1: Run an action with default behavior (all filters applied)
+result = processAction("show");
+// Executes the "show" action of the current controller with before/after filters
+
+// Example 2: Run an action but only apply "before" filters
+result = processAction("edit", includeFilters="before");
+// Useful for testing preconditions without running the full action
+
+// Example 3: Run an action but only apply "after" filters
+result = processAction("update", includeFilters="after");
+// Useful for testing cleanup logic that runs post-action
+
+// Example 4: Run an action without any filters
+result = processAction("delete", includeFilters=false);
+// Skips before/after filters, only executes the "delete" action
+
+// Example 5: Simulating in a test case
+it("should process the show action without filters", function() {
+    var controller = controller("users");
+    var success = controller.processAction("show", includeFilters=false);
+    expect(success).toBeTrue();
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````processRequest:
+The processRequest() function simulates a full controller request by creating a controller instance and executing a specific action based on the parameters provided. The controller and action are determined by the params struct, which must include at least the controller and action keys. This function is primarily designed for testing purposes, where it allows developers to mimic HTTP requests and observe responses without needing to go through the full web server stack.
+
+By default, the function returns the rendered output of the action as a string. However, if you set the returnAs argument to "struct", you will receive a structured response containing detailed request information, including body, emails, files, flash, redirect, status, and type. You can also control the HTTP method, apply or skip filters, and wrap database changes in a transaction that rolls back at the end of the request to keep your test data clean.
+
+// Example 1: Simple request, returns rendered output as string
+result = processRequest(params={controller="users", action="show", id=5});
+// Returns: rendered HTML for the users/show action
+
+// Example 2: Simulate a POST request
+result = processRequest(
+    params={controller="users", action="create", name="Alice"},
+    method="post"
+);
+// Returns: rendered output of the create action
+
+// Example 3: Get a detailed struct response instead of just body
+result = processRequest(
+    params={controller="sessions", action="create", email="test@example.com"},
+    method="post",
+    returnAs="struct"
+);
+// Returns struct with keys: body, emails, files, flash, redirect, status, type
+
+// Example 4: Automatically roll back database changes
+result = processRequest(
+    params={controller="orders", action="create", product_id=42},
+    method="post",
+    rollback=true
+);
+// Data is inserted during the request but rolled back afterward
+
+// Example 5: Skip all filters
+result = processRequest(
+    params={controller="users", action="delete", id=10},
+    includeFilters=false
+);
+// Runs delete action without before/after filters
+
+// Example 6: Run only "before" filters (useful for testing filter logic)
+result = processRequest(
+    params={controller="users", action="edit", id=10},
+    includeFilters="before"
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````properties:
+The properties() function returns a structure containing all the properties of a model object, where the keys are the property (column) names and the values are the current values for that object. This is useful when you want to inspect all the attributes of a record at once, serialize data, or debug object state. By default, properties() includes nested or associated properties (such as related objects). You can control this behavior using the returnIncluded argument to exclude them if you only want the direct properties of the object.
+
+// Example 1: Get all properties for a user object
+user = model("user").findByKey(1);
+props = user.properties();
+// Returns struct with all properties, e.g. {id=1, firstName="Alice", lastName="Smith", email="alice@example.com", ...}
+
+// Example 2: Exclude nested/associated properties
+user = model("user").findByKey(1);
+props = user.properties(returnIncluded=false);
+// Returns struct with only direct table columns, e.g. {id=1, firstName="Alice", lastName="Smith", email="alice@example.com"}
+
+// Example 3: Iterate through properties
+user = model("user").findByKey(2);
+props = user.properties();
+for (key in props) {
+    writeOutput("#key#: #props[key]#<br>");
+}
+// Prints each property name and its value
+
+// Example 4: Convert properties to JSON for API output
+user = model("user").findByKey(3);
+props = user.properties(returnIncluded=false);
+jsonData = serializeJSON(props);
+// Returns: {"id":3,"firstName":"John","lastName":"Doe","email":"john@example.com"}
+
+// Example 5: Using with associations (if returnIncluded=true)
+// A user with associated profile object might return:
+// {id=4, firstName="Sara", lastName="Lee", profile={bio="Developer", website="example.com"}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````property:
+The property() function lets you customize how model properties map to database columns or SQL expressions. By default, Wheels automatically maps a model’s property name to the column with the same name in the table. However, when your database uses non-standard column names, calculated values, or requires custom behavior, you can use property() to override the default mapping.
+
+This method also supports options for customizing labels, default values, validation behavior, and whether or not the property is included in queries.
+
+// Example 1: Map property to a differently named column
+// Database column is STR_USERS_FNAME, but we want to use firstName in CFML
+property(name="firstName", column="STR_USERS_FNAME");
+
+// Example 2: Map property to a calculated SQL expression
+// Concatenate two columns into a single property
+property(name="fullName", sql="STR_USERS_FNAME + ' ' + STR_USERS_LNAME");
+
+// Example 3: Assign a custom label for forms and error messages
+property(name="firstName", label="First name(s)");
+
+// Example 4: Set a default value for new records
+property(name="firstName", defaultValue="Dave");
+
+// Example 5: Exclude property from SELECT queries
+// Useful for virtual/computed properties you don’t want fetched from the DB
+property(name="tempValue", select=false);
+
+// Example 6: Override data type explicitly
+property(name="isActive", dataType="boolean");
+
+// Example 7: Disable automatic validations for a column
+property(name="notes", automaticValidations=false);
+
+// Example 8: Combine multiple options
+// Map database column, set label, and provide default
+property(
+    name="status",
+    column="USR_STATUS_CODE",
+    label="Account Status",
+    defaultValue="pending"
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````propertyIsBlank:
+The propertyIsBlank() function checks whether a given property on a model object is either:
+
+Not defined on the model, or
+
+Defined but set to an empty string ("").
+
+This is the inverse of propertyIsPresent() which checks that a property both exists and has a non-empty value.
+
+This function is especially useful in validations, conditional logic, and form handling when distinguishing between "no value" and "value present."
+
+// Example 1: Basic usage
+user = model("user").new();
+isBlank = user.propertyIsBlank("firstName"); // returns true if firstName is not set
+
+// Example 2: Property exists but is empty
+user = model("user").new(firstName="");
+isBlank = user.propertyIsBlank("firstName"); // true
+
+// Example 3: Property exists with value
+user = model("user").new(firstName="Salman");
+isBlank = user.propertyIsBlank("firstName"); // false
+
+// Example 4: Checking property that doesn’t exist on the model
+isBlank = user.propertyIsBlank("nonexistentProperty"); // true
+
+// Example 5: Using in validation logic
+if (user.propertyIsBlank("email")) {
+    writeOutput("Email is required.");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````propertyIsPresent:
+The propertyIsPresent() function checks whether a given property on a model object:
+
+Exists on the model, and
+
+Is not a blank string ("").
+
+This is the inverse of propertyIsBlank() which checks that a property is either missing or empty.
+
+// Example 1: Property exists with a value
+employee = model("employee").new();
+employee.firstName = "Dude";
+writeOutput(employee.propertyIsPresent("firstName")); // true
+
+// Example 2: Property exists but is blank
+employee.firstName = "";
+writeOutput(employee.propertyIsPresent("firstName")); // false
+
+// Example 3: Property does not exist on the model
+writeOutput(employee.propertyIsPresent("nonexistentProperty")); // false
+
+// Example 4: Conditional logic
+if (!employee.propertyIsPresent("email")) {
+    writeOutput("Email is required.");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````propertyNames:
+The propertyNames() function returns a list of all property names associated with a model. The list is ordered by the columns’ ordinal positions as they exist in the underlying database table. In addition to actual table columns, the list also includes any calculated properties defined through the property()
+ method, which may be derived from SQL expressions or mapped column names.
+
+This is useful when you need to dynamically work with all of a model’s attributes without hardcoding them, such as generating dynamic forms, building custom serializers, or inspecting ORM mappings.
+
+// Example 1: Get property names for the User model
+propNames = model("user").propertyNames();
+writeOutput(propNames);
+// Output: id,firstName,lastName,email,createdAt,updatedAt
+
+// Example 2: Loop through property names
+for (prop in listToArray(model("employee").propertyNames())) {
+    writeOutput("Property: #prop#<br>");
+}
+
+// Example 3: Check if a property exists in the list
+if (listFindNoCase(model("order").propertyNames(), "totalAmount")) {
+    writeOutput("Order model has a totalAmount property.");
+}
+
+// Example 4: Including calculated properties
+// In the model configuration:
+property(name="fullName", sql="firstName + ' ' + lastName");
+
+// propertyNames() will now include "fullName"
+writeOutput(model("user").propertyNames());
+// Output: id,firstName,lastName,email,createdAt,updatedAt,fullName
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````protectedProperties:
+The protectedProperties() function is used to protect one or more model properties from being set or modified through mass assignment operations. Mass assignment occurs when values are assigned to a model in bulk, such as through create(), update(), or updateAll() using a struct of data. By marking certain properties as protected, you can prevent accidental or malicious changes to sensitive fields (such as id, role, or passwordHash).
+
+This method is typically called in the model’s config() function to define rules that apply across the entire model.
+
+// Example 1: Protecting multiple properties
+// In models/User.cfc
+function config() {
+    protectedProperties("firstName,lastName");
+}
+
+// Now, mass assignment will ignore these:
+user = model("user").new({firstName="John", lastName="Doe", email="test@example.com"});
+writeDump(user);
+// firstName and lastName will remain blank, only email is set.
+
+
+// Example 2: Protecting sensitive fields
+// Prevent id and role from being mass assigned
+function config() {
+    protectedProperties("id,role");
+}
+
+// This ensures a malicious user cannot override the primary key or escalate their role
+user.updateAll({id=999, role="admin", email="safe@example.com"});
+// Only "email" will be updated.
+
+
+// Example 3: Dynamic usage
+function config() {
+    // Combine static protection with conditional logic
+    if (get("environment") == "production") {
+        protectedProperties("passwordHash,lastLoginIp");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````protectsFromForgery:
+The protectsFromForgery() function enables protection against Cross-Site Request Forgery (CSRF) attacks in Wheels. When enabled, all incoming POST requests must include a valid authenticity token, either in the params.authenticityToken parameter or in the X-CSRF-Token HTTP header. If the token is missing or invalid, the request will be blocked based on the handling mode you choose.
+
+It is recommended to call this method inside your base Controller.cfc so that CSRF protection applies across the entire application by default. You can then fine-tune its behavior for specific actions using the only and except arguments.
+
+// Example 1: Protect all POST requests globally
+// In controllers/Controller.cfc
+function config() {
+    protectsFromForgery();
+}
+
+// Example 2: Abort requests silently instead of throwing an error
+function config() {
+    protectsFromForgery(with="abort");
+}
+
+// Example 3: Apply CSRF protection only on create and update actions
+function config() {
+    protectsFromForgery(only="create,update");
+}
+
+// Example 4: Exclude the "webhook" action from CSRF protection
+function config() {
+    protectsFromForgery(except="webhook");
+}
+
+// Example 5: Ignore CSRF protection (not recommended, but useful for debugging)
+function config() {
+    protectsFromForgery(with="ignore");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````provides:
+The provides() function defines the response formats that a controller can return. Clients can request a specific format in three ways:
+
+Through a URL parameter called format (e.g., ?format=json)
+
+By appending the format as an extension to the URL (e.g., /users/1.json) when URL rewriting is enabled
+
+Through the Accept header in the HTTP request
+
+By specifying the supported formats, you ensure that your controller can automatically render the response in the requested format, such as html, json, xml, csv, pdf, or xls. If no format is requested or supported, the controller defaults to html.
+
+// Example 1: Provide HTML, XML, and JSON responses
+function config() {
+    provides("html,xml,json");
+}
+
+// Example 2: Provide only JSON and CSV
+function config() {
+    provides("json,csv");
+}
+
+// Example 3: Default behavior (HTML only)
+function config() {
+    provides(); // equivalent to provides("html")
+}
+
+// Example 4: Handling requested format in the action
+function show() {
+    // Wheels automatically detects the requested format and renders accordingly
+    render(data=model("user").findByKey(params.id));
+}
+
+// Example 5: Using format extension in URL
+// Requesting /users/10.json returns JSON
+// Requesting /users/10.xml returns XML
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````put:
+The put() function creates a route that matches a URL requiring an HTTP PUT request. This is primarily used for exposing actions that update existing database records. While PUT is fully supported, consider using the patch() matcher for partial updates, as it is often more appropriate in RESTful applications.
+
+Like other routing helpers in Wheels, put() allows you to define the route’s name, URL pattern, associated controller and action, and other options such as redirecting, scoping within nested resources, and referencing a controller in a package/subfolder.
+
+<cfscript>
+mapper()
+    // Example 1: Nested resource update
+    // Route: /ghosts/666/stories/616
+    // Controller: Stories, Action: update
+    .put(
+        name="ghostStory",
+        pattern="ghosts/[ghostKey]/stories/[key]",
+        to="stories##update"
+    )
+
+    // Example 2: Simple resource update
+    // Route: /goblins
+    // Controller: Goblins, Action: update
+    .put(name="goblins", controller="goblins", action="update")
+
+    // Example 3: Update route with package/subfolder
+    // Route: /preferences, Controller: users.Preferences, Action: update
+    .put(name="preferences", to="preferences##update", package="users")
+
+    // Example 4: Nested collection action
+    // Route: /subscribers/3209/launch
+    .resources(name="subscribers", nested=true)
+        .put(name="launch", to="subscribers##update", on="collection")
+    .end()
+.end();
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````radioButton:
+The radioButton() function generates an HTML radio button for a form, based on a model object’s property. It can handle simple properties as well as nested properties through associations, making it ideal for forms that work with both individual objects and collections.
+
+You can customize the radio button with additional attributes, labels, and error handling options. It automatically reflects the object’s current property value, so if the property matches the tagValue, the radio button will be marked as checked.
+
+This function helps you build dynamic forms safely and easily, with support for encoding to prevent XSS attacks, error highlighting, and custom HTML wrapping.
+
+<!-- Example 1: Basic radio buttons for gender -->
+<cfoutput>
+<fieldset>
+    <legend>Gender</legend>
+    #radioButton(objectName="user", property="gender", tagValue="m", label="Male")#<br>
+    #radioButton(objectName="user", property="gender", tagValue="f", label="Female")#
+</fieldset>
+</cfoutput>
+
+<!-- Example 2: Radio buttons for nested association (committee members) -->
+<cfoutput>
+<cfloop from="1" to="#ArrayLen(committee.members)#" index="i">
+    <div>
+        <h3>#committee.members[i].fullName#:</h3>
+        <div>
+            #radioButton(
+                objectName="committee",
+                association="members",
+                position=i,
+                property="gender",
+                tagValue="m",
+                label="Male"
+            )#<br>
+            #radioButton(
+                objectName="committee",
+                association="members",
+                position=i,
+                property="gender",
+                tagValue="f",
+                label="Female"
+            )#
+        </div>
+    </div>
+</cfloop>
+</cfoutput>
+
+<!-- Example 3: Custom HTML wrapping and label placement -->
+#radioButton(
+    objectName="user",
+    property="subscription",
+    tagValue="premium",
+    label="Premium Plan",
+    prepend="<div class='radio-wrapper'>",
+    append="</div>",
+    labelPlacement="aroundRight"
+)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````radioButtonTag:
+The radioButtonTag() function generates a standard HTML <input type="radio"> element based on the supplied name and value. Unlike radioButton(), this function works directly with form tags rather than binding to a model object. It is useful for simple forms or when you need fine-grained control over the HTML attributes.
+
+You can customize the radio button with labels, label placement, HTML wrapping, and encoding to prevent XSS attacks. The generated radio button will be marked as checked if the checked argument is true.
+
+<!-- Example 1: Basic radio buttons for gender -->
+<cfoutput>
+<fieldset>
+    <legend>Gender</legend>
+    #radioButtonTag(name="gender", value="m", label="Male", checked=true)#<br>
+    #radioButtonTag(name="gender", value="f", label="Female")#
+</fieldset>
+</cfoutput>
+
+<!-- Example 2: Label before radio button -->
+#radioButtonTag(name="subscription", value="premium", label="Premium Plan", labelPlacement="before")#
+
+<!-- Example 3: Custom HTML wrappers -->
+#radioButtonTag(
+    name="newsletter",
+    value="yes",
+    label="Subscribe",
+    prepend="<div class='radio-wrapper'>",
+    append="</div>",
+    labelPlacement="aroundRight"
+)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````raised:
+The raised() function is used in legacy Wheels testing to catch errors or exceptions raised by a given CFML expression. It evaluates the expression and, if an error occurs, returns the type of the error. This is especially useful when writing tests to ensure that specific operations correctly trigger exceptions under invalid or unexpected conditions.
+
+By using raised(), you can assert that your code behaves safely and predictably when encountering errors.
+
+// Example 1: Testing for a specific exception
+// Assume updateUser() should throw an error if email is invalid
+errorType = raised('model("user").updateUser({email="invalid-email"})');
+assertEquals(errorType, "Wheels.InvalidEmailException");
+
+// Example 2: Using raised() in a test case
+function testInvalidPassword() {
+    var errorType = raised('model("user").login(username="jdoe", password="wrong")');
+    writeOutput("Caught error type: " & errorType);
+    // Output: Caught error type: Wheels.InvalidPassword
+}
+
+// Example 3: Catching any error
+var errorType = raised('1 / 0'); // Division by zero
+writeOutput(errorType);
+// Output: CFDivideByZeroException
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````redirectTo:
+The redirectTo() function is used to redirect the browser to another page, action, controller, route, or back to the referring page. Internally, it uses Wheels’ URLFor() function to construct the URL and the <cflocation> tag (or equivalent in your CFML engine) to perform the actual redirect.
+
+You can redirect to internal routes or controllers, pass keys and query parameters, include anchors, override protocol, host, or port, and even delay the redirect until after your action code executes. This function ensures URLs are safely encoded and properly formatted for the redirect.
+
+<!-- Example 1: Redirect to an action after saving -->
+if (user.save()) {
+    redirectTo(action="saveSuccessful");
+}
+
+<!-- Example 2: Redirect to a secure checkout page with parameters -->
+redirectTo(
+    controller="checkout",
+    action="start",
+    params="type=express",
+    protocol="https"
+);
+
+<!-- Example 3: Redirect to a named route and pass a route parameter -->
+redirectTo(route="profile", screenName="Joe");
+
+<!-- Example 4: Redirect back to the referring page -->
+redirectTo(back=true);
+
+<!-- Example 5: Redirect to an external URL -->
+redirectTo(url="https://example.com/welcome");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````redoMigration:
+The redoMigration() function allows you to rerun a specific database migration version. This can be useful for testing migrations, correcting issues in a migration, or resetting a schema change during development.
+
+While it can be called directly from your application code, it is generally recommended to use this function via the CommandBox CLI or the Wheels GUI migration interface, as these provide safer execution and logging.
+
+// Example 1: Rerun a specific migration version
+result = redoMigration(version="202509250915_create_users_table");
+writeOutput(result); // Returns status or log of the migration rerun
+
+// Example 2: Using redoMigration in a script for testing
+if (environment() == "development") {
+    redoMigration(version="202509250920_add_email_index");
+}
+
+// Example 3: Rerun latest migration (if version not specified)
+result = redoMigration();
+writeOutput(result);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````references:
+The references() function is used when defining a table schema to add reference columns that act as foreign keys, linking the table to other tables in the database. It automatically creates integer columns for the references and sets up foreign key constraints, helping maintain referential integrity.
+
+You can customize the behavior of these reference columns, including whether they allow nulls, default values, or support polymorphic associations. You can also define actions for ON UPDATE and ON DELETE events.
+
+// Example 1: Basic reference column
+tableDefinition.references("userId");
+
+// Example 2: Multiple references with nulls allowed
+tableDefinition.references("userId,orderId", null=true);
+
+// Example 3: Reference with default value
+tableDefinition.references("statusId", default=1);
+
+// Example 4: Polymorphic reference (used in polymorphic associations)
+tableDefinition.references("referenceableId", polymorphic=true);
+
+// Example 5: Custom foreign key actions
+tableDefinition.references(
+    "customerId",
+    onUpdate="CASCADE",
+    onDelete="SET NULL"
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````reload:
+The reload() function refreshes the property values of a model object from the database. This is useful when an object’s values might have changed in the database due to other operations or external processes. By calling reload(), you ensure that your object reflects the current state of the corresponding database record.
+
+// Example 1: Reload after a database update
+employee = model("employee").findByKey(params.key);
+
+// Call a method that modifies the database directly
+employee.someCallThatChangesValuesInTheDatabase();
+
+// Refresh the object to reflect the latest database values
+employee.reload();
+
+// Now employee properties are up-to-date
+writeDump(employee);
+cfml
+Copy code
+// Example 2: Reload inside a workflow after an external update
+project = model("project").findByKey(42);
+
+// Suppose another process updates project status in the database
+externalUpdateProjectStatus(42);
+
+// Reload to ensure object has latest status
+project.reload();
+writeOutput("Updated status: " & project.status);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````removeColumn:
+The removeColumn() function is used to delete a column from a database table within a migration CFC. This is useful when you need to remove obsolete or incorrectly added columns during schema evolution. Optionally, you can also remove a reference column by specifying its referenceName.
+
+Since this function modifies the database schema, it should only be used inside a migration file to ensure proper version control and rollback capability.
+
+// Example 1: Remove a single column from a table
+removeColumn(table="users", columnName="middleName");
+
+// Example 2: Remove a foreign key reference column
+removeColumn(table="orders", referenceName="customerId");
+
+// Example 3: Remove multiple columns in separate calls
+removeColumn(table="products", columnName="oldPrice");
+removeColumn(table="products", columnName="discountRate");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````removeIndex:
+The removeIndex() function is used to delete an index from a database table within a migration CFC. Indexes are typically added to improve query performance, but there are scenarios where an index becomes unnecessary or needs to be replaced. Using removeIndex() allows you to safely remove an index while maintaining database integrity.
+
+This function should only be called inside migration files to ensure proper version control and rollback capability.
+
+// Example 1: Remove an index from the members table
+removeIndex(table="members", indexName="members_username");
+
+// Example 2: Remove an index from the orders table
+removeIndex(table="orders", indexName="orders_createdAt_idx");
+
+// Example 3: Remove multiple indexes in separate calls
+removeIndex(table="products", indexName="products_name_idx");
+removeIndex(table="products", indexName="products_category_idx");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````removeRecord:
+The removeRecord() function is used to delete specific records from a database table within a migration CFC. This is useful when you need to clean up obsolete data, remove test data, or correct records as part of a schema migration.
+
+You can optionally provide a where clause to target specific rows. If no where clause is provided, the behavior depends on the database; usually, no records are removed unless explicitly specified. This function should only be used inside migration files to ensure controlled and reversible changes.
+
+// Example 1: Remove a specific record by ID
+removeRecord(table="users", where="id = 42");
+
+// Example 2: Remove multiple records matching a condition
+removeRecord(table="orders", where="status = 'cancelled'");
+
+// Example 3: Remove all records from a table (use with caution)
+removeRecord(table="temporary_data", where="1=1");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````renameColumn:
+The renameColumn() function is used to change the name of an existing column in a database table within a migration CFC. This is useful when you need to standardize column names, correct naming mistakes, or improve clarity in your database schema.
+
+This function should only be used inside migration files to maintain proper version control and rollback capability. Renaming a column preserves the existing data and column type while updating the schema.
+
+// Example 1: Rename a column in the users table
+renameColumn(table="users", columnName="username", newColumnName="user_name");
+
+// Example 2: Rename a column in the orders table
+renameColumn(table="orders", columnName="createdAt", newColumnName="order_created_at");
+
+// Example 3: Rename multiple columns in separate migration calls
+renameColumn(table="products", columnName="oldPrice", newColumnName="price_old");
+renameColumn(table="products", columnName="discountRate", newColumnName="discount_percent");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````renameTable:
+The renameTable() function is used to change the name of an existing database table within a migration CFC. This is helpful when you want to standardize table names, correct naming mistakes, or improve clarity in your database schema.
+
+This operation preserves all the existing data, indexes, and constraints in the table while updating its name. Since it modifies the schema, it should be used within a migration file to ensure proper version control and rollback capability.
+
+// Example 1: Rename the users table
+renameTable(oldName="users", newName="app_users");
+
+// Example 2: Rename the orders table
+renameTable(oldName="orders", newName="customer_orders");
+
+// Example 3: Rename multiple tables in separate migration calls
+renameTable(oldName="products_old", newName="products");
+renameTable(oldName="temp_data", newName="archived_data");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````renderNothing:
+The renderNothing() function instructs the controller to render an empty response when an action completes. Unlike using cfabort, which stops request processing immediately, renderNothing() ensures that any after filters associated with the action still execute.
+
+You can optionally provide an HTTP status code to indicate the type of response being returned. This is useful for APIs or endpoints that need to signal a specific status without returning a body.
+
+// Example 1: Render an empty page with default status (200 OK)
+renderNothing();
+
+// Example 2: Render nothing with a 204 No Content status
+renderNothing(status="204");
+
+// Example 3: Use renderNothing in an API endpoint after deleting a resource
+function deleteResource() {
+    resource = model("resource").findByKey(params.id);
+    resource.delete();
+    renderNothing(status="204");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````renderPartial:
+The renderPartial() function instructs the controller to render a partial view when an action completes. Partials are reusable view fragments, typically prefixed with an underscore (e.g., _comment.cfm). This function allows you to render these fragments either directly to the client or capture them as a string for further processing.
+
+You can control caching, layouts, HTTP status codes, and data-loading behavior, making it flexible for both full-page updates and AJAX responses.
+
+// Example 1: Render a partial in the current controller's view folder
+renderPartial("comment");
+
+// Example 2: Render a partial from the shared folder
+renderPartial("/shared/comment");
+
+// Example 3: Render a partial without a layout
+renderPartial("/shared/comment", layout=false);
+
+// Example 4: Render a partial and return it as a string
+commentHtml = renderPartial("comment", returnAs="string");
+
+// Example 5: Render a partial with caching for 15 minutes
+renderPartial("comment", cache=15);
+
+// Example 6: Render a partial with a custom HTTP status code
+renderPartial("comment", status="202");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````renderText:
+The renderText() function instructs the controller to output plain text as the response when an action completes. Unlike rendering a view or partial, this sends the specified text directly to the client. This is especially useful for APIs, AJAX responses, or simple status messages.
+
+You can also provide an HTTP status code to control the response status.
+
+// Example 1: Render a simple message
+renderText("Done!");
+
+// Example 2: Render serialized product data as JSON
+products = model("product").findAll();
+renderText(SerializeJson(products));
+
+// Example 3: Render a message with a custom HTTP status code
+renderText("Unauthorized access", status=401);
+
+// Example 4: Use in an API endpoint
+function checkStatus() {
+    if (someCondition()) {
+        renderText("OK", status=200);
+    } else {
+        renderText("Error", status=500);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````renderView:
+The renderView() function instructs the controller to render a specific view template when an action completes. It determines which view file to display and which layout (if any) to wrap around it.
+
+Unlike executing a different action directly, this function only loads the corresponding view template. You can render views from the current action, a different action in the same controller, or even a view in another controller. Additional options such as caching, layouts, hiding debug info, and returning the output as a string make it flexible for APIs, AJAX responses, or template manipulation.
+
+// Example 1: Render a view page for a different action within the same controller
+renderView(action="edit");
+
+// Example 2: Render a view page for a different controller and action
+renderView(controller="blog", action="new");
+
+// Example 3: Render a specific template from a different folder
+renderView(template="/blog/new");
+
+// Example 4: Render the current action view without a layout and cache it for 60 minutes
+renderView(layout=false, cache=60);
+
+// Example 5: Load a layout from a different folder within views
+renderView(layout="/layouts/blog");
+
+// Example 6: Return the rendered view as a string for further processing
+myView = renderView(returnAs="string");
+
+// Example 7: Render a view and force a 202 HTTP status code
+renderView(action="edit", status="202");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````renderWith:
+The renderWith() function instructs the controller to render the given data in the format requested by the client. If the requested format is json or xml, Wheels automatically converts the data into the appropriate format. For other formats—or to override automatic formatting—you can create a view template matching the requested format, such as nameofaction.json.cfm, nameofaction.xml.cfm, or nameofaction.pdf.cfm.
+
+This function is especially useful in APIs, AJAX endpoints, or situations where you need to respond dynamically in multiple formats based on client preferences. You can also control caching, layout, HTTP status codes, and whether to return the result as a string for further processing.
+
+// Example 1: Render all products in the requested format (json, xml, etc.)
+products = model("product").findAll();
+renderWith(products);
+
+// Example 2: Render a JSON error message with a 403 status code
+msg = {
+    "status" : "Error",
+    "message": "Not Authenticated"
+};
+renderWith(data=msg, status=403);
+
+// Example 3: Render with a custom layout
+products = model("product").findAll();
+renderWith(data=products, layout="/layouts/api");
+
+// Example 4: Render a view template from a different controller
+data = model("order").findAll();
+renderWith(data=data, controller="orders", action="list");
+
+// Example 5: Capture the output as a string instead of sending it to the client
+output = renderWith(data=products, returnAs="string");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````resetCycle:
+The resetCycle() function resets a named cycle, allowing it to start from the first value the next time it is called. In Wheels, cycle() is often used to alternate values in a repeated pattern, such as CSS classes for table rows, positions, or emphasis levels. By calling resetCycle(), you ensure that the cycle begins again from its initial value, which is useful when looping through nested structures or when a new grouping starts.
+
+<!-- Example 1: Resetting a cycle for row colors in a grouped query -->
+<cfoutput query="employees" group="departmentId">
+    <div class="#cycle(values="even,odd", name="row")#">
+        <ul>
+            <cfoutput>
+                <li class="#cycle(values="president,vice-president,director,manager,specialist,intern", name="position")#">
+                    #categories.categoryName#
+                </li>
+                <!-- Reset the 'position' cycle for the next iteration -->
+                <cfset resetCycle("position")>
+            </cfoutput>
+        </ul>
+    </div>
+</cfoutput>
+
+<!-- Example 2: Resetting the default cycle -->
+<cfset resetCycle()>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````resource:
+The resource() function in Wheels is used to create a group of routes for a singular resource, exposing the full CRUD lifecycle without including a primary key in the URL. Singular resources are typically used for entities tied to the session, application, or another resource, such as a user's profile or a site-wide settings page.
+
+Unlike resources() which generates routes for collections (including URLs with primary keys), resource() focuses on a single entity, providing routes for actions such as show, new, create, edit, update, and delete. You can customize the generated routes using options like controller, path, only, except, and nested. Additional options allow overriding singular/plural naming, adding constraints, supporting shallow nesting, and enabling format mapping for URLs (like .json or .xml).
+
+<cfscript>
+// Default singular resource for checkout
+mapper().resource("checkout");
+
+// Custom controller for authentication
+mapper().resource(name="auth", controller="sessions.auth");
+
+// Generate only specific routes
+mapper().resource(name="profile", only="show,edit,update");
+
+// Exclude certain routes
+mapper().resource(name="cart", except="new,create,edit,delete");
+
+// Nested resource example
+mapper().resource(name="preferences", only="index", nested=true)
+    .get(name="editPassword", to="passwords##edit")
+    .patch(name="password", to="passwords##update")
+    .resources("foods")
+.end();
+
+// Custom path
+mapper().resource(name="blogPostOptions", path="blog-post/options");
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````resources:
+The resources() function in Wheels is used to create a group of routes for a collection of resources, exposing the full CRUD lifecycle for multiple records. Plural resources typically represent database tables or collections, like posts, users, or orders. Unlike resource() (which is singular and doesn’t include a primary key in the URL), resources() generates routes for all standard actions including index, show, new, create, edit, update, and delete.
+
+For actions that operate on a specific record (show, edit, update, delete), the URL includes the primary key of the resource. This method allows nesting of resources to reflect hierarchical relationships, like stories having heroes and villains as nested resources. You can also customize the generated routes using options like controller, path, only, except, shallow nesting, constraints, and optional format mapping.
+
+<cfscript>
+// Default collection resource
+mapper().resources("admins");
+
+// Custom controller mapping
+mapper().resources(name="authors", controller="users");
+
+// Generate only specific actions
+mapper().resources(name="products", only="index,show,edit,update");
+
+// Exclude a route
+mapper().resources(name="orders", except="delete");
+
+// Nested resources
+mapper().resources(name="stories", nested=true)
+    .resources("heroes")
+    .resources("villains")
+.end();
+
+// Custom URL path
+mapper().resources(name="blogPostsOptions", path="blog-posts/options");
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````response:
+The response() function returns the content that Wheels is preparing to send back to the client for the current request. This can include the output generated by renderView(), renderPartial(), renderText(), or any other rendering function that has been called during the request lifecycle. Essentially, response() lets you inspect or manipulate the final output before it is sent to the client, which can be particularly useful in testing, debugging, or middleware-style functions.
+
+<cfscript>
+// Render a view for the current action
+renderView(action="show");
+
+// Capture the response content
+wheelsResponse = response();
+
+// Log or inspect the response
+writeDump(wheelsResponse);
+</cfscript>
+cfml
+Copy code
+<cfscript>
+// Render some text directly
+renderText("Hello, Wheels!");
+
+// Access the response content
+wheelsResponse = response(); // Returns "Hello, Wheels!"
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````root:
+The root() function defines a route that matches the root of the current context. This could be the root of the entire application (like the home page) or the root of a namespaced section of your routes. It is commonly used to map a controller action to the main entry point of your application or a subsection of it. You can specify the controller and action either using the to argument (controller##action) or by passing controller and action separately. Optionally, mapFormat can be set to true to allow a format suffix like .json or .xml in the URL.
+
+1. Application Home Page
+Map the root of the application (/) to a controller action:
+
+<cfscript>
+mapper()
+    .root(to="dashboards##show")
+.end();
+</cfscript>
+
+
+Explanation:
+When a user visits /, the request is routed to the show action of the dashboards controller.
+
+2. Root of a Namespaced Section (API)
+Map /api to an API controller:
+
+<cfscript>
+mapper()
+    .namespace("api")
+        .root(controller="apis", action="index")
+    .end();
+</cfscript>
+
+
+Explanation:
+Visiting /api calls the index action of the apis controller. This is useful for API endpoints where you want a clean root for a namespace.
+
+3. Root with Optional Format
+Enable clients to request JSON or XML directly:
+
+<cfscript>
+mapper()
+    .namespace("api")
+        .root(controller="apis", action="index", mapFormat=true)
+    .end();
+</cfscript>
+
+
+Explanation:
+Requests to /api.json or /api.xml automatically format the response in the requested format.
+
+4. Root for Nested Resources
+Use root() inside a nested scope:
+
+<cfscript>
+mapper()
+    .namespace("admin")
+        .root(controller="dashboard", action="index")
+    .end();
+.end();
+</cfscript>
+
+
+Explanation:
+Visiting /admin triggers the index action of the dashboard controller. This helps organize admin-specific routes under a clear namespace.
+
+5. Multiple Namespaced Roots
+Define separate roots for different sections of your application:
+
+<cfscript>
+mapper()
+    .namespace("api")
+        .root(controller="apis", action="index")
+    .end()
+
+    .namespace("reports")
+        .root(controller="reports", action="overview")
+    .end()
+
+    // Default application root
+    .root(to="home##show")
+.end();
+</cfscript>
+
+
+Explanation:
+
+/api → apis#index
+
+/reports → reports#overview
+
+/ → home#show
+
+This setup provides clean, organized entry points for multiple application sections.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````save:
+The save() function persists the current model object to the database. Wheels determines whether to perform an INSERT (for new objects) or UPDATE (for existing objects) automatically.
+
+It returns:
+
+true if the object was successfully saved.
+
+false if the object failed validation or could not be saved.
+
+save() also respects callbacks, validations, and parameterization by default, but these behaviors can be customized with optional arguments.
+
+1. Basic Save (Automatic INSERT/UPDATE)
+
+<cfscript>
+user = model("user").new();
+user.firstName = "Alice";
+user.lastName = "Smith";
+user.email = "alice@example.com";
+
+if(user.save()){
+    writeOutput("User saved successfully!");
+} else {
+    writeOutput("Error saving user. Please check validations.");
+}
+</cfscript>
+
+
+Explanation:
+
+Wheels will automatically determine if an INSERT or UPDATE is needed.
+
+Validations and callbacks are executed by default.
+
+2. Save Without Validations
+
+<cfscript>
+user = model("user").findByKey(1);
+user.firstName = ""; // Normally fails validation
+
+// Save without running validations
+user.save(validate=false);
+</cfscript>
+
+
+Explanation:
+Useful when you know the data is already clean, or when making programmatic updates that may temporarily violate validations.
+
+3. Save Using Specific cfqueryparam Columns
+
+<cfscript>
+user = model("user").new();
+user.firstName = "Bob";
+user.lastName = "Jones";
+user.email = "bob@example.com";
+
+// Only parameterize the `email` field
+user.save(parameterize="email");
+</cfscript>
+
+
+Explanation:
+
+Enhances performance or compatibility when some columns do not require cfqueryparam.
+
+4. Save Within a Transaction
+
+<cfscript>
+user = model("user").new();
+user.firstName = "Charlie";
+user.lastName = "Brown";
+user.email = "charlie@example.com";
+
+// Attempt to save, but roll back instead of committing
+user.save(transaction="rollback");
+</cfscript>
+
+
+Explanation:
+
+Useful in tests or batch operations where you want to execute the query without permanently modifying the database.
+
+5. Save and Handle Callbacks Manually
+
+<cfscript>
+user = model("user").new();
+user.firstName = "Dana";
+user.lastName = "White";
+user.email = "dana@example.com";
+
+// Save without triggering beforeSave/afterSave callbacks
+user.save(callbacks=false);
+</cfscript>
+
+
+Explanation:
+
+Avoid running callbacks if you only want to persist data quickly or bypass custom logic.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````scope:
+The scope() function in Wheels is used to define a block of routes that share common parameters, such as controller, package, path, or naming prefixes. All routes defined inside a scope() block inherit these parameters unless explicitly overridden.
+
+This is particularly useful for:
+
+Grouping routes under the same controller or package.
+
+Adding a common URL prefix to multiple routes.
+
+Applying shallow routing to nested resources.
+
+Reducing repetition and improving maintainability of route definitions.
+
+1. Set a default controller for multiple routes
+
+<cfscript>
+mapper()
+    .scope(controller="freeForAll")
+        .get(name="bananas", action="bananas")
+        .root(action="index")
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+All routes inside the scope() block will use the freeForAll controller.
+
+2. Apply a package/subfolder to multiple resources
+
+<cfscript>
+mapper()
+    .scope(package="public")
+        .resource(name="search", only="show,create")
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+
+All routes inside this scope will reference controllers inside the public package/subfolder.
+
+3. Add a common URL path prefix
+
+<cfscript>
+mapper()
+    .scope(path="phones")
+        .get(name="newest", to="phones##newest")
+        .get(name="sortOfNew", to="phones##sortOfNew")
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+
+All routes inside this scope will be prefixed with /phones/ in the URL.
+
+Example URLs: /phones/newest and /phones/sort-of-new.
+
+4. Combine controller and path scoping
+
+<cfscript>
+mapper()
+    .scope(controller="products", path="shop")
+        .get(name="featured", action="featured")
+        .get(name="sale", action="sale")
+    .end()
+.end();
+</cfscript>
+
+
+Explanation:
+
+All routes use the products controller and have a /shop/ prefix.
+
+Generated URLs: /shop/featured → products##featured, /shop/sale → products##sale.
+
+5. Use constraints for route variables
+
+<cfscript>
+mapper()
+    .scope(path="users", constraints={userId="\d+"})
+        .get(name="profile", pattern="[userId]/profile", action="show")
+    .end()
+.end();
+</cfscript>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````secondSelectTag:
+The secondSelectTag() function generates an HTML <select> form control populated with seconds (0–59) for a minute. You can bind it to a form parameter or manually set a selected value, control the step interval, include a blank option, and customize labels and HTML attributes.
+
+This is especially useful for time selection forms, like setting the seconds for a scheduled task or timestamp input.
+
+1. Basic select for seconds (0–59)
+
+<cfoutput>
+#secondSelectTag(name="secondsToLaunch")#
+</cfoutput>
+
+
+Result: A <select> element with options 0, 1, 2, …, 59.
+
+2. Pre-select a second based on a parameter
+
+<cfoutput>
+#secondSelectTag(name="secondsToLaunch", selected=params.secondsToLaunch)#
+</cfoutput>
+
+
+If params.secondsToLaunch = 30, the option 30 will be selected.
+
+3. Only show 15-second intervals
+
+<cfoutput>
+#secondSelectTag(name="secondsToLaunch", selected=params.secondsToLaunch, secondStep=15)#
+</cfoutput>
+
+
+Result: Options: 0, 15, 30, 45.
+
+4. Include a blank option with custom text
+
+<cfoutput>
+#secondSelectTag(name="secondsToLaunch", includeBlank="- Select Seconds -")#
+</cfoutput>
+
+
+Adds a first option like <option value="">- Select Seconds -</option>.
+
+5. Add a label around the select control
+
+<cfoutput>
+#secondSelectTag(name="secondsToLaunch", label="Launch Second", labelPlacement="around")#
+</cfoutput>
+
+
+Result:
+
+<label>Launch Second
+  <select name="secondsToLaunch">...</select>
+</label>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````select:
+The select() helper builds and returns an HTML <select> element bound to a model object property. It automatically handles nested associations, labels, options, and error highlighting. You can provide a list of options as a query, array of objects, or simple array, and customize labels, HTML attributes, and encoding.
+
+It is especially useful for forms where a user must select a value from a predefined list that is related to a database model.
+
+1. Basic select bound to a model property
+
+<cfscript>
+authors = model("author").findAll();
+</cfscript>
+
+<!--- View code --->
+#select(objectName="book", property="authorId", options=authors)#
+
+
+Automatically binds book.authorId to the selected option.
+
+Uses the first column as value and display text if valueField and textField are not specified.
+
+2. Using valueField and textField
+
+#select(
+    objectName="book",
+    property="authorId",
+    options=authors,
+    valueField="id",
+    textField="authorfullname"
+)#
+
+
+Required when options is an array of objects or query.
+
+id will be used for option values, authorfullname for display text.
+
+3. Include blank option
+
+#select(
+    objectName="book",
+    property="authorId",
+    options=authors,
+    valueField="id",
+    textField="authorfullname",
+    includeBlank="- Select Author -"
+)#
+
+
+Adds a blank option at the top of the list.
+
+4. Nested hasMany association
+
+<cfloop from="1" to="#ArrayLen(shipments.orders)#" index="i">
+    #select(
+        label="Order #shipments.orders[i].orderNum#",
+        objectName="shipment",
+        association="orders",
+        position=i,
+        property="statusId",
+        options=statuses,
+        valueField="id",
+        textField="name"
+    )#
+</cfloop>
+
+
+Generates a <select> for each associated order within shipments.orders.
+
+Properly handles nested objects and maintains binding to shipment.orders[i].statusId.
+
+5. Custom label and placement
+
+#select(
+    objectName="book",
+    property="authorId",
+    options=authors,
+    valueField="id",
+    textField="authorfullname",
+    label="Choose Author",
+    labelPlacement="before"
+)#
+
+
+The label appears before the <select> element instead of the default wrapping.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````selectTag:
+The selectTag() helper builds an HTML <select> element using a name and a set of options. Unlike select(), it does not require a model object and is not bound to a property. It is useful for standalone select controls or when you want full manual control over the field.
+
+1. Basic selectTag with a query
+
+<cfscript>
+cities = model("city").findAll();
+</cfscript>
+
+<!--- View code --->
+#selectTag(name="cityId", options=cities)#
+
+
+Uses the first column of the query for both values and labels if valueField/textField not specified.
+
+2. SelectTag with valueField and textField
+
+#selectTag(
+    name="cityId",
+    options=cities,
+    valueField="id",
+    textField="name"
+)#
+
+
+Explicitly sets option values to id and display text to name.
+
+Required when the options collection is an array of objects or query with multiple columns.
+
+3. Including a blank option
+
+#selectTag(
+    name="cityId",
+    options=cities,
+    valueField="id",
+    textField="name",
+    includeBlank="- Select a City -"
+)#
+
+
+Adds a blank line at the top of the <select> dropdown.
+
+4. Multiple selection
+
+#selectTag(
+    name="cityIds",
+    options=cities,
+    valueField="id",
+    textField="name",
+    multiple=true
+)#
+
+
+Generates a multi-select <select> element.
+
+5. Custom label and HTML wrapping
+
+#selectTag(
+    name="cityId",
+    options=cities,
+    valueField="id",
+    textField="name",
+    label="Choose a City",
+    labelPlacement="before",
+    prepend="<div class='input-group'>",
+    append="</div>"
+)#
+
+
+Places a label before the select field and wraps it in custom HTML.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````sendEmail:
+sendEmail() is a helper that sends emails using a template with optional layouts. It wraps around <cfmail> and integrates with Wheels view templates, allowing you to pass variables to the template for dynamic content. You can also attach files or write the email content to a file without sending it.
+
+1. Basic email to a new user
+
+newMember = model("member").findByKey(params.member.id);
+
+sendEmail(
+    to=newMember.email,
+    template="welcomeEmail",
+    subject="Thank You for Joining!",
+    recipientName=newMember.name,
+    startDate=newMember.startDate
+);
+
+
+Sends a welcome email using the welcomeEmail template.
+
+Template can reference recipientName and startDate.
+
+2. Multipart email (HTML + text)
+
+sendEmail(
+    to="user@example.com",
+    template=["welcomeEmailText", "welcomeEmailHTML"],
+    subject="Welcome!",
+    detectMultipart=true
+);
+
+
+Wheels detects which template is text vs HTML automatically.
+
+3. Email with a layout
+
+sendEmail(
+    to="user@example.com",
+    template="newsletter",
+    layout="emailLayout",
+    subject="Monthly Newsletter",
+    userName="Salman"
+);
+
+
+Wraps the newsletter template inside the emailLayout template.
+
+4. Email with attachments
+
+sendEmail(
+    to="user@example.com",
+    template="reportEmail",
+    subject="Your Monthly Report",
+    file=["report.pdf", "summary.xlsx"]
+);
+
+
+Attaches files stored in the files folder.
+
+5. Write email to a file without sending
+
+sendEmail(
+    to="user@example.com",
+    template="testEmail",
+    subject="Testing Email",
+    writeToFile="#expandPath('./tmp/testEmail.eml')#",
+    deliver=false
+);
+
+
+Useful for debugging templates without actually sending the email.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````sendFile:
+sendFile() sends a file to the client. By default, it serves files from the files folder in your project or a path relative to it. You can control how the file is presented to the user (download dialog vs inline display), set the content type, rename it for the client, or even delete it from the server after delivery.
+
+1. Send a file for download from the files folder
+
+sendFile(file="wheels_tutorial_20081028_J657D6HX.pdf");
+
+
+Sends the file for download using its original name.
+
+Default disposition is attachment, so the browser shows a download dialog.
+
+2. Rename the file for the client
+
+sendFile(
+    file="wheels_tutorial_20081028_J657D6HX.pdf",
+    name="Tutorial.pdf"
+);
+
+
+User sees Tutorial.pdf in the download dialog instead of the original filename.
+
+3. Send a file located outside the web root
+
+sendFile(
+    file="../../tutorials/wheels_tutorial_20081028_J657D6HX.pdf"
+);
+
+
+Works with relative or absolute paths outside the files folder.
+
+4. Inline display instead of download
+
+sendFile(
+    file="brochure.pdf",
+    disposition="inline",
+    type="application/pdf"
+);
+
+
+PDF opens directly in the browser instead of triggering a download dialog.
+
+Setting the type ensures the browser interprets the file correctly.
+
+5. Delete file after sending
+
+sendFile(
+    file="temporary_report.xlsx",
+    deleteFile=true
+);
+
+
+Sends the file to the client and then deletes it from the server.
+
+Useful for temporary or dynamically generated files.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````set:
+The set() function is used to configure global settings or set default argument values for Wheels functions. It can be applied to core functions, helpers, and even migrations. This allows you to define a standard behavior across your application without repeating arguments every time a function is called.
+
+1. Set a global configuration value
+
+// Set URL rewriting mode to Partial across the app
+set(URLRewriting="Partial");
+
+
+This affects how URLs are generated application-wide.
+
+Other global settings (like caching or logging) can also be set in a similar way.
+
+2. Set default values for a view helper
+
+// Set default arguments for the `buttonTo` helper
+set(
+    functionName="buttonTo",
+    onlyPath=true,
+    host="",
+    protocol="",
+    port=0,
+    text="",
+    confirm="",
+    image="",
+    disable=""
+);
+
+
+Whenever buttonTo() is called, these defaults will be applied unless explicitly overridden.
+
+Simplifies repetitive calls with common argument values.
+
+3. Set default markup for form helpers
+
+// Customize `textField` helper globally
+set(
+    functionName="textField",
+    labelPlacement="before",
+    prependToLabel="<div>",
+    append="</div>",
+    appendToLabel="<br>"
+);
+
+
+All calls to textField() will use these defaults, creating consistent HTML markup.
+
+Useful for standardizing forms and styling across the application.
+
+4. Configure a default for a migration helper
+
+// Set default behavior for `references` in migrations
+set(
+    functionName="references",
+    null=true,
+    foreignKey=true,
+    onDelete="cascade",
+    onUpdate="cascade"
+);
+
+
+All calls to references() in migrations will automatically use these defaults unless overridden.
+
+Helps maintain consistent database schema behavior.
+
+5. Combine global settings with function defaults
+
+// Global URL rewriting plus default helper settings
+set(URLRewriting="Full");
+set(functionName="radioButton", labelPlacement="aroundRight", encode=true);
+
+
+Combines app-wide configuration with helper-level defaults.
+
+Reduces repetitive code and enforces consistency.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setFilterChain:
+The setFilterChain() function provides a low-level way to define the complete filter chain for a controller. Unlike the higher-level beforeFilter() and afterFilter() methods, this lets you explicitly specify the sequence of filters, their scope, and the actions they apply to, all in a single configuration.
+
+Filters are functions that run before, after, or around actions to handle tasks such as authentication, logging, or IP restrictions.
+
+Example 1: Basic filter chain
+// Set filter chain directly
+setFilterChain([
+    {through="restrictAccess"}, // runs for all actions by default
+    {through="isLoggedIn, checkIPAddress", except="home, login"}, // exclude certain actions
+    {type="after", through="logConversion", only="thankYou"} // after filter for specific action
+]);
+
+
+First filter: restrictAccess runs before all actions.
+
+Second filter: isLoggedIn and checkIPAddress run before all actions except home and login.
+
+Third filter: logConversion runs after the thankYou action only.
+
+Example 2: Using only and except with different filter types
+setFilterChain([
+    {through="authenticateUser", only="edit, update, delete"}, // only for sensitive actions
+    {through="trackActivity", except="index, show"},           // for most actions except viewing
+    {type="after", through="sendAnalytics"}                   // after all actions
+]);
+
+
+Demonstrates selective filtering with only and except.
+
+Can combine before (default) and after filters in the same chain.
+
+Example 3: Multiple filters in one chain struct
+setFilterChain([
+    {through="validateSession, checkPermissions", only="admin, settings"},
+    {through="logRequest"},
+    {type="after", through="cleanupTempFiles"}
+]);
+
+
+Multiple filters can run together (validateSession and checkPermissions).
+
+Mix of before and after filters ensures proper order and execution context.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setPagination:
+The setPagination() function allows you to define a pagination handle for a custom query so that you can easily generate paginated links and manage page offsets in your views. It’s useful when you want manual or database-driven pagination instead of relying on built-in model queries.
+
+This works in combination with the pagination() function to retrieve pagination metadata (like startRow, endRow, maxRows) and paginationLinks() to render links in your view.
+
+Example 1: CFML handles pagination
+
+Model code:
+
+function myCustomQuery(required numeric page, numeric perPage=25){
+    local.customQuery = QueryExecute("SELECT * FROM users", [], { datasource=get('dataSourceName') });
+    
+    setPagination(
+        totalRecords = local.customQuery.RecordCount,
+        currentPage = arguments.page,
+        perPage = arguments.perPage,
+        handle = "myCustomQueryHandle"
+    );
+
+    return local.customQuery;
+}
+
+
+Controller code:
+
+function list(){
+    param name="params.page" default="1";
+    param name="params.perPage" default="25";
+
+    allUsers = model("user").myCustomQuery(page=params.page, perPage=params.perPage);
+    paginationData = pagination("myCustomQueryHandle"); // get metadata
+}
+
+
+View code using cfloop:
+
+<ul>
+<cfloop query="allUsers" startrow="#paginationData.startrow#" endrow="#paginationData.endrow#">
+    <li>#allUsers.firstName# #allUsers.lastName#</li>
+</cfloop>
+</ul>
+#paginationLinks(handle="myCustomQueryHandle")#
+
+
+View code using cfoutput:
+
+<ul>
+<cfoutput query="allUsers" startrow="#paginationData.startrow#" maxrows="#paginationData.maxrows#">
+    <li>#allUsers.firstName# #allUsers.lastName#</li>
+</cfoutput>
+</ul>
+#paginationLinks(handle="myCustomQueryHandle")#
+
+Example 2: Database handles pagination (more efficient)
+
+Model code:
+
+function myCustomQuery(required numeric page, numeric perPage=25){
+    local.customQueryCount = QueryExecute(
+        "SELECT COUNT(*) AS theCount FROM users",
+        [], { datasource=get('dataSourceName') }
+    );
+
+    local.offset = (arguments.page-1) * arguments.perPage;
+
+    local.customQuery = QueryExecute(
+        "SELECT * FROM users LIMIT ? OFFSET ?",
+        [arguments.perPage, local.offset],
+        { datasource=get('dataSourceName') }
+    );
+
+    setPagination(
+        totalRecords = local.customQueryCount.theCount,
+        currentPage = arguments.page,
+        perPage = arguments.perPage,
+        handle = "myCustomQueryHandle"
+    );
+
+    return local.customQuery;
+}
+
+
+Controller code:
+
+function list(){
+    param name="params.page" default="1";
+    param name="params.perPage" default="25";
+
+    allUsers = model("user").myCustomQuery(page=params.page, perPage=params.perPage);
+}
+
+
+View code (cfloop or cfoutput):
+
+<ul>
+<cfloop query="allUsers">
+    <li>#allUsers.firstName# #allUsers.lastName#</li>
+</cfloop>
+</ul>
+
+#paginationLinks(handle="myCustomQueryHandle")#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setPrimaryKey:
+The setPrimaryKey() function allows you to define which property (or properties) of a model represent the primary key in the database. This is crucial for Wheels to correctly handle CRUD operations, updates, and record lookups.
+
+For single-column primary keys, pass the property name as a string.
+
+For composite primary keys (multiple columns together form the key), pass a comma-separated list of property names.
+
+Alias: setPrimaryKeys()
+
+Example 1: Single primary key
+component extends="Model" {
+
+    function config() {
+        // The primary key for this table is `userID`
+        setPrimaryKey("userID");
+    }
+
+}
+
+
+Effect: Wheels will use the userID column to identify records for findByKey(), update(), delete(), etc.
+
+Example 2: Composite primary key
+component extends="Model" {
+
+    function config() {
+        // The combination of `orderID` and `productID` uniquely identifies a record
+        setPrimaryKey("orderID,productID");
+    }
+
+}
+
+
+Effect: Wheels treats the combination of orderID and productID as the unique key for CRUD operations.
+
+Example 3: Using the alias setPrimaryKeys()
+component extends="Model" {
+
+    function config() {
+        // Alias works the same as `setPrimaryKey()`
+        setPrimaryKeys("customerID");
+    }
+
+}
+
+
+Effect: Wheels will behave exactly the same as using setPrimaryKey().
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setPrimaryKeys:
+setPrimaryKeys() is an alias for setPrimaryKey(), intended to make code more readable when defining composite primary keys.
+
+For single-column primary keys, it works the same as setPrimaryKey().
+
+For composite primary keys, you pass a comma-separated list of property names.
+
+Example 1: Single primary key
+component extends="Model" {
+
+    function config() {
+        // Using the alias for a single primary key
+        setPrimaryKeys("userID");
+    }
+
+}
+
+
+Effect: Identical to setPrimaryKey(). Wheels will use userID for record operations.
+
+Example 2: Composite primary key
+component extends="Model" {
+
+    function config() {
+        // Composite key: combination of customerId and publicationId
+        setPrimaryKeys("customerId,publicationId");
+    }
+
+}
+
+
+Effect: Wheels treats customerId + publicationId as the unique identifier for CRUD operations (findByKey(), update(), delete()).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setProperties:
+setProperties() allows you to set multiple properties of a model object at once. It is useful when you want to update a model with a structure (struct) of key/value pairs instead of assigning each property individually.
+
+The keys of the struct should match the property names of the model.
+
+You can also pass named arguments directly instead of a struct.
+
+Example 1: Using a struct (common scenario with form submission)
+// Controller code: retrieve user from database
+user = model("user").findByKey(1);
+
+// Set properties from a submitted form
+user.setProperties(params.user);
+
+// Save the updated user
+user.save();
+
+
+Effect: All keys in params.user that match the user model’s properties will be updated.
+
+Example 2: Using named arguments
+user = model("user").findByKey(1);
+
+// Set properties directly using named arguments
+user.setProperties(
+    firstName="John",
+    lastName="Doe",
+    email="john.doe@example.com"
+);
+
+// Save changes
+user.save();
+
+Example 3: Using with validations
+user = model("user").findByKey(2);
+
+// Set multiple properties, skipping one intentionally
+user.setProperties({
+    firstName = "Jane",
+    lastName = "Smith"
+});
+
+// Only save if validations pass
+if(user.save()){
+    writeOutput("User updated successfully!");
+} else {
+    writeDump(user.errors);
+}
+
+
+Effect: Only firstName and lastName are updated; any other properties remain unchanged. Validations are enforced unless validate=false is passed to save().
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setResponse:
+setResponse() allows you to manually set the content that Wheels will send back to the client for a given request. Unlike renderView() or renderText(), which automatically generate output from templates or data, setResponse() gives you full control over the response content.
+
+Example 1: Sending plain text
+function myAction() {
+    setResponse("This is a custom response sent directly to the client.");
+}
+
+
+Effect: The browser will display exactly:
+This is a custom response sent directly to the client.
+
+Example 2: Sending JSON content
+function getUserData() {
+    user = model("user").findByKey(1);
+    
+    // Convert the user object to JSON
+    jsonData = serializeJson(user);
+    
+    // Set the JSON response
+    setResponse(jsonData);
+}
+
+
+Effect: The client receives a JSON representation of the user object. You can also set the response content type using cfheader if needed:
+
+cfheader(name="Content-Type", value="application/json");
+
+Example 3: Sending HTML content
+function showCustomHtml() {
+    htmlContent = "<h1>Welcome!</h1><p>This is a custom HTML response.</p>";
+    setResponse(htmlContent);
+}
+
+
+Effect: The client will render the HTML directly.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setTableNamePrefix:
+setTableNamePrefix() allows you to add a prefix to the table name used by a model when performing SQL queries. This is useful if your database uses a consistent naming convention, such as tblUsers instead of Users.
+
+By default, Wheels infers the table name from the model name (e.g., User → users). Using a prefix ensures that all queries automatically reference the correctly prefixed table.
+
+Example 1: Basic prefix
+// In models/User.cfc
+function config(){
+    // All queries will now target 'tblUsers' instead of 'users'
+    setTableNamePrefix("tbl");
+}
+
+
+Effect:
+
+user = model("user").findByKey(1);
+
+
+Generates SQL similar to:
+
+SELECT * FROM tblUsers WHERE userID = 1
+
+Example 2: Using a custom prefix for multiple models
+// models/Product.cfc
+function config(){
+    setTableNamePrefix("tbl");
+}
+
+// models/Order.cfc
+function config(){
+    setTableNamePrefix("tbl");
+}
+
+
+All queries for Product and Order will now reference tblProducts and tblOrders automatically.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setup:
+The setup() function is a callback used in Wheels legacy testing framework. It runs before every individual test case within a test suite. This allows you to prepare the test environment, initialize objects, or reset state before each test executes.
+
+Example 1: Basic setup for a test suite
+component extends="TestCase" {
+
+    // Will run before every test case
+    function setup() {
+        // Initialize a new user object before each test
+        variables.user = model("user").init();
+    }
+
+    function testUserCreation() {
+        variables.user.firstName = "John";
+        variables.user.lastName = "Doe";
+
+        expect(variables.user.save()).toBeTrue();
+    }
+
+    function testUserEmailValidation() {
+        variables.user.email = "invalid-email";
+
+        expect(variables.user.valid()).toBeFalse();
+        assertHasErrors(variables.user, "email");
+    }
+}
+
+
+Explanation:
+
+setup() ensures that variables.user is reset before each test, so tests are independent.
+
+Example 2: Reset database table before each test
+component extends="TestCase" {
+
+    function setup() {
+        // Delete all records in the users table before each test
+        model("user").deleteAll();
+    }
+
+    function testUserInsert() {
+        newUser = model("user").init(firstName="Alice", lastName="Smith");
+        expect(newUser.save()).toBeTrue();
+    }
+
+    function testUserCount() {
+        count = model("user").count();
+        expect(count).toBe(0); // Will always pass due to setup()
+    }
+}
+
+
+Explanation:
+
+setup() ensures a clean database state before each test case runs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setVerificationChain:
+setVerificationChain() allows you to define the entire verification chain for a controller in a low-level, structured way. Verification chains are used to validate requests, ensuring they meet specific requirements (like HTTP method, parameters, or types) before the controller action executes.
+
+Instead of defining individual verifies() calls in each action, you can use setVerificationChain() to set all verifications at once.
+
+Example 1: Basic verification chain
+component extends="Controller" {
+
+    function init() {
+        // Set verification rules for multiple actions
+        setVerificationChain([
+            {only="handleForm", post=true},
+            {only="edit", get=true, params="userId", paramsTypes="integer"}
+        ]);
+    }
+
+    function handleForm() {
+        // Action logic here
+    }
+
+    function edit() {
+        // Action logic here
+    }
+}
+
+
+Explanation:
+
+handleForm must be accessed via POST.
+
+edit must be accessed via GET and requires a userId parameter of type integer.
+
+Example 2: Adding custom error handling
+component extends="Controller" {
+
+    function init() {
+        setVerificationChain([
+            {only="edit", get=true, params="userId", paramsTypes="integer", handler="index", error="Invalid userId"},
+            {only="delete", post=true, params="id", paramsTypes="integer", error="Missing or invalid id"}
+        ]);
+    }
+
+    function edit() { /* edit logic */ }
+    function delete() { /* delete logic */ }
+}
+
+
+Explanation:
+
+If the userId parameter for edit is invalid, the request is redirected to index with the error message.
+
+delete must be accessed via POST and requires a valid id.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````simpleFormat:
+simpleFormat() takes plain text and converts newline (\n) and carriage return characters (\r\n) into HTML <br> and <p> tags for display in a browser.
+This is particularly useful for rendering user-submitted text (like blog posts, comments, or descriptions) in a way that respects the author’s formatting.
+
+By default, the text is wrapped in a <p> element and URL parameters are encoded for safety.
+
+Example 1: Typical usage
+#simpleFormat(post.bodyText)#
+
+
+If post.bodyText =
+
+This is the first line.
+
+This is the second paragraph.
+
+
+Output:
+
+<p>This is the first line.</p>
+
+<p>This is the second paragraph.</p>
+
+Example 2: Demonstrating line breaks
+<cfsavecontent variable="comment">
+I love this post!
+
+Here's why:
+* Short
+* Succinct
+* Awesome
+</cfsavecontent>
+
+#simpleFormat(comment)#
+
+
+Output:
+
+<p>I love this post!</p>
+
+<p>Here's why:<br>
+* Short<br>
+* Succinct<br>
+* Awesome</p>
+
+Example 3: Disable paragraph wrapping
+<cfsavecontent variable="bio">
+Hello, I’m Salman.
+I write about ColdFusion and backend development.
+</cfsavecontent>
+
+#simpleFormat(bio, wrap=false)#
+
+
+Output:
+
+Hello, I’m Salman.<br>
+I write about ColdFusion and backend development.
+
+
+(No <p> tags, only <br> for newlines.)
+
+Example 4: Handling user input safely
+
+When you’re rendering user-submitted text in HTML attributes, simpleFormat() alone is not enough:
+
+<!-- Incorrect usage in an attribute -->
+<div title="#simpleFormat(userInput)#">...</div>
+
+
+Instead, combine with EncodeForHtmlAttribute():
+
+<div title="#EncodeForHtmlAttribute(simpleFormat(userInput))#">...</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````singularize:
+singularize() converts a plural word into its singular form.
+It uses Wheels’ built-in inflection rules, handling common English pluralization cases as well as irregular words.
+
+This is useful when dynamically generating model names, table names, or working with resource naming conventions.
+
+Example 1: Simple plural → singular
+#singularize("languages")#
+
+
+Output:
+
+language
+
+Example 2: Words ending in -ies
+#singularize("companies")#
+
+
+Output:
+
+company
+
+Example 3: Words ending in -es
+#singularize("boxes")#
+
+
+Output:
+
+box
+
+Example 4: Irregular plural
+#singularize("children")#
+
+
+Output:
+
+child
+
+Example 5: When used in a controller/model context
+// Suppose you have a resource named "users"
+// Wheels might call `singularize("users")` internally to map to the `User` model
+userModelName = singularize("users");
+writeOutput(userModelName); // Outputs: User
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````startFormTag:
+startFormTag() builds and returns an opening <form> tag.
+The form’s action URL is automatically generated following the same rules as urlFor().
+
+You can pass standard Wheels routing arguments (controller, action, route, key, params) as well as custom HTML attributes (id, class, rel, etc.).
+Use this in combination with endFormTag() to wrap your form controls.
+
+Example 1: Basic form for create action
+#startFormTag(action="create")#
+    #textFieldTag(name="firstName")#
+    #submitTag(value="Save")#
+#endFormTag()#
+
+
+Output:
+
+<form action="/users/create" method="post">
+    <input type="text" name="firstName">
+    <input type="submit" value="Save">
+</form>
+
+Example 2: Form with file upload
+#startFormTag(action="upload", multipart=true)#
+    #fileFieldTag(name="profilePicture")#
+    #submitTag(value="Upload")#
+#endFormTag()#
+
+Example 3: Using a named route
+#startFormTag(route="registerUser")#
+    #textFieldTag(name="email")#
+    #passwordFieldTag(name="password")#
+    #submitTag(value="Register")#
+#endFormTag()#
+
+Example 4: Passing keys and params
+#startFormTag(controller="posts", action="edit", key=42, params="draft=true")#
+    #textAreaTag(name="content")#
+    #submitTag(value="Update Post")#
+#endFormTag()#
+
+
+Generates a form pointing to:
+
+/posts/edit/42?draft=true
+
+Example 5: Custom attributes
+#startFormTag(action="search", id="searchForm", class="inline-form")#
+    #textFieldTag(name="q")#
+    #submitTag(value="Search")#
+#endFormTag()#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````string:
+The string() function is used inside a migration’s createTable() or changeTable() block to add one or more string (VARCHAR) columns to a database table.
+
+It supports specifying default values, nullability, and a maximum length (limit).
+
+Example 1: Add a simple string column
+createTable("users", function(table) {
+    table.string("username");
+});
+
+
+Creates a username column of type string.
+
+Example 2: Limit the length of the string
+createTable("users", function(table) {
+    table.string("email", limit=255);
+});
+
+
+Creates an email column with a maximum length of 255 characters.
+
+Example 3: Set default values
+createTable("products", function(table) {
+    table.string("status", default="active");
+});
+
+
+Adds a status column with a default value of "active".
+
+Example 4: Multiple columns in one call
+createTable("profiles", function(table) {
+    table.string("firstName,lastName");
+});
+
+
+Creates two string columns: firstName and lastName.
+
+Example 5: Nullable vs non-nullable
+createTable("settings", function(table) {
+    table.string("configKey", null=false);
+    table.string("configValue", null=true);
+});
+
+
+configKey must always have a value (NOT NULL).
+
+configValue can be left NULL.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````stripLinks:
+The stripLinks() function removes all <a> tags (hyperlinks) from an HTML string while preserving the inner text.
+This is useful when you want to display content without clickable links but still retain the text inside them.
+
+Example 1: Remove links but keep text
+#stripLinks('<strong>Wheels</strong> is a framework for <a href="http://www.adobe.com/products/coldfusion">ColdFusion</a>.')#
+
+
+Output:
+
+<strong>Wheels</strong> is a framework for ColdFusion.
+
+Example 2: Strip links from user-submitted content
+userComment = '<p>Check out <a href="http://spam.com">this link</a>!</p>';
+#stripLinks(userComment)#
+
+
+Output:
+
+<p>Check out this link!</p>
+
+Example 3: Encoding URLs (optional)
+#stripLinks('<a href="http://example.com/page?param=value&another=1">Example</a>', encode=false)#
+
+
+Output:
+
+Example
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````stripTags:
+The stripTags() function removes all HTML tags from a string, leaving only the raw text content.
+Use this when you need to sanitize HTML by completely removing formatting and markup.
+
+Example 1: Remove all tags from a string
+#stripTags('<strong>Wheels</strong> is a framework for <a href="http://www.adobe.com/products/coldfusion">ColdFusion</a>.')#
+
+
+Output:
+
+Wheels is a framework for ColdFusion.
+
+Example 2: Sanitize user input
+userInput = '<script>alert("xss")</script>Normal text';
+#stripTags(userInput)#
+
+
+Output:
+
+Normal text
+
+Example 3: With encoding
+#stripTags('<a href="http://example.com/page?param=value&another=1">Example</a>')#
+
+
+Output:
+
+Example
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````styleSheetLinkTag:
+The styleSheetLinkTag() function generates one or more <link> tags for including CSS stylesheets in your application.
+By default, it looks in the stylesheets folder of your app but can also handle external URLs or place stylesheets directly in the <head> section when needed.
+
+Example 1: Single local stylesheet
+#styleSheetLinkTag("styles")#
+
+
+Output:
+
+<link href="/stylesheets/styles.css" rel="stylesheet" type="text/css" media="all" />
+
+Example 2: Multiple stylesheets
+#styleSheetLinkTag("blog,comments")#
+
+
+Output:
+
+<link href="/stylesheets/blog.css" rel="stylesheet" type="text/css" media="all" />
+<link href="/stylesheets/comments.css" rel="stylesheet" type="text/css" media="all" />
+
+Example 3: Print-specific stylesheet
+#styleSheetLinkTag(sources="print", media="print")#
+
+
+Output:
+
+<link href="/stylesheets/print.css" rel="stylesheet" type="text/css" media="print" />
+
+Example 4: External stylesheet (e.g., CDN)
+#styleSheetLinkTag("https://cdn.example.com/ui.css")#
+
+
+Output:
+
+<link href="https://cdn.example.com/ui.css" rel="stylesheet" type="text/css" media="all" />
+
+Example 5: Forcing a stylesheet into <head>
+#styleSheetLinkTag(sources="tabs", head=true)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````submitTag:
+The submitTag() function generates a submit button form control (<input type="submit"> by default, or <input type="image"> if you specify an image).
+You can customize the button text, use an image, or add extra HTML attributes (such as class, id, or rel).
+
+Example 1: Default submit button
+#startFormTag(action="save")#
+    #submitTag()#
+#endFormTag()#
+
+
+Output:
+
+<form action="/save" method="post">
+    <input type="submit" value="Save changes" />
+</form>
+
+Example 2: Custom button label
+#submitTag(value="Register Now")#
+
+
+Output:
+
+<input type="submit" value="Register Now" />
+
+Example 3: Submit button with CSS class and ID
+#submitTag(value="Update Profile", class="btn btn-primary", id="updateBtn")#
+
+
+Output:
+
+<input type="submit" value="Update Profile" class="btn btn-primary" id="updateBtn" />
+
+Example 4: Submit as an image button
+#submitTag(image="submit-icon.png", value="Submit Form")#
+
+
+Output:
+
+<input type="image" src="/images/submit-icon.png" alt="Submit Form" />
+
+Example 5: Wrapping with prepend and append
+#submitTag(
+    value="Send Message",
+    prepend="<div class='form-actions'>",
+    append="</div>"
+)#
+
+
+Output:
+
+<div class='form-actions'>
+    <input type="submit" value="Send Message" />
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````sum:
+The sum() function calculates the total of all values for a given property (column) using SQL’s SUM() function.
+It’s typically used to aggregate numeric values across a set of records (e.g., summing salaries, prices, or quantities).
+
+You can add filtering with where, group results with group, or join associations using include.
+If no records are found, use the ifNull argument to return a safe default (commonly 0 for numeric sums).
+
+Example 1: Basic sum
+
+Get the total of all salaries:
+
+allSalaries = model("employee").sum("salary");
+
+Example 2: With filtering (where)
+
+Get the sum of salaries for employees in Australia:
+
+allAustralianSalaries = model("employee").sum(
+    property="salary",
+    include="country",
+    where="countryname='Australia'"
+);
+
+Example 3: With ifNull safeguard
+
+Always return a numeric result, even if no records are found:
+
+salarySum = model("employee").sum(
+    property="salary",
+    where="salary BETWEEN #params.min# AND #params.max#",
+    ifNull=0
+);
+
+Example 4: Sum with grouping
+
+Get the total salary per department:
+
+salariesByDept = model("employee").sum(
+    property="salary",
+    group="departmentId"
+);
+
+
+Output (query result):
+
+departmentId	sum
+1	45000
+2	60000
+Example 5: Distinct sum
+
+Avoid counting duplicate salaries:
+
+uniqueSalaries = model("employee").sum(
+    property="salary",
+    distinct=true
+);
