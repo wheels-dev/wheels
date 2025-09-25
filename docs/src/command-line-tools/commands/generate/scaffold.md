@@ -108,7 +108,7 @@ wheels generate scaffold User --hasMany=posts,comments --api=true
 #### 3. Positional + Flags (Valid)
 ```bash
 wheels generate scaffold Order --properties="total:decimal" --belongsTo=User --migrate
-wheels scaffold Product --properties="name:string" --api --tests=false --force
+wheels g scaffold Product --properties="name:string" --api --tests=false --force
 ```
 
 ### Parameter Validation Rules
