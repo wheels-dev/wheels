@@ -3,8 +3,7 @@
     "prefix": "accessibleProperties",
     "description": "Use this method to specify which properties can be set through mass assignment.",
     "body": [
-      "accessibleProperties()",
-      "$0"
+      "accessibleProperties()$0"
     ],
     "scope": "cfml"
   },
@@ -129,8 +128,7 @@
     "prefix": "afterAll",
     "description": "Executes once after the test suite runs.",
     "body": [
-      "afterAll()",
-      "$0"
+      "afterAll()$0"
     ],
     "scope": "cfml"
   },
@@ -138,8 +136,7 @@
     "prefix": "afterCreate",
     "description": "Registers method(s) that should be called after a new object is created.",
     "body": [
-      "afterCreate()",
-      "$0"
+      "afterCreate()$0"
     ],
     "scope": "cfml"
   },
@@ -156,8 +153,7 @@
     "prefix": "afterDelete",
     "description": "Registers method(s) that should be called after an object is deleted.",
     "body": [
-      "afterDelete()",
-      "$0"
+      "afterDelete()$0"
     ],
     "scope": "cfml"
   },
@@ -174,8 +170,7 @@
     "prefix": "afterFind",
     "description": "Registers method(s) that should be called after an existing object has been initialized (which is usually done with the findByKey or findOne method).",
     "body": [
-      "afterFind()",
-      "$0"
+      "afterFind()$0"
     ],
     "scope": "cfml"
   },
@@ -192,8 +187,7 @@
     "prefix": "afterInitialization",
     "description": "Registers method(s) that should be called after an object has been initialized.",
     "body": [
-      "afterInitialization()",
-      "$0"
+      "afterInitialization()$0"
     ],
     "scope": "cfml"
   },
@@ -210,8 +204,7 @@
     "prefix": "afterNew",
     "description": "Registers method(s) that should be called after a new object has been initialized (which is usually done with the new method).",
     "body": [
-      "afterNew()",
-      "$0"
+      "afterNew()$0"
     ],
     "scope": "cfml"
   },
@@ -228,8 +221,7 @@
     "prefix": "afterSave",
     "description": "Registers method(s) that should be called after an object is saved.",
     "body": [
-      "afterSave()",
-      "$0"
+      "afterSave()$0"
     ],
     "scope": "cfml"
   },
@@ -246,8 +238,7 @@
     "prefix": "afterUpdate",
     "description": "Registers method(s) that should be called after an existing object is updated.",
     "body": [
-      "afterUpdate()",
-      "$0"
+      "afterUpdate()$0"
     ],
     "scope": "cfml"
   },
@@ -264,8 +255,7 @@
     "prefix": "afterValidation",
     "description": "Registers method(s) that should be called after an object is validated.",
     "body": [
-      "afterValidation()",
-      "$0"
+      "afterValidation()$0"
     ],
     "scope": "cfml"
   },
@@ -282,8 +272,7 @@
     "prefix": "afterValidationOnCreate",
     "description": "Registers method(s) that should be called after a new object is validated.",
     "body": [
-      "afterValidationOnCreate()",
-      "$0"
+      "afterValidationOnCreate()$0"
     ],
     "scope": "cfml"
   },
@@ -300,8 +289,7 @@
     "prefix": "afterValidationOnUpdate",
     "description": "Registers method(s) that should be called after an existing object is validated.",
     "body": [
-      "afterValidationOnUpdate()",
-      "$0"
+      "afterValidationOnUpdate()$0"
     ],
     "scope": "cfml"
   },
@@ -318,8 +306,7 @@
     "prefix": "allChanges",
     "description": "Returns a struct detailing all changes that have been made on the object but not yet saved to the database.",
     "body": [
-      "allChanges()",
-      "$0"
+      "allChanges()$0"
     ],
     "scope": "cfml"
   },
@@ -327,8 +314,7 @@
     "prefix": "allErrors",
     "description": "Returns an array of all the errors on the object.   It does this by storing instances of models that are associations, and not checking associations of those instances because they have already been checked.",
     "body": [
-      "allErrors()",
-      "$0"
+      "allErrors()$0"
     ],
     "scope": "cfml"
   },
@@ -363,8 +349,7 @@
     "prefix": "authenticityToken",
     "description": "Returns the raw CSRF authenticity token",
     "body": [
-      "authenticityToken()",
-      "$0"
+      "authenticityToken()$0"
     ],
     "scope": "cfml"
   },
@@ -372,8 +357,7 @@
     "prefix": "authenticityTokenField",
     "description": "Returns a hidden form field containing a new authenticity token.",
     "body": [
-      "authenticityTokenField()",
-      "$0"
+      "authenticityTokenField()$0"
     ],
     "scope": "cfml"
   },
@@ -426,8 +410,7 @@
     "prefix": "beforeAll",
     "description": "Executes once before the test suite runs.",
     "body": [
-      "beforeAll()",
-      "$0"
+      "beforeAll()$0"
     ],
     "scope": "cfml"
   },
@@ -435,8 +418,7 @@
     "prefix": "beforeCreate",
     "description": "Registers method(s) that should be called before a new object is created.",
     "body": [
-      "beforeCreate()",
-      "$0"
+      "beforeCreate()$0"
     ],
     "scope": "cfml"
   },
@@ -453,8 +435,7 @@
     "prefix": "beforeDelete",
     "description": "Registers method(s) that should be called before an object is deleted.",
     "body": [
-      "beforeDelete()",
-      "$0"
+      "beforeDelete()$0"
     ],
     "scope": "cfml"
   },
@@ -471,8 +452,7 @@
     "prefix": "beforeSave",
     "description": "Registers method(s) that should be called before an object is saved.",
     "body": [
-      "beforeSave()",
-      "$0"
+      "beforeSave()$0"
     ],
     "scope": "cfml"
   },
@@ -489,8 +469,7 @@
     "prefix": "beforeUpdate",
     "description": "Registers method(s) that should be called before an existing object is updated.",
     "body": [
-      "beforeUpdate()",
-      "$0"
+      "beforeUpdate()$0"
     ],
     "scope": "cfml"
   },
@@ -507,8 +486,7 @@
     "prefix": "beforeValidation",
     "description": "Registers method(s) that should be called before an object is validated.",
     "body": [
-      "beforeValidation()",
-      "$0"
+      "beforeValidation()$0"
     ],
     "scope": "cfml"
   },
@@ -525,8 +503,7 @@
     "prefix": "beforeValidationOnCreate",
     "description": "Registers method(s) that should be called before a new object is validated.",
     "body": [
-      "beforeValidationOnCreate()",
-      "$0"
+      "beforeValidationOnCreate()$0"
     ],
     "scope": "cfml"
   },
@@ -543,8 +520,7 @@
     "prefix": "beforeValidationOnUpdate",
     "description": "Registers method(s) that should be called before an existing object is validated.",
     "body": [
-      "beforeValidationOnUpdate()",
-      "$0"
+      "beforeValidationOnUpdate()$0"
     ],
     "scope": "cfml"
   },
@@ -579,8 +555,7 @@
     "prefix": "bigInteger",
     "description": "Adds integer columns to table definition.",
     "body": [
-      "bigInteger()",
-      "$0"
+      "bigInteger()$0"
     ],
     "scope": "cfml"
   },
@@ -597,8 +572,7 @@
     "prefix": "binary",
     "description": "Adds binary columns to table definition.",
     "body": [
-      "binary()",
-      "$0"
+      "binary()$0"
     ],
     "scope": "cfml"
   },
@@ -615,8 +589,7 @@
     "prefix": "boolean",
     "description": "Adds boolean columns to table definition.",
     "body": [
-      "boolean()",
-      "$0"
+      "boolean()$0"
     ],
     "scope": "cfml"
   },
@@ -633,8 +606,7 @@
     "prefix": "buttonTag",
     "description": "Builds and returns a string containing a button form control.",
     "body": [
-      "buttonTag()",
-      "$0"
+      "buttonTag()$0"
     ],
     "scope": "cfml"
   },
@@ -651,8 +623,7 @@
     "prefix": "buttonTo",
     "description": "Creates a form containing a single button that submits to the URL. The URL is built the same way as the linkTo function.",
     "body": [
-      "buttonTo()",
-      "$0"
+      "buttonTo()$0"
     ],
     "scope": "cfml"
   },
@@ -669,8 +640,7 @@
     "prefix": "caches",
     "description": "Tells Wheels to cache one or more actions.",
     "body": [
-      "caches()",
-      "$0"
+      "caches()$0"
     ],
     "scope": "cfml"
   },
@@ -687,8 +657,7 @@
     "prefix": "clearCachableActions",
     "description": "Tells Wheels to remove one or more actions from cacheable actions.",
     "body": [
-      "clearCachableActions()",
-      "$0"
+      "clearCachableActions()$0"
     ],
     "scope": "cfml"
   },
@@ -714,8 +683,7 @@
     "prefix": "change",
     "description": "alters existing table in the database",
     "body": [
-      "change()",
-      "$0"
+      "change()$0"
     ],
     "scope": "cfml"
   },
@@ -759,8 +727,7 @@
     "prefix": "changedProperties",
     "description": "Returns a list of the object properties that have been changed but not yet saved to the database.",
     "body": [
-      "changedProperties()",
-      "$0"
+      "changedProperties()$0"
     ],
     "scope": "cfml"
   },
@@ -777,8 +744,7 @@
     "prefix": "char",
     "description": "adds char columns to table definition",
     "body": [
-      "char()",
-      "$0"
+      "char()$0"
     ],
     "scope": "cfml"
   },
@@ -831,8 +797,7 @@
     "prefix": "clearChangeInformation",
     "description": "Clears all internal knowledge of the current state of the object.",
     "body": [
-      "clearChangeInformation()",
-      "$0"
+      "clearChangeInformation()$0"
     ],
     "scope": "cfml"
   },
@@ -849,8 +814,7 @@
     "prefix": "clearErrors",
     "description": "Clears out all errors set on the object or only the ones set for a specific property or name.",
     "body": [
-      "clearErrors()",
-      "$0"
+      "clearErrors()$0"
     ],
     "scope": "cfml"
   },
@@ -867,8 +831,7 @@
     "prefix": "collection",
     "description": "A collection route doesn't require an id because it acts on a collection of objects. photos/search is an example of a collection route, because it acts on (and displays) a collection of objects.",
     "body": [
-      "collection()",
-      "$0"
+      "collection()$0"
     ],
     "scope": "cfml"
   },
@@ -912,8 +875,7 @@
     "prefix": "columnNames",
     "description": "Returns a list of column names in the table mapped to this model. The list is ordered according to the columns' ordinal positions in the database table.",
     "body": [
-      "columnNames()",
-      "$0"
+      "columnNames()$0"
     ],
     "scope": "cfml"
   },
@@ -921,8 +883,7 @@
     "prefix": "columns",
     "description": "Returns an array of columns names for the table associated with this class. Does not include calculated properties that will be generated by the Wheels ORM.",
     "body": [
-      "columns()",
-      "$0"
+      "columns()$0"
     ],
     "scope": "cfml"
   },
@@ -939,8 +900,7 @@
     "prefix": "constraints",
     "description": "Set variable patterns to use for matching.",
     "body": [
-      "constraints()",
-      "$0"
+      "constraints()$0"
     ],
     "scope": "cfml"
   },
@@ -948,8 +908,7 @@
     "prefix": "contentFor",
     "description": "Used to store a section's output for rendering within a layout. This content store acts as a stack, so you can store multiple pieces of content for a given section.",
     "body": [
-      "contentFor()",
-      "$0"
+      "contentFor()$0"
     ],
     "scope": "cfml"
   },
@@ -966,8 +925,7 @@
     "prefix": "contentForLayout",
     "description": "Includes content for the body section, which equates to the output generated by the view template run by the request.",
     "body": [
-      "contentForLayout()",
-      "$0"
+      "contentForLayout()$0"
     ],
     "scope": "cfml"
   },
@@ -993,8 +951,7 @@
     "prefix": "count",
     "description": "Returns the number of rows that match the arguments (or all rows if no arguments are passed in). Uses the SQL function COUNT. If no records can be found to perform the calculation on, 0 is returned.",
     "body": [
-      "count()",
-      "$0"
+      "count()$0"
     ],
     "scope": "cfml"
   },
@@ -1011,8 +968,7 @@
     "prefix": "create",
     "description": "Creates a new object, saves it to the database (if the validation permits it), and returns it. If the validation fails, the unsaved object (with errors added to it) is still returned. Property names and values can be passed in either using named arguments or as a struct to the properties argument.",
     "body": [
-      "create()",
-      "$0"
+      "create()$0"
     ],
     "scope": "cfml"
   },
@@ -1074,8 +1030,7 @@
     "prefix": "csrfMetaTags",
     "description": "Include this in your layouts' head sections to include meta tags containing the authenticity token for use by JavaScript AJAX requests needing to POST data to your application.",
     "body": [
-      "csrfMetaTags()",
-      "$0"
+      "csrfMetaTags()$0"
     ],
     "scope": "cfml"
   },
@@ -1119,8 +1074,7 @@
     "prefix": "date",
     "description": "Adds date columns to table definition.",
     "body": [
-      "date()",
-      "$0"
+      "date()$0"
     ],
     "scope": "cfml"
   },
@@ -1137,8 +1091,7 @@
     "prefix": "dateSelect",
     "description": "Builds and returns a string containing three select form controls for month, day, and year based on the supplied objectName and property.",
     "body": [
-      "dateSelect()",
-      "$0"
+      "dateSelect()$0"
     ],
     "scope": "cfml"
   },
@@ -1173,8 +1126,7 @@
     "prefix": "datetime",
     "description": "adds datetime columns to table definition",
     "body": [
-      "datetime()",
-      "$0"
+      "datetime()$0"
     ],
     "scope": "cfml"
   },
@@ -1263,8 +1215,7 @@
     "prefix": "decimal",
     "description": "adds decimal columns to table definition",
     "body": [
-      "decimal()",
-      "$0"
+      "decimal()$0"
     ],
     "scope": "cfml"
   },
@@ -1281,8 +1232,7 @@
     "prefix": "delete",
     "description": "Deletes the object, which means the row is deleted from the database (unless prevented by a beforeDelete callback). Returns true on successful deletion of the row, false otherwise.",
     "body": [
-      "delete()",
-      "$0"
+      "delete()$0"
     ],
     "scope": "cfml"
   },
@@ -1299,8 +1249,7 @@
     "prefix": "deleteAll",
     "description": "Deletes all records that match the where argument. By default, objects will not be instantiated and therefore callbacks and validations are not invoked. You can change this behavior by passing in instantiate=true. Returns the number of records that were deleted.",
     "body": [
-      "deleteAll()",
-      "$0"
+      "deleteAll()$0"
     ],
     "scope": "cfml"
   },
@@ -1335,8 +1284,7 @@
     "prefix": "deleteOne",
     "description": "Gets an object based on conditions and deletes it.",
     "body": [
-      "deleteOne()",
-      "$0"
+      "deleteOne()$0"
     ],
     "scope": "cfml"
   },
@@ -1380,8 +1328,7 @@
     "prefix": "down",
     "description": "Migrates down: will be executed when migrating your schema backward Along with up(), these are the two main functions in any migration file Only available in a migration CFC",
     "body": [
-      "down()",
-      "$0"
+      "down()$0"
     ],
     "scope": "cfml"
   },
@@ -1425,8 +1372,7 @@
     "prefix": "end",
     "description": "Call this to end a nested routing block or the entire route configuration. This method is chained on a sequence of routing mapper method calls started by mapper().",
     "body": [
-      "end()",
-      "$0"
+      "end()$0"
     ],
     "scope": "cfml"
   },
@@ -1434,8 +1380,7 @@
     "prefix": "endFormTag",
     "description": "Builds and returns a string containing the closing form tag.",
     "body": [
-      "endFormTag()",
-      "$0"
+      "endFormTag()$0"
     ],
     "scope": "cfml"
   },
@@ -1452,8 +1397,7 @@
     "prefix": "errorCount",
     "description": "Returns the number of errors this object has associated with it. Specify property or name if you wish to count only specific errors.",
     "body": [
-      "errorCount()",
-      "$0"
+      "errorCount()$0"
     ],
     "scope": "cfml"
   },
@@ -1524,8 +1468,7 @@
     "prefix": "errorsOnBase",
     "description": "Returns an array of all errors associated with the object as a whole (not related to any specific property).",
     "body": [
-      "errorsOnBase()",
-      "$0"
+      "errorsOnBase()$0"
     ],
     "scope": "cfml"
   },
@@ -1569,8 +1512,7 @@
     "prefix": "exists",
     "description": "Checks if a record exists in the table. You can pass in either a primary key value to the key argument or a string to the where argument. If you don't pass in either of those, it will simply check if any record exists in the table.",
     "body": [
-      "exists()",
-      "$0"
+      "exists()$0"
     ],
     "scope": "cfml"
   },
@@ -1587,8 +1529,7 @@
     "prefix": "fail",
     "description": "",
     "body": [
-      "fail()",
-      "$0"
+      "fail()$0"
     ],
     "scope": "cfml"
   },
@@ -1641,8 +1582,7 @@
     "prefix": "filterChain",
     "description": "Returns an array of all the filters set on current controller in the order in which they will be executed.",
     "body": [
-      "filterChain()",
-      "$0"
+      "filterChain()$0"
     ],
     "scope": "cfml"
   },
@@ -1677,8 +1617,7 @@
     "prefix": "findAll",
     "description": "Returns records from the database table mapped to this model according to the arguments passed in (use the where argument to decide which records to get, use the order argument to set the order in which those records should be returned, and so on). The records will be returned as either a cfquery result set, an array of objects, or an array of structs (depending on what the returnAs argument is set to).",
     "body": [
-      "findAll()",
-      "$0"
+      "findAll()$0"
     ],
     "scope": "cfml"
   },
@@ -1695,8 +1634,7 @@
     "prefix": "findAllKeys",
     "description": "Returns all primary key values in a list. In addition to quoted and delimiter you can pass in any argument that findAll() accepts.",
     "body": [
-      "findAllKeys()",
-      "$0"
+      "findAllKeys()$0"
     ],
     "scope": "cfml"
   },
@@ -1731,8 +1669,7 @@
     "prefix": "findFirst",
     "description": "Fetches the first record ordered by primary key value. Use the property argument to order by something else. Returns a model object.",
     "body": [
-      "findFirst()",
-      "$0"
+      "findFirst()$0"
     ],
     "scope": "cfml"
   },
@@ -1749,8 +1686,7 @@
     "prefix": "findLastOne",
     "description": "Fetches the last record ordered by primary key value. Use the property argument to order by something else. Returns a model object. Formerly known as findLast.",
     "body": [
-      "findLastOne()",
-      "$0"
+      "findLastOne()$0"
     ],
     "scope": "cfml"
   },
@@ -1767,8 +1703,7 @@
     "prefix": "findOne",
     "description": "Fetches the first record found based on the WHERE and ORDER BY clauses. With the default settings (i.e. the returnAs argument set to object), a model object will be returned if the record is found and the boolean value false if not. Instead of using the where argument, you can create cleaner code by making use of a concept called Dynamic Finders.",
     "body": [
-      "findOne()",
-      "$0"
+      "findOne()$0"
     ],
     "scope": "cfml"
   },
@@ -1785,8 +1720,7 @@
     "prefix": "flash",
     "description": "Returns the value of a specific key in the Flash (or the entire Flash as a struct if no key is passed in).",
     "body": [
-      "flash()",
-      "$0"
+      "flash()$0"
     ],
     "scope": "cfml"
   },
@@ -1803,8 +1737,7 @@
     "prefix": "flashClear",
     "description": "Deletes everything from the Flash.",
     "body": [
-      "flashClear()",
-      "$0"
+      "flashClear()$0"
     ],
     "scope": "cfml"
   },
@@ -1812,8 +1745,7 @@
     "prefix": "flashCount",
     "description": "Returns how many keys exist in the Flash.",
     "body": [
-      "flashCount()",
-      "$0"
+      "flashCount()$0"
     ],
     "scope": "cfml"
   },
@@ -1830,8 +1762,7 @@
     "prefix": "flashInsert",
     "description": "Inserts a new key / value into the Flash.",
     "body": [
-      "flashInsert()",
-      "$0"
+      "flashInsert()$0"
     ],
     "scope": "cfml"
   },
@@ -1839,8 +1770,7 @@
     "prefix": "flashIsEmpty",
     "description": "Returns whether or not the Flash is empty.",
     "body": [
-      "flashIsEmpty()",
-      "$0"
+      "flashIsEmpty()$0"
     ],
     "scope": "cfml"
   },
@@ -1848,8 +1778,7 @@
     "prefix": "flashKeep",
     "description": "Make the entire Flash or specific key in it stick around for one more request.",
     "body": [
-      "flashKeep()",
-      "$0"
+      "flashKeep()$0"
     ],
     "scope": "cfml"
   },
@@ -1875,8 +1804,7 @@
     "prefix": "flashMessages",
     "description": "Displays a marked-up listing of messages that exist in the Flash.",
     "body": [
-      "flashMessages()",
-      "$0"
+      "flashMessages()$0"
     ],
     "scope": "cfml"
   },
@@ -1893,8 +1821,7 @@
     "prefix": "float",
     "description": "adds float columns to table definition",
     "body": [
-      "float()",
-      "$0"
+      "float()$0"
     ],
     "scope": "cfml"
   },
@@ -1929,8 +1856,7 @@
     "prefix": "getAvailableMigrations",
     "description": "Searches db/migrate folder for migrations. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
     "body": [
-      "getAvailableMigrations()",
-      "$0"
+      "getAvailableMigrations()$0"
     ],
     "scope": "cfml"
   },
@@ -1947,8 +1873,7 @@
     "prefix": "getCurrentMigrationVersion",
     "description": "Returns current database version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
     "body": [
-      "getCurrentMigrationVersion()",
-      "$0"
+      "getCurrentMigrationVersion()$0"
     ],
     "scope": "cfml"
   },
@@ -1956,8 +1881,7 @@
     "prefix": "getEmails",
     "description": "Primarily used for testing to get information about emails sent during the request.",
     "body": [
-      "getEmails()",
-      "$0"
+      "getEmails()$0"
     ],
     "scope": "cfml"
   },
@@ -1965,8 +1889,7 @@
     "prefix": "getFiles",
     "description": "Primarily used for testing to get information about files sent during the request.",
     "body": [
-      "getFiles()",
-      "$0"
+      "getFiles()$0"
     ],
     "scope": "cfml"
   },
@@ -1974,8 +1897,7 @@
     "prefix": "getRedirect",
     "description": "Primarily used for testing to establish whether the current request has performed a redirect.",
     "body": [
-      "getRedirect()",
-      "$0"
+      "getRedirect()$0"
     ],
     "scope": "cfml"
   },
@@ -1983,8 +1905,7 @@
     "prefix": "getRoutes",
     "description": "",
     "body": [
-      "getRoutes()",
-      "$0"
+      "getRoutes()$0"
     ],
     "scope": "cfml"
   },
@@ -1992,8 +1913,7 @@
     "prefix": "getTableNamePrefix",
     "description": "Returns the table name prefix set for the table.",
     "body": [
-      "getTableNamePrefix()",
-      "$0"
+      "getTableNamePrefix()$0"
     ],
     "scope": "cfml"
   },
@@ -2001,8 +1921,7 @@
     "prefix": "globalHelperFunction",
     "description": "",
     "body": [
-      "globalHelperFunction()",
-      "$0"
+      "globalHelperFunction()$0"
     ],
     "scope": "cfml"
   },
@@ -2010,8 +1929,7 @@
     "prefix": "hasChanged",
     "description": "Returns true if the specified property (or any if none was passed in) has been changed but not yet saved to the database. Will also return true if the object is new and no record for it exists in the database.",
     "body": [
-      "hasChanged()",
-      "$0"
+      "hasChanged()$0"
     ],
     "scope": "cfml"
   },
@@ -2028,8 +1946,7 @@
     "prefix": "hasErrors",
     "description": "Returns true if the object has any errors. You can also limit to only check a specific property or name for errors.",
     "body": [
-      "hasErrors()",
-      "$0"
+      "hasErrors()$0"
     ],
     "scope": "cfml"
   },
@@ -2244,8 +2161,7 @@
     "prefix": "includeContent",
     "description": "Used to output the content for a particular section in a layout.",
     "body": [
-      "includeContent()",
-      "$0"
+      "includeContent()$0"
     ],
     "scope": "cfml"
   },
@@ -2271,8 +2187,7 @@
     "prefix": "includeLayout",
     "description": "Includes the contents of another layout file. This is usually used to include a parent layout from within a child layout.",
     "body": [
-      "includeLayout()",
-      "$0"
+      "includeLayout()$0"
     ],
     "scope": "cfml"
   },
@@ -2307,8 +2222,7 @@
     "prefix": "integer",
     "description": "adds integer columns to table definition",
     "body": [
-      "integer()",
-      "$0"
+      "integer()$0"
     ],
     "scope": "cfml"
   },
@@ -2343,8 +2257,7 @@
     "prefix": "isAjax",
     "description": "Returns whether the page was called from JavaScript or not.",
     "body": [
-      "isAjax()",
-      "$0"
+      "isAjax()$0"
     ],
     "scope": "cfml"
   },
@@ -2352,8 +2265,7 @@
     "prefix": "isClass",
     "description": "Use this method to check whether you are currently in a class-level object.",
     "body": [
-      "isClass()",
-      "$0"
+      "isClass()$0"
     ],
     "scope": "cfml"
   },
@@ -2361,8 +2273,7 @@
     "prefix": "isDelete",
     "description": "Returns whether the request was a DELETE request or not.",
     "body": [
-      "isDelete()",
-      "$0"
+      "isDelete()$0"
     ],
     "scope": "cfml"
   },
@@ -2370,8 +2281,7 @@
     "prefix": "isGet",
     "description": "Returns whether the request was a normal GET request or not.",
     "body": [
-      "isGet()",
-      "$0"
+      "isGet()$0"
     ],
     "scope": "cfml"
   },
@@ -2379,8 +2289,7 @@
     "prefix": "isHead",
     "description": "Returns whether the request was a HEAD request or not.",
     "body": [
-      "isHead()",
-      "$0"
+      "isHead()$0"
     ],
     "scope": "cfml"
   },
@@ -2388,8 +2297,7 @@
     "prefix": "isInstance",
     "description": "Use this method to check whether you are currently in an instance object.",
     "body": [
-      "isInstance()",
-      "$0"
+      "isInstance()$0"
     ],
     "scope": "cfml"
   },
@@ -2397,8 +2305,7 @@
     "prefix": "isNew",
     "description": "Returns true if this object hasn't been saved yet (in other words, no matching record exists in the database yet). Returns false if a record exists.",
     "body": [
-      "isNew()",
-      "$0"
+      "isNew()$0"
     ],
     "scope": "cfml"
   },
@@ -2406,8 +2313,7 @@
     "prefix": "isOptions",
     "description": "Returns whether the request was an OPTIONS request or not.",
     "body": [
-      "isOptions()",
-      "$0"
+      "isOptions()$0"
     ],
     "scope": "cfml"
   },
@@ -2415,8 +2321,7 @@
     "prefix": "isPatch",
     "description": "Returns whether the request was a PATCH request or not.",
     "body": [
-      "isPatch()",
-      "$0"
+      "isPatch()$0"
     ],
     "scope": "cfml"
   },
@@ -2424,8 +2329,7 @@
     "prefix": "isPersisted",
     "description": "Returns true if this object has been persisted to the database or was loaded from the database via a finder. Returns false if the record has not been persisted to the database.",
     "body": [
-      "isPersisted()",
-      "$0"
+      "isPersisted()$0"
     ],
     "scope": "cfml"
   },
@@ -2433,8 +2337,7 @@
     "prefix": "isPost",
     "description": "Returns whether the request came from a form POST submission or not.",
     "body": [
-      "isPost()",
-      "$0"
+      "isPost()$0"
     ],
     "scope": "cfml"
   },
@@ -2442,8 +2345,7 @@
     "prefix": "isPut",
     "description": "Returns whether the request was a PUT request or not.",
     "body": [
-      "isPut()",
-      "$0"
+      "isPut()$0"
     ],
     "scope": "cfml"
   },
@@ -2451,8 +2353,7 @@
     "prefix": "isSecure",
     "description": "Returns whether Wheels is communicating over a secure port.",
     "body": [
-      "isSecure()",
-      "$0"
+      "isSecure()$0"
     ],
     "scope": "cfml"
   },
@@ -2460,8 +2361,7 @@
     "prefix": "javaScriptIncludeTag",
     "description": "Returns a script tag for a JavaScript file (or several) based on the supplied arguments.",
     "body": [
-      "javaScriptIncludeTag()",
-      "$0"
+      "javaScriptIncludeTag()$0"
     ],
     "scope": "cfml"
   },
@@ -2478,8 +2378,7 @@
     "prefix": "key",
     "description": "Returns the value of the primary key for the object. If you have a single primary key named id, then someObject.key() is functionally equivalent to someObject.id. This method is more useful when you do dynamic programming and don't know the name of the primary key or when you use composite keys (in which case it's convenient to use this method to get a list of both key values returned).",
     "body": [
-      "key()",
-      "$0"
+      "key()$0"
     ],
     "scope": "cfml"
   },
@@ -2496,8 +2395,7 @@
     "prefix": "linkTo",
     "description": "Creates a link to another page in your application. Pass in the name of a route to use your configured routes or a controller/action/key combination. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
     "body": [
-      "linkTo()",
-      "$0"
+      "linkTo()$0"
     ],
     "scope": "cfml"
   },
@@ -2532,8 +2430,7 @@
     "prefix": "mapper",
     "description": "Returns the mapper object used to configure your application's routes. Usually you will use this method in config/routes.cfm to start chaining route mapping methods like resources, namespace, etc.",
     "body": [
-      "mapper()",
-      "$0"
+      "mapper()$0"
     ],
     "scope": "cfml"
   },
@@ -2568,8 +2465,7 @@
     "prefix": "member",
     "description": "Scope routes within a nested resource which require use of the primary key as part of the URL pattern; A member route will require an ID, because it acts on a member. photos/1/preview is an example of a member route, because it acts on (and displays) a single object.",
     "body": [
-      "member()",
-      "$0"
+      "member()$0"
     ],
     "scope": "cfml"
   },
@@ -2577,8 +2473,7 @@
     "prefix": "migrateTo",
     "description": "Migrates database to a specified version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
     "body": [
-      "migrateTo()",
-      "$0"
+      "migrateTo()$0"
     ],
     "scope": "cfml"
   },
@@ -2595,8 +2490,7 @@
     "prefix": "migrateToLatest",
     "description": "Shortcut function to migrate to the latest version",
     "body": [
-      "migrateToLatest()",
-      "$0"
+      "migrateToLatest()$0"
     ],
     "scope": "cfml"
   },
@@ -2703,8 +2597,7 @@
     "prefix": "nestedProperties",
     "description": "Allows for nested objects, structs, and arrays to be set from params and other generated data.",
     "body": [
-      "nestedProperties()",
-      "$0"
+      "nestedProperties()$0"
     ],
     "scope": "cfml"
   },
@@ -2721,8 +2614,7 @@
     "prefix": "new",
     "description": "Creates a new object based on supplied properties and returns it. The object is not saved to the database, it only exists in memory. Property names and values can be passed in either using named arguments or as a struct to the properties argument.",
     "body": [
-      "new()",
-      "$0"
+      "new()$0"
     ],
     "scope": "cfml"
   },
@@ -2748,8 +2640,7 @@
     "prefix": "onlyProvides",
     "description": "Use this in an individual controller action to define which formats the action will respond with. This can be used to define provides behavior in individual actions or to override a global setting set with provides in the controller's config().",
     "body": [
-      "onlyProvides()",
-      "$0"
+      "onlyProvides()$0"
     ],
     "scope": "cfml"
   },
@@ -2793,8 +2684,7 @@
     "prefix": "packageSetup",
     "description": "Executes once before this package's first test case.",
     "body": [
-      "packageSetup()",
-      "$0"
+      "packageSetup()$0"
     ],
     "scope": "cfml"
   },
@@ -2802,8 +2692,7 @@
     "prefix": "packageTeardown",
     "description": "Executes once after this package's last test case.",
     "body": [
-      "packageTeardown()",
-      "$0"
+      "packageTeardown()$0"
     ],
     "scope": "cfml"
   },
@@ -2811,8 +2700,7 @@
     "prefix": "pagination",
     "description": "Returns a struct with information about the specificed paginated query. The keys that will be included in the struct are currentPage, totalPages and totalRecords.",
     "body": [
-      "pagination()",
-      "$0"
+      "pagination()$0"
     ],
     "scope": "cfml"
   },
@@ -2829,8 +2717,7 @@
     "prefix": "paginationLinks",
     "description": "Builds and returns a string containing links to pages based on a paginated query. Uses linkTo() internally to build the link, so you need to pass in a route name or a controller/action/key combination. All other linkTo() arguments can be supplied as well, in which case they are passed through directly to linkTo(). If you have paginated more than one query in the controller, you can use the handle argument to reference them. (Don't forget to pass in a handle to the findAll() function in your controller first.)",
     "body": [
-      "paginationLinks()",
-      "$0"
+      "paginationLinks()$0"
     ],
     "scope": "cfml"
   },
@@ -2883,8 +2770,7 @@
     "prefix": "patch",
     "description": "Create a route that matches a URL requiring an HTTP PATCH method. We recommend using this matcher to expose actions that update database records.",
     "body": [
-      "patch()",
-      "$0"
+      "patch()$0"
     ],
     "scope": "cfml"
   },
@@ -2901,8 +2787,7 @@
     "prefix": "pluginNames",
     "description": "Returns a list of the names of all installed plugins.",
     "body": [
-      "pluginNames()",
-      "$0"
+      "pluginNames()$0"
     ],
     "scope": "cfml"
   },
@@ -2928,8 +2813,7 @@
     "prefix": "post",
     "description": "Create a route that matches a URL requiring an HTTP POST method. We recommend using this matcher to expose actions that create database records.",
     "body": [
-      "post()",
-      "$0"
+      "post()$0"
     ],
     "scope": "cfml"
   },
@@ -2964,8 +2848,7 @@
     "prefix": "primaryKeys",
     "description": "Alias for primaryKey(). Use this for better readability when you're accessing multiple primary keys.",
     "body": [
-      "primaryKeys()",
-      "$0"
+      "primaryKeys()$0"
     ],
     "scope": "cfml"
   },
@@ -2982,8 +2865,7 @@
     "prefix": "processAction",
     "description": "Process the specified action of the controller. This is exposed in the API primarily for testing purposes; you would not usually call it directly unless in the test suite.",
     "body": [
-      "processAction()",
-      "$0"
+      "processAction()$0"
     ],
     "scope": "cfml"
   },
@@ -3018,8 +2900,7 @@
     "prefix": "properties",
     "description": "Returns a structure of all the properties with their names as keys and the values of the property as values.",
     "body": [
-      "properties()",
-      "$0"
+      "properties()$0"
     ],
     "scope": "cfml"
   },
@@ -3072,8 +2953,7 @@
     "prefix": "propertyNames",
     "description": "Returns a list of property names ordered by their respective column's ordinal position in the database table. Also includes calculated property names that will be generated by the Wheels ORM.",
     "body": [
-      "propertyNames()",
-      "$0"
+      "propertyNames()$0"
     ],
     "scope": "cfml"
   },
@@ -3081,8 +2961,7 @@
     "prefix": "protectedProperties",
     "description": "Use this method to specify which properties cannot be set through mass assignment.",
     "body": [
-      "protectedProperties()",
-      "$0"
+      "protectedProperties()$0"
     ],
     "scope": "cfml"
   },
@@ -3099,8 +2978,7 @@
     "prefix": "protectsFromForgery",
     "description": "Tells Wheels to protect POSTed requests from CSRF vulnerabilities. Instructs the controller to verify that params.authenticityToken or X-CSRF-Token HTTP header is provided along with the request containing a valid authenticity token. Call this method within a controller's config method, preferably the base Controller.cfc file, to protect the entire application.",
     "body": [
-      "protectsFromForgery()",
-      "$0"
+      "protectsFromForgery()$0"
     ],
     "scope": "cfml"
   },
@@ -3117,8 +2995,7 @@
     "prefix": "provides",
     "description": "Defines formats that the controller will respond with upon request. The format can be requested through a URL variable called format, by appending the format name to the end of a URL as an extension (when URL rewriting is enabled), or in the request header.",
     "body": [
-      "provides()",
-      "$0"
+      "provides()$0"
     ],
     "scope": "cfml"
   },
@@ -3135,8 +3012,7 @@
     "prefix": "put",
     "description": "Create a route that matches a URL requiring an HTTP PUT method. We recommend using this matcher to expose actions that update database records. This method is provided as a convenience for when you really need to support the PUT verb; consider using the patch matcher instead of this one.",
     "body": [
-      "put()",
-      "$0"
+      "put()$0"
     ],
     "scope": "cfml"
   },
@@ -3198,8 +3074,7 @@
     "prefix": "redirectTo",
     "description": "Redirects the browser to the supplied controller/action/key, route or back to the referring page. Internally, this function uses the URLFor function to build the link and the cflocation tag to perform the redirect.",
     "body": [
-      "redirectTo()",
-      "$0"
+      "redirectTo()$0"
     ],
     "scope": "cfml"
   },
@@ -3216,8 +3091,7 @@
     "prefix": "redoMigration",
     "description": "Reruns the specified migration version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface",
     "body": [
-      "redoMigration()",
-      "$0"
+      "redoMigration()$0"
     ],
     "scope": "cfml"
   },
@@ -3252,8 +3126,7 @@
     "prefix": "reload",
     "description": "Reloads the property values of this object from the database.",
     "body": [
-      "reload()",
-      "$0"
+      "reload()$0"
     ],
     "scope": "cfml"
   },
@@ -3324,8 +3197,7 @@
     "prefix": "renderNothing",
     "description": "Instructs the controller to render an empty string when it's finished processing the action. This is very similar to calling cfabort with the advantage that any after filters you have set on the action will still be run.",
     "body": [
-      "renderNothing()",
-      "$0"
+      "renderNothing()$0"
     ],
     "scope": "cfml"
   },
@@ -3360,8 +3232,7 @@
     "prefix": "renderText",
     "description": "Instructs the controller to render specified text when it's finished processing the action.",
     "body": [
-      "renderText()",
-      "$0"
+      "renderText()$0"
     ],
     "scope": "cfml"
   },
@@ -3378,8 +3249,7 @@
     "prefix": "renderView",
     "description": "Instructs the controller which view template and layout to render when it's finished processing the action. Note that when passing values for controller and / or action, this function does not execute the actual action but rather just loads the corresponding view template.",
     "body": [
-      "renderView()",
-      "$0"
+      "renderView()$0"
     ],
     "scope": "cfml"
   },
@@ -3414,8 +3284,7 @@
     "prefix": "resetCycle",
     "description": "Resets a cycle so that it starts from the first list value the next time it is called.",
     "body": [
-      "resetCycle()",
-      "$0"
+      "resetCycle()$0"
     ],
     "scope": "cfml"
   },
@@ -3468,8 +3337,7 @@
     "prefix": "response",
     "description": "Returns content that Wheels will send to the client in response to the request.",
     "body": [
-      "response()",
-      "$0"
+      "response()$0"
     ],
     "scope": "cfml"
   },
@@ -3477,8 +3345,7 @@
     "prefix": "root",
     "description": "Create a route that matches the root of its current context. This mapper can be used for the application's web root (or home page), or it can generate a route for the root of a namespace or other path scoping mapper.",
     "body": [
-      "root()",
-      "$0"
+      "root()$0"
     ],
     "scope": "cfml"
   },
@@ -3495,8 +3362,7 @@
     "prefix": "save",
     "description": "Saves the object if it passes validation and callbacks. Returns true if the object was saved successfully to the database, false if not.",
     "body": [
-      "save()",
-      "$0"
+      "save()$0"
     ],
     "scope": "cfml"
   },
@@ -3513,8 +3379,7 @@
     "prefix": "scope",
     "description": "Set any number of parameters to be inherited by mappers called within this matcher's block. For example, set a package or URL path to be used by all child routes.",
     "body": [
-      "scope()",
-      "$0"
+      "scope()$0"
     ],
     "scope": "cfml"
   },
@@ -3585,8 +3450,7 @@
     "prefix": "sendEmail",
     "description": "Sends an email using a template and an optional layout to wrap it in. Besides the Wheels-specific arguments documented here, you can also pass in any argument that is accepted by the cfmail tag as well as your own arguments to be used by the view.",
     "body": [
-      "sendEmail()",
-      "$0"
+      "sendEmail()$0"
     ],
     "scope": "cfml"
   },
@@ -3621,8 +3485,7 @@
     "prefix": "set",
     "description": "Use to configure a global setting or set a default for a function.",
     "body": [
-      "set()",
-      "$0"
+      "set()$0"
     ],
     "scope": "cfml"
   },
@@ -3675,8 +3538,7 @@
     "prefix": "setProperties",
     "description": "Allows you to set all the properties of an object at once by passing in a structure with keys matching the property names.",
     "body": [
-      "setProperties()",
-      "$0"
+      "setProperties()$0"
     ],
     "scope": "cfml"
   },
@@ -3711,8 +3573,7 @@
     "prefix": "setup",
     "description": "Executes before every test case.",
     "body": [
-      "setup()",
-      "$0"
+      "setup()$0"
     ],
     "scope": "cfml"
   },
@@ -3756,8 +3617,7 @@
     "prefix": "startFormTag",
     "description": "Builds and returns a string containing the opening form tag. The form's action will be built according to the same rules as URLFor. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
     "body": [
-      "startFormTag()",
-      "$0"
+      "startFormTag()$0"
     ],
     "scope": "cfml"
   },
@@ -3774,8 +3634,7 @@
     "prefix": "string",
     "description": "adds string columns to table definition",
     "body": [
-      "string()",
-      "$0"
+      "string()$0"
     ],
     "scope": "cfml"
   },
@@ -3828,8 +3687,7 @@
     "prefix": "styleSheetLinkTag",
     "description": "Returns a link tag for a stylesheet (or several) based on the supplied arguments.",
     "body": [
-      "styleSheetLinkTag()",
-      "$0"
+      "styleSheetLinkTag()$0"
     ],
     "scope": "cfml"
   },
@@ -3846,8 +3704,7 @@
     "prefix": "submitTag",
     "description": "Builds and returns a string containing a submit button form control. Note: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.",
     "body": [
-      "submitTag()",
-      "$0"
+      "submitTag()$0"
     ],
     "scope": "cfml"
   },
@@ -3891,8 +3748,7 @@
     "prefix": "tableName",
     "description": "Returns the name of the database table that this model is mapped to.",
     "body": [
-      "tableName()",
-      "$0"
+      "tableName()$0"
     ],
     "scope": "cfml"
   },
@@ -3900,8 +3756,7 @@
     "prefix": "teardown",
     "description": "Executes after every test case.",
     "body": [
-      "teardown()",
-      "$0"
+      "teardown()$0"
     ],
     "scope": "cfml"
   },
@@ -3909,8 +3764,7 @@
     "prefix": "testExample",
     "description": "An example test.",
     "body": [
-      "testExample()",
-      "$0"
+      "testExample()$0"
     ],
     "scope": "cfml"
   },
@@ -3918,8 +3772,7 @@
     "prefix": "text",
     "description": "adds text columns to table definition",
     "body": [
-      "text()",
-      "$0"
+      "text()$0"
     ],
     "scope": "cfml"
   },
@@ -4008,8 +3861,7 @@
     "prefix": "time",
     "description": "adds time columns to table definition",
     "body": [
-      "time()",
-      "$0"
+      "time()$0"
     ],
     "scope": "cfml"
   },
@@ -4044,8 +3896,7 @@
     "prefix": "timeSelect",
     "description": "Builds and returns a string containing three select form controls for hour, minute, and second based on the supplied objectName and property.",
     "body": [
-      "timeSelect()",
-      "$0"
+      "timeSelect()$0"
     ],
     "scope": "cfml"
   },
@@ -4080,8 +3931,7 @@
     "prefix": "timestamp",
     "description": "adds timestamp columns to table definition",
     "body": [
-      "timestamp()",
-      "$0"
+      "timestamp()$0"
     ],
     "scope": "cfml"
   },
@@ -4098,8 +3948,7 @@
     "prefix": "timestamps",
     "description": "adds Wheels convention automatic timestamp and soft delete columns to table definition",
     "body": [
-      "timestamps()",
-      "$0"
+      "timestamps()$0"
     ],
     "scope": "cfml"
   },
@@ -4170,8 +4019,7 @@
     "prefix": "uniqueidentifier",
     "description": "adds UUID columns to table definition",
     "body": [
-      "uniqueidentifier()",
-      "$0"
+      "uniqueidentifier()$0"
     ],
     "scope": "cfml"
   },
@@ -4188,8 +4036,7 @@
     "prefix": "up",
     "description": "Migrates up: will be executed when migrating your schema forward Along with down(), these are the two main functions in any migration file Only available in a migration CFC",
     "body": [
-      "up()",
-      "$0"
+      "up()$0"
     ],
     "scope": "cfml"
   },
@@ -4197,8 +4044,7 @@
     "prefix": "update",
     "description": "Updates the object with the supplied properties and saves it to the database. Returns true if the object was saved successfully to the database and false otherwise.",
     "body": [
-      "update()",
-      "$0"
+      "update()$0"
     ],
     "scope": "cfml"
   },
@@ -4215,8 +4061,7 @@
     "prefix": "updateAll",
     "description": "Updates all properties for the records that match the where argument. Property names and values can be passed in either using named arguments or as a struct to the properties argument. By default, objects will not be instantiated and therefore callbacks and validations are not invoked. You can change this behavior by passing in instantiate=true. This method returns the number of records that were updated.",
     "body": [
-      "updateAll()",
-      "$0"
+      "updateAll()$0"
     ],
     "scope": "cfml"
   },
@@ -4251,8 +4096,7 @@
     "prefix": "updateOne",
     "description": "Gets an object based on the arguments used and updates it with the supplied properties. Returns true if an object was found and updated successfully, false otherwise.",
     "body": [
-      "updateOne()",
-      "$0"
+      "updateOne()$0"
     ],
     "scope": "cfml"
   },
@@ -4269,8 +4113,7 @@
     "prefix": "updateProperty",
     "description": "Updates a single property and saves the record without going through the normal validation procedure. This is especially useful for boolean flags on existing records.",
     "body": [
-      "updateProperty()",
-      "$0"
+      "updateProperty()$0"
     ],
     "scope": "cfml"
   },
@@ -4305,8 +4148,7 @@
     "prefix": "URLFor",
     "description": "Creates an internal URL based on supplied arguments.",
     "body": [
-      "URLFor()",
-      "$0"
+      "URLFor()$0"
     ],
     "scope": "cfml"
   },
@@ -4341,8 +4183,7 @@
     "prefix": "valid",
     "description": "Runs the validation on the object and returns true if it passes it. Wheels will run the validation process automatically whenever an object is saved to the database, but sometimes it's useful to be able to run this method to see if the object is valid without saving it to the database.",
     "body": [
-      "valid()",
-      "$0"
+      "valid()$0"
     ],
     "scope": "cfml"
   },
@@ -4359,8 +4200,7 @@
     "prefix": "validate",
     "description": "Registers method(s) that should be called to validate objects before they are saved.",
     "body": [
-      "validate()",
-      "$0"
+      "validate()$0"
     ],
     "scope": "cfml"
   },
@@ -4377,8 +4217,7 @@
     "prefix": "validateOnCreate",
     "description": "Registers method(s) that should be called to validate new objects before they are inserted.",
     "body": [
-      "validateOnCreate()",
-      "$0"
+      "validateOnCreate()$0"
     ],
     "scope": "cfml"
   },
@@ -4395,8 +4234,7 @@
     "prefix": "validateOnUpdate",
     "description": "Registers method(s) that should be called to validate existing objects before they are updated.",
     "body": [
-      "validateOnUpdate()",
-      "$0"
+      "validateOnUpdate()$0"
     ],
     "scope": "cfml"
   },
@@ -4413,8 +4251,7 @@
     "prefix": "validatesConfirmationOf",
     "description": "Validates that the value of the specified property also has an identical confirmation value. This is common when having a user type in their email address a second time to confirm, confirming a password by typing it a second time, etc. The confirmation value only exists temporarily and never gets saved to the database. By convention, the confirmation property has to be named the same as the property with \"Confirmation\" appended at the end. Using the password example, to confirm our password property, we would create a property called passwordConfirmation.",
     "body": [
-      "validatesConfirmationOf()",
-      "$0"
+      "validatesConfirmationOf()$0"
     ],
     "scope": "cfml"
   },
@@ -4449,8 +4286,7 @@
     "prefix": "validatesFormatOf",
     "description": "Validates that the value of the specified property is formatted correctly by matching it against a regular expression using the regEx argument and / or against a built-in CFML validation type using the type argument (creditcard, date, email, etc.).",
     "body": [
-      "validatesFormatOf()",
-      "$0"
+      "validatesFormatOf()$0"
     ],
     "scope": "cfml"
   },
@@ -4485,8 +4321,7 @@
     "prefix": "validatesLengthOf",
     "description": "Validates that the value of the specified property matches the length requirements supplied. Use the exactly, maximum, minimum and within arguments to specify the length requirements.",
     "body": [
-      "validatesLengthOf()",
-      "$0"
+      "validatesLengthOf()$0"
     ],
     "scope": "cfml"
   },
@@ -4503,8 +4338,7 @@
     "prefix": "validatesNumericalityOf",
     "description": "Validates that the value of the specified property is numeric.",
     "body": [
-      "validatesNumericalityOf()",
-      "$0"
+      "validatesNumericalityOf()$0"
     ],
     "scope": "cfml"
   },
@@ -4521,8 +4355,7 @@
     "prefix": "validatesPresenceOf",
     "description": "Validates that the specified property exists and that its value is not blank.",
     "body": [
-      "validatesPresenceOf()",
-      "$0"
+      "validatesPresenceOf()$0"
     ],
     "scope": "cfml"
   },
@@ -4539,8 +4372,7 @@
     "prefix": "validatesUniquenessOf",
     "description": "Validates that the value of the specified property is unique in the database table. Useful for ensuring that two users can't sign up to a website with identical usernames for example. When a new record is created, a check is made to make sure that no record already exists in the database table with the given value for the specified property. When the record is updated, the same check is made but disregarding the record itself.",
     "body": [
-      "validatesUniquenessOf()",
-      "$0"
+      "validatesUniquenessOf()$0"
     ],
     "scope": "cfml"
   },
@@ -4566,8 +4398,7 @@
     "prefix": "verificationChain",
     "description": "Returns an array of all the verifications set on this controller in the order in which they will be executed.",
     "body": [
-      "verificationChain()",
-      "$0"
+      "verificationChain()$0"
     ],
     "scope": "cfml"
   },
@@ -4575,8 +4406,7 @@
     "prefix": "verifies",
     "description": "Instructs Wheels to verify that some specific criterias are met before running an action. Note that all undeclared arguments will be passed to redirectTo() call if a handler is not specified.",
     "body": [
-      "verifies()",
-      "$0"
+      "verifies()$0"
     ],
     "scope": "cfml"
   },
@@ -4593,8 +4423,7 @@
     "prefix": "wildcard",
     "description": "Special wildcard matching generates routes with `",
     "body": [
-      "wildcard()",
-      "$0"
+      "wildcard()$0"
     ],
     "scope": "cfml"
   },
@@ -4647,8 +4476,7 @@
     "prefix": "setFlashStorage",
     "description": "Dynamically sets flashStorage during request lifecycle.",
     "body": [
-      "setFlashStorage()",
-      "$0"
+      "setFlashStorage()$0"
     ],
     "scope": "cfml"
   },

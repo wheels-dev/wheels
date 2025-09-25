@@ -99,6 +99,7 @@
 * [Using the Test Environment](working-with-wheels/using-the-test-environment.md)
 * [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
 * [Contributing to Wheels VS Code Extension](working-with-wheels/contributing-to-wheels-vscode-extension.md)
+* [Contributing to Wheels Windows Installer](working-with-wheels/contributing-to-wheels-windows-installer.md)
 * [Submitting Pull Requests](working-with-wheels/submitting-pull-requests.md)
 * [Documenting your Code](working-with-wheels/documenting-your-code.md)
 
