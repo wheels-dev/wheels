@@ -106,17 +106,146 @@ class WheelsHoverProvider {
         try {
             const range = document.getWordRangeAtPosition(position);
             if (!range) return null;
-            
+
             const word = document.getText(range);
             const func = this.functionsData[word];
-            
+
             if (!func) return null;
-            
+
+            // Only show hover if this looks like a function call
+            if (!this.isFunctionCall(document, range)) {
+                return null;
+            }
+
             return this.createProfessionalHover(func);
-            
+
         } catch (error) {
             return null; // Fail silently
         }
+    }
+
+    /**
+     * Check if the word at the given range is being used as a function call
+     * Handles multi-line function calls and various edge cases
+     */
+    isFunctionCall(document, range) {
+        try {
+            // Check if we're inside a string literal or comment
+            if (this.isInStringOrComment(document, range.start)) {
+                return false;
+            }
+
+            // First check the current line for immediate parenthesis
+            const currentLine = document.lineAt(range.start.line);
+            const lineText = currentLine.text;
+            const wordEndIndex = range.end.character;
+
+            // Look for opening parenthesis on the same line (most common case)
+            for (let i = wordEndIndex; i < lineText.length; i++) {
+                const char = lineText[i];
+
+                if (char === '(') {
+                    return true; // Found opening parenthesis - this is a function call
+                } else if (char !== ' ' && char !== '\t') {
+                    // Found non-whitespace that's not '(' - check if it's assignment or other operators
+                    if (char === '=' || char === ';' || char === ',' || char === ')' || char === '}') {
+                        return false; // This is variable assignment or other non-function usage
+                    }
+                    break; // Other non-whitespace - stop looking on this line
+                }
+            }
+
+            // Check next few lines for opening parenthesis (multi-line function calls)
+            const maxLinesToCheck = 5; // Reasonable limit to avoid performance issues
+            for (let lineNum = range.start.line + 1;
+                 lineNum <= range.start.line + maxLinesToCheck && lineNum < document.lineCount;
+                 lineNum++) {
+
+                const nextLineText = document.lineAt(lineNum).text;
+                const trimmedLine = nextLineText.trim();
+
+                // Skip empty lines and comment lines
+                if (trimmedLine === '' || this.isCommentLine(trimmedLine)) {
+                    continue;
+                }
+
+                // Check if line starts with opening parenthesis
+                if (trimmedLine.startsWith('(')) {
+                    return true; // Found opening paren on subsequent line
+                }
+
+                // If we find non-empty, non-comment content that doesn't start with '(',
+                // this is likely not a function call
+                break;
+            }
+
+            return false;
+
+        } catch (error) {
+            return false; // Fail safely
+        }
+    }
+
+    /**
+     * Check if the position is inside a string literal or comment
+     */
+    isInStringOrComment(document, position) {
+        try {
+            const line = document.lineAt(position.line);
+            const lineText = line.text;
+            const charIndex = position.character;
+
+            let inSingleQuote = false;
+            let inDoubleQuote = false;
+
+            for (let i = 0; i < charIndex; i++) {
+                const char = lineText[i];
+                const prevChar = i > 0 ? lineText[i - 1] : '';
+
+                // Check for single-line comment (// or <!--- style)
+                if (!inSingleQuote && !inDoubleQuote) {
+                    // JavaScript/CFML style comment
+                    if (char === '/' && i + 1 < lineText.length && lineText[i + 1] === '/') {
+                        return true;
+                    }
+                    // CFML comment
+                    if (char === '<' && lineText.substring(i, i + 4) === '<!-') {
+                        return true;
+                    }
+                    // Hash comment (CFScript)
+                    if (char === '/' && i + 1 < lineText.length && lineText[i + 1] === '*') {
+                        return true;
+                    }
+                }
+
+                // Skip escaped quotes
+                if (prevChar === '\\') continue;
+
+                // Toggle quote states
+                if (char === '"' && !inSingleQuote) {
+                    inDoubleQuote = !inDoubleQuote;
+                } else if (char === "'" && !inDoubleQuote) {
+                    inSingleQuote = !inSingleQuote;
+                }
+            }
+
+            return inSingleQuote || inDoubleQuote;
+
+        } catch (error) {
+            return false; // Fail safely
+        }
+    }
+
+    /**
+     * Check if a line is a comment line
+     */
+    isCommentLine(lineText) {
+        const trimmed = lineText.trim();
+        return trimmed.startsWith('//') ||
+               trimmed.startsWith('<!-') ||
+               trimmed.startsWith('/*') ||
+               trimmed.startsWith('*') ||
+               trimmed.toLowerCase().startsWith('<cfcomment');
     }
     
     /**
