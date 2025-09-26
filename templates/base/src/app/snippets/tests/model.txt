@@ -1,28 +1,21 @@
 component extends="wheels.Testbox" {
 
-	function beforeAll() {
-		// Setup test data once for all tests in this component
-		// Example: variables.testUser = model("User").create(name="Test User");
-	}
-
-	function afterAll() {
-		// Cleanup test data once after all tests complete
-		// Example: model("User").deleteAll(where="name LIKE 'Test%'");
-	}
-
 	function run() {
-		// Write the name for your test suite in the describe function
-		describe("Model Tests", function() {
 
-			// Only use beforeEach/afterEach when tests need isolated state
-			// Most tests should use the component-level beforeAll/afterAll instead
+		// Write the name for your test suite in the "" in describe function. You can create mutiple suites by writing multiple describes.
+		describe("", () => {
 
-			it("should validate required fields", function() {
-				// Your model tests here
-				var model = model("YourModel").new();
-				expect(model.valid()).toBeFalse();
-			});
+			beforeEach(() => {
+				
+			})
 
-		});
+			afterEach(() => {
+				
+			})
+
+			// Your model tests here:
+			
+
+		})
 	}
 }

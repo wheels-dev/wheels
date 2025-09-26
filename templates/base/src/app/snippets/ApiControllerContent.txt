@@ -1,4 +1,4 @@
-component extends="wheels.Controller" {
+|DescriptionComment|component extends="wheels.Controller" {
 
     function init() {
         provides("json");
