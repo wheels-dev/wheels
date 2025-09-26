@@ -1,5 +1,42 @@
 # Change Log
 
+## [1.1.0] - 2025-09-24
+
+### Added
+- **Go to Definition (F12)**: Navigate directly to Wheels components with Cmd+Click/Ctrl+Click
+  - Model navigation: `model("User")` → jumps to `User.cfc`
+  - Controller actions: `redirectTo(controller="users", action="show")` → jumps to specific action
+  - Route-based navigation: `linkTo(route="editUser")` → jumps to controller action
+  - View definitions: `renderView("users/show")` → jumps to view file
+  - Smart inference: Handles route patterns like `editUser` → `users#edit`
+
+- **File Templates & Scaffolding**: Create Wheels components instantly with intelligent templates
+  - Right-click any folder → "New Wheels Component" submenu
+  - Command Palette: "Wheels: Create Controller/Model/View" commands
+  - Smart naming conventions (User → Users.cfc controller, User.cfc model)
+  - Auto-directory creation and immediate file opening
+  - Complete CRUD templates with error handling and best practices
+
+- **Route Validation**: Real-time route validation with intelligent error detection
+  - Highlights route typos: `rout=` → suggests `route=`
+  - Warns about suspicious route names (too short, all caps, etc.)
+  - Detects missing key parameters in edit/update/delete routes
+  - Suggests using route parameter instead of controller/action for maintainability
+
+- **Enhanced Code Snippets**: Pattern-based snippets for rapid development
+  - `wcontroller` → Complete CRUD controller with all actions, filters, error handling
+  - `wmodel` → Model template with associations, validations, callbacks, custom methods
+  - `wvalidation` → Common validation patterns (presence, uniqueness, format, conditional)
+  - `wassociations` → Relationship patterns (hasMany, belongsTo, hasOne, through)
+  - `wfinders` → Custom finder method examples with complex queries
+
+### Enhanced
+- **Real-time parameter hints**: Shows function parameters as you type
+- **Smart Parameter Highlighting**: Intelligent parameter highlighting the matching parameter
+- **Context-Aware Hover**: Now only shows documentation for actual function calls, not variables or strings
+- **Multi-line Function Detection**: Supports function calls spanning multiple lines
+- **Improved Error Handling**: Extension fails gracefully without crashes
+
 ## [1.0.5] - 2025-09-24
 
 ### Fixed

@@ -1,8 +1,8 @@
 {
 	"name": "wheels-vscode",
 	"displayName": "Wheels VS Code",
-	"description": "Enhance your Wheels development workflow with intelligent code snippets for all framework functions, offered in both minimal (required-only) and comprehensive (all-parameters) variants, plus built-in function documentation.",
-	"version": "1.0.5",
+	"description": "Enhance your Wheels development workflow with intelligent code snippets, smart parameter highlighting that responds to user input, comprehensive function documentation, and built-in Go-to-Definition support for MVC components.",
+	"version": "1.1.0",
 	"engines": {
 		"vscode": "^1.80.0"
 	},
@@ -18,7 +18,8 @@
 	},
 	"license": "MIT",
 	"categories": [
-		"Snippets"
+		"Snippets",
+		"Linters"
 	],
 	"keywords": [
 		"wheels.dev",
@@ -38,6 +39,31 @@
 	"activationEvents": [
 		"onLanguage:cfml"
 	],
+	"configuration": {
+		"title": "Wheels",
+		"properties": {
+			"wheels.enableGoToDefinition": {
+				"type": "boolean",
+				"default": true,
+				"description": "Enable Go to Definition for Wheels MVC components"
+			},
+			"wheels.enableHover": {
+				"type": "boolean",
+				"default": true,
+				"description": "Enable hover documentation for Wheels functions"
+			},
+			"wheels.enableRouteValidation": {
+				"type": "boolean",
+				"default": true,
+				"description": "Enable route validation and error detection"
+			},
+			"wheels.templateCacheSize": {
+				"type": "number",
+				"default": 50,
+				"description": "Maximum number of templates to cache in memory"
+			}
+		}
+	},
 	"main": "./src/extension.js",
 	"contributes": {
 		"languages": [
@@ -58,6 +84,55 @@
 				"command": "wheels.showDocumentation",
 				"title": "Open Wheels Documentation",
 				"category": "Wheels"
+			},
+			{
+				"command": "wheels.createController",
+				"title": "Controller (CRUD Actions)",
+				"category": "Wheels"
+			},
+			{
+				"command": "wheels.createModel",
+				"title": "Model (Validations & Associations)",
+				"category": "Wheels"
+			},
+			{
+				"command": "wheels.createView",
+				"title": "View (Template with Layout)",
+				"category": "Wheels"
+			},
+			{
+				"command": "wheels.newFileWithTemplate",
+				"title": "New File with Template",
+				"category": "Wheels"
+			}
+		],
+		"menus": {
+			"explorer/context": [
+				{
+					"submenu": "wheels.create",
+					"group": "2_workspace",
+					"when": "explorerResourceIsFolder"
+				}
+			],
+			"wheels.create": [
+				{
+					"command": "wheels.createController",
+					"group": "1_components"
+				},
+				{
+					"command": "wheels.createModel",
+					"group": "1_components"
+				},
+				{
+					"command": "wheels.createView",
+					"group": "1_components"
+				}
+			]
+		},
+		"submenus": [
+			{
+				"id": "wheels.create",
+				"label": "New Wheels Component"
 			}
 		]
 	},
