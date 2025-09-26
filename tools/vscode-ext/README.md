@@ -1,96 +1,47 @@
 # Wheels VS Code Extension
 
-The ultimate VS Code extension for Wheels framework development! Boost your productivity with intelligent scaffolding, real-time validation, comprehensive snippets, professional documentation, Go to Definition, and IntelliSense parameter hints.
+The ultimate VS Code extension for Wheels framework development! Boost your productivity and makes development easier and faster. Get helpful code completion, smart navigation, file templates, and real-time assistance as you write your CFML code.
 
-## Features in Action
-
-### File Templates & Scaffolding
-![Wheels File Scaffolding](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/wheels-demo-01.gif)
-
-### IntelliSense & Parameter Hints
-![Wheels IntelliSense](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/wheels-demo-02.gif)
-
-### Go to Definition & Smart Navigation
-![Wheels Navigation](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/wheels-demo-03.gif)
-
-## Key Features
+## Features
 
 ### File Templates & Scaffolding
-- **Right-click scaffolding**: Create controllers, models, and views instantly from Explorer
-- **Command palette integration**: `Wheels: Create Controller/Model/View`
-- **Smart naming conventions**:
-  - Input "User" → creates "Users.cfc" controller (plural)
-  - Input "User" → creates "User.cfc" model (singular)
-  - Automatically handles whitespace trimming
-- **Complete templates**: Full CRUD controllers with error handling, models with validations
-- **Auto-directory creation**: Creates missing folders automatically
-- **Intelligent path detection**: Works from any directory, finds correct app structure
 
-### Go to Definition (F12)
-- **Model navigation**: `Cmd+Click` (macOS) or `Ctrl+Click` (Windows/Linux) on `model("User")` → jumps to `User.cfc`
-- **Controller actions**: `Cmd+Click` (macOS) or `Ctrl+Click` (Windows/Linux) on `redirectTo(controller="users", action="show")` → jumps to specific action
-- **Route-based navigation**: `Cmd+Click` (macOS) or `Ctrl+Click` (Windows/Linux) on `linkTo(route="editUser")` → jumps to controller action
-- **View definitions**: `Cmd+Click` (macOS) or `Ctrl+Click` (Windows/Linux) on `renderView("users/show")` → jumps to view file
-- **Smart inference**: Handles route patterns like `editUser` → `users#edit`
+Create complete Wheels controllers, models, and views templates instantly with ready-made templates that include common code patterns, validations, and best practices.
 
-### IntelliSense Parameter Hints (Ctrl+Shift+Space)
-- **Real-time parameter hints**: Shows function signatures as you type
-- **Active parameter highlighting**: Highlights current parameter position
-- **300+ Wheels functions**: Complete parameter information for all framework functions
-- **Method chaining support**: Works with `model("User").findAll()` patterns
-- **Smart triggers**: Activates on `(`, `,`, and space characters
+**How to use it:**
+- **Right-click method:** Right-click any folder → "New Wheels Component" → Choose Controller/Model/View → Enter name
+    ![Wheels File Scaffolding Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/scaffolding-demo-1.gif)
+- **Command palette:** Ctrl+Shift+P → "Wheels: Create Controller" → Enter target path → Enter name
+    ![Wheels File Scaffolding Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/scaffolding-demo-2.gif)
+    ![Wheels File Scaffolding Demo 3](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/scaffolding-demo-3.gif)
 
-### Route Validation
-- **Real-time error detection**: Catches route typos as you type
-- **Smart suggestions**: `rout=` → suggests `route=`
-- **Parameter validation**: Warns about missing `key` parameter in edit/update/delete routes
-- **Best practice hints**: Suggests route parameters over controller/action
-- **Typo detection**: Identifies suspicious route names and common mistakes
+**Examples:**
+- Right-click `templates` folder → Create Controller → Type "Users" → Creates `Users.cfc` in `templates` folder
+- Command Palette → "Wheels: Create Model" → Path: `app/models/admin` → Name: "User" → Creates `User.cfc` in that location
 
-### Enhanced Code Snippets
-- **Template snippets**: `wcontroller`, `wmodel` with automatic CFML language detection
-- **Rapid development**: Type `wcontroller` + Tab → get complete CRUD controller
-- **Best practices included**: Error handling, validation patterns, proper associations
-- **Smart caching**: Templates cached for better performance
-- **Auto-language detection**: Automatically sets file language to CFML
+**Features:**
+- Files use the name you type
+- Creates missing directories automatically
+- Complete CRUD controllers with error handling
+- Models with validations, associations, and custom methods
+- Views with proper CFML template structure
 
-### Context-Aware Documentation (Hover)
-- **Smart hover**: Only shows documentation for actual function calls (not variables or strings)
-- **Multi-line support**: Works with function calls spanning multiple lines
-- **Professional formatting**: Clean, VS Code-style documentation with examples
-- **Parameter tables**: Types, defaults, and descriptions for all parameters
-- **Framework context**: Shows which scope functions are available in
-- **Performance optimized**: Lazy loading with intelligent caching
+---
 
-### Developer Productivity
-- **300+ framework functions** with intelligent autocomplete
-- **Two variants per function**: minimal (required) and comprehensive (all params)
-- **Multi-version support**: Works with all Wheels versions
-- **Zero configuration**: Works out of the box
-- **Template caching**: Fast template loading and generation
+### Quick Code Templates
 
-## Quick Start Guide
+Type short keywords and press Tab to expand into complete code templates with proper structure and best practices.
 
-### 1. Creating Files
+**How to use it:**
+- In any CFML file, type the snippet keyword
+- Press Tab to expand
+- Language is automatically set to CFML
 
-#### Right-Click Method (Recommended)
-1. **Right-click any folder** in VS Code Explorer
-2. Select **"New Wheels Component"**
-3. Choose: **"Controller (CRUD Actions)"**, **"Model (Validations & Associations)"**, or **"View (Template with Layout)"**
-4. Enter component name (e.g., "User", "Product")
-5. File created with complete template structure
+**Examples:**
 
-#### Command Palette Method
-1. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
-2. Type: **"Wheels: Create Controller"**
-3. Enter component name
-4. File created in appropriate directory
-
-### 2. Using Code Snippets
-
-#### Quick Templates
+**Controller Template:**
 ```cfml
-// Type "wcontroller" and press Tab:
+// Type "wcontroller" + Tab to get:
 component extends="Controller" {
     function config() {
         // Filters, verification, formats
@@ -113,8 +64,11 @@ component extends="Controller" {
 }
 ```
 
+![Wheels Quick Code Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/quick-code-demo-1.gif)
+
+**Model Template:**
 ```cfml
-// Type "wmodel" and press Tab:
+// Type "wmodel" + Tab to get:
 component extends="Model" {
     function config() {
         // Associations
@@ -141,339 +95,195 @@ component extends="Model" {
 }
 ```
 
-### 3. Navigation with Go to Definition
+![Wheels Quick Code Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/quick-code-demo-2.gif)
 
-#### Model Navigation
+**Available snippets:**
+- `wcontroller` → Complete CRUD controller with all actions and error handling
+- `wmodel` → Model with validations, associations, callbacks, custom methods
+
+[Demo will be added here]
+
+---
+
+### Go to Definition (F12)
+
+Click on Wheels components references to instantly jump to the corresponding files. Works with models, controllers, routes, and views.
+
+**How to use it:**
+- Ctrl+Click (or Cmd+Click on Mac) on any Wheels component reference
+- Or press F12 while cursor is on the component name
+- Or right-click → "Go to Definition"
+
+**Examples:**
 ```cfml
-// Ctrl+Click on "User" to jump to User.cfc
+// Ctrl+Click on "User" to jump to `User.cfc` model
 user = model("User").findAll();
-users = model("User").findByKey(1);
-```
 
-#### Controller & Action Navigation
-```cfml
-// Cmd+Click (macOS) or Ctrl+Click (Windows/Linux) on "users" to jump to Users.cfc
-redirectTo(controller="users", action="show", key=user.id);
+// Ctrl+Click on "users" to jump to `Users.cfc` controller
+redirectTo(controller="users", action="show");
 
-// Cmd+Click (macOS) or Ctrl+Click (Windows/Linux) on "editUser" to jump to Users.cfc edit() action
-linkTo(route="editUser", key=user.id, text="Edit");
-```
+// Ctrl+Click on "editUser" to jump to Users.cfc edit() action
+linkTo(route="editUser", key=user.id);
 
-#### View Navigation
-```cfml
-// Cmd+Click (macOS) or Ctrl+Click (Windows/Linux) on "users/show" to jump to users/show.cfm
+// Ctrl+Click on "users/show" to jump to users/show.cfm
 renderView("users/show");
-includePartial("shared/header");
 ```
 
-### 4. IntelliSense Parameter Hints
+![Wheels Go To Definition Demo](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/go-to-definition.gif)
 
-#### Function Parameter Help
+**Supported patterns:**
+- `model("ModelName")` → jumps to `ModelName.cfc`
+- `controller="name"` → jumps to `Name.cfc`
+- `route="routeName"` → jumps to controller action
+- `renderView("path")` → jumps to view file
+
+[Demo will be added here]
+
+---
+
+### Smart Parameter Help (Ctrl+Shift+Space)
+
+Shows function parameters as you type with intelligent highlighting that only appears when you start typing parameter names.
+
+**How to use it:**
+- Type opening parenthesis `(` after any Wheels function
+- Or press Ctrl+Shift+Space to manually trigger
+- Navigate between parameters with Tab
+- Start typing parameter names to see intelligent highlighting
+
+**Examples:**
 ```cfml
-// Type opening parenthesis to see parameter hints
+// Type opening parenthesis to see all available parameters
 findAll(     // Shows: where?, order?, group?, select?, include?, etc.
 
-// Navigate parameters with Tab, see active parameter highlighted
-findAll(where="active = 1",     // 'order' parameter now highlighted
+// Start typing to see intelligent highlighting
+findAll(w    // Highlights "where" parameter
+findAll(o    // Highlights "order" parameter
 
 // Works with method chaining
 model("User").findAll(     // Shows findAll parameters
+
+// Multiple parameters with smart highlighting
+findAll(where="active = 1", o    // Highlights "order" parameter next
 ```
 
-### 5. Hover Documentation
+**Features:**
+- Works with 300+ Wheels framework functions
+- Highlights when you start typing (not by default)
+- Shows parameter types, defaults, and descriptions
+- Supports complex method chaining
+- Context-aware (for actual function calls)
 
-#### Smart Function Help
+[Demo will be added here]
+
+---
+
+### Route Validation
+
+Real-time error detection that catches route typos, missing parameters, and suggests best practices as you type.
+
+**How to use it:**
+- Just type route code - validation happens automatically
+- Red underlines show errors
+- Yellow underlines show warnings
+- Blue underlines show suggestions
+
+**Examples:**
 ```cfml
-// Hover over any Wheels function for instant documentation
+// ERROR: Typo detection
+linkTo(rout="users")              // "Did you mean 'route'?"
+linkTo(root="home")               // "Did you mean 'route'?"
+
+// WARNING: Missing parameters
+linkTo(route="editUser")          // "Edit routes typically require a 'key' parameter"
+linkTo(route="deleteUser")        // "Delete routes typically require a 'key' parameter"
+
+// INFO: Best practices
+linkTo(controller="users", action="index")  // "Consider using route parameter instead"
+
+// WARNING: Suspicious routes
+linkTo(route="a")                 // "Potentially invalid route: 'a' (too short)"
+linkTo(route="USER LIST")         // "Route contains spaces"
+
+// CORRECT: No warnings
+linkTo(route="editUser", key=user.id)      // All good!
+redirectTo(route="users")                   // Perfect!
+```
+
+**Validation types:**
+- Typo detection (`rout=`, `root=` → suggests `route=`)
+- Missing key parameters for edit/update/delete routes
+- Suspicious route names (too short, all caps, spaces)
+- Best practice suggestions
+
+[Demo will be added here]
+
+---
+
+### Hover Documentation
+
+Hover over Wheels function names to see clean, professional documentation with parameter details and examples.
+
+**How to use it:**
+- Simply hover your mouse over any Wheels function name
+- Documentation appears automatically
+- Works across multiple lines
+
+**Examples:**
+```cfml
+// Hover over "findAll" to see complete documentation
 users = findAll()     // Shows: parameters, types, descriptions, examples
+
+// Hover over "linkTo" for parameter reference
 linkTo()              // Shows: complete parameter table with defaults
+
+// Hover over "hasMany" for association help
 hasMany()             // Shows: association options and usage patterns
 
-// Context-aware: only shows for function calls, not variables
-findAll = "some string"  // No hover documentation (correctly detected as variable)
+// Context-aware - shows for function calls
+findAll = "some string"  // No hover (correctly detected as variable)
+"findAll is a function"  // No hover (correctly detected as string)
 ```
 
-### 6. Route Validation in Action
+**Features:**
+- Context-aware (shows for function calls, not variables or strings)
+- Multi-line function support
+- Parameter tables with types, defaults, and descriptions
+- Professional VS Code-style formatting
+- Fast performance with intelligent caching
 
-#### Real-time Error Detection
-```cfml
-// Extension warns about typos:
-linkTo(rout="users")              // ERROR: "Did you mean 'route'?"
-linkTo(root="home")               // ERROR: "Did you mean 'route'?"
+[Demo will be added here]
 
-// Warns about missing parameters:
-linkTo(route="editUser")          // WARNING: "Edit routes typically require a 'key' parameter"
-linkTo(route="deleteUser")        // WARNING: "Delete routes typically require a 'key' parameter"
+---
 
-// Suggests best practices:
-linkTo(controller="users", action="index")  // INFO: "Consider using route parameter instead"
+## Installation & Setup
 
-// Validates correct usage:
-linkTo(route="editUser", key=user.id)      // No warnings
-redirectTo(route="users")                   // No warnings
-```
-
-#### Suspicious Route Detection
-```cfml
-// Detects potentially problematic routes:
-linkTo(route="a")                 // WARNING: "Potentially invalid route: 'a' (too short)"
-linkTo(route="USERS LIST")        // WARNING: "Route contains spaces"
-linkTo(route="CONSTANT_NAME")     // WARNING: "All caps route name (might be constant)"
-```
-
-## Available Features Reference
-
-### Template Snippets
-| Snippet | Description | Auto-Generated Content |
-|---------|-------------|------------------------|
-| `wcontroller` | Complete CRUD controller | All CRUD actions (index, show, new, create, edit, update, delete) with error handling |
-| `wmodel` | Model with validations | Associations, validations, callbacks, custom finder methods |
-
-### Go to Definition Support
-| Pattern | Action | Example |
-|---------|--------|---------|
-| `model("ModelName")` | Jump to model file | `model("User")` → `User.cfc` |
-| `controller="name"` | Jump to controller | `redirectTo(controller="users")` → `Users.cfc` |
-| `route="routeName"` | Jump to controller action | `linkTo(route="editUser")` → `Users.cfc#edit` |
-| `renderView("path")` | Jump to view file | `renderView("users/show")` → `users/show.cfm` |
-
-### IntelliSense Functions
-- **300+ Wheels functions** with complete parameter hints
-- **Real-time parameter help** with type information
-- **Active parameter highlighting** as you type
-- **Method chaining support** for complex expressions
-
-### Route Validation Rules
-| Validation Type | Detection | Example Warning |
-|----------------|-----------|------------------|
-| Typos | `rout=`, `root=` | "Did you mean 'route'?" |
-| Missing params | Edit/delete routes without `key` | "Typically requires 'key' parameter" |
-| Best practices | `controller=` + `action=` usage | "Consider using route parameter" |
-| Suspicious routes | Too short, spaces, all caps | "Potentially invalid route" |
-
-### Smart Hover Documentation
-- **Context-aware**: Only shows for actual function calls
-- **Multi-line support**: Works across line breaks
-- **Parameter tables**: Complete parameter reference with types and defaults
-- **Framework context**: Shows available scopes (controller, model, view)
-- **Professional formatting**: VS Code-style documentation
-
-## Testing All Features
-
-### 1. Testing File Templates
-
-#### Controller Creation
-1. Open a Wheels project in VS Code
-2. Right-click any folder → "New Wheels Component" → "Controller (CRUD Actions)"
-3. Enter "Users" → Should create `Users.cfc` with complete CRUD template
-4. Check: Contains index, show, new, create, edit, update, delete actions
-5. Verify: File automatically opens and language set to CFML
-
-#### Model Creation
-1. Right-click folder → "New Wheels Component" → "Model (Validations & Associations)"
-2. Enter "User" → Should create `User.cfc` with validations and associations
-3. Check: Contains config() with examples, custom finder methods
-4. Verify: Proper singular naming (User.cfc, not Users.cfc)
-
-#### View Creation
-1. Right-click folder → "New Wheels Component" → "View (Template with Layout)"
-2. Enter "users/index" → Should create `users/index.cfm`
-3. Check: Contains proper CFML template structure with contentFor, layout integration
-
-### 2. Testing Go to Definition (F12 or Ctrl+Click)
-
-#### Model Navigation
-```cfml
-// Test these patterns - should jump to User.cfc:
-user = model("User").findAll();
-users = model("User").findByKey(1);
-```
-
-#### Controller Navigation
-```cfml
-// Should jump to Users.cfc:
-redirectTo(controller="users", action="show");
-
-// Should jump to Users.cfc edit() function:
-linkTo(route="editUser", key=1);
-```
-
-#### View Navigation
-```cfml
-// Should jump to users/show.cfm:
-renderView("users/show");
-includePartial("shared/header");
-```
-
-### 3. Testing IntelliSense (Ctrl+Shift+Space)
-
-#### Parameter Hints
-1. Type: `findAll(` → Should show parameter popup
-2. Type: `where="active = 1",` → Should highlight next parameter
-3. Test method chaining: `model("User").findAll(`
-4. Verify triggers work: `(`, `,`, space
-
-#### Function Coverage
-```cfml
-// Test these functions show parameter hints:
-findAll(
-hasMany(
-validatesPresenceOf(
-linkTo(
-redirectTo(
-```
-
-### 4. Testing Route Validation
-
-#### Error Detection
-1. Type: `linkTo(rout="test")` → Should show red underline
-2. Type: `linkTo(route="editUser")` → Should show yellow warning about missing `key`
-3. Type: `linkTo(controller="users", action="index")` → Should show info suggestion
-4. Fix to: `linkTo(route="editUser", key=1)` → All warnings should disappear
-
-#### Typo Detection
-```cfml
-// These should show warnings:
-linkTo(rout="users");              // "Did you mean 'route'?"
-linkTo(root="home");               // "Did you mean 'route'?"
-linkTo(route="a");                 // "Too short, potentially invalid"
-linkTo(route="USER LIST");         // "Contains spaces"
-```
-
-### 5. Testing Hover Documentation
-
-#### Function Documentation
-1. Type: `users = findAll()`
-2. Hover over `findAll` → Should show rich documentation with parameters table
-3. Type: `linkTo()` → Hover should show complete parameter reference
-4. Test multi-line: Hover should work on functions spanning multiple lines
-
-#### Context Awareness
-```cfml
-// Should show documentation:
-users = findAll();           // SHOWS: Hover on findAll
-model("User").findAll();     // SHOWS: Hover on findAll
-
-// Should NOT show documentation:
-findAll = "some string";     // NO HOVER: Hover on findAll (variable)
-"findAll is a function";     // NO HOVER: Hover on findAll (in string)
-```
-
-### 6. Testing Code Snippets
-
-#### Template Expansion
-1. Create new `.cfc` file (or set language to CFML)
-2. Type `wcontroller` + Tab → Should expand to full CRUD controller
-3. Type `wmodel` + Tab → Should expand to complete model with validations
-4. Verify: Language automatically set to CFML
-5. Check: Template caching works (second use should be faster)
-
-#### Auto-Language Detection
-1. Create new file (plaintext)
-2. Type `wcontroller` + Tab
-3. Verify: File language automatically changes to CFML
-4. Check: Syntax highlighting active
-
-### 7. Performance Testing
-
-#### Large Files
-1. Open large CFML files (1000+ lines)
-2. Test hover responsiveness
-3. Test Go to Definition speed
-4. Verify: No lag or freezing
-
-#### Memory Usage
-1. Use multiple features extensively
-2. Check VS Code memory usage stays reasonable
-3. Verify: Template caching doesn't cause memory leaks
-
-## Building and Installing
-
-### For Development:
-```bash
-# Install dependencies
-cd tools/vscode-ext
-npm install
-
-# Package extension
-vsce package
-
-# Install locally
-code --install-extension wheels-vscode-1.1.0.vsix
-```
-
-### For Testing:
 1. Open VS Code
-2. Go to Extensions view (`Ctrl+Shift+X`)
-3. Click "..." → "Install from VSIX..."
-4. Select the generated `.vsix` file
+2. Go to Extensions (Ctrl+Shift+X)
+3. Search "Wheels"
+4. Install and reload VS Code
+
+**No configuration needed** - works immediately with any CFML file.
 
 ## Troubleshooting
 
-### Extension Not Activating?
-- **Check language**: Ensure file language is set to "CFML" (bottom-right of VS Code)
-- **Reload window**: `Ctrl+Shift+P` → "Developer: Reload Window"
-- **Check output**: View → Output → Select "Wheels VS Code" for error messages
-- **Verify activation**: Extension should activate automatically when opening CFML files
+### Extension Not Working?
+- Check file language is set to "CFML" (bottom-right corner of VS Code)
+- Reload window: Ctrl+Shift+P → "Developer: Reload Window"
 
 ### Go to Definition Not Working?
-- **Workspace folder**: Ensure your Wheels project is opened as a workspace folder
-- **File structure**: Extension expects standard Wheels structure (`app/models/`, `app/controllers/`, `app/views/`)
-- **File naming**: Controllers should be plural (`Users.cfc`), models singular (`User.cfc`)
-- **Syntax**: Use correct syntax: `model("User")`, not `model('User')` or `model(User)`
+- Ensure your Wheels project is opened as a workspace folder
+- Check file structure follows standard Wheels layout
+- Use correct syntax: `model("User")` not `model('User')`
 
-### IntelliSense Not Showing?
-- **Trigger characters**: Make sure you're using `(`, `,`, or space to trigger hints
-- **Function context**: IntelliSense only works for recognized Wheels functions
-- **File type**: Ensure file is recognized as CFML (check language in status bar)
-- **Force trigger**: Use `Ctrl+Shift+Space` to manually trigger parameter hints
+### Parameter Hints Not Showing?
+- Use Ctrl+Shift+Space to manually trigger
+- Ensure you're in a function call context
+- Check file language is set to CFML
 
-### Templates Not Creating Files?
-- **Permissions**: Ensure you have write permissions in the target directory
-- **Workspace**: Check that workspace folder is properly opened
-- **Path issues**: Try using Command Palette instead of right-click menu
-- **Directory structure**: Extension will create missing directories automatically
-- **Naming**: Avoid special characters, spaces, or invalid file name characters
-
-### Route Validation Too Aggressive?
-- **Non-blocking**: Warnings are informational and won't prevent code execution
-- **Context-specific**: Validation is designed to catch common Wheels routing mistakes
-- **Disable**: Currently no setting to disable, but warnings don't affect functionality
-- **False positives**: If you get incorrect warnings, they're safe to ignore
-
-### Hover Documentation Not Appearing?
-- **Function calls only**: Documentation only shows for actual function calls, not variables
-- **Context detection**: Ensure you're hovering over a function name followed by `(`
-- **Multi-line**: Should work across multiple lines, try hovering on function name
-- **Performance**: Large files might have slight delay, this is normal
-
-### Performance Issues?
-- **Template caching**: Templates are cached after first use for better performance
-- **Large projects**: Extension is optimized for large codebases
-- **Memory usage**: If VS Code becomes slow, try reloading the window
-- **Multiple workspaces**: Having many workspace folders open can impact performance
-
-### Snippets Not Expanding?
-- **Language setting**: Ensure file is set to CFML language
-- **Trigger**: Type `wcontroller` or `wmodel` exactly, then press Tab
-- **File context**: Works in both new files and existing CFML files
-- **Auto-detection**: Should automatically set language to CFML after expansion
-
-### Common Issues & Solutions
-
-| Issue | Solution |
-|-------|----------|
-| "No definition found" | Check file exists in expected location (`app/models/User.cfc`) |
-| "Parameter hints not showing" | Use `Ctrl+Shift+Space` or ensure you're in function call context |
-| "Route warnings everywhere" | Warnings are informational - your code will still work |
-| "Template didn't expand" | Check language is CFML, type exact snippet name + Tab |
-| "File created in wrong location" | Extension auto-detects Wheels structure, may create directories |
-
-### Getting Help
-- **Extension logs**: Check VS Code Output panel → "Wheels VS Code"
-- **VS Code logs**: Help → Toggle Developer Tools → Console
-- **GitHub issues**: Report bugs at extension repository
-- **Community**: Ask questions in Wheels community discussions
+### Files Created in Wrong Location?
+- Extension creates files where you right-click or specify
+- For Command Palette, double-check the target path you entered
 
 ## Resources
 
@@ -481,10 +291,6 @@ code --install-extension wheels-vscode-1.1.0.vsix
 - [Community Discussions](https://github.com/wheels-dev/wheels/discussions)
 - [Report Issues](https://github.com/wheels-dev/wheels/issues)
 - [Extension Source Code](https://github.com/wheels-dev/wheels/tree/main/tools/vscode-ext)
-
-## License
-
-MIT License - free to use, modify, and distribute.
 
 ---
 

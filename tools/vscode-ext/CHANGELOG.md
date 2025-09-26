@@ -10,12 +10,10 @@
   - View definitions: `renderView("users/show")` → jumps to view file
   - Smart inference: Handles route patterns like `editUser` → `users#edit`
 
-- **File Templates & Scaffolding**: Create Wheels components instantly with intelligent templates
-  - Right-click any folder → "New Wheels Component" submenu
+- **File Templates & Scaffolding**: Create Wheels components quickly with ready-made templates
+  - Right-click any folder → "New Wheels Component" menu
   - Command Palette: "Wheels: Create Controller/Model/View" commands
-  - Smart naming conventions (User → Users.cfc controller, User.cfc model)
-  - Auto-directory creation and immediate file opening
-  - Complete CRUD templates with error handling and best practices
+  - Complete templates with common templates already written
 
 - **Route Validation**: Real-time route validation with intelligent error detection
   - Highlights route typos: `rout=` → suggests `route=`
@@ -26,16 +24,11 @@
 - **Enhanced Code Snippets**: Pattern-based snippets for rapid development
   - `wcontroller` → Complete CRUD controller with all actions, filters, error handling
   - `wmodel` → Model template with associations, validations, callbacks, custom methods
-  - `wvalidation` → Common validation patterns (presence, uniqueness, format, conditional)
-  - `wassociations` → Relationship patterns (hasMany, belongsTo, hasOne, through)
-  - `wfinders` → Custom finder method examples with complex queries
 
 ### Enhanced
 - **Real-time parameter hints**: Shows function parameters as you type
-- **Smart Parameter Highlighting**: Intelligent parameter highlighting the matching parameter
-- **Context-Aware Hover**: Now only shows documentation for actual function calls, not variables or strings
-- **Multi-line Function Detection**: Supports function calls spanning multiple lines
-- **Improved Error Handling**: Extension fails gracefully without crashes
+- **Intelligent highlighting**: Intelligent parameter highlighting the matching parameter
+- **Context-Aware Hover**: Shows documentation for function calls
 
 ## [1.0.5] - 2025-09-24
 

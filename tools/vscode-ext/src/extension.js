@@ -719,15 +719,7 @@ class WheelsSignatureHelpProvider {
         const currentParam = this.findParameterAtPosition(callContent, cursorPos);
 
         if (currentParam && currentParam.name) {
-            // Check if this parameter is already completed (has a value)
-            const existingParam = parsedParams.find(p => p.name === currentParam.name);
-
-            if (existingParam && existingParam.completed) {
-                // Parameter already provided with value, find next available parameter
-                return this.findNextAvailableParameter(parameters, providedParamNames);
-            }
-
-            // Find the parameter index by name (currently being typed)
+            // Find the parameter index by name (exact match first)
             const paramIndex = parameters.findIndex(p => p.label === currentParam.name);
             if (paramIndex !== -1) {
                 return paramIndex;
@@ -866,13 +858,13 @@ class WheelsSignatureHelpProvider {
 
     /**
      * Find which parameter the cursor is currently positioned in
+     * Returns the parameter name that should be highlighted based on cursor position
      */
     findParameterAtPosition(callContent, cursorPos) {
-        let currentParam = '';
         let inString = false;
         let stringChar = '';
         let depth = 0;
-        let paramName = '';
+        let currentParamName = '';
         let inValue = false;
         let paramStart = 0;
 
@@ -889,13 +881,16 @@ class WheelsSignatureHelpProvider {
                 } else if (char === ')') {
                     depth--;
                 } else if (char === '=' && depth === 0 && !inValue) {
+                    // Found equals sign - now we're in the parameter value
                     inValue = true;
                 } else if (char === ',' && depth === 0) {
-                    paramName = '';
+                    // Found comma - reset for next parameter
+                    currentParamName = '';
                     inValue = false;
                     paramStart = i + 1;
-                } else if (!inValue && depth === 0) {
-                    paramName += char;
+                } else if (!inValue && depth === 0 && !/\s/.test(char)) {
+                    // Building parameter name (not in value, not whitespace)
+                    currentParamName += char;
                 }
             } else {
                 if (char === stringChar && (i === 0 || callContent[i-1] !== '\\')) {
@@ -904,10 +899,14 @@ class WheelsSignatureHelpProvider {
             }
         }
 
-        // If cursor is within a parameter, return its name
-        if (paramName.trim()) {
+        // Return the current parameter name if we have one
+        // This handles cases like:
+        // - "findAll(where" -> "where"
+        // - "findAll(where=" -> "where" (still in where parameter)
+        // - "findAll(where=\"id=1\"" -> "where" (still in where parameter until comma)
+        if (currentParamName.trim()) {
             return {
-                name: paramName.trim(),
+                name: currentParamName.trim(),
                 position: paramStart
             };
         }
@@ -1596,8 +1595,12 @@ async function createWheelsFile(type, uri) {
                     if (!value || value.trim().length === 0) {
                         return 'Controller name is required';
                     }
-                    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(value.trim())) {
-                        return 'Controller name must start with a letter and contain only letters and numbers';
+                    const trimmed = value.trim();
+                    if (trimmed !== value) {
+                        return 'Controller name cannot have leading or trailing spaces';
+                    }
+                    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(trimmed)) {
+                        return 'Controller name must start with a letter and contain only letters and numbers (no spaces or special characters)';
                     }
                     return null;
                 }
@@ -1609,8 +1612,12 @@ async function createWheelsFile(type, uri) {
                     if (!value || value.trim().length === 0) {
                         return 'Model name is required';
                     }
-                    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(value.trim())) {
-                        return 'Model name must start with a letter and contain only letters and numbers';
+                    const trimmed = value.trim();
+                    if (trimmed !== value) {
+                        return 'Model name cannot have leading or trailing spaces';
+                    }
+                    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(trimmed)) {
+                        return 'Model name must start with a letter and contain only letters and numbers (no spaces or special characters)';
                     }
                     return null;
                 }
@@ -1622,6 +1629,13 @@ async function createWheelsFile(type, uri) {
                     if (!value || value.trim().length === 0) {
                         return 'View path is required';
                     }
+                    const trimmed = value.trim();
+                    if (trimmed !== value) {
+                        return 'View path cannot have leading or trailing spaces';
+                    }
+                    if (!/^[A-Za-z0-9\/\_\-]+$/.test(trimmed)) {
+                        return 'View path can only contain letters, numbers, slashes, hyphens, and underscores';
+                    }
                     return null;
                 }
             }
@@ -1631,8 +1645,26 @@ async function createWheelsFile(type, uri) {
 
         if (!fileName) return;
 
+        // For Command Palette (no uri), ask for target directory
+        let finalTargetDir = targetDir;
+        if (!uri) {
+            const targetPath = await vscode.window.showInputBox({
+                prompt: `Enter target directory for ${type}`,
+                placeHolder: `Enter path (e.g., templates, custom/folder, src/components)`,
+                value: ``,
+                validateInput: (value) => {
+                    if (!value || value.trim().length === 0) {
+                        return 'Target directory is required';
+                    }
+                    return null;
+                }
+            });
+            if (!targetPath) return;
+            finalTargetDir = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, targetPath.trim());
+        }
+
         // Determine file paths and template data
-        const templateData = getTemplateData(type, fileName, targetDir);
+        const templateData = getTemplateData(type, fileName, finalTargetDir);
 
         // Get template content from template files
         const fileContent = getTemplateContentFromFiles(type, templateData);
@@ -1671,80 +1703,6 @@ async function createWheelsFile(type, uri) {
     }
 }
 
-/**
- * Determine the correct target directory based on Wheels project structure
- * Detects both normal user structure and core/base template structure
- */
-function determineTargetDirectory(currentDir, expectedSubdir) {
-    // Normalize path separators
-    const normalizedPath = currentDir.replace(/\\/g, '/');
-
-    // Check if we're already in the exact correct subdirectory
-    if (normalizedPath.endsWith(`/app/${expectedSubdir}`) ||
-        normalizedPath.endsWith(`/src/app/${expectedSubdir}`) ||
-        (normalizedPath.endsWith(`/${expectedSubdir}`) && normalizedPath.includes('/app/'))) {
-        return currentDir; // Use current directory exactly as is
-    }
-
-    // First, detect which Wheels project structure we're in
-    let searchDir = currentDir;
-    const maxDepth = 10;
-    let depth = 0;
-
-    while (depth < maxDepth) {
-        // Check for core/base template structure
-        const baseTemplateStructure = path.join(searchDir, 'templates', 'base', 'src', 'app');
-        if (fs.existsSync(baseTemplateStructure)) {
-            return path.join(searchDir, 'templates', 'base', 'src', 'app', expectedSubdir);
-        }
-
-        // Check for normal user structure
-        const normalStructure = path.join(searchDir, 'app');
-        if (fs.existsSync(normalStructure)) {
-            return path.join(searchDir, 'app', expectedSubdir);
-        }
-
-        // Check for alternative src structure
-        const srcStructure = path.join(searchDir, 'src', 'app');
-        if (fs.existsSync(srcStructure)) {
-            return path.join(searchDir, 'src', 'app', expectedSubdir);
-        }
-
-        // Look for Wheels project markers
-        const boxJsonPath = path.join(searchDir, 'box.json');
-        const appCfcPath = path.join(searchDir, 'public', 'Application.cfc');
-
-        if (fs.existsSync(boxJsonPath) || fs.existsSync(appCfcPath)) {
-            // Found Wheels project root, now determine structure
-            if (fs.existsSync(path.join(searchDir, 'templates', 'base', 'src', 'app'))) {
-                return path.join(searchDir, 'templates', 'base', 'src', 'app', expectedSubdir);
-            } else if (fs.existsSync(path.join(searchDir, 'app'))) {
-                return path.join(searchDir, 'app', expectedSubdir);
-            } else if (fs.existsSync(path.join(searchDir, 'src', 'app'))) {
-                return path.join(searchDir, 'src', 'app', expectedSubdir);
-            }
-        }
-
-        const parentDir = path.dirname(searchDir);
-        if (parentDir === searchDir) break; // Reached filesystem root
-        searchDir = parentDir;
-        depth++;
-    }
-
-    // Auto-detect based on current path
-    if (normalizedPath.includes('/templates/base/src/')) {
-        // We're in core template structure
-        const pathParts = normalizedPath.split('/');
-        const srcIndex = pathParts.lastIndexOf('src');
-        if (srcIndex !== -1) {
-            const srcPath = pathParts.slice(0, srcIndex + 1).join('/');
-            return path.join(srcPath, 'app', expectedSubdir);
-        }
-    }
-
-    // Final fallback: create normal structure in current directory
-    return path.join(currentDir, 'app', expectedSubdir);
-}
 
 /**
  * Get template data for file creation
@@ -1753,169 +1711,39 @@ function getTemplateData(type, fileName, targetDir) {
     const data = {};
 
     if (type === 'controller') {
-        // Controllers.cfc - trim whitespace and handle plural naming
         const cleanName = fileName.trim();
-        const controllerName = cleanName.endsWith('s') ? cleanName : cleanName + 's';
-        const modelName = cleanName.endsWith('s') ? cleanName.slice(0, -1) : cleanName;
 
-        data.fileName = `${controllerName}.cfc`;
-        data.targetDir = determineTargetDirectory(targetDir, 'controllers');
-        data.modelName = capitalize(modelName);
-        data.modelNameLower = modelName.toLowerCase();
-        data.modelNamePlural = modelName.toLowerCase() + 's';
+        data.fileName = `${cleanName}.cfc`;
+        data.targetDir = targetDir;
+        data.modelName = cleanName;
+        data.modelNameLower = cleanName.toLowerCase();
+        data.modelNamePlural = cleanName.toLowerCase();
         data.defaultSortColumn = 'name';
-        data.routeName = modelName.toLowerCase();
-        data.routeNamePlural = data.modelNamePlural;
+        data.routeName = cleanName.toLowerCase();
+        data.routeNamePlural = cleanName.toLowerCase();
 
     } else if (type === 'model') {
-        // User.cfc - trim whitespace and handle singular naming
         const cleanName = fileName.trim();
-        const modelName = cleanName.endsWith('s') ? cleanName.slice(0, -1) : cleanName;
 
-        data.fileName = `${capitalize(modelName)}.cfc`;
-        data.targetDir = determineTargetDirectory(targetDir, 'models');
-        data.modelName = capitalize(modelName);
-        data.modelNameLower = modelName.toLowerCase();
-        data.tableName = data.modelNameLower + 's';
-        data.hasManySample = 'orders';
-        data.belongsToSample = 'category';
-        data.hasOneSample = 'profile';
-        data.requiredFields = 'name';
-        data.uniqueFields = 'email';
-        data.lengthField = 'name';
-        data.minLength = '2';
-        data.maxLength = '50';
-        data.emailField = 'email';
-        data.beforeSaveMethod = 'normalizeData';
-        data.afterCreateMethod = 'sendWelcomeEmail';
-        data.afterUpdateMethod = 'clearCache';
-        data.propertyName = 'fullName';
-        data.primaryKeyColumn = 'id';
-        data.dateProperty = 'birthDate';
+        data.fileName = `${cleanName}.cfc`;
+        data.targetDir = targetDir;
+        data.modelName = cleanName;
+        data.modelNameLower = cleanName.toLowerCase();
+        data.tableName = data.modelNameLower;
 
     } else if (type === 'view') {
-        // users/index.cfm - trim whitespace
         const cleanName = fileName.trim();
         const viewPath = cleanName.includes('/') ? cleanName : `${cleanName}/index`;
-        const pathParts = viewPath.split('/');
-        const actionName = pathParts[pathParts.length - 1];
-        const controllerName = pathParts[0];
 
         data.fileName = `${viewPath}.cfm`;
-        data.targetDir = determineTargetDirectory(targetDir, 'views');
-        data.paramName = controllerName.toLowerCase();
-        data.viewTitle = `${capitalize(actionName)} ${capitalize(controllerName)}`;
+        data.targetDir = targetDir;
+        data.viewTitle = capitalize(cleanName);
         data.pageHeading = data.viewTitle;
-
-        // Generate appropriate content based on action
-        if (actionName === 'index') {
-            data.actionLinks = `#linkTo(route="new${capitalize(controllerName.slice(0, -1))}", text="New ${capitalize(controllerName.slice(0, -1))}", class="btn btn-primary")#`;
-            data.contentBlock = generateIndexContent(controllerName);
-        } else if (actionName === 'show') {
-            data.actionLinks = `#linkTo(route="edit${capitalize(controllerName.slice(0, -1))}", key=${controllerName.slice(0, -1)}.id, text="Edit", class="btn btn-secondary")#\n                #linkTo(route="${controllerName}", text="Back to List", class="btn btn-outline-secondary")#`;
-            data.contentBlock = generateShowContent(controllerName);
-        } else if (actionName === 'new' || actionName === 'edit') {
-            data.actionLinks = `#linkTo(route="${controllerName}", text="Back to List", class="btn btn-outline-secondary")#`;
-            data.contentBlock = generateFormContent(controllerName, actionName);
-        } else {
-            data.actionLinks = `#linkTo(route="${controllerName}", text="Back to List", class="btn btn-outline-secondary")#`;
-            data.contentBlock = `<p>Content for ${actionName} action.</p>`;
-        }
     }
 
     return data;
 }
 
-/**
- * Generate content for index views
- */
-function generateIndexContent(controllerName) {
-    const singular = controllerName.slice(0, -1);
-    return `<cfif ${controllerName}.recordCount>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Created</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <cfloop query="${controllerName}">
-                            <tr>
-                                <td>
-                                    #linkTo(route="${singular}", key=${controllerName}.id, text=${controllerName}.name)#
-                                </td>
-                                <td>#dateFormat(${controllerName}.createdAt, "mm/dd/yyyy")#</td>
-                                <td>
-                                    #linkTo(route="${singular}", key=${controllerName}.id, text="View", class="btn btn-sm btn-outline-primary")#
-                                    #linkTo(route="edit${capitalize(singular)}", key=${controllerName}.id, text="Edit", class="btn btn-sm btn-outline-secondary")#
-                                </td>
-                            </tr>
-                            </cfloop>
-                        </tbody>
-                    </table>
-                </div>
-            <cfelse>
-                <div class="alert alert-info">
-                    <p>No ${controllerName} found.</p>
-                    <p>#linkTo(route="new${capitalize(singular)}", text="Create the first ${singular}", class="btn btn-primary")#</p>
-                </div>
-            </cfif>`;
-}
-
-/**
- * Generate content for show views
- */
-function generateShowContent(controllerName) {
-    const singular = controllerName.slice(0, -1);
-    return `<div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">#${singular}.name#</h5>
-
-                    <div class="row">
-                        <div class="col-sm-3"><strong>ID:</strong></div>
-                        <div class="col-sm-9">#${singular}.id#</div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-sm-3"><strong>Created:</strong></div>
-                        <div class="col-sm-9">#dateFormat(${singular}.createdAt, "mm/dd/yyyy")#</div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-sm-3"><strong>Updated:</strong></div>
-                        <div class="col-sm-9">#dateFormat(${singular}.updatedAt, "mm/dd/yyyy")#</div>
-                    </div>
-                </div>
-            </div>`;
-}
-
-/**
- * Generate content for form views
- */
-function generateFormContent(controllerName, actionName) {
-    const singular = controllerName.slice(0, -1);
-    const isEdit = actionName === 'edit';
-
-    return `#startFormTag(route="${singular}", method="${isEdit ? 'put' : 'post'}"${isEdit ? ', key=' + singular + '.id' : ''})#
-                <div class="form-group mb-3">
-                    #textField(objectName="${singular}", property="name", label="Name", class="form-control")#
-                    #errorMessageOn(objectName="${singular}", property="name", class="text-danger")#
-                </div>
-
-                <div class="form-group mb-3">
-                    #textArea(objectName="${singular}", property="description", label="Description", class="form-control", rows="4")#
-                    #errorMessageOn(objectName="${singular}", property="description", class="text-danger")#
-                </div>
-
-                <div class="form-group">
-                    #submitTag(value="${isEdit ? 'Update' : 'Create'} ${capitalize(singular)}", class="btn btn-primary")#
-                    #linkTo(route="${controllerName}", text="Cancel", class="btn btn-secondary")#
-                </div>
-            #endFormTag()#`;
-}
 
 /**
  * Get template content from template files
@@ -1942,31 +1770,6 @@ function getTemplateContentFromFiles(type, templateData) {
     }
 }
 
-/**
- * Create basic view template
- */
-function createViewTemplate(templateData) {
-    return `<cfparam name="${templateData.paramName}">
-<cfoutput>
-
-#contentFor("title", "${templateData.viewTitle}")#
-
-<div class="container">
-    <div class="row">
-        <div class="col-md-12">
-            <h1>${templateData.pageHeading}</h1>
-
-            <div class="actions mb-3">
-                ${templateData.actionLinks}
-            </div>
-
-            ${templateData.contentBlock}
-        </div>
-    </div>
-</div>
-
-</cfoutput>`;
-}
 
 /**
  * Create basic template fallback
@@ -1974,25 +1777,25 @@ function createViewTemplate(templateData) {
 function createBasicTemplate(type, templateData) {
     if (type === 'controller') {
         return `component extends="Controller" {
-
     function config() {
         // Configuration here
     }
 
     function index() {
-        ${templateData.modelNamePlural} = model("${templateData.modelName}").findAll();
+        // Controller logic here
     }
 }`;
     } else if (type === 'model') {
         return `component extends="Model" {
-
     function config() {
-        // Configuration here
         validatesPresenceOf("name");
     }
-
-    // Custom methods here
 }`;
+    } else if (type === 'view') {
+        return `<cfoutput>
+<h1>${templateData.pageHeading}</h1>
+<p>View content here.</p>
+</cfoutput>`;
     }
 
     return '';

@@ -60,7 +60,7 @@ component extends="Model" {
         // Actions to perform after creating a new record
         // Example: Send welcome email
         // sendEmail(template="welcome", to=this.email);
-    }
+    // }
 
     // private function ${afterUpdateMethod}() {
         // Actions to perform after updating a record

@@ -1,7 +1,7 @@
 {
 	"name": "wheels-vscode",
 	"displayName": "Wheels VS Code",
-	"description": "Enhance your Wheels development workflow with intelligent code snippets, smart parameter highlighting that responds to user input, comprehensive function documentation, and built-in Go-to-Definition support for MVC components.",
+	"description": "Enhance your Wheels development workflow. Makes Wheels framework development easier and faster. Get helpful code completion, smart navigation, file templates, smart parameter highlighting, route validation, and real-time assistance as you write your CFML code.",
 	"version": "1.1.0",
 	"engines": {
 		"vscode": "^1.80.0"
@@ -19,7 +19,8 @@
 	"license": "MIT",
 	"categories": [
 		"Snippets",
-		"Linters"
+		"Programming Languages",
+		"Other"
 	],
 	"keywords": [
 		"wheels.dev",
@@ -34,7 +35,14 @@
 		"mvc",
 		"framework",
 		"hover",
-		"documentation"
+		"documentation",
+		"go-to-definition",
+		"navigation",
+		"templates",
+		"scaffolding",
+		"parameter-hints",
+		"route-validation",
+		"intellisense"
 	],
 	"activationEvents": [
 		"onLanguage:cfml"
@@ -139,6 +147,17 @@
 	"galleryBanner": {
 		"color": "#B2050E",
 		"theme": "dark"
+	},
+	"badges": [
+		{
+			"url": "https://img.shields.io/badge/Wheels-v1.1.0-blue",
+			"href": "https://wheels.dev",
+			"description": "Wheels Framework"
+		}
+	],
+	"qna": "https://github.com/wheels-dev/wheels/discussions",
+	"sponsor": {
+		"url": "https://github.com/sponsors/wheels-dev"
 	}
 
 }
