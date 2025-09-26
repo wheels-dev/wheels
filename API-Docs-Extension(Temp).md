@@ -15778,3 +15778,2814 @@ uniqueSalaries = model("employee").sum(
     property="salary",
     distinct=true
 );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````table:
+The table() function is used to tell Wheels which database table a model should connect to. Normally, Wheels automatically maps a model name to a plural table name (for example, a model named User maps to the users table). However, when your database uses custom naming conventions that do not match the Wheels defaults, you can override the mapping by explicitly specifying the table name with table(). If you want a model to not be tied to any database table at all, you can set table(false). This is useful for models that are used purely for logic, service layers, or scenarios where the model acts as a data wrapper without persistence.
+
+Basic override for custom table name
+
+// In models/User.cfc
+function config() {
+    // Tell Wheels to use the `tbl_USERS` table instead of the default `users`.
+    table("tbl_USERS");
+}
+
+
+Using a table with a completely different name
+
+// In models/Order.cfc
+function config() {
+    // Map the Order model to a table named `sales_transactions`.
+    table("sales_transactions");
+}
+
+
+Disabling table mapping for a non-database model
+
+// In models/Notification.cfc
+function config() {
+    // This model will not connect to any table.
+    table(false);
+}
+
+
+Working with legacy naming conventions
+
+// In models/Product.cfc
+function config() {
+    // The database uses uppercase with prefixes for tables.
+    table("LEGACY_PRODUCTS_TABLE");
+}
+
+
+Example with schema-qualified table
+
+// In models/Invoice.cfc
+function config() {
+    // Explicitly set schema and table if needed.
+    table("accounting.invoices");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````tableName:
+The tableName() function returns the name of the database table that a model is mapped to. Wheels automatically determines the table name based on its naming convention, where a singular model name maps to a plural table name (for example, a model named User maps to the users table). If the table has been explicitly overridden using the table() function in the model’s config(), then tableName() will return the custom mapping instead. This function is useful when you want to programmatically check or log the database table a model is connected to, especially in projects with mixed or legacy naming conventions.
+
+Checking the default mapping
+
+// In a controller or anywhere you need to check
+defaultTable = model("user").tableName();
+// Returns "users"
+
+
+Checking a custom-mapped model
+
+// In models/User.cfc
+function config() {
+    table("tbl_USERS");
+}
+
+// Later in code
+customTable = model("user").tableName();
+// Returns "tbl_USERS"
+
+
+Using in debugging or logging
+
+// Log which table a model points to for troubleshooting
+writeDump(model("order").tableName());
+
+
+Schema-qualified table name
+
+// In models/Invoice.cfc
+function config() {
+    table("accounting.invoices");
+}
+
+// Later in code
+schemaTable = model("invoice").tableName();
+// Returns "accounting.invoices"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````teardown:
+The teardown() function is a callback that executes after every test case when using Wheels’ legacy testing framework. It is typically used to clean up any data, variables, or state changes made during a test, ensuring that each test runs in isolation and does not interfere with subsequent tests. This helps maintain reliability and consistency across the test suite. If defined, teardown() runs automatically after each test case without requiring manual calls.
+
+Basic cleanup after tests
+
+// In tests/models/UserTest.cfc
+function teardown() {
+    // Remove temporary data created during the test
+    queryExecute("DELETE FROM users WHERE email LIKE 'testuser%@example.com'");
+}
+
+
+Resetting application variables
+
+// In tests/controllers/SessionTest.cfc
+function teardown() {
+    // Clear session values to avoid leaking between tests
+    structClear(session);
+}
+
+
+Rolling back test data with transactions
+
+// In tests/models/OrderTest.cfc
+function teardown() {
+    // Roll back the transaction started in setup
+    transaction action="rollback";
+}
+
+
+Cleaning up mock objects or stubs
+
+// In tests/services/NotificationServiceTest.cfc
+function teardown() {
+    // Reset mock services after each test
+    variables.mockService.reset();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````testExample:
+this is an example test so need to remove it.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````text:
+The text() function is used within a migration to add one or more text columns to a database table definition. Text columns are designed for storing larger amounts of character data compared to standard string or varchar columns. This function allows you to define the column name, set a default value, and control whether the column allows null values. If multiple column names are passed in, the same options apply to all of them.
+
+Adding a single text column
+
+// In a migration file
+t.text("description");
+
+
+Adding multiple text columns at once
+
+// Creates both summary and notes columns as text types
+t.text("summary,notes");
+
+
+Specifying a default value
+
+// Adds a column with a default placeholder text
+t.text(columnNames="details", default="N/A");
+
+
+Requiring non-null values
+
+// Adds a text column that must always have a value
+t.text(columnNames="bio", null=false);
+
+
+Combining options
+
+// Adds a column with a default value and disallows nulls
+t.text(columnNames="comments", default="No comments provided", null=false);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````textArea:
+The textArea() function builds and returns an HTML <textarea> form control for a given model object and property. It is commonly used when you need a larger text input field, such as for descriptions, comments, or notes. The function automatically binds the value of the specified property from the object to the textarea. You can also pass additional attributes like class, id, or rel to customize the generated HTML. When working with nested forms or associations, you can specify the association and position arguments to bind the field to related objects. Wheels also provides options to add labels, control label placement, prepend or append HTML around the field, and handle error display automatically.
+
+Basic textarea with label
+
+#textArea(label="Overview", objectName="article", property="overview")#
+
+
+This generates a textarea for the overview property of the article object with a label displayed by default.
+
+Customizing with HTML attributes
+
+#textArea(
+    label="Comments", 
+    objectName="post", 
+    property="comments", 
+    class="form-control", 
+    id="commentsBox", 
+    rows="5", 
+    cols="50"
+)#
+
+
+Here the textarea is given a Bootstrap class, custom ID, and defined rows and columns.
+
+Using with nested associations
+
+<fieldset>
+    <legend>Screenshots</legend>
+    <cfloop from="1" to="#ArrayLen(site.screenshots)#" index="i">
+        #fileField(label="File #i#", objectName="site", association="screenshots", position=i, property="file")#
+        #textArea(label="Caption #i#", objectName="site", association="screenshots", position=i, property="caption")#
+    </cfloop>
+</fieldset>
+
+
+This example shows a hasMany association where each screenshot has its own caption field.
+
+Controlling label placement
+
+#textArea(
+    label="Details", 
+    objectName="project", 
+    property="details", 
+    labelPlacement="before"
+)#
+
+
+Places the label before the textarea rather than wrapping around it.
+
+Prepending and appending HTML
+
+#textArea(
+    label="Notes", 
+    objectName="task", 
+    property="notes", 
+    prepend="<div class='input-wrapper'>", 
+    append="</div>"
+)#
+
+
+Wraps the textarea inside a custom <div> for styling.
+
+Handling validation errors
+
+#textArea(
+    label="Description", 
+    objectName="product", 
+    property="description", 
+    errorElement="div", 
+    errorClass="input-error"
+)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````textAreaTag:
+The textAreaTag() function builds and returns an HTML <textarea> form control based only on the supplied field name, rather than being tied to a specific model object. It is useful when you want to generate a standalone text area not bound to an object, such as for ad-hoc forms, search boxes, or generic input fields. You can set the initial content of the textarea, add a label, and pass in additional attributes like class, id, or rel. Options are also available to control label placement, prepend or append HTML wrappers, and configure whether output should be encoded for XSS protection.
+
+Basic textarea with label
+
+#textAreaTag(label="Description", name="description", content=params.description)#
+
+
+Generates a textarea with the value from params.description and a label displayed around it.
+
+Textarea with custom attributes
+
+#textAreaTag(
+    label="Notes", 
+    name="notes", 
+    class="form-control", 
+    id="notesBox", 
+    rows="6", 
+    cols="60"
+)#
+
+
+Adds custom styling, ID, and row/column attributes to the textarea.
+
+Textarea without label
+
+#textAreaTag(name="feedback", content="Enter your feedback here...")#
+
+
+Creates a textarea without a label and with default placeholder text.
+
+Custom label placement
+
+#textAreaTag(
+    label="Comments", 
+    name="comments", 
+    labelPlacement="before"
+)#
+
+
+Places the label before the textarea instead of wrapping it.
+
+Prepending and appending HTML
+
+#textAreaTag(
+    label="Message", 
+    name="message", 
+    prepend="<div class='input-wrapper'>", 
+    append="</div>"
+)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````textField:
+The textField() function builds and returns an HTML <input type="text"> form control that is bound to a model object and one of its properties. By default, it will populate the value of the field from the property on the object. You can pass additional attributes such as class, id, or rel to customize the rendered tag. When working with nested associations or hasMany relationships, you can use the association and position arguments to bind the field to related properties. Wheels also supports automatically generating and placing labels, wrapping controls with custom HTML, and marking fields with errors when validation fails. The type argument lets you adjust the input type for use with HTML5 attributes like email, tel, or url.
+
+Basic text field with label
+
+#textField(label="First Name", objectName="user", property="firstName")#
+
+
+Generates a labeled text field bound to the firstName property of the user object.
+
+Using a custom input type
+
+#textField(
+    label="Email Address", 
+    objectName="user", 
+    property="email", 
+    type="email"
+)#
+
+
+Creates an email input field using HTML5 validation.
+
+Adding CSS classes and attributes
+
+#textField(
+    label="Phone", 
+    objectName="contact", 
+    property="phoneNumber", 
+    class="form-control", 
+    placeholder="Enter phone number"
+)#
+
+
+Renders a styled text field with a placeholder.
+
+Nested form with hasMany association
+
+<fieldset>
+    <legend>Phone Numbers</legend>
+    <cfloop from="1" to="#ArrayLen(contact.phoneNumbers)#" index="i">
+        #textField(
+            label="Phone ##i#", 
+            objectName="contact", 
+            association="phoneNumbers", 
+            position=i, 
+            property="phoneNumber"
+        )#
+    </cfloop>
+</fieldset>
+
+
+Creates multiple fields for a hasMany relationship (e.g., multiple phone numbers for one contact).
+
+Prepending and appending HTML wrappers
+
+#textField(
+    label="Website", 
+    objectName="company", 
+    property="website", 
+    prepend="<div class='field-wrapper'>", 
+    append="</div>"
+)#
+
+
+Wraps the text field with custom HTML for layout purposes.
+
+Handling validation errors
+
+#textField(
+    label="Username", 
+    objectName="user", 
+    property="username", 
+    errorElement="div", 
+    errorClass="input-error"
+)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````textFieldTag:
+Builds and returns a string containing an HTML text field form control based on the supplied name.
+
+Pass any additional arguments (e.g. class, rel, id) and the generated tag will also include those values as HTML attributes.
+
+Examples
+<!--- Basic usage with label, name, and value --->
+#textFieldTag(label="Search", name="q", value=params.q)#
+
+<!--- Email input with placeholder and custom class --->
+#textFieldTag(name="email", label="Email Address", type="email", class="form-control", placeholder="you@example.com")#
+
+<!--- Label placed after the input --->
+#textFieldTag(name="username", label="Username", labelPlacement="after")#
+
+<!--- Wrapped with prepend/append for Bootstrap styling --->
+#textFieldTag(name="price", label="Price", prepend="<div class='input-group'>", append="</div>", prependToLabel="<span class='icon'>$</span>")#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````time:
+Adds one or more TIME columns to a table definition in a migration.
+
+// Add a simple time column
+t.time("startTime")
+
+// Add multiple time columns
+t.time("opensAt, closesAt")
+
+// Add a time column with a default value
+t.time(columnNames="reminderAt", default="09:00:00")
+
+// Add a nullable time column
+t.time(columnNames="lunchBreak", null=true)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````timeAgoInWords:
+Returns a human-friendly string describing the approximate time difference between two dates (defaults to comparing against the current time).
+
+// Example in a controller
+aWhileAgo = DateAdd("d", -90, Now());
+
+// Example in a view (outputs: "3 months")
+#timeAgoInWords(aWhileAgo)#
+
+// Including seconds (outputs: "less than 5 seconds")
+#timeAgoInWords(DateAdd("s", -3, Now()), includeSeconds=true)#
+
+// Comparing two specific dates
+past = CreateDateTime(2024, 01, 01, 12, 0, 0);
+future = CreateDateTime(2024, 06, 01, 12, 0, 0);
+// Outputs: "5 months"
+#timeAgoInWords(fromTime=past, toTime=future)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````timeSelect:
+The timeSelect() function builds and returns three select form controls for hours, minutes, and seconds, based on the supplied object name and property. It is useful when you want users to input a time in a structured way without manually typing values. You can configure it to display only specific units (such as hours and minutes), control step intervals for minutes or seconds, display in 12-hour format with AM/PM, and customize labels, error handling, and additional HTML wrapping. By default, the three selects are ordered as hour, minute, and second, but you can change this order or exclude parts completely.
+
+<!--- Basic usage: create hour, minute, and second selects for a property --->
+#timeSelect(objectName="business", property="openUntil")#
+
+<!--- Only display hour and minute selectors --->
+#timeSelect(objectName="business", property="openUntil", order="hour,minute")#
+
+<!--- Limit minutes to 15-minute intervals (00, 15, 30, 45) --->
+#timeSelect(objectName="appointment", property="dateTimeStart", minuteStep=15)#
+
+<!--- Use 12-hour format with AM/PM --->
+#timeSelect(objectName="event", property="startTime", twelveHour=true)#
+
+<!--- Add a blank option at the top --->
+#timeSelect(objectName="schedule", property="startTime", includeBlank="- Select Time -")#
+
+<!--- Customize the label and append helper text --->
+#timeSelect(objectName="meeting", property="endTime", label="End Time", append="(select carefully)")#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````timeSelectTags:
+The timeSelectTags() function builds and returns three <select> form controls for hours, minutes, and seconds based on the supplied name. This is the tag-based version of timeSelect(), meaning it does not bind to a model object but instead works with raw form field names. You can control the order of the selects, limit minute and second intervals, display in 12-hour format with AM/PM, and include custom labels, error handling, and HTML wrappers.
+
+<!--- Basic usage: creates hour, minute, and second selects --->
+#timeSelectTags(name="timeOfMeeting", selected=params.timeOfMeeting)#
+
+<!--- Only show hour and minute selects --->
+#timeSelectTags(name="timeOfMeeting", selected=params.timeOfMeeting, order="hour,minute")#
+
+<!--- Show 15-minute intervals --->
+#timeSelectTags(name="reminderTime", minuteStep=15)#
+
+<!--- Display in 12-hour format with AM/PM --->
+#timeSelectTags(name="eventStart", twelveHour=true)#
+
+<!--- Include a blank option --->
+#timeSelectTags(name="timeSlot", includeBlank="- Select Time -")#
+
+<!--- Add a label and append helper text --->
+#timeSelectTags(name="appointmentEnd", label="End Time", append="(HH:MM:SS)")#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````timestamp:
+The timestamp() function is used inside migrations to add one or more TIMESTAMP (or DATETIME) columns to a table definition. It lets you specify default values, whether the column allows NULL, and even override the underlying SQL type through the columnType argument. This is especially useful when you need to track creation and update times or work with custom timestamp fields.
+
+// Add a basic timestamp column
+t.timestamp("createdAt")
+
+// Add multiple timestamp columns
+t.timestamp("createdAt, updatedAt")
+
+// Add a timestamp column with a default value
+t.timestamp(columnNames="createdAt", default="CURRENT_TIMESTAMP")
+
+// Add a nullable timestamp column
+t.timestamp(columnNames="deletedAt", null=true)
+
+// Override column type to use TIMESTAMP instead of DATETIME
+t.timestamp(columnNames="syncedAt", columnType="timestamp")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````timestamps:
+The timestamps() function is a shortcut for adding Wheels’ convention-based automatic timestamp and soft delete columns to a table definition during migrations. Instead of defining each field manually, this function quickly sets up the standard fields that are commonly used across models to track record lifecycle and soft deletion. By default, it adds createdAt, updatedAt, and deletedAt columns with appropriate types, making your migrations more concise and consistent.
+
+// Add createdAt, updatedAt, and deletedAt columns to the users table
+t.timestamps()
+
+// Use with other column definitions in the same migration
+t.string("name")
+t.timestamps()
+
+// Combine with associations or other fields
+t.integer("roleId")
+t.timestamps()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````timeUntilInWords:
+The timeUntilInWords() function returns a human-readable string describing the approximate time difference between the current date (or another starting point you provide) and a future date. It is the inverse of timeAgoInWords(), focusing on how long until something happens instead of how long ago it occurred. You can optionally include seconds for more precise descriptions.
+
+// Example in a controller
+aLittleAhead = DateAdd("d", 365, Now());
+
+// Example in a view (outputs: "about 1 year")
+#timeUntilInWords(aLittleAhead)#
+
+// Including seconds (outputs: "less than 5 seconds")
+#timeUntilInWords(DateAdd("s", 3, Now()), includeSeconds=true)#
+
+// Comparing between two specific dates
+fromDate = CreateDateTime(2024, 01, 01, 12, 0, 0);
+toDate   = CreateDateTime(2024, 06, 01, 12, 0, 0);
+// Outputs: "5 months"
+#timeUntilInWords(toTime=toDate, fromTime=fromDate)#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````titleize:
+The titleize() function converts a string so that the first letter of each word is capitalized, producing a cleaner, title-like appearance. It is useful for formatting headings, labels, or any text that should follow title case conventions.
+
+// Basic usage
+#titleize("Wheels is a framework for ColdFusion")#
+// Output: "Wheels Is A Framework For ColdFusion"
+
+// Works with single words
+#titleize("hello")#
+// Output: "Hello"
+
+// Works with multiple words including numbers
+#titleize("coldfusion 2025 features")#
+// Output: "Coldfusion 2025 Features"
+
+// Can be used in views for dynamic labels
+<h1>#titleize(article.title)#</h1>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````toggle:
+The toggle() function inverts the current boolean value of a specified property on a model object. If the property is true, it becomes false, and vice versa. An error will be thrown if the property cannot be interpreted as a boolean. By default, the object is saved automatically after toggling the property, but you can disable automatic saving by passing save=false. The function returns a boolean indicating whether the save operation was successful when saving is enabled, or returns the object itself if save is disabled.
+
+// Fetch a user object and toggle a boolean property
+user = model("user").findByKey(58);
+isSuccess = user.toggle("isActive");
+// Returns true if saved successfully, false otherwise
+
+// Disable automatic saving
+user = model("user").findByKey(58);
+user.toggle("isActive", save=false);
+// Returns the user object without saving
+
+// Use a dynamic helper method for convenience
+user = model("user").findByKey(58);
+isSuccess = user.toggleIsActive();
+// Returns whether the save was successful
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````truncate:
+The truncate() function shortens a given text string to a specified length and appends a replacement string (by default "...") at the end to indicate truncation. It is useful for displaying previews of longer text in UIs, summaries, or reports while keeping the output concise.
+
+// Truncate text to 20 characters, default truncation string "..."
+#truncate(text="Wheels is a framework for ColdFusion", length=20)#
+/* Output: "Wheels is a fra..." */
+
+// Use a custom truncation string
+#truncate(text="Wheels is a framework for ColdFusion", truncateString=" (more)")#
+/* Output: "Wheels is a framework (more)" */
+
+// Short text does not get truncated
+#truncate(text="Short text", length=20)#
+/* Output: "Short text" */
+
+// Display in a view for previews
+<p>#truncate(article.content, 100)#</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````uniqueidentifier:
+The uniqueidentifier() function is used inside migrations to add one or more UUID (Universally Unique Identifier) columns to a table definition. These columns are useful for generating globally unique keys for records instead of relying on auto-incrementing integers. By default, the function uses newid() to populate the column with a UUID, and you can also configure whether the column allows NULL.
+
+// Add a single UUID column
+t.uniqueidentifier("uuid")
+
+// Add multiple UUID columns
+t.uniqueidentifier("uuid, externalId")
+
+// Add a UUID column with default UUID generation
+t.uniqueidentifier(columnNames="uuid", default="newid()")
+
+// Add a nullable UUID column
+t.uniqueidentifier(columnNames="optionalUuid", null=true)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````up:
+The up() function defines the actions to migrate your database schema forward. It is called when applying a migration and is typically paired with the down() function, which rolls back the migration. All schema changes, such as creating tables, adding columns, or setting up indexes, should be placed inside up(). Wrapping your migration code in a transaction block ensures that changes are either fully applied or rolled back in case of errors.
+
+function up() {
+    transaction {
+        try {
+            // Create a new table with convention-based timestamp columns
+            t = createTable(name='myTable');
+            t.timestamps();
+            t.create();
+        } catch (any e) {
+            local.exception = e;
+        }
+
+        // Rollback if there was an error, otherwise commit
+        if (StructKeyExists(local, "exception")) {
+            transaction action="rollback";
+            throw(
+                errorCode="1",
+                detail=local.exception.detail,
+                message=local.exception.message,
+                type="any"
+            );
+        } else {
+            transaction action="commit";
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````update:
+The update() function updates an existing model object with the supplied properties and saves the changes to the database. It returns true if the save was successful and false otherwise. You can pass properties directly as named arguments or as a struct. Additional options allow you to control validation, callbacks, transactions, parameterization, cache reloading, and explicit timestamp handling. This method also works seamlessly with associations, making it possible to update related objects in hasOne or hasMany relationships.
+
+// Update a single property and save
+post = model("post").findByKey(33);
+post.update(title="New version of Wheels just released");
+
+// Update multiple properties, including from a URL or form
+post = model("post").findByKey(params.key);
+post.update(title="New version of Wheels just released", properties=params.post);
+
+// Update a hasOne associated object
+author = model("author").findByKey(params.authorId); 
+bio = model("bio").findByKey(params.bioId); 
+author.setBio(bio); // calls bio.update internally
+
+// Update a hasMany association (add or remove related objects)
+anOwner = model("owner").findByKey(params.ownerId); 
+aCar = model("car").findByKey(params.carId); 
+anOwner.addCar(aCar); // calls car.update(ownerId=anOwner.id)
+
+aPost = model("post").findByKey(params.postId); 
+aComment = model("comment").findByKey(params.commentId); 
+aPost.removeComment(aComment); // calls comment.update(postId="")
+
+// Toggle a boolean property (convenience dynamic helper)
+user = model("user").findByKey(58); 
+isSuccess = user.toggle("isActive"); // returns save result
+isSuccess = user.toggleIsActive();    // same using dynamic helper
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````updateAll:
+The updateAll() function updates one or more properties for all records that match a given where condition. Property names and values can be passed either as named arguments or as a struct. By default, the objects are not instantiated, meaning that validations and callbacks are skipped. You can enable full instantiation and callback execution by setting instantiate=true. This method returns the number of records that were successfully updated. It also supports advanced query options like joins via include, soft-delete handling, parameterization, transactions, and index hints.
+
+// Update all posts that are unpublished
+recordsUpdated = model("post").updateAll(
+    published=1,
+    publishedAt=Now(),
+    where="published=0"
+);
+
+// Scoped update for a hasMany association (removing all comments)
+post = model("post").findByKey(params.postId);
+post.removeAllComments(); 
+// Internally calls: model("comment").updateAll(postId="", where="postId=#post.id#")
+
+// Update all users and force validations and callbacks
+recordsUpdated = model("user").updateAll(
+    properties={isActive=true},
+    instantiate=true,
+    validate=true
+);
+
+// Using index hints for MySQL
+recordsUpdated = model("user").updateAll(
+    properties={isVerified=true},
+    where="isVerified=0",
+    useIndex={user="idx_users_isVerified"}
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````updateByKey:
+The updateByKey() function fetches a model object using its primary key and updates it with the supplied properties or named arguments. It automatically saves the object if validations pass. The function returns true if the object was found and updated successfully, and false if the object could not be found or the save failed. This method is useful for quickly updating a single record by its key without first manually fetching it. Additional options allow control over validation, callbacks, transactions, cache reloading, and soft-delete handling.
+
+// Update a record by key using a struct of properties
+result = model("post").updateByKey(33, params.post);
+// Returns true if the update was successful
+
+// Update a record by key using named arguments
+result = model("post").updateByKey(
+    key=33,
+    title="New version of Wheels just released",
+    published=1
+);
+
+// Include soft-deleted records in the update
+result = model("user").updateByKey(
+    key=42,
+    properties={isActive=true},
+    includeSoftDeletes=true
+);
+
+// Disable validation and callbacks
+result = model("post").updateByKey(
+    key=33,
+    properties={title="Force Update"},
+    validate=false,
+    callbacks=false
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````updateOne:
+The updateOne() function retrieves a single model object based on the supplied arguments and updates it with the specified properties. It returns true if an object was found and updated successfully, and false if no object matched the criteria or the update failed. This method is useful when you want to update a single record that matches a certain condition without fetching multiple records. By default, objects are not instantiated, so validations and callbacks are applied only if enabled. Additional options allow control over query ordering, transactions, cache reloading, index hints, and inclusion of soft-deleted records.
+
+// Update a single property on the most recently released product
+result = model("product").updateOne(
+    order="releaseDate DESC",
+    new=1
+);
+
+// Scoped update for a hasOne association (removing a profile)
+aUser = model("user").findByKey(params.userId);
+aUser.removeProfile(); 
+// Internally calls: model("profile").updateOne(where="userId=#aUser.id#", userId="")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````updateProperty:
+The updateProperty() function updates a single property on a model object and saves the record immediately without running the normal validation procedures. This method is particularly useful for quickly updating flags or boolean values on existing records where full validation is not necessary. You can control transaction behavior, parameterization, and callback execution when using this method.
+
+// Update a single property on an existing product
+product = model("product").findByKey(56);
+product.updateProperty("new", 1);
+
+// Update a boolean flag without callbacks or validations
+user = model("user").findByKey(42);
+user.updateProperty(property="isActive", value=false, callbacks=false);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````updateRecord:
+The updateRecord() function allows you to update an existing record in a database table directly from within a migration CFC. This function is particularly useful when you need to modify data as part of a schema migration, such as setting default values, correcting legacy data, or updating specific records based on certain conditions. The function requires the table name and optionally allows a where clause to target specific rows.
+
+// Update the `active` column to 0 for all admin users in a migration
+updateRecord(
+    table="users",
+    where="admin = 1",
+    active=0
+);
+
+// Update a specific product record by ID
+updateRecord(
+    table="products",
+    where="id = 42",
+    price=19.99,
+    stock=100
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````URLFor:
+The URLFor() function generates an internal URL based on the supplied arguments. It can create URLs using a named route, or by specifying a controller and action directly. Additional options let you include keys, query parameters, anchors, and override protocol, host, or port. By default, the function returns a relative URL, but you can configure it to return a fully qualified URL. URL parameters are automatically encoded for safety, but for HTML attribute safety, further encoding is recommended.
+
+// Generate the URL for the logOut action on the account controller
+#urlFor(controller="account", action="logOut")#
+// Example output: /account/log-out
+
+// Generate a URL with an anchor
+#urlFor(action="comments", anchor="comment10")#
+// Example output: /comments#comment10
+
+// Generate a URL using a named route with parameters
+#urlFor(route="product", categorySlug="accessories", productSlug="battery-charger")#
+// Example output: /accessories/battery-charger
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````usesLayout:
+The usesLayout() function is used inside a controller's config() function to specify which layout template should be applied to the controller or specific actions. You can define a default layout for the entire controller, specify layouts only for certain actions, exclude specific actions from using a layout, or even provide a custom function to determine which layout to use dynamically. This allows fine-grained control over your page structure and helps maintain consistent design while accommodating exceptions.
+
+// Use a layout for the entire controller except for a specific AJAX action
+usesLayout(template="myLayout", except="myAjax");
+
+// Use a custom layout only for certain actions, default layout for the rest
+usesLayout(template="myLayout", only="termsOfService,shippingPolicy");
+
+// Define a function that determines which layout to display dynamically
+// The function should return the layout name or true to use the default
+usesLayout("setLayout");
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````valid:
+The valid() function runs all validations defined on a model object and returns true if the object passes validation, or false if it fails. While Wheels automatically validates objects when they are saved to the database, this method allows you to check an object's validity without saving it, which is useful for conditional logic, form previews, or API input validation.
+
+// Create a new user object and validate it without saving
+user = model("user").new(params.user);
+
+if (user.valid) {
+    // The user object passed all validations
+    // Proceed with further logic or display success
+} else {
+    // The user object failed validation
+    // Handle errors accordingly
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validate:
+The validate() function is used to register one or more validation methods that will be executed on a model object before it is saved to the database. This allows you to define custom validation logic beyond the built-in validations like presence or uniqueness. You can also control when the validation runs (on create, update, or both) and under what conditions using condition and unless.
+
+Examples
+// Basic usage: register a method to validate objects before saving
+function config() {
+    validate("checkPhoneNumber");
+}
+
+function checkPhoneNumber() {
+    // Make sure area code is '614'
+    return Left(this.phoneNumber, 3) == "614";
+}
+
+// Register multiple validation methods
+function config() {
+    validate("checkPhoneNumber, checkEmailFormat");
+}
+
+function checkEmailFormat() {
+    // Ensure email contains '@'
+    return Find("@", this.email);
+}
+
+// Conditional validation using `condition`
+function config() {
+    // Only validate phone numbers if the user is in the US
+    validate("checkPhoneNumber", condition="this.country == 'US'");
+}
+
+// Skip validation under certain conditions using `unless`
+function config() {
+    // Skip phone number validation if the user is a guest
+    validate("checkPhoneNumber", unless="this.isGuest");
+}
+
+// Run validation only on create or update
+function config() {
+    // Validate email only when creating a new record
+    validate("checkEmailFormat", when="onCreate");
+
+    // Validate password only on update
+    validate("checkPasswordStrength", when="onUpdate");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validateOnCreate:
+The validateOnCreate() function registers one or more validation methods that will be executed only when a new object is being inserted into the database. This is useful for rules that should apply strictly at creation and not during updates. You can also control whether the validation runs using the condition and unless arguments.
+
+Examples
+// Basic usage: validate new objects before insertion
+function config() {
+    validateOnCreate("checkPhoneNumber");
+}
+
+function checkPhoneNumber() {
+    // Ensure area code is '614'
+    return Left(this.phoneNumber, 3) == "614";
+}
+
+// Register multiple methods for validation on creation
+function config() {
+    validateOnCreate("checkPhoneNumber, checkEmailFormat");
+}
+
+function checkEmailFormat() {
+    // Ensure email contains '@'
+    return Find("@", this.email);
+}
+
+// Conditional validation using `condition`
+function config() {
+    // Only validate phone number if the country is US
+    validateOnCreate("checkPhoneNumber", condition="this.country == 'US'");
+}
+
+// Skip validation under certain conditions using `unless`
+function config() {
+    // Skip phone number validation if user is a guest
+    validateOnCreate("checkPhoneNumber", unless="this.isGuest");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validateOnUpdate:
+The validateOnUpdate() function registers one or more validation methods that will be executed only when an existing object is being updated in the database. This allows you to enforce rules that apply strictly to updates, without affecting the creation of new records. You can also control whether the validation runs using the condition and unless arguments.
+
+Examples
+// Basic usage: validate existing objects before update
+function config() {
+    validateOnUpdate("checkPhoneNumber");
+}
+
+function checkPhoneNumber() {
+    // Ensure area code is '614'
+    return Left(this.phoneNumber, 3) == "614";
+}
+
+// Register multiple methods for validation on update
+function config() {
+    validateOnUpdate("checkPhoneNumber, checkEmailFormat");
+}
+
+function checkEmailFormat() {
+    // Ensure email contains '@'
+    return Find("@", this.email);
+}
+
+// Conditional validation using `condition`
+function config() {
+    // Only validate phone number if the country is US
+    validateOnUpdate("checkPhoneNumber", condition="this.country == 'US'");
+}
+
+// Skip validation under certain conditions using `unless`
+function config() {
+    // Skip phone number validation if the user is an admin
+    validateOnUpdate("checkPhoneNumber", unless="this.isAdmin");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesConfirmationOf:
+The validatesConfirmationOf() function is used to ensure that the value of a given property matches a corresponding confirmation property. This is commonly used for fields like password or email, where users are asked to enter the value twice for confirmation. The confirmation property is temporary and never saved to the database. By convention, the confirmation property name is the original property name with "Confirmation" appended (e.g., passwordConfirmation for password). You can customize when the validation occurs, provide a custom message, or enforce case sensitivity.
+
+Examples
+// Validate password confirmation on user creation
+validatesConfirmationOf(
+    property="password",
+    when="onCreate",
+    message="Your password and its confirmation do not match. Please try again."
+);
+
+// Validate multiple fields at once: password and email
+validatesConfirmationOf(
+    properties="password,email",
+    when="onCreate",
+    message="Fields must match their confirmation."
+);
+
+// Case-sensitive validation
+validatesConfirmationOf(
+    property="password",
+    caseSensitive=true,
+    message="Password and confirmation must match exactly, including case."
+);
+
+// Conditional validation using `condition`
+validatesConfirmationOf(
+    property="email",
+    condition="this.isNewsletterSubscriber",
+    message="Email confirmation required for newsletter subscription."
+);
+
+// Skip validation for admin users using `unless`
+validatesConfirmationOf(
+    property="password",
+    unless="this.isAdmin",
+    message="Admins do not need to confirm their password."
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesExclusionOf:
+The validatesExclusionOf() function ensures that the value of a specified property is not included in a given list of disallowed values. This is commonly used to prevent reserved words, restricted entries, or disallowed values from being saved to the database. You can specify when the validation should run, allow blank values to skip validation, or conditionally run it.
+
+Examples
+// Prevent users from selecting certain programming languages
+validatesExclusionOf(
+    property="coolLanguage",
+    list="php,fortran",
+    message="Haha, you can not be serious. Try again, please."
+);
+
+// Validate multiple properties at once
+validatesExclusionOf(
+    properties="username,email",
+    list="admin,root,system",
+    message="This value is reserved. Please choose another."
+);
+
+// Only apply validation on object creation
+validatesExclusionOf(
+    property="username",
+    list="admin,root",
+    when="onCreate",
+    message="Username is reserved and cannot be used."
+);
+
+// Skip validation if the property is blank
+validatesExclusionOf(
+    property="nickname",
+    list="boss,chief",
+    allowBlank=true
+);
+
+// Conditional validation using `condition`
+validatesExclusionOf(
+    property="category",
+    list="deprecated,legacy",
+    condition="this.isArchived",
+    message="Archived items cannot use deprecated categories."
+);
+
+// Skip validation for admin users using `unless`
+validatesExclusionOf(
+    property="role",
+    list="banned,guest",
+    unless="this.isAdmin",
+    message="This role is restricted for regular users."
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesFormatOf:
+The validatesFormatOf() function is used to ensure that the value of a property matches a specific format. You can validate against a regular expression using regEx or use built-in CFML validation types via the type argument (e.g., email, creditcard, date, URL). This validation is commonly used for email addresses, phone numbers, credit card numbers, and custom patterns.
+
+Examples
+// Validate that a credit card number is correct
+validatesFormatOf(property="cc", type="creditcard");
+
+// Validate that a US zipcode matches 5 or 9 digit format
+validatesFormatOf(property="zipcode", type="zipcode");
+
+// Ensure that an email ends with `.se` when IP check returns true and today is not Sunday
+validatesFormatOf(
+    property="email",
+    regEx="^.*@.*\.se$",
+    condition="ipCheck()",
+    unless="DayOfWeek() eq 1",
+    message="Sorry, you must have a Swedish email address to use this website."
+);
+
+// Validate that a username contains only letters, numbers, or underscores
+validatesFormatOf(
+    property="username",
+    regEx="^[a-zA-Z0-9_]+$",
+    message="Username can only contain letters, numbers, and underscores."
+);
+
+// Validate multiple properties at once using built-in CFML types
+validatesFormatOf(
+    properties="phone,email",
+    type="telephone,email",
+    allowBlank=true
+);
+
+// Validate only when updating an existing object
+validatesFormatOf(
+    property="ssn",
+    type="social_security_number",
+    when="onUpdate",
+    message="Invalid SSN format for updating records."
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesInclusionOf:
+The validatesInclusionOf() function ensures that a property’s value exists in a predefined list of allowed values. It is commonly used for dropdowns, radio buttons, or any scenario where only specific values are acceptable.
+
+Examples
+// Ensure that the user selects either "Wheels" or "Rails" as their framework
+validatesInclusionOf(
+    property="frameworkOfChoice",
+    list="wheels,rails",
+    message="Please try again, and this time, select a decent framework!"
+);
+
+// Validate multiple properties at once
+validatesInclusionOf(
+    properties="frameworkOfChoice,editorChoice",
+    list="wheels,rails,vsCode,sublime",
+    message="Invalid selection."
+);
+
+// Only validate when creating a new object
+validatesInclusionOf(
+    property="subscriptionType",
+    list="free,premium,enterprise",
+    when="onCreate",
+    message="You must choose a valid subscription type."
+);
+
+// Skip validation if property is blank
+validatesInclusionOf(
+    property="preferredLanguage",
+    list="cfml,python,javascript",
+    allowBlank=true
+);
+
+// Conditionally validate only for users in Europe
+validatesInclusionOf(
+    property="currency",
+    list="EUR,GBP,CHF",
+    condition="this.region eq 'Europe'",
+    message="Invalid currency for European users."
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesLengthOf:
+The validatesLengthOf() function ensures that a property’s value meets specific length requirements. You can enforce exact length, maximum, minimum, or a range of lengths using the exactly, maximum, minimum, and within arguments.
+
+Examples
+// Ensure that `firstName` and `lastName` are no more than 50 characters
+validatesLengthOf(
+    properties="firstName,lastName",
+    maximum=50,
+    message="Please shorten your [property] please (50 characters max)."
+);
+
+// Ensure `password` is between 4 and 20 characters
+validatesLengthOf(
+    property="password",
+    within="4,20",
+    message="The password length must be between 4 and 20 characters."
+);
+
+// Ensure `username` is exactly 8 characters
+validatesLengthOf(
+    property="username",
+    exactly=8,
+    message="Username must be exactly 8 characters."
+);
+
+// Only validate if `region` is 'US'
+validatesLengthOf(
+    property="zipCode",
+    exactly=5,
+    condition="this.region eq 'US'",
+    message="US zip codes must be exactly 5 digits."
+);
+
+// Skip validation if property is blank
+validatesLengthOf(
+    property="nickname",
+    maximum=15,
+    allowBlank=true
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesNumericalityOf:
+The validatesNumericalityOf() function ensures that a property’s value is numeric. You can also enforce additional constraints such as integer-only values, odd/even numbers, and comparison limits (greaterThan, lessThan, etc.).
+
+Examples
+// Score must be an integer, but allow blank values
+validatesNumericalityOf(
+    property="score",
+    onlyInteger=true,
+    allowBlank=true,
+    message="Please enter a correct score."
+);
+
+// Age must be a number greater than or equal to 18
+validatesNumericalityOf(
+    property="age",
+    greaterThanOrEqualTo=18,
+    message="You must be at least 18 years old."
+);
+
+// Price must be a positive number less than 1000
+validatesNumericalityOf(
+    property="price",
+    greaterThan=0,
+    lessThan=1000,
+    message="Price must be between 0 and 1000."
+);
+
+// Ensure a number is odd and an integer
+validatesNumericalityOf(
+    property="lotteryNumber",
+    odd=true,
+    onlyInteger=true,
+    message="Lottery number must be an odd integer."
+);
+
+// Validate only when a specific condition is true
+validatesNumericalityOf(
+    property="discount",
+    greaterThanOrEqualTo=0,
+    lessThanOrEqualTo=50,
+    condition="this.isOnSale()",
+    message="Discount must be between 0 and 50 for sale items."
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesPresenceOf:
+The validatesPresenceOf() function ensures that the specified property (or properties) exists and is not blank. It is commonly used to enforce required fields before saving an object to the database.
+
+Examples
+// Ensure the `emailAddress` property is not blank
+validatesPresenceOf("emailAddress");
+
+// Ensure multiple properties are present
+validatesPresenceOf("firstName,lastName,emailAddress");
+
+// Use a custom error message for missing email
+validatesPresenceOf(
+    property="emailAddress",
+    message="Email is required to create your account."
+);
+
+// Validate only on create, not on update
+validatesPresenceOf(
+    properties="password",
+    when="onCreate",
+    message="Password is required when registering a new user."
+);
+
+// Conditional validation based on a method
+validatesPresenceOf(
+    properties="discountCode",
+    condition="this.isOnSale()",
+    message="Discount code must be present for sale items."
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validatesUniquenessOf:
+The validatesUniquenessOf() function ensures that the value of a specified property is unique within the database table. It is particularly useful for properties such as usernames, email addresses, or any field that must not have duplicates.
+
+When creating a new record, it checks that no other record exists with the same value. When updating, it disregards the record itself and checks for uniqueness against other records.
+
+Examples
+// Ensure that usernames are unique across all users
+validatesUniquenessOf(
+    property="username",
+    message="Sorry, that username is already taken."
+);
+
+// Ensure that email addresses are unique
+validatesUniquenessOf(
+    property="emailAddress",
+    message="This email has already been registered."
+);
+
+// Allow the same username in different accounts but unique within an account
+validatesUniquenessOf(
+    property="username",
+    scope="accountId",
+    message="This username is already used in this account."
+);
+
+// Only enforce uniqueness if the user is active
+validatesUniquenessOf(
+    property="username",
+    condition="this.isActive",
+    message="Active users must have a unique username."
+);
+
+// Skip uniqueness check if the field is blank
+validatesUniquenessOf(
+    property="nickname",
+    allowBlank=true,
+    message="Nickname must be unique if supplied."
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````validationTypeForProperty:
+The validationTypeForProperty() function returns the type of validation that Wheels would apply for a given property. This is useful if you want to dynamically inspect a model's property type or apply logic based on the property's expected format.
+
+// Create a new employee object
+employee = model("employee").new();
+
+// Assume 'firstName' is a varchar(50) column
+// This will output: "string"
+#employee.validationTypeForProperty("firstName")#
+
+// Assume 'hireDate' is a datetime column
+// This will output: "date"
+#employee.validationTypeForProperty("hireDate")#
+
+// Assume 'salary' is a numeric column
+// This will output: "numeric"
+#employee.validationTypeForProperty("salary")#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````verificationChain:
+The verificationChain() function returns an array of all verifications (filters, before-actions, or checks) that are configured for the current controller, in the order they will be executed. This allows you to inspect, modify, or reorder the verifications dynamically.
+
+// Get the current verification chain for this controller
+myVerificationChain = verificationChain();
+
+// Remove the first verification from the chain
+ArrayDeleteAt(myVerificationChain, 1);
+
+// Set the modified verification chain back to the controller
+setVerificationChain(myVerificationChain);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````verifies:
+The verifies() function instructs a Wheels controller to check that certain criteria are met before executing an action. This is useful for enforcing request types, required parameters, session/cookie values, or custom verifications.
+
+All undeclared arguments are automatically passed to a redirectTo() call if a handler is not specified.
+
+1. Enforce POST request for a specific action:
+
+// Only the handleForm action must be POST
+verifies(only="handleForm", post=true);
+
+
+2. Ensure a GET request and that a parameter exists with a type check:
+
+// The edit action must be GET and have a numeric userId in params
+verifies(only="edit", get=true, params="userId", paramsTypes="integer");
+
+
+3. Use a custom handler function for failed verifications:
+
+// If verification fails, call myCustomFunction in the controller
+verifies(only="edit", get=true, params="userId", paramsTypes="integer", handler="myCustomFunction");
+
+
+4. Redirect and show flash error if verification fails:
+
+// Instead of a handler, redirect to index action and show an error message
+verifies(
+    only="edit", 
+    get=true, 
+    params="userId", 
+    paramsTypes="integer", 
+    action="index", 
+    error="Invalid userId"
+);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````wildcard:
+The wildcard() function automatically generates dynamic routes for your controllers using placeholders like [controller], [action], and optionally [key] or [format]. This allows you to quickly map standard URL patterns to controllers and actions without explicitly defining every route.
+
+1. Basic wildcard routing (controller and action, GET only):
+
+mapper()
+    .wildcard()
+.end();
+
+
+This generates routes like:
+
+/posts           -> posts/index
+/posts/show      -> posts/show
+/users           -> users/index
+/users/edit      -> users/edit
+
+
+2. Enable [key] pattern for resource-style URLs:
+
+mapper()
+    .wildcard(mapKey=true)
+.end();
+
+
+Generates:
+
+/posts/1         -> posts/show with key=1
+/users/42/edit   -> users/edit with key=42
+
+
+3. Enable optional format (e.g., .json, .xml):
+
+mapper()
+    .wildcard(mapFormat=true)
+.end();
+
+
+Generates:
+
+/posts.json           -> posts/index format=json
+/posts/show.xml       -> posts/show format=xml
+/users/42.json/edit   -> users/edit key=42 format=json
+
+
+4. Support multiple HTTP methods:
+
+mapper()
+    .wildcard(methods="get,post")
+.end();
+
+
+⚠️ Warning: Allowing POST via wildcard can be dangerous if not combined with verifies() in your controller to ensure only authorized requests can modify data.
+
+5. Full example combining key and format:
+
+mapper()
+    .wildcard(mapKey=true, mapFormat=true, methods="get,post")
+.end();
+
+
+Generates routes like:
+
+/posts/1.json         -> posts/show key=1 format=json
+/users/42/edit.xml    -> users/edit key=42 format=xml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````wordTruncate:
+Truncates a string by words instead of characters. After the specified number of words, it replaces the remaining text with a truncation string (defaults to "...").
+
+1. Basic truncation (default truncate string "..."):
+
+#wordTruncate(text="Wheels is a framework for ColdFusion", length=4)#
+
+
+Output:
+
+Wheels is a framework...
+
+
+2. Truncate with a custom string:
+
+#wordTruncate(text="Wheels is a framework for ColdFusion", length=3, truncateString=" (more)")#
+
+
+Output:
+
+Wheels is a (more)
+
+
+3. Using with shorter text than length (no truncation applied):
+
+#wordTruncate(text="Hello world", length=5)#
+
+
+Output:
+
+Hello world
+
+
+4. Dynamic usage in a view:
+
+<cfoutput>
+    #wordTruncate(text=post.content, length=10)#
+</cfoutput>
+
+
+This is useful for showing previews of long content while preserving word boundaries.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````yearSelectTag:
+Generates a <select> form control with a range of years, making it easy to create date-of-birth selectors or other year-based dropdowns.
+
+1. Basic year dropdown:
+
+#yearSelectTag(name="yearOfBirthday", selected=params.yearOfBirthday)#
+
+
+Output:
+
+<select name="yearOfBirthday">
+  <option value="2018">2018</option>
+  ...
+  <option value="2028">2028</option>
+</select>
+
+
+2. Custom range (past 50 years, at least 18 years ago):
+
+fiftyYearsAgo = Year(Now()) - 50;
+eighteenYearsAgo = Year(Now()) - 18;
+
+#yearSelectTag(
+    name="yearOfBirthday", 
+    selected=params.yearOfBirthday, 
+    startYear=fiftyYearsAgo, 
+    endYear=eighteenYearsAgo
+)#
+
+
+Output: A <select> with years from fiftyYearsAgo to eighteenYearsAgo.
+
+3. Include a blank option:
+
+#yearSelectTag(name="graduationYear", includeBlank="- Select Year -")#
+
+
+Output: Dropdown starts with an empty option labeled "- Select Year -".
+
+4. Add label with custom placement:
+
+#yearSelectTag(
+    name="yearOfHiring",
+    label="Hiring Year",
+    labelPlacement="aroundRight"
+)#
+
+
+Output: The label wraps the <select> on the right side.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`````setFlashStorage:
+Dynamically sets the storage mechanism for flash messages during the current request lifecycle. Flash messages are temporary messages (e.g., success or error notifications) that persist across requests.
+
+1. Set flash storage to cookie for the current controller only:
+
+setFlashStorage("cookie");
+
+
+Effect: Flash messages will now be stored in cookies only for the current controller. Other controllers remain unaffected.
+
+2. Set flash storage to session for both controller and application:
+
+setFlashStorage("session", true);
+
+
+Effect: Flash messages will now be stored in session globally, so all controllers in the application will use session storage for flash messages.
