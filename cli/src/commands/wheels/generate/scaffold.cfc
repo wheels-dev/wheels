@@ -37,7 +37,7 @@ component aliases="wheels g scaffold" extends="../base" {
         arguments = reconstructArgs(arguments);
         
         // Validate scaffold
-        var validation = scaffoldService.validateScaffold(arguments.name, getCWD());
+        var validation = scaffoldService.validateScaffold(arguments.name, getCWD(), arguments.force);
         if (!validation.valid) {
             detailOutput.error("Cannot scaffold '#arguments.name#':");
             for (var error in validation.errors) {

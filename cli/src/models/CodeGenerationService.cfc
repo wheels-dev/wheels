@@ -125,7 +125,9 @@ component {
         boolean api = false,
         boolean force = false,
         array actions = [],
-        string baseDirectory = ""
+        string baseDirectory = "",
+        string belongsTo = "",
+        string hasMany = ""
     ) {
         var controllerName = capitalize(arguments.name);
         var fileName = controllerName & ".cfc";
@@ -158,6 +160,8 @@ component {
             actions: arguments.actions,
             rest: arguments.rest,
             api: arguments.api,
+            belongsTo: arguments.belongsTo,
+            hasMany: arguments.hasMany,
             timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
         };
         
@@ -199,7 +203,9 @@ component {
         string template = "",
         boolean force = false,
         string baseDirectory = "",
-        array properties = []
+        array properties = [],
+        string belongsTo = "",
+        string hasMany = ""
     ) {
         var controllerName = capitalize(arguments.name);
         var viewDir = resolvePath("views/#lCase(controllerName)#", arguments.baseDirectory);
@@ -250,7 +256,9 @@ component {
             modelName: singularize(controllerName),
             action: arguments.action,
             timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss"),
-            properties: arguments.properties
+            properties: arguments.properties,
+            belongsTo: arguments.belongsTo,
+            hasMany: arguments.hasMany
         };
         
         // Generate from template

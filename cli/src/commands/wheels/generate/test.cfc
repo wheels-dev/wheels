@@ -21,28 +21,31 @@ component aliases='wheels g test' extends="../base"  {
 	}
 
 	/**
-	 * @type.hint Type of test: model, controller, view, unit, integration, api
-	 * @type.options model,controller,view,unit,integration,api
-	 * @target.hint Name of object/class to test
-	 * @name.hint Name of the action/view (for view tests)
-	 * @crud.hint Generate CRUD test methods
-	 * @mock.hint Generate mock objects and stubs
-	 * @factory.hint Generate factory examples
-	 * @open.hint Open the created file in editor
+	 * @type.hint Type of test: model, controller, view, helper, route
+	 * @type.options model,controller,view,helper,route
+	 * @name.hint Name of the component to test
+	 * @methods.hint Specific methods to test (comma-separated)
+	 * @integration.hint Generate integration tests
+	 * @coverage.hint Include coverage setup
+	 * @fixtures.hint Generate test fixtures
+	 * @force.hint Overwrite existing files
 	 **/
 	function run(
 		required string type,
-		required string target,
-		string name="",
-		boolean crud=false,
-		boolean mock=false,
-		boolean factory=false,
-		boolean open=false
+		required string name,
+		string methods="",
+		boolean integration=false,
+		boolean coverage=false,
+		boolean fixtures=true,
+		boolean force=false
 	){
+		//reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
+
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
-		var obj = helpers.getNameVariants(listLast( arguments.target, '/\' ));
+		var obj = helpers.getNameVariants(listLast( arguments.name, '/\' ));
 		var testsdirectory = fileSystemUtil.resolvePath( "tests/specs" );
 
 		// Validate directories
@@ -54,12 +57,19 @@ component aliases='wheels g test' extends="../base"  {
 			}
 		}
 		
-		if( arguments.type == "view" && !len(arguments.name)){
-			error( "If creating a view test, we need to know the name of the view as well as the target");
+		// For view tests, extract view name from the name parameter
+		var viewName = "";
+		if( arguments.type == "view" ){
+			var nameParts = listToArray(arguments.name, "/");
+			if (arrayLen(nameParts) < 2) {
+				error( "For view tests, provide name in format 'controller/action' (e.g., 'products/index')");
+			}
+			arguments.name = nameParts[1]; // controller name
+			viewName = nameParts[2]; // view/action name
 		}
 
 		// Determine test directory and name based on type
-		var testInfo = determineTestInfo(arguments.type, obj, arguments.name);
+		var testInfo = determineTestInfo(arguments.type, obj, viewName);
 		var testPath = testInfo.path;
 		
 		// Create directory if it doesn't exist
@@ -67,7 +77,7 @@ component aliases='wheels g test' extends="../base"  {
 			directoryCreate(getDirectoryFromPath(testPath));
 		}
 
-		if( fileExists( testPath ) ) {
+		if( fileExists( testPath ) && !arguments.force) {
 			if( !confirm( "[#testPath#] already exists. Overwrite? [y/n]" ) ){
 				details.skip(testPath & " (cancelled by user)");
 				return;
@@ -77,25 +87,22 @@ component aliases='wheels g test' extends="../base"  {
 		// Copy template files to the application folder if they do not exist there
 		ensureSnippetTemplatesExist();
 		
-		// Get test content - enhanced with CRUD, mock, and factory options
+		// Get test content with documented options
 		var testContent = generateTestContent(
-			type = arguments.type, 
-			obj = obj, 
-			crud = arguments.crud, 
-			mock = arguments.mock,
-			factory = arguments.factory,
-			name = arguments.name
+			type = arguments.type,
+			obj = obj,
+			methods = arguments.methods,
+			integration = arguments.integration,
+			coverage = arguments.coverage,
+			fixtures = arguments.fixtures,
+			name = viewName
 		);
 		
 		// Output detail header
-		details.header("🧪", "Test Generation");
+		details.header("", "Test Generation");
 		
 		file action='write' file='#testPath#' mode ='777' output='#trim( testContent )#';
 		details.create(testPath);
-		
-		if (arguments.open) {
-			openPath(testPath);
-		}
 		
 		details.success("Test created successfully!");
 		
@@ -103,11 +110,12 @@ component aliases='wheels g test' extends="../base"  {
 		var nextSteps = [];
 		arrayAppend(nextSteps, "Run your test with: box testbox run --testBundles=#listLast(testPath, '/')#");
 		arrayAppend(nextSteps, "Run all tests with: box testbox run");
-		if (!arguments.open) {
-			arrayAppend(nextSteps, "Open the test file: #testPath#");
+		arrayAppend(nextSteps, "Open the test file: #testPath#");
+		if (arguments.type == "model" && !arguments.fixtures) {
+			arrayAppend(nextSteps, "Add fixture support with: wheels g test model #arguments.name# --fixtures");
 		}
-		if (arguments.type == "model" && !arguments.factory) {
-			arrayAppend(nextSteps, "Add factory support with: wheels g test model #arguments.target# --factory");
+		if (!arguments.integration && arrayFind(["model", "controller"], arguments.type)) {
+			arrayAppend(nextSteps, "Generate integration tests with: wheels g test #arguments.type# #arguments.name# --integration");
 		}
 		arrayAppend(nextSteps, "Add more test cases to cover edge cases and error conditions");
 		details.nextSteps(nextSteps);
@@ -156,58 +164,56 @@ component aliases='wheels g test' extends="../base"  {
 				info.path = fileSystemUtil.resolvePath("tests/specs/integration/workflows/#info.className#.cfc");
 				break;
 				
-			case "api":
-				info.className = obj.objectNamePluralC & "APISpec";
-				var apiDir = fileSystemUtil.resolvePath("tests/specs/integration/api");
-				if (!directoryExists(apiDir)) {
-					directoryCreate(apiDir);
-				}
-				info.path = "#apiDir#/#info.className#.cfc";
+			case "helper":
+				info.className = obj.objectNameSingularC & "HelperSpec";
+				info.path = fileSystemUtil.resolvePath("tests/specs/unit/helpers/#info.className#.cfc");
 				break;
-				
+
+			case "route":
+				info.className = obj.objectNamePluralC & "RoutesSpec";
+				info.path = fileSystemUtil.resolvePath("tests/specs/unit/routes/#info.className#.cfc");
+				break;
+
 			default:
-				throw(type="InvalidTestType", message="Unknown type: should be one of model/controller/view/unit/integration/api");
+				throw(type="InvalidTestType", message="Unknown type: should be one of model/controller/view/helper/route");
 		}
 		
 		return info;
 	}
 	
 	/**
-	 * Generate enhanced test content based on type and options
+	 * Generate test content based on type and options
 	 */
 	private function generateTestContent(
 		required string type,
 		required struct obj,
-		boolean crud = false,
-		boolean mock = false,
-		boolean factory = false,
+		string methods = "",
+		boolean integration = false,
+		boolean coverage = false,
+		boolean fixtures = true,
 		string name = ""
 	) {
 		var content = "";
 		
 		switch(arguments.type) {
 			case "model":
-				content = generateModelTest(arguments.obj, arguments.crud, arguments.factory);
+				content = generateModelTest(arguments.obj, arguments.integration, arguments.fixtures, arguments.methods);
 				break;
-				
+
 			case "controller":
-				content = generateControllerTest(arguments.obj, arguments.crud, arguments.mock);
+				content = generateControllerTest(arguments.obj, arguments.integration, arguments.methods);
 				break;
-				
+
 			case "view":
 				content = generateViewTest(arguments.obj, arguments.name);
 				break;
-				
-			case "unit":
-				content = generateUnitTest(arguments.obj, arguments.mock);
+
+			case "helper":
+				content = generateHelperTest(arguments.obj, arguments.methods);
 				break;
-				
-			case "integration":
-				content = generateIntegrationTest(arguments.obj, arguments.crud, arguments.factory);
-				break;
-				
-			case "api":
-				content = generateAPITest(arguments.obj, arguments.crud, arguments.mock);
+
+			case "route":
+				content = generateRouteTest(arguments.obj);
 				break;
 		}
 		
@@ -219,20 +225,31 @@ component aliases='wheels g test' extends="../base"  {
 	 */
 	private function generateModelTest(
 		required struct obj,
-		boolean crud = false,
-		boolean factory = false
+		boolean integration = false,
+		boolean fixtures = true,
+		string methods = ""
 	) {
 		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
 		content &= chr(9) & chr(9) & 'describe("#obj.objectNameSingularC# Model", () => {' & chr(10) & chr(10);
 		
 		// Setup
-		content &= chr(9) & chr(9) & chr(9) & 'beforeEach(() => {' & chr(10);
-		if (arguments.factory) {
-			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'variables.#obj.objectNameSingular# = build("#obj.objectNameSingular#");' & chr(10);
-		} else {
-			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'variables.#obj.objectNameSingular# = model("#obj.objectNameSingularC#").new();' & chr(10);
+		if (arguments.fixtures) {
+			content &= chr(9) & chr(9) & chr(9) & 'beforeAll(() => {' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & '// Setup test data' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'variables.valid#obj.objectNameSingularC# = {' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'name: "Test #obj.objectNameSingularC#"' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & '};' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
+
+			content &= chr(9) & chr(9) & chr(9) & 'afterAll(() => {' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & '// Clean up test data' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'model("#obj.objectNameSingularC#").deleteAll();' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
 		}
+
+		content &= chr(9) & chr(9) & chr(9) & 'beforeEach(() => {' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & chr(9) & 'variables.#obj.objectNameSingular# = model("#obj.objectNameSingularC#").new();' & chr(10);
 		content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
 		
 		// Validations
@@ -256,31 +273,24 @@ component aliases='wheels g test' extends="../base"  {
 		content &= chr(9) & chr(9) & chr(9) & chr(9) & '// Test custom model methods here' & chr(10);
 		content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
 		
-		// CRUD operations
-		if (arguments.crud) {
+		// CRUD operations (generated when integration testing is enabled)
+		if (arguments.integration) {
 			content &= chr(9) & chr(9) & chr(9) & 'describe("CRUD Operations", () => {' & chr(10);
 			
 			// Create
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'it("should create a new #obj.objectNameSingular#", () => {' & chr(10);
-			if (arguments.factory) {
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var new#obj.objectNameSingularC# = create("#obj.objectNameSingular#", {' & chr(10);
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '// Add test attributes' & chr(10);
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '});' & chr(10);
+			if (arguments.fixtures) {
+				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var #obj.objectNameSingular# = model("#obj.objectNameSingularC#").new(valid#obj.objectNameSingularC#);' & chr(10);
 			} else {
 				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '#obj.objectNameSingular#.name = "Test #obj.objectNameSingularC#";' & chr(10);
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(#obj.objectNameSingular#.save()).toBeTrue();' & chr(10);
 			}
-			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(new#obj.objectNameSingularC#.id).toBeGT(0);' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(#obj.objectNameSingular#.save()).toBeTrue();' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(#obj.objectNameSingular#.id).toBeGT(0);' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
 			
 			// Read
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'it("should find an existing #obj.objectNameSingular#", () => {' & chr(10);
-			if (arguments.factory) {
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var created = create("#obj.objectNameSingular#");' & chr(10);
-			} else {
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '#obj.objectNameSingular#.save();' & chr(10);
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var created = #obj.objectNameSingular#;' & chr(10);
-			}
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var created = model("#obj.objectNameSingularC#").create(valid#obj.objectNameSingularC#);' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var found = model("#obj.objectNameSingularC#").findByKey(created.id);' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(found).toBeInstanceOf("app.models.#obj.objectNameSingularC#");' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(found.id).toBe(created.id);' & chr(10);
@@ -288,12 +298,7 @@ component aliases='wheels g test' extends="../base"  {
 			
 			// Update
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'it("should update an existing #obj.objectNameSingular#", () => {' & chr(10);
-			if (arguments.factory) {
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var existing = create("#obj.objectNameSingular#");' & chr(10);
-			} else {
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '#obj.objectNameSingular#.save();' & chr(10);
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var existing = #obj.objectNameSingular#;' & chr(10);
-			}
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var existing = model("#obj.objectNameSingularC#").create(valid#obj.objectNameSingularC#);' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'existing.name = "Updated Name";' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(existing.save()).toBeTrue();' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var updated = model("#obj.objectNameSingularC#").findByKey(existing.id);' & chr(10);
@@ -302,12 +307,7 @@ component aliases='wheels g test' extends="../base"  {
 			
 			// Delete
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'it("should delete a #obj.objectNameSingular#", () => {' & chr(10);
-			if (arguments.factory) {
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var toDelete = create("#obj.objectNameSingular#");' & chr(10);
-			} else {
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '#obj.objectNameSingular#.save();' & chr(10);
-				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var toDelete = #obj.objectNameSingular#;' & chr(10);
-			}
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var toDelete = model("#obj.objectNameSingularC#").create(valid#obj.objectNameSingularC#);' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var id = toDelete.id;' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(toDelete.delete()).toBeTrue();' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'var deleted = model("#obj.objectNameSingularC#").findByKey(id);' & chr(10);
@@ -329,8 +329,8 @@ component aliases='wheels g test' extends="../base"  {
 	 */
 	private function generateControllerTest(
 		required struct obj,
-		boolean crud = false,
-		boolean mock = false
+		boolean integration = false,
+		string methods = ""
 	) {
 		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
 		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
@@ -339,13 +339,9 @@ component aliases='wheels g test' extends="../base"  {
 		// Setup
 		content &= chr(9) & chr(9) & chr(9) & 'beforeEach(() => {' & chr(10);
 		content &= chr(9) & chr(9) & chr(9) & chr(9) & 'variables.controller = controller("#obj.objectNamePluralC#");' & chr(10);
-		if (arguments.mock) {
-			content &= chr(9) & chr(9) & chr(9) & chr(9) & '// Setup mocks if needed' & chr(10);
-			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'variables.mockService = createMock("app.services.#obj.objectNameSingularC#Service");' & chr(10);
-		}
 		content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
-		
-		if (arguments.crud) {
+
+		if (arguments.integration) {
 			// Index action
 			content &= chr(9) & chr(9) & chr(9) & 'describe("index action", () => {' & chr(10);
 			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'it("should list all #obj.objectNamePlural#", () => {' & chr(10);
@@ -633,15 +629,62 @@ component aliases='wheels g test' extends="../base"  {
 	}
 	
 	/**
-	 * Open a file path in the default editor
+	 * Generate helper test
 	 */
-	private function openPath(required string path) {
-		if (shell.isWindows()) {
-			runCommand("start #arguments.path#");
-		} else if (shell.isMac()) {
-			runCommand("open #arguments.path#");
+	private function generateHelperTest(required struct obj, string methods = "") {
+		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
+		content &= chr(9) & chr(9) & 'describe("#obj.objectNameSingularC# Helper Tests", () => {' & chr(10) & chr(10);
+
+		// If specific methods are provided, generate tests for each
+		if (len(arguments.methods)) {
+			var methodList = listToArray(arguments.methods);
+			for (var method in methodList) {
+				content &= chr(9) & chr(9) & chr(9) & 'describe("#method#()", () => {' & chr(10);
+				content &= chr(9) & chr(9) & chr(9) & chr(9) & 'it("should work correctly", () => {' & chr(10);
+				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '// Test #method# function here' & chr(10);
+				content &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & 'expect(true).toBeTrue();' & chr(10);
+				content &= chr(9) & chr(9) & chr(9) & chr(9) & '});' & chr(10);
+				content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
+			}
 		} else {
-			runCommand("xdg-open #arguments.path#");
+			// Generic helper tests
+			content &= chr(9) & chr(9) & chr(9) & 'it("should format values correctly", () => {' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & '// Add helper function tests here' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & chr(9) & 'expect(true).toBeTrue();' & chr(10);
+			content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
 		}
+
+		content &= chr(9) & chr(9) & '});' & chr(10);
+		content &= chr(9) & '}' & chr(10);
+		content &= '}' & chr(10);
+
+		return content;
+	}
+
+	/**
+	 * Generate route test
+	 */
+	private function generateRouteTest(required struct obj) {
+		var content = 'component extends="wheels.Testbox" {' & chr(10) & chr(10);
+		content &= chr(9) & 'function run() {' & chr(10) & chr(10);
+		content &= chr(9) & chr(9) & 'describe("#obj.objectNamePluralC# Routes", () => {' & chr(10) & chr(10);
+
+		content &= chr(9) & chr(9) & chr(9) & 'it("should resolve routes correctly", () => {' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & chr(9) & '// Test route resolution' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & chr(9) & 'expect(urlFor(route="#obj.objectNamePlural#")).toBe("/#obj.objectNamePlural#");' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & chr(9) & 'expect(urlFor(route="new#obj.objectNameSingularC#")).toBe("/#obj.objectNamePlural#/new");' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & '});' & chr(10) & chr(10);
+
+		content &= chr(9) & chr(9) & chr(9) & 'it("should generate URLs correctly", () => {' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & chr(9) & '// Test URL generation' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & chr(9) & 'expect(urlFor(route="#obj.objectNameSingular#", key=123)).toBe("/#obj.objectNamePlural#/123");' & chr(10);
+		content &= chr(9) & chr(9) & chr(9) & '});' & chr(10);
+
+		content &= chr(9) & chr(9) & '});' & chr(10);
+		content &= chr(9) & '}' & chr(10);
+		content &= '}' & chr(10);
+
+		return content;
 	}
 }
