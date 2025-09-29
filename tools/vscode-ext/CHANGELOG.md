@@ -1,10 +1,10 @@
 # Change Log
 
-## [1.1.0] - 2025-09-24
+## [1.0.6] - 2025-09-29
 
 ### Added
 - **Go to Definition (F12)**: Navigate directly to Wheels components with Cmd+Click/Ctrl+Click
-  - Model navigation: `model("User")` → jumps to `User.cfc`
+  - Model navigation: `model("User")` → jumps to `User.cfc`, supports namespaced models `model("Api.User")` → `Api/User.cfc`
   - Controller actions: `redirectTo(controller="users", action="show")` → jumps to specific action
   - Route-based navigation: `linkTo(route="editUser")` → jumps to controller action
   - View definitions: `renderView("users/show")` → jumps to view file
@@ -13,22 +13,28 @@
 - **File Templates & Scaffolding**: Create Wheels components quickly with ready-made templates
   - Right-click any folder → "New Wheels Component" menu
   - Command Palette: "Wheels: Create Controller/Model/View" commands
-  - Complete templates with common templates already written
+  - Complete templates with common patterns and templates
 
-- **Route Validation**: Real-time route validation with intelligent error detection
-  - Highlights route typos: `rout=` → suggests `route=`
-  - Warns about suspicious route names (too short, all caps, etc.)
-  - Detects missing key parameters in edit/update/delete routes
-  - Suggests using route parameter instead of controller/action for maintainability
+- **Smart Parameter System**: Intelligent parameter assistance with integrated features:
+  - **Parameter Highlighting**: Smart highlighting as you type parameter names with Ctrl+Shift+Space
+  - **Parameter Auto-completion**: Type partial names (e.g., "o") and press Tab to complete to "order = ""
+  - **Parameter Validation**: Real-time validation with yellow underlines for invalid parameter names
 
-- **Enhanced Code Snippets**: Pattern-based snippets for rapid development
+- **Component Templates**: Complete structures for rapid development
   - `wcontroller` → Complete CRUD controller with all actions, filters, error handling
   - `wmodel` → Model template with associations, validations, callbacks, custom methods
 
+- **Function Snippets**: 300+ Wheels function completions with dual options (basic/full parameters)
+
 ### Enhanced
-- **Real-time parameter hints**: Shows function parameters as you type
-- **Intelligent highlighting**: Intelligent parameter highlighting the matching parameter
-- **Context-Aware Hover**: Shows documentation for function calls
+- **Hover Documentation**: Clean, professional documentation with parameter details and examples
+- **Context-Aware Features**: Parameter hints adapt to context (routes, controllers, models, views)
+- **CFML Type Support**: Proper handling of CFML type declarations (string, numeric, boolean, etc.)
+
+### Fixed
+- **Parameter Parsing**: Fixed issue where CFML type declarations caused false parameter warnings
+- **String Boundary Detection**: Proper parsing to avoid false positives in string content
+- **Namespaced Model Support**: Added support for dot notation in model names
 
 ## [1.0.5] - 2025-09-24
 

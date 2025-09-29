@@ -150,131 +150,441 @@ Creates a complete model with:
 }
 
 /**
- * Wheels Route Validator
+ * Wheels Parameter Validator
+ * Validates parameter names in Wheels API function calls when using named parameter syntax
  */
-class WheelsRouteValidator {
+class WheelsParameterValidator {
     constructor() {
-        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('wheels-routes');
-        this.commonRoutes = new Set(['root', 'login', 'logout', 'home', 'dashboard']);
-        this.routePatterns = [
-            /linkTo\s*\(\s*route\s*=\s*["']([^"']+)["']/gi,
-            /redirectTo\s*\(\s*route\s*=\s*["']([^"']+)["']/gi,
-            /urlFor\s*\(\s*route\s*=\s*["']([^"']+)["']/gi,
-            /startFormTag\s*\(\s*route\s*=\s*["']([^"']+)["']/gi
-        ];
-        this.parameterTyPos = [
-            /\broute\s*=\s*["']([^"']*?)["']/gi,
-            /\brout\s*=\s*["']([^"']+)["']/gi,  // Common typo
-            /\broot\s*=\s*["']([^"']+)["']/gi   // Another typo
-        ];
+        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('wheels-parameters');
+        this.wheelsParameters = {};
+        this.loadWheelsParameters();
     }
 
     validateDocument(document) {
         const diagnostics = [];
         const text = document.getText();
 
-        // Check for route-related issues
-        this.checkRouteReferences(text, document, diagnostics);
-        this.checkCommonTypos(text, document, diagnostics);
-        this.checkParameterIssues(text, document, diagnostics);
+        // Only validate if we have parameter data loaded
+        if (Object.keys(this.wheelsParameters).length > 0) {
+            this.checkParameterNames(text, document, diagnostics);
+        }
 
         this.diagnosticCollection.set(document.uri, diagnostics);
     }
 
-    checkRouteReferences(text, document, diagnostics) {
-        // Find all route references
-        this.routePatterns.forEach(pattern => {
-            let match;
-            while ((match = pattern.exec(text)) !== null) {
-                const routeName = match[1];
-                const startPos = document.positionAt(match.index + match[0].indexOf(routeName));
-                const endPos = document.positionAt(match.index + match[0].indexOf(routeName) + routeName.length);
+    checkParameterNames(text, document, diagnostics) {
+        // Find all function calls with named parameters
+        const functionCallPattern = /(\w+)\s*\(([^)]+)\)/g;
+        let match;
+
+        while ((match = functionCallPattern.exec(text)) !== null) {
+            const functionName = match[1];
+            const parametersString = match[2];
+            const functionStart = match.index;
+            const parametersStart = functionStart + match[0].indexOf('(') + 1;
+
+            // Skip if this function is not in our Wheels API
+            if (!this.wheelsParameters[functionName]) {
+                continue;
+            }
+
+            // Parse named parameters only (skip positional parameters)
+            const namedParams = this.parseNamedParameters(parametersString);
+
+            // Validate each named parameter
+            namedParams.forEach(param => {
+                const paramStart = parametersStart + param.startIndex;
+                const paramEnd = paramStart + param.name.length;
+                const startPos = document.positionAt(paramStart);
+                const endPos = document.positionAt(paramEnd);
                 const range = new vscode.Range(startPos, endPos);
 
-                // Check for suspicious route names
-                if (this.isSuspiciousRoute(routeName)) {
-                    diagnostics.push(new vscode.Diagnostic(
-                        range,
-                        `Potentially invalid route: '${routeName}'. Check your routes.cfm file.`,
-                        vscode.DiagnosticSeverity.Warning
-                    ));
-                }
-            }
-        });
-    }
-
-    checkCommonTypos(text, document, diagnostics) {
-        // Check for common parameter typos
-        const typoPattern = /\brout\s*=\s*["']([^"']+)["']/gi;
-        let match;
-        while ((match = typoPattern.exec(text)) !== null) {
-            const startPos = document.positionAt(match.index);
-            const endPos = document.positionAt(match.index + match[0].length);
-            const range = new vscode.Range(startPos, endPos);
-
-            diagnostics.push(new vscode.Diagnostic(
-                range,
-                `Did you mean 'route' instead of 'rout'?`,
-                vscode.DiagnosticSeverity.Error
-            ));
-        }
-
-        // Check for controller/action vs route confusion
-        const controllerActionPattern = /linkTo\s*\(\s*controller\s*=\s*["']([^"']+)["']\s*,\s*action\s*=\s*["']([^"']+)["']/gi;
-        while ((match = controllerActionPattern.exec(text)) !== null) {
-            const startPos = document.positionAt(match.index);
-            const endPos = document.positionAt(match.index + match[0].length);
-            const range = new vscode.Range(startPos, endPos);
-
-            diagnostics.push(new vscode.Diagnostic(
-                range,
-                `Consider using route parameter instead of controller/action for better maintainability.`,
-                vscode.DiagnosticSeverity.Information
-            ));
-        }
-    }
-
-    checkParameterIssues(text, document, diagnostics) {
-        // Check for missing key parameter in edit/update/delete contexts
-        const editPatterns = [
-            /linkTo\s*\(\s*route\s*=\s*["'](edit[^"']*|.*update.*|.*delete.*)["'][^)]*\)/gi
-        ];
-
-        editPatterns.forEach(pattern => {
-            let match;
-            while ((match = pattern.exec(text)) !== null) {
-                const routeCall = match[0];
-
-                // Check if it has key parameter
-                if (!/\bkey\s*=/.test(routeCall)) {
-                    const startPos = document.positionAt(match.index);
-                    const endPos = document.positionAt(match.index + match[0].length);
-                    const range = new vscode.Range(startPos, endPos);
+                if (!this.isValidParameter(functionName, param.name)) {
+                    const suggestion = this.suggestParameter(functionName, param.name);
+                    const message = suggestion ?
+                        `Invalid parameter '${param.name}'. Did you mean '${suggestion}'?` :
+                        `Invalid parameter '${param.name}' for function '${functionName}'`;
 
                     diagnostics.push(new vscode.Diagnostic(
                         range,
-                        `Edit/Update/Delete routes typically require a 'key' parameter.`,
+                        message,
                         vscode.DiagnosticSeverity.Warning
                     ));
                 }
-            }
-        });
+            });
+        }
     }
 
-    isSuspiciousRoute(routeName) {
-        // Routes that might be typos or issues
-        const suspiciousPatterns = [
-            /^.{1,2}$/,  // Too short (likely typo)
-            /\s/,        // Contains spaces
-            /[A-Z]{3,}/, // All caps (might be constant name instead of route)
-            /^(form|link|button)$/i  // Common function names mistaken for routes
-        ];
+    parseNamedParameters(parametersString) {
+        const namedParams = [];
+        let inString = false;
+        let stringChar = '';
+        let depth = 0;
+        let currentParam = '';
+        let paramStart = -1;
+        let i = 0;
 
-        return suspiciousPatterns.some(pattern => pattern.test(routeName));
+        while (i < parametersString.length) {
+            const char = parametersString[i];
+
+            if (!inString) {
+                if (char === '"' || char === "'") {
+                    inString = true;
+                    stringChar = char;
+                } else if (char === '(') {
+                    depth++;
+                } else if (char === ')') {
+                    depth--;
+                } else if (char === '=' && depth === 0) {
+                    // Found a named parameter assignment at top level
+                    if (currentParam.trim()) {
+                        namedParams.push({
+                            name: currentParam.trim(),
+                            startIndex: paramStart
+                        });
+                    }
+                    // Skip to after the equals sign and find the value
+                    i = this.skipParameterValue(parametersString, i + 1);
+                    currentParam = '';
+                    paramStart = -1;
+                    continue;
+                } else if (char === ',' && depth === 0) {
+                    // Reset for next parameter
+                    currentParam = '';
+                    paramStart = -1;
+                } else if (/[a-zA-Z_]/.test(char) && currentParam === '' && paramStart === -1) {
+                    // Start of a potential parameter name
+                    currentParam = char;
+                    paramStart = i;
+                } else if (/\w/.test(char) && currentParam !== '') {
+                    // Continue building parameter name
+                    currentParam += char;
+                } else if (char === ' ' && currentParam !== '') {
+                    // Space after word - check if it's a CFML type declaration
+                    const currentWord = currentParam.trim();
+                    const cfmlTypes = ['required', 'string', 'numeric', 'boolean', 'date', 'struct', 'array', 'query', 'any'];
+
+                    if (cfmlTypes.includes(currentWord.toLowerCase())) {
+                        // This is a type declaration, reset and look for actual parameter name
+                        currentParam = '';
+                        paramStart = -1;
+                    }
+                } else if (!/\s/.test(char) && currentParam !== '') {
+                    // Non-whitespace, non-word character - not a parameter name
+                    currentParam = '';
+                    paramStart = -1;
+                }
+            } else {
+                // We're inside a string
+                if (char === stringChar && (i === 0 || parametersString[i-1] !== '\\')) {
+                    inString = false;
+                    stringChar = '';
+                }
+            }
+
+            i++;
+        }
+
+        return namedParams;
+    }
+
+    skipParameterValue(parametersString, startIndex) {
+        let i = startIndex;
+        let inString = false;
+        let stringChar = '';
+        let depth = 0;
+
+        // Skip whitespace
+        while (i < parametersString.length && /\s/.test(parametersString[i])) {
+            i++;
+        }
+
+        while (i < parametersString.length) {
+            const char = parametersString[i];
+
+            if (!inString) {
+                if (char === '"' || char === "'") {
+                    inString = true;
+                    stringChar = char;
+                } else if (char === '(') {
+                    depth++;
+                } else if (char === ')') {
+                    depth--;
+                } else if (char === ',' && depth === 0) {
+                    // Found the end of this parameter value
+                    return i;
+                }
+            } else {
+                if (char === stringChar && (i === 0 || parametersString[i-1] !== '\\')) {
+                    inString = false;
+                    stringChar = '';
+                }
+            }
+
+            i++;
+        }
+
+        return i;
+    }
+
+    isValidParameter(functionName, parameterName) {
+        const validParams = this.wheelsParameters[functionName];
+        if (!validParams) return true; // Function not found, assume valid
+
+        return validParams.includes(parameterName.toLowerCase());
+    }
+
+    suggestParameter(functionName, parameterName) {
+        const validParams = this.wheelsParameters[functionName];
+        if (!validParams) return null;
+
+        const lowerParam = parameterName.toLowerCase();
+
+        // Find best match using simple string similarity
+        let bestMatch = null;
+        let bestScore = 0;
+
+        validParams.forEach(validParam => {
+            const score = this.calculateSimilarity(lowerParam, validParam);
+            if (score > bestScore && score > 0.5) { // Threshold for suggestions
+                bestScore = score;
+                bestMatch = validParam;
+            }
+        });
+
+        return bestMatch;
+    }
+
+    calculateSimilarity(str1, str2) {
+        // Simple similarity calculation
+        if (str1 === str2) return 1;
+        if (str2.startsWith(str1) || str1.startsWith(str2)) return 0.8;
+
+        // Levenshtein distance-based similarity
+        const maxLength = Math.max(str1.length, str2.length);
+        const distance = this.levenshteinDistance(str1, str2);
+        return (maxLength - distance) / maxLength;
+    }
+
+    levenshteinDistance(str1, str2) {
+        const matrix = [];
+
+        for (let i = 0; i <= str2.length; i++) {
+            matrix[i] = [i];
+        }
+
+        for (let j = 0; j <= str1.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        for (let i = 1; i <= str2.length; i++) {
+            for (let j = 1; j <= str1.length; j++) {
+                if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+
+        return matrix[str2.length][str1.length];
+    }
+
+    loadWheelsParameters() {
+        try {
+            const jsonPath = path.join(__dirname, '..', 'snippets', 'wheels-api.json');
+            const rawData = fs.readFileSync(jsonPath, 'utf8');
+            const jsonData = JSON.parse(rawData);
+
+            const parameters = {};
+            let count = 0;
+
+            if (jsonData.functions && Array.isArray(jsonData.functions)) {
+                jsonData.functions.forEach(func => {
+                    if (func.name && func.parameters && Array.isArray(func.parameters)) {
+                        parameters[func.name] = func.parameters.map(p => p.name.toLowerCase());
+                        count++;
+                    }
+                });
+            }
+
+            console.log(`Loaded ${count} Wheels functions for parameter validation`);
+            this.wheelsParameters = parameters;
+
+        } catch (error) {
+            console.error('Failed to load Wheels parameters:', error);
+            this.wheelsParameters = {};
+        }
     }
 
     dispose() {
         this.diagnosticCollection.dispose();
+    }
+}
+
+/**
+ * Wheels Parameter Completion Provider
+ * Provides auto-completion for Wheels function parameters when typing partial parameter names
+ */
+class WheelsParameterCompletionProvider {
+    constructor() {
+        this.wheelsParameters = {};
+        this.loadWheelsParameters();
+    }
+
+    provideCompletionItems(document, position, token, context) {
+        try {
+            // Only provide completions for CFML files
+            if (document.languageId !== 'cfml') {
+                return [];
+            }
+
+            const line = document.lineAt(position.line);
+            const lineText = line.text;
+            const beforeCursor = lineText.substring(0, position.character);
+
+            // Check if we're inside a function call with parameters
+            const functionMatch = this.findCurrentFunctionCall(beforeCursor);
+            if (!functionMatch) {
+                return [];
+            }
+
+            const functionName = functionMatch.functionName;
+            const validParams = this.wheelsParameters[functionName];
+            if (!validParams || validParams.length === 0) {
+                return [];
+            }
+
+            // Get the current partial parameter being typed
+            const partialParam = this.getCurrentPartialParameter(beforeCursor, functionMatch.paramStart);
+            if (!partialParam || partialParam.length === 0) {
+                return [];
+            }
+
+            // Find matching parameters
+            const completions = [];
+            validParams.forEach(paramName => {
+                if (paramName.toLowerCase().startsWith(partialParam.toLowerCase())) {
+                    const completion = new vscode.CompletionItem(
+                        `${paramName} = `,
+                        vscode.CompletionItemKind.Property
+                    );
+
+                    // Set the text to insert (replace the partial text)
+                    completion.insertText = `${paramName} = `;
+
+                    // Set the range to replace the partial parameter text
+                    const startPos = new vscode.Position(position.line, position.character - partialParam.length);
+                    const endPos = position;
+                    completion.range = new vscode.Range(startPos, endPos);
+
+                    // Set sort order to prioritize exact matches
+                    if (paramName.toLowerCase() === partialParam.toLowerCase()) {
+                        completion.sortText = '0' + paramName;
+                    } else {
+                        completion.sortText = '1' + paramName;
+                    }
+
+                    // Add documentation
+                    completion.detail = `${functionName} parameter`;
+                    completion.documentation = `Auto-complete parameter name for ${functionName}()`;
+
+                    completions.push(completion);
+                }
+            });
+
+            return completions;
+
+        } catch (error) {
+            return [];
+        }
+    }
+
+    findCurrentFunctionCall(lineText) {
+        // Find the most recent function call that hasn't been closed
+        const functionPattern = /(\w+)\s*\(/g;
+        let lastMatch = null;
+        let match;
+        let openParens = 0;
+
+        // Find all function calls and track parentheses
+        const matches = [];
+        while ((match = functionPattern.exec(lineText)) !== null) {
+            matches.push({
+                functionName: match[1],
+                start: match.index,
+                paramStart: match.index + match[0].length
+            });
+        }
+
+        if (matches.length === 0) return null;
+
+        // Check which function call we're currently inside
+        for (let i = matches.length - 1; i >= 0; i--) {
+            const funcMatch = matches[i];
+            const afterFunction = lineText.substring(funcMatch.paramStart);
+
+            // Count parentheses to see if this function is still open
+            openParens = 0;
+            for (let j = 0; j < afterFunction.length; j++) {
+                if (afterFunction[j] === '(') openParens++;
+                else if (afterFunction[j] === ')') openParens--;
+            }
+
+            // If we have more opening than closing parens, we're inside this function
+            if (openParens > 0) {
+                return funcMatch;
+            }
+        }
+
+        // Default to the last function found
+        return matches[matches.length - 1];
+    }
+
+    getCurrentPartialParameter(lineText, paramStart) {
+        // Get the text after the opening parenthesis
+        const paramText = lineText.substring(paramStart);
+
+        // Find the current parameter being typed
+        // Look for the last word that could be a parameter name
+        const lastWordMatch = paramText.match(/(?:^|[,\s])([a-zA-Z]\w*)$/);
+
+        if (lastWordMatch) {
+            return lastWordMatch[1];
+        }
+
+        return '';
+    }
+
+    loadWheelsParameters() {
+        try {
+            const jsonPath = path.join(__dirname, '..', 'snippets', 'wheels-api.json');
+            const rawData = fs.readFileSync(jsonPath, 'utf8');
+            const jsonData = JSON.parse(rawData);
+
+            const parameters = {};
+            let count = 0;
+
+            if (jsonData.functions && Array.isArray(jsonData.functions)) {
+                jsonData.functions.forEach(func => {
+                    if (func.name && func.parameters && Array.isArray(func.parameters)) {
+                        parameters[func.name] = func.parameters.map(p => p.name);
+                        count++;
+                    }
+                });
+            }
+
+            console.log(`Loaded ${count} Wheels functions for parameter completion`);
+            this.wheelsParameters = parameters;
+
+        } catch (error) {
+            console.error('Failed to load Wheels parameters for completion:', error);
+            this.wheelsParameters = {};
+        }
     }
 }
 
@@ -403,20 +713,23 @@ class WheelsDefinitionProvider {
     createModelLocation(modelName) {
         if (!this.workspaceRoot) return null;
 
+        // Handle namespaced models: Api.User -> Api/User.cfc
+        const modelPath = modelName.includes('.') ? modelName.replace(/\./g, '/') : modelName;
+
         // Support both Wheels project structures
         const possiblePaths = [
             // Normal user structure
-            path.join(this.workspaceRoot, 'app', 'models', `${modelName}.cfc`),
+            path.join(this.workspaceRoot, 'app', 'models', `${modelPath}.cfc`),
             // Core/Base template structure
-            path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'models', `${modelName}.cfc`),
+            path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'models', `${modelPath}.cfc`),
             // Alternative structures
-            path.join(this.workspaceRoot, 'src', 'app', 'models', `${modelName}.cfc`),
-            path.join(this.workspaceRoot, 'models', `${modelName}.cfc`)
+            path.join(this.workspaceRoot, 'src', 'app', 'models', `${modelPath}.cfc`),
+            path.join(this.workspaceRoot, 'models', `${modelPath}.cfc`)
         ];
 
-        for (const modelPath of possiblePaths) {
-            if (fs.existsSync(modelPath)) {
-                const uri = vscode.Uri.file(modelPath);
+        for (const fullPath of possiblePaths) {
+            if (fs.existsSync(fullPath)) {
+                const uri = vscode.Uri.file(fullPath);
                 return new vscode.Location(uri, new vscode.Position(0, 0));
             }
         }
@@ -1854,27 +2167,27 @@ function activate(context) {
             '(', ',', ' '  // Trigger characters: opening parenthesis, comma, space
         );
 
-        // Register route validator
-        const routeValidator = new WheelsRouteValidator();
+        // Register parameter validator
+        const parameterValidator = new WheelsParameterValidator();
 
         // Validate open documents
         vscode.workspace.textDocuments.forEach(document => {
             if (document.languageId === 'cfml') {
-                routeValidator.validateDocument(document);
+                parameterValidator.validateDocument(document);
             }
         });
 
         // Validate documents when opened
         const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument(document => {
             if (document.languageId === 'cfml') {
-                routeValidator.validateDocument(document);
+                parameterValidator.validateDocument(document);
             }
         });
 
         // Validate documents when changed and auto-detect CFML
         const onDidChangeTextDocument = vscode.workspace.onDidChangeTextDocument(event => {
             if (event.document.languageId === 'cfml') {
-                routeValidator.validateDocument(event.document);
+                parameterValidator.validateDocument(event.document);
             }
 
             // Auto-detect CFML for Wheels templates
@@ -1898,7 +2211,7 @@ function activate(context) {
 
         // Clear diagnostics when document is closed
         const onDidCloseTextDocument = vscode.workspace.onDidCloseTextDocument(document => {
-            routeValidator.diagnosticCollection.delete(document.uri);
+            parameterValidator.diagnosticCollection.delete(document.uri);
         });
         
         // Register command to open Wheels documentation
@@ -1946,11 +2259,19 @@ function activate(context) {
             'w' // Trigger on 'w' for wcontroller, wmodel
         );
 
+        // Register parameter completion provider for Tab auto-completion
+        const parameterCompletionProvider = vscode.languages.registerCompletionItemProvider(
+            ['cfml'],
+            new WheelsParameterCompletionProvider(),
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+            'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'  // Trigger on any letter
+        );
+
         context.subscriptions.push(
             hoverProvider,
             definitionProvider,
             signatureHelpProvider,
-            routeValidator,
+            parameterValidator,
             onDidOpenTextDocument,
             onDidChangeTextDocument,
             onDidCloseTextDocument,
@@ -1960,7 +2281,8 @@ function activate(context) {
             createView,
             newFileWithTemplate,
             setLanguageToCFML,
-            completionProvider
+            completionProvider,
+            parameterCompletionProvider
         );
         
         console.log('Wheels VS Code Extension activated successfully!');

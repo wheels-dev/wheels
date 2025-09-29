@@ -1,12 +1,12 @@
 # Wheels VS Code Extension
 
-The ultimate VS Code extension for Wheels framework development! Boost your productivity and makes development easier and faster. Get helpful code completion, smart navigation, file templates, and real-time assistance as you write your CFML code.
+The ultimate VS Code extension for Wheels framework development! Boost productivity and makes development easier and faster. Get helpful code completion, file scaffolding, parameter hints, smart navigation, file templates, and real-time validation - all designed for specifically for Wheels developers.
 
 ## Features
 
 ### File Templates & Scaffolding
 
-Create complete Wheels controllers, models, and views templates instantly with ready-made templates that include common code patterns, validations, and best practices.
+Quickly generate controllers, models, and views with ready-made templates that include common code patterns, validations, and best practices.
 
 **How to use it:**
 - **Right-click method:** Right-click any folder → "New Wheels Component" → Choose Controller/Model/View → Enter name
@@ -16,8 +16,16 @@ Create complete Wheels controllers, models, and views templates instantly with r
     ![Wheels File Scaffolding Demo 3](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/scaffolding-demo-3.gif)
 
 **Examples:**
-- Right-click `templates` folder → Create Controller → Type "Users" → Creates `Users.cfc` in `templates` folder
-- Command Palette → "Wheels: Create Model" → Path: `app/models/admin` → Name: "User" → Creates `User.cfc` in that location
+
+**Creating a Users Controller:**
+- Right-click `app/controllers/` folder → "New Wheels Component" → "Controller (CRUD Actions)" → Type "Users"
+- Generates `Users.cfc` with complete CRUD actions: index(), show(), new(), create(), edit(), update(), delete()
+- Same goes for `models` and `views`
+
+**Creating a Product Model:**
+- Command Palette → "Wheels: Create Model" → Path: `app/models` → Name: "Product"
+- Generates `Product.cfc` with associations, validations, callbacks, and custom finder methods
+- Also, you can create `controller` and `view` from this way
 
 **Features:**
 - Files use the name you type
@@ -30,12 +38,14 @@ Create complete Wheels controllers, models, and views templates instantly with r
 
 ### Quick Code Templates
 
-Type short keywords and press Tab to expand into complete code templates with proper structure and best practices.
+#### Component Templates
+
+Create complete component structures instantly with professional templates that include best practices and common patterns.
 
 **How to use it:**
-- In any CFML file, type the snippet keyword
-- Press Tab to expand
-- Language is automatically set to CFML
+- In any CFML file, type the template keyword (`wcontroller` or `wmodel`)
+- Press Tab/Enter to import complete structure
+- Language automatically sets to CFML
 
 **Examples:**
 
@@ -97,17 +107,58 @@ component extends="Model" {
 
 ![Wheels Quick Code Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/quick-code-demo-2.gif)
 
-**Available snippets:**
-- `wcontroller` → Complete CRUD controller with all actions and error handling
-- `wmodel` → Model with validations, associations, callbacks, custom methods
+---
 
-[Demo will be added here]
+#### Function Snippets
+
+Get intelligent code completion for Wheels functions with multiple parameter options - choose between basic **required parameters** or **full parameter** sets.
+
+**How to use it:**
+- Type any Wheels function name (e.g., `findAll`, `mimeTypes`)
+- Choose from dropdown options:
+  - **Basic version** - Only required parameters
+  - **Full version** - All available parameters
+- Tab through parameters to fill in values
+
+**Examples:**
+
+**Model Functions:**
+```cfml
+// Type "findAll" and choose from dropdown:
+// Option 1: findAll (basic - required params only)
+users = findAll()
+
+// Option 2: findAll(allParams) (full version with all parameters)
+users = findAll(where = "", order = "", group = "", select = "", distinct = "false", include = "")
+
+// After selecting either option, customize as needed:
+users = findAll(where = "active = 1", order = "name ASC")
+```
+
+**Utility Functions:**
+```cfml
+// Type "mimeTypes" and choose from dropdown:
+// Option 1: mimeTypes (basic - required params only)
+type = mimeTypes(extension = "")
+
+// Option 2: mimeTypes(allParams) (with optional fallback)
+type = mimeTypes(extension = "", fallback = "")
+
+// Practical usage:
+type = mimeTypes(extension = "pdf", fallback = "application/pdf")
+```
+
+**Features:**
+- 300+ Wheels framework functions included
+- Dual options: basic (required) vs. full (all parameters)
+- Smart parameter completion with Tab navigation
+- Context-aware suggestions based on function type
 
 ---
 
 ### Go to Definition (F12)
 
-Click on Wheels components references to instantly jump to the corresponding files. Works with models, controllers, routes, and views.
+Click on Wheels components references to instantly jump to the corresponding file/component. Works with models, controllers, routes, and views.
 
 **How to use it:**
 - Ctrl+Click (or Cmd+Click on Mac) on any Wheels component reference
@@ -129,92 +180,135 @@ linkTo(route="editUser", key=user.id);
 renderView("users/show");
 ```
 
-![Wheels Go To Definition Demo](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/go-to-definition.gif)
-
 **Supported patterns:**
 - `model("ModelName")` → jumps to `ModelName.cfc`
 - `controller="name"` → jumps to `Name.cfc`
 - `route="routeName"` → jumps to controller action
 - `renderView("path")` → jumps to view file
 
-[Demo will be added here]
+![Wheels Go To Definition Demo](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/go-to-definition-demo.gif)
 
 ---
 
-### Smart Parameter Help (Ctrl+Shift+Space)
+### Smart Parameter System
 
-Shows function parameters as you type with intelligent highlighting that only appears when you start typing parameter names.
+Intelligent parameter assistance for Wheels functions with real-time hints, auto-completion, and validation.
+
+---
+
+#### Parameter Highlighting (Ctrl+Shift+Space)
+
+Show function parameters on the fly with smart highlighting that appears when you start typing parameter names.
 
 **How to use it:**
-- Type opening parenthesis `(` after any Wheels function
+- Type opening parenthesis `(` after any Wheels function call
 - Or press Ctrl+Shift+Space to manually trigger
-- Navigate between parameters with Tab
 - Start typing parameter names to see intelligent highlighting
 
 **Examples:**
 ```cfml
-// Type opening parenthesis to see all available parameters
-findAll(     // Shows: where?, order?, group?, select?, include?, etc.
+// Type opening parenthesis to see all parameters
+findAll(     // Shows: where?, order?, group?, select?, include?, cache?, reload?
+             // Parameter types: where: string, order: string, group: string, etc.
 
-// Start typing to see intelligent highlighting
-findAll(w    // Highlights "where" parameter
-findAll(o    // Highlights "order" parameter
-
-// Works with method chaining
-model("User").findAll(     // Shows findAll parameters
-
-// Multiple parameters with smart highlighting
-findAll(where="active = 1", o    // Highlights "order" parameter next
+// Smart highlighting as you type
+findAll(w    // Highlights "where" parameter in suggestion list
+findAll(wh   // Further narrows to "where"
+findAll(where="active = 1", o    // Now highlights "order" parameter
 ```
-
-**Features:**
-- Works with 300+ Wheels framework functions
-- Highlights when you start typing (not by default)
-- Shows parameter types, defaults, and descriptions
-- Supports complex method chaining
-- Context-aware (for actual function calls)
 
 [Demo will be added here]
 
 ---
 
-### Route Validation
+#### Parameter Auto-completion
 
-Real-time error detection that catches route typos, missing parameters, and suggests best practices as you type.
+Type partial parameter names and it will automatically display for quick snippets, press Tab/Enter to auto-complete with parameters.
 
 **How to use it:**
-- Just type route code - validation happens automatically
-- Red underlines show errors
-- Yellow underlines show warnings
-- Blue underlines show suggestions
+- Type partial parameter name inside function parentheses
+- Press Tab/Enter to auto-complete to full `parameterName = ""` format
 
 **Examples:**
 ```cfml
-// ERROR: Typo detection
-linkTo(rout="users")              // "Did you mean 'route'?"
-linkTo(root="home")               // "Did you mean 'route'?"
+// Type partial parameter name and press Tab to auto-complete with snippet
+findAll(o    // Type "o" + Tab → becomes "order = """
+findAll(wh   // Type "wh" + Tab → becomes "where = """
+linkTo(rou   // Type "rou" + Tab → becomes "route = """
+validatesPresenceOf("name", mes  // Type "mes" + Tab → becomes "message = """
 
-// WARNING: Missing parameters
-linkTo(route="editUser")          // "Edit routes typically require a 'key' parameter"
-linkTo(route="deleteUser")        // "Delete routes typically require a 'key' parameter"
+// Works inside function calls with existing parameters
+findAll(where="active = 1", o  // Type "o" + Tab → becomes "order = """
 
-// INFO: Best practices
-linkTo(controller="users", action="index")  // "Consider using route parameter instead"
-
-// WARNING: Suspicious routes
-linkTo(route="a")                 // "Potentially invalid route: 'a' (too short)"
-linkTo(route="USER LIST")         // "Route contains spaces"
-
-// CORRECT: No warnings
-linkTo(route="editUser", key=user.id)      // All good!
-redirectTo(route="users")                   // Perfect!
+// Result after Tab completion:
+findAll(where="active = 1", order = "")  // Cursor positioned inside quotes
 ```
 
-**Validation types:**
-- Typo detection (`rout=`, `root=` → suggests `route=`)
-- Missing key parameters for edit/update/delete routes
-- Suspicious route names (too short, all caps, spaces)
-- Best practice suggestions
+[Demo will be added here]
+
+---
+
+#### Parameter Validation
+
+Real-time validation that detects incorrect parameter names in Wheels functions when using named parameter syntax.
+
+**How it works:**
+- Only validates when using named parameter syntax with `=` (parameterName="value")
+- Yellow underlines show invalid parameter names
+- No validation for positional parameters (function("value1", "value2"))
+- Works with 300+ Wheels framework functions
+
+**Examples:**
+
+**Invalid Parameter Names (Yellow Underlines):**
+```cfml
+// findAll with incorrect parameter names
+model("User").findAll(ordr="name ASC")        // "ordr" should be "order"
+model("User").findAll(useIndex=false)         // "useIndex" should be "reload"
+model("User").findAll(wher="active = 1")      // "wher" should be "where"
+
+// linkTo with incorrect parameter names
+linkTo(rout="users")                          // "rout" should be "route"
+linkTo(route="users", txt="All Users")        // "txt" should be "text"
+linkTo(route="users", metod="post")           // "metod" should be "method"
+
+// Model validation with incorrect parameter names
+validatesPresenceOf("name", mesage="Required") // "mesage" should be "message"
+validatesLengthOf("email", minimun=5)         // "minimun" should be "minimum"
+
+// Form helpers with incorrect parameter names
+textField(objectNam="user", property="name")  // "objectNam" should be "objectName"
+startFormTag(rout="users", method="post")     // "rout" should be "route"
+```
+
+**Correct Usage (No Warnings):**
+```cfml
+// Correct named parameters - no underlines
+model("User").findAll(order="name ASC", where="active = 1")
+linkTo(route="users", text="All Users", method="get")
+validatesPresenceOf("name", message="Name is required")
+textField(objectName="user", property="name", label="Full Name")
+
+// Positional parameters - no validation (already working)
+model("User").findAll("active = 1", "name ASC")  // No warnings shown
+linkTo("users", "All Users")                      // No warnings shown
+textField("user", "name")                         // No warnings shown
+```
+
+**Parameter Suggestions:**
+When invalid parameters are detected, the extension suggests the correct parameter name:
+- `ordr` → suggests `order`
+- `wher` → suggests `where`
+- `grp` → suggests `group`
+- `txt` → suggests `text`
+- `mesage` → suggests `message`
+
+**Features:**
+- Only validates named parameter syntax (param="value")
+- Ignores positional parameters (no interference with existing code)
+- Context-aware suggestions based on function name
+- Works with all Wheels API functions
+- Real-time validation as you type
 
 [Demo will be added here]
 
@@ -231,18 +325,20 @@ Hover over Wheels function names to see clean, professional documentation with p
 
 **Examples:**
 ```cfml
-// Hover over "findAll" to see complete documentation
-users = findAll()     // Shows: parameters, types, descriptions, examples
+// Hover over "findAll" shows:
+// Parameters: where?, order?, group?, select?, include?, cache?, reload?, etc.
+// Returns: Query object or array of model instances
+// Example: findAll(where="active = 1", order="name ASC")
+users = model("User").findAll();
 
-// Hover over "linkTo" for parameter reference
-linkTo()              // Shows: complete parameter table with defaults
+// Hover over "linkTo" shows complete parameter reference:
+// route, controller, action, key, params, anchor, text, confirm, method, etc.
+// Shows parameter types and default values
+linkTo(route="editUser", key=user.id, text="Edit User");
 
-// Hover over "hasMany" for association help
-hasMany()             // Shows: association options and usage patterns
-
-// Context-aware - shows for function calls
-findAll = "some string"  // No hover (correctly detected as variable)
-"findAll is a function"  // No hover (correctly detected as string)
+// Hover over "hasMany" shows association options:
+// name, class, foreignKey, dependent, include, order, conditions, etc.
+hasMany(name="orders", dependent="delete");
 ```
 
 **Features:**
@@ -287,7 +383,7 @@ findAll = "some string"  // No hover (correctly detected as variable)
 
 ## Resources
 
-- [Wheels Framework Documentation](https://wheels.dev/docs)
+- [Wheels Documentation](https://wheels.dev/docs)
 - [Community Discussions](https://github.com/wheels-dev/wheels/discussions)
 - [Report Issues](https://github.com/wheels-dev/wheels/issues)
 - [Extension Source Code](https://github.com/wheels-dev/wheels/tree/main/tools/vscode-ext)

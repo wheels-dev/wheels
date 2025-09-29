@@ -2,7 +2,7 @@
 	"name": "wheels-vscode",
 	"displayName": "Wheels VS Code",
 	"description": "Enhance your Wheels development workflow. Makes Wheels framework development easier and faster. Get helpful code completion, smart navigation, file templates, smart parameter highlighting, route validation, and real-time assistance as you write your CFML code.",
-	"version": "1.1.0",
+	"version": "1.0.6",
 	"engines": {
 		"vscode": "^1.80.0"
 	},
@@ -19,6 +19,7 @@
 	"license": "MIT",
 	"categories": [
 		"Snippets",
+		"Linters",
 		"Programming Languages",
 		"Other"
 	],
@@ -157,7 +158,7 @@
 	],
 	"qna": "https://github.com/wheels-dev/wheels/discussions",
 	"sponsor": {
-		"url": "https://github.com/sponsors/wheels-dev"
+		"url": "https://opencollective.com/wheels-dev"
 	}
 
 }

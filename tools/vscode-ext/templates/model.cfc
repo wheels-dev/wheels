@@ -17,8 +17,8 @@ component extends="Model" {
         // Validations
         // validatesPresenceOf("${requiredFields}");
         // validatesUniquenessOf("${uniqueFields}");
-        // validatesLengthOf(property="${lengthField}", minimum=${minLength}, maximum=${maxLength});
-        // validatesFormatOf(property="${emailField}", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
+        // validatesLengthOf(properties="${lengthField}", minimum=${minLength}, maximum=${maxLength});
+        // validatesFormatOf(properties="${emailField}", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
 
         // Callbacks
         // beforeSave("${beforeSaveMethod}");
