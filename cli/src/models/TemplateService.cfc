@@ -163,6 +163,11 @@ component {
             processed = replace(processed, "|FormFields|", "", "all");
         }
         
+        // Process controller includes for associations
+        if (structKeyExists(arguments.context, "belongsTo") && len(arguments.context.belongsTo)) {
+            processed = addControllerIncludes(processed, arguments.context.belongsTo);
+        }
+
         // Process CLI-Appends markers for index and show views BEFORE replacing object name placeholders
         if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties)) {
             // Process index view table headers
@@ -170,17 +175,22 @@ component {
                 var theadCode = generateIndexTableHeaders(arguments.context.properties);
                 processed = replace(processed, "<!--- CLI-Appends-thead-Here --->", theadCode, "all");
             }
-            
+
             // Process index view table body
             if (find("<!--- CLI-Appends-tbody-Here --->", processed)) {
                 var tbodyCode = generateIndexTableBody(arguments.context.properties);
                 processed = replace(processed, "<!--- CLI-Appends-tbody-Here --->", tbodyCode, "all");
             }
-            
-            // Process show view properties
+
+            // Process show view properties - only for show.txt template, not for form templates
             if (find("<!--- CLI-Appends-Here --->", processed)) {
-                var showCode = generateShowViewProperties(arguments.context.properties, arguments.context.modelName);
-                processed = replace(processed, "<!--- CLI-Appends-Here --->", showCode, "all");
+                if (structKeyExists(arguments.context, "action") && arguments.context.action == "show") {
+                    var showCode = generateShowViewProperties(arguments.context.properties, arguments.context.modelName);
+                    processed = replace(processed, "<!--- CLI-Appends-Here --->", showCode, "all");
+                } else {
+                    // Remove the marker from non-show templates (like forms) without adding content
+                    processed = replace(processed, "<!--- CLI-Appends-Here --->", "", "all");
+                }
             }
         }
         
@@ -242,51 +252,59 @@ component {
     }
     
     /**
-     * Generate form fields code based on properties
+     * Generate form fields code based on properties with association support
      */
     private function generateFormFieldsCode(required array properties, required string modelName) {
         var fields = [];
         var objectName = lCase(arguments.modelName);
-        
+
         for (var prop in arguments.properties) {
             var fieldCode = "";
             var fieldName = prop.name;
             var fieldType = prop.keyExists("type") ? prop.type : "string";
             var fieldLabel = variables.helpers.capitalize(fieldName);
-            
-            // Generate appropriate form field based on type
-            switch(lCase(fieldType)) {
-                case "boolean":
-                    fieldCode = '##checkBox(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
-                    break;
-                case "text":
-                case "longtext":
-                    fieldCode = '##textArea(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
-                    break;
-                case "integer":
-                case "biginteger":
-                case "decimal":
-                case "float":
-                    fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
-                    break;
-                case "date":
-                    fieldCode = '##dateSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
-                    break;
-                case "datetime":
-                case "timestamp":
-                    fieldCode = '##dateTimeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
-                    break;
-                case "time":
-                    fieldCode = '##timeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
-                    break;
-                default:
-                    // Default to text field for string and unknown types
-                    fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+
+            // Check if this is a foreign key field (ends with "Id")
+            if (right(fieldName, 2) == "Id" && len(fieldName) > 2) {
+                // This is a foreign key - generate a select field
+                var associationName = left(fieldName, len(fieldName) - 2);
+                var associationModel = variables.helpers.capitalize(associationName);
+                fieldCode = '##select(objectName="|ObjectNameSingular|", property="#fieldName#", options=model("#associationModel#").findAll(), textField="name", valueField="id", includeBlank="Select #associationModel#", label="#fieldLabel#")##';
+            } else {
+                // Generate appropriate form field based on type
+                switch(lCase(fieldType)) {
+                    case "boolean":
+                        fieldCode = '##checkBox(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                        break;
+                    case "text":
+                    case "longtext":
+                        fieldCode = '##textArea(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                        break;
+                    case "integer":
+                    case "biginteger":
+                    case "decimal":
+                    case "float":
+                        fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                        break;
+                    case "date":
+                        fieldCode = '##dateSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                        break;
+                    case "datetime":
+                    case "timestamp":
+                        fieldCode = '##dateTimeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                        break;
+                    case "time":
+                        fieldCode = '##timeSelect(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                        break;
+                    default:
+                        // Default to text field for string and unknown types
+                        fieldCode = '##textField(objectName="|ObjectNameSingular|", property="#fieldName#", label="#fieldLabel#")##';
+                }
             }
-            
+
             arrayAppend(fields, fieldCode);
         }
-        
+
         return arrayToList(fields, chr(10));
     }
     
@@ -357,49 +375,76 @@ component {
     }
     
     /**
-     * Generate table headers for index view
+     * Generate table headers for index view with association support
      */
     private function generateIndexTableHeaders(required array properties) {
         var headers = [];
-        
+
         for (var prop in arguments.properties) {
             var headerName = variables.helpers.capitalize(prop.name);
+
+            // Check if this is a foreign key field (ends with "Id")
+            if (right(prop.name, 2) == "Id" && len(prop.name) > 2) {
+                // Show association name instead of foreign key
+                var associationName = left(prop.name, len(prop.name) - 2);
+                headerName = variables.helpers.capitalize(associationName);
+            }
+
             arrayAppend(headers, '<th>#headerName#</th>');
         }
-        
+
         return arrayToList(headers, chr(10) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9));
     }
     
     /**
-     * Generate table body cells for index view
+     * Generate table body cells for index view with association support
      */
     private function generateIndexTableBody(required array properties) {
         var cells = [];
-        
+
         for (var prop in arguments.properties) {
             var cellCode = '<td>' & chr(10);
-            cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.#prop.name###' & chr(10);
+
+            // Check if this is a foreign key field (ends with "Id")
+            if (right(prop.name, 2) == "Id" && len(prop.name) > 2) {
+                // Display association name instead of foreign key ID
+                var associationName = left(prop.name, len(prop.name) - 2);
+                cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.' & associationName & '.name##' & chr(10);
+            } else {
+                cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.#prop.name###' & chr(10);
+            }
+
             cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '</td>';
             arrayAppend(cells, cellCode);
         }
-        
+
         return arrayToList(cells, chr(10) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9));
     }
     
     /**
-     * Generate property display for show view
+     * Generate property display for show view with association support
      */
     private function generateShowViewProperties(required array properties, required string modelName) {
         var displayCode = [];
         var objectName = lCase(arguments.modelName);
-        
+
         for (var prop in arguments.properties) {
             var propDisplay = '<p>' & chr(10);
-            propDisplay &= chr(9) & '<strong>#variables.helpers.capitalize(prop.name)#:</strong> ##encodeForHTML(|ObjectNameSingular|.#prop.name#)##' & chr(10);
+
+            // Check if this is a foreign key field (ends with "Id")
+            if (right(prop.name, 2) == "Id" && len(prop.name) > 2) {
+                // Display association name instead of foreign key ID
+                var associationName = left(prop.name, len(prop.name) - 2);
+                var displayLabel = variables.helpers.capitalize(associationName);
+                propDisplay &= chr(9) & '<strong>#displayLabel#:</strong> ##encodeForHTML(|ObjectNameSingular|.' & associationName & '.name)##' & chr(10);
+            } else {
+                propDisplay &= chr(9) & '<strong>#variables.helpers.capitalize(prop.name)#:</strong> ##encodeForHTML(|ObjectNameSingular|.#prop.name#)##' & chr(10);
+            }
+
             propDisplay &= '</p>';
             arrayAppend(displayCode, propDisplay);
         }
-        
+
         // Add action links after properties
         arrayAppend(displayCode, '');
         arrayAppend(displayCode, '<p>');
@@ -438,5 +483,37 @@ component {
         }
         
         return baseDir & appPath;
+    }
+
+    /**
+     * Add includes to controller methods for associations
+     */
+    private function addControllerIncludes(required string template, required string belongsTo) {
+        var processed = arguments.template;
+        var associations = listToArray(arguments.belongsTo);
+        var includeList = [];
+
+        // Build include list from belongsTo associations
+        for (var association in associations) {
+            arrayAppend(includeList, lCase(association));
+        }
+
+        var includeParam = 'include="' & arrayToList(includeList) & '"';
+
+        // Add includes to CRUD controller patterns
+        // Add includes to findAll() calls (index action)
+        processed = replace(processed, '=model("|ObjectNameSingular|").findAll();', '=model("|ObjectNameSingular|").findAll(' & includeParam & ');', 'all');
+
+        // Add includes to findByKey() calls (show and edit actions)
+        processed = replace(processed, '=model("|ObjectNameSingular|").findByKey(params.key);', '=model("|ObjectNameSingular|").findByKey(params.key, ' & includeParam & ');', 'all');
+
+        // Add includes to API controller patterns
+        // API index: local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll();
+        processed = replace(processed, 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll();', 'local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll(' & includeParam & ');', 'all');
+
+        // API show/update/delete: local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);
+        processed = replace(processed, 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);', 'local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key, ' & includeParam & ');', 'all');
+
+        return processed;
     }
 }

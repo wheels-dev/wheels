@@ -31,6 +31,8 @@ component aliases='wheels g view' extends="../base"  {
 		string layout="",
 		boolean force=false
 	){
+		//reconstruct arguments for handling --prefixed options
+		arguments = reconstructArgs(arguments);
 		var obj = helpers.getNameVariants(listLast( arguments.objectName, '/\' ));
 		var viewdirectory     = fileSystemUtil.resolvePath( "app/views" );
 		var directory 		  = fileSystemUtil.resolvePath( "app/views" & "/" & obj.objectNamePlural);
@@ -38,9 +40,9 @@ component aliases='wheels g view' extends="../base"  {
 		// Handle multiple views if comma-separated list is provided
 		var viewNames = listToArray(arguments.name);
 		if (arrayLen(viewNames) > 1) {
-			detailOutput.header("📄", "Generating views: #arguments.objectName#/#arguments.name#");
+			detailOutput.header("", "Generating views: #arguments.objectName#/#arguments.name#");
 		} else {
-			detailOutput.header("📄", "Generating view: #arguments.objectName#/#arguments.name#");
+			detailOutput.header("", "Generating view: #arguments.objectName#/#arguments.name#");
 		}
 
 		// Validate directory

@@ -26,11 +26,41 @@ component {
         
         try {
             // Start transaction-like operation
-            
+
+            // Parse properties and add foreign keys for relationships
+            var parsedProperties = parseProperties(arguments.properties);
+
+            // Add foreign key columns for belongsTo relationships
+            if (len(arguments.belongsTo)) {
+                var parents = listToArray(arguments.belongsTo);
+                for (var parent in parents) {
+                    var foreignKeyName = lCase(parent) & "Id";
+                    var hasFK = false;
+
+                    // Check if FK already exists
+                    for (var prop in parsedProperties) {
+                        if (prop.name == foreignKeyName) {
+                            hasFK = true;
+                            break;
+                        }
+                    }
+
+                    // Add FK if not present
+                    if (!hasFK) {
+                        arrayAppend(parsedProperties, {
+                            name: foreignKeyName,
+                            type: "integer",
+                            required: false,
+                            unique: false
+                        });
+                    }
+                }
+            }
+
             // 1. Generate Model
             var modelResult = codeGenerationService.generateModel(
                 name = arguments.name,
-                properties = parseProperties(arguments.properties),
+                properties = parsedProperties,
                 belongsTo = arguments.belongsTo,
                 hasMany = arguments.hasMany,
                 force = arguments.force,
@@ -50,36 +80,6 @@ component {
             
             // 2. Generate Migration
             try {
-                // Parse properties and add foreign keys for relationships
-                var parsedProperties = parseProperties(arguments.properties);
-                
-                // Add foreign key columns for belongsTo relationships
-                if (len(arguments.belongsTo)) {
-                    var parents = listToArray(arguments.belongsTo);
-                    for (var parent in parents) {
-                        var foreignKeyName = lCase(parent) & "Id";
-                        var hasFK = false;
-                        
-                        // Check if FK already exists
-                        for (var prop in parsedProperties) {
-                            if (prop.name == foreignKeyName) {
-                                hasFK = true;
-                                break;
-                            }
-                        }
-                        
-                        // Add FK if not present
-                        if (!hasFK) {
-                            arrayAppend(parsedProperties, {
-                                name: foreignKeyName,
-                                type: "integer",
-                                required: false,
-                                unique: false
-                            });
-                        }
-                    }
-                }
-                
                 var migrationPath = createMigrationWithProperties(
                     name = arguments.name,
                     properties = parsedProperties,
@@ -101,7 +101,9 @@ component {
                 rest = true,
                 api = arguments.api,
                 force = arguments.force,
-                baseDirectory = arguments.baseDirectory
+                baseDirectory = arguments.baseDirectory,
+                belongsTo = arguments.belongsTo,
+                hasMany = arguments.hasMany
             );
             
             if (controllerResult.success) {
@@ -120,7 +122,6 @@ component {
                 // Creating views...
                 var viewActions = ["index", "show", "new", "edit", "_form"];
                 var viewsCreated = 0;
-                var parsedProperties = parseProperties(arguments.properties);
                 
                 for (var action in viewActions) {
                     var viewResult = codeGenerationService.generateView(
@@ -128,7 +129,9 @@ component {
                         action = action,
                         force = arguments.force,
                         baseDirectory = arguments.baseDirectory,
-                        properties = parsedProperties
+                        properties = parsedProperties,
+                        belongsTo = arguments.belongsTo,
+                        hasMany = arguments.hasMany
                     );
                     
                     if (viewResult.success) {
@@ -519,30 +522,32 @@ component {
     /**
      * Validate scaffold requirements
      */
-    function validateScaffold(required string name, string baseDirectory = "") {
+    function validateScaffold(required string name, string baseDirectory = "", boolean force = false) {
         var errors = [];
-        
+
         // Check name
         if (!len(trim(arguments.name))) {
             arrayAppend(errors, "Resource name is required");
         }
-        
+
         // Check for valid name format (allow namespaces with slashes)
         if (!reFindNoCase("^[a-zA-Z][a-zA-Z0-9_/]*$", arguments.name)) {
             arrayAppend(errors, "Resource name must start with a letter and contain only letters, numbers, underscores, and forward slashes for namespaces");
         }
-        
-        // Check if already exists
-        var modelPath = resolvePath("models/#variables.helpers.capitalize(arguments.name)#.cfc", arguments.baseDirectory);
-        if (fileExists(modelPath)) {
-            arrayAppend(errors, "Model already exists: #modelPath#");
+
+        // Check if already exists (only if not forcing)
+        if (!arguments.force) {
+            var modelPath = resolvePath("models/#variables.helpers.capitalize(arguments.name)#.cfc", arguments.baseDirectory);
+            if (fileExists(modelPath)) {
+                arrayAppend(errors, "Model already exists: #modelPath#");
+            }
+
+            var controllerPath = resolvePath("controllers/#variables.helpers.pluralize(variables.helpers.capitalize(arguments.name))#.cfc", arguments.baseDirectory);
+            if (fileExists(controllerPath)) {
+                arrayAppend(errors, "Controller already exists: #controllerPath#");
+            }
         }
-        
-        var controllerPath = resolvePath("controllers/#variables.helpers.pluralize(variables.helpers.capitalize(arguments.name))#.cfc", arguments.baseDirectory);
-        if (fileExists(controllerPath)) {
-            arrayAppend(errors, "Controller already exists: #controllerPath#");
-        }
-        
+
         return {
             valid: arrayLen(errors) == 0,
             errors: errors

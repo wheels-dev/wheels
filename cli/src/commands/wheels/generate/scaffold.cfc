@@ -33,8 +33,11 @@ component aliases="wheels g scaffold" extends="../base" {
         boolean migrate = false,
         boolean force = false
     ) {
+        // Reconstruct arguments for handling --prefixed options
+        arguments = reconstructArgs(arguments);
+        
         // Validate scaffold
-        var validation = scaffoldService.validateScaffold(arguments.name, getCWD());
+        var validation = scaffoldService.validateScaffold(arguments.name, getCWD(), arguments.force);
         if (!validation.valid) {
             detailOutput.error("Cannot scaffold '#arguments.name#':");
             for (var error in validation.errors) {
@@ -45,7 +48,7 @@ component aliases="wheels g scaffold" extends="../base" {
         }
         
         // Generate scaffold
-        detailOutput.header("🏗️", "Scaffolding resource: #arguments.name#");
+        detailOutput.header("", "Scaffolding resource: #arguments.name#");
         
         var result = scaffoldService.generateScaffold(
             name = arguments.name,

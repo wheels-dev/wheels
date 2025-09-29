@@ -28,9 +28,10 @@ The `wheels generate snippets` command creates code snippets for common Wheels p
 | `--list` | List all available snippets | `false` |
 | `--category` | Filter by category | All categories |
 | `--output` | Output format (console, file, clipboard) | `console` |
+| `--path` | Output file path (required when output=file) | |
 | `--customize` | Interactive customization | `false` |
+| `--create` | Create custom snippet template | |
 | `--force` | Overwrite existing files | `false` |
-| `--help` | Show help information | |
 
 ## Available Snippets
 

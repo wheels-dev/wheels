@@ -1,6 +1,6 @@
-component extends="wheels.Controller" {
+|DescriptionComment|component extends="wheels.Controller" {
 
-    function init() {
+    function config() {
         provides("json");
 				filters(through="setJsonResponse");
     }
