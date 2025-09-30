@@ -1985,6 +1985,22 @@ async function createWheelsFile(type, uri) {
         // Create target file
         const targetPath = path.join(templateData.targetDir, templateData.fileName);
 
+        // Check if file already exists
+        if (fs.existsSync(targetPath)) {
+            const relativePath = vscode.workspace.asRelativePath(targetPath);
+            const overwrite = await vscode.window.showWarningMessage(
+                `Component Already Exists\n\nThe file "${relativePath}" already exists and will be overwritten.\n\nDo you want to continue?`,
+                { modal: true },
+                'Yes, Overwrite',
+                'No, Cancel'
+            );
+
+            if (overwrite !== 'Yes, Overwrite') {
+                vscode.window.showInformationMessage(`File creation cancelled. Your existing "${templateData.fileName}" was not modified.`);
+                return;
+            }
+        }
+
         // Ensure directory exists
         const dir = path.dirname(targetPath);
         if (!fs.existsSync(dir)) {
@@ -2004,9 +2020,9 @@ async function createWheelsFile(type, uri) {
         }
 
         const successMessages = {
-            controller: `Created controller: ${templateData.fileName} with complete CRUD actions (index, show, create, update, delete)`,
-            model: `Created model: ${templateData.fileName} with validation and association examples`,
-            view: `Created view: ${templateData.fileName} with layout integration and helpers`
+            controller: `Created controller: ${templateData.fileName}`,
+            model: `Created model: ${templateData.fileName}`,
+            view: `Created view: ${templateData.fileName}`
         };
 
         vscode.window.showInformationMessage(successMessages[type] || `Created ${type}: ${templateData.fileName}`);
@@ -2050,8 +2066,24 @@ function getTemplateData(type, fileName, targetDir) {
 
         data.fileName = `${viewPath}.cfm`;
         data.targetDir = targetDir;
+
+        // Extract model name and action from path
+        const pathParts = viewPath.split('/');
+        const modelNamePlural = pathParts[0]; // e.g., "customers"
+        const action = pathParts[1] || 'index'; // e.g., "new", "show", "edit", "index"
+
+        // Generate model names
+        const modelName = modelNamePlural.charAt(0).toUpperCase() + modelNamePlural.slice(1, -1); // "customers" -> "Customer"
+        const modelNameSingular = modelName.toLowerCase(); // "customer"
+
+        data.modelName = modelName; // "Customer"
+        data.modelNamePlural = modelNamePlural; // "customers"
+        data.itemVar = modelNameSingular; // "customer"
+        data.itemVarLower = modelNameSingular; // "customer"
+        data.itemsVar = modelNamePlural; // "customers"
         data.viewTitle = capitalize(cleanName);
         data.pageHeading = data.viewTitle;
+        data.action = action;
     }
 
     return data;
@@ -2059,12 +2091,46 @@ function getTemplateData(type, fileName, targetDir) {
 
 
 /**
+ * Detect action from view path (e.g., "users/index.cfm" -> "index", "customers/new.cfm" -> "new")
+ */
+function detectActionFromViewPath(fileName) {
+    // Remove .cfm extension
+    const pathWithoutExt = fileName.replace(/\.cfm$/, '');
+
+    // Split by forward slash to get parts
+    const parts = pathWithoutExt.split('/');
+
+    // Get the last part (the action)
+    const lastPart = parts[parts.length - 1];
+
+    // Check if it's a known action
+    const knownActions = ['index', 'show', 'new', 'edit'];
+    if (knownActions.includes(lastPart)) {
+        return lastPart;
+    }
+
+    return null;
+}
+
+/**
  * Get template content from template files
  */
 function getTemplateContentFromFiles(type, templateData) {
     try {
-        // Get template file path
-        const templateFileName = type === 'view' ? `${type}.cfm` : `${type}.cfc`;
+        let templateFileName;
+
+        if (type === 'view') {
+            // Detect action from view path for action-specific templates
+            const action = detectActionFromViewPath(templateData.fileName);
+            if (action) {
+                templateFileName = `view-${action}.cfm`;
+            } else {
+                templateFileName = `view.cfm`;
+            }
+        } else {
+            templateFileName = `${type}.cfc`;
+        }
+
         const templatePath = path.join(__dirname, '..', 'templates', templateFileName);
 
         // Read template file
