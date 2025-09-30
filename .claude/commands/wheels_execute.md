@@ -3,6 +3,76 @@
 ## Description
 Execute a complete, systematic Wheels development workflow that implements features with professional quality, comprehensive testing, and bulletproof error prevention.
 
+## 🎓 Key Learnings Implemented
+
+This workflow incorporates critical lessons from real-world Wheels development:
+
+### 1. **Views Are Critical** - Don't Skip Them
+- Models and controllers are quick to generate, but **views are what make the application functional**
+- All CRUD views (index, show, new, edit) must be created for a working application
+- Forms need validation error displays, not just input fields
+- **Views are where most errors occur** - query access patterns, association handling
+
+### 2. **Test Incrementally, Not At The End**
+- Generate model → Test it works → Then move to controller
+- Generate controller → Test actions return 200 → Then create views
+- Generate view → Test it renders → Then move to next view
+- **Don't build everything then test** - you'll waste time debugging stacked errors
+
+### 3. **HTTP 200 ≠ Success** - Verify Content Too
+- A page can return 200 OK but contain error messages in the HTML
+- Always check: `curl URL | grep "Expected Content"` not just `curl URL -I`
+- Verify records display, forms render, links point to correct URLs
+
+### 4. **Query Access Inside Loops Requires Special Handling**
+```cfm
+❌ BAD: #post.comments.recordCount#  (property access - fails)
+✅ GOOD: <cfset postComments = model("Post").findByKey(post.id).comments()>
+         #postComments.recordCount#  (method call - works)
+```
+
+### 5. **Migration Date Functions Are Database-Specific**
+```cfm
+❌ BAD: DATE_SUB(NOW(), INTERVAL 1 DAY)  (MySQL only)
+✅ GOOD: var day1 = DateAdd("d", -1, Now())
+         TIMESTAMP '#DateFormat(day1, "yyyy-mm-dd")# #TimeFormat(day1, "HH:mm:ss")#'
+```
+
+### 6. **Forms Without Error Display Are Incomplete**
+Every form field needs:
+```cfm
+#textField(objectName="resource", property="name", label=false)#
+<cfif resource.hasErrors("name")>
+    <p class="error">#resource.allErrors("name")[1]#</p>
+</cfif>
+```
+
+### 7. **Controller Filters Must Be Private**
+```cfm
+private function findResource() {  // Must be private
+    resource = model("Resource").findByKey(key=params.key);
+    if (!isObject(resource)) {
+        flashInsert(error="Resource not found.");
+        redirectTo(action="index");
+    }
+}
+```
+
+### 8. **Use Consistent Argument Styles**
+```cfm
+❌ MIXED: hasMany("comments", dependent="delete")
+✅ CONSISTENT: hasMany(name="comments", dependent="delete")
+```
+
+### 9. **Frontend Stack Integration Via Layout Templates**
+- Provide pre-built layouts (Basic, Tailwind+Alpine+HTMX, Bootstrap)
+- Include CDN links, navigation structure, flash messages
+- Users choose template during generation
+
+### 10. **Resource Routes Work Differently Than Rails**
+- `.resources("posts")` generates `/posts/:id` (not `/posts/show/:id`)
+- Test actual generated URLs: `curl URL | grep 'href="'`
+
 ## Usage
 ```
 /wheels_execute [task_description]
@@ -19,45 +89,182 @@ Execute a complete, systematic Wheels development workflow that implements featu
 
 ## Workflow Overview
 
-The `/wheels_execute` command implements a comprehensive 7-phase development workflow:
+The `/wheels_execute` command implements a comprehensive 8-phase development workflow with **incremental testing**:
 
+0. **MCP Tools Detection & Validation** - Verify MCP availability and enforce usage (30 seconds)
 1. **Pre-Flight Documentation Loading** - Systematically load relevant patterns from `.ai` folder
-2. **Intelligent Analysis & Planning** - Parse requirements and create detailed implementation plan
-3. **Template-Driven Implementation** - Generate code using established patterns with error recovery
-4. **TestBox BDD Test Suite Creation** - Write comprehensive BDD tests before marking complete
+2. **Intelligent Analysis & Planning with View Requirements** - Parse requirements, plan models, controllers, AND all required views
+3. **Incremental Implementation with Real-Time Testing** - Generate and test each component before moving to next
+4. **TestBox BDD Test Suite Creation** - Write comprehensive BDD tests after implementation
 5. **Multi-Level Testing Execution** - Run unit tests, integration tests, and validation
-6. **Comprehensive Browser Testing** - Test every button, form, and link automatically
+6. **Comprehensive Browser Testing with Content Verification** - Test every button, form, link and verify actual content
 7. **Quality Assurance & Reporting** - Anti-pattern detection and final validation
+8. **Rollback & Recovery** - Handle failures and document issues (if needed)
 
 ## Phase Details
 
+### Phase 0: MCP Tools Detection & Validation (30 seconds)
+- **🔴 CRITICAL**: This phase is MANDATORY and must be executed FIRST
+- **Check MCP Availability**: Verify `.mcp.json` exists in project root
+- **Test MCP Connection**: Run `mcp__wheels__wheels_server(action="status")` to validate server is running
+- **Enforce MCP Usage**: If `.mcp.json` exists, ALL operations MUST use `mcp__wheels__*` tools
+- **Strict Prohibition**: NEVER use CLI commands (`wheels g`, `wheels dbmigrate`, etc.) when MCP exists
+- **Port Discovery**: Get running server port from MCP status or `server.json`
+
+**MCP Detection Logic:**
+```bash
+# Check for MCP configuration
+ls .mcp.json
+
+# If exists → MCP is MANDATORY
+# Use: mcp__wheels__wheels_generate, mcp__wheels__wheels_migrate, etc.
+# NEVER use: wheels g, wheels dbmigrate, etc.
+```
+
+**MCP Tools Reference:**
+- `mcp__wheels__wheels_generate(type, name, attributes)` - Generate components
+- `mcp__wheels__wheels_migrate(action)` - Run migrations (latest, up, down, info)
+- `mcp__wheels__wheels_test(type, reporter)` - Execute tests
+- `mcp__wheels__wheels_server(action)` - Manage server (status, start, stop)
+- `mcp__wheels__wheels_reload()` - Reload application
+- `mcp__wheels__wheels_analyze(target, verbose)` - Analyze project
+
 ### Phase 1: Pre-Flight Documentation Loading (2-3 minutes)
 - **Critical Error Prevention**: Always load `common-errors.md` and `validation-templates.md` first
-- **Smart Documentation Discovery**: Analyze task type and load relevant `.ai` documentation
+- **Smart Documentation Discovery**: Use task-to-documentation mapping decision tree
 - **Project Context Loading**: Understand existing codebase patterns and conventions
 - **Pattern Recognition**: Detect argument styles and naming conventions already in use
 
-### Phase 2: Intelligent Analysis & Planning (3-5 minutes)
+**Documentation Loading Decision Tree:**
+- **Task includes "blog" + "posts"** → Load: `.ai/wheels/database/models/associations.md`, `.ai/wheels/controllers/rendering.md`, `.ai/wheels/views/data-handling.md`
+- **Task includes "authentication" or "login"** → Load: `.ai/wheels/database/models/user-authentication.md`, `.ai/wheels/security/csrf-protection.md`, `.ai/wheels/controllers/filters.md`
+- **Task includes "API"** → Load: `.ai/wheels/controllers/api-development.md`, `.ai/wheels/views/rendering.md`
+- **Task includes "forms"** → Load: `.ai/wheels/views/helpers/forms.md`, `.ai/wheels/security/csrf-protection.md`, `.ai/wheels/models/validations.md`
+- **Task includes "admin" or "dashboard"** → Load: `.ai/wheels/controllers/filters.md`, `.ai/wheels/security/`, `.ai/wheels/views/layouts.md`
+
+### Phase 2: Intelligent Analysis & Planning with View Requirements (3-5 minutes)
 - **Requirement Analysis**: Parse natural language into specific Wheels components
-- **Component Mapping**: Identify models, controllers, views, migrations needed
+- **Component Mapping**: Identify models, controllers, **AND ALL REQUIRED VIEWS**, migrations needed
+- **View Requirements Planning**: For each controller action, identify required view:
+  - `index` action → needs `index.cfm` (list view with proper query loops)
+  - `show` action → needs `show.cfm` (detail view with association access)
+  - `new` action → needs `new.cfm` (form with validation error display)
+  - `edit` action → needs `edit.cfm` (form with pre-populated data)
+  - Plan forms with: field labels, error displays, CSRF tokens, submit buttons
+- **Frontend Stack Selection**: Choose layout template (Basic, Tailwind+Alpine+HTMX, Bootstrap)
 - **Dependency Analysis**: Determine implementation order and resolve conflicts
 - **Browser Test Planning**: Plan comprehensive user flow testing scenarios
 - **Risk Assessment**: Identify potential issues and mitigation strategies
 
-### Phase 3: Template-Driven Implementation (5-15 minutes)
-- **Code Generation**: Use templates from `.ai/wheels/snippets/` as starting points
-- **Incremental Validation**: Validate each component after generation
-- **Error Recovery**: Intelligent fallbacks when generation fails
-- **Consistency Enforcement**: Ensure patterns match existing codebase
-- **Security Integration**: Add CSRF protection, validation, authentication
+### Phase 3: Incremental Implementation with Real-Time Testing (10-20 minutes)
+
+**🚨 CRITICAL: Test each component IMMEDIATELY after generation before moving to next**
+
+#### Step-by-Step Implementation Order:
+
+**Step 1: Generate & Test Models**
+- Generate model via MCP
+- Enhance with validations, associations, methods
+- **TEST**: Verify model instantiates: `curl http://localhost:PORT?reload=true`
+- **TEST**: Check no errors in model code
+- ✅ Only proceed if model works
+
+**Step 2: Run & Test Migrations**
+- Generate migrations for database schema
+- **Fix database-specific functions**: Use CFML `DateAdd()` + `TIMESTAMP` formatting, NOT `DATE_SUB()`
+- Run migrations via MCP
+- **TEST**: Verify tables exist and migrations complete successfully
+- ✅ Only proceed if database is ready
+
+**Step 3: Generate & Test Controllers**
+- Generate controller via MCP
+- Add actions, filters, parameter verification
+- **Use consistent named parameters**: `findByKey(key=params.key, include="assoc")`
+- **TEST**: Hit controller action URL: `curl http://localhost:PORT/resource -I`
+- **TEST**: Verify returns 200 or expected redirect (not 500 error)
+- ✅ Only proceed if controller actions work
+
+**Step 4: Generate & Test Layout**
+- Choose frontend stack template (Tailwind+Alpine+HTMX recommended)
+- Create layout.cfm with navigation, flash messages, content area
+- Include CDN links for CSS/JS libraries
+- **TEST**: Reload app and hit homepage
+- **TEST**: Verify layout loads without errors
+- ✅ Only proceed if layout renders
+
+**Step 5: Generate & Test Views (ONE AT A TIME)**
+
+**For each view:**
+1. Create view file (index.cfm, show.cfm, new.cfm, edit.cfm)
+2. Use proper query access patterns:
+   ```cfm
+   ❌ BAD: #resource.association.recordCount#
+   ✅ GOOD: <cfset assocRecords = model("Resource").findByKey(resource.id).association()>
+            #assocRecords.recordCount#
+   ```
+3. Include validation error displays in forms:
+   ```cfm
+   <cfif objectName.hasErrors("property")>
+       <p class="error">#objectName.allErrors("property")[1]#</p>
+   </cfif>
+   ```
+4. **TEST IMMEDIATELY**: `curl http://localhost:PORT/resource -I` (should return 200)
+5. **TEST CONTENT**: `curl http://localhost:PORT/resource | grep "Expected Content"`
+6. ✅ Only proceed to next view if current view works
+
+**Step 6: Configure & Test Routes**
+- Add resource routes to routes.cfm
+- Set root route
+- **TEST**: Reload app
+- **TEST**: Verify all route URLs work (index, show, new, edit)
+- ✅ Only proceed if all routes map correctly
+
+**Real-Time Anti-Pattern Detection:**
+- During code generation, check for anti-patterns BEFORE saving:
+  ```cfm
+  // DETECT & FIX: Mixed argument styles
+  hasMany("comments", dependent="delete");  // ❌ STOP - Fix before proceeding
+  hasMany(name="comments", dependent="delete");  // ✅ Save and continue
+
+  // DETECT & FIX: Query/Array confusion
+  <cfset count = ArrayLen(post.comments())>  // ❌ STOP - Fix before proceeding
+  <cfset count = post.comments().recordCount>  // ✅ Save and continue
+  ```
+
+**Error Recovery at Each Step:**
+- If any test fails, STOP and fix before proceeding
+- Don't generate more code on top of broken code
+- Fix the current component until tests pass
+- Document what was fixed for learning
+
+**Anti-Pattern Detection During Implementation:**
+```cfm
+// DETECT: Mixed argument styles
+hasMany("comments", dependent="delete");  // ❌ STOP - Fix before proceeding
+hasMany(name="comments", dependent="delete");  // ✅ Continue
+
+// DETECT: Query/Array confusion
+<cfset count = ArrayLen(post.comments())>  // ❌ STOP - Fix before proceeding
+<cfset count = post.comments().recordCount>  // ✅ Continue
+
+// DETECT: Missing CSRF protection
+#startFormTag(...)#  // ❌ STOP - Add CSRF token
+#startFormTag(...)##authenticityToken()#  // ✅ Continue
+```
 
 ### Phase 4: TestBox BDD Test Suite Creation (10-20 minutes)
+- **⏰ TIMING**: Tests are written AFTER implementation is complete (not before - this is not TDD)
+- **✅ REQUIREMENT**: Tests MUST be written BEFORE marking feature complete
+- **🧹 CLEANUP**: All tests must include proper `beforeEach()` and `afterEach()` for isolation
 - **Model Tests**: Write BDD specs for all model functionality, validations, and associations
 - **Controller Tests**: Write BDD specs for all controller actions and security filters
 - **Integration Tests**: Write BDD specs for complete user workflows and CRUD operations
 - **Test Data Setup**: Create fixtures and test data for comprehensive testing
 - **Validation Testing**: Write BDD specs for all form validation scenarios
 - **Security Testing**: Write BDD specs for authentication, authorization, and CSRF protection
+
+**Test Writing Order:**
+1. Implementation complete → 2. Write tests → 3. Run tests → 4. Mark feature complete
 
 ### Phase 5: Multi-Level Testing Execution (3-8 minutes)
 - **Unit Test Execution**: Run all model and controller BDD specs
@@ -66,22 +273,383 @@ The `/wheels_execute` command implements a comprehensive 7-phase development wor
 - **Test Coverage Analysis**: Ensure all code paths are tested
 - **Test Failure Resolution**: Fix any failing tests before proceeding
 
-### Phase 6: Comprehensive Browser Testing (5-10 minutes)
-- **Server Verification**: Ensure development server is running
-- **Navigation Testing**: Test all menu links, buttons, and navigation paths
-- **CRUD Flow Testing**: Test complete create, read, update, delete operations
-- **Form Testing**: Submit all forms, test validation scenarios
-- **Interactive Testing**: Test JavaScript, Alpine.js, HTMX functionality
-- **Responsive Testing**: Validate mobile, tablet, desktop layouts
-- **Error Scenario Testing**: Test 404s, validation failures, edge cases
+### Phase 6: Comprehensive Browser Testing with Content Verification (10-15 minutes)
+
+**🚨 CRITICAL: Don't just check HTTP status - verify actual page content renders correctly**
+
+#### Testing Process:
+
+**Step 1: Verify Server & Port**
+- Get port from MCP: `mcp__wheels__wheels_server(action="status")`
+- Construct base URL: `http://localhost:PORT`
+
+**Step 2: Test Homepage/Index**
+```bash
+# Check HTTP status
+curl -s "http://localhost:PORT" -I  # Should be 200 OK
+
+# Verify actual content appears (not just status code)
+curl -s "http://localhost:PORT" | grep "Expected Title"
+curl -s "http://localhost:PORT" | grep -c "article class"  # Count records displayed
+
+# Verify frontend stack loaded
+curl -s "http://localhost:PORT" | grep -E "(Tailwind|Alpine|HTMX)"
+```
+
+**Step 3: Test Individual Resource Pages**
+```bash
+# Test show page
+curl -s "http://localhost:PORT/posts/2" -I  # Should be 200 OK
+curl -s "http://localhost:PORT/posts/2" | grep "Comments ("  # Verify comments section
+
+# Test new page
+curl -s "http://localhost:PORT/posts/new" -I  # Should be 200 OK
+curl -s "http://localhost:PORT/posts/new" | grep "Create"  # Verify form title
+
+# Test edit page
+curl -s "http://localhost:PORT/posts/2/edit" -I  # Should be 200 OK
+curl -s "http://localhost:PORT/posts/2/edit" | grep "Edit"  # Verify form title
+```
+
+**Step 4: Verify Links Generate Correctly**
+```bash
+# Check what URLs linkTo generates
+curl -s "http://localhost:PORT" | grep -o 'href="[^"]*posts[^"]*"' | head -5
+
+# Verify links point to correct resources, not just /posts
+```
+
+**Step 5: Test Interactive Elements**
+```bash
+# Verify Alpine.js directives exist
+curl -s "http://localhost:PORT/posts/2" | grep -E "x-data|@click"
+
+# Verify HTMX attributes if used
+curl -s "http://localhost:PORT" | grep "hx-"
+```
+
+**Step 6: Verify Forms Have Required Elements**
+```bash
+# Check CSRF tokens present
+curl -s "http://localhost:PORT/posts/new" | grep "csrf"
+
+# Check submit buttons exist
+curl -s "http://localhost:PORT/posts/new" | grep "submit"
+
+# Verify validation error display areas exist
+curl -s "http://localhost:PORT/posts/new" | grep "hasErrors"
+```
+
+**Step 7: Test Error Scenarios**
+```bash
+# Test 404 handling
+curl -s "http://localhost:PORT/posts/99999" -I  # Should redirect or show 404
+
+# Test missing views don't cause 500 errors
+curl -s "http://localhost:PORT/posts/1" -I  # Should be 200, not 500
+```
+
+**What Makes a Test PASS:**
+- ✅ HTTP 200 status code
+- ✅ Expected content appears in HTML (titles, records, forms)
+- ✅ No error messages in page content
+- ✅ Frontend libraries loaded (Tailwind, Alpine, HTMX)
+- ✅ Links generate correct URLs with IDs
+- ✅ Forms have all required elements (fields, labels, submit, CSRF)
+- ✅ Interactive elements have proper attributes (x-data, @click, hx-)
+
+**What Makes a Test FAIL:**
+- ❌ HTTP 500 Internal Server Error
+- ❌ HTTP 302 redirect to unexpected location
+- ❌ Page returns HTML but no actual content (empty lists)
+- ❌ Error messages visible in page content
+- ❌ Links missing or pointing to wrong URLs
+- ❌ Forms missing fields or submit buttons
+- ❌ Missing CSRF protection
+
+**Port Discovery Process:**
+```javascript
+// Step 1: Get server status via MCP (preferred)
+mcp__wheels__wheels_server(action="status")  // Returns port if running
+
+// Step 2: Fallback - Use CLI command
+Bash("wheels server status")  // Returns port and server status
+
+// Step 3: Fallback - Read server.json
+Read("server.json")  // Check "port" or "web.http.port" settings
+
+// Step 4: Default - Use 8080 if not specified
+var port = discoveredPort || 8080;
+var baseUrl = "http://localhost:" + port;
+```
 
 ### Phase 7: Quality Assurance & Reporting (2-3 minutes)
-- **Anti-Pattern Detection**: Scan for mixed arguments, query/array confusion
+- **⚠️ NOTE**: Anti-pattern detection should have already occurred during Phase 3 implementation
+- **Final Anti-Pattern Scan**: One last check for any missed issues
 - **Security Review**: Verify CSRF, authentication, input validation
 - **Performance Analysis**: Check for N+1 queries, optimization opportunities
 - **Documentation Compliance**: Validate against `.ai` documentation patterns
 - **Test Coverage Report**: Generate detailed test coverage analysis
 - **Comprehensive Reporting**: Generate detailed results with screenshots and test results
+
+### Phase 8: Rollback & Recovery (if needed)
+**This phase only executes if previous phases encounter critical failures.**
+
+- **Test Failures**: Roll back code changes, analyze root cause, fix issues, re-run tests
+- **Browser Test Failures**: Investigate root cause in screenshots, fix implementation, re-test
+- **Migration Failures**: Run down migrations, fix schema issues, re-apply migrations
+- **MCP Tool Failures**: Verify MCP server connection, restart if needed, document fallback to CLI
+- **Complete Failure**: Document what worked and what didn't, propose alternative approach
+- **Partial Success**: Document completed components, identify blocking issues, plan resolution
+
+**Rollback Strategy:**
+```bash
+# If MCP tools are available
+mcp__wheels__wheels_migrate(action="down")  # Rollback migrations
+mcp__wheels__wheels_analyze(target="all")   # Analyze current state
+
+# Document the issue
+- What was attempted
+- What failed and why
+- What was successfully completed
+- Recommended next steps
+```
+
+## View Generation Templates
+
+### Critical View Patterns
+
+All generated views MUST follow these patterns to avoid common errors:
+
+#### Index View Template (Resource List)
+```cfm
+<cfparam name="resources">
+<cfoutput>
+#contentFor("title", "Resource List")#
+
+<h1>Resources</h1>
+
+<cfif resources.recordCount>
+    <div class="grid">
+        <cfloop query="resources">
+            <article>
+                <h2>#linkTo(controller="resources", action="show", key=resources.id, text=resources.name)#</h2>
+
+                <!-- CRITICAL: Accessing associations inside query loop -->
+                <cfset resourceAssoc = model("Resource").findByKey(resources.id).association()>
+                <p>#resourceAssoc.recordCount# associated items</p>
+            </article>
+        </cfloop>
+    </div>
+<cfelse>
+    <p>No resources found.</p>
+</cfif>
+</cfoutput>
+```
+
+#### Show View Template (Resource Detail)
+```cfm
+<cfparam name="resource">
+<cfparam name="associations">
+<cfoutput>
+#contentFor("title", "#resource.name# - Detail")#
+
+<h1>#resource.name#</h1>
+<p>#resource.description#</p>
+
+<!-- Actions -->
+<div class="actions">
+    #linkTo(controller="resources", action="edit", key=resource.id, text="Edit")#
+    #linkTo(controller="resources", action="index", text="Back to List")#
+</div>
+
+<!-- Associated Records -->
+<h2>Associated Items (#associations.recordCount#)</h2>
+<cfif associations.recordCount>
+    <cfloop query="associations">
+        <div>#associations.name#</div>
+    </cfloop>
+</cfif>
+</cfoutput>
+```
+
+#### New/Edit Form Template
+```cfm
+<cfparam name="resource">
+<cfoutput>
+#contentFor("title", "Create Resource")#
+
+<h1>Create Resource</h1>
+
+#startFormTag(controller="resources", action="create", method="post")#
+
+    <!-- Text Field with Validation Errors -->
+    <div>
+        <label for="resource-name">Name *</label>
+        #textField(objectName="resource", property="name", label=false)#
+        <cfif resource.hasErrors("name")>
+            <p class="error">#resource.allErrors("name")[1]#</p>
+        </cfif>
+    </div>
+
+    <!-- Textarea with Validation Errors -->
+    <div>
+        <label for="resource-description">Description</label>
+        #textArea(objectName="resource", property="description", label=false)#
+        <cfif resource.hasErrors("description")>
+            <p class="error">#resource.allErrors("description")[1]#</p>
+        </cfif>
+    </div>
+
+    <!-- Checkbox -->
+    <div>
+        <label>
+            #checkBox(objectName="resource", property="active", label=false)#
+            <span>Active</span>
+        </label>
+    </div>
+
+    <!-- Submit -->
+    <div>
+        #submitTag(value="Create Resource")#
+        #linkTo(controller="resources", action="index", text="Cancel")#
+    </div>
+
+#endFormTag()#
+</cfoutput>
+```
+
+#### Controller Template with Filters
+```cfm
+component extends="Controller" {
+
+    function config() {
+        // Parameter verification
+        verifies(only="show,edit,update,delete", params="key", paramsTypes="integer");
+
+        // Filters
+        filters(through="findResource", only="show,edit,update,delete");
+    }
+
+    function index() {
+        // Load with associations to avoid N+1 queries
+        resources = model("Resource").findAll(
+            order="createdAt DESC",
+            include="association"
+        );
+    }
+
+    function show() {
+        // Resource loaded by filter
+        // Load associated records
+        associations = resource.association(order="createdAt ASC");
+    }
+
+    function new() {
+        resource = model("Resource").new();
+    }
+
+    function create() {
+        resource = model("Resource").new(params.resource);
+
+        if (resource.save()) {
+            flashInsert(success="Resource created successfully!");
+            redirectTo(action="show", key=resource.id);
+        } else {
+            flashInsert(error="Please correct the errors below.");
+            renderView(action="new");
+        }
+    }
+
+    function edit() {
+        // Resource loaded by filter
+    }
+
+    function update() {
+        // Resource loaded by filter
+        if (resource.update(params.resource)) {
+            flashInsert(success="Resource updated successfully!");
+            redirectTo(action="show", key=resource.id);
+        } else {
+            flashInsert(error="Please correct the errors below.");
+            renderView(action="edit");
+        }
+    }
+
+    function delete() {
+        // Resource loaded by filter
+        if (resource.delete()) {
+            flashInsert(success="Resource deleted successfully!");
+            redirectTo(action="index");
+        } else {
+            flashInsert(error="Unable to delete resource.");
+            redirectTo(action="show", key=resource.id);
+        }
+    }
+
+    // Private filter
+    private function findResource() {
+        resource = model("Resource").findByKey(key=params.key);
+
+        if (!isObject(resource)) {
+            flashInsert(error="Resource not found.");
+            redirectTo(action="index");
+        }
+    }
+}
+```
+
+### Migration Template (Database-Agnostic)
+```cfm
+component extends="wheels.migrator.Migration" {
+
+    function up() {
+        transaction {
+            try {
+                // Use CFML date functions, not database-specific
+                var now = Now();
+                var pastDate = DateAdd("d", -7, now);
+
+                // Create table
+                t = createTable(name="resources", force=false);
+                t.string(columnNames="name", allowNull=false, limit=255);
+                t.text(columnNames="description", allowNull=true);
+                t.boolean(columnNames="active", default=false);
+                t.timestamps();
+                t.create();
+
+                // Add indexes
+                addIndex(table="resources", columnNames="name");
+                addIndex(table="resources", columnNames="active,createdAt");
+
+                // Seed data (if needed) using CFML date formatting
+                execute("INSERT INTO resources (name, description, active, createdAt, updatedAt)
+                         VALUES (
+                             'Sample Resource',
+                             'Description here',
+                             1,
+                             TIMESTAMP '#DateFormat(now, "yyyy-mm-dd")# #TimeFormat(now, "HH:mm:ss")#',
+                             TIMESTAMP '#DateFormat(now, "yyyy-mm-dd")# #TimeFormat(now, "HH:mm:ss")#'
+                         )");
+
+            } catch (any e) {
+                local.exception = e;
+            }
+
+            if (StructKeyExists(local, "exception")) {
+                transaction action="rollback";
+                Throw(errorCode="1", detail=local.exception.detail, message=local.exception.message, type="any");
+            } else {
+                transaction action="commit";
+            }
+        }
+    }
+
+    function down() {
+        dropTable("resources");
+    }
+}
+```
 
 ## Anti-Pattern Prevention
 
@@ -122,6 +690,9 @@ model("Post").findByKey(params.key);
 ## Success Criteria
 
 A feature is only considered complete when ALL of the following are true:
+- [ ] ✅ **MCP tools were used exclusively (if `.mcp.json` exists)**
+- [ ] ✅ **No CLI commands used when MCP available**
+- [ ] ✅ **MCP server connection validated before starting**
 - [ ] ✅ All relevant `.ai` documentation was consulted
 - [ ] ✅ No anti-patterns detected in generated code
 - [ ] ✅ **Comprehensive TestBox BDD test suite written and passing**
@@ -198,10 +769,11 @@ Code will be automatically rejected if:
 - Routes don't follow RESTful conventions
 
 ### Performance Requirements
-- Pages must load within 3 seconds
-- Forms must submit within 2 seconds
-- No N+1 query patterns allowed
-- Database queries must be optimized
+- Pages should load without obvious delays
+- Forms should submit without timeout errors
+- No N+1 query patterns detected (check for missing `include` in model calls)
+- Database queries should use indexes where appropriate
+- Responsive design should not cause layout shifts
 
 ### Security Requirements
 - CSRF protection must be enabled
@@ -482,6 +1054,22 @@ component extends="wheels.Testbox" {
 #### Mandatory Test Commands
 All tests MUST be executed and pass before completion:
 
+**If MCP tools available (preferred):**
+```javascript
+// Run all model specs
+mcp__wheels__wheels_test(type="models", reporter="json")
+
+// Run all controller specs
+mcp__wheels__wheels_test(type="controllers", reporter="json")
+
+// Run all integration specs
+mcp__wheels__wheels_test(type="integration", reporter="json")
+
+// Run complete test suite
+mcp__wheels__wheels_test(type="all", reporter="json")
+```
+
+**If MCP tools NOT available (fallback only):**
 ```bash
 # Run all model specs
 wheels test model --reporter=json
@@ -492,8 +1080,8 @@ wheels test controller --reporter=json
 # Run all integration specs
 wheels test integration --reporter=json
 
-# Run complete test suite with coverage
-wheels test all --coverage --reporter=json
+# Run complete test suite
+wheels test all --reporter=json
 ```
 
 #### Test Coverage Requirements
@@ -536,6 +1124,15 @@ Error: ArrayLen() on query object detected
 → Fix: Use .recordCount and proper loop syntax
 → Retry: View generation with correct patterns
 → Validate: Browser test confirms functionality
+```
+
+#### MCP Connection Failure Recovery
+```
+Error: MCP server not responding
+→ Check: Server running via mcp__wheels__wheels_server(action="status")
+→ Fix: Restart server or verify .mcp.json configuration
+→ Validate: Test MCP connection before retrying
+→ Fallback: Document why MCP unavailable, use CLI tools as last resort
 ```
 
 #### TestBox BDD Test Failure Recovery
