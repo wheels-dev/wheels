@@ -247,9 +247,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Add an error on the object that's not specific to a single property.\nthis.addErrorToBase(message=&quot;Your email address must be the same as your domain name.&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add a general error\nthis.addErrorToBase(\n    message=&quot;Your email address must be the same as your domain name.&quot;\n);\n\nError applies to the whole object, not just email.\n\n2. Add a named error\nthis.addErrorToBase(\n    message=&quot;Order total must be greater than zero.&quot;,\n    name=&quot;invalidTotal&quot;\n);\n\nUseful for distinguishing this error later when multiple base errors exist.\n\n3. Enforce a cross-property rule\nif (this.startDate &gt; this.endDate) {\n    this.addErrorToBase(\n        message=&quot;Start date cannot be after end date.&quot;,\n        name=&quot;invalidDateRange&quot;\n    );\n}\n\nRule depends on two properties, so the error belongs on the object as a whole.\n\n4. Business logic validation\nif (this.balance &lt; this.minimumDeposit) {\n    this.addErrorToBase(\n        message=&quot;Balance is below the required minimum deposit.&quot;,\n        name=&quot;lowBalance&quot;\n    );\n}\n\nExample where validation involves external business rules, not just a single column.\n\n5. Using with valid()\nif (!user.valid()) {\n    writeDump(user.allErrors());\n    // Will include base-level errors from addErrorToBase()\n}</code></pre>"
       },
-      "hint": "Adds an error on a specific property.\n\n",
+      "hint": "Adds an error directly on the model object itself, not tied to a specific property. This is useful when the error applies to the object as a whole or to a combination of properties, rather than a single field (for example: comparing two values, enforcing cross-property business rules, or validating external conditions).\n\n",
       "returntype": "void",
       "slug": "model.addErrorToBase",
       "parameters": [
@@ -280,10 +280,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic foreign key\naddForeignKey(\n    table=&quot;orders&quot;,\n    referenceTable=&quot;users&quot;,\n    column=&quot;userId&quot;,\n    referenceColumn=&quot;id&quot;\n);\n\nEnsures that every orders.userId must exist in users.id.\n\n2. Foreign key for many-to-one relation\naddForeignKey(\n    table=&quot;comments&quot;,\n    referenceTable=&quot;posts&quot;,\n    column=&quot;postId&quot;,\n    referenceColumn=&quot;id&quot;\n);\n\nEnsures each comment is linked to a valid post.\n\n3. Foreign key with a custom reference column\naddForeignKey(\n    table=&quot;invoices&quot;,\n    referenceTable=&quot;customers&quot;,\n    column=&quot;customerCode&quot;,\n    referenceColumn=&quot;code&quot;\n);\n\nLinks invoices.customerCode to customers.code instead of a numeric ID.\n\n4. Multiple foreign keys in one migration\n// In migration\naddForeignKey(\n    table=&quot;enrollments&quot;,\n    referenceTable=&quot;students&quot;,\n    column=&quot;studentId&quot;,\n    referenceColumn=&quot;id&quot;\n);\n\naddForeignKey(\n    table=&quot;enrollments&quot;,\n    referenceTable=&quot;courses&quot;,\n    column=&quot;courseId&quot;,\n    referenceColumn=&quot;id&quot;\n);\n\nThe enrollments table is linked to both students and courses.</code></pre>"
       },
-      "hint": "Add a foreign key constraint to the database, using the reference name that was used to create it\nOnly available in a migration CFC\n\n",
+      "hint": "Adds a foreign key constraint between two tables. This ensures that values in one table’s column must exist in the referenced column of another table, enforcing referential integrity. This function is only available inside a migration CFC and is part of the Wheels migrator API.\n\n",
       "returntype": "void",
       "slug": "migration.addForeignKey",
       "parameters": [
@@ -326,9 +326,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Add the `js` format\naddFormat(extension=&quot;js&quot;, mimeType=&quot;text/javascript&quot;);\n\n// Add the `ppt` and `pptx` formats\naddFormat(extension=&quot;ppt&quot;, mimeType=&quot;application/vnd.ms-powerpoint&quot;);\naddFormat(extension=&quot;pptx&quot;, mimeType=&quot;application/vnd.ms-powerpoint&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add a JavaScript format\naddFormat(\n    extension=&quot;js&quot;,\n    mimeType=&quot;text/javascript&quot;\n);\n\nAllows controllers to respond to .js requests with the correct MIME type.\n\n2. Add PowerPoint formats\naddFormat(extension=&quot;ppt&quot;, mimeType=&quot;application/vnd.ms-powerpoint&quot;);\naddFormat(extension=&quot;pptx&quot;, mimeType=&quot;application/vnd.ms-powerpoint&quot;);\n\nEnables Wheels to correctly serve legacy and modern PowerPoint files.\n\n3. Add JSON format\naddFormat(\n    extension=&quot;json&quot;,\n    mimeType=&quot;application/json&quot;\n);\n\nUseful for APIs that need to respond with .json requests.\n\n4. Add PDF format\naddFormat(\n    extension=&quot;pdf&quot;,\n    mimeType=&quot;application/pdf&quot;\n);\n\nEnsures .pdf responses are correctly labeled for browsers.\n\n5. Add multiple custom data formats\naddFormat(extension=&quot;csv&quot;, mimeType=&quot;text/csv&quot;);\naddFormat(extension=&quot;yaml&quot;, mimeType=&quot;application/x-yaml&quot;);\n\nExpands your app to handle CSV and YAML outputs.</code></pre>"
       },
-      "hint": "Adds a new MIME type to your Wheels application for use with responding to multiple formats.\n\n",
+      "hint": "Registers a new MIME type in your Wheels application for use with responding to multiple formats. This is helpful when your app needs to handle file types beyond the defaults provided by Wheels (e.g., serving JavaScript, PowerPoint, JSON, custom data formats).\n\n",
       "returntype": "void",
       "slug": "controller.addFormat",
       "parameters": [
@@ -364,9 +364,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>addIndex(table='members', columnNames='username', unique=true);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add a unique index on a single column\naddIndex(\n    table=&quot;members&quot;,\n    columnNames=&quot;username&quot;,\n    unique=true\n);\n\nEnsures username values in members are unique.\n\n2. Add a non-unique index for faster queries\naddIndex(\n    table=&quot;orders&quot;,\n    columnNames=&quot;createdAt&quot;\n);\n\nSpeeds up queries filtering or ordering by createdAt.\n\n3. Add a composite index (multiple columns)\naddIndex(\n    table=&quot;posts&quot;,\n    columnNames=&quot;authorId,createdAt&quot;\n);\n\nOptimizes queries that filter or sort on both authorId and createdAt.\n\n4. Add an index with a custom name\naddIndex(\n    table=&quot;comments&quot;,\n    columnNames=&quot;postId&quot;,\n    indexName=&quot;idx_comments_postId&quot;\n);\n\nCreates index with a custom name instead of default comments_postId.\n\n5. Composite unique index\naddIndex(\n    table=&quot;enrollments&quot;,\n    columnNames=&quot;studentId,courseId&quot;,\n    unique=true,\n    indexName=&quot;unique_enrollments&quot;\n);\n\nPrevents the same studentId and courseId pair from being inserted more than once.</code></pre>"
       },
-      "hint": "Add database index on a table column\nOnly available in a migration CFC\n\n",
+      "hint": "Adds a database index on one or more columns of a table. Indexes speed up queries that filter, sort, or join on those columns. This function is only available inside a migration CFC and is part of the Wheels migrator API.\n\n",
       "returntype": "void",
       "slug": "migration.addIndex",
       "parameters": [
@@ -411,9 +411,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>addRecord(table='people',\n\t\tid = 1,\n\t\ttitle = &quot;Mr&quot;,\n\t\tfirstname = &quot;Bruce&quot;,\n\t\tlastname = &quot;Wayne&quot;, \n\t\temail = &quot;bruce@wayneenterprises.com&quot;,\n\t\ttel = &quot;555-67869099&quot;, \n);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add a single record\naddRecord(\n    table=&quot;people&quot;,\n    id=1,\n    title=&quot;Mr&quot;,\n    firstname=&quot;Bruce&quot;,\n    lastname=&quot;Wayne&quot;, \n    email=&quot;bruce@wayneenterprises.com&quot;,\n    tel=&quot;555-67869099&quot;\n);\n\nInserts one record into the people table.\n\n2. Add a record with only required fields\naddRecord(\n    table=&quot;roles&quot;,\n    id=1,\n    name=&quot;Admin&quot;\n);\n\nSeeds an Admin role into the roles table.\n\n3. Add a record with default values in schema\naddRecord(\n    table=&quot;users&quot;,\n    email=&quot;new@example.com&quot;,\n    firstName=&quot;new&quot;,\n    lastName=&quot;user&quot;\n);\n\nRelies on schema defaults (e.g., isActive=true) for missing fields.\n\n4. Add lookup data\naddRecord(\n    table=&quot;statuses&quot;,\n    id=1,\n    name=&quot;Pending&quot;\n);\naddRecord(\n    table=&quot;statuses&quot;,\n    id=2,\n    name=&quot;Approved&quot;\n);\naddRecord(\n    table=&quot;statuses&quot;,\n    id=3,\n    name=&quot;Rejected&quot;\n);\n\nSeeds reusable lookup/status values.\n\n5. Add a record referencing another table\n// Assuming user with ID=1 exists\naddRecord(\n    table=&quot;posts&quot;,\n    id=1,\n    title=&quot;First Post&quot;,\n    content=&quot;Hello, Wheels!&quot;,\n    userId=1\n);\n\nCreates a post tied to an existing user.</code></pre>"
       },
-      "hint": "Adds a record to a table\nOnly available in a migration CFC\n\n",
+      "hint": "Inserts a new record into a table. This function is only available inside a migration CFC and is part of the Wheels migrator API. Useful for seeding initial data (like admin users, roles, or lookup values) alongside schema changes.\n\n",
       "returntype": "void",
       "slug": "migration.addRecord",
       "parameters": [
@@ -437,10 +437,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a user reference to orders\naddReference(\n    table=&quot;orders&quot;,\n    referenceName=&quot;users&quot;\n);\n\nAdds a userId column to orders and creates a foreign key to users.id.\n\n2. Add a post reference to comments\naddReference(\n    table=&quot;comments&quot;,\n    referenceName=&quot;posts&quot;\n);\n\nCreates a postId column on comments and links it to posts.id.\n\n3. Add references to multiple tables\naddReference(table=&quot;enrollments&quot;, referenceName=&quot;students&quot;);\naddReference(table=&quot;enrollments&quot;, referenceName=&quot;courses&quot;);\n\nAdds both studentId and courseId to enrollments with foreign keys to students and courses.\n\n4. Composite example (reference + other fields)\naddColumn(table=&quot;votes&quot;, columnType=&quot;boolean&quot;, columnName=&quot;upvote&quot;, default=1);\naddReference(table=&quot;votes&quot;, referenceName=&quot;users&quot;);\naddReference(table=&quot;votes&quot;, referenceName=&quot;posts&quot;);\n\nBuilds a votes table that connects users and posts with foreign keys.</code></pre>"
       },
-      "hint": "Add a foreign key constraint to the database, using the reference name that was used to create it\nOnly available in a migration CFC\n\n",
+      "hint": "Adds a reference column and a foreign key constraint to a table in one step. This is a shortcut for creating an integer column (e.g., userId) and then linking it to another table using a foreign key. This function is only available inside a migration CFC and is part of the Wheels migrator API.\n\n",
       "returntype": "void",
       "slug": "migration.addReference",
       "parameters": [
@@ -470,30 +470,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
-      },
-      "hint": "Executes once after the test suite runs.\n\n",
-      "returntype": "any",
-      "slug": "test.afterAll",
-      "parameters": [],
-      "availableIn": [
-        "test"
-      ],
-      "name": "afterAll",
-      "tags": {
-        "categoryClass": "callbackfunctions",
-        "sectionClass": "testmodelconfiguration",
-        "category": "Callback Functions",
-        "section": "Test Model Configuration"
-      }
-    },
-    {
-      "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after an object has been created.\nafterCreate(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Single callback method\n// Instruct Wheels to call the `fixObj` method after an object is created\nafterCreate(\"fixObj\");\n\nfunction fixObj() {\n    variables.fixed = true;\n}\n\n2. Multiple callbacks\nafterCreate(\"logCreation,notifyAdmin\");\n\nfunction logCreation() {\n    writeLog(\"New record created at #now()#\");\n}\n\nfunction notifyAdmin() {\n    // send an email notification\n}\n\n3. With object attributes\nafterCreate(\"setDefaults\");\n\nfunction setDefaults() {\n    if (!len(variables.status)) {\n        variables.status = \"pending\";\n    }\n}\n\n4. Practical usage in User.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        afterCreate(\"assignRole,sendWelcomeEmail\");\n    }\n\n    function assignRole() {\n        if (isNull(roleId)) {\n            roleId = Role.findOneByName(\"User\").id;\n        }\n    }\n\n    function sendWelcomeEmail() {\n        // code to send welcome email\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after a new object is created.\n\n",
+      "hint": "Registers one or more callback methods that are automatically executed after a new object is created (i.e., after calling create() on a model). This is part of the model lifecycle callbacks in Wheels.\n\n",
       "returntype": "void",
       "slug": "model.afterCreate",
       "parameters": [
@@ -519,9 +499,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after an object has been deleted.\nafterDelete(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Single callback method\n// Call `logDeletion` after an object is deleted\nafterDelete(\"logDeletion\");\n\nfunction logDeletion() {\n    writeLog(\"Record deleted at #now()#\");\n}\n\n2. Multiple callbacks\nafterDelete(\"archiveData,notifyAdmin\");\n\nfunction archiveData() {\n    // move deleted data to an archive table\n}\n\nfunction notifyAdmin() {\n    // send a notification email\n}\n\n3. With related cleanup\nafterDelete(\"removeAssociatedRecords\");\n\nfunction removeAssociatedRecords() {\n    // remove orphaned child records manually\n    Order.deleteAll(where=\"userId = #this.id#\");\n}\n\n4. Practical usage in User.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        afterDelete(\"cleanupSessions,sendGoodbyeEmail\");\n    }\n\n    function cleanupSessions() {\n        Session.deleteAll(where=\"userId = #id#\");\n    }\n\n    function sendGoodbyeEmail() {\n        // code to send a farewell email\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after an object is deleted.\n\n",
+      "hint": "Registers one or more callback methods that should be executed after an object is deleted from the database. This hook allows you to perform cleanup, logging, or side effects when a record has been removed.\n\n",
       "returntype": "void",
       "slug": "model.afterDelete",
       "parameters": [
@@ -547,9 +527,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `setTime` method after getting objects or records with one of the finder methods.\nconfig() {\n\tafterFind(&quot;setTime&quot;);\n}\n\nfunction setTime(){\n\targuments.fetchedAt = Now();\n\treturn arguments;\n}\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add a timestamp when data was fetched\ncomponent extends=\"Model\" {\n    function config() {\n        afterFind(\"setTime\");\n    }\n\n    function setTime() {\n        arguments.fetchedAt = now();\n        return arguments;\n    }\n}\n\nWhen you call:\n\nuser = model(\"User\").findByKey(1);\nwriteOutput(user.fetchedAt); // Shows the time record was retrieved\n\n2. Format or normalize data\nafterFind(\"normalizeEmail\");\n\nfunction normalizeEmail() {\n    this.email = lcase(this.email);\n}\n\nEnsures all email addresses are lowercased when loaded.\n\n3. Load related info automatically\nafterFind(\"attachProfile\");\n\nfunction attachProfile() {\n    this.profile = model(\"Profile\").findOne(where=\"userId = #this.id#\");\n}\n\nNow every User object automatically has its related profile loaded.\n\n4. Multiple callbacks\nafterFind(\"setTime,normalizeEmail,attachProfile\");\n\nAll three methods will run in order after the object is retrieved.</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after an existing object has been initialized (which is usually done with the <code>findByKey</code> or <code>findOne</code> method).\n\n",
+      "hint": "Registers one or more callback methods that should be executed after an existing object has been initialized, typically via finder methods such as findByKey, findOne, findAll, or other query-based lookups. This hook is useful for adjusting, enriching, or transforming model objects immediately after they are loaded from the database.\n\n",
       "returntype": "void",
       "slug": "model.afterFind",
       "parameters": [
@@ -575,9 +555,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after an object has been initialized (i.e. after creating it or fetching it with a finder method).\nafterInitialization(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Normalize data after every initialization\nafterInitialization(\"normalizeName\");\n\nfunction normalizeName() {\n    this.firstName = trim(this.firstName);\n    this.lastName = trim(this.lastName);\n}\n\nEnsures whitespace is stripped whether the object is new or fetched.\n\n2. Add a helper attribute for all instances\nafterInitialization(\"addFullName\");\n\nfunction addFullName() {\n    this.fullName = this.firstName & \" \" & this.lastName;\n}\n\nNow every object has a fullName property set right after creation or retrieval.\n\n3. Multiple callbacks\nafterInitialization(\"normalizeName,addFullName\");\n\nRuns both methods sequentially.\n\n4. Practical example in User.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        afterInitialization(\"normalizeName,addFullName,setFetchedAt\");\n    }\n\n    function normalizeName() {\n        this.firstName = trim(this.firstName);\n        this.lastName = trim(this.lastName);\n    }\n\n    function addFullName() {\n        this.fullName = this.firstName & \" \" & this.lastName;\n    }\n\n    function setFetchedAt() {\n        arguments.fetchedAt = now();\n        return arguments;\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after an object has been initialized.\n\n",
+      "hint": "Registers one or more callback methods that should be executed after an object has been initialized. Initialization happens in two cases, When a new object is created (via new() or similar) or when an existing object is fetched from the database (via findByKey, findOne, etc.). This makes afterInitialization() more general than afterCreate() or afterFind(), since it runs in both scenarios.\n\n",
       "returntype": "void",
       "slug": "model.afterInitialization",
       "parameters": [
@@ -603,9 +583,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after a new object has been created.\nafterNew(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Set default values for new records\nafterNew(\"setDefaults\");\n\nfunction setDefaults() {\n    this.isActive = true;\n    this.role = \"member\";\n}\n\nWhenever a new object is initialized, default values are assigned.\n\n2. Generate a temporary property\nafterNew(\"assignTempId\");\n\nfunction assignTempId() {\n    this.tempId = createUUID();\n}\n\nEach new object will have a unique tempId until it’s saved.\n\n3. Multiple callbacks\nafterNew(\"setDefaults,assignTempId\");\n\nRuns both methods sequentially for every new object.\n\n4. Example in User.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        afterNew(\"setDefaults,prepareDisplayName\");\n    }\n\n    function setDefaults() {\n        this.isActive = true;\n    }\n\n    function prepareDisplayName() {\n        this.displayName = this.firstName & \" \" & this.lastName;\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after a new object has been initialized (which is usually done with the <code>new</code> method).\n\n",
+      "hint": "Registers one or more callback methods that should be executed after a new object has been initialized, typically via the new() method. This hook is useful for setting default values, preparing derived attributes, or running logic every time you create a fresh model instance (before saving it to the database).\n\n",
       "returntype": "void",
       "slug": "model.afterNew",
       "parameters": [
@@ -631,9 +611,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after an object has been saved.\nafterSave(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Log every save\nafterSave(\"logSave\");\n\nfunction logSave() {\n    writeLog(\"User ##this.id## saved at #now()#\");\n}\n\n2. Trigger notifications\nafterSave(\"notifyAdmin\");\n\nfunction notifyAdmin() {\n    if (this.role == \"admin\") {\n        sendEmail(to=\"superadmin@example.com\", subject=\"Admin Updated\", body=\"Admin user #this.id# has been updated.\");\n    }\n}\n\n3. Multiple callbacks\nafterSave(\"logSave,notifyAdmin\");\n\n4. Example in Order.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        afterSave(\"recalculateInventory,sendConfirmation\");\n    }\n\n    function recalculateInventory() {\n        Inventory.updateStock(this.productId, -this.quantity);\n    }\n\n    function sendConfirmation() {\n        EmailService.sendOrderConfirmation(this.id);\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after an object is saved.\n\n",
+      "hint": "Registers one or more callback methods that should be executed after an object is saved to the database. This hook runs whether the save was the result of creating a new record or updating an existing one. It’s ideal for tasks that must happen after persistence, such as logging, syncing data, or triggering external processes.\n\n",
       "returntype": "void",
       "slug": "model.afterSave",
       "parameters": [
@@ -659,9 +639,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after an object has been updated.\nafterUpdate(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Simple logging\nafterUpdate(\"logUpdate\");\n\nfunction logUpdate() {\n    writeLog(\"Record ##this.id## was updated at #now()#\");\n}\n\n2. Trigger an email when a specific field changes\nafterUpdate(\"notifyEmailChange\");\n\nfunction notifyEmailChange() {\n    if (this.hasChanged(\"email\")) {\n        sendEmail(\n            to=this.email,\n            subject=\"Your email was updated\",\n            body=\"Hi #this.firstName#, your email address has been changed.\"\n        );\n    }\n}\n\n3. Multiple callbacks\nafterUpdate(\"logUpdate,notifyEmailChange\");\n\n4. Example in Order.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        afterUpdate(\"updateInventory,sendUpdateNotification\");\n    }\n\n    function updateInventory() {\n        Inventory.adjustStock(this.productId, -this.quantity);\n    }\n\n    function sendUpdateNotification() {\n        EmailService.sendOrderUpdate(this.id);\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after an existing object is updated.\n\n",
+      "hint": "Registers one or more callback methods that should be executed after an existing object has been updated in the database. This hook is ideal for performing follow-up tasks whenever a record changes — such as logging, cache invalidation, or sending notifications about updates.\n\n",
       "returntype": "void",
       "slug": "model.afterUpdate",
       "parameters": [
@@ -687,9 +667,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after an object has been validated.\nafterValidation(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add a custom validation error\nafterValidation(\"checkRestrictedEmails\");\n\nfunction checkRestrictedEmails() {\n    if (listFindNoCase(\"test@example.com,admin@example.com\", this.email)) {\n        this.addError(\"email\", \"That email address is not allowed.\");\n    }\n}\n\n2. Normalize data after validation\nafterValidation(\"normalizePhone\");\n\nfunction normalizePhone() {\n    if (len(this.phone)) {\n        this.phone = rereplace(this.phone, \"[^0-9]\", \"\", \"all\");\n    }\n}\n\n3. Multiple callbacks\nafterValidation(\"checkRestrictedEmails,normalizePhone\");\n\n4. Example in User.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        validatesPresenceOf(\"email\");\n        afterValidation(\"checkRestrictedEmails,normalizePhone\");\n    }\n\n    function checkRestrictedEmails() {\n        if (listFindNoCase(\"banned@example.com\", this.email)) {\n            this.addError(\"email\", \"This email address is not permitted.\");\n        }\n    }\n\n    function normalizePhone() {\n        this.phone = rereplace(this.phone, \"[^0-9]\", \"\", \"all\");\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after an object is validated.\n\n",
+      "hint": "Registers one or more callback methods that should be executed after an object has been validated. This hook is useful for running extra logic that depends on validation results, such as adjusting error messages, performing side validations, or preparing data before saving.\n\n",
       "returntype": "void",
       "slug": "model.afterValidation",
       "parameters": [
@@ -715,9 +695,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after a new object has been validated.\nafterValidationOnCreate(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add a creation-only error\nafterValidationOnCreate(\"checkSignupEmail\");\n\nfunction checkSignupEmail() {\n    if (listFindNoCase(\"banned@example.com,blocked@example.com\", this.email)) {\n        this.addError(\"email\", \"This email address cannot be used for registration.\");\n    }\n}\n\n2. Generate a default username if missing\nafterValidationOnCreate(\"generateUsername\");\n\nfunction generateUsername() {\n    if (!len(this.username)) {\n        this.username = listFirst(this.email, \"@\");\n    }\n}\n\n3. Multiple callbacks\nafterValidationOnCreate(\"checkSignupEmail,generateUsername\");\n\n4. Example in User.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        validatesPresenceOf(\"email\");\n        validatesFormatOf(property=\"email\", regex=\"^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$\");\n\n        afterValidationOnCreate(\"checkSignupEmail,generateUsername\");\n    }\n\n    function checkSignupEmail() {\n        if (listFindNoCase(\"banned@example.com\", this.email)) {\n            this.addError(\"email\", \"This email address is restricted.\");\n        }\n    }\n\n    function generateUsername() {\n        if (!len(this.username)) {\n            this.username = listFirst(this.email, \"@\");\n        }\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after a new object is validated.\n\n",
+      "hint": "Registers one or more callback methods that should be executed after a new object has been validated (i.e., when running validations during a create() or save() on a new record). This hook is useful when you want to apply custom logic only during new record creation, not during updates.\n\n",
       "returntype": "void",
       "slug": "model.afterValidationOnCreate",
       "parameters": [
@@ -743,9 +723,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method after an existing object has been validated.\nafterValidationOnUpdate(&quot;fixObj&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Prevent updating restricted emails\nafterValidationOnUpdate(\"checkRestrictedEmail\");\n\nfunction checkRestrictedEmail() {\n    if (this.email eq \"admin@example.com\") {\n        this.addError(\"email\", \"You cannot change this email address.\");\n    }\n}\n\n2. Automatically update a lastModifiedBy field\nafterValidationOnUpdate(\"setLastModifiedBy\");\n\nfunction setLastModifiedBy() {\n    this.lastModifiedBy = session.userId;\n}\n\n3. Multiple callbacks\nafterValidationOnUpdate(\"checkRestrictedEmail,setLastModifiedBy\");\n\n4. Example in User.cfc\ncomponent extends=\"Model\" {\n    function config() {\n        validatesPresenceOf(\"email\");\n        validatesFormatOf(property=\"email\", regex=\"^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$\");\n\n        afterValidationOnUpdate(\"checkRestrictedEmail,setLastModifiedBy\");\n    }\n\n    function checkRestrictedEmail() {\n        if (this.email eq \"admin@example.com\") {\n            this.addError(\"email\", \"This email cannot be changed.\");\n        }\n    }\n\n    function setLastModifiedBy() {\n        this.lastModifiedBy = session.userId;\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called after an existing object is validated.\n\n",
+      "hint": "Registers one or more callback methods that should be executed after an existing object has been validated (i.e., when running validations during an update() or save() on an already-persisted record). This hook is useful when you want logic to run only on updates, not on initial creation.\n\n",
       "returntype": "void",
       "slug": "model.afterValidationOnUpdate",
       "parameters": [
@@ -771,9 +751,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get an object, change it, and then ask for its changes (will return a struct containing the changes, both property names and their values).\nmember = model(&quot;member&quot;).findByKey(params.memberId);\nmember.firstName = params.newFirstName;\nmember.email = params.newEmail;\nallChanges = member.allChanges();\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage\nmember = model(\"member\").findByKey(params.memberId);\n\n// Change some values (not saved yet)\nmember.firstName = params.newFirstName;\nmember.email = params.newEmail;\n\n// Get all pending changes\nallChanges = member.allChanges();\n// Example output: {\"email\":{\"CHANGEDTO\":\"old@gmail.com\",\"CHANGEDFROM\":\"new@gmail.com\"},\"firstname\":{\"CHANGEDTO\":\"old\",\"CHANGEDFROM\":\"new\"}}\n\n2. Checking if changes exist before saving\nmember = model(\"member\").findByKey(42);\nmember.status = \"inactive\";\n\nif (!structIsEmpty(member.allChanges())) {\n    writeDump(var=member.allChanges(), label=\"Pending Changes\");\n    member.save();\n}\n\n3. Using in a validation callback\nafterValidation(\"logChanges\");\n\nfunction logChanges() {\n    var changes = this.allChanges();\n    if (!structIsEmpty(changes)) {\n        log(message=\"User ##this.id## updated fields: #structKeyList(changes)#\");\n    }\n}\n\n4. Example with multiple updates\nuser = model(\"user\").findByKey(10);\n\nuser.firstName = \"Jane\";\nuser.lastName  = \"Doe\";\nuser.email     = \"jane.doe@example.com\";\n\nchanges = user.allChanges();\n// Output might be: {\"email\":{\"CHANGEDTO\":\"jane.doe@example.com\",\"CHANGEDFROM\":\"example.user@gmail.com\"},\"lastname\":{\"CHANGEDTO\":\"Doe\",\"CHANGEDFROM\":\"user\"},\"firstname\":{\"CHANGEDTO\":\"Jane\",\"CHANGEDFROM\":\"example\"}}</code></pre>"
       },
-      "hint": "Returns a struct detailing all changes that have been made on the object but not yet saved to the database.\n\n",
+      "hint": "Returns a struct containing all unsaved changes made to an object since it was last loaded or saved. Each entry in the struct uses the property name as the key and the new (unsaved) value as the value.\n\n",
       "returntype": "struct",
       "slug": "model.allChanges",
       "parameters": [],
@@ -791,7 +771,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get all the errors for the `user` object.\nerrorInfo = user.allErrors();\n\n// Sample return of method.\n[\n\t{\n  \tmessage: 'Username must not be blank.',\n    name: 'usernameError',\n    property: 'username'\n  },\n  {\n  \tmessage: 'Password must not be blank.',\n    name: 'passwordError',\n    property: 'password'\n  }\n]\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get all validation errors\nuser = model(\"user\").new(\n    username = \"\",\n    password = \"\"\n);\n\n// Validate the object\nuser.valid();\n\n// Fetch errors\nerrorInfo = user.allErrors();\n\nwriteDump(var=errorInfo, label=\"User Errors\");\n\nSample output:\n\n[\n  {\n    \"message\": \"Username must not be blank.\",\n    \"name\": \"PresenceOf\",\n    \"property\": \"username\"\n  },\n  {\n    \"message\": \"Password must not be blank.\",\n    \"name\": \"PresenceOf\",\n    \"property\": \"password\"\n  }\n]\n\n2. Including associated model errors\norder = model(\"order\").new(\n    customer = model(\"customer\").new(name=\"\")\n);\n\n// Validate both order and associated customer\norder.valid();\n\n// Get errors from both order and customer\nerrors = order.allErrors(includeAssociations=true);\n\n3. Checking for errors before saving\nuser = model(\"user\").new(email=\"not-an-email\");\n\nif (!user.valid()) {\n    errors = user.allErrors();\n    for (err in errors) {\n        writeOutput(\"Error on #err.property#: #err.message#\");\n    }\n}</code></pre>"
       },
       "hint": "Returns an array of all the errors on the object.\n\n\nIt does this by storing instances of models that are associations, and not checking associations of those instances because they have already been checked.",
       "returntype": "array",
@@ -824,10 +804,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Announce a step in a migration\nannounce(\"Adding status column to members table...\");\naddColumn(\n    table = \"members\",\n    columnType = \"string\",\n    columnName = \"status\",\n    limit = 50\n);\n\n2. Announce progress in multiple steps\nannounce(\"Creating orders table...\");\ncreateTable(\"orders\", function(table) {\n    table.integer(\"id\");\n    table.string(\"description\");\n});\n\nannounce(\"Adding index on orders.description...\");\naddIndex(table=\"orders\", columnNames=\"description\");\n\n3. Use for debugging migrations\nannounce(\"Starting migration at #Now()#\");\n\n// Migration logic here...\n\nannounce(\"Migration completed successfully.\");</code></pre>"
       },
-      "hint": "",
+      "hint": "Outputs a custom message during migration execution. This is useful for logging progress or providing context when multiple migration steps are running.\n\n",
       "returntype": "any",
       "slug": "migration.announce",
       "parameters": [
@@ -851,10 +831,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic true assertion\n// Passes because 2 + 2 = 4\nassert(\"2 + 2 EQ 4\");\n\n2. Assertion that fails\n// This will fail the test because 5 is not less than 3\nassert(\"5 LT 3\");\n\n3. With model object conditions\nuser = model(\"user\").findByKey(1);\n\n// Assert that the user has an email set\nassert(len(user.email));</code></pre>"
       },
-      "hint": "",
+      "hint": "Asserts that an expression evaluates to true in a test. If the expression evaluates to false, the test will fail and an error will be raised. This is one of the core testing functions available when writing legacy tests in Wheels.",
       "returntype": "void",
       "slug": "test.assert",
       "parameters": [
@@ -877,10 +857,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get the raw CSRF token in a controller\ntoken = authenticityToken();\n\n2. Output token manually in a form (not recommended, but possible)\n&lt;form action=\"/posts/create\" method=\"post\"&gt;\n    &lt;input type=\"hidden\" name=\"authenticityToken\" value=\"#authenticityToken()#\"&gt;\n    &lt;input type=\"text\" name=\"title\"&gt;\n    &lt;input type=\"submit\" value=\"Save\"&gt;\n&lt;/form&gt;\n\n3. Use in AJAX request headers\nfetch(\"/posts/create\", {\n  method: \"POST\",\n  headers: {\n    \"Content-Type\": \"application/json\",\n    \"X-CSRF-Token\": \"<cfoutput>#authenticityToken()#</cfoutput>\"\n  },\n  body: JSON.stringify({ title: \"New Post\" })\n});</code></pre>"
       },
-      "hint": "Returns the raw CSRF authenticity token\n\n",
+      "hint": "Returns the raw CSRF authenticity token for the current user session. This token is used to help protect against Cross-Site Request Forgery (CSRF) attacks by verifying that form submissions or AJAX requests originate from your application. You typically won’t call this function directly in views — instead, Wheels provides helpers like authenticityTokenField() to generate hidden form fields. But authenticityToken() can be useful if you need direct access to the token string (for example, in custom JavaScript code).\n\n",
       "returntype": "string",
       "slug": "controller.authenticityToken",
       "parameters": [],
@@ -898,9 +878,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Needed here because we're not using `startFormTag`. ---&gt;\n&lt;form action=&quot;#urlFor(route='posts')#&quot; method=&quot;post&quot;&gt;\n  #authenticityTokenField()#\n&lt;/form&gt;\n  \n&lt;!--- Not needed here because we're not POSTing the form. ---&gt;\n&lt;form action=&quot;#urlFor(route='invoices')#&quot; method=&quot;get&quot;&gt;\n&lt;/form&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Adding a CSRF token to a manual form\n&lt;!--- Needed here because we're not using startFormTag ---&gt;\n&lt;form action=\"#urlFor(route='posts')#\" method=\"post\"&gt;\n  #authenticityTokenField()#\n  &lt;input type=\"text\" name=\"title\"&gt;\n  &lt;input type=\"submit\" value=\"Create Post\"&gt;\n&lt;/form&gt;\n\n2. No token needed for safe GET forms\n&lt;!--- Not needed here because GET requests are not protected ---&gt;\n&lt;form action=\"#urlFor(route='invoices')#\" method=\"get\"&gt;\n  &lt;input type=\"text\" name=\"search\"&gt;\n  &lt;input type=\"submit\" value=\"Find Invoice\"&gt;\n&lt;/form&gt;\n\n3. Custom AJAX form with CSRF token\n&lt;form id=\"ajaxForm\"&gt;\n  #authenticityTokenField()#\n  &lt;input type=\"text\" name=\"title\"&gt;\n  &lt;button type=\"submit\"&gt;Save&lt;/button&gt;\n&lt;/form&gt;\n\ndocument.getElementById(\"ajaxForm\").addEventListener(\"submit\", function(e) {\n  e.preventDefault();\n\n  const token = document.querySelector(\"input[name='authenticityToken']\").value;\n\n  fetch(\"/posts\", {\n    method: \"POST\",\n    headers: {\n      \"Content-Type\": \"application/json\",\n      \"X-CSRF-Token\": token\n    },\n    body: JSON.stringify({ title: \"CSRF-protected post\" })\n  });\n});</code></pre>"
       },
-      "hint": "Returns a hidden form field containing a new authenticity token.\n\n",
+      "hint": "Generates a hidden form field that contains a CSRF authenticity token. This token is required for verifying that POST, PUT, PATCH, or DELETE requests originated from your application, helping protect against Cross-Site Request Forgery (CSRF) attacks. When you use startFormTag(), Wheels automatically includes the token field for you. You’ll usually only need to call authenticityTokenField() manually when creating forms without startFormTag() or when building raw HTML forms.\n\n",
       "returntype": "string",
       "slug": "controller.authenticityTokenField",
       "parameters": [],
@@ -918,9 +898,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Will output: Download Wheels from &lt;a href=&quot;https://wheels.dev&quot;&gt;https://wheels.dev&lt;/a&gt; ---&gt;\n#autoLink(&quot;Download Wheels from https://wheels.dev&quot;)#\n\n&lt;!--- Will output: Email us at &lt;a href=&quot;mailto:info@cfwheels.org&quot;&gt;info@cfwheels.org&lt;/a&gt; ---&gt;\n#autoLink(&quot;Email us at info@cfwheels.org&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Auto-link a URL\n#autoLink(\"Download Wheels from https://wheels.dev\")#\n\nOutput:\n\nDownload Wheels from &lt;a href=\"https://wheels.dev\"&gt;https://wheels.dev&lt;/a&gt;\n\n2. Auto-link an email address\n#autoLink(\"Email us at info@cfwheels.org\")#\n\nOutput:\n\nEmail us at &lt;a href=\"mailto:info@cfwheels.org\"&gt;info@cfwheels.org&lt;/a&gt;\n\n3. Only link URLs, not emails\n#autoLink(text=\"Visit https://cfwheels.org or email support@cfwheels.org\", link=\"URLs\")#\n\nOutput:\n\nVisit &lt;a href=\"https://cfwheels.org\"&gt;https://cfwheels.org&lt;/a&gt; or email support@cfwheels.org\n\n4. Only link email addresses\n#autoLink(text=\"Contact info@cfwheels.org or see https://cfwheels.org\", link=\"emailAddresses\")#\n\nOutput:\n\nContact &lt;a href=\"mailto:info@cfwheels.org\"&gt;info@cfwheels.org&lt;/a&gt; or see https://cfwheels.org\n\n5. Disable auto-linking of relative URLs\n#autoLink(text=\"See /about for more info\", relative=false)#\n\nOutput:\n\nSee /about for more info</code></pre>"
       },
-      "hint": "Turns all URLs and email addresses into links.\n\n",
+      "hint": "Scans a block of text for URLs and/or email addresses and automatically converts them into clickable links. This helper is handy for displaying user-generated content, comments, or messages where you want to make links interactive without manually adding <a> tags.\n\n",
       "returntype": "string",
       "slug": "controller.autoLink",
       "parameters": [
@@ -966,9 +946,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Disable automatic validations (for example when automatic validations are enabled globally, but we want to disable just for this model).\nconfig() {\n\tautomaticValidations(false);\n}\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Disable automatic validations for a single model\ncomponent extends=\"Model\" {\n    function config() {\n        automaticValidations(false);\n    }\n}\n\n\nUseful when automatic validations are enabled globally but a model requires custom validation handling.\n\n2. Enable automatic validations explicitly for a model\ncomponent extends=\"Model\" {\n    function config() {\n        automaticValidations(true);\n    }\n}\n\n\nEnsures this model always applies database-inferred validations, even if global automatic validations are turned off.\n\n3. Combining with custom validations\ncomponent extends=\"Model\" {\n    function config() {\n        automaticValidations(false); // turn off inferred rules\n        validatesPresenceOf(\"email\");\n        validatesFormatOf(property=\"email\", regex=\"^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$\");\n    }\n}\n\n\nHere, automatic validations are disabled, but explicit validation rules are still applied.</code></pre>"
       },
-      "hint": "Whether or not to enable default validations for this model.\n\n",
+      "hint": "Controls whether automatic validations should be enabled for a specific model. By default, Wheels can automatically infer validations from your database schema (e.g., NOT NULL fields, field length limits, etc.). This function lets you override that behavior at the model level — enabling or disabling automatic validations regardless of the global setting.\n\n",
       "returntype": "void",
       "slug": "model.automaticValidations",
       "parameters": [
@@ -993,7 +973,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the average salary for all employees.\navgSalary = model(&quot;employee&quot;).average(&quot;salary&quot;);\n\n// Get the average salary for employees in a given department.\navgSalary = model(&quot;employee&quot;).average(property=&quot;salary&quot;, where=&quot;departmentId=#params.key#&quot;);\n\n// Make sure a numeric value is always returned if no records are calculated.\navgSalary = model(&quot;employee&quot;).average(property=&quot;salary&quot;, where=&quot;salary BETWEEN #params.min# AND #params.max#&quot;, ifNull=0);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Average salary for all employees\navgSalary = model(\"employee\").average(\"salary\");\n\n2. Average salary filtered by department\navgSalary = model(\"employee\").average(\n    property = \"salary\",\n    where    = \"departmentId = #params.key#\"\n);\n\n3. Ensure a numeric value is always returned\navgSalary = model(\"employee\").average(\n    property = \"salary\",\n    where    = \"salary BETWEEN #params.min# AND #params.max#\",\n    ifNull   = 0\n);\n\n4. Average with distinct values only\navgSalary = model(\"employee\").average(\n    property = \"salary\",\n    distinct = true\n);\n\n5. Grouped average by department\navgSalaries = model(\"employee\").average(\n    property = \"salary\",\n    group    = \"departmentId\"\n);</code></pre>"
       },
       "hint": "Calculates the average value for a given property.\nUses the SQL function <code>AVG</code>.\nIf no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.\n\n",
       "returntype": "any",
@@ -1063,26 +1043,6 @@
         "sectionClass": "modelclass",
         "category": "Statistics Functions",
         "section": "Model Class"
-      }
-    },
-    {
-      "extended": {
-        "hasExtended": false,
-        "docs": ""
-      },
-      "hint": "Executes once before the test suite runs.\n\n",
-      "returntype": "any",
-      "slug": "test.beforeAll",
-      "parameters": [],
-      "availableIn": [
-        "test"
-      ],
-      "name": "beforeAll",
-      "tags": {
-        "categoryClass": "callbackfunctions",
-        "sectionClass": "testmodelconfiguration",
-        "category": "Callback Functions",
-        "section": "Test Model Configuration"
       }
     },
     {
