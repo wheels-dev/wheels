@@ -4488,5 +4488,99 @@
       "$0"
     ],
     "scope": "cfml"
+  },
+  "wheels-controller-template": {
+    "prefix": "wcontroller",
+    "description": "Complete Wheels controller template with CRUD actions",
+    "body": [
+      "// This template now loads from /templates/controller.cfc file",
+      "// Edit the template file directly for easier maintenance"
+    ],
+    "scope": "cfml"
+  },
+  "wheels-model-template": {
+    "prefix": "wmodel",
+    "description": "Complete Wheels model template with common patterns",
+    "body": [
+      "// This template now loads from /templates/model.cfc file",
+      "// Edit the template file directly for easier maintenance"
+    ],
+    "scope": "cfml"
+  },
+  "wheels-validation-set": {
+    "prefix": "wvalidation",
+    "description": "Common Wheels validation patterns",
+    "body": [
+      "// Basic validations",
+      "validatesPresenceOf(\"${1:name,email}\");",
+      "validatesUniquenessOf(\"${2:email}\");",
+      "validatesLengthOf(property=\"${3:name}\", minimum=${4:2}, maximum=${5:50});",
+      "",
+      "// Format validations",
+      "validatesFormatOf(property=\"${2:email}\", regEx=\"^[\\w\\.-]+@[\\w\\.-]+\\.\\w+$\");",
+      "validatesFormatOf(property=\"${6:phone}\", regEx=\"^[\\d\\-\\(\\)\\+\\s]+$\");",
+      "",
+      "// Conditional validations",
+      "validatesPresenceOf(property=\"${7:password}\", condition=\"this.isNew()\");",
+      "validatesConfirmationOf(\"${7:password}\");",
+      "",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "wheels-association-set": {
+    "prefix": "wassociations",
+    "description": "Common Wheels association patterns",
+    "body": [
+      "// One-to-many relationships",
+      "hasMany(\"${1:orders}\", dependent=\"${2:delete}\");",
+      "hasMany(\"${3:comments}\", class=\"${4:Comment}\", foreignKey=\"${5:userId}\");",
+      "",
+      "// Many-to-one relationships",
+      "belongsTo(\"${6:category}\");",
+      "belongsTo(\"${7:user}\", class=\"${8:User}\", foreignKey=\"${9:createdBy}\");",
+      "",
+      "// One-to-one relationships",
+      "hasOne(\"${10:profile}\");",
+      "hasOne(\"${11:account}\", dependent=\"${12:delete}\");",
+      "",
+      "// Many-to-many relationships",
+      "hasMany(\"${13:tags}\", through=\"${14:taggings}\");",
+      "",
+      "$0"
+    ],
+    "scope": "cfml"
+  },
+  "wheels-finder-methods": {
+    "prefix": "wfinders",
+    "description": "Custom Wheels finder method examples",
+    "body": [
+      "// Basic finders",
+      "function findActive() {",
+      "\treturn findAll(where=\"active = 1\", order=\"${1:name} ASC\");",
+      "}",
+      "",
+      "function findByName(required string name) {",
+      "\treturn findOne(where=\"name = '#arguments.name#'\");",
+      "}",
+      "",
+      "function findRecent(numeric limit = 10) {",
+      "\treturn findAll(",
+      "\t\torder=\"createdAt DESC\",",
+      "\t\tmaxRows=arguments.limit",
+      "\t);",
+      "}",
+      "",
+      "// Complex finders with joins",
+      "function findWithCategory() {",
+      "\treturn findAll(",
+      "\t\tinclude=\"${2:category}\",",
+      "\t\torder=\"categories.name ASC, ${1:name} ASC\"",
+      "\t);",
+      "}",
+      "",
+      "$0"
+    ],
+    "scope": "cfml"
   }
 }

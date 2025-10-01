@@ -1,5 +1,37 @@
 # Change Log
 
+## [1.0.6] - 2025-10-01
+
+### Added
+- **Go to Definition (F12)**: Navigate directly to Wheels components with Cmd+Click/Ctrl+Click
+  - Model navigation: `model("User")` → jumps to `User.cfc`, supports namespaced models `model("Api.User")` → `Api/User.cfc`
+  - Controller actions: `redirectTo(controller="users", action="show")` → jumps to specific action
+  - Route-based navigation: `linkTo(route="editUser")` → jumps to controller action
+  - View definitions: `renderView("users/show")` → jumps to view file
+  - Smart inference: Handles route patterns like `editUser` → `users#edit`
+
+- **File Templates & Scaffolding**: Create Wheels components quickly with ready-made templates
+  - Right-click any folder → "New Wheels Component" menu
+  - Command Palette: "Wheels: Create Controller/Model/View" commands
+  - Complete templates with common patterns and templates
+
+- **Smart Parameter System**: Intelligent parameter assistance with integrated features:
+  - **Parameter Highlighting**: Smart highlighting as you type parameter names with Ctrl+Shift+Space
+  - **Parameter Auto-completion**: Type partial names (e.g., "o") and press Tab to complete to "order = ""
+  - **Intelligent Typo Detection**: Catches likely typos (similarity > 50%) while respecting CFML's dynamic parameter passing
+    - warns when parameter name is similar to a valid parameter (e.g., `ordr` → suggests `order`)
+
+- **Component Templates**: Complete structures for rapid development
+  - `wcontroller` → Complete CRUD controller with all actions, filters, error handling
+  - `wmodel` → Model template with associations, validations, callbacks, custom methods
+
+- **Function Snippets**: 300+ Wheels function completions with dual options (basic/full parameters)
+
+### Enhanced
+- **Hover Documentation**: Clean, professional documentation with parameter details and examples
+- **Context-Aware Features**: Parameter hints adapt to context (routes, controllers, models, views)
+- **CFML Type Support**: Proper handling of CFML type declarations (string, numeric, boolean, etc.)
+
 ## [1.0.5] - 2025-09-24
 
 ### Fixed
