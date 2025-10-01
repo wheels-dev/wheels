@@ -2881,9 +2881,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// In models/User.cfc.\nconfig() {\n\t// Tell Wheels to use the data source named `users_source` instead of the default one whenever this model makes SQL calls.\n\tdataSource(&quot;users_source&quot;);\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>// In app/models/User.cfc\ncomponent extends=\"Model\" {\n\n    function config() {\n        // Use a custom datasource for this model\n        dataSource(\"users_source\");\n        \n        // Optional: specify credentials\n        // dataSource(\"users_source\", \"dbUser\", \"dbPass\");\n    }\n}</code></pre>"
       },
-      "hint": "Use this method to override the data source connection information for this model.\n\n",
+      "hint": "dataSource() is a model configuration method used to override the default database connection for a specific model. This is useful when you want a model to query a different database or use specific credentials than the application default.\n\n",
       "returntype": "void",
       "slug": "model.dataSource",
       "parameters": [
@@ -2921,10 +2921,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>// In a migration CFC\nt = createTable(name=\"events\");\nt.date(columnNames=\"startDate,endDate\",  default=\"\",  allowNull=false);\nt.create();</code></pre>"
       },
-      "hint": "Adds date columns to table definition.\n\n",
+      "hint": "date() is a table definition function used in a migration CFC to add one or more DATE columns to a table.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.date",
       "parameters": [
@@ -2958,7 +2958,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- View code ---&gt;\n#dateSelect(objectName=&quot;user&quot;, property=&quot;dateOfBirth&quot;)#\n\n&lt;!--- Show fields to select month and year ---&gt;\n#dateSelect(objectName=&quot;order&quot;, property=&quot;expirationDate&quot;, order=&quot;month,year&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\n#dateSelect(objectName=\"user\", property=\"dateOfBirth\")#\n\nOutputs month/day/year selects for the user.dateOfBirth property.\n\n---\n\nExample 2: Only month and year (no day)\n#dateSelect(objectName=\"order\", property=\"expirationDate\", order=\"month,year\")#\n\nUseful for credit card expiration dates.\n\nOnly month and year dropdowns appear.\n\n---\n\nExample 3: Custom year range\n#dateSelect(objectName=\"event\", property=\"eventDate\", startYear=2000, endYear=2030)#\n\nDropdown shows years 2000–2030.\n\n---\n\nExample 4: Custom month display\n#dateSelect(objectName=\"user\", property=\"anniversary\", monthDisplay=\"abbreviations\")#\n\nMonths display as Jan, Feb, Mar… instead of full names.\n\n---\n\nExample 5: Include blank options\n#dateSelect(objectName=\"profile\", property=\"graduationDate\", includeBlank=\"- Select Date -\")#\n\nAdds a blank option at the top of each select with the label - Select Date -.\n\n---\n\nExample 6: Using labels and custom HTML\n#dateSelect(objectName=\"employee\", property=\"hireDate\", label=\"Hire Date\", labelPlacement=\"before\", prepend=\"&lt;div class='date-wrapper'&gt;\", append=\"&lt;/div&gt;\")#\n\nAdds a label and wraps selects inside a div for styling.</code></pre>"
       },
       "hint": "Builds and returns a string containing three <code>select</code> form controls for month, day, and year based on the supplied <code>objectName</code> and <code>property</code>.\n\n",
       "returntype": "string",
@@ -3127,9 +3127,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- This &quot;Tag&quot; version of function accepts `name` and `selected` instead of binding to a model object ---&gt;\n#dateSelectTags(name=&quot;dateStart&quot;, selected=params.dateStart)#\n\n&lt;!--- Show fields for month and year only ---&gt;\n#dateSelectTags(name=&quot;expiration&quot;, selected=params.expiration, order=&quot;month,year&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\n#dateSelectTags(name=\"dateStart\", selected=params.dateStart)#\n\nOutputs month/day/year selects with the value pre-selected from params.dateStart.\n\n---\n\nExample 2: Month and year only\n#dateSelectTags(name=\"expiration\", selected=params.expiration, order=\"month,year\")#\n\nUseful for credit card expiration date inputs.\n\nOnly month and year dropdowns appear.\n\n---\n\nExample 3: Custom year range\n#dateSelectTags(name=\"eventDate\", startYear=2000, endYear=2030)#\n\nDropdown shows years 2000–2030.\n\n---\n\nExample 4: Custom month display\n#dateSelectTags(name=\"anniversary\", monthDisplay=\"abbreviations\")#\n\nMonths display as Jan, Feb, Mar… instead of full names.\n\n---\n\nExample 5: Include blank options\n#dateSelectTags(name=\"graduationDate\", includeBlank=\"- Select Date -\")#\n\nAdds a blank option at the top of each dropdown with - Select Date -.\n\n---\n\nExample 6: Using labels and custom HTML\n#dateSelectTags(name=\"hireDate\", label=\"Hire Date\", labelPlacement=\"before\", prepend=\"&lt;div class='date-wrapper'&gt;\", append=\"&lt;/div>\")#\n\nAdds a label and wraps selects inside a &lt;div&gt; for styling.</code></pre>"
       },
-      "hint": "Builds and returns a string containing three <code>select</code> form controls (month, day, and year) based on a name and value.\n\n",
+      "hint": "dateSelectTags() is similar to dateSelect(), but instead of binding to a model object, it works directly with a name and selected value. It generates three select dropdowns (month, day, year) for form tags.\n\n",
       "returntype": "string",
       "slug": "controller.dateSelectTags",
       "parameters": [
@@ -3277,10 +3277,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\nt = createTable(name=\"appointments\"); \nt.datetime(columnNames=\"startAt,endAt\");\nt.create();\n\nCreates startAt and endAt columns as datetime columns in the appointments table.\n\n---\n\nExample 2: With NULL allowed\nt = createTable(name=\"events\"); \nt.datetime(columnNames=\"cancelledAt\", allowNull=true);\nt.create();\n\ncancelledAt column allows NULL values.\n\n---\n\nExample 3: With default timestamp\nt = createTable(name=\"logs\"); \nt.datetime(columnNames=\"createdAt\", default=\"CURRENT_TIMESTAMP\");\nt.create();\n\nSets createdAt to the current timestamp by default.\n\n---\n\nExample 4: Multiple datetime columns with defaults\nt = createTable(name=\"tasks\"); \nt.datetime(columnNames=\"assignedAt,completedAt\", default=\"CURRENT_TIMESTAMP\", allowNull=false);\nt.create();\n\nBoth columns are non-nullable and default to the current timestamp.</code></pre>"
       },
-      "hint": "adds datetime columns to table definition\n\n",
+      "hint": "Adds datetime columns to a table definition when creating or altering a table in a migration. These columns store both date and time values.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.datetime",
       "parameters": [
@@ -3314,7 +3314,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- View code ---&gt;\n#dateTimeSelect(objectName=&quot;article&quot;, property=&quot;publishedAt&quot;)#\n\n&lt;!--- Show fields for month, day, hour, and minute ---&gt;\n#dateTimeSelect(objectName=&quot;appointment&quot;, property=&quot;dateTimeStart&quot;, dateOrder=&quot;month,day&quot;, timeOrder=&quot;hour,minute&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\n#dateTimeSelect(objectName=\"article\", property=\"publishedAt\")#\n\nGenerates all six selects for article.publishedAt.\n\n---\n\nExample 2: Custom date and time order\n#dateTimeSelect(objectName=\"appointment\", property=\"dateTimeStart\", dateOrder=\"month,day\", timeOrder=\"hour,minute\")#\n\nOnly shows month & day for date and hour & minute for time.\n\n---\n\nExample 3: 12-hour format with AM/PM\n#dateTimeSelect(objectName=\"meeting\", property=\"startTime\", twelveHour=true, timeOrder=\"hour,minute\")#\n\nHours dropdown uses 1–12 with AM/PM options.\n\n---\n\nExample 4: Include blank options and custom year range\n#dateTimeSelect(objectName=\"event\", property=\"eventTime\", startYear=2020, endYear=2030, includeBlank=true)#\n\nAdds an empty option for each select and sets the year range to 2020–2030.\n\n---\n\nExample 5: Custom separators\n#dateTimeSelect(objectName=\"flight\", property=\"departure\", dateSeparator=\"/\", timeSeparator=\".\")#\n\nShows / between date selects and . between time selects.</code></pre>"
       },
       "hint": "Builds and returns a string containing six <code>select</code> form controls (three for date selection and the remaining three for time selection) based on the supplied objectName and property.\n\n",
       "returntype": "string",
@@ -3522,7 +3522,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- This &quot;Tag&quot; version of the function accepts a `name` and `selected` instead of binding to a model object---&gt;\n#dateTimeSelectTags(name=&quot;dateTimeStart&quot;, selected=params.dateTimeStart)#\n\n&lt;!--- Show fields for month, day, hour, and minute---&gt;\n#dateTimeSelectTags(name=&quot;dateTimeStart&quot;, selected=params.dateTimeStart, dateOrder=&quot;month,day&quot;, timeOrder=&quot;hour,minute&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\n#dateTimeSelectTags(\n    name=\"dateTimeStart\",\n    selected=params.dateTimeStart\n)#\n\nGenerates six selects for date/time with default order and all fields included.\n\n---\n\nExample 2: Show only month, day, hour, and minute\n#dateTimeSelectTags(\n    name=\"dateTimeStart\",\n    selected=params.dateTimeStart,\n    dateOrder=\"month,day\",\n    timeOrder=\"hour,minute\"\n)#\n\nExcludes year and seconds from the dropdowns.\n\n---\n\nExample 3: 12-hour format with AM/PM\n#dateTimeSelectTags(\n    name=\"meetingTime\",\n    selected=params.meetingTime,\n    twelveHour=true,\n    timeOrder=\"hour,minute\"\n)#\n\nHours are displayed as 1–12 with AM/PM dropdown.\n\n---\n\nExample 4: Custom year range with blank options\n#dateTimeSelectTags(\n    name=\"eventTime\",\n    selected=params.eventTime,\n    startYear=2020,\n    endYear=2030,\n    includeBlank=true\n)#\n\nAdds blank options and limits year selection to 2020–2030.\n\n---\n\nExample 5: Custom separators between date and time\n#dateTimeSelectTags(\n    name=\"flightDeparture\",\n    selected=params.departure,\n    dateSeparator=\"/\",\n    timeSeparator=\".\"\n)#\n\nUses / between date selects and . between time selects.</code></pre>"
       },
       "hint": "Builds and returns a string containing six <code>select</code> form controls (three for date selection and the remaining three for time selection) based on a name.\n\n",
       "returntype": "string",
@@ -3709,9 +3709,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- This &quot;Tag&quot; version of the function accepts a `name` and `selected` instead of binding to a model object ---&gt;\n#daySelectTag(name=&quot;dayOfWeek&quot;, selected=params.dayOfWeek)#</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\n#daySelectTag(name=\"dayOfWeek\", selected=params.dayOfWeek)#\n\nGenerates a standard select dropdown for all days of the week.\n\nPre-selects the value from params.dayOfWeek if available.\n\n---\n\nExample 2: Include a blank option\n#daySelectTag(name=\"meetingDay\", selected=params.meetingDay, includeBlank=true)#\n\nAdds a blank option at the top so users can select nothing.\n\n---\n\nExample 3: Custom label before the field\n#daySelectTag(\n    name=\"deliveryDay\",\n    selected=params.deliveryDay,\n    label=\"Choose delivery day:\",\n    labelPlacement=\"before\"\n)#\n\nAdds a label that appears before the dropdown.\n\n---\n\nExample 4: Prepend and append HTML\n#daySelectTag(\n    name=\"eventDay\",\n    prepend=\"&lt;div class='select-wrapper'&gt;\",\n    append=\"&lt;/div&gt;\"\n)#\n\nWraps the dropdown inside a &lt;div&gt; for styling purposes.</code></pre>"
       },
-      "hint": "Builds and returns a string containing a <code>select</code> form control for the days of the week based on the supplied name.\n\n",
+      "hint": "Builds and returns a string containing a <code>select</code> form control for the days of the week based on the supplied name. This version works without binding to a model object.\n\n",
       "returntype": "string",
       "slug": "controller.daySelectTag",
       "parameters": [
@@ -3804,10 +3804,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\n// In a test\nuser = model(\"user\").findByKey(1);\n\n// Inspect the user object\ndebug(user);\n\nDumps the contents of the user object to the test output.\n\n---\n\nExample 2: Debug without output\n// Evaluate an expression but don't output\nresult = someFunction();\ndebug(result, display=false);\n\nUseful when you want to leave the debug call in place for later but don’t want it to show in test output immediately.\n\n---\n\nExample 3: Debug an expression directly\ndebug(\"2 + 2\");\n\nQuickly examines a simple expression, like a calculation or string.</code></pre>"
       },
-      "hint": "Used to examine an expression\nAny overloaded arguments get passed to cfdump's attributeCollection\n\n",
+      "hint": "Used in tests to inspect any expression. It behaves like a cfdump but is tailored for the testing environment. This helps you examine values while writing or running legacy tests.\n\n",
       "returntype": "any",
       "slug": "test.debug",
       "parameters": [
@@ -3838,10 +3838,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>Example 1: Basic decimal column\nt = changeTable(\"products\");\nt.decimal(columnNames=\"price\", default=\"0.00\", allowNull=false, precision=10, scale=2);\nt.change();\n\nAdds a price column with up to 10 digits, 2 of which are after the decimal point, default 0.00, and cannot be NULL.\n\n---\n\nExample 2: Multiple decimal columns\nt = changeTable(\"invoices\");\nt.decimal(columnNames=\"tax,discount\", default=\"0.00\", allowNull=false, precision=8, scale=2);\nt.change();\n\nAdds tax and discount columns with the same configuration.\n\n---\n\nExample 3: Nullable decimal column with no default\nt = createTable(\"payments\");\nt.decimal(columnNames=\"amountDue\", allowNull=true, precision=12, scale=4);\nt.create();\n\nAdds a amountDue column that can be NULL and allows up to 12 digits, 4 of which are after the decimal.</code></pre>"
       },
-      "hint": "adds decimal columns to table definition\n\n",
+      "hint": "Adds decimal (numeric) columns to a table definition when creating or altering tables via a migration CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.decimal",
       "parameters": [
@@ -3954,7 +3954,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a post object and then delete it from the database.\npost = model(&quot;post&quot;).findByKey(33);\npost.delete();\n\n// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `deleteComment` method below will call `comment.delete()` internally.)\npost = model(&quot;post&quot;).findByKey(params.postId);\ncomment = model(&quot;comment&quot;).findByKey(params.commentId);\npost.deleteComment(comment);</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Delete a single object\n&lt;cfscript&gt;\npost = model(\"post\").findByKey(33);\nsuccess = post.delete();\n&lt;/cfscript&gt;\n\nDeletes the post with ID 33 from the database.\n\nReturns true if deletion succeeds.\n\nExample 2: Scoped delete via association\n&lt;cfscript&gt;\npost = model(\"post\").findByKey(params.postId);\ncomment = model(\"comment\").findByKey(params.commentId);\n\n// Calls comment.delete() internally\npost.deleteComment(comment);\n&lt;/cfscript&gt;\n\nIf post has a hasMany association to comment, this uses the association method to delete a related comment.\n\nExample 3: Permanent deletion (bypass soft-delete)\n&lt;cfscript&gt;\npost = model(\"post\").findByKey(33);\npost.delete(softDelete=false);\n&lt;/cfscript&gt;\n\nForces a hard delete even if the model uses soft-delete columns.</code></pre>"
       },
       "hint": "Deletes the object, which means the row is deleted from the database (unless prevented by a <code>beforeDelete</code> callback).\nReturns <code>true</code> on successful deletion of the row, <code>false</code> otherwise.\n\n",
       "returntype": "boolean",
@@ -4010,7 +4010,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Delete all inactive users without instantiating them (will skip validation and callbacks).\nrecordsDeleted = model(&quot;user&quot;).deleteAll(where=&quot;inactive=1&quot;, instantiate=false);\n\n// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `deleteAllComments` method below will call `model(&quot;comment&quot;).deleteAll(where=&quot;postId=#post.id#&quot;)` internally.)\npost = model(&quot;post&quot;).findByKey(params.postId);\nhowManyDeleted = post.deleteAllComments();\n</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Delete inactive users (skip callbacks and validations)\n&lt;cfscript&gt;\nrecordsDeleted = model(\"user\").deleteAll(where=\"inactive=1\", instantiate=false);\nwriteOutput(\"Deleted #recordsDeleted# inactive users.\");\n&lt;/cfscript&gt;\n\nDeletes all users where inactive=1.\n\nObjects are not instantiated, so callbacks and validations are skipped.\n\nExample 2: Scoped delete using an association\n&lt;cfscript&gt;\npost = model(\"post\").findByKey(params.postId);\n\n// Deletes all comments associated with this post\nhowManyDeleted = post.deleteAllComments();\nwriteOutput(\"Deleted #howManyDeleted# comments for this post.\");\n&lt;/cfscript&gt;\n\nAssumes a hasMany association from post → comment.\n\nInternally calls model(\"comment\").deleteAll(where=\"postId=#post.id#\").\n\nExample 3: Delete and run callbacks\n&lt;cfscript&gt;\nrecordsDeleted = model(\"user\").deleteAll(where=\"inactive=1\", instantiate=true, callbacks=true);\n&lt;/cfscript&gt;\n\nDeletes the records after instantiating the objects.\n\nAny beforeDelete or afterDelete callbacks are triggered.</code></pre>"
       },
       "hint": "Deletes all records that match the <code>where</code> argument.\nBy default, objects will not be instantiated and therefore callbacks and validations are not invoked.\nYou can change this behavior by passing in <code>instantiate=true</code>.\nReturns the number of records that were deleted.\n\n",
       "returntype": "numeric",
@@ -4101,7 +4101,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Delete the user with the primary key value of `1`.\nresult = model(&quot;user&quot;).deleteByKey(1);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Delete a user by primary key\n&lt;cfscript&gt;\nresult = model(\"user\").deleteByKey(1);\n\nif (result) {\n    writeOutput(\"User deleted successfully.\");\n} else {\n    writeOutput(\"Failed to delete user.\");\n}\n&lt;/cfscript&gt;\n\nDeletes the user with id=1.\n\nReturns true on success, false on failure.\n\nExample 2: Delete a record permanently (ignore soft delete)\n&lt;cfscript&gt;\nresult = model(\"user\").deleteByKey(1, softDelete=false);\n\nif (result) {\n    writeOutput(\"User permanently deleted.\");\n}\n&lt;/cfscript&gt;\n\nIgnores any soft delete column.\n\nThe record is removed from the database entirely.\n\nExample 3: Disable callbacks\n&lt;cfscript&gt;\nresult = model(\"user\").deleteByKey(1, callbacks=false);\n\nwriteOutput(\"Deleted user without triggering callbacks: #result#\");\n&lt;/cfscript&gt;\n\nSkips any beforeDelete or afterDelete logic.</code></pre>"
       },
       "hint": "Finds the record with the supplied key and deletes it.\nReturns <code>true</code> on successful deletion of the row, <code>false</code> otherwise.\n\n",
       "returntype": "boolean",
@@ -4163,9 +4163,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Delete the user that signed up last.\nresult = model(&quot;user&quot;).deleteOne(order=&quot;signupDate DESC&quot;);\n\n// If you have a `hasOne` association setup from `user` to `profile` you can do a scoped call (the `deleteProfile` method below will call `model(&quot;profile&quot;).deleteOne(where=&quot;userId=#aUser.id#&quot;)` internally).\naUser = model(&quot;user&quot;).findByKey(params.userId);\naUser.deleteProfile();\n</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Delete the most recently signed-up user\n&lt;cfscript&gt;\nresult = model(\"user\").deleteOne(order=\"signupDate DESC\");\n\nif (result) {\n    writeOutput(\"Deleted the most recently signed-up user.\");\n} else {\n    writeOutput(\"No user found to delete.\");\n}\n&lt;/cfscript&gt;\n\nDeletes one record based on the order of signupDate descending.\n\nOnly the first matching record is deleted.\n\nExample 2: Delete a specific user by condition\n&lt;cfscript&gt;\nresult = model(\"user\").deleteOne(where=\"email='test@example.com'\");\n\nwriteOutput(\"Deletion status: #result#\");\n&lt;/cfscript&gt;\n\nFinds a user with the email test@example.com and deletes it.\n\nExample 3: Scoped delete via association\n&lt;cfscript&gt;\n// Assuming a hasOne association: user -&gt; profile\naUser = model(\"user\").findByKey(params.userId);\naUser.deleteProfile(); // deletes the profile associated with this user\n&lt;/cfscript&gt;\n\ndeleteProfile() internally calls model(\"profile\").deleteOne(where=\"userId=#aUser.id#\").\n</code></pre>"
       },
-      "hint": "Gets an object based on conditions and deletes it.\n\n",
+      "hint": "Finds a single record based on conditions and deletes it. Returns true if deletion succeeds, false otherwise. It is useful when you want to remove one specific record without fetching it manually first.\n\n",
       "returntype": "boolean",
       "slug": "model.deleteOne",
       "parameters": [
@@ -4240,9 +4240,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the original value from an obfuscated one\noriginalValue = deobfuscateParam(&quot;b7ab9a50&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Deobfuscate a single value\n&lt;cfscript&gt;\n// Assume \"b7ab9a50\" is an obfuscated ID\noriginalValue = deobfuscateParam(\"b7ab9a50\");\n\nwriteOutput(\"Original value: #originalValue#\");\n&lt;/cfscript&gt;\n\nConverts the obfuscated string \"b7ab9a50\" back to its original value.\n\nUseful for safely passing IDs in URLs or forms while preventing direct exposure of database keys.\n\nExample 2: Deobfuscate a request parameter\n&lt;cfscript&gt;\n// Assume params.userId contains an obfuscated user ID\nuserId = deobfuscateParam(params.userId);\n\nuser = model(\"user\").findByKey(userId);\nwriteDump(user);\n&lt;/cfscript&gt;\n\nSafely retrieves a user using an obfuscated ID passed in a URL or form.</code></pre>"
       },
-      "hint": "Deobfuscates a value.\n\n",
+      "hint": "Converts an obfuscated string back into its original value. This is typically used when IDs or other sensitive data are encoded for security purposes and need to be restored to their original form.\n\n",
       "returntype": "string",
       "slug": "controller.deobfuscateParam",
       "parameters": [
@@ -4272,7 +4272,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Controller code.\nrightNow = Now();\naWhileAgo = DateAdd(&quot;d&quot;, -30, rightNow);\n\n// View code.\n&lt;!--- Will output: about 1 month ---&gt;\n#distanceOfTimeInWords(aWhileAgo, rightNow)#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1: Basic usage\n&lt;cfscript&gt;\nrightNow = now();\naWhileAgo = dateAdd(\"d\", -30, rightNow);\n\ntimeDifference = distanceOfTimeInWords(aWhileAgo, rightNow);\nwriteOutput(timeDifference); // Outputs: \"about 1 month\"\n&lt;/cfscript&gt;\n\nCalculates the difference between two dates.\n\nReturns \"about 1 month\" because aWhileAgo is 30 days before rightNow.\n\nExample 2: Include seconds\n&lt;cfscript&gt;\nstartTime = now();\nendTime = dateAdd(\"s\", 45, startTime);\n\ntimeDifference = distanceOfTimeInWords(startTime, endTime, true);\nwriteOutput(timeDifference); // Outputs: \"less than a minute\" or \"45 seconds\" depending on Wheels version\n&lt;/cfscript&gt;\n\nUseful when you need a more precise human-readable difference for very short intervals.\n\nExample 3: Past vs future dates\n&lt;cfscript&gt;\npastDate = dateAdd(\"d\", -10, now());\nfutureDate = dateAdd(\"d\", 5, now());\n\nwriteOutput(distanceOfTimeInWords(pastDate, now()));   // \"10 days\"\nwriteOutput(distanceOfTimeInWords(now(), futureDate)); // \"5 days\"\n&lt;/cfscript&gt;\n\nWorks regardless of the order of the dates.\n\nAlways returns a human-friendly description.</code></pre>"
       },
       "hint": "Pass in two dates to this method, and it will return a string describing the difference between them.\n\n",
       "returntype": "string",
@@ -4319,7 +4319,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>function down() {\n\ttransaction {\n\t\ttry {\n\t\t\t// your code goes here\n\t\t\tdropTable('myTable');\n\t\t} catch (any e) {\n\t\t\tlocal.exception = e;\n\t\t}\n\n\t\tif (StructKeyExists(local, &quot;exception&quot;)) {\n\t\t\ttransaction action=&quot;rollback&quot;;\n\t\t\tthrow(errorCode=&quot;1&quot;, detail=local.exception.detail, message=local.exception.message, type=&quot;any&quot;);\n\t\t} else {\n\t\t\ttransaction action=&quot;commit&quot;;\n\t\t}\n\t}\n}\n</code></pre>"
       },
-      "hint": "Migrates down: will be executed when migrating your schema backward\nAlong with up(), these are the two main functions in any migration file\nOnly available in a migration CFC\n\n",
+      "hint": "down() defines the steps to revert a database migration. It’s executed when rolling back a migration, typically to undo the changes applied by the corresponding up() function. Only available in a migration CFC\n\n",
       "returntype": "void",
       "slug": "migration.down",
       "parameters": [],
@@ -4336,10 +4336,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>function up() {\n    // Remove a foreign key from the orders table\n    dropForeignKey(\n        table=\"orders\",\n        keyName=\"fk_orders_customerId\"\n    );\n}\n\ntable = \"orders\" -> the table that has the foreign key.\n\nkeyName = \"fk_orders_customerId\" -> the exact name of the foreign key constraint you want to drop.</code></pre>"
       },
-      "hint": "Drops a foreign key constraint from the database\nOnly available in a migration CFC\n\n",
+      "hint": "dropForeignKey() is used to remove a foreign key constraint from a table in the database. This is typically done during schema changes in migrations. Only available in a migration CFC.\n\n",
       "returntype": "void",
       "slug": "migration.dropForeignKey",
       "parameters": [
@@ -4369,10 +4369,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>function up() {\n    // Remove a foreign key reference from the orders table\n    dropReference(\n        table=\"orders\",\n        referenceName=\"customer_ref\"\n    );\n}\n\ntable = \"orders\" -> the table that contains the foreign key reference.\n\nreferenceName = \"customer_ref\" -> the reference name that was originally defined when the foreign key was created.</code></pre>"
       },
-      "hint": "Drop a foreign key constraint from the database, using the reference name that was used to create it\nOnly available in a migration CFC\n\n",
+      "hint": "dropReference() is used to remove a foreign key constraint from a table in the database using the reference name that was originally used to create it. This is slightly different from dropForeignKey(), which requires the actual key name. Only available in a migration CFC\n\n",
       "returntype": "void",
       "slug": "migration.dropReference",
       "parameters": [
@@ -4402,10 +4402,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>function down() {\n    // Drop the 'users' table\n    dropTable(name=\"users\");\n}\n\nname = \"users\" -> the table that you want to remove from the database.\n\nNotes\n\nTypically used in the down() method of a migration when rolling back a previous createTable().\n\nCan be combined with transaction {} to ensure rollback in case of errors:\n\nfunction down() {\n    transaction {\n        try {\n            dropTable(\"orders\");\n        } catch (any e) {\n            transaction action=\"rollback\";\n            throw(errorCode=\"1\", detail=e.detail, message=e.message, type=\"any\");\n        }\n        transaction action=\"commit\";\n    }\n}\n\nCaution: This operation permanently deletes all data in the table.</code></pre>"
       },
-      "hint": "Drops a table from the database\nOnly available in a migration CFC\n\n",
+      "hint": "dropTable() is used to remove a table from the database entirely. This is a destructive operation, so all data in the table will be lost. Only available in a migration CFC\n\n",
       "returntype": "void",
       "slug": "migration.dropTable",
       "parameters": [
@@ -4429,10 +4429,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>function down() {\n    // Drop the 'active_users' view\n    dropView(name=\"active_users\");\n}\n\nname = \"active_users\" -> the view that you want to remove from the database.\n\nNotes\n\nTypically used in the down() method of a migration when rolling back a previous createView().\n\nCan be wrapped in a transaction for safety:\n\nfunction down() {\n    transaction {\n        try {\n            dropView(\"recent_orders\");\n        } catch (any e) {\n            transaction action=\"rollback\";\n            throw(errorCode=\"1\", detail=e.detail, message=e.message, type=\"any\");\n        }\n        transaction action=\"commit\";\n    }\n}\n\nCaution: This permanently deletes the view definition. Any queries depending on the view will fail after this operation.</code></pre>"
       },
-      "hint": "drops a view from the database\nOnly available in a migration CFC\n\n",
+      "hint": "dropView() is used to remove a database view entirely. A view is a saved query that acts like a virtual table, so this operation deletes that virtual table definition. Only available in a migration CFC\n\n",
       "returntype": "void",
       "slug": "migration.dropView",
       "parameters": [
@@ -4477,9 +4477,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- view code ---&gt;\n#startFormTag(action=&quot;create&quot;)#\n   &lt;!---  your form controls ---&gt;\n#endFormTag()#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>#startFormTag(action=&quot;create&quot;)#\n &lt;input type=&quot;text&quot; name=&quot;firstName&quot; placeholder=&quot;First Name&quot;&gt;\n &lt;input type=&quot;text&quot; name=&quot;lastName&quot; placeholder=&quot;Last Name&quot;&gt;\n#endFormTag()#\n\nOutput:\n&lt;form action=&quot;/create&quot; method=&quot;post&quot;&gt;\n &lt;input type=&quot;text&quot; name=&quot;firstName&quot; placeholder=&quot;First Name&quot;&gt;\n &lt;input type=&quot;text&quot; name=&quot;lastName&quot; placeholder=&quot;Last Name&quot;&gt;\n&lt;/form&gt;\n\n#startFormTag(action=&quot;update&quot;)#\n &lt;input type=&quot;email&quot; name=&quot;email&quot; placeholder=&quot;Email&quot;&gt;\n#endFormTag(prepend=&quot;&lt;div class='form-wrapper'&gt;&quot;, append=&quot;&lt;/div&gt;&quot;)#\n\nOutput:\n&lt;div class='form-wrapper'&gt;\n&lt;form action=&quot;/update&quot; method=&quot;post&quot;&gt;\n &lt;input type=&quot;email&quot; name=&quot;email&quot; placeholder=&quot;Email&quot;&gt;\n&lt;/form&gt;\n&lt;/div&gt;\n\n#startFormTag(action=&quot;login&quot;)#\n &lt;input type=&quot;text&quot; name=&quot;username&quot;&gt;\n#endFormTag(encode=true)#\n\nOutput:\n&lt;form action=&quot;/login&quot; method=&quot;post&quot;&gt;\n &lt;input type=&quot;text&quot; name=&quot;username&quot;&gt;\n&lt;/form&gt;\n\n#startFormTag(action=&quot;register&quot;, prepend=&quot;&lt;section&gt;&quot;)#\n &lt;input type=&quot;text&quot; name=&quot;username&quot;&gt;\n &lt;input type=&quot;password&quot; name=&quot;password&quot;&gt;\n#endFormTag(append=&quot;&lt;/section&gt;&quot;)#\n\nOutput:\n&lt;section&gt;\n&lt;form action=&quot;/register&quot; method=&quot;post&quot;&gt;\n &lt;input type=&quot;text&quot; name=&quot;username&quot;&gt;\n &lt;input type=&quot;password&quot; name=&quot;password&quot;&gt;\n&lt;/form&gt;\n&lt;/section&gt;\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing the closing <code>form</code> tag.\n\n",
+      "hint": "Builds and returns a string containing the closing <code>form</code> tag. It’s typically used in conjunction with startFormTag().\n\n",
       "returntype": "string",
       "slug": "controller.endFormTag",
       "parameters": [
@@ -4519,7 +4519,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Check how many errors are set on the object\nif(author.errorCount() GTE 10){\n    // Do something to deal with this very erroneous author here...\n}\n\n// Check how many errors are associated with the `email` property\nif(author.errorCount(&quot;email&quot;) gt 0){\n    // Do something to deal with this erroneous author here...\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Check how many errors are set on the object\nif(author.errorCount() GTE 10){\n    // Do something to deal with this very erroneous author here...\n}\n\n2. Check how many errors are associated with the `email` property\nif(author.errorCount(&quot;email&quot;) gt 0){\n    // Do something to deal with this erroneous author here...\n}\n\n3. Count errors by error name\nif (author.errorCount(\"\", \"invalidFormat\") GT 0) {\n    // Handle errors with a specific error name\n    writeOutput(\"There are fields with invalid formatting!\");\n}</code></pre>"
       },
       "hint": "Returns the number of errors this object has associated with it.\nSpecify property or name if you wish to count only specific errors.\n\n",
       "returntype": "numeric",
@@ -4553,10 +4553,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>Example 1 — Basic usage\n&lt;cfoutput&gt;\n#errorMessageOn(objectName=&quot;author&quot;, property=&quot;email&quot;)#\n&lt;/cfoutput&gt;\n\nDisplays the first error message for the email property of the author object.\n\nDefault wrapper is &lt;span class=&quot;error-message&quot;&gt;.\n\nExample 2 — Custom wrapper and class\n&lt;cfoutput&gt;\n#errorMessageOn(\n objectName=&quot;author&quot;,\n property=&quot;email&quot;,\n wrapperElement=&quot;div&quot;,\n class=&quot;alert alert-danger&quot;\n)#\n&lt;/cfoutput&gt;\n\nWraps the error in a &lt;div&gt; instead of &lt;span&gt;.\n\nUses Bootstrap classes for styling.\n\nExample 3 — Prepend or append text\n&lt;cfoutput&gt;\n#errorMessageOn(\n objectName=&quot;author&quot;,\n property=&quot;email&quot;,\n prependText=&quot;Error: &quot;,\n appendText=&quot; Please fix it.&quot;\n)#\n&lt;/cfoutput&gt;\n\nPrepends &quot;Error: &quot; and appends &quot; Please fix it.&quot; around the actual error message.\n\nExample 4 — With HTML encoding disabled\n&lt;cfoutput&gt;\n#errorMessageOn(\n objectName=&quot;author&quot;,\n property=&quot;email&quot;,\n encode=false\n)#\n&lt;/cfoutput&gt;\n\nOutput is not encoded, which can be useful if you want to include HTML formatting inside the error message itself.\n</code></pre>"
       },
-      "hint": "Returns the error message, if one exists, on the object's property.\nIf multiple error messages exist, the first one is returned.\n\n",
+      "hint": "Returns the error message, if one exists, on the object's property.\nIf multiple error messages exist, the first one is returned. If no error exists, it returns an empty string.\n\n",
       "returntype": "string",
       "slug": "controller.errorMessageOn",
       "parameters": [
@@ -4621,8 +4621,8 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>Example 1 — Basic usage\n&lt;cfoutput&gt;\n#errorMessagesFor(objectName=&quot;author&quot;)#\n&lt;/cfoutput&gt;\n\nGenerates a &lt;ul class=&quot;error-messages&quot;&gt; containing all errors for the author object.\n\nDefault behavior includes all associated object errors.\n\nExample 2 — Custom CSS class\n&lt;cfoutput&gt;\n#errorMessagesFor(objectName=&quot;author&quot;, class=&quot;alert alert-danger&quot;)#\n&lt;/cfoutput&gt;\n\nUses a custom CSS class for styling (e.g., Bootstrap alerts).\n\nExample 3 — Exclude duplicate errors\n&lt;cfoutput&gt;\n#errorMessagesFor(objectName=&quot;author&quot;, showDuplicates=false)#\n&lt;/cfoutput&gt;\n\nPrevents duplicate messages from appearing multiple times in the list.\n\nExample 4 — Include or exclude associated objects\n&lt;cfoutput&gt;\n&lt;!--- Only show errors on this object, not on associated objects ---&gt;\n#errorMessagesFor(objectName=&quot;author&quot;, includeAssociations=false)#\n&lt;/cfoutput&gt;\n\nUseful if you want to display errors for the main object separately from associated objects (like a nested profile or address).\n\nExample 5 — HTML encoding disabled\n&lt;cfoutput&gt;\n#errorMessagesFor(objectName=&quot;author&quot;, encode=false)#\n&lt;/cfoutput&gt;\n\nErrors are output as-is, allowing embedded HTML in the messages (use with caution).\n</code></pre>"
       },
       "hint": "Builds and returns a list (<code>ul</code> tag with a default <code>class</code> of <code>error-messages</code>) containing all the error messages for all the properties of the object.\nReturns an empty string if no errors exist.\n\n",
       "returntype": "string",
@@ -4676,9 +4676,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get all errors related to the email address of the user object\nerrors = user.errorsOn(&quot;emailAddress&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1 — Basic usage\n&lt;cfscript&gt;\nuser = model(&quot;user&quot;).findByKey(12);\n\nerrors = user.errorsOn(&quot;emailAddress&quot;);\n\nwriteDump(errors);\n&lt;/cfscript&gt;\n\nReturns an array of error objects associated with the emailAddress property.\n\nEach element typically contains the error message and metadata like name or type.\n\nExample 2 — Filter by error name\n&lt;cfscript&gt;\nerrors = user.errorsOn(&quot;emailAddress&quot;, &quot;uniqueEmail&quot;);\n\nwriteDump(errors);\n&lt;/cfscript&gt;\n\nReturns only errors for emailAddress that have the error name uniqueEmail.\n\nExample 3 — Checking if a property has any errors\n&lt;cfscript&gt;\nif (arrayLen(user.errorsOn(&quot;password&quot;)) &gt; 0) {\n writeOutput(&quot;Password has errors!&quot;);\n}\n&lt;/cfscript&gt;\n\nThis is helpful when you need conditional logic based on whether a field has errors.\n\nExample 4 — Iterating over errors\n&lt;cfscript&gt;\nerrors = user.errorsOn(&quot;username&quot;);\n\nfor (var e in errors) {\n writeOutput(&quot;Error: &quot; & e.message & &quot;&lt;br&gt;&quot;);\n}\n&lt;/cfscript&gt;\n\nLoops through all errors on a property and outputs the messages individually.\n</code></pre>"
       },
-      "hint": "Returns an array of all errors associated with the supplied property (and error name if passed in).\n\n",
+      "hint": "errorsOn() returns an array of all errors associated with a specific property of a model object. You can also filter by a specific error name if needed. This is useful when you need programmatic access to errors rather than just displaying them in the view.\n\n",
       "returntype": "array",
       "slug": "model.errorsOn",
       "parameters": [
@@ -4710,9 +4710,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get all general type errors for the user object\nerrors = user.errorsOnBase();</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1 — Get all base errors\n&lt;cfscript&gt;\nuser = model(&quot;user&quot;).findByKey(12);\n\nerrors = user.errorsOnBase();\n\nwriteDump(errors);\n&lt;/cfscript&gt;\n\nReturns all general errors on the user object.\n\nEach element typically contains message, name, and type information.\n\nExample 2 — Filter by error name\n&lt;cfscript&gt;\nerrors = user.errorsOnBase(&quot;accountLocked&quot;);\n\nwriteDump(errors);\n&lt;/cfscript&gt;\n\nReturns only base errors that have the error name accountLocked.\n\nExample 3 — Conditional logic with base errors\n&lt;cfscript&gt;\nif (arrayLen(user.errorsOnBase()) &gt; 0) {\n writeOutput(&quot;There are general errors on this user account.&quot;);\n}\n&lt;/cfscript&gt;\n\nThis can be used to block actions or display notices when object-level errors exist.\n\nExample 4 — Iterating over base errors\n&lt;cfscript&gt;\nfor (var e in user.errorsOnBase()) {\n writeOutput(&quot;General error: &quot; & e.message & &quot;&lt;br&gt;&quot;);\n}\n&lt;/cfscript&gt;\n\nLoops through each object-level error and outputs its message.\n</code></pre>"
       },
-      "hint": "Returns an array of all errors associated with the object as a whole (not related to any specific property).\n\n",
+      "hint": "errorsOnBase() returns an array of all errors associated with the object as a whole, not tied to any specific property. This is useful for general errors such as system-level validations, cross-field validations, or custom errors added at the object level.\n\n",
       "returntype": "array",
       "slug": "model.errorsOnBase",
       "parameters": [
@@ -4738,9 +4738,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Will output: ... MVC framework for ... ---&gt;\n#excerpt(text=&quot;Wheels is a Rails-like MVC framework for Adobe ColdFusion and Lucee&quot;, phrase=&quot;framework&quot;, radius=5)#</code></pre>"
+        "docs": "<pre><code class='javascript'>Example 1 — Basic usage\n&lt;cfscript&gt;\ntext = &quot;Wheels is a Rails-like MVC framework for Adobe ColdFusion and Lucee&quot;;\n\nsnippet = excerpt(text=text, phrase=&quot;framework&quot;, radius=5);\n\nwriteOutput(snippet);\n&lt;/cfscript&gt;\n\nOutput:\n\n... MVC framework for ...\n\nExtracts 5 characters before and after &quot;framework&quot;.\n\nAdds ... at the start and end to indicate truncation.\n\nExample 2 — Increase radius\n&lt;cfscript&gt;\nsnippet = excerpt(text=text, phrase=&quot;framework&quot;, radius=20);\n\nwriteOutput(snippet);\n&lt;/cfscript&gt;\n\nOutput:\n\n... Rails-like MVC framework for Adobe Cold...\n\nShows more surrounding context (20 characters before and after the phrase).\n\nExample 3 — Custom excerpt string\n&lt;cfscript&gt;\nsnippet = excerpt(\n text=text,\n phrase=&quot;framework&quot;,\n radius=10,\n excerptString=&quot;***&quot;\n);\n\nwriteOutput(snippet);\n&lt;/cfscript&gt;\n\nOutput:\n\n*** Rails-like MVC framework for Adob ***\n\nUses *** instead of ... to mark truncated text.\n</code></pre>"
       },
-      "hint": "Extracts an excerpt from text that matches the first instance of a given phrase.\n\n",
+      "hint": "excerpt() extracts a portion of text surrounding the first instance of a given phrase. This is useful for previews, search result snippets, or highlighting context around a keyword.\n\n",
       "returntype": "string",
       "slug": "controller.excerpt",
       "parameters": [
@@ -4789,10 +4789,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\nfunction up() {\n  transaction {\n     // Execute a raw SQL statement\n     execute(sql=&quot;INSERT INTO users (firstname, lastname, email) VALUES ('John', 'Doe', 'john@example.com')&quot;);\n  }\n}\n&lt;/cfscript&gt;\n</code></pre>"
       },
-      "hint": "Executes a raw sql query\nOnly available in a migration CFC\n\n",
+      "hint": "execute() allows you to run a raw SQL query directly from a migration file. This is useful when you need to perform operations that aren’t easily handled by the built-in migration methods like createTable() or addColumn(). Only available in a migration CFC\n\n",
       "returntype": "void",
       "slug": "migration.execute",
       "parameters": [
@@ -4817,7 +4817,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Checking if Joe exists in the database\nresult = model(&quot;user&quot;).exists(where=&quot;firstName = 'Joe'&quot;);\n\n// Checking if a specific user exists based on a primary key valued passed in through the URL/form in an if statement\nif (model(&quot;user&quot;).exists(keyparams.key))\n{\n\t// Do something\n}\n\n// If you have a `belongsTo` association setup from `comment` to `post`, you can do a scoped call. (The `hasPost` method below will call `model(&quot;post&quot;).exists(comment.postId)` internally.)\ncomment = model(&quot;comment&quot;).findByKey(params.commentId);\ncommentHasAPost = comment.hasPost();\n\n// If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `hasProfile` method below will call `model(&quot;profile&quot;).exists(where=&quot;userId=#user.id#&quot;)` internally.)\nuser = model(&quot;user&quot;).findByKey(params.userId);\nuserHasProfile = user.hasProfile();\n\n// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `hasComments` method below will call `model(&quot;comment&quot;).exists(where=&quot;postid=#post.id#&quot;)` internally.)\npost = model(&quot;post&quot;).findByKey(params.postId);\npostHasComments = post.hasComments();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Checking if Joe exists in the database\nresult = model(&quot;user&quot;).exists(where=&quot;firstName = 'Joe'&quot;);\n\n2. Checking if a specific user exists based on a primary key valued passed in through the URL/form in an if statement\nif (model(&quot;user&quot;).exists(keyparams.key))\n{\n\t// Do something\n}\n\n3. If you have a `belongsTo` association setup from `comment` to `post`, you can do a scoped call. (The `hasPost` method below will call `model(&quot;post&quot;).exists(comment.postId)` internally.)\ncomment = model(&quot;comment&quot;).findByKey(params.commentId);\ncommentHasAPost = comment.hasPost();\n\n4. If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `hasProfile` method below will call `model(&quot;profile&quot;).exists(where=&quot;userId=#user.id#&quot;)` internally.)\nuser = model(&quot;user&quot;).findByKey(params.userId);\nuserHasProfile = user.hasProfile();\n\n5. If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `hasComments` method below will call `model(&quot;comment&quot;).exists(where=&quot;postid=#post.id#&quot;)` internally.)\npost = model(&quot;post&quot;).findByKey(params.postId);\npostHasComments = post.hasComments();</code></pre>"
       },
       "hint": "Checks if a record exists in the table.\nYou can pass in either a primary key value to the <code>key</code> argument or a string to the <code>where</code> argument.\nIf you don't pass in either of those, it will simply check if any record exists in the table.\n\n",
       "returntype": "boolean",
