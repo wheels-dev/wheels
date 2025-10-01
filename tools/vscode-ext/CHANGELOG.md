@@ -1,6 +1,6 @@
 # Change Log
 
-## [1.0.6] - 2025-09-29
+## [1.0.6] - 2025-10-01
 
 ### Added
 - **Go to Definition (F12)**: Navigate directly to Wheels components with Cmd+Click/Ctrl+Click
@@ -18,7 +18,8 @@
 - **Smart Parameter System**: Intelligent parameter assistance with integrated features:
   - **Parameter Highlighting**: Smart highlighting as you type parameter names with Ctrl+Shift+Space
   - **Parameter Auto-completion**: Type partial names (e.g., "o") and press Tab to complete to "order = ""
-  - **Parameter Validation**: Real-time validation with yellow underlines for invalid parameter names
+  - **Intelligent Typo Detection**: Catches likely typos (similarity > 50%) while respecting CFML's dynamic parameter passing
+    - warns when parameter name is similar to a valid parameter (e.g., `ordr` → suggests `order`)
 
 - **Component Templates**: Complete structures for rapid development
   - `wcontroller` → Complete CRUD controller with all actions, filters, error handling
@@ -30,11 +31,6 @@
 - **Hover Documentation**: Clean, professional documentation with parameter details and examples
 - **Context-Aware Features**: Parameter hints adapt to context (routes, controllers, models, views)
 - **CFML Type Support**: Proper handling of CFML type declarations (string, numeric, boolean, etc.)
-
-### Fixed
-- **Parameter Parsing**: Fixed issue where CFML type declarations caused false parameter warnings
-- **String Boundary Detection**: Proper parsing to avoid false positives in string content
-- **Namespaced Model Support**: Added support for dot notation in model names
 
 ## [1.0.5] - 2025-09-24
 

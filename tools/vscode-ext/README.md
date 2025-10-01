@@ -10,10 +10,7 @@ Quickly generate controllers, models, and views with ready-made templates that i
 
 **How to use it:**
 - **Right-click method:** Right-click any folder → "New Wheels Component" → Choose Controller/Model/View → Enter name
-    ![Wheels File Scaffolding Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/scaffolding-demo-1.gif)
-- **Command palette:** Ctrl+Shift+P → "Wheels: Create Controller" → Enter target path → Enter name
-    ![Wheels File Scaffolding Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/scaffolding-demo-2.gif)
-    ![Wheels File Scaffolding Demo 3](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/scaffolding-demo-3.gif)
+- **Command palette:** Ctrl+Shift+P → "Wheels: Model" → Enter name  → Enter target path
 
 **Examples:**
 
@@ -22,10 +19,18 @@ Quickly generate controllers, models, and views with ready-made templates that i
 - Generates `Users.cfc` with complete CRUD actions: index(), show(), new(), create(), edit(), update(), delete()
 - Same goes for `models` and `views`
 
+![Wheels File Scaffolding Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/scaffolding-demo-1.gif)
+
 **Creating a Product Model:**
 - Command Palette → "Wheels: Create Model" → Path: `app/models` → Name: "Product"
 - Generates `Product.cfc` with associations, validations, callbacks, and custom finder methods
 - Also, you can create `controller` and `view` from this way
+
+![Wheels File Scaffolding Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/scaffolding-demo-2.gif)
+
+![Wheels File Scaffolding Demo 3](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/scaffolding-demo-3.gif)
+
+![Wheels File Scaffolding Demo 3](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/scaffolding-demo-4.gif)
 
 **Features:**
 - Files use the name you type
@@ -74,7 +79,7 @@ component extends="Controller" {
 }
 ```
 
-![Wheels Quick Code Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/quick-code-demo-1.gif)
+![Wheels Quick Code Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/quick-code-demo-1.gif)
 
 **Model Template:**
 ```cfml
@@ -105,7 +110,7 @@ component extends="Model" {
 }
 ```
 
-![Wheels Quick Code Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/quick-code-demo-2.gif)
+![Wheels Quick Code Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/quick-code-demo-2.gif)
 
 ---
 
@@ -135,6 +140,8 @@ users = findAll(where = "", order = "", group = "", select = "", distinct = "fal
 users = findAll(where = "active = 1", order = "name ASC")
 ```
 
+![Wheels Function Snippets Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/functions-snippets-demo-1.gif)
+
 **Utility Functions:**
 ```cfml
 // Type "mimeTypes" and choose from dropdown:
@@ -147,6 +154,8 @@ type = mimeTypes(extension = "", fallback = "")
 // Practical usage:
 type = mimeTypes(extension = "pdf", fallback = "application/pdf")
 ```
+
+![Wheels Function Snippets Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/functions-snippets-demo-2.gif)
 
 **Features:**
 - 300+ Wheels framework functions included
@@ -180,19 +189,21 @@ linkTo(route="editUser", key=user.id);
 renderView("users/show");
 ```
 
+![Wheels Go To Definition Demo 1](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/go-to-definition-demo-1.gif)
+
 **Supported patterns:**
 - `model("ModelName")` → jumps to `ModelName.cfc`
 - `controller="name"` → jumps to `Name.cfc`
 - `route="routeName"` → jumps to controller action
 - `renderView("path")` → jumps to view file
 
-![Wheels Go To Definition Demo](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/go-to-definition-demo.gif)
+![Wheels Go To Definition Demo 2](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/go-to-definition-demo-2.gif)
 
 ---
 
 ### Smart Parameter System
 
-Intelligent parameter assistance for Wheels functions with real-time hints, auto-completion, and validation.
+Intelligent parameter assistance for Wheels functions with real-time hints and auto-completion.
 
 ---
 
@@ -217,7 +228,7 @@ findAll(wh   // Further narrows to "where"
 findAll(where="active = 1", o    // Now highlights "order" parameter
 ```
 
-[Demo will be added here]
+![Wheels Parameter Hints Demo](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/parameter-hints-demo.gif)
 
 ---
 
@@ -244,8 +255,6 @@ findAll(where="active = 1", o  // Type "o" + Tab → becomes "order = """
 findAll(where="active = 1", order = "")  // Cursor positioned inside quotes
 ```
 
-[Demo will be added here]
-
 ---
 
 #### Parameter Validation
@@ -254,45 +263,30 @@ Real-time validation that detects incorrect parameter names in Wheels functions 
 
 **How it works:**
 - Only validates when using named parameter syntax with `=` (parameterName="value")
+- Validates when user makes a typo of any function parameter
 - Yellow underlines show invalid parameter names
-- No validation for positional parameters (function("value1", "value2"))
 - Works with 300+ Wheels framework functions
 
 **Examples:**
 
 **Invalid Parameter Names (Yellow Underlines):**
 ```cfml
-// findAll with incorrect parameter names
-model("User").findAll(ordr="name ASC")        // "ordr" should be "order"
-model("User").findAll(useIndex=false)         // "useIndex" should be "reload"
-model("User").findAll(wher="active = 1")      // "wher" should be "where"
-
-// linkTo with incorrect parameter names
-linkTo(rout="users")                          // "rout" should be "route"
-linkTo(route="users", txt="All Users")        // "txt" should be "text"
-linkTo(route="users", metod="post")           // "metod" should be "method"
-
-// Model validation with incorrect parameter names
-validatesPresenceOf("name", mesage="Required") // "mesage" should be "message"
-validatesLengthOf("email", minimun=5)         // "minimun" should be "minimum"
-
-// Form helpers with incorrect parameter names
-textField(objectNam="user", property="name")  // "objectNam" should be "objectName"
-startFormTag(rout="users", method="post")     // "rout" should be "route"
+findAll(ordr="name ASC")              // Warning: "Looks invalid parameter 'ordr'. Did you mean 'order'?"
+linkTo(rout="users")                  // Warning: "Looks invalid parameter 'rout'. Did you mean 'route'?"
+validatesPresenceOf("name", mesage="Required")  // Warning: "Looks invalid parameter 'mesage'. Did you mean 'message'?"
+textField(objectNam="user")           // Warning: "Looks invalid parameter 'objectNam'. Did you mean 'objectName'?"
 ```
 
-**Correct Usage (No Warnings):**
+**No Warning (Custom Parameters or Too Different):**
 ```cfml
-// Correct named parameters - no underlines
-model("User").findAll(order="name ASC", where="active = 1")
-linkTo(route="users", text="All Users", method="get")
-validatesPresenceOf("name", message="Name is required")
-textField(objectName="user", property="name", label="Full Name")
+// Custom parameters - no warnings (respects arguments scope)
+findAll(customParam="value")          // No warning (not similar to any parameter)
+myFunc(template="email")              // No warning (intentional custom parameter)
+process(metadata="data")              // No warning (custom parameter)
 
-// Positional parameters - no validation (already working)
-model("User").findAll("active = 1", "name ASC")  // No warnings shown
-linkTo("users", "All Users")                      // No warnings shown
-textField("user", "name")                         // No warnings shown
+// Valid parameters - no warnings
+findAll(order="name ASC", where="active = 1")  // No warning (correct)
+linkTo(route="users", text="All Users")        // No warning (correct)
 ```
 
 **Parameter Suggestions:**
@@ -303,14 +297,7 @@ When invalid parameters are detected, the extension suggests the correct paramet
 - `txt` → suggests `text`
 - `mesage` → suggests `message`
 
-**Features:**
-- Only validates named parameter syntax (param="value")
-- Ignores positional parameters (no interference with existing code)
-- Context-aware suggestions based on function name
-- Works with all Wheels API functions
-- Real-time validation as you type
-
-[Demo will be added here]
+![Wheels Parameter Validation Demo](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/parameter-validation-demo.gif)
 
 ---
 
@@ -348,7 +335,7 @@ hasMany(name="orders", dependent="delete");
 - Professional VS Code-style formatting
 - Fast performance with intelligent caching
 
-[Demo will be added here]
+![Wheels Hover Documentation Demo](https://raw.githubusercontent.com/wheels-dev/wheels/develop/tools/vscode-ext/assets/demos/hover-docs-demo.gif)
 
 ---
 

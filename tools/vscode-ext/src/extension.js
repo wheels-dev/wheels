@@ -150,12 +150,14 @@ Creates a complete model with:
 }
 
 /**
- * Wheels Parameter Validator
- * Validates parameter names in Wheels API function calls when using named parameter syntax
+ * Wheels Parameter Typo Detector
+ * Detects potential typos in parameter names and suggests corrections
+ * Only shows warnings when a close match is found (similarity > 0.5)
+ * Respects CFML's dynamic nature by not warning about custom parameters
  */
-class WheelsParameterValidator {
+class WheelsParameterTypoDetector {
     constructor() {
-        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('wheels-parameters');
+        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('wheels-typos');
         this.wheelsParameters = {};
         this.loadWheelsParameters();
     }
@@ -166,13 +168,13 @@ class WheelsParameterValidator {
 
         // Only validate if we have parameter data loaded
         if (Object.keys(this.wheelsParameters).length > 0) {
-            this.checkParameterNames(text, document, diagnostics);
+            this.checkParameterTypos(text, document, diagnostics);
         }
 
         this.diagnosticCollection.set(document.uri, diagnostics);
     }
 
-    checkParameterNames(text, document, diagnostics) {
+    checkParameterTypos(text, document, diagnostics) {
         // Find all function calls with named parameters
         const functionCallPattern = /(\w+)\s*\(([^)]+)\)/g;
         let match;
@@ -191,7 +193,7 @@ class WheelsParameterValidator {
             // Parse named parameters only (skip positional parameters)
             const namedParams = this.parseNamedParameters(parametersString);
 
-            // Validate each named parameter
+            // Check each named parameter for potential typos
             namedParams.forEach(param => {
                 const paramStart = parametersStart + param.startIndex;
                 const paramEnd = paramStart + param.name.length;
@@ -199,17 +201,20 @@ class WheelsParameterValidator {
                 const endPos = document.positionAt(paramEnd);
                 const range = new vscode.Range(startPos, endPos);
 
+                // Only warn if parameter is not valid AND we have a suggestion
                 if (!this.isValidParameter(functionName, param.name)) {
                     const suggestion = this.suggestParameter(functionName, param.name);
-                    const message = suggestion ?
-                        `Invalid parameter '${param.name}'. Did you mean '${suggestion}'?` :
-                        `Invalid parameter '${param.name}' for function '${functionName}'`;
 
-                    diagnostics.push(new vscode.Diagnostic(
-                        range,
-                        message,
-                        vscode.DiagnosticSeverity.Warning
-                    ));
+                    // Only show warning if we found a close match (suggestion exists)
+                    if (suggestion) {
+                        const message = `Looks invalid parameter '${param.name}'. Did you mean '${suggestion}'?`;
+                        diagnostics.push(new vscode.Diagnostic(
+                            range,
+                            message,
+                            vscode.DiagnosticSeverity.Warning
+                        ));
+                    }
+                    // If no suggestion, don't warn (respect CFML's arguments scope)
                 }
             });
         }
@@ -346,13 +351,13 @@ class WheelsParameterValidator {
 
         validParams.forEach(validParam => {
             const score = this.calculateSimilarity(lowerParam, validParam);
-            if (score > bestScore && score > 0.5) { // Threshold for suggestions
+            if (score > bestScore && score > 0.5) { // Threshold for suggestions (only show if > 50% similar)
                 bestScore = score;
                 bestMatch = validParam;
             }
         });
 
-        return bestMatch;
+        return bestMatch; // Returns null if no close match found
     }
 
     calculateSimilarity(str1, str2) {
@@ -412,7 +417,7 @@ class WheelsParameterValidator {
                 });
             }
 
-            console.log(`Loaded ${count} Wheels functions for parameter validation`);
+            console.log(`Loaded ${count} Wheels functions for typo detection`);
             this.wheelsParameters = parameters;
 
         } catch (error) {
@@ -688,14 +693,14 @@ class WheelsDefinitionProvider {
     }
 
     /**
-     * Find view definitions from renderView, includePartial calls
+     * Find view definitions from renderView, includePartial, renderWith calls
      */
     findViewDefinition(line, word, position, document) {
-        // Match patterns like: renderView("users/show"), includePartial("shared/header")
-        const viewPattern = /(?:renderView|includePartial|include)\s*\(\s*["']([^"']+)["']\s*\)/g;
-        const matches = [...line.matchAll(viewPattern)];
+        // Match positional patterns like: renderView("users/show"), includePartial("shared/header")
+        const positionalPattern = /(?:renderView|renderPage|renderWith|includePartial|include)\s*\(\s*["']([^"']+)["']\s*(?:,|\))/g;
+        const positionalMatches = [...line.matchAll(positionalPattern)];
 
-        for (const match of matches) {
+        for (const match of positionalMatches) {
             const viewPath = match[1];
             const startIndex = match.index + match[0].indexOf(viewPath);
             const endIndex = startIndex + viewPath.length;
@@ -704,6 +709,23 @@ class WheelsDefinitionProvider {
                 return this.createViewLocation(viewPath);
             }
         }
+
+        // Match named parameter patterns like:
+        // renderWith(template="/email"), renderWith(templates="/email")
+        // renderPage(layout="custom"), includePartial(partial="header")
+        const namedPattern = /(?:renderView|renderPage|renderWith|includePartial|include)\s*\([^)]*(?:template|templates|layout|partial)\s*=\s*["']([^"']+)["'][^)]*/g;
+        const namedMatches = [...line.matchAll(namedPattern)];
+
+        for (const match of namedMatches) {
+            const viewPath = match[1];
+            const startIndex = match.index + match[0].indexOf(viewPath);
+            const endIndex = startIndex + viewPath.length;
+
+            if (position.character >= startIndex && position.character <= endIndex) {
+                return this.createViewLocation(viewPath);
+            }
+        }
+
         return null;
     }
 
@@ -751,23 +773,25 @@ class WheelsDefinitionProvider {
 
         for (const name of possibleNames) {
             // Support both Wheels project structures
-            const possiblePaths = [
+            const basePaths = [
                 // Normal user structure
-                path.join(this.workspaceRoot, 'app', 'controllers', `${this.capitalize(name)}.cfc`),
+                path.join(this.workspaceRoot, 'app', 'controllers'),
                 // Core/Base template structure
-                path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'controllers', `${this.capitalize(name)}.cfc`),
+                path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'controllers'),
                 // Alternative structures
-                path.join(this.workspaceRoot, 'src', 'app', 'controllers', `${this.capitalize(name)}.cfc`),
-                path.join(this.workspaceRoot, 'controllers', `${this.capitalize(name)}.cfc`)
+                path.join(this.workspaceRoot, 'src', 'app', 'controllers'),
+                path.join(this.workspaceRoot, 'controllers')
             ];
 
-            for (const controllerPath of possiblePaths) {
-                if (fs.existsSync(controllerPath)) {
-                    const uri = vscode.Uri.file(controllerPath);
+            for (const basePath of basePaths) {
+                // First, try direct path (controllers in root directory)
+                const directPath = path.join(basePath, `${this.capitalize(name)}.cfc`);
+                if (fs.existsSync(directPath)) {
+                    const uri = vscode.Uri.file(directPath);
 
                     // If action name is provided, try to find the specific function
                     if (actionName) {
-                        const position = this.findFunctionInFile(controllerPath, actionName);
+                        const position = this.findFunctionInFile(directPath, actionName);
                         if (position) {
                             return new vscode.Location(uri, position);
                         }
@@ -775,9 +799,63 @@ class WheelsDefinitionProvider {
 
                     return new vscode.Location(uri, new vscode.Position(0, 0));
                 }
+
+                // Second, search in subdirectories (e.g., app/controllers/web/, app/controllers/api/)
+                if (fs.existsSync(basePath)) {
+                    const foundPath = this.findControllerInSubdirectories(basePath, name);
+                    if (foundPath) {
+                        const uri = vscode.Uri.file(foundPath);
+
+                        // If action name is provided, try to find the specific function
+                        if (actionName) {
+                            const position = this.findFunctionInFile(foundPath, actionName);
+                            if (position) {
+                                return new vscode.Location(uri, position);
+                            }
+                        }
+
+                        return new vscode.Location(uri, new vscode.Position(0, 0));
+                    }
+                }
             }
         }
         return null;
+    }
+
+    /**
+     * Recursively search for controller file in subdirectories
+     */
+    findControllerInSubdirectories(basePath, controllerName) {
+        try {
+            const capitalizedName = this.capitalize(controllerName);
+            const targetFileName = `${capitalizedName}.cfc`;
+
+            // Read all entries in the base path
+            const entries = fs.readdirSync(basePath, { withFileTypes: true });
+
+            for (const entry of entries) {
+                if (entry.isDirectory()) {
+                    const subDirPath = path.join(basePath, entry.name);
+
+                    // Check if controller exists in this subdirectory
+                    const controllerPath = path.join(subDirPath, targetFileName);
+                    if (fs.existsSync(controllerPath)) {
+                        return controllerPath;
+                    }
+
+                    // Recursively search nested subdirectories
+                    const nestedPath = this.findControllerInSubdirectories(subDirPath, controllerName);
+                    if (nestedPath) {
+                        return nestedPath;
+                    }
+                }
+            }
+
+            return null;
+        } catch (error) {
+            // Directory doesn't exist or can't be read
+            return null;
+        }
     }
 
     /**
@@ -836,19 +914,22 @@ class WheelsDefinitionProvider {
     createViewLocation(viewPath) {
         if (!this.workspaceRoot) return null;
 
+        // Strip leading slash if present (e.g., "/email" -> "email")
+        const cleanViewPath = viewPath.startsWith('/') ? viewPath.substring(1) : viewPath;
+
         // Support both Wheels project structures and different view path formats
         const possiblePaths = [
             // Normal user structure
-            path.join(this.workspaceRoot, 'app', 'views', `${viewPath}.cfm`),
-            path.join(this.workspaceRoot, 'app', 'views', viewPath, 'index.cfm'),
+            path.join(this.workspaceRoot, 'app', 'views', `${cleanViewPath}.cfm`),
+            path.join(this.workspaceRoot, 'app', 'views', cleanViewPath, 'index.cfm'),
             // Core/Base template structure
-            path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'views', `${viewPath}.cfm`),
-            path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'views', viewPath, 'index.cfm'),
+            path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'views', `${cleanViewPath}.cfm`),
+            path.join(this.workspaceRoot, 'templates', 'base', 'src', 'app', 'views', cleanViewPath, 'index.cfm'),
             // Alternative structures
-            path.join(this.workspaceRoot, 'src', 'app', 'views', `${viewPath}.cfm`),
-            path.join(this.workspaceRoot, 'src', 'app', 'views', viewPath, 'index.cfm'),
-            path.join(this.workspaceRoot, 'views', `${viewPath}.cfm`),
-            path.join(this.workspaceRoot, 'views', viewPath, 'index.cfm')
+            path.join(this.workspaceRoot, 'src', 'app', 'views', `${cleanViewPath}.cfm`),
+            path.join(this.workspaceRoot, 'src', 'app', 'views', cleanViewPath, 'index.cfm'),
+            path.join(this.workspaceRoot, 'views', `${cleanViewPath}.cfm`),
+            path.join(this.workspaceRoot, 'views', cleanViewPath, 'index.cfm')
         ];
 
         for (const viewFilePath of possiblePaths) {
@@ -2058,7 +2139,7 @@ function getTemplateData(type, fileName, targetDir) {
         data.targetDir = targetDir;
         data.modelName = cleanName;
         data.modelNameLower = cleanName.toLowerCase();
-        data.tableName = data.modelNameLower;
+        data.tableName = pluralize(data.modelNameLower);
 
     } else if (type === 'view') {
         const cleanName = fileName.trim();
@@ -2209,6 +2290,54 @@ function capitalize(str) {
 }
 
 /**
+ * Simple pluralization function following CFWheels conventions
+ */
+function pluralize(str) {
+    if (!str) return str;
+
+    const lower = str.toLowerCase();
+
+    // Irregular plurals
+    const irregulars = {
+        'person': 'people',
+        'man': 'men',
+        'woman': 'women',
+        'child': 'children',
+        'tooth': 'teeth',
+        'foot': 'feet',
+        'mouse': 'mice',
+        'goose': 'geese'
+    };
+
+    if (irregulars[lower]) {
+        return irregulars[lower];
+    }
+
+    // Words ending in 'y' preceded by consonant -> 'ies'
+    if (lower.match(/[^aeiou]y$/)) {
+        return lower.slice(0, -1) + 'ies';
+    }
+
+    // Words ending in 's', 'x', 'z', 'ch', 'sh' -> add 'es'
+    if (lower.match(/(s|x|z|ch|sh)$/)) {
+        return lower + 'es';
+    }
+
+    // Words ending in 'fe' -> 'ves'
+    if (lower.endsWith('fe')) {
+        return lower.slice(0, -2) + 'ves';
+    }
+
+    // Words ending in 'f' -> 'ves'
+    if (lower.endsWith('f')) {
+        return lower.slice(0, -1) + 'ves';
+    }
+
+    // Default: just add 's'
+    return lower + 's';
+}
+
+/**
  * Activate extension
  */
 function activate(context) {
@@ -2233,27 +2362,27 @@ function activate(context) {
             '(', ',', ' '  // Trigger characters: opening parenthesis, comma, space
         );
 
-        // Register parameter validator
-        const parameterValidator = new WheelsParameterValidator();
+        // Register parameter typo detector
+        const typoDetector = new WheelsParameterTypoDetector();
 
         // Validate open documents
         vscode.workspace.textDocuments.forEach(document => {
             if (document.languageId === 'cfml') {
-                parameterValidator.validateDocument(document);
+                typoDetector.validateDocument(document);
             }
         });
 
         // Validate documents when opened
         const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument(document => {
             if (document.languageId === 'cfml') {
-                parameterValidator.validateDocument(document);
+                typoDetector.validateDocument(document);
             }
         });
 
         // Validate documents when changed and auto-detect CFML
         const onDidChangeTextDocument = vscode.workspace.onDidChangeTextDocument(event => {
             if (event.document.languageId === 'cfml') {
-                parameterValidator.validateDocument(event.document);
+                typoDetector.validateDocument(event.document);
             }
 
             // Auto-detect CFML for Wheels templates
@@ -2277,7 +2406,7 @@ function activate(context) {
 
         // Clear diagnostics when document is closed
         const onDidCloseTextDocument = vscode.workspace.onDidCloseTextDocument(document => {
-            parameterValidator.diagnosticCollection.delete(document.uri);
+            typoDetector.diagnosticCollection.delete(document.uri);
         });
         
         // Register command to open Wheels documentation
@@ -2337,7 +2466,7 @@ function activate(context) {
             hoverProvider,
             definitionProvider,
             signatureHelpProvider,
-            parameterValidator,
+            typoDetector,
             onDidOpenTextDocument,
             onDidChangeTextDocument,
             onDidCloseTextDocument,
