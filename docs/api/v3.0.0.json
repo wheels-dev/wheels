@@ -1048,9 +1048,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method\nbeforeCreate(&quot;fixObj&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Run a method before saving a new object\nfunction config() {\n    beforeCreate(\"fixObj\");\n}\n\nfunction fixObj() {\n    // Ensure a default role is assigned\n    if (!structKeyExists(this, \"roleId\")) {\n        this.roleId = 2; // Assign \"user\" role\n    }\n}\n\n2. Generate a unique slug before creation\nfunction config() {\n    beforeCreate(\"generateSlug\");\n}\n\nfunction generateSlug() {\n    this.slug = lcase(replace(this.title, \" \", \"-\", \"all\"));\n}\n\n3. Hash a password before inserting a new user\nfunction config() {\n    beforeCreate(\"hashPassword\");\n}\n\nfunction hashPassword() {\n    this.password = hash(this.password, \"SHA-256\");\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called before a new object is created.\n\n",
+      "hint": "Registers method(s) that should be called before a new object is created. This allows you to modify or validate data, set defaults, or perform logic right before the object is persisted in the database for the first time.\n\n",
       "returntype": "void",
       "slug": "model.beforeCreate",
       "parameters": [
@@ -1076,9 +1076,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method\nbeforeDelete(&quot;fixObj&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: run a method before deleting\nfunction config() {\n    beforeDelete(\"fixObj\");\n}\n\nfunction fixObj() {\n    // Example: log deletions\n    writeLog(\"Deleting record with ID #this.id#\");\n}\n\n2. Prevent deletion if conditions fail\nfunction config() {\n    beforeDelete(\"checkIfAdmin\");\n}\n\nfunction checkIfAdmin() {\n    if (!session.isAdmin) {\n        throw(type=\"SecurityException\", message=\"Only admins can delete records.\");\n    }\n}\n\n3. Cascade cleanup before deletion\nfunction config() {\n    beforeDelete(\"cleanupAssociations\");\n}\n\nfunction cleanupAssociations() {\n    // Delete related comments before removing a post\n    model(\"comment\").deleteAll(where=\"postId = #this.id#\");\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called before an object is deleted.\n\n",
+      "hint": "Registers method(s) that should be called before an object is deleted. This allows you to perform cleanup, enforce constraints, or prevent deletion if certain conditions are not met.\n\n",
       "returntype": "void",
       "slug": "model.beforeDelete",
       "parameters": [
@@ -1104,9 +1104,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method\nbeforeSave(&quot;fixObj&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: run a method before save\nfunction config() {\n    beforeSave(\"fixObj\");\n}\n\nfunction fixObj() {\n    // Example: Trim whitespace before saving\n    this.username = trim(this.username);\n}\n\n2. Automatically update a timestamp\nfunction config() {\n    beforeSave(\"updateTimestamp\");\n}\n\nfunction updateTimestamp() {\n    this.lastModifiedAt = now();\n}\n\n3. Normalize data before saving\nfunction config() {\n    beforeSave(\"normalizeData\");\n}\n\nfunction normalizeData() {\n    // Example: ensure email is lowercase\n    this.email = lcase(this.email);\n\n    // Example: capitalize first name\n    this.firstName = ucase(left(this.firstName, 1)) & mid(this.firstName, 2);\n}\n\n4. Prevent save if conditions fail\nfunction config() {\n    beforeSave(\"blockInactiveUsers\");\n}\n\nfunction blockInactiveUsers() {\n    if (!this.isActive) {\n        throw(type=\"ValidationException\", message=\"Inactive users cannot be saved.\");\n    }\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called before an object is saved.\n\n",
+      "hint": "Registers method(s) that should be called before an object is saved. This is useful for performing transformations, validations, or logging before data is persisted.\n\n",
       "returntype": "void",
       "slug": "model.beforeSave",
       "parameters": [
@@ -1132,9 +1132,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method\nbeforeUpdate(&quot;fixObj&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: register a method before update\nfunction config() {\n    beforeUpdate(\"fixObj\");\n}\n\nfunction fixObj() {\n    // Example: trim whitespace before updating\n    this.lastName = trim(this.lastName);\n}\n\n2. Update an \\\"last modified\\\" timestamp\nfunction config() {\n    beforeUpdate(\"updateTimestamp\");\n}\n\nfunction updateTimestamp() {\n    this.updatedAt = now();\n}\n\n3. Prevent updating sensitive fields\nfunction config() {\n    beforeUpdate(\"restrictEmailChange\");\n}\n\nfunction restrictEmailChange() {\n    if (this.hasChanged(\"email\")) {\n        throw(type=\"ValidationException\", message=\"Email address cannot be changed.\");\n    }\n}\n\n4. Audit updates with logging\nfunction config() {\n    beforeUpdate(\"logChanges\");\n}\n\nfunction logChanges() {\n    var changes = this.allChanges();\n    writeLog(text=\"User ##this.id## updated with changes: #serializeJSON(changes)#\", file=\"audit\");\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called before an existing object is updated.\n\n",
+      "hint": "Registers method(s) that should be called before an existing object is updated. This is useful for enforcing rules, transforming values, or checking conditions specifically for update operations (unlike beforeSave(), which applies to both create and update).\n\n",
       "returntype": "void",
       "slug": "model.beforeUpdate",
       "parameters": [
@@ -1160,9 +1160,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method\nbeforeValidation(&quot;fixObj&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: register a method before validation\nfunction config() {\n    beforeValidation(\"fixObj\");\n}\n\nfunction fixObj() {\n    // Example: normalize names before validation\n    this.firstName = trim(this.firstName);\n    this.lastName = trim(this.lastName);\n}\n\n2. Ensure default values before validation\nfunction config() {\n    beforeValidation(\"setDefaults\");\n}\n\nfunction setDefaults() {\n    if (!len(this.status)) {\n        this.status = \"pending\";\n    }\n}\n\n3. Convert input formats before validating\nfunction config() {\n    beforeValidation(\"normalizePhone\");\n}\n\nfunction normalizePhone() {\n    // Remove spaces/dashes so the validation regex can run correctly\n    this.phoneNumber = rereplace(this.phoneNumber, \"[^0-9]\", \"\", \"all\");\n}\n\n4. Multi-method callback\nfunction config() {\n    beforeValidation(\"sanitizeEmail, normalizeUsername\");\n}\n\nfunction sanitizeEmail() {\n    this.email = lcase(trim(this.email));\n}\n\nfunction normalizeUsername() {\n    this.username = rereplace(this.username, \"[^a-zA-Z0-9]\", \"\", \"all\");\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called before an object is validated.\n\n",
+      "hint": "Registers method(s) that should be called before an object is validated. This hook is helpful when you want to adjust, normalize, or clean up data before validation rules run. It ensures the object is in the correct state so that validations pass or fail as expected.\n\n",
       "returntype": "void",
       "slug": "model.beforeValidation",
       "parameters": [
@@ -1188,9 +1188,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method\nbeforeValidationOnCreate(&quot;fixObj&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: register a method before validation on create\nfunction config() {\n    beforeValidationOnCreate(\"fixObj\");\n}\n\nfunction fixObj() {\n    this.firstName = trim(this.firstName);\n}\n\n2. Ensure default values only for new records\nfunction config() {\n    beforeValidationOnCreate(\"setDefaults\");\n}\n\nfunction setDefaults() {\n    if (!len(this.role)) {\n        this.role = \"member\";\n    }\n}\n\n3. Normalize data formats for new users\nfunction config() {\n    beforeValidationOnCreate(\"normalizeNewUserData\");\n}\n\nfunction normalizeNewUserData() {\n    // Make sure emails are stored lowercase for new accounts\n    this.email = lcase(trim(this.email));\n}\n\n4. Run multiple setup methods before new record validation\nfunction config() {\n    beforeValidationOnCreate(\"assignUUID, sanitizeName\");\n}\n\nfunction assignUUID() {\n    if (!len(this.uuid)) {\n        this.uuid = createUUID();\n    }\n}\n\nfunction sanitizeName() {\n    this.fullName = trim(this.fullName);\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called before a new object is validated.\n\n",
+      "hint": "Registers method(s) that should be called before a new object is validated. This hook is useful when you want to prepare or sanitize data specifically for new records, ensuring that validations run on properly formatted data. It will not run on updates—only on create() or new() + save() operations.\n\n",
       "returntype": "void",
       "slug": "model.beforeValidationOnCreate",
       "parameters": [
@@ -1216,9 +1216,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Instruct Wheels to call the `fixObj` method\nbeforeValidationOnUpdate(&quot;fixObj&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: register a method before validation on update\nfunction config() {\n    beforeValidationOnUpdate(\"fixObj\");\n}\n\nfunction fixObj() {\n    this.lastName = trim(this.lastName);\n}\n\n2. Prevent changes to immutable fields\nfunction config() {\n    beforeValidationOnUpdate(\"restrictImmutableFields\");\n}\n\nfunction restrictImmutableFields() {\n    if (this.hasChanged(\"email\")) {\n        this.addError(property=\"email\", message=\"Email cannot be changed once set.\");\n    }\n}\n\n3. Normalize input before update validations\nfunction config() {\n    beforeValidationOnUpdate(\"sanitizePhone\");\n}\n\nfunction sanitizePhone() {\n    this.phoneNumber = rereplace(this.phoneNumber, \"[^0-9]\", \"\", \"all\");\n}\n\n4. Run multiple pre-validation methods for updates\nfunction config() {\n    beforeValidationOnUpdate(\"updateTimestamp, sanitizeNotes\");\n}\n\nfunction updateTimestamp() {\n    this.lastModified = now();\n}\n\nfunction sanitizeNotes() {\n    this.notes = trim(this.notes);\n}</code></pre>"
       },
-      "hint": "Registers method(s) that should be called before an existing object is validated.\n\n",
+      "hint": "Registers method(s) that should be called before an existing object is validated. This hook is useful when you want to adjust, sanitize, or enforce rules specifically for updates (not for new records). It ensures the object is in the correct state before validation checks run.\n\n",
       "returntype": "void",
       "slug": "model.beforeValidationOnUpdate",
       "parameters": [
@@ -1244,9 +1244,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Specify that instances of this model belong to an author. (The table for this model should have a foreign key set on it, typically named `authorid`.)\nbelongsTo(&quot;author&quot;);\n\n// Same as above, but because we have broken away from the foreign key naming convention, we need to set `modelName` and `foreignKey`.\nbelongsTo(name=&quot;bookWriter&quot;, modelName=&quot;author&quot;, foreignKey=&quot;authorId&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Standard belongsTo association\n// Specify that instances of this model belong to an author\nbelongsTo(\"author\");\n\nWheels will automatically deduce the foreign key as authorId and the associated model as Author.\n\n2. Custom foreign key and model name\n// Foreign key does not follow convention\nbelongsTo(name = \"bookWriter\", modelName = \"author\", foreignKey = \"authorId\");\n\nUseful when your database column names or model names deviate from Wheels conventions.\n\n3. Specify LEFT OUTER JOIN\nbelongsTo(name = \"publisher\", joinType = \"outer\");</code></pre>"
       },
-      "hint": "Sets up a <code>belongsTo</code> association between this model and the specified one.\nUse this association when this model contains a foreign key referencing another model.\n\n",
+      "hint": "Sets up a belongsTo association between this model and another model. Use this when the current model contains a foreign key referencing another model. This establishes a one-to-many relationship from the perspective of the other model (i.e., this model “belongs to” a parent model).\n\n",
       "returntype": "void",
       "slug": "model.belongsTo",
       "parameters": [
@@ -1298,10 +1298,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a single big integer column\nbigInteger(columnNames=\"userId\");\n\n2. Add multiple big integer columns\nbigInteger(columnNames=\"orderId, invoiceId\");\n\n3. Add a column with a default value and disallow NULLs\nbigInteger(columnNames=\"views\", default=\"0\", allowNull=false);\n\n4. Add a column with a custom limit\nbigInteger(columnNames=\"serialNumber\", limit=20);</code></pre>"
       },
-      "hint": "Adds integer columns to table definition.\n\n",
+      "hint": "Adds one or more big integer columns to a table definition in a migration. Use this when you need columns capable of storing large integer values, typically larger than standard integer columns.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.bigInteger",
       "parameters": [
@@ -1339,10 +1339,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a single binary column\nbinary(columnNames=\"profilePicture\");\n\n2. Add multiple binary columns\nbinary(columnNames=\"thumbnail, documentBlob\");\n\n3. Add a binary column that allows NULLs\nbinary(columnNames=\"attachment\", allowNull=true);\n\n4. Add a binary column with a default value\nbinary(columnNames=\"signature\", default=\"0x00\");</code></pre>"
       },
-      "hint": "Adds binary columns to table definition.\n\n",
+      "hint": "Adds one or more binary columns to a table definition in a migration. Use this for storing raw binary data, such as files, images, or other byte streams.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.binary",
       "parameters": [
@@ -1375,10 +1375,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a single boolean column\nboolean(columnNames=\"isActive\");\n\n2. Add multiple boolean columns\nboolean(columnNames=\"isPublished, isVerified\");\n\n3. Add a boolean column with a default value\nboolean(columnNames=\"isAdmin\", default=\"false\");\n\n4. Add a boolean column that allows NULLs\nboolean(columnNames=\"isArchived\", allowNull=true);</code></pre>"
       },
-      "hint": "Adds boolean columns to table definition.\n\n",
+      "hint": "Adds one or more boolean columns to a table definition in a migration. Use this for columns that store true/false values.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.boolean",
       "parameters": [
@@ -1412,9 +1412,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- View Code ---&gt;\n#startFormTag(action=&quot;something&quot;)#\n    &lt;!--- Form Controls go here ---&gt;\n    #buttonTag(content=&quot;Submit this form&quot;, value=&quot;save&quot;)#\n#endFormTag()#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic submit button\n#startFormTag(action=\"something\")#\n    #buttonTag(content=\"Submit this form\", value=\"save\")#\n#endFormTag()#\n\n2. Button with a different type\n#buttonTag(content=\"Reset form\", type=\"reset\")#\n\n3. Button using an image\n#buttonTag(image=\"submit.png\", value=\"save\")#\n\n4. Button with HTML wrappers\n#buttonTag(content=\"Click Me\", prepend=\"&lt;div class='btn-wrapper'&gt;\", append=\"&lt;/div&gt;\")#\n\n5. Disable encoding for raw HTML content\n#buttonTag(content=\"&lt;strong&gt;Submit&lt;/strong&gt;\", encode=false)#</code></pre>"
       },
-      "hint": "Builds and returns a string containing a button form control.\n\n",
+      "hint": "Builds and returns a string containing a button form control for use in your HTML forms. Use this helper to create buttons with custom content, types, values, images, and optional HTML wrappers.\n\n",
       "returntype": "string",
       "slug": "controller.buttonTag",
       "parameters": [
@@ -1482,9 +1482,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>#buttonTo(text=&quot;Delete Account&quot;, action=&quot;perFormDelete&quot;, disable=&quot;Wait...&quot;)#\n\n&lt;!--- apply attributes to the input element by prefixing any arguments with &quot;input&quot;---&gt;\n#buttonTo(text=&quot;Edit&quot;, action=&quot;edit&quot;, inputId=&quot;edit-button&quot;, inputClass=&quot;edit-button-class&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic button submitting to an action\n#buttonTo(text=\"Delete Account\", action=\"performDelete\", disable=\"Wait...\")#\n\n2. Button with an ID and class applied to the input\n#buttonTo(text=\"Edit\", action=\"edit\", inputId=\"edit-button\", inputClass=\"edit-button-class\")#\n\n3. Button using an image instead of text\n#buttonTo(image=\"delete-icon.png\", action=\"delete\")#\n\n4. Button linking to a specific route with query parameters\n#buttonTo(text=\"View Report\", route=\"reportRoute\", params=\"year=2025&month=9\")#\n\n5. Button using DELETE method\n#buttonTo(text=\"Remove\", action=\"deleteItem\", method=\"delete\")#</code></pre>"
       },
-      "hint": "Creates a form containing a single button that submits to the URL.\nThe URL is built the same way as the <code>linkTo</code> function.\n\n",
+      "hint": "Creates a form containing a single button that submits to a URL. The URL is constructed the same way as linkTo(). This helper is useful when you want a button that performs a specific action (GET, POST, PUT, DELETE, PATCH) without manually creating a form.\n\n",
       "returntype": "string",
       "slug": "controller.buttonTo",
       "parameters": [
@@ -1600,9 +1600,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Cache the `termsOfUse` action.\ncaches(&quot;termsOfUse&quot;);\n\n// Cache the `termsOfUse` action for 30 minutes.\ncaches(actions=&quot;browseByUser, browseByTitle&quot;, time=30);\n\n// Cache the `termsOfUse` and `codeOfConduct` actions, including their filters.\ncaches(actions=&quot;termsOfUse, codeOfConduct&quot;, static=true);\n\n// Cache content separately based on region.\ncaches(action=&quot;home&quot;, key=&quot;request.region&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Cache a single action (default 60 minutes)\ncaches(\"termsOfUse\");\n\n2. Cache multiple actions for 30 minutes\ncaches(actions=\"browseByUser, browseByTitle\", time=30);\n\n3. Cache actions as static pages, skipping filters\ncaches(actions=\"termsOfUse, codeOfConduct\", static=true);\n\n4. Cache content separately based on runtime variable\ncaches(action=\"home\", appendToKey=\"request.region\");</code></pre>"
       },
-      "hint": "Tells Wheels to cache one or more actions.\n\n",
+      "hint": "Tells Wheels to cache one or more controller actions. Caching improves performance by storing the output of actions so that repeated requests do not require re-running the action logic.\n\n",
       "returntype": "void",
       "slug": "controller.caches",
       "parameters": [
@@ -1649,9 +1649,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Clear the `termsOfUse` action.\nclearCachableActions(\"termsOfUse\");\n\n// Clear the `termsOfUse` and `codeOfConduct` actions.\nclearCachableActions(actions=\"termsOfUse,codeOfConduct\");\n\n// Clear all cachable actions in the controller.\nclearCachableActions();\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Clear a single action from cache\nclearCachableActions(\"termsOfUse\");\n\n2. Clear multiple actions from cache\nclearCachableActions(actions=\"termsOfUse,codeOfConduct\");\n\n3. Clear all cacheable actions in the controller\nclearCachableActions();</code></pre>"
       },
-      "hint": "Tells Wheels to remove one or more actions from cacheable actions.",
+      "hint": "Removes one or more actions from the list of cacheable actions in a controller. Use this when you want to prevent previously cached actions from being cached or to reset caching for certain actions.",
       "returntype": "void",
       "slug": "controller.clearCachableActions",
       "parameters": [
@@ -1677,9 +1677,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Capitalize a sentence, will result in &quot;Wheels is a framework&quot;---&gt;\n#capitalize(&quot;wheels is a framework&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Capitalize a single sentence\n#capitalize(\"wheels is a framework\")#\n<!--- Output: Wheels Is A Framework --->\n\n2. Capitalize a name\n#capitalize(\"john doe\")#\n<!--- Output: John Doe --->\n\n3. Capitalize a title\n#capitalize(\"introduction to wheels framework\")#\n<!--- Output: Introduction To Wheels Framework ---></code></pre>"
       },
-      "hint": "Capitalizes all words in the text to create a nicer looking title.\n\n",
+      "hint": "Capitalizes the first letter of every word in the provided text, creating a nicely formatted title or sentence.\n\n",
       "returntype": "string",
       "slug": "controller.capitalize",
       "parameters": [
@@ -1708,10 +1708,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Alter a table to add new columns\nt = changeTable(name='employees');\nt.string(columnNames=\"fullName\", default=\"\", allowNull=true, limit=\"255\");\nt.change();\n\n</code></pre>"
       },
-      "hint": "alters existing table in the database\n\n",
+      "hint": "Used in migrations to alter an existing table in the database. This function allows you to modify the structure of a table, such as adding, modifying, or removing columns.\n\n",
       "returntype": "void",
       "slug": "tabledefinition.change",
       "parameters": [
@@ -1736,9 +1736,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>changeColumn(table='members', columnType='string', columnName='status', limit=50);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Change the type and limit of a column\nchangeColumn(table='members', columnName='status', columnType='string', limit=50);\n\n2. Change a decimal column’s precision and scale\nchangeColumn(table='products', columnName='price', columnType='decimal', precision=10, scale=2);\n\n3. Change a column to allow NULL and set a default value\nchangeColumn(table='users', columnName='nickname', columnType='string', limit=100, allowNull=true, default='Guest');\n\n4. Move a column to a specific position in the table\nchangeColumn(table='orders', columnName='status', columnType='string', limit=20, afterColumn='orderDate');</code></pre>"
       },
-      "hint": "changes a column definition\nOnly available in a migration CFC\n\n",
+      "hint": "Changes the definition of an existing column in a database table. This function is used in migration CFCs to update column properties such as type, size, default value, nullability, precision, and scale.\n\n",
       "returntype": "void",
       "slug": "migration.changeColumn",
       "parameters": [
@@ -1826,9 +1826,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a member object and change the `email` property on it\nmember = model(&quot;member&quot;).findByKey(params.memberId);\nmember.email = params.newEmail;\n\n// Get the previous value (what the `email` property was before it was changed)\noldValue = member.changedFrom(&quot;email&quot;);\n\n// The above can also be done using a dynamic function like this\noldValue = member.emailChangedFrom();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Track changes on a single property\nmember = model(\"member\").findByKey(params.memberId);\nmember.email = params.newEmail;\n\n// Get the previous value of the email\noldValue = member.changedFrom(\"email\");\n\n2. Using dynamic property function\n// Dynamic method naming also works\noldValue = member.emailChangedFrom();\n\n3. Check before saving\nmember.firstName = \"Bruce\";\n\nif (member.changedFrom(\"firstName\") != \"\") {\n    writeOutput(\"First name was changed from \" & member.changedFrom(\"firstName\"));\n}\n\nmember.save();</code></pre>"
       },
-      "hint": "Returns the previous value of a property that has changed.\nReturns an empty string if no previous value exists.\nWheels will keep a note of the previous property value until the object is saved to the database.\n\n",
+      "hint": "Returns the previous value of a property that has been modified on a model object. Wheels tracks changes to object properties until the object is saved to the database. If no previous value exists (the property was never modified), it returns an empty string. This is useful for auditing, logging, or conditional logic based on changes to object properties.\n\n",
       "returntype": "string",
       "slug": "model.changedFrom",
       "parameters": [
@@ -1853,9 +1853,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get an object, change it, and then ask for its changes (will return a list of the property names that have changed, not the values themselves)\nmember = model(&quot;member&quot;).findByKey(params.memberId);\nmember.firstName = params.newFirstName;\nmember.email = params.newEmail;\nchangedProperties = member.changedProperties();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Track changed properties\nmember = model(\"member\").findByKey(params.memberId);\nmember.firstName = params.newFirstName;\nmember.email = params.newEmail;\n\n// Get a list of properties that have changed\nchangedProperties = member.changedProperties();\n\n2. Conditional logic based on changes\nif (arrayLen(member.changedProperties()) > 0) {\n    writeOutput(\"The following fields were changed: \" & arrayToList(member.changedProperties()));\n}</code></pre>"
       },
-      "hint": "Returns a list of the object properties that have been changed but not yet saved to the database.\n\n",
+      "hint": "Returns a list of property names that have been modified on a model object but not yet saved to the database. This is useful for tracking which fields were updated, triggering specific actions based on changes, or performing conditional validation.\n\n",
       "returntype": "string",
       "slug": "model.changedProperties",
       "parameters": [],
@@ -1873,9 +1873,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>t = changeTable(name='employees');\nt.string(columnNames=&quot;fullName&quot;, default=&quot;&quot;, null=true, limit=&quot;255&quot;);\nt.change();\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Add new columns to an existing table\nt = changeTable(name='employees');\nt.string(columnNames=\"fullName\", default=\"\", allowNull=true, limit=255);\nt.boolean(columnNames=\"isActive\", default=true);\nt.change();\n\n2. Modify multiple columns\nt = changeTable(name='products');\nt.string(columnNames=\"productName\", limit=150, allowNull=false);\nt.decimal(columnNames=\"price\", precision=10, scale=2);\nt.change();</code></pre>"
       },
-      "hint": "Creates a table definition object to store modifications to table properties\nOnly available in a migration CFC\n\n",
+      "hint": "Creates a table definition object used to store and apply modifications to an existing table in the database. This function is only available inside a migration CFC and works in conjunction with table definition methods like string(), integer(), boolean(), etc., and the change() method to apply the changes.\n\n",
       "returntype": "TableDefinition",
       "slug": "migration.changeTable",
       "parameters": [
@@ -1899,10 +1899,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a single CHAR column\nt.char(columnNames=\"status\", limit=1, default=\"A\", allowNull=false);\n\n2. Add multiple CHAR columns\nt.char(columnNames=\"type,code\", limit=2, default=\"\", allowNull=true);\n\n3. Add a CHAR column without a limit\nt.char(columnNames=\"initials\", allowNull=true);</code></pre>"
       },
-      "hint": "adds char columns to table definition\n\n",
+      "hint": "Adds one or more CHAR columns to a table definition in a migration. Use this function to define fixed-length string columns when creating or modifying a table.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.char",
       "parameters": [
@@ -1941,7 +1941,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Basic example of a check box for a boolean field ---&gt;\n#checkBox(objectName=&quot;photo&quot;, property=&quot;isPublic&quot;, label=&quot;Display this photo publicly.&quot;)#\n\n&lt;!--- Shows check boxes for selecting public access for all photos provided by the `photos` association and nested properties ---&gt;\n&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(user.photos)#&quot; index=&quot;i&quot;&gt;\n    &lt;div&gt;\n        &lt;h3&gt;#user.photos[i].title#:&lt;/h3&gt;\n        &lt;div&gt;\n            #checkBox(objectName=&quot;user&quot;, association=&quot;photos&quot;, position=i, property=&quot;isPublic&quot;, label=&quot;Display this photo publicly.&quot;)#\n        &lt;/div&gt;\n    &lt;/div&gt;\n&lt;/cfloop&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic checkbox for a single boolean property\n#checkBox(objectName=&quot;photo&quot;, property=&quot;isPublic&quot;, label=&quot;Display this photo publicly.&quot;)#\n\n2. Checkbox for a nested hasMany association\n&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(user.photos)#&quot; index=&quot;i&quot;&gt;\n    &lt;div&gt;\n        &lt;h3&gt;#user.photos[i].title#:&lt;/h3&gt;\n        &lt;div&gt;\n            #checkBox(objectName=&quot;user&quot;, association=&quot;photos&quot;, position=i, property=&quot;isPublic&quot;, label=&quot;Display this photo publicly.&quot;)#\n        &lt;/div&gt;\n    &lt;/div&gt;\n&lt;/cfloop&gt;</code></pre>"
       },
       "hint": "Builds and returns a string containing a check box form control based on the supplied name.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -2062,7 +2062,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Example 1: Basic usage involves a `label`, `name`, and `value` ---&gt;\n#checkBoxTag(name=&quot;subscribe&quot;, value=&quot;true&quot;, label=&quot;Subscribe to our newsletter&quot;, checked=false)#\n\n&lt;!--- Example 2: Loop over a query to display choices and whether or not they are checked ---&gt;\n// Controller code\npizza = model(&quot;pizza&quot;).findByKey(session.pizzaId);\nselectedToppings = pizza.toppings();\ntoppings = model(&quot;topping&quot;).findAll(order=&quot;name&quot;);\n\n&lt;!--- View code ---&gt;\n&lt;fieldset&gt;\n\t&lt;legend&gt;Toppings&lt;/legend&gt;\n\t&lt;cfoutput query=&quot;toppings&quot;&gt;\n\t\t#checkBoxTag(name=&quot;toppings&quot;, value=&quot;true&quot;, label=toppings.name, checked=YesNoFormat(ListFind(ValueList(selectedToppings.id), toppings.id))#\n\t&lt;/cfoutput&gt;\n&lt;/fieldset&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic checkbox\n#checkBoxTag(name=&quot;subscribe&quot;, value=&quot;true&quot;, label=&quot;Subscribe to our newsletter&quot;, checked=false)#\n\n2. Checkboxes generated from a query\n// Controller code\npizza = model(&quot;pizza&quot;).findByKey(session.pizzaId);\nselectedToppings = pizza.toppings();\ntoppings = model(&quot;topping&quot;).findAll(order=&quot;name&quot;);\n\n&lt;!--- View code ---&gt;\n&lt;fieldset&gt;\n\t&lt;legend&gt;Toppings&lt;/legend&gt;\n\t&lt;cfoutput query=&quot;toppings&quot;&gt;\n\t\t#checkBoxTag(name=&quot;toppings&quot;, value=&quot;true&quot;, label=toppings.name, checked=YesNoFormat(ListFind(ValueList(selectedToppings.id), toppings.id))#\n\t&lt;/cfoutput&gt;\n&lt;/fieldset&gt;</code></pre>"
       },
       "hint": "Builds and returns a string containing a check box form control based on the supplied name.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -2159,9 +2159,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Convert startTime to UTC (maybe done in an &quot;after find&quot; call back) but then tell Wheels to clear the information about this change (but not the change itself) so that it won't attempt to save the new value to the database, report it as being changed when calling hasChanged() etc.\n\nthis.startTime = DateConvert(&quot;Local2UTC&quot;, this.startTime);\nthis.clearChangeInformation(property=&quot;startTime&quot;);\n\n// Clear information for all properties\nthis.clearChangeInformation();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Clear change information for a single property\n// Convert startTime to UTC in an \"afterFind\" callback\nthis.startTime = DateConvert(\"Local2UTC\", this.startTime);\n\n// Tell Wheels to clear internal change tracking for this property\nthis.clearChangeInformation(property=\"startTime\");\n\n2. Clear change information for all properties\n// Clear internal tracking for all properties of the object\nthis.clearChangeInformation();</code></pre>"
       },
-      "hint": "Clears all internal knowledge of the current state of the object.\n\n",
+      "hint": "Clears all internal tracking information that Wheels maintains about an object’s properties. This does not undo changes made to the object—it simply resets the record of which properties are considered “changed,” so methods like hasChanged(), changedProperties(), or allChanges() will no longer report them. This is useful when you modify a property programmatically (for example, in a callback) and don’t want Wheels to attempt saving or reporting it as a change.\n\n",
       "returntype": "void",
       "slug": "model.clearChangeInformation",
       "parameters": [
@@ -2186,9 +2186,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Clear all errors on the object as a whole\nthis.clearErrors();\n\n// Clear all errors on `firstName`\nthis.clearErrors(&quot;firstName&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Clear all errors on the object\n// Remove all errors regardless of property\nthis.clearErrors();\n\n2. Clear errors on a specific property\n// Remove all errors associated with the 'firstName' property\nthis.clearErrors(property=\"firstName\");\n\n3. Clear a specific error by name\n// Remove only the error named 'emailFormatError' without affecting other errors\nthis.clearErrors(name=\"emailFormatError\");</code></pre>"
       },
-      "hint": "Clears out all errors set on the object or only the ones set for a specific property or name.\n\n",
+      "hint": "Clears all validation or manual errors stored on a model object. You can clear all errors, or target specific errors either by property name or by a custom error name. This is useful when resetting an object’s state before re-validation, updating values programmatically, or handling conditional validation logic.\n\n",
       "returntype": "void",
       "slug": "model.clearErrors",
       "parameters": [
@@ -2223,7 +2223,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>\n&lt;cfscript&gt;\n\nmapper()\n    // Create a route like `photos/search`\n    .resources(name=&quot;photos&quot;, nested=true)\n        .collection()\n            .get(&quot;search&quot;)\n        .end()\n    .end()\n.end();\n\n&lt;/cfscript&gt;\n</code></pre>"
       },
-      "hint": "A collection route doesn't require an id because it acts on a collection of objects.\nphotos/search is an example of a collection route, because it acts on (and displays) a collection of objects.\n\n",
+      "hint": "Defines a collection route in your Wheels application. Collection routes operate on a set of resources and do not require an id, unlike member routes which act on a single resource. This is useful when building actions that retrieve, filter, or display multiple objects, such as search pages, listings, or batch operations.\n\n",
       "returntype": "struct",
       "slug": "mapper.collection",
       "parameters": [],
@@ -2240,10 +2240,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a string column\nt = changeTable(name=\"employees\");\nt.column(columnName=\"fullName\", columnType=\"string\", limit=255, allowNull=false, default=\"Unknown\");\nt.change();\n\n2. Add a decimal column\nt = changeTable(name=\"products\");\nt.column(columnName=\"price\", columnType=\"decimal\", precision=10, scale=2, allowNull=false, default=\"0.00\");\nt.change();\n\n3. Add a boolean column\nt = changeTable(name=\"members\");\nt.column(columnName=\"isActive\", columnType=\"boolean\", allowNull=false, default=\"1\");\nt.change();</code></pre>"
       },
-      "hint": "Adds a column to table definition.\n\n",
+      "hint": "Adds a column to a table definition in a migration. This function is used when defining or altering database tables. It supports multiple column types and allows you to specify constraints like default values, nullability, length, and precision. Use this inside a table definition object in a migration CFC when building or modifying tables.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.column",
       "parameters": [
@@ -2296,10 +2296,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Inspect a simple property\nuser = model(\"user\").columnDataForProperty(\"email\");\n\nwriteDump(user);\n\nOutput might include:\n{\n  \"column\": \"email\",\n  \"dataType\": \"string\",\n  \"columnDefault\": \"\",\n  \"nullable\": \"NO\",\n  \"size\": 255\n}\n\n2. Use column metadata for validation or dynamic forms\ncolumns = model(\"product\").columnDataForProperty(\"price\");\n\nif(columns.nullable EQ \"NO\" AND columns.dataType EQ \"decimal\") {\n    writeOutput(\"Price is required and must be decimal.\");\n}</code></pre>"
       },
-      "hint": "Returns a struct with data for the named property.\n\n",
+      "hint": "Returns a struct containing metadata about a specific property in a model. This includes information such as type, constraints, default values, and other column-specific details. It’s useful when you need to introspect the schema of your model dynamically.\n\n",
       "returntype": "any",
       "slug": "model.columnDataForProperty",
       "parameters": [
@@ -2323,10 +2323,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Retrieve the column name for a property\nuser = model(\"user\").columnForProperty(\"email\");\n\nwriteOutput(user);  // Might output: \"email_address\"\n\n2. Use in dynamic SQL queries\nuserModel = model(\"user\");\ncolumn = userModel.columnForProperty(\"firstName\");\nquery = \"SELECT #column# FROM users WHERE id = 1\";</code></pre>"
       },
-      "hint": "Returns the column name mapped for the named model property.\n\n",
+      "hint": "Returns the database column name that corresponds to a given model property. This is useful when your model property names differ from the actual database column names, or when you need to dynamically generate SQL queries or mappings.\n\n",
       "returntype": "any",
       "slug": "model.columnForProperty",
       "parameters": [
@@ -2350,10 +2350,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get all column names for a model\nuserModel = model(\"user\");\ncolumns = userModel.columnNames();\n\nwriteOutput(columns);\n// Might output: \"id,first_name,last_name,email,created_at,updated_at\"\n\n2. Use column names to dynamically select fields in a query\nuserModel = model(\"user\");\nqueryColumns = userModel.columnNames();\nq = \"SELECT #queryColumns# FROM users WHERE active = 1\";</code></pre>"
       },
-      "hint": "Returns a list of column names in the table mapped to this model.\nThe list is ordered according to the columns' ordinal positions in the database table.\n\n",
+      "hint": "Returns a list of column names for the table mapped to this model. The list is ordered according to the columns’ ordinal positions in the database table. This is useful for dynamically generating queries, forms, or for inspecting the database structure associated with a model.\n\n",
       "returntype": "string",
       "slug": "model.columnNames",
       "parameters": [],
@@ -2370,10 +2370,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get an array of columns for a model\nuserModel = model(\"user\");\ncolumnArray = userModel.columns();\n\nwriteDump(columnArray);\n// Might output: [\"id\", \"first_name\", \"last_name\", \"email\", \"created_at\", \"updated_at\"]\n\n2. Loop through the columns for dynamic processing\nuserModel = model(\"user\");\nfor(column in userModel.columns()) {\n    writeOutput(\"Column: #column#<br>\");\n}</code></pre>"
       },
-      "hint": "Returns an array of columns names for the table associated with this class.\nDoes not include calculated properties that will be generated by the Wheels ORM.\n\n",
+      "hint": "Returns an array of database column names for the table associated with the model. This method excludes calculated or transient properties that are defined in the model but not stored in the database.\n\n",
       "returntype": "array",
       "slug": "model.columns",
       "parameters": [],
@@ -2390,10 +2390,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Compare two user objects\nuser1 = model(\"user\").findByKey(1);\nuser2 = model(\"user\").findByKey(2);\n\nif(user1.compareTo(user2)) {\n    writeOutput(\"Objects are the same.\");\n} else {\n    writeOutput(\"Objects are different.\");\n}\n\n2. Compare dynamically after changing a property\nuser1 = model(\"user\").findByKey(1);\nuser2 = model(\"user\").findByKey(1);\n\nuser2.email = \"[newemail@example.com](mailto:newemail@example.com)\";\n\nwriteDump(user1.compareTo(user2)); // Will output false because email changed</code></pre>"
       },
-      "hint": "Pass in another model object to see if the two objects are the same.\n\n",
+      "hint": "Compares the current model object with another model object to determine if they are effectively the same. This is useful for checking equality between two instances of the same model before performing operations like updates or merges.\n\n",
       "returntype": "boolean",
       "slug": "model.compareTo",
       "parameters": [
@@ -2416,10 +2416,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Constrain a route parameter to digits only\nmapper()\n    .resources(name=\"users\", nested=true)\n        .member(id=\":userId\")\n            .constraints({ userId=\"^\\d+$\" })\n        .end()\n    .end()\n.end();\n\nHere, the userId parameter must be a number, otherwise the route won’t match.\n\n2. Constrain multiple parameters\nmapper()\n    .resources(name=\"orders\", nested=true)\n        .member(orderId=\":orderId\", itemId=\":itemId\")\n            .constraints({ \n                orderId=\"^\\d+$\", \n                itemId=\"^\\d{3}-[A-Z]{2}$\" \n            })\n        .end()\n    .end()\n.end();</code></pre>"
       },
-      "hint": "Set variable patterns to use for matching.\n\n",
+      "hint": "Defines variable patterns for route parameters when setting up routes using the Wheels mapper(). This allows you to restrict the values that route parameters can take, such as limiting an id parameter to numbers only or enforcing a specific string format.\n\n",
       "returntype": "struct",
       "slug": "mapper.constraints",
       "parameters": [],
@@ -2437,9 +2437,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- In your view ---&gt;\n&lt;cfsavecontent variable=&quot;mySidebar&quot;&gt;\n&lt;h1&gt;My Sidebar Text&lt;/h1&gt;\n&lt;/cfsavecontent&gt;\n&lt;cfset contentFor(sidebar=mySidebar)&gt;\n\n&lt;!--- In your layout ---&gt;\n&lt;html&gt;\n\t&lt;head&gt;\n\t    &lt;title&gt;My Site&lt;/title&gt;\n\t&lt;/head&gt;\n\t&lt;body&gt;\n\t\t&lt;cfoutput&gt;\n\t\t\t#includeContent(&quot;sidebar&quot;)#\n\t\t\t#includeContent()#\n\t\t&lt;/cfoutput&gt;\n\t&lt;/body&gt;\n&lt;/html&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage\n&lt;!--- In your view ---&gt;\n&lt;cfsavecontent variable=\"mySidebar\"&gt;\n    &lt;h1&gt;My Sidebar Text&lt;/h1&gt;\n&lt;/cfsavecontent&gt;\n\n&lt;cfset contentFor(sidebar=mySidebar)&gt;\n\n&lt;!--- In your layout ---&gt;\n&lt;html&gt;\n    &lt;head&gt;&lt;title&gt;My Site&lt;/title&gt;&lt;/head&gt;\n    &lt;body&gt;\n        &lt;cfoutput&gt;\n            #includeContent(\"sidebar\")#  &lt;!-- Renders the sidebar content --&gt;\n            #includeContent()#           &lt;!-- Renders main content --&gt;\n        &lt;/cfoutput&gt;\n    &lt;/body&gt;\n&lt;/html&gt;\n\n2. Adding multiple pieces to the same section\n&lt;cfset contentFor(sidebar=\"First piece of content\")&gt;\n&lt;cfset contentFor(sidebar=\"Second piece of content\", position=\"first\")&gt;\n\n&lt;!--- Renders 'Second piece of content' first, then 'First piece of content' --&gt;\n#includeContent(\"sidebar\")#\n\n3. Overwriting content\n&lt;cfset contentFor(sidebar=\"Old content\")&gt;\n&lt;cfset contentFor(sidebar=\"New content\", overwrite=true)&gt;\n\n&lt;!--- Only 'New content' will be rendered --&gt;\n#includeContent(\"sidebar\")#</code></pre>"
       },
-      "hint": "Used to store a section's output for rendering within a layout.\nThis content store acts as a stack, so you can store multiple pieces of content for a given section.\n\n",
+      "hint": "contentFor() is used to store a section's output in a layout. It allows you to define content in your view templates and then render it in a layout using #includeContent()#. The function maintains a stack for each section, so multiple pieces of content can be added in a controlled order.\n\n",
       "returntype": "void",
       "slug": "controller.contentFor",
       "parameters": [
@@ -2472,9 +2472,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- In `views/layout.cfm` ---&gt;\n#contentForLayout()#</code></pre>"
+        "docs": "<pre><code class='javascript'>Controller:\n// PostsController.cfc\nfunction show() {\n    var post = model(\"post\").findByKey(params.id);\n}\n\nView (views/posts/show.cfm):\n&lt;h2&gt;#post.title#&lt;/h2&gt;\n&lt;p&gt;#post.body#&lt;/p&gt;\n\nLayout (views/layout.cfm):\n&lt;html&gt;\n&lt;head&gt;\n    &lt;title&gt;Blog&lt;/title&gt;\n&lt;/head&gt;\n&lt;body&gt;\n    &lt;nav&gt;Home | Posts&lt;/nav&gt;\n\n    &lt;!-- Inject view content --&gt;\n    #contentForLayout()#\n\n    &lt;footer&gt;&copy; 2025 My Blog&lt;/footer&gt;\n&lt;/body&gt;\n&lt;/html&gt;\n\nOutput when visiting /posts/show?id=1:\n&lt;html&gt;\n&lt;head&gt;\n    &lt;title&gt;Blog&lt;/title&gt;\n&lt;/head&gt;\n&lt;body&gt;\n    &lt;nav&gt;Home | Posts&lt;/nav&gt;\n\n    &lt;h2&gt;Hello World&lt;/h2&gt;\n    &lt;p&gt;This is my first post!&lt;/p&gt;\n\n    &lt;footer&gt;&copy; 2025 My Blog&lt;/footer&gt;\n&lt;/body&gt;\n&lt;/html&gt;</code></pre>"
       },
-      "hint": "Includes content for the body section, which equates to the output generated by the view template run by the request.\n\n",
+      "hint": "contentForLayout() is used to render the main content of the current view inside a layout. In Wheels, when a controller action renders a view, that view generates content. This content can then be injected into the layout at the appropriate place using contentForLayout(). Essentially, it’s the placeholder for the view’s body content in your layout template.\n\n",
       "returntype": "string",
       "slug": "controller.contentForLayout",
       "parameters": [],
@@ -2494,7 +2494,7 @@
         "hasExtended": false,
         "docs": ""
       },
-      "hint": "Considered deprecated as this doesn't conform to RESTful routing principles; Try not to use this.\n\n",
+      "hint": "The controller() function in Wheels is used to define routes that point to a specific controller. However, it is considered deprecated, because it does not align with RESTful routing principles. Wheels encourages using resources() and other RESTful routing helpers instead.\n\n",
       "returntype": "struct",
       "slug": "mapper.controller",
       "parameters": [
@@ -2532,7 +2532,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>testController = controller(&quot;users&quot;, params);</code></pre>"
       },
-      "hint": "Creates and returns a controller object with your own custom name and params.\nUsed primarily for testing purposes.\n\n",
+      "hint": "The controller() function creates and returns a controller object with a custom name and optional parameters. It is primarily used for testing, but can also be used in code to instantiate a controller programmatically. Unlike the deprecated routing controller() function, this helper does not define routes—it creates controller instances.\n\n",
       "returntype": "any",
       "slug": "controller.controller",
       "parameters": [
@@ -2569,9 +2569,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Count how many authors there are in the table\nauthorCount = model(&quot;author&quot;).count();\n\n// Count how many authors that have a last name starting with an &quot;A&quot;\nauthorOnACount = model(&quot;author&quot;).count(where=&quot;lastName LIKE 'A%'&quot;);\n\n// Count how many authors that have written books starting with an &quot;A&quot;\nauthorWithBooksOnACount = model(&quot;author&quot;).count(include=&quot;books&quot;, where=&quot;booktitle LIKE 'A%'&quot;);\n\n// Count the number of comments on a specific post (a `hasMany` association from `post` to `comment` is required)\n// The `commentCount` method will call `model(&quot;comment&quot;).count(where=&quot;postId=#post.id#&quot;)` internally\naPost = model(&quot;post&quot;).findByKey(params.postId);\namount = aPost.commentCount();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Count how many authors there are in the table\nauthorCount = model(&quot;author&quot;).count();\n\n2. Count how many authors that have a last name starting with an &quot;A&quot;\nauthorOnACount = model(&quot;author&quot;).count(where=&quot;lastName LIKE 'A%'&quot;);\n\n3. Count how many authors that have written books starting with an &quot;A&quot;\nauthorWithBooksOnACount = model(&quot;author&quot;).count(include=&quot;books&quot;, where=&quot;booktitle LIKE 'A%'&quot;);\n\n4. Count the number of comments on a specific post (a `hasMany` association from `post` to `comment` is required)\n// The `commentCount` method will call `model(&quot;comment&quot;).count(where=&quot;postId=#post.id#&quot;)` internally\naPost = model(&quot;post&quot;).findByKey(params.postId);\namount = aPost.commentCount();</code></pre>"
       },
-      "hint": "Returns the number of rows that match the arguments (or all rows if no arguments are passed in).\nUses the SQL function <code>COUNT</code>.\nIf no records can be found to perform the calculation on, <code>0</code> is returned.\n\n",
+      "hint": "The count() method calculates the number of records in a table that match a given set of conditions. It internally uses the SQL COUNT() function. If no arguments are provided, it returns the total number of rows in the table. It works on model classes.\n\n",
       "returntype": "any",
       "slug": "model.count",
       "parameters": [
@@ -2623,10 +2623,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>t = table(name=\"employees\");\nt.string(columnNames=\"firstName\", limit=50, allowNull=false);\nt.string(columnNames=\"lastName\", limit=50, allowNull=false);\nt.integer(columnNames=\"age\", allowNull=true);\nt.boolean(columnNames=\"isActive\", default=\"1\");\n\n// Create the table in the database\nt.create();</code></pre>"
       },
-      "hint": "creates the table in the database\n\n",
+      "hint": "The create() method is used to create a database table based on the table definition that has been built using the migrator’s table definition functions (string(), integer(), boolean(), etc.). This method is only available within a migration CFC and finalizes the table creation in the database.\n\n",
       "returntype": "void",
       "slug": "tabledefinition.create",
       "parameters": [],
@@ -2644,9 +2644,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Create a new author and save it to the database\nnewAuthor = model(&quot;author&quot;).create(params.author);\n\n// Same as above using named arguments\nnewAuthor = model(&quot;author&quot;).create(firstName=&quot;John&quot;, lastName=&quot;Doe&quot;);\n\n// Same as above using both named arguments and a struct\nnewAuthor = model(&quot;author&quot;).create(active=1, properties=params.author);\n\n// If you have a `hasOne` or `hasMany` association setup from `customer` to `order`, you can do a scoped call. (The `createOrder` method below will call `model(&quot;order&quot;).create(customerId=aCustomer.id, shipping=params.shipping)` internally.)\naCustomer = model(&quot;customer&quot;).findByKey(params.customerId);\nanOrder = aCustomer.createOrder(shipping=params.shipping);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Create a new author and save it to the database\nnewAuthor = model(&quot;author&quot;).create(params.author);\n\n2. Same as above using named arguments\nnewAuthor = model(&quot;author&quot;).create(firstName=&quot;John&quot;, lastName=&quot;Doe&quot;);\n\n3. Same as above using both named arguments and a struct\nnewAuthor = model(&quot;author&quot;).create(active=1, properties=params.author);\n\n4. If you have a `hasOne` or `hasMany` association setup from `customer` to `order`, you can do a scoped call. (The `createOrder` method below will call `model(&quot;order&quot;).create(customerId=aCustomer.id, shipping=params.shipping)` internally.)\naCustomer = model(&quot;customer&quot;).findByKey(params.customerId);\nanOrder = aCustomer.createOrder(shipping=params.shipping);</code></pre>"
       },
-      "hint": "Creates a new object, saves it to the database (if the validation permits it), and returns it.\nIf the validation fails, the unsaved object (with errors added to it) is still returned.\nProperty names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument.\n\n",
+      "hint": "The create() method is used to instantiate a new model object, set its properties, and save it to the database (if validations pass). Even if validation fails, the method still returns the unsaved object, including any validation errors. It’s a higher-level convenience function that combines object creation, property assignment, validation, and saving into a single call. Property names and values can be passed in either using named arguments or as a struct to the properties argument.\n\n",
       "returntype": "any",
       "slug": "model.create",
       "parameters": [
@@ -2714,9 +2714,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Create an empty migration file\nresult=application.wheels.migrator.createMigration(&quot;MyMigrationFile&quot;);\n\n// Or Create a migration file from the create-table template\nresult=application.wheels.migrator.createMigration(&quot;MyMigrationFile&quot;,&quot;create-table&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Create an empty migration file:\n\nresult = application.wheels.migrator.createMigration(\"MyMigrationFile\");\n\n// Generates a blank migration file with a timestamped prefix.\n\n// You can then edit it to define your table or schema changes.\n\n2. Create a migration file from a template (e.g., create-table):\n\nresult = application.wheels.migrator.createMigration(\"MyMigrationFile\", \"create-table\");\n\n// Generates a migration file pre-populated with a create-table template.</code></pre>"
       },
-      "hint": "Creates a migration file. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface\n\n",
+      "hint": "The createMigration() method is used to generate a new migration file for managing database schema changes. While you can call it from your application code, it is primarily intended for use via the CLI or Wheels GUI. A migration file allows you to define table creations, modifications, or deletions in a structured way that can be applied or rolled back consistently.\n\n",
       "returntype": "string",
       "slug": "migrator.createMigration",
       "parameters": [
@@ -2752,9 +2752,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Example: create a users table\nt = createTable(name='users'); \n\tt.string(columnNames='firstname,lastname', default='', null=false, limit=50);\n\tt.string(columnNames='email', default='', null=false, limit=255); \n\tt.string(columnNames='passwordHash', default='', null=true, limit=500);\n\tt.string(columnNames='passwordResetToken,verificationToken', default='', null=true, limit=500);\n\tt.boolean(columnNames='passwordChangeRequired,verified', default=false); \n\tt.datetime(columnNames='passwordResetTokenAt,passwordResetAt,loggedinAt', default='', null=true); \n\tt.integer(columnNames='roleid', default=0, null=false, limit=3);\n\tt.timestamps();\nt.create();\n\n// Example: Create a table with a different Primary Key\nt = createTable(name='tokens', id=false);\n\tt.primaryKey(name='id', null=false, type=&quot;string&quot;, limit=35 );\n\tt.datetime(columnNames=&quot;expiresAt&quot;, null=false);\n\tt.integer(columnNames='requests', default=0, null=false);\n\tt.timestamps();\nt.create();\n\n// Example: Create a Join Table with composite primary keys\nt = createTable(name='userkintins', id=false); \n\tt.primaryKey(name=&quot;userid&quot;, null=false, limit=11);\n\tt.primaryKey(name='profileid', type=&quot;string&quot;, limit=11 );  \nt.create();\n</code></pre>"
+        "docs": "<pre><code class='javascript'>// Example: create a users table\nt = createTable(name='users'); \n\tt.string(columnNames='firstname,lastname', default='', allowNull=false, limit=50);\n\tt.string(columnNames='email', default='', allowNull=false, limit=255); \n\tt.string(columnNames='passwordHash', default='', allowNull=true, limit=500);\n\tt.string(columnNames='passwordResetToken,verificationToken', default='', allowNull=true, limit=500);\n\tt.boolean(columnNames='passwordChangeRequired,verified', default=false); \n\tt.datetime(columnNames='passwordResetTokenAt,passwordResetAt,loggedinAt', default='', allowNull=true); \n\tt.integer(columnNames='roleid', default=0, allowNull=false, limit=3);\n\tt.timestamps();\nt.create();\n\n// Example: Create a table with a different Primary Key\nt = createTable(name='tokens', id=false);\n\tt.primaryKey(name='id', allowNull=false, type=&quot;string&quot;, limit=35 );\n\tt.datetime(columnNames=&quot;expiresAt&quot;, allowNull=false);\n\tt.integer(columnNames='requests', default=0, allowNull=false);\n\tt.timestamps();\nt.create();\n\n// Example: Create a Join Table with composite primary keys\nt = createTable(name='userkintins', id=false); \n\tt.primaryKey(name=&quot;userid&quot;, allowNull=false, limit=11);\n\tt.primaryKey(name='profileid', type=&quot;string&quot;, limit=11 );  \nt.create();\n</code></pre>"
       },
-      "hint": "Creates a table definition object to store table properties\nOnly available in a migration CFC\n\n",
+      "hint": "The createTable() function is used in migration CFCs to define a new database table. It returns a TableDefinition object, on which you can specify columns, primary keys, timestamps, and other table properties. Once the table is defined, you call create() to actually create it in the database.\n\n",
       "returntype": "TableDefinition",
       "slug": "migration.createTable",
       "parameters": [
@@ -2799,10 +2799,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Simple View Creation\n\nv = createView(name='active_users');\nv.selectStatement(sql = \"SELECT * FROM c_o_r_e_users\")\nv.create();\n\n// Creates a view active_users that selects only active users from the users table.\n\n2. View with Join\n\nv = createView(name='user_orders');\nv.selectStatement(sql = \"SELECT u.id, u.firstname, u.lastname, o.id AS orderId, o.total FROM users u JOIN orders o ON u.id = o.userId WHERE o.status = \"completed\";\")\nv.create();\n\n// Creates a user_orders view joining users and orders tables, filtering only completed orders.</code></pre>"
       },
-      "hint": "Creates a view definition object to store view properties\nOnly available in a migration CFC\n\n",
+      "hint": "The createView() function is used in migration CFCs to define a new database view. It returns a ViewDefinition object, on which you can specify the view’s SQL query and properties. Once the view is fully defined, you call create() to actually create it in the database.\n\n",
       "returntype": "ViewDefinition",
       "slug": "migration.createView",
       "parameters": [
@@ -2827,9 +2827,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;head&gt;\n  #csrfMetaTags()#\n&lt;/head&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>&lt;head&gt;\n    &lt;title&gt;My Application&lt;/title&gt;\n    #csrfMetaTags()#\n&lt;/head&gt;\n\n// This will output something like:\n// &lt;meta name=\"csrf-token\" content=\"YOUR_AUTH_TOKEN_HERE\"&gt;\n// &lt;meta name=\"csrf-param\" content=\"authenticityToken\"&gt;</code></pre>"
       },
-      "hint": "Include this in your layouts' <code>head</code> sections to include meta tags containing the authenticity token for use by JavaScript AJAX requests needing to <code>POST</code> data to your application.\n\n",
+      "hint": "The csrfMetaTags() helper generates meta tags containing your application's CSRF authenticity token. This is useful for JavaScript/AJAX requests that need to POST data securely, ensuring that the request comes from a trusted source.\n\n",
       "returntype": "string",
       "slug": "controller.csrfMetaTags",
       "parameters": [],
@@ -2849,7 +2849,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>&lt;!--- Alternating table row colors ---&gt;\n&lt;table&gt;\n\t&lt;thead&gt;\n\t\t&lt;tr&gt;\n\t\t\t&lt;th&gt;Name&lt;/th&gt;\n\t\t\t&lt;th&gt;Phone&lt;/th&gt;\n\t\t&lt;/tr&gt;\n\t&lt;/thead&gt;\n\t&lt;tbody&gt;\n\t\t&lt;cfoutput query=&quot;employees&quot;&gt;\n\t\t\t&lt;tr class=&quot;#cycle(&quot;odd,even&quot;)#&quot;&gt;\n\t\t\t\t&lt;td&gt;#employees.name#&lt;/td&gt;\n\t\t\t\t&lt;td&gt;#employees.phone#&lt;/td&gt;\n\t\t\t&lt;/tr&gt;\n\t\t&lt;/cfoutput&gt;\n\t&lt;/tbody&gt;\n&lt;/table&gt;\n\n&lt;!--- Alternating row colors and shrinking emphasis ---&gt;\n&lt;cfoutput query=&quot;employees&quot; group=&quot;departmentId&quot;&gt;\n\t&lt;div class=&quot;#cycle(values=&quot;even,odd&quot;, name=&quot;row&quot;)#&quot;&gt;\n\t\t&lt;ul&gt;\n\t\t\t&lt;cfoutput&gt;\n\t\t\t\trank = cycle(values=&quot;president,vice-president,director,manager,specialist,intern&quot;, name=&quot;position&quot;)&gt;\n\t\t\t\t&lt;li class=&quot;#rank#&quot;&gt;#categories.categoryName#&lt;/li&gt;\n\t\t\t\tresetCycle(&quot;emphasis&quot;)&gt;\n\t\t\t&lt;/cfoutput&gt;\n\t\t&lt;/ul&gt;\n\t&lt;/div&gt;\n&lt;/cfoutput&gt;</code></pre>"
       },
-      "hint": "Cycles through list values every time it is called.\n\n",
+      "hint": "cycle() is a view helper used to loop through a list of values sequentially, returning the next value each time it’s called. This is especially useful for things like alternating row colors in tables or assigning sequential classes in repeated HTML elements.\n\n",
       "returntype": "string",
       "slug": "controller.cycle",
       "parameters": [
