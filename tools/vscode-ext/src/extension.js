@@ -62,7 +62,7 @@ class WheelsCompletionProvider {
 
             // Get template file path
             const templateFileName = `${templateType}.cfc`;
-            const templatePath = path.join(__dirname, '..', 'templates', templateFileName);
+            const templatePath = path.join(__dirname, '..', 'assets', 'templates', templateFileName);
 
             // Read template file
             let template = fs.readFileSync(templatePath, 'utf8');
@@ -1831,7 +1831,7 @@ function getTemplateContentForSnippet(templateType) {
     try {
         // Get template file path
         const templateFileName = `${templateType}.cfc`;
-        const templatePath = path.join(__dirname, '..', 'templates', templateFileName);
+        const templatePath = path.join(__dirname, '..', 'assets', 'templates', templateFileName);
 
         // Read template file
         let template = fs.readFileSync(templatePath, 'utf8');
@@ -2131,7 +2131,7 @@ function getTemplateContentFromFiles(type, templateData) {
             templateFileName = `${type}.cfc`;
         }
 
-        const templatePath = path.join(__dirname, '..', 'templates', templateFileName);
+        const templatePath = path.join(__dirname, '..', 'assets', 'templates', templateFileName);
 
         // Read template file
         let template = fs.readFileSync(templatePath, 'utf8');
