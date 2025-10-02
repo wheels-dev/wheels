@@ -4869,10 +4869,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Simple fail with no message\nfunction test_should_fail_on_purpose() {\n fail();\n};\n\nMarks the test as failed without explanation.\n\n2. Fail with a custom message\nfunction test_should_fail_with_a_message() {\n fail(&quot;This path should never be reached!&quot;);\n};\n\nProduces a failure with the message This path should never be reached!.\n\n3. Guarding unexpected conditions\nfunction test_should_not_allow_null_users() {\n var user = getUserById(123);\n if (isNull(user)) {\n     fail(&quot;Expected user with ID 123 to exist but got null.&quot;);\n }\n};\n</code></pre>"
       },
-      "hint": "",
+      "hint": "Forces a test to fail intentionally. You can call fail() inside a test when you want to stop execution and explicitly mark the test as failed or highlight cases that should never happen. When called, it throws an exception that results in a test failure. You can optionally pass a custom message to clarify why the failure occurred. Used in wheels legacy testing.\n\n",
       "returntype": "void",
       "slug": "test.fail",
       "parameters": [
@@ -4897,7 +4897,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Provide a `label` and the required `objectName` and `property` ---&gt;\n#fileField(label=&quot;Photo&quot;, objectName=&quot;photo&quot;, property=&quot;imageFile&quot;)#\n\n\n&lt;!--- Display fields for photos provided by the `screenshots` association and nested properties ---&gt;\n&lt;fieldset&gt;\n\t&lt;legend&gt;Screenshots&lt;/legend&gt;\n\t&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(site.screenshots)#&quot; index=&quot;i&quot;&gt;\n\t\t#fileField(label=&quot;File ##i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;file&quot;)#\n\t\t#textField(label=&quot;Caption ##i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;caption&quot;)#\n\t&lt;/cfloop&gt;\n&lt;/fieldset&gt;\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Provide a `label` and the required `objectName` and `property`\n#fileField(label=&quot;Photo&quot;, objectName=&quot;photo&quot;, property=&quot;imageFile&quot;)#\n\n\n2. Display fields for photos provided by the `screenshots` association and nested properties\n&lt;fieldset&gt;\n\t&lt;legend&gt;Screenshots&lt;/legend&gt;\n\t&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(site.screenshots)#&quot; index=&quot;i&quot;&gt;\n\t\t#fileField(label=&quot;File ##i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;file&quot;)#\n\t\t#textField(label=&quot;Caption ##i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;caption&quot;)#\n\t&lt;/cfloop&gt;\n&lt;/fieldset&gt;\n</code></pre>"
       },
       "hint": "Builds and returns a string containing a file field form control based on the supplied objectName and property.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -5005,7 +5005,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!---  Basic usage usually involves a `label`, `name`, and `value` ---&gt;\n#fileFieldTag(label=&quot;Photo&quot;, name=&quot;photo&quot;, value=params.photo)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage with label\n#fileFieldTag(label=&quot;Upload Photo&quot;, name=&quot;photo&quot;)#\n\nOutput:\n\n&lt;label for=&quot;photo&quot;&gt;Upload Photo&lt;/label&gt;\n&lt;input type=&quot;file&quot; id=&quot;photo&quot; name=&quot;photo&quot;&gt;\n\n2. With custom attributes\n#fileFieldTag(\n label=&quot;Resume&quot;, \n name=&quot;resume&quot;, \n class=&quot;upload&quot;, \n id=&quot;resume-upload&quot;, \n accept=&quot;.pdf,.docx&quot;\n)#\n\nAdds CSS class, ID, and file type restrictions.\n\n3. Label placement options\n#fileFieldTag(label=&quot;Avatar&quot;, name=&quot;avatar&quot;, labelPlacement=&quot;before&quot;)#\n#fileFieldTag(label=&quot;Attachment&quot;, name=&quot;attachment&quot;, labelPlacement=&quot;after&quot;)#\n\nMoves the label before or after the &lt;input&gt; instead of wrapping.\n\n4. Prepending/Appending markup\n#fileFieldTag(\n label=&quot;Select File&quot;, \n name=&quot;document&quot;, \n prepend='&lt;div class=&quot;field-wrapper&quot;&gt;', \n append='&lt;/div&gt;'\n)#\n\nWraps the input inside a custom &lt;div&gt;.\n\n5. Label customization with prepend/append\n#fileFieldTag(\n label=&quot;Profile Photo&quot;, \n name=&quot;profile&quot;, \n prependToLabel='&lt;span class=&quot;required&quot;&gt;*&lt;/span&gt;', \n appendToLabel=' &lt;small&gt;(max 2MB)&lt;/small&gt;'\n)#\n</code></pre>"
       },
       "hint": "Builds and returns a string containing a file form control based on the supplied name.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -5081,9 +5081,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get filter chain.\nmyFilterChain = filterChain();\n\n// Get filter chain for after filters only.\nmyFilterChain = filterChain(type=&quot;after&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get filter chain.\nmyFilterChain = filterChain();\n\n2. Get filter chain for after filters only.\nmyFilterChain = filterChain(type=&quot;after&quot;);\n</code></pre>"
       },
-      "hint": "Returns an array of all the filters set on current controller in the order in which they will be executed.\n\n",
+      "hint": "The filterChain() function returns an array of all filters that are set on the current controller in the order they will be executed. By default, it includes both before and after filters, but you can specify the type argument if you want to return only one type. For example, setting type=\"after\" will return only the filters that run after the controller action.\n\n",
       "returntype": "array",
       "slug": "controller.filterChain",
       "parameters": [
@@ -5109,9 +5109,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Always execute `restrictAccess` before all actions in this controller.\nfilters(&quot;restrictAccess&quot;);\n\n// Always execute `isLoggedIn` and `checkIPAddress` (in that order) before all actions in this controller, except the `home` and `login` actions.\nfilters(through=&quot;isLoggedIn, checkIPAddress&quot;, except=&quot;home, login&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Run a filter before all actions\n// Always execute restrictAccess before every action\nfilters(&quot;restrictAccess&quot;);\n\n2. Multiple filters before all actions\n// Run both isLoggedIn and checkIPAddress before all actions\nfilters(through=&quot;isLoggedIn, checkIPAddress&quot;);\n\n3. Exclude specific actions\n// Run filters before all actions, except home and login\nfilters(through=&quot;isLoggedIn, checkIPAddress&quot;, except=&quot;home, login&quot;);\n\n4. Limit filters to specific actions\n// Only run ensureAdmin before the delete action\nfilters(through=&quot;ensureAdmin&quot;, only=&quot;delete&quot;);\n\n5. Run filters after an action\n// Run logAction after every action\nfilters(through=&quot;logAction&quot;, type=&quot;after&quot;);\n</code></pre>"
       },
-      "hint": "Tells Wheels to run a function before an action is run or after an action has been run.\n\n",
+      "hint": "The filters() function lets you specify methods in your controller that should run automatically either before or after certain actions. Filters are useful for handling cross-cutting concerns such as authentication, authorization, logging, or cleanup, without having to repeat the same code inside each action. By default, filters run before the action, but you can configure them to run after, limit them to specific actions, exclude them from others, or control their placement in the filter chain.\n\n",
       "returntype": "void",
       "slug": "controller.filters",
       "parameters": [
@@ -5164,7 +5164,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Getting only 5 users and ordering them randomly\nfiveRandomUsers = model(&quot;user&quot;).findAll(maxRows=5, order=&quot;random&quot;);\n\n// Including an association (which in this case needs to be setup as a `belongsTo` association to `author` on the `article` model first)\narticles = model(&quot;article&quot;).findAll( include=&quot;author&quot;, where=&quot;published=1&quot;, order=&quot;createdAt DESC&quot; );\n\n// Similar to the above but using the association in the opposite direction (which needs to be setup as a `hasMany` association to `article` on the `author` model)  bobsArticles = model(&quot;author&quot;).findAll( include=&quot;articles&quot;, where=&quot;firstName='Bob'&quot; );\n\n// Using pagination (getting records 26-50 in this case) and a more complex way to include associations (a song `belongsTo` an album, which in turn `belongsTo` an artist)  songs = model(&quot;song&quot;).findAll( include=&quot;album(artist)&quot;, page=2, perPage=25 );\n\n// Using a dynamic finder to get all books released a certain year. Same as calling model(&quot;book&quot;).findOne(where=&quot;releaseYear=#params.year#&quot;)\nbooks = model(&quot;book&quot;).findAllByReleaseYear(params.year);\n\n// Getting all books of a certain type from a specific year by using a dynamic finder. Same as calling  model(&quot;book&quot;).findAll( where=&quot;releaseYear=#params.year# AND type='#params.type#'&quot; )\nbooks = model(&quot;book&quot;).findAllByReleaseYearAndType( &quot;#params.year#,#params.type#&quot; );\n\n// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `comments` method below will call `model(&quot;comment&quot;).findAll(where=&quot;postId=#post.id#&quot;)` internally)\npost = model(&quot;post&quot;).findByKey(params.postId);\ncomments = post.comments();\n\n// If you have an `Order` model with properties for `productId`, `amount` and a calculated property named `totalAmount` (set up as `property(name=&quot;totalAmount&quot;, sql=&quot;SUM(amount)&quot;)`), then you can do the following to get the ids for all products with over $1,000 in sales (the SQL will be created using `HAVING` instead of `WHERE` in this case since you're getting an aggregate value for a calculated property)\nids = model(&quot;order&quot;).findAll(group=&quot;productId&quot;, where=&quot;totalAmount &gt; 1000&quot;);\n\n// Using index hints\nindexes = {\n\tauthor=&quot;idx_authors_123&quot;,\n\tpost=&quot;idx_posts_123&quot;\n}\nposts = model(&quot;author&quot;).findAll(where=&quot;firstname LIKE '#params.q#%' OR subject LIKE '#params.q#%'&quot;, include=&quot;posts&quot;, useIndex=indexes);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Getting only 5 users and ordering them randomly\nfiveRandomUsers = model(&quot;user&quot;).findAll(maxRows=5, order=&quot;random&quot;);\n\n2. Including an association (which in this case needs to be setup as a `belongsTo` association to `author` on the `article` model first)\narticles = model(&quot;article&quot;).findAll( include=&quot;author&quot;, where=&quot;published=1&quot;, order=&quot;createdAt DESC&quot; );\n\n3. Similar to the above but using the association in the opposite direction (which needs to be setup as a `hasMany` association to `article` on the `author` model)\nbobsArticles = model(&quot;author&quot;).findAll( include=&quot;articles&quot;, where=&quot;firstName='Bob'&quot; );\n\n4. Using pagination (getting records 26-50 in this case) and a more complex way to include associations (a song `belongsTo` an album, which in turn `belongsTo` an artist)\nsongs = model(&quot;song&quot;).findAll( include=&quot;album(artist)&quot;, page=2, perPage=25 );\n\n5. Using a dynamic finder to get all books released a certain year. Same as calling model(&quot;book&quot;).findOne(where=&quot;releaseYear=#params.year#&quot;)\nbooks = model(&quot;book&quot;).findAllByReleaseYear(params.year);\n\n6. Getting all books of a certain type from a specific year by using a dynamic finder. Same as calling  model(&quot;book&quot;).findAll( where=&quot;releaseYear=#params.year# AND type='#params.type#'&quot; )\nbooks = model(&quot;book&quot;).findAllByReleaseYearAndType( &quot;#params.year#,#params.type#&quot; );\n\n7. If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `comments` method below will call `model(&quot;comment&quot;).findAll(where=&quot;postId=#post.id#&quot;)` internally)\npost = model(&quot;post&quot;).findByKey(params.postId);\ncomments = post.comments();\n\n8. If you have an `Order` model with properties for `productId`, `amount` and a calculated property named `totalAmount` (set up as `property(name=&quot;totalAmount&quot;, sql=&quot;SUM(amount)&quot;)`), then you can do the following to get the ids for all products with over $1,000 in sales (the SQL will be created using `HAVING` instead of `WHERE` in this case since you're getting an aggregate value for a calculated property)\nids = model(&quot;order&quot;).findAll(group=&quot;productId&quot;, where=&quot;totalAmount &gt; 1000&quot;);\n\n9. Using index hints\nindexes = {\n\tauthor=&quot;idx_authors_123&quot;,\n\tpost=&quot;idx_posts_123&quot;\n}\nposts = model(&quot;author&quot;).findAll(where=&quot;firstname LIKE '#params.q#%' OR subject LIKE '#params.q#%'&quot;, include=&quot;posts&quot;, useIndex=indexes);\n</code></pre>"
       },
       "hint": "Returns records from the database table mapped to this model according to the arguments passed in (use the <code>where</code> argument to decide which records to get, use the <code>order</code> argument to set the order in which those records should be returned, and so on).\nThe records will be returned as either a <code>cfquery</code> result set, an array of objects, or an array of structs (depending on what the <code>returnAs</code> argument is set to).\n\n",
       "returntype": "any",
@@ -5337,9 +5337,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// basic usage\nprimaryKeyList = model(&quot;artist&quot;).findAllKeys();\n\n// Quote values, use a different delimiter and filter results with the &quot;where&quot; argument\nprimaryKeyList = model(&quot;artist&quot;).findAllKeys(quoted=true, delimiter=&quot;-&quot;, where=&quot;active=1&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get all IDs for a model (basic usage):\n\nartistIds = model(&quot;artist&quot;).findAllKeys();\n\nReturns a comma-delimited list of all artist IDs.\n\n2. Get active artist IDs with custom delimiter and quotes:\n\nartistIds = model(&quot;artist&quot;).findAllKeys(quoted=true, delimiter=&quot;|&quot;, where=&quot;active=1&quot;);\n\nReturns only active artist IDs, quoted and separated with |.\n\n3. Limit results (top 10 user IDs):\n\nuserIds = model(&quot;user&quot;).findAllKeys(maxRows=10, order=&quot;createdAt DESC&quot;);\n\nReturns the 10 most recently created user IDs.\n\n4. Paginated IDs (books, second page):\n\nbookIds = model(&quot;book&quot;).findAllKeys(page=2, perPage=20, order=&quot;title ASC&quot;);\n\nFetches IDs for books on page 2 (records 21–40), ordered alphabetically.\n\n5. Grouped query with HAVING (order IDs by sales total):\n\norderIds = model(&quot;order&quot;).findAllKeys(group=&quot;productId&quot;, where=&quot;totalAmount &gt; 500&quot;);\n\nReturns order IDs for products that generated more than $500 in sales.\n</code></pre>"
       },
-      "hint": "Returns all primary key values in a list.\nIn addition to <code>quoted</code> and <code>delimiter</code> you can pass in any argument that <code>findAll()</code> accepts.\n\n",
+      "hint": "The findAllKeys() function retrieves all primary key values for a model’s records and returns them as a list. By default, the values are separated with commas, but you can change the delimiter with the delimiter argument or add single quotes around each value with the quoted argument. Since findAllKeys() accepts all arguments that findAll() does, you can also filter results with where, control ordering with order, or even include associations when filtering. This makes it useful when you need just the IDs of records without fetching full objects or rows.\n\n",
       "returntype": "string",
       "slug": "model.findAllKeys",
       "parameters": [
@@ -5372,9 +5372,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Getting the author with the primary key value `99` as an object\nauth = model(&quot;author&quot;).findByKey(99);\n\n// Getting an author based on a form/URL value and then checking if it was found\nauth = model(&quot;author&quot;).findByKey(params.key);\nif(!isObject(auth)){\n    flashInsert(message=&quot;Author #params.key# was not found&quot;);\n    redirectTo(back=true);\n}\n\n// If you have a `belongsTo` association setup from `comment` to `post`, you can do a scoped call. (The `post` method below will call `model(&quot;post&quot;).findByKey(comment.postId)` internally)\ncomment = model(&quot;comment&quot;).findByKey(params.commentId);\npost = comment.post();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Getting the author with the primary key value `99` as an object\nauth = model(&quot;author&quot;).findByKey(99);\n\n2. Getting an author based on a form/URL value and then checking if it was found\nauth = model(&quot;author&quot;).findByKey(params.key);\nif(!isObject(auth)){\n    flashInsert(message=&quot;Author #params.key# was not found&quot;);\n    redirectTo(back=true);\n}\n\n3. If you have a `belongsTo` association setup from `comment` to `post`, you can do a scoped call. (The `post` method below will call `model(&quot;post&quot;).findByKey(comment.postId)` internally)\ncomment = model(&quot;comment&quot;).findByKey(params.commentId);\npost = comment.post();</code></pre>"
       },
-      "hint": "Fetches the requested record by primary key and returns it as an object.\nReturns <code>false</code> if no record is found.\nYou can override this behavior to return a <code>cfquery</code> result set instead, similar to what's described in the documentation for <code>findOne()</code>.\n\n",
+      "hint": "The findByKey() function retrieves a single record from the database using its primary key value and returns it as an object by default. If the record is not found, it returns false, making it easy to handle missing data gracefully. You can also control what columns are returned using the select argument, include related associations, or override the return format to a query, struct, or even raw SQL. Since it accepts the same options as other read functions like findOne(), you can apply caching, indexing, and even include soft-deleted records when needed.\n\n",
       "returntype": "any",
       "slug": "model.findByKey",
       "parameters": [
@@ -5468,10 +5468,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get the first record by primary key (default behavior):\n\nfirstUser = model(&quot;user&quot;).findFirst();\n\nFetches the user with the lowest primary key value.\n\n2. Get the first record alphabetically by name:\n\nfirstAuthor = model(&quot;author&quot;).findFirst(property=&quot;lastName&quot;);\n\nFetches the author with the alphabetically first last name.\n\n3. Get the earliest created record (using a timestamp column):\n\nfirstArticle = model(&quot;article&quot;).findFirst(property=&quot;createdAt&quot;);\n\nFetches the oldest article based on creation date.\n\n4. Get the cheapest product:\n\ncheapestProduct = model(&quot;product&quot;).findFirst(property=&quot;price&quot;);\n\nFetches the product with the lowest price.\n\n5. Use alias properties instead of property:\n\nfirstComment = model(&quot;comment&quot;).findFirst(properties=&quot;createdAt&quot;);\n\nWorks the same as property — useful when you prefer the plural alias.\n</code></pre>"
       },
-      "hint": "Fetches the first record ordered by primary key value.\nUse the <code>property</code> argument to order by something else.\nReturns a model object.\n\n",
+      "hint": "The findFirst() function fetches the first record from the database table mapped to the model, ordered by the primary key value by default. You can customize the ordering by passing a property name through the property argument, which is also aliased as properties. This makes it useful when you want the \"first\" record based on a specific field (e.g., earliest created date, alphabetically first name, lowest price, etc.). The result is returned as a model object.\n\n",
       "returntype": "any",
       "slug": "model.findFirst",
       "parameters": [
@@ -5502,10 +5502,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get the last record by primary key (default behavior):\n\nlastUser = model(&quot;user&quot;).findLastOne();\n\nFetches the user with the highest primary key value.\n\n2. Get the last record alphabetically by name:\n\nlastAuthor = model(&quot;author&quot;).findLastOne(property=&quot;lastName&quot;);\n\nFetches the author with the alphabetically last last name.\n\n3. Get the most recently created record:\n\nlastArticle = model(&quot;article&quot;).findLastOne(property=&quot;createdAt&quot;);\n\nFetches the article with the latest creation date.\n\n4. Get the most expensive product:\n\npriciestProduct = model(&quot;product&quot;).findLastOne(property=&quot;price&quot;);\n\nFetches the product with the highest price.\n\n5. Use alias properties instead of property:\n\nlastComment = model(&quot;comment&quot;).findLastOne(properties=&quot;createdAt&quot;);\n\nWorks the same as property — useful when you prefer the plural alias.\n</code></pre>"
       },
-      "hint": "Fetches the last record ordered by primary key value.\nUse the <code>property</code> argument to order by something else.\nReturns a model object. Formerly known as findLast.\n\n",
+      "hint": "The findLastOne() function fetches the last record from the database table mapped to the model, ordered by the primary key value by default. You can override this ordering by passing a property name through the property argument (also aliased as properties). This is useful when you want to retrieve the \"last\" record based on something other than the primary key, such as the most recently created entry, the highest price, or the latest updated timestamp. The result is returned as a model object. This function was formerly known as findLast.\n\n",
       "returntype": "any",
       "slug": "model.findLastOne",
       "parameters": [
@@ -5530,7 +5530,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Getting the most recent order as an object from the database\norder = model(&quot;order&quot;).findOne(order=&quot;datePurchased DESC&quot;);\n\n// Using a dynamic finder to get the first person with the last name `Smith`. Same as calling `model(&quot;user&quot;).findOne(where&quot;lastName='Smith'&quot;)`\nperson = model(&quot;user&quot;).findOneByLastName(&quot;Smith&quot;);\n\n// Getting a specific user using a dynamic finder. Same as calling `model(&quot;user&quot;).findOne(where&quot;email='someone@somewhere.com' AND password='mypass'&quot;)`\nuser = model(&quot;user&quot;).findOneByEmailAndPassword(&quot;someone@somewhere.com,mypass&quot;);\n\n// If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `profile` method below will call `model(&quot;profile&quot;).findOne(where=&quot;userId=#user.id#&quot;)` internally)\nuser = model(&quot;user&quot;).findByKey(params.userId);\nprofile = user.profile();\n\n// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `findOneComment` method below will call `model(&quot;comment&quot;).findOne(where=&quot;postId=#post.id#&quot;)` internally)\npost = model(&quot;post&quot;).findByKey(params.postId);\ncomment = post.findOneComment(where=&quot;text='I Love Wheels!'&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Getting the most recent order as an object from the database\norder = model(&quot;order&quot;).findOne(order=&quot;datePurchased DESC&quot;);\n\n2. Using a dynamic finder to get the first person with the last name `Smith`. Same as calling `model(&quot;user&quot;).findOne(where&quot;lastName='Smith'&quot;)`\nperson = model(&quot;user&quot;).findOneByLastName(&quot;Smith&quot;);\n\n3. Getting a specific user using a dynamic finder. Same as calling `model(&quot;user&quot;).findOne(where&quot;email='someone@somewhere.com' AND password='mypass'&quot;)`\nuser = model(&quot;user&quot;).findOneByEmailAndPassword(&quot;someone@somewhere.com,mypass&quot;);\n\n4. If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `profile` method below will call `model(&quot;profile&quot;).findOne(where=&quot;userId=#user.id#&quot;)` internally)\nuser = model(&quot;user&quot;).findByKey(params.userId);\nprofile = user.profile();\n\n5. If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `findOneComment` method below will call `model(&quot;comment&quot;).findOne(where=&quot;postId=#post.id#&quot;)` internally)\npost = model(&quot;post&quot;).findByKey(params.postId);\ncomment = post.findOneComment(where=&quot;text='I Love Wheels!'&quot;);</code></pre>"
       },
       "hint": "Fetches the first record found based on the <code>WHERE</code> and <code>ORDER BY</code> clauses.\nWith the default settings (i.e. the <code>returnAs</code> argument set to <code>object</code>), a model object will be returned if the record is found and the boolean value <code>false</code> if not.\nInstead of using the <code>where</code> argument, you can create cleaner code by making use of a concept called Dynamic Finders.\n\n",
       "returntype": "any",
@@ -5635,9 +5635,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the current value of notice in the Flash\nnotice = flash(&quot;notice&quot;);\n\n// Get the entire Flash as a struct\nflashContents = flash();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get a specific Flash value (commonly used for notifications or messages)\n\nnotice = flash(&quot;notice&quot;);\n\n2. Get another value stored in Flash, e.g., an error message\n\nerrorMsg = flash(&quot;error&quot;);\n\n3. Retrieve the entire Flash scope as a struct\n\nallFlash = flash();\n</code></pre>"
       },
-      "hint": "Returns the value of a specific key in the Flash (or the entire Flash as a struct if no key is passed in).\n\n",
+      "hint": "The flash() function is used in controllers to access data stored in the Flash scope. Flash is a temporary storage mechanism that lets you persist values across the next request (often after a redirect). You can use it to retrieve a specific key or the entire Flash struct. If you pass in a key, it returns the value associated with it; if no key is passed, it returns all the Flash contents as a struct.\n\n",
       "returntype": "any",
       "slug": "controller.flash",
       "parameters": [
@@ -5662,9 +5662,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>flashClear();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Clear all flash values at the start of an action\nflashClear();\n\n2. Clear messages after they've been displayed\nnotice = flash(&quot;notice&quot;);\nif (len(notice)) {\n    writeOutput(notice);\n    flashClear(); // reset Flash so it doesn't show again\n}\n\n3. Use before redirecting if you want to ensure no old flash values remain\nflashClear();\nredirectTo(action=&quot;index&quot;);\n</code></pre>"
       },
-      "hint": "Deletes everything from the Flash.\n\n",
+      "hint": "The flashClear() function removes all keys and values from the Flash scope. This is useful when you want to reset or clear out any temporary messages or data that were carried over from a previous request. After calling flashClear(), the Flash will be empty for the remainder of the request and any future requests until new values are inserted.\n\n",
       "returntype": "void",
       "slug": "controller.flashClear",
       "parameters": [],
@@ -5682,9 +5682,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>count = flashCount();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get the number of items in Flash\ncount = flashCount();\n\n2. Check if there are any flash messages before displaying\nif (flashCount() &gt; 0) {\n    writeOutput(&quot;You have &quot; &amp; flashCount() &amp; &quot; messages in Flash.&quot;);\n}\n\n3. Only display notice if Flash is not empty\nif (flashCount() &gt; 0 &amp;&amp; structKeyExists(flash(), &quot;notice&quot;)) {\n    writeOutput(flash(&quot;notice&quot;));\n}\n</code></pre>"
       },
-      "hint": "Returns how many keys exist in the Flash.\n\n",
+      "hint": "The flashCount() function returns the number of keys currently stored in the Flash scope. This is useful to check whether there are any flash messages or temporary data before attempting to read or display them. It helps in conditionally rendering notifications or determining if the Flash is empty.\n\n",
       "returntype": "numeric",
       "slug": "controller.flashCount",
       "parameters": [],
@@ -5702,9 +5702,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>flashDelete(key=&quot;errorMessage&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Delete a single flash message\nflashDelete(key=&quot;errorMessage&quot;);\n\n2. Delete another key and check if it existed\nif (flashDelete(key=&quot;notice&quot;)) {\n    writeOutput(&quot;Notice deleted from Flash.&quot;);\n} else {\n    writeOutput(&quot;Notice key did not exist.&quot;);\n}\n\n3. Conditional usage before displaying flash\nif (structKeyExists(flash(), &quot;warning&quot;)) {\n    warningMsg = flash(&quot;warning&quot;);\n    flashDelete(key=&quot;warning&quot;); // remove after reading\n    writeOutput(warningMsg);\n}\n</code></pre>"
       },
-      "hint": "Deletes a specific key from the Flash.\nReturns <code>true</code> if the key exists.\n\n",
+      "hint": "The flashDelete() function removes a specific key from the Flash scope. It is useful when you want to delete a particular temporary message or piece of data without clearing the entire Flash. The function returns true if the key existed and was deleted, or false if the key was not present.\n\n",
       "returntype": "any",
       "slug": "controller.flashDelete",
       "parameters": [
@@ -5729,9 +5729,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>flashInsert(msg=&quot;It Worked!&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Insert a simple flash message\nflashInsert(msg=&quot;It Worked!&quot;);\n\n2. Insert multiple types of data\nflashInsert(userId=123);\nflashInsert(errorMessage=&quot;Something went wrong&quot;);\n\n3. Typical usage: insert a message before redirecting\nflashInsert(notice=&quot;Profile updated successfully&quot;);\nredirectTo(action=&quot;show&quot;);\n\n4. Insert a structured value\nflashInsert(userStruct={id=42, name=&quot;Alice&quot;});\n</code></pre>"
       },
-      "hint": "Inserts a new key / value into the Flash.\n\n",
+      "hint": "The flashInsert() function adds a new key-value pair to the Flash scope. This is useful for storing temporary messages or data that you want to persist across the next request, typically after a redirect. You can insert any type of value, such as strings, numbers, or structs, and later retrieve it using flash().\n\n",
       "returntype": "void",
       "slug": "controller.flashInsert",
       "parameters": [],
@@ -5749,9 +5749,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>empty = flashIsEmpty();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Check if the Flash is empty\nif (flashIsEmpty()) {\n    writeOutput(&quot;No messages to display.&quot;);\n} else {\n    writeOutput(&quot;There are messages in Flash.&quot;);\n}\n\n2. Use before reading a specific key\nif (!flashIsEmpty() &amp;&amp; structKeyExists(flash(), &quot;notice&quot;)) {\n    writeOutput(flash(&quot;notice&quot;));\n}\n\n3. Typical flow: after clearing Flash\nflashClear();\nwriteOutput(flashIsEmpty()); // true\n</code></pre>"
       },
-      "hint": "Returns whether or not the Flash is empty.\n\n",
+      "hint": "The flashIsEmpty() function checks whether the Flash scope contains any keys. It returns true if the Flash is empty and false if it contains one or more keys. This is useful for conditionally displaying messages or deciding whether to process Flash data before reading or clearing it.\n\n",
       "returntype": "boolean",
       "slug": "controller.flashIsEmpty",
       "parameters": [],
@@ -5769,9 +5769,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Keep the entire Flash for the next request\nflashKeep();\n\n// Keep the &quot;error&quot; key in the Flash for the next request\nflashKeep(&quot;error&quot;);\n\n// Keep both the &quot;error&quot; and &quot;success&quot; keys in the Flash for the next request\nflashKeep(&quot;error,success&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Keep the entire Flash for the next request\nflashKeep();\n\n2. Keep the &quot;error&quot; key in the Flash for the next request\nflashKeep(&quot;error&quot;);\n\n3. Keep both the &quot;error&quot; and &quot;success&quot; keys in the Flash for the next request\nflashKeep(&quot;error,success&quot;);</code></pre>"
       },
-      "hint": "Make the entire Flash or specific key in it stick around for one more request.\n\n",
+      "hint": "The flashKeep() function allows you to preserve Flash data for one additional request. By default, Flash values are only available for the very next request; calling flashKeep() prevents them from being cleared after the current request. You can choose to keep the entire Flash or only specific keys. This is useful when you want messages or temporary data to persist through multiple redirects or page loads.\n\n",
       "returntype": "void",
       "slug": "controller.flashKeep",
       "parameters": [
@@ -5796,9 +5796,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>errorExists = flashKeyExists(&quot;error&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Check if the &quot;error&quot; key exists\nerrorExists = flashKeyExists(&quot;error&quot;);\n\n2. Conditional display based on key existence\nif (flashKeyExists(&quot;notice&quot;)) {\n    writeOutput(flash(&quot;notice&quot;));\n}\n\n3. Example usage in a form flow\nif (flashKeyExists(&quot;validationErrors&quot;)) {\n    errors = flash(&quot;validationErrors&quot;);\n    // Process or display errors\n}\n</code></pre>"
       },
-      "hint": "Checks if a specific key exists in the Flash.\n\n",
+      "hint": "The flashKeyExists() function checks whether a specific key is present in the Flash scope. It returns true if the key exists and false if it does not. This is useful for conditionally displaying or processing Flash messages or data before attempting to read them.\n\n",
       "returntype": "boolean",
       "slug": "controller.flashKeyExists",
       "parameters": [
@@ -5825,7 +5825,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>// In the controller action\nflashInsert(success=&quot;Your post was successfully submitted.&quot;);\nflashInsert(alert=&quot;Don't forget to tweet about this post!&quot;);\nflashInsert(error=&quot;This is an error message.&quot;);\n\n&lt;!--- In the layout or view ---&gt;\n#flashMessages()#\n\n&lt;!--- Generates this (sorted alphabetically):---&gt;\n&lt;div class=&quot;flashMessages&quot;&gt;\n\t&lt;p class=&quot;alertMessage&quot;&gt;\n\t\tDon't forget to tweet about this post!\n\t&lt;/p&gt;\n\t&lt;p class=&quot;errorMessage&quot;&gt;\n\t\tThis is an error message.\n\t&lt;/p&gt;\n\t&lt;p class=&quot;successMessage&quot;&gt;\n\t\tYour post was successfully submitted.\n\t&lt;/p&gt;\n&lt;/div&gt;\n\n\n&lt;!---  Only show the &quot;success&quot; key in the view ---&gt;\n#flashMessages(key=&quot;success&quot;)#\n\n&lt;!--- Generates this: ---&gt;\n&lt;div class=&quot;flashMessage&quot;&gt;\n\t&lt;p class=&quot;successMessage&quot;&gt;\n\t\tYour post was successfully submitted.\n\t&lt;/p&gt;\n&lt;/div&gt;\n\n\n&lt;!--- Show only the &quot;success&quot; and &quot;alert&quot; keys in the view, in that order ---&gt;\n#flashMessages(keys=&quot;success,alert&quot;)#\n\n&lt;!--- Generates this (sorted alphabetically):---&gt;\n&lt;div class=&quot;flashMessages&quot;&gt;\n\t&lt;p class=&quot;successMessage&quot;&gt;\n\t\tYour post was successfully submitted.\n\t&lt;/p&gt;\n\t&lt;p class=&quot;alertMessage&quot;&gt;\n\t\tDon't forget to tweet about this post!\n\t&lt;/p&gt;\n&lt;/div&gt;</code></pre>"
       },
-      "hint": "Displays a marked-up listing of messages that exist in the Flash.\n\n",
+      "hint": "The flashMessages() function generates a formatted HTML output of messages stored in the Flash scope. It is typically used in views or layouts to display temporary notifications like success messages, alerts, or errors. You can choose to display all messages, a specific key, or multiple keys in a defined order. Additional options let you customize the container’s HTML class, include an empty container if no messages exist, and control whether the message content is URL-encoded.\n\n",
       "returntype": "string",
       "slug": "controller.flashMessages",
       "parameters": [
@@ -5870,10 +5870,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic usage: add a single float column\nt.float(&quot;price&quot;);\n\n2. Add multiple float columns at once\nt.float(&quot;length,width,height&quot;);\n\n3. Add a float column with a default value\nt.float(columnNames=&quot;discount&quot;, default=&quot;0.0&quot;);\n\n4. Add a float column that cannot be null\nt.float(columnNames=&quot;taxRate&quot;, allowNull=false);\n\n5. Add multiple float columns with defaults\nt.float(columnNames=&quot;latitude,longitude&quot;, default=&quot;0.0&quot;);\n\n6. Combine default value and null constraint\nt.float(columnNames=&quot;weight&quot;, default=&quot;1.0&quot;, allowNull=false);\n</code></pre>"
       },
-      "hint": "adds float columns to table definition\n\n",
+      "hint": "The float() function is used in a table definition during a migration to add one or more float-type columns to a database table. You can specify column names, default values, and whether the columns allow NULL. This helps define numeric columns with decimal values in your schema. Only available in a migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.float",
       "parameters": [
@@ -5978,9 +5978,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the current value for the `tableNamePrefix` Wheels setting\nsetting = get(&quot;tableNamePrefix&quot;);\n\n// Get the default for the `message` argument of the `validatesConfirmationOf` method\nsetting = get(functionName=&quot;validatesConfirmationOf&quot;, name=&quot;message&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get the current value of a global Wheels setting\ntablePrefix = get(&quot;tableNamePrefix&quot;);\n\n2. Get the default message for the `validatesConfirmationOf` function\nconfirmationMessageDefault = get(functionName=&quot;validatesConfirmationOf&quot;, name=&quot;message&quot;);\n\n3. Check the default value for the &quot;null&quot; argument in migrations\nallowNullDefault = get(functionName=&quot;float&quot;, name=&quot;null&quot;);\n\n4. Retrieve the current default number of rows per page in pagination\nperPageDefault = get(&quot;perPage&quot;);\n</code></pre>"
       },
-      "hint": "Returns the current setting for the supplied Wheels setting or the current default for the supplied Wheels function argument.\n\n",
+      "hint": "Returns the current value of a Wheels configuration setting or the default value for a specific function argument. It can be used to inspect global Wheels settings (like table name prefixes, pagination defaults, or other configuration values) or to check what the default argument would be for a particular Wheels function.\n\n",
       "returntype": "any",
       "slug": "controller.get",
       "parameters": [
@@ -6017,9 +6017,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get array of available migrations\nmigrations = application.wheels.migrator.getAvailableMigrations();\n\nif(ArrayLen(migrations)){\n\t latestVersion = migrations[ArrayLen(migrations)].version;\n} else {\n\t latestVersion = 0;\n}\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get all available migrations in the default folder\nmigrations = application.wheels.migrator.getAvailableMigrations();\n\n// Determine the latest migration version\nif (ArrayLen(migrations)) {\n    latestVersion = migrations[ArrayLen(migrations)].version;\n} else {\n    latestVersion = 0;\n}\n\n2. Get available migrations from a custom folder\ncustomMigrations = application.wheels.migrator.getAvailableMigrations(path=&quot;/custom/migrations&quot;);\n\n// Loop through migrations and display their versions\nfor (var m in migrations) {\n    writeOutput(&quot;Migration version: &quot; & m.version & &quot;&lt;br&gt;&quot;);\n}\n</code></pre>"
       },
-      "hint": "Searches db/migrate folder for migrations. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface\n\n",
+      "hint": "The getAvailableMigrations() function scans the migration folder (by default /app/migrator/migrations/) and returns an array of all migration files it finds. Each item in the array contains information about the migration, including its version. While this function can be called from within your application, it is primarily intended for use via the Wheels CLI or GUI tools. It is useful for programmatically determining which migrations are available and what the latest migration version is.\n\n",
       "returntype": "array",
       "slug": "migrator.getAvailableMigrations",
       "parameters": [
@@ -6045,9 +6045,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get current database version\ncurrentVersion = application.wheels.migrator.getCurrentMigrationVersion();\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get the current database migration version\ncurrentVersion = application.wheels.migrator.getCurrentMigrationVersion();\nwriteOutput(&quot;Current DB version: &quot; & currentVersion);\n\n// Compare with the latest available migration version\nmigrations = application.wheels.migrator.getAvailableMigrations();\nif (ArrayLen(migrations)) {\n    latestVersion = migrations[ArrayLen(migrations)].version;\n    if (currentVersion LT latestVersion) {\n        writeOutput(&quot;Database is behind the latest migration.&quot;);\n    } else {\n        writeOutput(&quot;Database is up-to-date.&quot;);\n    }\n}\n\n// Conditional logic based on migration version\nif (currentVersion EQ &quot;2023091501&quot;) {\n    // perform tasks specific to this version\n}\n</code></pre>"
       },
-      "hint": "Returns current database version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface\n\n",
+      "hint": "The getCurrentMigrationVersion() function returns the version number of the latest migration that has been applied to the database. This is useful for determining the current schema state programmatically, though it is primarily intended for use via the Wheels CLI or GUI interface. You can use this function within your application to perform conditional logic based on the database version or to verify that the database is up-to-date.\n\n",
       "returntype": "string",
       "slug": "migrator.getCurrentMigrationVersion",
       "parameters": [],
@@ -6064,10 +6064,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get all emails sent during the current request\nemails = getEmails();\n\n// Check if an email was sent to a specific recipient\nfor (var email in emails) {\n    if (email.to EQ &quot;user@example.com&quot;) {\n        writeOutput(&quot;Email sent to user@example.com&lt;br&gt;&quot;);\n    }\n}\n</code></pre>"
       },
-      "hint": "Primarily used for testing to get information about emails sent during the request.\n\n",
+      "hint": "Primarily used in testing scenarios to retrieve information about the emails that were sent during the current request. It returns an array containing details of all sent emails, which allows you to verify the content, recipients, and other properties of the emails in your automated tests. This is especially useful for unit or functional tests where you want to assert that specific emails are being triggered by certain actions without actually sending them.\n\n",
       "returntype": "array",
       "slug": "controller.getEmails",
       "parameters": [],
@@ -6084,10 +6084,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get all files sent during the current request\nfiles = getFiles();\n\n// Check if a specific file was sent\nfor (var file in files) {\n    if (file.name EQ &quot;report.pdf&quot;) {\n        writeOutput(&quot;File 'report.pdf' was sent.&lt;br&gt;&quot;);\n    }\n}\n</code></pre>"
       },
-      "hint": "Primarily used for testing to get information about files sent during the request.\n\n",
+      "hint": "The getFiles() function is primarily used in testing scenarios to retrieve information about files sent during the current request. It returns an array containing details of all files handled in the request, such as uploaded attachments or generated files. This allows you to inspect and verify file-related operations in automated tests without needing to access the file system directly.\n\n",
       "returntype": "array",
       "slug": "controller.getFiles",
       "parameters": [],
@@ -6104,10 +6104,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get redirect information for the current request\nredirectInfo = getRedirect();\n\n// Check if a redirect occurred\nif (structKeyExists(redirectInfo, &quot;url&quot;)) {\n    writeOutput(&quot;Redirected to: &quot; & redirectInfo.url);\n    writeOutput(&quot;HTTP status: &quot; & redirectInfo.status);\n} else {\n    writeOutput(&quot;No redirect occurred.&quot;);\n}\n</code></pre>"
       },
-      "hint": "Primarily used for testing to establish whether the current request has performed a redirect.\n\n",
+      "hint": "Primarily used in testing scenarios to determine whether the current request has performed a redirect. It returns a structure containing information about the redirect, such as the target URL and the HTTP status code. This allows you to verify redirect behavior in automated tests without actually sending the user to another page.\n\n",
       "returntype": "struct",
       "slug": "controller.getRedirect",
       "parameters": [],
@@ -6124,10 +6124,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Get all defined routes\nallRoutes = application.wheels.mapper.getRoutes();\n\n// Loop through routes and display their patterns\nfor (var r in allRoutes) {\n    writeOutput(&quot;Route name: &quot; & r.name & &quot;&lt;br&gt;&quot;);\n    writeOutput(&quot;Pattern: &quot; & r.pattern & &quot;&lt;br&gt;&quot;);\n    writeOutput(&quot;Controller: &quot; & r.controller & &quot;&lt;br&gt;&quot;);\n    writeOutput(&quot;Action: &quot; & r.action & &quot;&lt;br&gt;&lt;br&gt;&quot;);\n}\n</code></pre>"
       },
-      "hint": "",
+      "hint": "Returns all the routes that have been defined in the application via the mapper() function. It provides a programmatic way to inspect the routing table, including route names, URL patterns, controllers, actions, and other metadata. This is useful for debugging, generating dynamic links, or performing logic based on the routes that exist in your application.",
       "returntype": "any",
       "slug": "mapper.getRoutes",
       "parameters": [],
@@ -6145,9 +6145,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the table name prefix for this user when running a custom query.\n&lt;cffunction name=&quot;getDisabledUsers&quot; returntype=&quot;query&quot;&gt;\n\t&lt;cfquery datasource=&quot;#get('dataSourceName')#&quot; name=&quot;local.disabledUsers&quot;&gt;\n\tSELECT *\n\tFROM #this.getTableNamePrefix()#users\n\tWHERE disabled = 1\n\t&lt;/cfquery&gt;\n\t&lt;cfreturn local.disabledUsers&gt;\n&lt;/cffunction&gt;\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get the table name prefix for the current model\nprefix = model(\"user\").getTableNamePrefix();\nwriteOutput(\"Table prefix: \" & prefix);\n\n2. Get the table name prefix for this user when running a custom query.\n&lt;cffunction name=&quot;getDisabledUsers&quot; returntype=&quot;query&quot;&gt;\n\t&lt;cfquery datasource=&quot;#get('dataSourceName')#&quot; name=&quot;local.disabledUsers&quot;&gt;\n\tSELECT *\n\tFROM #this.getTableNamePrefix()#users\n\tWHERE disabled = 1\n\t&lt;/cfquery&gt;\n\t&lt;cfreturn local.disabledUsers&gt;\n&lt;/cffunction&gt;\n</code></pre>"
       },
-      "hint": "Returns the table name prefix set for the table.\n\n",
+      "hint": "Returns the table name prefix that is set for the current model. This is useful when your database tables share a common prefix, and you need to construct queries dynamically or perform operations that require the full table name. By using this function, you ensure consistency and avoid hardcoding table prefixes in your queries.\n\n",
       "returntype": "string",
       "slug": "model.getTableNamePrefix",
       "parameters": [],
@@ -6164,28 +6164,8 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
-      },
-      "hint": "",
-      "returntype": "any",
-      "slug": "controller.globalHelperFunction",
-      "parameters": [],
-      "availableIn": [
-        "controller"
-      ],
-      "name": "globalHelperFunction",
-      "tags": {
-        "categoryClass": "",
-        "sectionClass": "",
-        "category": "",
-        "section": ""
-      }
-    },
-    {
-      "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a member object and change the `email` property on it\nmember = model(&quot;member&quot;).findByKey(params.memberId);\nmember.email = params.newEmail;\n\n// Check if the `email` property has changed\nif(member.hasChanged(&quot;email&quot;)){\n    // Do something...\n}\n\n// The above can also be done using a dynamic function like this\nif(member.emailHasChanged()){\n    // Do something...\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get a member object and change the `email` property on it\nmember = model(&quot;member&quot;).findByKey(params.memberId);\nmember.email = params.newEmail;\n\n2. Check if the `email` property has changed\nif(member.hasChanged(&quot;email&quot;)){\n    // Do something...\n}\n\n3. The above can also be done using a dynamic function like this\nif(member.emailHasChanged()){\n    // Do something...\n}</code></pre>"
       },
       "hint": "Returns <code>true</code> if the specified property (or any if none was passed in) has been changed but not yet saved to the database.\nWill also return <code>true</code> if the object is new and no record for it exists in the database.\n\n",
       "returntype": "boolean",
@@ -6213,9 +6193,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Check if the post object has any errors set on it \nif(post.hasErrors()){\n    // Send user to a form to correct the errors... \n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get a post object\npost = model(&quot;post&quot;).findByKey(params.postId);\n\n// Check if the object has any errors\nif (post.hasErrors()) {\n    writeOutput(&quot;There are errors. Redirecting to the edit form...&quot;);\n    redirectTo(action=&quot;edit&quot;, id=post.id);\n}\n\n2. Check if a specific property has errors\nif (post.hasErrors(property=&quot;title&quot;)) {\n    writeOutput(&quot;The title field contains errors.&quot;);\n}\n\n3. Check if a specific named error exists\nif (post.hasErrors(name=&quot;requiredTitle&quot;)) {\n    writeOutput(&quot;The post is missing a required title.&quot;);\n}\n</code></pre>"
       },
-      "hint": "Returns <code>true</code> if the object has any errors.\nYou can also limit to only check a specific property or name for errors.\n\n",
+      "hint": "Checks whether a model object has any validation or other errors. It returns true if the object contains errors, or if a specific property or named error is provided, it checks only that subset. This is useful for validating objects before saving them to the database or displaying error messages to the user.\n\n",
       "returntype": "boolean",
       "slug": "model.hasErrors",
       "parameters": [
@@ -6248,9 +6228,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Specify that instances of this model has many comments (the table for the associated model, not the current, should have the foreign key set on it).\nhasMany(&quot;comments&quot;);\n\n// Specify that this model (let's call it `reader` in this case) has many subscriptions and setup a shortcut to the `publication` model (useful when dealing with many-to-many relationships).\nhasMany(name=&quot;subscriptions&quot;, shortcut=&quot;publications&quot;);\n\n// Automatically delete all associated `comments` whenever this object is deleted.\nhasMany(name=&quot;comments&quot;, dependent=&quot;deleteAll&quot;);\n\n// When not following Wheels naming conventions for associations, it can get complex to define how a `shortcut` works.\n// In this example, we are naming our `shortcut` differently than the actual model's name.\n\n// In the models/Customer.cfc `config()` method.\nhasMany(name=&quot;subscriptions&quot;, shortcut=&quot;magazines&quot;, through=&quot;publication,subscriptions&quot;);\n\n// In the models/Subscription.cfc `config()` method.\nbelongsTo(&quot;customer&quot;);\nbelongsTo(&quot;publication&quot;);\n\n// In the models/Publication `config()` method.\nhasMany(&quot;subscriptions&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Specify that instances of this model has many comments (the table for the associated model, not the current, should have the foreign key set on it).\nhasMany(&quot;comments&quot;);\n\n2. Specify that this model (let's call it `reader` in this case) has many subscriptions and setup a shortcut to the `publication` model (useful when dealing with many-to-many relationships).\nhasMany(name=&quot;subscriptions&quot;, shortcut=&quot;publications&quot;);\n\n3. Automatically delete all associated `comments` whenever this object is deleted.\nhasMany(name=&quot;comments&quot;, dependent=&quot;deleteAll&quot;);\n\n// When not following Wheels naming conventions for associations, it can get complex to define how a `shortcut` works.\n// In this example, we are naming our `shortcut` differently than the actual model's name.\n\n4. In the app/models/Customer.cfc `config()` method.\nhasMany(name=&quot;subscriptions&quot;, shortcut=&quot;magazines&quot;, through=&quot;publication,subscriptions&quot;);\n\n// In the app/models/Subscription.cfc `config()` method.\nbelongsTo(&quot;customer&quot;);\nbelongsTo(&quot;publication&quot;);\n\n// In the app/models/Publication `config()` method.\nhasMany(&quot;subscriptions&quot;);\n</code></pre>"
       },
-      "hint": "Sets up a <code>hasMany</code> association between this model and the specified one.\n\n",
+      "hint": "Sets up a one-to-many association between the current model and another model. This allows you to easily fetch, join, and manage related records in a relational way while following Wheels conventions.\n\n",
       "returntype": "void",
       "slug": "model.hasMany",
       "parameters": [
@@ -6324,9 +6304,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Show check boxes for associating authors with the current book ---&gt;\n&lt;cfloop query=&quot;authors&quot;&gt;\n    #hasManyCheckBox(\n        label=authors.fullName,\n        objectName=&quot;book&quot;,\n        association=&quot;bookAuthors&quot;,\n        keys=&quot;#book.key()#,#authors.id#&quot;\n    )#\n&lt;/cfloop&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage (Books -&gt; Authors)\n\n// Loop through all authors and render checkboxes for associating them with the current book\n&lt;cfloop query=&quot;authors&quot;&gt;\n    #hasManyCheckBox(\n        objectName=&quot;book&quot;,\n        association=&quot;bookAuthors&quot;,\n        keys=&quot;#book.key()#,#authors.id#&quot;,\n        label=authors.fullName\n    )#\n&lt;/cfloop&gt;\n\n2. Custom label placement\n\n// Place the label after the checkbox instead of before\n&lt;cfloop query=&quot;categories&quot;&gt;\n    #hasManyCheckBox(\n        objectName=&quot;post&quot;,\n        association=&quot;postCategories&quot;,\n        keys=&quot;#post.key()#,#categories.id#&quot;,\n        label=categories.name,\n        labelPlacement=&quot;after&quot;\n    )#\n&lt;/cfloop&gt;\n\n3. Wrapping checkboxes in extra HTML (prepend/append)\n\n// Use prepend and append to wrap checkboxes in a &lt;div&gt; with a custom class\n&lt;cfloop query=&quot;tags&quot;&gt;\n    #hasManyCheckBox(\n        objectName=&quot;article&quot;,\n        association=&quot;articleTags&quot;,\n        keys=&quot;#article.key()#,#tags.id#&quot;,\n        label=tags.name,\n        prepend='&lt;div class=&quot;tag-option&quot;&gt;',\n        append='&lt;/div&gt;'\n    )#\n&lt;/cfloop&gt;\n</code></pre>"
       },
-      "hint": "Used as a shortcut to output the proper form elements for an association.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "The hasManyCheckBox() helper generates the correct form elements for managing a hasMany or many-to-many association. It creates checkboxes for linking records together (e.g., a Book with many Authors).\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
       "slug": "controller.hasManyCheckBox",
       "parameters": [
@@ -6418,9 +6398,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Show radio buttons for associating a default address with the current author ---&gt;\n&lt;cfloop query=&quot;addresses&quot;&gt;\n    #hasManyRadioButton(\n        label=addresses.title,\n        objectName=&quot;author&quot;,\n        association=&quot;authorsDefaultAddresses&quot;,\n        keys=&quot;#author.key()#,#addresses.id#&quot;\n    )#\n&lt;/cfloop&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage (Author -&gt; Default Address)\n\n// Pick one address as the author’s default\n&lt;cfloop query=&quot;addresses&quot;&gt;\n    #hasManyRadioButton(\n        objectName=&quot;author&quot;,\n        association=&quot;authorsDefaultAddresses&quot;,\n        property=&quot;defaultAddressId&quot;,\n        keys=&quot;#author.key()#,#addresses.id#&quot;,\n        tagValue=&quot;#addresses.id#&quot;,\n        label=addresses.title\n    )#\n&lt;/cfloop&gt;\n\n2. Pre-check default radio if property is blank\n\n// If no address is selected yet, pre-check the &quot;Home&quot; option\n&lt;cfloop query=&quot;addresses&quot;&gt;\n    #hasManyRadioButton(\n        objectName=&quot;author&quot;,\n        association=&quot;authorsDefaultAddresses&quot;,\n        property=&quot;defaultAddressId&quot;,\n        keys=&quot;#author.key()#,#addresses.id#&quot;,\n        tagValue=&quot;#addresses.id#&quot;,\n        label=addresses.title,\n        checkIfBlank=(addresses.title EQ &quot;Home&quot;)\n    )#\n&lt;/cfloop&gt;\n\n3. Style with extra HTML attributes\n\n// Add class and id for custom styling\n&lt;cfloop query=&quot;paymentMethods&quot;&gt;\n    #hasManyRadioButton(\n        objectName=&quot;user&quot;,\n        association=&quot;userPaymentMethods&quot;,\n        property=&quot;defaultPaymentMethodId&quot;,\n        keys=&quot;#user.key()#,#paymentMethods.id#&quot;,\n        tagValue=&quot;#paymentMethods.id#&quot;,\n        label=paymentMethods.name,\n        class=&quot;radio-option&quot;,\n        id=&quot;paymentMethod_#paymentMethods.id#&quot;\n    )#\n&lt;/cfloop&gt;\n</code></pre>"
       },
-      "hint": "Used as a shortcut to output the proper form elements for an association.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "This helper generates radio buttons for managing a hasMany or one-to-many association, where you want the user to pick one option (e.g., default address, primary contact method, preferred category).\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
       "slug": "controller.hasManyRadioButton",
       "parameters": [
@@ -6489,9 +6469,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Specify that instances of this model has one profile. (The table for the associated model, not the current, should have the foreign key set on it.)\nhasOne(&quot;profile&quot;);\n\n// Same as above but setting the `joinType` to `inner`, which basically means this model should always have a record in the `profiles` table.\nhasOne(name=&quot;profile&quot;, joinType=&quot;inner&quot;);\n\n// Automatically delete the associated `profile` whenever this object is deleted.\nhasMany(name=&quot;comments&quot;, dependent=&quot;delete&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic one-to-one association\n\n// A User has one Profile. The profiles table has userId as the foreign key.\n// In app/models/User.cfc\nhasOne(&quot;profile&quot;);\n\n2. Strict inner join\n\n// Force that every Employee must have one PayrollRecord.\n// In app/models/Employee.cfc\nhasOne(name=&quot;payrollRecord&quot;, joinType=&quot;inner&quot;);\n\n// If there is no matching payrollRecord, the employee will not appear in queries using this association.\n\n3. Auto-delete dependent record\n\n// Delete the Profile when the User is deleted.\n// In app/models/User.cfc\nhasOne(name=&quot;profile&quot;, dependent=&quot;delete&quot;);\n\n4. Custom foreign key\n\n// If the foreign key doesn’t follow Wheels’ naming conventions.\n// For example, Driver has one License, but the foreign key column is driver_ref.\n// In app/models/Driver.cfc\nhasOne(name=&quot;license&quot;, foreignKey=&quot;driver_ref&quot;);\n\n5. Using joinKey for non-standard PK\n\n// If the Company table uses companyCode instead of id as the primary key, and the Address table has companyCode as the foreign key:\n// In app/models/Company.cfc\nhasOne(name=&quot;address&quot;, joinKey=&quot;companyCode&quot;);\n</code></pre>"
       },
-      "hint": "Sets up a <code>hasOne</code> association between this model and the specified one.\n\n",
+      "hint": "Defines a one-to-one relationship between two models. It means each instance of this model is linked to exactly one record in another model. By default, Wheels infers table and key names, but you can customize them with arguments like foreignKey, joinKey, and joinType.\n\n",
       "returntype": "void",
       "slug": "model.hasOne",
       "parameters": [
@@ -6551,9 +6531,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get an object, set a value and then see if the property exists\nemployee = model(&quot;employee&quot;).new();\nemployee.firstName = &quot;dude&quot;;\nemployee.hasProperty(&quot;firstName&quot;); // returns true\n\n// This is also a dynamic method that you could do\nemployee.hasFirstName();\n\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage with existing property\nemployee = model(&quot;employee&quot;).new();\nemployee.firstName = &quot;Alice&quot;;\n\nwriteOutput(employee.hasProperty(&quot;firstName&quot;)); // true\n\n2. Checking a property that does not exist\nemployee = model(&quot;employee&quot;).new();\n\nwriteOutput(employee.hasProperty(&quot;middleName&quot;)); // false\n\n3. Using the dynamic helper\nemployee = model(&quot;employee&quot;).new();\nemployee.email = &quot;alice@example.com&quot;;\n\n// Equivalent to hasProperty(&quot;email&quot;)\nif (employee.hasEmail()) {\n    writeOutput(&quot;Email property exists!&quot;);\n}\n\n4. Before using a property safely\nuser = model(&quot;user&quot;).findByKey(1);\n\n// Avoid runtime errors by checking\nif (user.hasProperty(&quot;phoneNumber&quot;)) {\n    writeOutput(user.phoneNumber);\n} else {\n    writeOutput(&quot;No phone number property defined.&quot;);\n}\n</code></pre>"
       },
-      "hint": "Returns <code>true</code> if the specified property name exists on the model.\n\n",
+      "hint": "Checks if a given property exists on a model object. It’s useful for safely validating whether a field is defined before accessing it, especially in dynamic code or when working with user input. This method also provides dynamic helpers (e.g., object.hasEmail()) for convenience.\n\n",
       "returntype": "boolean",
       "slug": "model.hasProperty",
       "parameters": [
@@ -6578,9 +6558,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Provide an `objectName` and `property` ---&gt;\n#hiddenField(objectName=&quot;user&quot;, property=&quot;id&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage with object and property\n&lt;!--- Hidden field for user.id ---&gt;\n#hiddenField(objectName=&quot;user&quot;, property=&quot;id&quot;)#\n\n// Generates something like:\n// &lt;input id=&quot;user-id&quot; name=&quot;user.id&quot; type=&quot;hidden&quot; value=&quot;123&quot;&gt;\n\n2. Adding extra HTML attributes\n#hiddenField(\n    objectName=&quot;user&quot;,\n    property=&quot;sessionToken&quot;,\n    id=&quot;custom-token&quot;,\n    class=&quot;hidden-tracker&quot;\n)#\n\n// &lt;input id=&quot;custom-token&quot; name=&quot;user.sessionToken&quot; type=&quot;hidden&quot; value=&quot;abc123&quot; class=&quot;hidden-tracker&quot;&gt;\n\n3. Nested association (hasOne or belongsTo)\n#hiddenField(\n    objectName=&quot;order&quot;,\n    property=&quot;id&quot;,\n    association=&quot;customer&quot;\n)#\n\n// If an order has a customer, this binds the hidden field to order.customer.id.\n\n4. Nested hasMany with position\n#hiddenField(\n    objectName=&quot;order&quot;,\n    property=&quot;id&quot;,\n    association=&quot;items&quot;,\n    position=&quot;1&quot;\n)#\n\n// Binds to the id of the second item in the order’s items collection.\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a hidden field form control based on the supplied objectName and property.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "The hiddenField() function generates a hidden &lt;input type=\"hidden\"&gt; tag for a given model object and property. It’s commonly used to store identifiers or other values that need to persist across form submissions without being visible to the user.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
       "slug": "controller.hiddenField",
       "parameters": [
@@ -6630,9 +6610,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Basic usage usually involves a `name` and `value` ---&gt;\n#hiddenFieldTag(name=&quot;userId&quot;, value=user.id)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage\n#hiddenFieldTag(name=&quot;userId&quot;, value=user.id)#\n\n// Generates:\n// &lt;input id=&quot;userId&quot; name=&quot;userId&quot; type=&quot;hidden&quot; value=&quot;123&quot;&gt;\n\n2. With additional attributes\n#hiddenFieldTag(\n    name=&quot;sessionToken&quot;,\n    value=&quot;abc123&quot;,\n    id=&quot;token-field&quot;,\n    class=&quot;hidden-tracker&quot;\n)#\n\n// &lt;input id=&quot;token-field&quot; name=&quot;sessionToken&quot; type=&quot;hidden&quot; value=&quot;abc123&quot; class=&quot;hidden-tracker&quot;&gt;\n\n3. Without specifying a value (empty by default)\n#hiddenFieldTag(name=&quot;csrfToken&quot;)#\n\n// &lt;input id=&quot;csrfToken&quot; name=&quot;csrfToken&quot; type=&quot;hidden&quot; value=&quot;&quot;&gt;\n\n4. Disabling encoding\n#hiddenFieldTag(\n    name=&quot;redirectUrl&quot;,\n    value=&quot;https://example.com/?a=1&amp;b=2&quot;,\n    encode=false\n)#\n\n// &lt;input id=&quot;redirectUrl&quot; name=&quot;redirectUrl&quot; type=&quot;hidden&quot; value=&quot;https://example.com/?a=1&amp;b=2&quot;&gt;\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a hidden field form control based on the supplied name.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Generates a hidden &lt;input type=\"hidden\"&gt; tag using a plain name/value pair. Unlike hiddenField(), this helper does not tie to a model object — it’s meant for raw form fields where you control the name and value manually.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
       "slug": "controller.hiddenFieldTag",
       "parameters": [
@@ -6671,9 +6651,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Will output: You searched for: &lt;span class=&quot;highlight&quot;&gt;Wheels ---&gt;\n#highlight(text=&quot;You searched for: Wheels&quot;, phrases=&quot;Wheels&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage (default &lt;span class=&quot;highlight&quot;&gt;)\n#highlight(text=&quot;You searched for: Wheels&quot;, phrases=&quot;Wheels&quot;)#\n\n// Output:\n// You searched for: &lt;span class=&quot;highlight&quot;&gt;Wheels&lt;/span&gt;\n\n2. Highlight multiple phrases\n#highlight(\n    text=&quot;ColdFusion and Wheels make development fun.&quot;,\n    phrases=&quot;ColdFusion,Wheels&quot;\n)#\n\n// Output:\n// &lt;span class=&quot;highlight&quot;&gt;ColdFusion&lt;/span&gt; and &lt;span class=&quot;highlight&quot;&gt;Wheels&lt;/span&gt; make development fun.\n\n3. Use a custom delimiter for multiple phrases\n#highlight(\n    text=&quot;Apples | Oranges | Bananas&quot;,\n    phrases=&quot;Apples|Bananas&quot;,\n    delimiter=&quot;|&quot;\n)#\n\n// Output:\n// &lt;span class=&quot;highlight&quot;&gt;Apples&lt;/span&gt; | Oranges | &lt;span class=&quot;highlight&quot;&gt;Bananas&lt;/span&gt;\n\n4. Use a different HTML tag\n#highlight(\n    text=&quot;Important: Read the documentation carefully.&quot;,\n    phrases=&quot;Important&quot;,\n    tag=&quot;strong&quot;\n)#\n\n// Output:\n// &lt;strong class=&quot;highlight&quot;&gt;Important&lt;/strong&gt;: Read the documentation carefully.\n</code></pre>"
       },
-      "hint": "Highlights the phrase(s) everywhere in the text if found by wrapping them in <code>span</code> tags.\n\n",
+      "hint": "Searches the given text for one or more phrases and wraps all matches in an HTML tag (default: &lt;span&gt;). This is useful for search results or emphasizing certain keywords dynamically.\n\n",
       "returntype": "string",
       "slug": "controller.highlight",
       "parameters": [
@@ -6732,9 +6712,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!---This &quot;Tag&quot; version of the function accepts a `name` and `selected` instead of binding to a model object ---&gt;\n#hourSelectTag(name=&quot;hourOfMeeting&quot;, selected=params.hourOfMeeting)#\n\n&lt;!---Show 12 hours instead of 24 ---&gt;\n#hourSelectTag(name=&quot;hourOfMeeting&quot;, selected=params.hourOfMeeting, twelveHour=true)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic 24-hour select\n#hourSelectTag(name=&quot;meetingHour&quot;)#\n\n// Output (simplified):\n// &lt;select name=&quot;meetingHour&quot;&gt;\n//   &lt;option value=&quot;00&quot;&gt;00&lt;/option&gt;\n//   &lt;option value=&quot;01&quot;&gt;01&lt;/option&gt;\n//   ...\n//   &lt;option value=&quot;23&quot;&gt;23&lt;/option&gt;\n// &lt;/select&gt;\n\n2. Pre-select an hour\n#hourSelectTag(name=&quot;meetingHour&quot;, selected=&quot;14&quot;)#\n\n// Output (simplified):\n// &lt;option value=&quot;14&quot; selected=&quot;selected&quot;&gt;14&lt;/option&gt;\n\n3. Include a blank option\n#hourSelectTag(name=&quot;meetingHour&quot;, includeBlank=&quot;- Select Hour -&quot;)#\n\n// Output (simplified):\n// &lt;option value=&quot;&quot;&gt;- Select Hour -&lt;/option&gt;\n// &lt;option value=&quot;00&quot;&gt;00&lt;/option&gt;\n// ...\n\n4. Use 12-hour format with AM/PM\n#hourSelectTag(name=&quot;meetingHour&quot;, twelveHour=true, selected=&quot;3&quot;)#\n\n// Output (simplified):\n// &lt;select name=&quot;meetingHour&quot;&gt;\n//   &lt;option value=&quot;01&quot;&gt;01&lt;/option&gt;\n//   &lt;option value=&quot;02&quot;&gt;02&lt;/option&gt;\n//   &lt;option value=&quot;03&quot; selected=&quot;selected&quot;&gt;03&lt;/option&gt;\n//   ...\n//   &lt;option value=&quot;12&quot;&gt;12&lt;/option&gt;\n// &lt;/select&gt;\n\n// &lt;select name=&quot;meetingHourMeridian&quot;&gt;\n//   &lt;option value=&quot;AM&quot;&gt;AM&lt;/option&gt;\n//   &lt;option value=&quot;PM&quot;&gt;PM&lt;/option&gt;\n// &lt;/select&gt;\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing one <code>select</code> form control for the hours of the day based on the supplied name.\n\n",
+      "hint": "Builds and returns a &lt;select&gt; form control for choosing an hour of the day. By default, hours are shown in 24-hour format (00–23), but you can switch to 12-hour format with an accompanying AM/PM dropdown.\n\n",
       "returntype": "string",
       "slug": "controller.hourSelectTag",
       "parameters": [
@@ -6835,9 +6815,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Humanize a string, will result in &quot;Wheels Is A Framework&quot; ---&gt;\n#humanize(&quot;wheelsIsAFramework&quot;)#\n\n&lt;!--- Humanize a string, force wheels to replace &quot;Cfml&quot; with &quot;CFML&quot; ---&gt;\n#humanize(&quot;wheelsIsACfmlFramework&quot;, &quot;CFML&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Humanize a string, will result in &quot;Wheels Is A Framework&quot;\n#humanize(text=&quot;wheelsIsAFramework&quot;)#\n\n2.Humanize a string, force wheels to replace &quot;Cfml&quot; with &quot;CFML&quot;\n#humanize(text=&quot;wheelsIsACfmlFramework&quot;, except=&quot;CFML&quot;)#</code></pre>"
       },
-      "hint": "Returns readable text by capitalizing and converting camel casing to multiple words.\n\n",
+      "hint": "Converts a camel-cased or underscored string into more readable, human-friendly text by inserting spaces and capitalizing words. You can also specify words that should be replaced or kept in a specific format.\n\n",
       "returntype": "string",
       "slug": "controller.humanize",
       "parameters": [
@@ -6875,9 +6855,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!---Outputs &quot;my-blog-post&quot; ---&gt;\n#hyphenize(&quot;myBlogPost&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic camelCase string\n#hyphenize(&quot;myBlogPost&quot;)#\n\n// Output:\n// my-blog-post\n\n2. PascalCase string\n#hyphenize(&quot;UserProfileSettings&quot;)#\n\n// Output:\n// user-profile-settings\n\n3. Single word (no change)\n#hyphenize(&quot;Dashboard&quot;)#\n\n// Output:\n// dashboard\n\n4. Already hyphenated string (stays lowercase)\n#hyphenize(&quot;already-hyphenized&quot;)#\n\n// Output:\n// already-hyphenized\n</code></pre>"
       },
-      "hint": "Converts camelCase strings to lowercase strings with hyphens as word delimiters instead. Example: myVariable becomes my-variable.\n\n",
+      "hint": "Converts camelCase or PascalCase strings into lowercase hyphen-separated strings. Useful for generating URL-friendly slugs, CSS class names, or readable identifiers.\n\n",
       "returntype": "string",
       "slug": "controller.hyphenize",
       "parameters": [
@@ -6908,7 +6888,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Outputs an `img` tag for `images/logo.png` ---&gt;\n#imageTag(&quot;logo.png&quot;)#\n\n&lt;!--- Outputs an `img` tag for `http://cfwheels.org/images/logo.png` ---&gt;\n#imageTag(source=&quot;http://cfwheels.org/images/logo.png&quot;, alt=&quot;ColdFusion on Wheels&quot;)#\n\n&lt;!--- Outputs an `img` tag with the `class` attribute set ---&gt;\n#imageTag(source=&quot;logo.png&quot;, class=&quot;logo&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Outputs an `img` tag for `public/images/logo.png`\n#imageTag(&quot;logo.png&quot;)#\n\n2. Outputs an `img` tag for `http://cfwheels.org/images/logo.png`\n#imageTag(source=&quot;http://cfwheels.org/images/logo.png&quot;, alt=&quot;ColdFusion on Wheels&quot;)#\n\n3. Outputs an `img` tag with the `class` attribute set\n#imageTag(source=&quot;logo.png&quot;, class=&quot;logo&quot;)#\n\n4. With explicit host and protocol\n#imageTag(source=\"logo.png\", onlyPath=false, host=\"cdn.myapp.com\", protocol=\"https\")#</code></pre>"
       },
       "hint": "Returns an <code>img</code> tag.\nIf the image is stored in the local <code>images</code> folder, the tag will also set the <code>width</code>, <code>height</code>, and <code>alt</code> attributes for you.\nYou can pass any additional arguments (e.g. <code>class</code>, <code>rel</code>, <code>id</code>), and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -6972,9 +6952,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- In your view template, let's say `views/blog/post.cfm---&gt;\ncontentFor(head='&lt;meta name=&quot;robots&quot; content=&quot;noindex,nofollow&quot;&gt;');\ncontentFor(head='&lt;meta name=&quot;author&quot; content=&quot;wheelsdude@wheelsify.com&quot;&gt;');\n\n// In `views/layout.cfm`\n&lt;html&gt;\n\t&lt;head&gt;\n\t    &lt;title&gt;My Site&lt;/title&gt;\n\t    #includeContent(&quot;head&quot;)#\n\t&lt;/head&gt;\n\t&lt;body&gt;\n\t\t&lt;cfoutput&gt;\n\t\t\t#includeContent()#\n\t\t&lt;/cfoutput&gt;\n\t&lt;/body&gt;\n&lt;/html&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. In your view template, let's say `app/views/blog/post.cfm\ncontentFor(head='&lt;meta name=&quot;robots&quot; content=&quot;noindex,nofollow&quot;&gt;');\ncontentFor(head='&lt;meta name=&quot;author&quot; content=&quot;wheelsdude@wheelsify.com&quot;&gt;');\n\n// In `app/views/layout.cfm`\n&lt;html&gt;\n\t&lt;head&gt;\n\t    &lt;title&gt;My Site&lt;/title&gt;\n\t    #includeContent(&quot;head&quot;)#\n\t&lt;/head&gt;\n\t&lt;body&gt;\n\t\t&lt;cfoutput&gt;\n\t\t\t#includeContent()#\n\t\t&lt;/cfoutput&gt;\n\t&lt;/body&gt;\n&lt;/html&gt;</code></pre>"
       },
-      "hint": "Used to output the content for a particular section in a layout.\n\n",
+      "hint": "Outputs the content for a specific section in a layout. Works together with contentFor() to define and then inject content into layouts. Typically used for head, sidebar, footer, or other pluggable layout sections. If the requested section hasn’t been defined, it will either return nothing or the provided defaultValue.\n\n",
       "returntype": "string",
       "slug": "controller.includeContent",
       "parameters": [
@@ -7007,7 +6987,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Check to see if the customer is subscribed to the Swimsuit Edition. Note that the order of the `keys` argument should match the order of the `customerid` and `publicationid` columns in the `subscriptions` join table\nif(!includedInObject(objectName=&quot;customer&quot;, association=&quot;subscriptions&quot;, keys=&quot;#customer.key()#,#swimsuitEdition.id#&quot;)){\n    assignSalesman(customer);\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Check to see if the customer is subscribed to the Swimsuit Edition. Note that the order of the `keys` argument should match the order of the `customerid` and `publicationid` columns in the `subscriptions` join table\nif(!includedInObject(objectName=&quot;customer&quot;, association=&quot;subscriptions&quot;, keys=&quot;#customer.key()#,#swimsuitEdition.id#&quot;)){\n    assignSalesman(customer);\n}</code></pre>"
       },
       "hint": "Used as a shortcut to check if the specified IDs are a part of the main form object.\nThis method should only be used for <code>hasMany</code> associations.\n\n",
       "returntype": "boolean",
@@ -7046,9 +7026,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Make sure that the `sidebar` value is provided for the parent layout ---&gt;\n&lt;cfsavecontent variable=&quot;categoriesSidebar&quot;&gt;\n\t&lt;cfoutput&gt;\n\t\t&lt;ul&gt;\n\t\t\t#includePartial(categories)#\n\t\t&lt;/ul&gt;\n\t&lt;/cfoutput&gt;\n&lt;/cfsavecontent&gt;\ncontentFor(sidebar=categoriesSidebar);\n\n&lt;!---Include parent layout at `views/layout.cfm`---&gt;\n#includeLayout(&quot;/layout.cfm&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Make sure that the `sidebar` value is provided for the parent layout\n&lt;cfsavecontent variable=&quot;categoriesSidebar&quot;&gt;\n\t&lt;cfoutput&gt;\n\t\t&lt;ul&gt;\n\t\t\t#includePartial(categories)#\n\t\t&lt;/ul&gt;\n\t&lt;/cfoutput&gt;\n&lt;/cfsavecontent&gt;\ncontentFor(sidebar=categoriesSidebar);\n\n// Include parent layout at `app/views/layout.cfm`\n#includeLayout(&quot;/layout.cfm&quot;)#</code></pre>"
       },
-      "hint": "Includes the contents of another layout file.\nThis is usually used to include a parent layout from within a child layout.\n\n",
+      "hint": "Includes the contents of another layout file. Typically used when a child layout wants to include a parent layout, or to nest layouts for consistent site structure.\n\n",
       "returntype": "string",
       "slug": "controller.includeLayout",
       "parameters": [
@@ -7074,7 +7054,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>\n// If we're in the &quot;sessions&quot; controller, Wheels will include the file &quot;views/sessions/_login.cfm&quot;.  \n#includePartial(&quot;login&quot;)# \n\n// Wheels will include the file &quot;views/shared/_button.cfm&quot;.  \n#includePartial(partial=&quot;/shared/button&quot;)# \n\n// If we're in the &quot;posts&quot; controller and the &quot;posts&quot; variable includes a query result set, Wheels will loop through the record set and include the file &quot;views/posts/_post.cfm&quot; for each record.  \n&lt;cfset posts = model(&quot;post&quot;).findAll()&gt; \n#includePartial(posts)# \n\n// We can also override the template file loaded for the example above.  \n#includePartial(partial=&quot;/shared/post&quot;, query=posts)# \n\n// The same works when passing a model instance.  \n&lt;cfset post = model(&quot;post&quot;).findByKey(params.key)&gt; #includePartial(post)# \n#includePartial(partial=&quot;/shared/post&quot;, object=post)# \n\n// The same works when passing an array of model objects.  \n&lt;cfset posts = model(&quot;post&quot;).findAll(returnAs=&quot;objects&quot;)&gt; \n#includePartial(posts)# \n#includePartial(partial=&quot;/shared/post&quot;, objects=posts)# \n&lt;/cfoutput&gt;\n\n</code></pre>"
+        "docs": "<pre><code class='javascript'>\n1. If we're in the &quot;sessions&quot; controller, Wheels will include the file &quot;app/views/sessions/_login.cfm&quot;.  \n#includePartial(&quot;login&quot;)# \n\n2. Wheels will include the file &quot;app/views/shared/_button.cfm&quot;.  \n#includePartial(partial=&quot;/shared/button&quot;)# \n\n3. If we're in the &quot;posts&quot; controller and the &quot;posts&quot; variable includes a query result set, Wheels will loop through the record set and include the file &quot;app/views/posts/_post.cfm&quot; for each record.  \n&lt;cfset posts = model(&quot;post&quot;).findAll()&gt; \n#includePartial(posts)# \n\n4. We can also override the template file loaded for the example above.  \n#includePartial(partial=&quot;/shared/post&quot;, query=posts)# \n\n5. The same works when passing a model instance.  \n&lt;cfset post = model(&quot;post&quot;).findByKey(params.key)&gt; #includePartial(post)# \n#includePartial(partial=&quot;/shared/post&quot;, object=post)# \n\n6. The same works when passing an array of model objects.  \n&lt;cfset posts = model(&quot;post&quot;).findAll(returnAs=&quot;objects&quot;)&gt; \n#includePartial(posts)# \n#includePartial(partial=&quot;/shared/post&quot;, objects=posts)# \n&lt;/cfoutput&gt;\n\n</code></pre>"
       },
       "hint": "Includes the specified partial file in the view.\nSimilar to using <code>cfinclude</code> but with the ability to cache the result and use Wheels-specific file look-up.\nBy default, Wheels will look for the file in the current controller's view folder.\nTo include a file relative from the base <code>views</code> folder, you can start the path supplied to <code>partial</code> with a forward slash.\n\n",
       "returntype": "string",
@@ -7141,10 +7121,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a single integer column age\nt.integer(&quot;age&quot;)\n\n2. Add multiple integer columns height and weight\nt.integer(&quot;height,weight&quot;)\n\n3. Add an integer column quantity with a default value of 0\nt.integer(columnNames=&quot;quantity&quot;, default=0)\n\n4. Add an integer column priority that cannot be null\nt.integer(columnNames=&quot;priority&quot;, allowNull=false)\n\n5. Add an integer column rating with a limit of 2 digits (smallint)\nt.integer(columnNames=&quot;rating&quot;, limit=2)\n\n6. Add multiple columns with different limits (comma-separated)\nt.integer(columnNames=&quot;smallValue,mediumValue,bigValue&quot;, limit=1)\n</code></pre>"
       },
-      "hint": "adds integer columns to table definition\n\n",
+      "hint": "Adds one or more integer columns to a table definition during a migration. You can optionally specify a limit, default value, and whether the column allows NULL. Only available in migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.integer",
       "parameters": [
@@ -7183,9 +7163,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// This is the method to be run inside a transaction.\npublic boolean function transferFunds(required any personFrom, required any personTo, required numeric amount) {\n\tif (arguments.personFrom.withdraw(arguments.amount) &amp;&amp; arguments.personTo.deposit(arguments.amount)) {\n\t\treturn true;\n\t} else {\n\t\treturn false;\n\t}\n}\n\nlocal.david = model(&quot;Person&quot;).findOneByName(&quot;David&quot;);\nlocal.mary = model(&quot;Person&quot;).findOneByName(&quot;Mary&quot;);\ninvokeWithTransaction(method=&quot;transferFunds&quot;, personFrom=local.david, personTo=local.mary, amount=100);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. This is the method to be run inside a transaction.\npublic boolean function transferFunds(required any personFrom, required any personTo, required numeric amount) {\n\tif (arguments.personFrom.withdraw(arguments.amount) &amp;&amp; arguments.personTo.deposit(arguments.amount)) {\n\t\treturn true;\n\t} else {\n\t\treturn false;\n\t}\n}\n\nlocal.david = model(&quot;Person&quot;).findOneByName(&quot;David&quot;);\nlocal.mary = model(&quot;Person&quot;).findOneByName(&quot;Mary&quot;);\ninvokeWithTransaction(method=&quot;transferFunds&quot;, personFrom=local.david, personTo=local.mary, amount=100);\n</code></pre>"
       },
-      "hint": "Runs the specified method within a single database transaction.\n\n",
+      "hint": "Runs a specified model method inside a single database transaction. This ensures that all database operations within the method are treated as a single atomic unit: either all succeed or all fail.\n\n",
       "returntype": "any",
       "slug": "model.invokeWithTransaction",
       "parameters": [
@@ -7224,9 +7204,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>requestIsAjax = isAjax();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Simple conditional logic\nif(isAjax()){\n    // Return JSON response for AJAX requests\n    cfcontent(type=&quot;application/json&quot;)\n    renderWith(data={ success = true, message = &quot;This is an AJAX request&quot; });\n} else {\n    // Render full HTML page for normal requests\n}\n\n2. Example in a Controller Action\ncomponent extends=&quot;Controller&quot; {\n\n    function checkStatus() {\n        if (isAjax()) {\n            renderWith(data={ success = true, message = &quot;This is an AJAX request&quot; });\n        } else {\n            flashInsert(msg=&quot;Page loaded normally&quot;);\n            redirectTo(&quot;home&quot;);\n        }\n    }\n\n}</code></pre>"
       },
-      "hint": "Returns whether the page was called from JavaScript or not.\n\n",
+      "hint": "Checks if the current request was made via JavaScript (AJAX) rather than a standard browser page load. This is useful when you want to return JSON or partial content instead of a full HTML page.\n\n",
       "returntype": "boolean",
       "slug": "controller.isAjax",
       "parameters": [],
@@ -7244,9 +7224,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Use the passed in `id` when we're already in an instance\nfunction memberIsAdmin(){\n\tif(isClass()){\n\t\treturn this.findByKey(arguments.id).admin;\n\t} else {\n\t\treturn this.admin;\n\t}\n}\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Use the passed in `id` when we're already in an instance\nfunction memberIsAdmin(){\n\tif(isClass()){\n\t\treturn this.findByKey(arguments.id).admin;\n\t} else {\n\t\treturn this.admin;\n\t}\n}\n</code></pre>"
       },
-      "hint": "Use this method to check whether you are currently in a class-level object.\n\n",
+      "hint": "Determines whether the method is being called at the class level (on the model itself) or on an instance of the model. This is useful when the same function can be invoked either on a model object or directly on the model class.\n\n",
       "returntype": "string",
       "slug": "model.isClass",
       "parameters": [],
@@ -7263,10 +7243,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>component extends=&quot;Controller&quot; {\n\n    public void function destroy() {\n        if (isDelete()) {\n            // Perform deletion logic\n            model(&quot;Post&quot;).deleteByKey(params.id);\n            flashInsert(success=&quot;Post deleted successfully.&quot;);\n            redirectTo(action=&quot;index&quot;);\n        } else {\n            // Handle non-DELETE request\n            flashInsert(error=&quot;Invalid request method.&quot;);\n            redirectTo(action=&quot;index&quot;);\n        }\n    }\n\n}</code></pre>"
       },
-      "hint": "Returns whether the request was a <code>DELETE</code> request or not.\n\n",
+      "hint": "Checks if the current HTTP request method is DELETE. This is useful for RESTful controllers where different logic is executed based on the request type.\n\n",
       "returntype": "boolean",
       "slug": "controller.isDelete",
       "parameters": [],
@@ -7284,9 +7264,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>requestIsGet = isGet();</code></pre>"
+        "docs": "<pre><code class='javascript'>component extends=&quot;Controller&quot; {\n\n    public void function show() {\n        if (isGet()) {\n            // Display a form or data\n            post = model(&quot;Post&quot;).findByKey(params.id);\n            renderWith(action=&quot;show&quot;, data=post);\n        } else {\n            // Handle non-GET request (e.g., POST, DELETE)\n            flashInsert(error=&quot;Invalid request method.&quot;);\n            redirectTo(action=&quot;index&quot;);\n        }\n    }\n\n}</code></pre>"
       },
-      "hint": "Returns whether the request was a normal <code>GET</code> request or not.\n\n",
+      "hint": "Checks if the current HTTP request method is GET. Useful for controlling logic depending on whether a page is being displayed or data is being requested via GET.\n\n",
       "returntype": "boolean",
       "slug": "controller.isGet",
       "parameters": [],
@@ -7303,10 +7283,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>component extends=&quot;Controller&quot; {\n\n    public void function checkFile() {\n        if (isHead()) {\n            // Respond with headers only, no content\n        } else {\n            // Handle normal GET or other requests\n            fileData = model(&quot;File&quot;).findByKey(params.id);\n            renderWith(action=&quot;show&quot;, data=fileData);\n        }\n    }\n\n}</code></pre>"
       },
-      "hint": "Returns whether the request was a <code>HEAD</code> request or not.\n\n",
+      "hint": "Checks if the current HTTP request method is HEAD. HEAD requests are similar to GET requests but do not return a message body, only the headers. This is often used for checking metadata like content length or existence without transferring the actual content.\n\n",
       "returntype": "boolean",
       "slug": "controller.isHead",
       "parameters": [],
@@ -7324,9 +7304,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Use the passed in `id` when we're not already in an instance\nfunction memberIsAdmin(){\n\tif(isInstance()){\n\t\treturn this.admin;\n\t} else {\n\t\treturn this.findByKey(arguments.id).admin;\n\t}\n}\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Use the passed in `id` when we're not already in an instance\nfunction memberIsAdmin(){\n\tif(isInstance()){\n\t\treturn this.admin;\n\t} else {\n\t\treturn this.findByKey(arguments.id).admin;\n\t}\n}\n</code></pre>"
       },
-      "hint": "Use this method to check whether you are currently in an instance object.\n\n",
+      "hint": "Checks whether the current context is an instance of a model object rather than a class-level context. This is useful when a method could be called either on a class or an instance, and you want to behave differently depending on which it is.\n\n",
       "returntype": "boolean",
       "slug": "model.isInstance",
       "parameters": [],
@@ -7344,7 +7324,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Create a new object and then check if it is new (yes, this example is ridiculous. It makes more sense in the context of callbacks for example)\nemployee = model(&quot;employee&quot;).new()&gt;\n&lt;cfif employee.isNew()&gt;\n    // Do something...\n&lt;/cfif&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Create a new object and then check if it is new (yes, this example is ridiculous. It makes more sense in the context of callbacks for example)\nemployee = model(&quot;employee&quot;).new()&gt;\n&lt;cfif employee.isNew()&gt;\n    // Do something...\n&lt;/cfif&gt;</code></pre>"
       },
       "hint": "Returns <code>true</code> if this object hasn't been saved yet (in other words, no matching record exists in the database yet).\nReturns <code>false</code> if a record exists.\n\n",
       "returntype": "boolean",
@@ -7363,10 +7343,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\nif (isOptions()) {\n   // Handle CORS preflight or respond to OPTIONS request\n   writeOutput(&quot;This is an OPTIONS request.&quot;);\n} else {\n   writeOutput(&quot;This is a different type of request.&quot;);\n}\n&lt;/cfscript&gt;</code></pre>"
       },
-      "hint": "Returns whether the request was an <code>OPTIONS</code> request or not.\n\n",
+      "hint": "Checks whether the current HTTP request was made using the OPTIONS method. Useful in REST APIs or CORS preflight requests.\n\n",
       "returntype": "boolean",
       "slug": "controller.isOptions",
       "parameters": [],
@@ -7383,10 +7363,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\nif (isPatch()) {\n    writeOutput(&quot;This is a PATCH request.&quot;);\n} else {\n    writeOutput(&quot;This is a different type of request.&quot;);\n}\n&lt;/cfscript&gt;</code></pre>"
       },
-      "hint": "Returns whether the request was a <code>PATCH</code> request or not.\n\n",
+      "hint": "Checks whether the current HTTP request was made using the PATCH method. Useful when building RESTful APIs where PATCH is used to partially update resources.\n\n",
       "returntype": "boolean",
       "slug": "controller.isPatch",
       "parameters": [],
@@ -7403,8 +7383,8 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Check an older object\nemployee = model(&quot;employee&quot;).findByKey(123);\nif (employee.isPersisted()) {\n    writeOutput(&quot;This employee exists in the database.&quot;);\n} else {\n    writeOutput(&quot;This employee has not been saved yet.&quot;);\n}\n\n2. Creating a new object\nnewEmployee = model(&quot;employee&quot;).new();\nif (!newEmployee.isPersisted()) {\n    writeOutput(&quot;This is a new object, not yet persisted.&quot;);\n}</code></pre>"
       },
       "hint": "Returns <code>true</code> if this object has been persisted to the database or was loaded from the database via a finder.\nReturns <code>false</code> if the record has not been persisted to the database.\n\n",
       "returntype": "boolean",
@@ -7424,7 +7404,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>requestIsPost = isPost();</code></pre>"
+        "docs": "<pre><code class='javascript'>if (isPost()) {\n    writeOutput(&quot;This request was submitted via POST.&quot;);\n} else {\n    writeOutput(&quot;This request is not a POST request.&quot;);\n}</code></pre>"
       },
       "hint": "Returns whether the request came from a form <code>POST</code> submission or not.\n\n",
       "returntype": "boolean",
@@ -7443,10 +7423,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>if (isPut()) {\n    writeOutput(&quot;This request was submitted via PUT.&quot;);\n} else {\n    writeOutput(&quot;This request is not a PUT request.&quot;);\n}</code></pre>"
       },
-      "hint": "Returns whether the request was a <code>PUT</code> request or not.\n\n",
+      "hint": "Checks whether the current HTTP request is a PUT request. PUT requests are typically used to update existing resources in RESTful APIs.\n\n",
       "returntype": "boolean",
       "slug": "controller.isPut",
       "parameters": [],
@@ -7464,9 +7444,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Redirect non-secure connections to the secure version\nif (!isSecure())\n{\n\tredirectTo(protocol=&quot;https&quot;);\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Redirect non-secure connections to the secure version\nif (!isSecure())\n{\n\tredirectTo(protocol=&quot;https&quot;);\n}</code></pre>"
       },
-      "hint": "Returns whether Wheels is communicating over a secure port.\n\n",
+      "hint": "Checks whether the current request is made over a secure connection (HTTPS). Returns true if the connection is secure, otherwise false.\n\n",
       "returntype": "boolean",
       "slug": "controller.isSecure",
       "parameters": [],
@@ -7484,9 +7464,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- View Code ---&gt;\n&lt;head&gt;\n    &lt;!--- Includes `javascripts/main.js` ---&gt;\n    #javaScriptIncludeTag(&quot;main&quot;)#\n\n    &lt;!--- Includes `javascripts/blog.js` and `javascripts/accordion.js` ---&gt;\n    #javaScriptIncludeTag(&quot;blog,accordion&quot;)#\n    \n    &lt;!--- Includes external JavaScript file ---&gt;\n    #javaScriptIncludeTag(&quot;https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js&quot;)#\n&lt;/head&gt;\n\n&lt;body&gt;\n    &lt;!--- Will still appear in the `head` ---&gt;\n    #javaScriptIncludeTag(source=&quot;tabs&quot;, head=true)#\n&lt;/body&gt;\n\n</code></pre>"
+        "docs": "<pre><code class='javascript'>&lt;!--- View Code ---&gt;\n&lt;head&gt;\n    &lt;!--- Includes `public/javascripts/main.js` ---&gt;\n    #javaScriptIncludeTag(&quot;main&quot;)#\n\n    &lt;!--- Includes `publicjavascripts/blog.js` and `public/javascripts/accordion.js` ---&gt;\n    #javaScriptIncludeTag(&quot;blog,accordion&quot;)#\n    \n    &lt;!--- Includes external JavaScript file ---&gt;\n    #javaScriptIncludeTag(&quot;https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js&quot;)#\n&lt;/head&gt;\n\n&lt;body&gt;\n    &lt;!--- Will still appear in the `head` ---&gt;\n    #javaScriptIncludeTag(source=&quot;tabs&quot;, head=true, type=\"text/javascript\")#\n&lt;/body&gt;\n\n</code></pre>"
       },
-      "hint": "Returns a <code>script</code> tag for a JavaScript file (or several) based on the supplied arguments.\n\n",
+      "hint": "Generates &lt;script&gt; tags for including JavaScript files. Can handle local files in the javascripts folder or external URLs. Supports multiple files and optional placement in the HTML &lt;head&gt;.\n\n",
       "returntype": "string",
       "slug": "controller.javaScriptIncludeTag",
       "parameters": [
@@ -7540,7 +7520,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get an object and then get the primary key value(s)\nemployee = model(&quot;employee&quot;).findByKey(params.key);\nval = employee.key();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Single Primary Key\n<!--- Assume Employee model has primary key `id` --->\nemployee = model(&quot;employee&quot;).findByKey(42);\n\n&lt;cfoutput&gt;\nEmployee ID: #employee.key()# &lt;!--- Equivalent to employee.id ---&gt;\n&lt;/cfoutput&gt;\n\n2. Dynamic Key Retrieval\n<!--- Useful when you don’t know the name of the primary key --->\nanyEmployee = model(&quot;employee&quot;).findByKey(params.key);\n\nprimaryKey = anyEmployee.key();\nwriteOutput(&quot;Primary key value is: &quot; &amp; primaryKey);\n\n3. Composite Primary Key\n<!--- Assume Subscription model has composite keys: customerId, publicationId --->\nsubscription = model(&quot;subscription&quot;).findByKey(customerId=3, publicationId=7);\n\n&lt;cfoutput&gt;\nComposite Keys: #subscription.key()# &lt;!--- Outputs: &quot;3,7&quot; ---&gt;\n&lt;/cfoutput&gt;\n\n4. Use in Links or Forms\n&lt;cfset employee = model(&quot;employee&quot;).findByKey(42)&gt;\n\n&lt;!--- Generate a link with dynamic primary key ---&gt;\n&lt;a href=&quot;#linkTo(action='edit', id=employee.key())#&quot;&gt;Edit Employee&lt;/a&gt;\n\n&lt;!--- Hidden field for a form ---&gt;\n#hiddenField(objectName=&quot;employee&quot;, property=&quot;id&quot;)#\n\n5. Passing Keys in Nested Relationships\n&lt;!--- Suppose a `bookAuthors` association exists ---&gt;\nbook = model(&quot;book&quot;).findByKey(15);\n\n&lt;cfloop array=&quot;#book.bookAuthors#&quot; index=&quot;author&quot;&gt;\n    &lt;cfoutput&gt;\n        Author Key: #author.key()# &lt;br&gt;\n    &lt;/cfoutput&gt;\n&lt;/cfloop&gt;</code></pre>"
       },
       "hint": "Returns the value of the primary key for the object.\nIf you have a single primary key named id, then <code>someObject.key()</code> is functionally equivalent to <code>someObject.id</code>.\nThis method is more useful when you do dynamic programming and don't know the name of the primary key or when you use composite keys (in which case it's convenient to use this method to get a list of both key values returned).\n\n",
       "returntype": "string",
@@ -7683,7 +7663,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>#mailTo(emailAddress=&quot;webmaster@yourdomain.com&quot;, name=&quot;Contact our Webmaster&quot;)#\n&lt;!--- Outputs: &lt;a href=&quot;mailto:webmaster@yourdomain.com&quot;&gt;Contact our Webmaster&lt;/a&gt; ---&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic mailto link\n#mailTo(emailAddress=&quot;webmaster@yourdomain.com&quot;)#\n&lt;!--- Outputs: &lt;a href=&quot;mailto:webmaster@yourdomain.com&quot;&gt;webmaster@yourdomain.com&lt;/a&gt; ---&gt;\n\n2. Mailto link with custom name\n#mailTo(emailAddress=&quot;webmaster@yourdomain.com&quot;, name=&quot;Contact our Webmaster&quot;)#\n&lt;!--- Outputs: &lt;a href=&quot;mailto:webmaster@yourdomain.com&quot;&gt;Contact our Webmaster&lt;/a&gt; ---&gt;\n\n3. Mailto link with special characters (encoding)\n#mailTo(emailAddress=&quot;support+help@yourdomain.com&quot;, name=&quot;Support Team&quot;)#\n&lt;!--- Outputs: &lt;a href=&quot;mailto:support+help@yourdomain.com&quot;&gt;Support Team&lt;/a&gt; ---&gt;</code></pre>"
       },
       "hint": "Creates a <code>mailto</code> link tag to the specified email address, which is also used as the name of the link unless name is specified.\n\n",
       "returntype": "string",
@@ -7723,10 +7703,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic Usage\n&lt;cfscript&gt;\nmapper()\n    .resources(&quot;posts&quot;)  // generates standard RESTful routes for posts\n    .get(name=&quot;about&quot;, pattern=&quot;about-us&quot;, to=&quot;pages##about&quot;) // custom GET route\n    .namespace(&quot;admin&quot;) // group routes under admin namespace\n        .resources(&quot;users&quot;) // RESTful routes for admin users\n    .end();\n&lt;/cfscript&gt;\n\n2. Disable format mapping\nmapper(mapFormat=false)\n    .resources(&quot;reports&quot;);\n\n// This will prevent automatic generation of .json or .xml endpoints for the resource.</code></pre>"
       },
-      "hint": "Returns the mapper object used to configure your application's routes. Usually you will use this method in <code>config/routes.cfm</code> to start chaining route mapping methods like <code>resources</code>, <code>namespace</code>, etc.\n\n",
+      "hint": "Returns the mapper object used to configure your application's routes. Usually you will use this method in <code>app/config/routes.cfm</code> to start chaining route mapping methods like <code>resources</code>, <code>namespace</code>, etc.\n\n",
       "returntype": "struct",
       "slug": "controller.mapper",
       "parameters": [
@@ -7771,7 +7751,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the amount of the highest salary for all employees\nhighestSalary = model(&quot;employee&quot;).maximum(&quot;salary&quot;);\n\n// Get the amount of the highest salary for employees in a given department\nhighestSalary = model(&quot;employee&quot;).maximum(property=&quot;salary&quot;, where=&quot;departmentId=#params.key#&quot;);\n\n// Make sure a numeric value is always returned, even if no records are found to calculate the maximum for\nhighestSalary = model(&quot;employee&quot;).maximum(property=&quot;salary&quot;, where=&quot;salary &gt; #params.minSalary#&quot;, ifNull=0);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Maximum value for all records\nhighestSalary = model(&quot;employee&quot;).maximum(&quot;salary&quot;);\n// one-liner: highestSalary = model(&quot;employee&quot;).maximum(&quot;salary&quot;);\n\n2. Maximum value with a WHERE condition\nhighestSalary = model(&quot;employee&quot;).maximum(\n    property=&quot;salary&quot;, \n    where=&quot;departmentId=#params.departmentId#&quot;\n);\n// one-liner: highestSalary = model(&quot;employee&quot;).maximum(property=&quot;salary&quot;, where=&quot;departmentId=#params.departmentId#&quot;);\n\n3. Maximum value with a default if no records found\nhighestSalary = model(&quot;employee&quot;).maximum(\n    property=&quot;salary&quot;, \n    where=&quot;salary &gt; #params.minSalary#&quot;, \n    ifNull=0\n);\n// one-liner: highestSalary = model(&quot;employee&quot;).maximum(property=&quot;salary&quot;, where=&quot;salary &gt; #params.minSalary#&quot;, ifNull=0);\n\n4. Maximum value including associations (nested join)\nhighestAlbumSales = model(&quot;album&quot;).maximum(\n    property=&quot;sales&quot;,\n    include=&quot;artist(genre)&quot;\n);\n// one-liner: highestAlbumSales = model(&quot;album&quot;).maximum(property=&quot;sales&quot;, include=&quot;artist(genre)&quot;);\n\n5. Maximum value grouped by a column\nmaxSalaryByDept = model(&quot;employee&quot;).maximum(\n    property=&quot;salary&quot;,\n    group=&quot;departmentId&quot;\n);\n// one-liner: maxSalaryByDept = model(&quot;employee&quot;).maximum(property=&quot;salary&quot;, group=&quot;departmentId&quot;);</code></pre>"
       },
       "hint": "Calculates the maximum value for a given property.\nUses the SQL function <code>MAX</code>.\nIf no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.\n\n",
       "returntype": "any",
@@ -7860,7 +7840,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>// Migrate to a specific version\n// Returns a message with the result\nresult=application.wheels.migrator.migrateTo(version);\n</code></pre>"
       },
-      "hint": "Migrates database to a specified version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface\n\n",
+      "hint": "Migrates the database schema to a specified version. This function is primarily intended for programmatic database migrations, but the recommended usage is via the CLI or Wheels GUI interface.\n\n",
       "returntype": "string",
       "slug": "migrator.migrateTo",
       "parameters": [
@@ -7885,10 +7865,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>// Migrate database to the latest version\nresult = application.wheels.migrator.migrateToLatest();\n\n// Output the result message\nwriteOutput(result);</code></pre>"
       },
-      "hint": "Shortcut function to migrate to the latest version\n\n",
+      "hint": "Migrates the database schema to the latest available migration version. This is a shortcut for migrateTo(version) without needing to specify a version explicitly.\n\n",
       "returntype": "string",
       "slug": "migrator.migrateToLatest",
       "parameters": [],
@@ -7906,9 +7886,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the internally-stored MIME type for `xls`\nmimeType = mimeTypes(&quot;xls&quot;);\n\n// Get the internally-stored MIME type for a dynamic value. Fall back to a MIME type of `text/plain` if it's not found\nmimeType = mimeTypes(extension=params.type, fallback=&quot;text/plain&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic Known Extension\n// Get the MIME type for a known extension\nmimeType = mimeTypes(&quot;jpg&quot;);\nwriteOutput(mimeType); // Outputs: &quot;image/jpeg&quot;\n\n2. Unknown Extension With Fallback\n// Use a fallback for unknown file types\nmimeType = mimeTypes(&quot;abc&quot;, fallback=&quot;text/plain&quot;);\nwriteOutput(mimeType); // Outputs: &quot;text/plain&quot;\n\n3. Dynamic Extension From User Input\nparams.type = &quot;pdf&quot;;\nmimeType = mimeTypes(extension=params.type);\nwriteOutput(mimeType); // Outputs: &quot;application/pdf&quot;\n\n4. Serving a File Download\nfileName = &quot;report.xlsx&quot;;\nfileExt = listLast(fileName, &quot;.&quot;);\ncfheader(name=&quot;Content-Disposition&quot;, value=&quot;attachment; filename=#fileName#&quot;);\ncfcontent(type=mimeTypes(fileExt), file=&quot;#expandPath('./public/files/' &amp; fileName)#&quot;);</code></pre>"
       },
-      "hint": "Returns an associated MIME type based on a file extension.\n\n",
+      "hint": "Returns the associated MIME type for a given file extension. Useful when serving files dynamically or setting response headers.\n\n",
       "returntype": "string",
       "slug": "controller.mimeTypes",
       "parameters": [
@@ -7945,9 +7925,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the amount of the lowest salary for all employees\nlowestSalary = model(&quot;employee&quot;).minimum(&quot;salary&quot;);\n\n// Get the amount of the lowest salary for employees in a given department\nlowestSalary = model(&quot;employee&quot;).minimum(property=&quot;salary&quot;, where=&quot;departmentId=#params.key#&quot;);\n\n// Make sure a numeric amount is always returned, even when there were no records analyzed by the query\nlowestSalary = model(&quot;employee&quot;).minimum(property=&quot;salary&quot;, where=&quot;salary BETWEEN #params.min# AND #params.max#&quot;, ifNull=0);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic Minimum Value\n// Get the lowest salary among all employees\nlowestSalary = model(&quot;employee&quot;).minimum(&quot;salary&quot;);\nwriteOutput(&quot;Lowest Salary: &quot; &amp; lowestSalary);\n// inline: writeOutput(model(&quot;employee&quot;).minimum(&quot;salary&quot;));\n\n2. Minimum Value with Condition\n// Get the lowest salary for employees in a specific department\ndeptId = 5;\nlowestSalary = model(&quot;employee&quot;).minimum(\n    property=&quot;salary&quot;,\n    where=&quot;departmentId=#deptId#&quot;\n);\nwriteOutput(&quot;Lowest Salary in Department #deptId#: &quot; &amp; lowestSalary);\n// inline: writeOutput(model(&quot;employee&quot;).minimum(property=&quot;salary&quot;, where=&quot;departmentId=5&quot;));\n\n3. Minimum Value with Range and Fallback\n// Get the lowest salary within a range and fallback to 0 if no records\nlowestSalary = model(&quot;employee&quot;).minimum(\n    property=&quot;salary&quot;,\n    where=&quot;salary BETWEEN #params.min# AND #params.max#&quot;,\n    ifNull=0\n);\nwriteOutput(&quot;Lowest Salary in range: &quot; &amp; lowestSalary);\n// inline: writeOutput(model(&quot;employee&quot;).minimum(property=&quot;salary&quot;, where=&quot;salary BETWEEN #params.min# AND #params.max#&quot;, ifNull=0));\n\n4. Including Associations\n// Get the lowest product price including related categories\nlowestPrice = model(&quot;product&quot;).minimum(\n    property=&quot;price&quot;,\n    include=&quot;category&quot;\n);\nwriteOutput(&quot;Lowest Product Price: &quot; &amp; lowestPrice);\n// inline: writeOutput(model(&quot;product&quot;).minimum(property=&quot;price&quot;, include=&quot;category&quot;));\n\n5. Include Soft-Deleted Records\n// Include soft-deleted employees in the calculation\nlowestSalary = model(&quot;employee&quot;).minimum(\n    property=&quot;salary&quot;,\n    includeSoftDeletes=true\n);\nwriteOutput(&quot;Lowest Salary including soft-deleted employees: &quot; &amp; lowestSalary);\n// inline: writeOutput(model(&quot;employee&quot;).minimum(property=&quot;salary&quot;, includeSoftDeletes=true));</code></pre>"
       },
-      "hint": "Calculates the minimum value for a given property.\nUses the SQL function <code>MIN</code>.\nIf no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.\n\n",
+      "hint": "Calculates the minimum value for a specified property in a model using SQL's MIN() function. This can be used to find the lowest value of a numeric property across all records or with conditions. You can also include associations, handle soft-deleted records, provide fallback values, and group results. If no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.\n\n",
       "returntype": "any",
       "slug": "model.minimum",
       "parameters": [
@@ -8013,9 +7993,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// This &quot;Tag&quot; version of the function accepts a `name` and `selected` instead of binding to a model object \n&lt;cfoutput&gt;\n    #minuteSelectTag(name=&quot;minuteOfMeeting&quot;, value=params.minuteOfMeeting)#\n&lt;/cfoutput&gt;\n\n// Only show 15-minute intervals \n&lt;cfoutput&gt;\n\t#minuteSelectTag(name=&quot;minuteOfMeeting&quot;, value=params.minuteOfMeeting, minuteStep=15)#\n&lt;/cfoutput&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic Minute Select\nminuteSelectTag(name=&quot;minuteOfMeeting&quot;, selected=params.minuteOfMeeting)\n\n2. 15-Minute Intervals\nminuteSelectTag(name=&quot;minuteOfMeeting&quot;, selected=params.minuteOfMeeting, minuteStep=15)\n\n3. Include Blank Option\nminuteSelectTag(name=&quot;minuteOfMeeting&quot;, includeBlank=&quot;- Select Minute -&quot;)\n\n4. Using Label\nminuteSelectTag(name=&quot;minuteOfMeeting&quot;, label=&quot;Select Minute&quot;)\n\n5. Custom Label Placement\nminuteSelectTag(name=&quot;minuteOfMeeting&quot;, label=&quot;Minute&quot;, labelPlacement=&quot;after&quot;)\n\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing one <code>select</code> form control for the minutes of an hour based on the supplied name.\n\n",
+      "hint": "Builds and returns a &lt;select&gt; dropdown for the minutes of an hour (0–59). You can customize the selected value, increment steps (e.g., 5, 10, 15 minutes), label placement, and include a blank option. Useful for forms where users pick a time.\n\n",
       "returntype": "string",
       "slug": "controller.minuteSelectTag",
       "parameters": [
@@ -8118,7 +8098,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>// The `model(&quot;author&quot;)` part of the code below gets a reference to the model from the application scope, and then the `findByKey` class level method is called on it\nauthorObject = model(&quot;author&quot;).findByKey(1);</code></pre>"
       },
-      "hint": "Returns a reference to the requested model so that class level methods can be called on it.\n\n",
+      "hint": "Returns a reference to a specific model defined in your application, allowing you to call class-level methods on it. This is useful when you want to access database records or invoke model methods without instantiating a new object first.\n\n",
       "returntype": "any",
       "slug": "controller.model",
       "parameters": [
@@ -8148,9 +8128,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// This &quot;Tag&quot; version of the function accepts a `name` and `selected` instead of binding to a model object \n&lt;cfoutput&gt;\n    #monthSelectTag(name=&quot;monthOfBirthday&quot;, selected=params.monthOfBirthday)#\n&lt;/cfoutput&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage\nmonthSelectTag(name=&quot;monthOfBirthday&quot;, selected=params.monthOfBirthday)\n\n2. Display months as numbers\nmonthSelectTag(name=&quot;monthOfHire&quot;, selected=3, monthDisplay=&quot;numbers&quot;)\n\n3. Display months as abbreviations\nmonthSelectTag(name=&quot;monthOfEvent&quot;, selected=&quot;Jun&quot;, monthDisplay=&quot;abbreviations&quot;)\n\n4. Include a blank option\nmonthSelectTag(name=&quot;monthOfAppointment&quot;, includeBlank=&quot;- Select Month -&quot;)\n\n5. Custom label and wrapping\nmonthSelectTag(name=&quot;monthOfSubscription&quot;, label=&quot;Subscription Month:&quot;, labelPlacement=&quot;before&quot;)\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a <code>select</code> form control for the months of the year based on the supplied name.\n\n",
+      "hint": "Generates a &lt;select&gt; dropdown for selecting a month. You can customize its options, labels, and display format. Unlike dateSelect, this function focuses only on the month portion.\n\n",
       "returntype": "string",
       "slug": "controller.monthSelectTag",
       "parameters": [
@@ -8267,7 +8247,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\n\nmapper()\n    .namespace(&quot;api&quot;)\n        .namespace(&quot;v2&quot;)\n            // Route name:  apiV2Products\n            // Example URL: /api/v2/products/1234\n            // Controller:  api.v2.Products\n            .resources(&quot;products&quot;)\n        .end()\n\n        .namespace(&quot;v1&quot;)\n            // Route name:  apiV1Users\n            // Example URL: /api/v1/users\n            // Controller:  api.v1.Users\n            .get(name=&quot;users&quot;, to=&quot;users##index&quot;)\n        .end()\n    .end()\n\n    .namespace(name=&quot;foo&quot;, package=&quot;foos&quot;, path=&quot;foose&quot;)\n        // Route name:  fooBars\n        // Example URL: /foose/bars\n        // Controller:  foos.Bars\n        .post(name=&quot;bars&quot;, to=&quot;bars##create&quot;)\n    .end()\n.end();\n\n&lt;/cfscript&gt;</code></pre>"
       },
-      "hint": "Scopes any the controllers for any routes configured within this block to a subfolder (package) and also adds the package name to the URL.\n\n",
+      "hint": "The namespace() function in Wheels is used to group controllers and routes under a specific namespace (subfolder/package). It also prepends the namespace to route names and can modify the URL path. This is useful for organizing APIs, versioning, or modular applications. Namespaces can be nested for hierarchical routing, e.g., /api/v1/... and /api/v2/....\n\n",
       "returntype": "struct",
       "slug": "mapper.namespace",
       "parameters": [
@@ -8306,9 +8286,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// In `models/User.cfc`, allow for `groupEntitlements` to be saved and deleted through the `user` object.\nfunction config(){\n\thasMany(&quot;groupEntitlements&quot;);\n\tnestedProperties(association=&quot;groupEntitlements&quot;, allowDelete=true);\n}\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic nested association with auto-save\n// app/models/User.cfc\nfunction config(){\n    hasMany(&quot;groupEntitlements&quot;);\n\n    // Allow nested save of `groupEntitlements` when user is saved\n    nestedProperties(association=&quot;groupEntitlements&quot;);\n}\n\n// Controller code\nuser = model(&quot;User&quot;).findByKey(1);\nuser.groupEntitlements = [\n    {groupId=1, role=&quot;admin&quot;},\n    {groupId=2, role=&quot;editor&quot;}\n];\nuser.save(); \n// Both the user and nested groupEntitlements are saved automatically\n\n2. Allow deletion of nested objects\nfunction config(){\n    hasMany(&quot;groupEntitlements&quot;);\n\n    // Enable deletion via `_delete` flag\n    nestedProperties(association=&quot;groupEntitlements&quot;, allowDelete=true);\n}\n\n// Example params\nparams.user.groupEntitlements = [\n    {id=10, _delete=true},\n    {groupId=3, role=&quot;viewer&quot;}\n];\n\nuser = model(&quot;User&quot;).findByKey(params.user.id);\nuser.setProperties(params.user);\nuser.save();\n// The first nested object (id=10) is deleted, the second is saved\n</code></pre>"
       },
-      "hint": "Allows for nested objects, structs, and arrays to be set from params and other generated data.\n\n",
+      "hint": "Allows nested objects, arrays, or structs associated with a model to be automatically set from incoming params or other generated data. This is particularly useful when you have hasMany or belongsTo associations and want to manage them directly when saving the parent object.\n\n",
       "returntype": "void",
       "slug": "model.nestedProperties",
       "parameters": [
@@ -8362,7 +8342,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Create a new author in memory (not saved to the database)\nnewAuthor = model(&quot;author&quot;).new();\n\n// Create a new author based on properties in a struct\nnewAuthor = model(&quot;author&quot;).new(params.authorStruct);\n\n// Create a new author by passing in named arguments\nnewAuthor = model(&quot;author&quot;).new(firstName=&quot;John&quot;, lastName=&quot;Doe&quot;);\n\n// If you have a `hasOne` or `hasMany` association setup from `customer` to `order`, you can do a scoped call. (The `newOrder` method below will call `model(&quot;order&quot;).new(customerId=aCustomer.id)` internally.)\naCustomer = model(&quot;customer&quot;).findByKey(params.customerId);\nanOrder = aCustomer.newOrder(shipping=params.shipping);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Create a new author in memory (not saved to the database)\nnewAuthor = model(&quot;author&quot;).new();\n\n2. Create a new author based on properties in a struct\nnewAuthor = model(&quot;author&quot;).new(params.authorStruct);\n\n3. Create a new author by passing in named arguments\nnewAuthor = model(&quot;author&quot;).new(firstName=&quot;John&quot;, lastName=&quot;Doe&quot;);\n\n4. If you have a `hasOne` or `hasMany` association setup from `customer` to `order`, you can do a scoped call. (The `newOrder` method below will call `model(&quot;order&quot;).new(customerId=aCustomer.id)` internally.)\naCustomer = model(&quot;customer&quot;).findByKey(params.customerId);\nanOrder = aCustomer.newOrder(shipping=params.shipping);\n\n5. Allow explicit timestamps\n// You can manually set createdAt and updatedAt fields\nnewAuthor = model(\"author\").new(\n    firstName=\"Bob\",\n    lastName=\"Builder\",\n    allowExplicitTimestamps=true,\n    createdAt=createDate(2025,9,24),\n    updatedAt=createDate(2025,9,24)\n);</code></pre>"
       },
       "hint": "Creates a new object based on supplied <code>properties</code> and returns it.\nThe object is not saved to the database, it only exists in memory.\nProperty names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument.\n\n",
       "returntype": "any",
@@ -8404,9 +8384,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Obfuscate the primary key value `99`\nnewValue = obfuscateParam(99);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Obfuscate a numeric primary key\n// Primary key value\nid = 99;\n\n// Obfuscate it before sending in the URL\nobfuscatedId = obfuscateParam(id);\nwriteOutput(obfuscatedId); \n\n2. Obfuscate a string value\n// Obfuscate an email address\nemail = &quot;user@example.com&quot;;\nobfuscatedEmail = obfuscateParam(email);\nwriteOutput(obfuscatedEmail); \n\n3. Use obfuscated value in a link\n// Pass obfuscated ID in a linkTo helper\nuserId = 42;\n#linkTo(text=&quot;View Profile&quot;, controller=&quot;user&quot;, action=&quot;profile&quot;, key=obfuscateParam(userId))#\n</code></pre>"
       },
-      "hint": "Obfuscates a value. Typically used for hiding primary key values when passed along in the URL.\n\n",
+      "hint": "Obfuscates a value, typically used to hide sensitive information like primary key IDs when passing them in URLs. This helps prevent users from easily guessing sequential IDs or sensitive values.\n\n",
       "returntype": "string",
       "slug": "controller.obfuscateParam",
       "parameters": [
@@ -8436,7 +8416,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// This will only provide the `html` type and will ignore what was defined in the call to `provides()` in the `config()` function\nonlyProvides(&quot;html&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Restrict an action to HTML only\nfunction show() {\n    // This action will only respond with HTML\n    onlyProvides(&quot;html&quot;);\n}\n\n2. Restrict an action to JSON and XML\nfunction data() {\n    // Only allow JSON or XML responses\n    onlyProvides(&quot;json,xml&quot;);\n}\n\n3. Override global provides setting\ncomponent extends=&quot;Controller&quot; {\n\n    function config() {\n        // Globally allow HTML and JSON\n        provides(&quot;html,json&quot;);\n    }\n\n    function exportCsv() {\n        // Override global, allow only CSV for this action\n        onlyProvides(&quot;csv&quot;);\n\n        orders = model(&quot;order&quot;).findAll();\n    }\n}\n</code></pre>"
       },
       "hint": "Use this in an individual controller action to define which formats the action will respond with.\nThis can be used to define provides behavior in individual actions or to override a global setting set with <code>provides</code> in the controller's <code>config()</code>.\n\n",
       "returntype": "void",
