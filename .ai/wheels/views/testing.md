@@ -453,6 +453,111 @@ describe("External Service Integration", () => {
 });
 ```
 
+## 🚨 CRITICAL: Content Verification, Not Just Status Codes
+
+### ❌ **Insufficient Testing**
+```bash
+# This only checks HTTP status - NOT actual content
+curl -s http://localhost:8080 -I | head -1  # HTTP/1.1 200 OK
+```
+
+**Problem:** HTTP 200 doesn't mean content is correct. Pages with errors can still return 200.
+
+### ✅ **Proper Content Verification**
+```bash
+# Verify actual content renders correctly
+curl -s http://localhost:8080 | grep "Latest Tech Posts"  # Confirms content rendered
+curl -s http://localhost:8080 | grep -c "article class"   # Counts posts displayed
+curl -s http://localhost:8080 | grep '#urlFor'           # Should return empty (no literal expressions)
+```
+
+### Testing Checklist for Views
+
+**After implementing ANY view changes, verify:**
+
+1. **Status Code**: Page returns 200 OK
+2. **Content Rendering**: Expected text appears in HTML
+3. **CFML Expression Evaluation**: No literal `#expression#` in output
+4. **Dynamic Data**: Database content displays correctly
+5. **Links Generate**: Navigation URLs are valid paths, not expressions
+6. **No Errors**: Console and logs show no errors
+
+### Integration Testing Pattern
+
+```cfm
+component extends="wheels.Testbox" {
+    function run() {
+        describe("Content Verification Tests", () => {
+
+            it("should render actual content, not just return 200", () => {
+                cfhttp(url="http://localhost:8080/posts", method="GET", result="response");
+
+                // ❌ NOT ENOUGH
+                expect(response.status_code).toBe(200);
+
+                // ✅ VERIFY ACTUAL CONTENT
+                expect(response.filecontent).toInclude("Latest Posts");
+                expect(response.filecontent).toInclude("<article");
+                expect(response.filecontent).notToInclude("##urlFor");  // No literal expressions
+                expect(response.filecontent).notToInclude("##flashMessages");
+            });
+
+            it("should verify CFML expressions evaluate correctly", () => {
+                cfhttp(url="http://localhost:8080", method="GET", result="response");
+
+                // Check expressions were evaluated
+                expect(response.filecontent).toInclude('href="/posts"');  // Not href="##urlFor..."
+                expect(response.filecontent).toMatch("\d{4}");  // Year displayed, not ##Year(Now())##
+            });
+        });
+    }
+}
+```
+
+### Command-Line Testing Strategy
+
+**Incremental testing after each component:**
+
+```bash
+# 1. After model generation
+curl "http://localhost:8080?reload=true" && echo "✓ Model loaded"
+
+# 2. After controller generation
+curl -I http://localhost:8080/posts 2>&1 | grep "200 OK" && echo "✓ Controller responds"
+
+# 3. After view creation
+curl -s http://localhost:8080/posts | grep -q "Expected Heading" && echo "✓ View renders"
+
+# 4. Verify no literal expressions
+curl -s http://localhost:8080 | grep -c '#urlFor' || echo "✓ No literal expressions"
+
+# 5. Count data items
+curl -s http://localhost:8080/posts | grep -c '<article' && echo "posts displayed"
+```
+
+### Why This Matters
+
+**Real-world example of status code false positive:**
+
+```cfm
+<!-- Layout with cfoutput error -->
+<html>
+<head>
+    #csrfMetaTags()#  <!-- Outside cfoutput block -->
+</head>
+<body>
+    <a href="#urlFor(controller='posts')#">Posts</a>  <!-- Literal text -->
+</body>
+</html>
+```
+
+**Result:**
+- HTTP Status: `200 OK` ✓
+- Content: Shows `#urlFor(controller='posts')#` as literal text ✗
+- Functionality: Completely broken navigation ✗
+
+**Without content verification, this error goes undetected!**
+
 ## Modern TestBox Resources
 
 For comprehensive TestBox 5 documentation:
