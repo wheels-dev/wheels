@@ -114,7 +114,47 @@ component extends="wheels.migrator.Migration" {
 }
 ```
 
-## Database-Specific Date Handling
+## Database-Agnostic Date Handling (RECOMMENDED)
+
+### ✅ **Best Practice: Use CFML Date Functions**
+
+**For maximum portability across databases (H2, MySQL, PostgreSQL, SQL Server), use CFML date math:**
+
+```cfm
+component extends="wheels.migrator.Migration" {
+    function up() {
+        var now = Now();
+        var day1 = DateAdd("d", -1, now);
+        var day7 = DateAdd("d", -7, now);
+        var month1 = DateAdd("m", -1, now);
+
+        execute("INSERT INTO posts (title, publishedAt, createdAt, updatedAt) VALUES (
+            'Recent Post',
+            TIMESTAMP '#DateFormat(day1, "yyyy-mm-dd")# #TimeFormat(day1, "HH:mm:ss")#',
+            TIMESTAMP '#DateFormat(day1, "yyyy-mm-dd")# #TimeFormat(day1, "HH:mm:ss")#',
+            TIMESTAMP '#DateFormat(now, "yyyy-mm-dd")# #TimeFormat(now, "HH:mm:ss")#'
+        )");
+
+        execute("INSERT INTO posts (title, publishedAt, createdAt, updatedAt) VALUES (
+            'Week Old Post',
+            TIMESTAMP '#DateFormat(day7, "yyyy-mm-dd")# #TimeFormat(day7, "HH:mm:ss")#',
+            TIMESTAMP '#DateFormat(day7, "yyyy-mm-dd")# #TimeFormat(day7, "HH:mm:ss")#',
+            TIMESTAMP '#DateFormat(now, "yyyy-mm-dd")# #TimeFormat(now, "HH:mm:ss")#'
+        )");
+    }
+}
+```
+
+**Advantages:**
+- Works consistently across all databases
+- Easier to test and debug
+- More readable CFML date math
+- Avoids database-specific function differences
+- Better for team collaboration
+
+## Database-Specific Date Handling (If Needed)
+
+**⚠️ Only use database-specific functions if you're locked into one database platform.**
 
 ### H2 Database (Development)
 ```cfm
@@ -138,6 +178,14 @@ execute("INSERT INTO posts (publishedAt) VALUES (STR_TO_DATE('2025-09-18 10:00:0
 execute("INSERT INTO posts (publishedAt) VALUES (CURRENT_TIMESTAMP)");
 execute("INSERT INTO posts (publishedAt) VALUES (CURRENT_TIMESTAMP - INTERVAL '30 days')");
 execute("INSERT INTO posts (publishedAt) VALUES (TO_TIMESTAMP('2025-09-18 10:00:00', 'YYYY-MM-DD HH24:MI:SS'))");
+```
+
+### SQL Server
+```cfm
+<!-- SQL Server date functions -->
+execute("INSERT INTO posts (publishedAt) VALUES (GETDATE())");
+execute("INSERT INTO posts (publishedAt) VALUES (DATEADD(DAY, -30, GETDATE()))");
+execute("INSERT INTO posts (publishedAt) VALUES (CONVERT(DATETIME, '2025-09-18 10:00:00', 120))");
 ```
 
 ## Safe Migration Template

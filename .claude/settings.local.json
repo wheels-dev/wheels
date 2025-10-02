@@ -118,7 +118,9 @@
       "Bash(tree:*)",
       "WebFetch(domain:stackoverflow.com)",
       "WebFetch(domain:helpx.adobe.com)",
-      "WebFetch(domain:opencode.ai)"
+      "WebFetch(domain:opencode.ai)",
+      "Bash(lsof:*)",
+      "Bash(/dev/null)"
     ],
     "deny": []
   }
