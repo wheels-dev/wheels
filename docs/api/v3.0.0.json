@@ -8484,7 +8484,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\n\nmapper()\n    .package(&quot;public&quot;)\n        // Example URL: /products/1234\n        // Controller:  public.Products\n        .resources(&quot;products&quot;)\n    .end()\n\n    // Example URL: /users/4321\n    // Controller:  Users\n    .resources(name=&quot;users&quot;, nested=true)\n        // Calling `package` here is useful to scope nested routes for the `users`\n        // resource into a subfolder.\n        .package(&quot;users&quot;)\n            // Example URL: /users/4321/profile\n            // Controller:  users.Profiles\n            .resource(&quot;profile&quot;)\n        .end()\n    .end()\n.end();\n\n&lt;/cfscript&gt;</code></pre>"
       },
-      "hint": "Scopes any the controllers for any routes configured within this block to a subfolder (package) without adding the package name to the URL.\n\n",
+      "hint": "Scopes the controllers for any routes defined inside its block to a specific subfolder (package) without adding the package name to the URL. This is useful for organizing your controllers in subfolders while keeping the URL structure clean.\n\n",
       "returntype": "struct",
       "slug": "mapper.package",
       "parameters": [
@@ -8515,10 +8515,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>component extends=&quot;app.tests.Test&quot; {\n\n    function packageSetup() {\n        // Run once before any test in this package\n        \n        // Create a test user\n        model(&quot;user&quot;).new(username=&quot;testuser&quot;, email=&quot;test@example.com&quot;).save();\n\n        // Initialize test data\n        application.testConfig = {\n            siteName: &quot;Wheels Test&quot;\n        };\n    }\n\n    function test_User_Creation() {\n        var user = model(&quot;user&quot;).findOneByUsername(&quot;testuser&quot;);\n        assert(&quot;user eq true&quot;);\n    }\n\n    function test_Config_Value() {\n        assert(&quot;application.testConfig.siteName eq 'Wheels Test'&quot;);\n    }\n}\n</code></pre>"
       },
-      "hint": "Executes once before this package's first test case.\n\n",
+      "hint": "The packageSetup() function is a callback in Wheels’ legacy testing framework. It runs once before the first test case in the test package. Use it to perform setup tasks that are shared across all tests in the package, such as initializing data, creating test records, or configuring environment settings.\n\n",
       "returntype": "any",
       "slug": "test.packageSetup",
       "parameters": [],
@@ -8535,10 +8535,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>component extends=&quot;app.tests.Test&quot; {\n\n    function packageSetup() {\n        // Run once before any test in this package\n        model(&quot;user&quot;).new(username=&quot;testuser&quot;, email=&quot;test@example.com&quot;).save();\n    }\n\n    function packageTeardown() {\n        // Run once after all tests in this package\n\n        // Delete test user\n        var user = model(&quot;user&quot;).findOneByUsername(&quot;testuser&quot;);\n        if (user) {\n            user.delete();\n        }\n\n        // Clear test configuration\n        structClear(application.testConfig);\n    }\n\n    function test_User_Exists() {\n        var user = model(&quot;user&quot;).findOneByUsername(&quot;testuser&quot;);\n        assert(&quot;user eq true&quot;);\n    }\n}\n</code></pre>"
       },
-      "hint": "Executes once after this package's last test case.\n\n",
+      "hint": "The packageTeardown() function is a callback in Wheels’ legacy testing framework. It runs once after the last test case in the test package. Use it to perform cleanup tasks that are shared across all tests in the package, such as deleting test records, resetting application state, or clearing cached data.\n\n",
       "returntype": "any",
       "slug": "test.packageTeardown",
       "parameters": [],
@@ -8742,7 +8742,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Provide a `label` and the required `objectName` and `property`\n&lt;cfoutput&gt;\n    #passwordField(label=&quot;Password&quot;, objectName=&quot;user&quot;, property=&quot;password&quot;)#\n&lt;/cfoutput&gt;\n\n// Display fields for passwords provided by the `passwords` association and nested properties\n&lt;fieldset&gt;\n\t&lt;legend&gt;Passwords&lt;/legend&gt;\n\t&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(user.passwords)#&quot; index=&quot;i&quot;&gt;\n\t\t#passwordField(label=&quot;Password ##i#&quot;, objectName=&quot;user&quot;, association=&quot;passwords&quot;, position=i, property=&quot;password&quot;)#\n\t&lt;/cfloop&gt;\n&lt;/fieldset&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic Password Field\n&lt;cfoutput&gt;\n    #passwordField(label=&quot;Password&quot;, objectName=&quot;user&quot;, property=&quot;password&quot;)#\n&lt;/cfoutput&gt;\n\n2. Password Field for a Nested Association\n&lt;fieldset&gt;\n    &lt;legend&gt;Passwords&lt;/legend&gt;\n    &lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(user.passwords)#&quot; index=&quot;i&quot;&gt;\n        #passwordField(\n            label=&quot;Password ##i#&quot;, \n            objectName=&quot;user&quot;, \n            association=&quot;passwords&quot;, \n            position=i, \n            property=&quot;password&quot;\n        )#\n    &lt;/cfloop&gt;\n&lt;/fieldset&gt;\n\n3. Custom Label Placement and Error Handling\n&lt;cfoutput&gt;\n    #passwordField(\n        label=&quot;Enter Your Password&quot;,\n        objectName=&quot;user&quot;,\n        property=&quot;password&quot;,\n        labelPlacement=&quot;before&quot;,\n        errorClass=&quot;input-error&quot;,\n        prepend=&quot;&lt;div class='input-group'&gt;&quot;,\n        append=&quot;&lt;/div&gt;&quot;\n    )#\n&lt;/cfoutput&gt;\n</code></pre>"
       },
       "hint": "Builds and returns a string containing a password field form control based on the supplied objectName and property.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -8850,7 +8850,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Basic usage usually involves a `label`, `name`, and `value` \n&lt;cfoutput&gt;\n    #passwordFieldTag(label=&quot;Password&quot;, name=&quot;password&quot;, value=params.password)#\n&lt;/cfoutput&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic Password Field\n&lt;cfoutput&gt;\n    #passwordFieldTag(label=&quot;Password&quot;, name=&quot;password&quot;, value=&quot;&quot;)#\n&lt;/cfoutput&gt;\n\n2. Label Placement Before Input\n&lt;cfoutput&gt;\n    #passwordFieldTag(label=&quot;Password&quot;, name=&quot;password&quot;, labelPlacement=&quot;before&quot;)#\n&lt;/cfoutput&gt;\n\n3. Wrapping Input with Custom HTML\n&lt;cfoutput&gt;\n    #passwordFieldTag(\n        label=&quot;Enter Password&quot;,\n        name=&quot;password&quot;,\n        prepend=&quot;&lt;div class='input-group'&gt;&quot;,\n        append=&quot;&lt;/div&gt;&quot;\n    )#\n&lt;/cfoutput&gt;\n\n4. Custom Label Decoration\n&lt;cfoutput&gt;\n    #passwordFieldTag(\n        label=&quot;Password&quot;,\n        name=&quot;password&quot;,\n        prependToLabel=&quot;&lt;strong&gt;&quot;,\n        appendToLabel=&quot;&lt;/strong&gt;&quot;\n    )#\n&lt;/cfoutput&gt;\n</code></pre>"
       },
       "hint": "Builds and returns a string containing a password field form control based on the supplied name.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -9002,9 +9002,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Check if the Scaffold plugin is installed \n&lt;cfif ListFindNoCase(&quot;scaffold&quot;, pluginNames())&gt;\n    // do something cool \n&lt;/cfif&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Check if a specific plugin is installed\n&lt;cfif ListFindNoCase(&quot;scaffold&quot;, pluginNames())&gt;\n    &lt;cfoutput&gt;\n        The Scaffold plugin is installed!\n    &lt;/cfoutput&gt;\n&lt;cfelse&gt;\n    &lt;cfoutput&gt;\n        Scaffold plugin is not installed.\n    &lt;/cfoutput&gt;\n&lt;/cfif&gt;\n\n2. List all installed plugins\n&lt;cfoutput&gt;\nInstalled Plugins: #pluginNames()#\n&lt;/cfoutput&gt;\n\n3. Loop through all installed plugins\n&lt;cfloop list=&quot;#pluginNames()#&quot; index=&quot;plugin&quot;&gt;\n    &lt;cfoutput&gt;\n        Plugin: #plugin#&lt;br&gt;\n    &lt;/cfoutput&gt;\n&lt;/cfloop&gt;\n\n4. Conditional logic based on multiple plugins\n&lt;cfset plugins = pluginNames()&gt;\n\n&lt;cfif ListFindNoCase(&quot;scaffold&quot;, plugins) AND ListFindNoCase(&quot;seo&quot;, plugins)&gt;\n    &lt;cfoutput&gt;\n        Both Scaffold and SEO plugins are installed.\n    &lt;/cfoutput&gt;\n&lt;/cfif&gt;\n</code></pre>"
       },
-      "hint": "Returns a list of the names of all installed plugins.\n\n",
+      "hint": "Returns a list of all installed Wheels plugins in your application. This can be useful if you want to check for the presence of a plugin before calling its functionality, or to display available plugins dynamically.\n\n",
       "returntype": "string",
       "slug": "controller.pluginNames",
       "parameters": [],
@@ -9027,7 +9027,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Pluralize a word, will result in &quot;people&quot; \n#pluralize(&quot;person&quot;)#\n\n// Pluralize based on the count passed in \nYour search returned #pluralize(word=&quot;person&quot;, count=users.RecordCount)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic pluralization\npluralize(&quot;person&quot;)\n&lt;!--- Returns: &quot;people&quot; ---&gt;\n\n2. Pluralization with count (count = 1, so singular is returned)\npluralize(word=&quot;car&quot;, count=1)\n&lt;!--- Returns: &quot;1 car&quot; ---&gt;\n\n3. Pluralization with count (count = 5, so plural is returned)\npluralize(word=&quot;car&quot;, count=5)\n&lt;!--- Returns: &quot;5 cars&quot; ---&gt;\n\n4. Suppressing the count in the result\npluralize(word=&quot;dog&quot;, count=3, returnCount=false)\n&lt;!--- Returns: &quot;dogs&quot; ---&gt;\n\n5. Irregular plural (child → children)\npluralize(&quot;child&quot;)\n&lt;!--- Returns: &quot;children&quot; ---&gt;\n\n6. Uncountable word stays the same\npluralize(&quot;equipment&quot;)\n&lt;!--- Returns: &quot;equipment&quot; ---&gt;\n\n7. With count and uncountable word\npluralize(word=&quot;equipment&quot;, count=2)\n&lt;!--- Returns: &quot;2 equipment&quot; ---&gt;\n</code></pre>"
       },
       "hint": "Returns the plural form of the passed in word. Can also pluralize a word based on a value passed to the <code>count</code> argument. Wheels stores a list of words that are the same in both singular and plural form (e.g. \"equipment\", \"information\") and words that don't follow the regular pluralization rules (e.g. \"child\" / \"children\", \"foot\" / \"feet\"). Use <code>get(\"uncountables\")</code> / <code>set(\"uncountables\", newList)</code> and <code>get(\"irregulars\")</code> / <code>set(\"irregulars\", newList)</code> to modify them to suit your needs.\n\n",
       "returntype": "string",
@@ -9143,9 +9143,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the name of the primary key of the table mapped to the `employee` model (which is the `employees` table by default)\nkeyName = model(&quot;employee&quot;).primaryKey();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get the primary key of a simple table\n// For employees table with id as primary key\nkeyName = model(&quot;employee&quot;).primaryKey();\n// Returns: &quot;id&quot;\n\n2. Alias usage\nkeyName = model(&quot;employee&quot;).primaryKeys();\n// Returns: &quot;id&quot;\n\n3. Composite primary key table (e.g., order_products with order_id + product_id)\nkeys = model(&quot;orderProduct&quot;).primaryKey();\n// Returns: &quot;order_id,product_id&quot;\n\n4. Fetching just the first key in a composite set\nfirstKey = model(&quot;orderProduct&quot;).primaryKey(position=1);\n// Returns: &quot;order_id&quot;\n\n5. Fetching the second key in a composite set\nsecondKey = model(&quot;orderProduct&quot;).primaryKey(position=2);\n// Returns: &quot;product_id&quot;\n</code></pre>"
       },
-      "hint": "Returns the name of the primary key for this model's table.\nThis is determined through database introspection.\nIf composite primary keys have been used, they will both be returned in a list.\nThis function is also aliased as <code>primaryKeys()</code>.\n\n",
+      "hint": "Returns the name of the primary key column for the table mapped to a given model. Wheels determines this automatically by introspecting the database. If the table uses a single primary key, the function returns that key’s name as a string. For tables with composite primary keys, the function will return a list of all keys. You can optionally pass in the position argument to retrieve a specific key from a composite set. This function is also available as the alias <code>primaryKeys()</code>.\n\n",
       "returntype": "string",
       "slug": "model.primaryKey",
       "parameters": [
@@ -9170,10 +9170,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic auto-incrementing integer primary key\nt.primaryKey(name=&quot;id&quot;, autoIncrement=true);\n\n2. Primary key with custom type\nt.primaryKey(name=&quot;sku&quot;, type=&quot;string&quot;, limit=20);\n\n3. Composite primary keys (order_id + product_id)\nt.primaryKey(name=&quot;order_id&quot;, type=&quot;integer&quot;);\nt.primaryKey(name=&quot;product_id&quot;, type=&quot;integer&quot;);\n\n4. UUID primary key\nt.primaryKey(name=&quot;session_id&quot;, type=&quot;uuid&quot;);\n\n5. Primary key with foreign key reference\nt.primaryKey(name=&quot;payment_id&quot;, autoIncrement=true);\n</code></pre>"
       },
-      "hint": "Adds a primary key definition to the table. this method also allows for multiple primary keys.\n\n",
+      "hint": "Used inside migration table definitions to define a primary key for the table. By default, it creates a single-column integer primary key, but you can customize the data type, size, precision, and whether it should auto-increment. If you need composite primary keys, you can call this method multiple times within the same table definition. Additionally, you can configure references to other tables, along with cascading behaviors for updates and deletes. Only available in the migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.primaryKey",
       "parameters": [
@@ -9241,7 +9241,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a list of the names of the primary keys in the table mapped to the `employee` model (which is the `employees` table by default)\nkeyNames = model(&quot;employee&quot;).primaryKeys();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get the primary key of a simple table\n// Employees table has &quot;id&quot; as primary key\nkeyNames = model(&quot;employee&quot;).primaryKeys();\n// Returns: &quot;id&quot;\n\n2. Composite primary keys (order_products table with order_id + product_id)\nkeys = model(&quot;orderProduct&quot;).primaryKeys();\n// Returns: &quot;order_id,product_id&quot;\n\n3. Get only the first key in a composite primary key\nfirstKey = model(&quot;orderProduct&quot;).primaryKeys(position=1);\n// Returns: &quot;order_id&quot;\n\n4. Get only the second key in a composite primary key\nsecondKey = model(&quot;orderProduct&quot;).primaryKeys(position=2);\n// Returns: &quot;product_id&quot;\n\n5. Using alias for clarity in multi-key situations\n// This makes it more obvious the table has multiple keys\nkeys = model(&quot;orderProduct&quot;).primaryKeys();\n// Easier to read than using model(&quot;orderProduct&quot;).primaryKey()\n</code></pre>"
       },
       "hint": "Alias for <code>primaryKey()</code>.\nUse this for better readability when you're accessing multiple primary keys.\n\n",
       "returntype": "string",
@@ -9268,10 +9268,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Run an action with default behavior (all filters applied)\nresult = processAction(&quot;show&quot;);\n// Executes the &quot;show&quot; action of the current controller with before/after filters\n\n2. Run an action but only apply &quot;before&quot; filters\nresult = processAction(&quot;edit&quot;, includeFilters=&quot;before&quot;);\n// Useful for testing preconditions without running the full action\n\n3. Run an action but only apply &quot;after&quot; filters\nresult = processAction(&quot;update&quot;, includeFilters=&quot;after&quot;);\n// Useful for testing cleanup logic that runs post-action\n\n4. Run an action without any filters\nresult = processAction(&quot;delete&quot;, includeFilters=false);\n// Skips before/after filters, only executes the &quot;delete&quot; action\n\n5. Simulating in a test case\nit(&quot;should process the show action without filters&quot;, function() {\n    var controller = controller(&quot;users&quot;);\n    var success = controller.processAction(&quot;show&quot;, includeFilters=false);\n    expect(success).toBeTrue();\n});\n</code></pre>"
       },
-      "hint": "Process the specified action of the controller.\nThis is exposed in the API primarily for testing purposes; you would not usually call it directly unless in the test suite.\n\n",
+      "hint": "Process the specified action of the controller.\nThis is exposed in the API primarily for testing purposes; you would not usually call it directly unless in the test suite. The optional includeFilters argument allows you to control whether before filters, after filters, or no filters at all should run when invoking the action. By default, all filters execute unless explicitly restricted.\n\n",
       "returntype": "boolean",
       "slug": "controller.processAction",
       "parameters": [
@@ -9296,8 +9296,8 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Simple request, returns rendered output as string\nresult = processRequest(params={controller=&quot;users&quot;, action=&quot;show&quot;, id=5});\n// Returns: rendered HTML for the users/show action\n\n2. Simulate a POST request\nresult = processRequest(\n    params={controller=&quot;users&quot;, action=&quot;create&quot;, name=&quot;Alice&quot;},\n    method=&quot;post&quot;\n);\n// Returns: rendered output of the create action\n\n3. Get a detailed struct response instead of just body\nresult = processRequest(\n    params={controller=&quot;sessions&quot;, action=&quot;create&quot;, email=&quot;test@example.com&quot;},\n    method=&quot;post&quot;,\n    returnAs=&quot;struct&quot;\n);\n// Returns struct with keys: body, emails, files, flash, redirect, status, type\n\n4. Automatically roll back database changes\nresult = processRequest(\n    params={controller=&quot;orders&quot;, action=&quot;create&quot;, product_id=42},\n    method=&quot;post&quot;,\n    rollback=true\n);\n// Data is inserted during the request but rolled back afterward\n\n5. Skip all filters\nresult = processRequest(\n    params={controller=&quot;users&quot;, action=&quot;delete&quot;, id=10},\n    includeFilters=false\n);\n// Runs delete action without before/after filters\n\n6. Run only &quot;before&quot; filters (useful for testing filter logic)\nresult = processRequest(\n    params={controller=&quot;users&quot;, action=&quot;edit&quot;, id=10},\n    includeFilters=&quot;before&quot;\n);\n</code></pre>"
       },
       "hint": "Creates a controller and calls an action on it.\nWhich controller and action that's called is determined by the params passed in.\nReturns the result of the request either as a string or in a struct with <code>body</code>, <code>emails</code>, <code>files</code>, <code>flash</code>, <code>redirect</code>, <code>status</code>, and <code>type</code>.\nPrimarily used for testing purposes.\n\n",
       "returntype": "any",
@@ -9357,9 +9357,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a structure of all the properties for an object\nuser = model(&quot;user&quot;).findByKey(1);\nprops = user.properties();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get all properties for a user object\nuser = model(&quot;user&quot;).findByKey(1);\nprops = user.properties();\n\n2. Exclude nested/associated properties\nuser = model(&quot;user&quot;).findByKey(1);\nprops = user.properties(returnIncluded=false);\n\n3. Iterate through properties\nuser = model(&quot;user&quot;).findByKey(2);\nprops = user.properties();\nfor (key in props) {\n    writeOutput(&quot;#key#: #props[key]#&lt;br&gt;&quot;);\n}\n\n4. Convert properties to JSON for API output\nuser = model(&quot;user&quot;).findByKey(3);\nprops = user.properties(returnIncluded=false);\njsonData = serializeJSON(props);\n</code></pre>"
       },
-      "hint": "Returns a structure of all the properties with their names as keys and the values of the property as values.\n\n",
+      "hint": "Returns a structure containing all the properties of a model object, where the keys are the property (column) names and the values are the current values for that object. This is useful when you want to inspect all the attributes of a record at once, serialize data, or debug object state. By default, properties() includes nested or associated properties (such as related objects). You can control this behavior using the returnIncluded argument to exclude them if you only want the direct properties of the object.\n\n",
       "returntype": "struct",
       "slug": "model.properties",
       "parameters": [
@@ -9385,9 +9385,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Tell Wheels that when we are referring to `firstName` in the CFML code, it should translate to the `STR_USERS_FNAME` column when interacting with the database instead of the default (which would be the `firstname` column)\nproperty(name=&quot;firstName&quot;, column=&quot;STR_USERS_FNAME&quot;);\n\n// Tell Wheels that when we are referring to `fullName` in the CFML code, it should concatenate the `STR_USERS_FNAME` and `STR_USERS_LNAME` columns\nproperty(name=&quot;fullName&quot;, sql=&quot;STR_USERS_FNAME + ' ' + STR_USERS_LNAME&quot;);\n\n// Tell Wheels that when displaying error messages or labels for form fields, we want to use `First name(s)` as the label for the `STR_USERS_FNAME` column\nproperty(name=&quot;firstName&quot;, label=&quot;First name(s)&quot;);\n\n// Tell Wheels that when creating new objects, we want them to be auto-populated with a `firstName` property of value `Dave`\nproperty(name=&quot;firstName&quot;, defaultValue=&quot;Dave&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Tell Wheels that when we are referring to `firstName` in the CFML code, it should translate to the `STR_USERS_FNAME` column when interacting with the database instead of the default (which would be the `firstname` column)\nproperty(name=&quot;firstName&quot;, column=&quot;STR_USERS_FNAME&quot;);\n\n2. Tell Wheels that when we are referring to `fullName` in the CFML code, it should concatenate the `STR_USERS_FNAME` and `STR_USERS_LNAME` columns\nproperty(name=&quot;fullName&quot;, sql=&quot;STR_USERS_FNAME + ' ' + STR_USERS_LNAME&quot;);\n\n3. Tell Wheels that when displaying error messages or labels for form fields, we want to use `First name(s)` as the label for the `STR_USERS_FNAME` column\nproperty(name=&quot;firstName&quot;, label=&quot;First name(s)&quot;);\n\n4. Tell Wheels that when creating new objects, we want them to be auto-populated with a `firstName` property of value `Dave`\nproperty(name=&quot;firstName&quot;, defaultValue=&quot;Dave&quot;);\n\n5. Exclude property from SELECT queries\n// Useful for virtual/computed properties you don’t want fetched from the DB\nproperty(name=\"tempValue\", select=false);\n\n6. Override data type explicitly\nproperty(name=\"isActive\", dataType=\"boolean\");\n</code></pre>"
       },
-      "hint": "Use this method to map an object property to either a table column with a different name than the property or to a SQL expression.\nYou only need to use this method when you want to override the default object relational mapping that Wheels performs.\n\n",
+      "hint": "Lets you customize how model properties map to database columns or SQL expressions. By default, Wheels automatically maps a model’s property name to the column with the same name in the table. However, when your database uses non-standard column names, calculated values, or requires custom behavior, you can use property() to override the default mapping.\n\n",
       "returntype": "void",
       "slug": "model.property",
       "parameters": [
@@ -9458,8 +9458,8 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic usage\nuser = model(&quot;user&quot;).new();\nisBlank = user.propertyIsBlank(&quot;firstName&quot;); // returns true if firstName is not set\n\n2. Property exists but is empty\nuser = model(&quot;user&quot;).new(firstName=&quot;&quot;);\nisBlank = user.propertyIsBlank(&quot;firstName&quot;); // true\n\n3. Property exists with value\nuser = model(&quot;user&quot;).new(firstName=&quot;Joe&quot;);\nisBlank = user.propertyIsBlank(&quot;firstName&quot;); // false\n\n4. Checking property that doesn’t exist on the model\nisBlank = user.propertyIsBlank(&quot;nonexistentProperty&quot;); // true\n\n5. Using in validation logic\nif (user.propertyIsBlank(&quot;email&quot;)) {\n    writeOutput(&quot;Email is required.&quot;);\n}\n</code></pre>"
       },
       "hint": "Returns <code>true</code> if the specified property doesn't exist on the model or is an empty string.\nThis method is the inverse of <code>propertyIsPresent()</code>.\n\n",
       "returntype": "boolean",
@@ -9486,9 +9486,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get an object, set a value and then see if the property exists\nemployee = model(&quot;employee&quot;).new();\nemployee.firstName = &quot;dude&quot;;\nreturn employee.propertyIsPresent(&quot;firstName&quot;); // Returns true\n\nemployee.firstName = &quot;&quot;&gt;\nreturn employee.propertyIsPresent(&quot;firstName&quot;); // Returns false</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Property exists with a value\nemployee = model(&quot;employee&quot;).new();\nemployee.firstName = &quot;Dude&quot;;\nwriteOutput(employee.propertyIsPresent(&quot;firstName&quot;)); // true\n\n2. Property exists but is blank\nemployee.firstName = &quot;&quot;;\nwriteOutput(employee.propertyIsPresent(&quot;firstName&quot;)); // false\n\n3. Property does not exist on the model\nwriteOutput(employee.propertyIsPresent(&quot;nonexistentProperty&quot;)); // false\n\n4. Conditional logic\nif (!employee.propertyIsPresent(&quot;email&quot;)) {\n    writeOutput(&quot;Email is required.&quot;);\n}\n</code></pre>"
       },
-      "hint": "Returns <code>true</code> if the specified property exists on the model and is not a blank string.\n\n",
+      "hint": "Returns <code>true</code> if the specified property exists on the model and is not a blank string. This is the inverse of propertyIsBlank() which checks that a property is either missing or empty.\n\n",
       "returntype": "boolean",
       "slug": "model.propertyIsPresent",
       "parameters": [
@@ -9513,9 +9513,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a list of the property names in use in the user model\npropNames = model(&quot;user&quot;).propertyNames();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get property names for the User model\npropNames = model(&quot;user&quot;).propertyNames();\nwriteOutput(propNames);\n\n2. Loop through property names\nfor (prop in listToArray(model(&quot;employee&quot;).propertyNames())) {\n    writeOutput(&quot;Property: #prop#&lt;br&gt;&quot;);\n}\n\n3. Check if a property exists in the list\nif (listFindNoCase(model(&quot;order&quot;).propertyNames(), &quot;totalAmount&quot;)) {\n    writeOutput(&quot;Order model has a totalAmount property.&quot;);\n}\n\n4. Including calculated properties\n// In the model configuration:\nproperty(name=&quot;fullName&quot;, sql=&quot;firstName + ' ' + lastName&quot;);\n\n// propertyNames() will now include &quot;fullName&quot;\nwriteOutput(model(&quot;user&quot;).propertyNames());\n</code></pre>"
       },
-      "hint": "Returns a list of property names ordered by their respective column's ordinal position in the database table.\nAlso includes calculated property names that will be generated by the Wheels ORM.\n\n",
+      "hint": "Returns a list of all property names associated with a model. The list is ordered by the columns’ ordinal positions as they exist in the underlying database table. In addition to actual table columns, the list also includes any calculated properties defined through the property(), method, which may be derived from SQL expressions or mapped column names. This is useful when you need to dynamically work with all of a model’s attributes without hardcoding them, such as generating dynamic forms, building custom serializers, or inspecting ORM mappings.\n\n",
       "returntype": "string",
       "slug": "model.propertyNames",
       "parameters": [],
@@ -9533,9 +9533,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// In `models/User.cfc`, `firstName` and `lastName` cannot be changed through mass assignment operations like `updateAll()`.\nfunction config(){\n\tprotectedProperties(&quot;firstName,lastName&quot;);\n}\n</code></pre>"
+        "docs": "<pre><code class='javascript'>// In `app/models/User.cfc`, `firstName` and `lastName` cannot be changed through mass assignment operations like `updateAll()`.\nfunction config(){\n\tprotectedProperties(&quot;firstName,lastName&quot;);\n}\n</code></pre>"
       },
-      "hint": "Use this method to specify which properties cannot be set through mass assignment.\n\n",
+      "hint": "Used to protect one or more model properties from being set or modified through mass assignment operations. Mass assignment occurs when values are assigned to a model in bulk, such as through create(), update(), or updateAll() using a struct of data. By marking certain properties as protected, you can prevent accidental or malicious changes to sensitive fields (such as id, role, or passwordHash). This method is typically called in the model’s config() function to define rules that apply across the entire model.\n\n",
       "returntype": "void",
       "slug": "model.protectedProperties",
       "parameters": [
@@ -9560,8 +9560,8 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Protect all POST requests globally\n// In app/controllers/Controller.cfc\nfunction config() {\n    protectsFromForgery();\n}</code></pre>"
       },
       "hint": "Tells Wheels to protect <code>POST</code>ed requests from CSRF vulnerabilities.\nInstructs the controller to verify that <code>params.authenticityToken</code> or <code>X-CSRF-Token</code> HTTP header is provided along with the request containing a valid authenticity token.\nCall this method within a controller's <code>config</code> method, preferably the base <code>Controller.cfc</code> file, to protect the entire application.\n\n",
       "returntype": "any",
@@ -9603,9 +9603,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>provides(&quot;html,xml,json&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Provide HTML, XML, and JSON responses\nfunction config() {\n    provides(&quot;html,xml,json&quot;);\n}\n\n2. Provide only JSON and CSV\nfunction config() {\n    provides(&quot;json,csv&quot;);\n}\n\n3. Default behavior (HTML only)\nfunction config() {\n    provides(); // equivalent to provides(&quot;html&quot;)\n}\n\n4. Handling requested format in the action\nfunction show() {\n    // Wheels automatically detects the requested format and renders accordingly\n    renderwith(data=model(&quot;user&quot;).findByKey(params.id));\n}\n</code></pre>"
       },
-      "hint": "Defines formats that the controller will respond with upon request.\nThe format can be requested through a URL variable called <code>format</code>, by appending the <code>format</code> name to the end of a URL as an extension (when URL rewriting is enabled), or in the request header.\n\n",
+      "hint": "The `provides()` function defines the response formats that a controller can return. Clients can request a specific format in three ways: by using a URL parameter called `format` (e.g., `?format=json`), by appending the format as an extension to the URL (e.g., `/users/1.json`) when URL rewriting is enabled, or by specifying the desired format in the `Accept` header of the HTTP request. By defining the supported formats, you ensure that your controller can automatically render the response in the requested format, such as HTML, JSON, XML, CSV, PDF, or XLS. If no format is requested or supported, the controller defaults to HTML.\n\n",
       "returntype": "void",
       "slug": "controller.provides",
       "parameters": [
@@ -9633,7 +9633,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\n\nmapper()\n    // Route name:  ghostStory\n    // Example URL: /ghosts/666/stories/616\n    // Controller:  Stories\n    // Action:      update\n    .put(name=&quot;ghostStory&quot;, pattern=&quot;ghosts/[ghostKey]/stories/[key]&quot;, to=&quot;stories##update&quot;)\n\n    // Route name:  goblins\n    // Example URL: /goblins\n    // Controller:  Goblins\n    // Action:      update\n    .put(name=&quot;goblins&quot;, controller=&quot;goblins&quot;, action=&quot;update&quot;)\n\n    // Route name:  heartbeat\n    // Example URL: /heartbeat\n    // Controller:  Sessions\n    // Action:      update\n    .put(name=&quot;heartbeat&quot;, to=&quot;sessions##update&quot;)\n\n    // Route name:  usersPreferences\n    // Example URL: /preferences\n    // Controller:  users.Preferences\n    // Action:      update\n    .put(name=&quot;preferences&quot;, to=&quot;preferences##update&quot;, package=&quot;users&quot;)\n\n    // Route name:  orderShipment\n    // Example URL: /shipments/5432\n    // Controller:  orders.Shipments\n    // Action:      update\n    .put(\n        name=&quot;shipment&quot;,\n        pattern=&quot;shipments/[key]&quot;,\n        to=&quot;shipments##update&quot;,\n        package=&quot;orders&quot;\n    )\n\n    // Example scoping within a nested resource\n    .resources(name=&quot;subscribers&quot;, nested=true)\n        // Route name:  launchSubscribers\n        // Example URL: /subscribers/3209/launch\n        // Controller:  Subscribers\n        // Action:      launch\n        .put(name=&quot;launch&quot;, to=&quot;subscribers##update&quot;, on=&quot;collection&quot;)\n\n        // Route name:  discontinueSubscriber\n        // Example URL: /subscribers/2251/discontinue\n        // Controller:  Subscribers\n        // Action:      discontinue\n        .put(name=&quot;discontinue&quot;, to=&quot;subscribers##discontinue&quot;, on=&quot;member&quot;)\n    .end()\n.end();\n\n&lt;/cfscript&gt;</code></pre>"
       },
-      "hint": "Create a route that matches a URL requiring an HTTP <code>PUT</code> method. We recommend using this matcher to expose actions that update database records. This method is provided as a convenience for when you really need to support the <code>PUT</code> verb; consider using the <code>patch</code> matcher instead of this one.\n\n",
+      "hint": "Create a route that matches a URL requiring an HTTP <code>PUT</code> method. We recommend using this matcher to expose actions that update database records. This method is provided as a convenience for when you really need to support the <code>PUT</code> verb. Consider using the <code>patch</code> matcher instead of this one.\n\n",
       "returntype": "struct",
       "slug": "mapper.put",
       "parameters": [
@@ -9700,9 +9700,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Basic example view code.\n&lt;cfoutput&gt;\n\t&lt;fieldset&gt;\n\t\t&lt;legend&gt;Gender&lt;/legend&gt;\n\t\t\t#radioButton(objectName=&quot;user&quot;, property=&quot;gender&quot;, tagValue=&quot;m&quot;, label=&quot;Male&quot;)#&lt;br&gt;\n\t\t\t#radioButton(objectName=&quot;user&quot;, property=&quot;gender&quot;, tagValue=&quot;f&quot;, label=&quot;Female&quot;)#\n\t&lt;/fieldset&gt;\n&lt;/cfoutput&gt;\n\n// Shows radio buttons for selecting the genders for all committee members provided by the `members` association and nested properties.\n&lt;cfoutput&gt;\n\t&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(committee.members)#&quot; index=&quot;i&quot;&gt;\n\t\t&lt;div&gt;\n\t\t\t&lt;h3&gt;#committee.members[i].fullName#:&lt;/h3&gt;\n\t\t\t&lt;div&gt;\n\t\t\t\t#radioButton(objectName=&quot;committee&quot;, association=&quot;members&quot;, position=i, property=&quot;gender&quot;, tagValue=&quot;m&quot;, label=&quot;Male&quot;)#&lt;br&gt;\n\t\t\t\t#radioButton(objectName=&quot;committee&quot;, association=&quot;members&quot;, position=i, property=&quot;gender&quot;, tagValue=&quot;f&quot;, label=&quot;Female&quot;)#\n\t\t\t&lt;/div&gt;\n\t\t&lt;/div&gt;\n\t&lt;/cfloop&gt;\n&lt;/cfoutput&gt;\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic radio buttons for gender\n&lt;cfoutput&gt;\n&lt;fieldset&gt;\n    &lt;legend&gt;Gender&lt;/legend&gt;\n    #radioButton(objectName=&quot;user&quot;, property=&quot;gender&quot;, tagValue=&quot;m&quot;, label=&quot;Male&quot;)#&lt;br&gt;\n    #radioButton(objectName=&quot;user&quot;, property=&quot;gender&quot;, tagValue=&quot;f&quot;, label=&quot;Female&quot;)#\n&lt;/fieldset&gt;\n&lt;/cfoutput&gt;\n\n2. Radio buttons for nested association (committee members)\n&lt;cfoutput&gt;\n&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(committee.members)#&quot; index=&quot;i&quot;&gt;\n    &lt;div&gt;\n        &lt;h3&gt;#committee.members[i].fullName#:&lt;/h3&gt;\n        &lt;div&gt;\n            #radioButton(\n                objectName=&quot;committee&quot;,\n                association=&quot;members&quot;,\n                position=i,\n                property=&quot;gender&quot;,\n                tagValue=&quot;m&quot;,\n                label=&quot;Male&quot;\n            )#&lt;br&gt;\n            #radioButton(\n                objectName=&quot;committee&quot;,\n                association=&quot;members&quot;,\n                position=i,\n                property=&quot;gender&quot;,\n                tagValue=&quot;f&quot;,\n                label=&quot;Female&quot;\n            )#\n        &lt;/div&gt;\n    &lt;/div&gt;\n&lt;/cfloop&gt;\n&lt;/cfoutput&gt;\n\n3. Custom HTML wrapping and label placement\n#radioButton(\n    objectName=&quot;user&quot;,\n    property=&quot;subscription&quot;,\n    tagValue=&quot;premium&quot;,\n    label=&quot;Premium Plan&quot;,\n    prepend=&quot;&lt;div class='radio-wrapper'&gt;&quot;,\n    append=&quot;&lt;/div&gt;&quot;,\n    labelPlacement=&quot;aroundRight&quot;\n)#\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a radio button form control based on the supplied objectName and property.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Generates an HTML radio button for a form, based on a model object’s property. It can handle simple properties as well as nested properties through associations, making it ideal for forms that work with both individual objects and collections. You can customize the radio button with additional attributes, labels, and error handling options. It automatically reflects the object’s current property value, so if the property matches the tagValue, the radio button will be marked as checked. This function helps you build dynamic forms safely and easily, with support for encoding to prevent XSS attacks, error highlighting, and custom HTML wrapping.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
       "slug": "controller.radioButton",
       "parameters": [
@@ -9814,9 +9814,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Basic usage usually involves a `label`, `name`, `value`, and `checked` value \n&lt;cfoutput&gt;\n\t&lt;fieldset&gt;\n\t\t&lt;legend&gt;Gender&lt;/legend&gt;\n\t\t#radioButtonTag(name=&quot;gender&quot;, value=&quot;m&quot;, label=&quot;Male&quot;, checked=true)#&lt;br&gt;\n\t\t#radioButtonTag(name=&quot;gender&quot;, value=&quot;f&quot;, label=&quot;Female&quot;)#\n\t&lt;/fieldset&gt;\n&lt;/cfoutput&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic radio buttons for gender\n&lt;cfoutput&gt;\n&lt;fieldset&gt;\n    &lt;legend&gt;Gender&lt;/legend&gt;\n    #radioButtonTag(name=&quot;gender&quot;, value=&quot;m&quot;, label=&quot;Male&quot;, checked=true)#&lt;br&gt;\n    #radioButtonTag(name=&quot;gender&quot;, value=&quot;f&quot;, label=&quot;Female&quot;)#\n&lt;/fieldset&gt;\n&lt;/cfoutput&gt;\n\n2. Label before radio button\n#radioButtonTag(name=&quot;subscription&quot;, value=&quot;premium&quot;, label=&quot;Premium Plan&quot;, labelPlacement=&quot;before&quot;)#\n\n3. Custom HTML wrappers\n#radioButtonTag(\n    name=&quot;newsletter&quot;,\n    value=&quot;yes&quot;,\n    label=&quot;Subscribe&quot;,\n    prepend=&quot;&lt;div class='radio-wrapper'&gt;&quot;,\n    append=&quot;&lt;/div&gt;&quot;,\n    labelPlacement=&quot;aroundRight&quot;\n)#\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a radio button form control based on the supplied name.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Generates a standard HTML &lt;input type=\"radio\"&gt; element based on the supplied name and value. Unlike radioButton(), this function works directly with form tags rather than binding to a model object. It is useful for simple forms or when you need fine-grained control over the HTML attributes. You can customize the radio button with labels, label placement, HTML wrapping, and encoding to prevent XSS attacks. The generated radio button will be marked as checked if the checked argument is true.\n\n",
       "returntype": "string",
       "slug": "controller.radioButtonTag",
       "parameters": [
@@ -9902,10 +9902,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Testing for a specific exception\n// Assume updateUser() should throw an error if email is invalid\nerrorType = raised('model(&quot;user&quot;).updateUser({email=&quot;invalid-email&quot;})');\nassert(&quot;errorType eq Wheels.InvalidEmailException&quot;);\n\n2. Using raised() in a test case\nfunction testInvalidPassword() {\n    var errorType = raised('model(&quot;user&quot;).login(username=&quot;jdoe&quot;, password=&quot;wrong&quot;)');\n    writeOutput(&quot;Caught error type: &quot; & errorType);\n    // Output: Caught error type: Wheels.InvalidPassword\n}\n\n3. Catching any error\nvar errorType = raised('1 / 0'); // Division by zero\nwriteOutput(errorType);\n</code></pre>"
       },
-      "hint": "Catches a raised error and returns the error type\nGreat if you want to\ttest that a certain exception will be raised.\n\n",
+      "hint": "Used in legacy Wheels testing to catch errors or exceptions raised by a given CFML expression. It evaluates the expression and, if an error occurs, returns the type of the error. This is especially useful when writing tests to ensure that specific operations correctly trigger exceptions under invalid or unexpected conditions. By using raised(), you can assert that your code behaves safely and predictably when encountering errors.\n\n",
       "returntype": "string",
       "slug": "test.raised",
       "parameters": [
@@ -9930,9 +9930,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Redirect to an action after successfully saving a user.\nif (user.save()) {\n\tredirectTo(action=&quot;saveSuccessful&quot;);\n}\n\n// Redirect to a specific page on a secure server.\nredirectTo(controller=&quot;checkout&quot;, action=&quot;start&quot;, params=&quot;type=express&quot;, protocol=&quot;https&quot;);\n\n// Redirect to a route specified in `config/routes.cfm` and pass in the screen name that the route takes.\nredirectTo(route=&quot;profile&quot;, screenName=&quot;Joe&quot;);\n\n// Redirect back to the page the user came from.\nredirectTo(back=true);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Redirect to an action after saving\nif (user.save()) {\n    redirectTo(action=&quot;saveSuccessful&quot;);\n}\n\n2. Redirect to a secure checkout page with parameters\nredirectTo(\n    controller=&quot;checkout&quot;,\n    action=&quot;start&quot;,\n    params=&quot;type=express&quot;,\n    protocol=&quot;https&quot;\n);\n\n3. Redirect to a named route and pass a route parameter\nredirectTo(route=&quot;profile&quot;, screenName=&quot;Joe&quot;);\n\n4. Redirect back to the referring page\nredirectTo(back=true);\n\n5. Redirect to an external URL\nredirectTo(url=&quot;https://example.com/welcome&quot;);\n</code></pre>"
       },
-      "hint": "Redirects the browser to the supplied controller/action/key, route or back to the referring page.\nInternally, this function uses the <code>URLFor</code> function to build the link and the <code>cflocation</code> tag to perform the redirect.\n\n",
+      "hint": "Used to redirect the browser to another page, action, controller, route, or back to the referring page. Internally, it uses Wheels’ URLFor() function to construct the URL and the &lt;cflocation&gt; tag (or equivalent in your CFML engine) to perform the actual redirect. You can redirect to internal routes or controllers, pass keys and query parameters, include anchors, override protocol, host, or port, and even delay the redirect until after your action code executes. This function ensures URLs are safely encoded and properly formatted for the redirect.\n\n",
       "returntype": "void",
       "slug": "controller.redirectTo",
       "parameters": [
@@ -10068,10 +10068,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Rerun a specific migration version\nresult = redoMigration(version=&quot;202509250915&quot;);\nwriteOutput(result); // Returns status or log of the migration rerun\n\n2. Using redoMigration in a script for testing\nif (environment() == &quot;development&quot;) {\n    redoMigration(version=&quot;202509250920&quot;);\n}\n\n3. Rerun latest migration (if version not specified)\nresult = redoMigration();\nwriteOutput(result);\n</code></pre>"
       },
-      "hint": "Reruns the specified migration version. Whilst you can use this in your application, the recommended useage is via either the CLI or the provided GUI interface\n\n",
+      "hint": "Allows you to rerun a specific database migration version. This can be useful for testing migrations, correcting issues in a migration, or resetting a schema change during development. While it can be called directly from your application code, it is generally recommended to use this function via the CommandBox CLI or the Wheels GUI migration interface, as these provide safer execution and logging.\n\n",
       "returntype": "string",
       "slug": "migrator.redoMigration",
       "parameters": [
@@ -10096,10 +10096,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic reference column\nt.references(&quot;userId&quot;);\n\n2. Multiple references with nulls allowed\nt.references(referenceNames=&quot;userId,orderId&quot;, allowNull=true);\n\n3. Reference with default value\nt.references(referenceNames=&quot;statusId&quot;, default=1);\n\n4. Polymorphic reference (used in polymorphic associations)\nt.references(referenceNames=&quot;referenceableId&quot;, polymorphic=true);\n\n5. Custom foreign key actions\nt.references(\n    referenceNames=&quot;customerId&quot;,\n    onUpdate=&quot;CASCADE&quot;,\n    onDelete=&quot;SET NULL&quot;\n);\n</code></pre>"
       },
-      "hint": "adds integer reference columns to table definition and creates foreign key constraints\n\n",
+      "hint": "Used when defining a table schema to add reference columns that act as foreign keys, linking the table to other tables in the database. It automatically creates integer columns for the references and sets up foreign key constraints, helping maintain referential integrity. You can customize the behavior of these reference columns, including whether they allow nulls, default values, or support polymorphic associations. You can also define actions for ON UPDATE and ON DELETE events.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.references",
       "parameters": [
@@ -10158,9 +10158,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get an object, call a method on it that could potentially change values, and then reload the values from the database\nemployee = model(&quot;employee&quot;).findByKey(params.key);\nemployee.someCallThatChangesValuesInTheDatabase();\nemployee.reload();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get an object, call a method on it that could potentially change values, and then reload the values from the database\nemployee = model(&quot;employee&quot;).findByKey(params.key);\nemployee.someCallThatChangesValuesInTheDatabase();\nemployee.reload();</code></pre>"
       },
-      "hint": "Reloads the property values of this object from the database.\n\n",
+      "hint": "Refreshes the property values of a model object from the database. This is useful when an object’s values might have changed in the database due to other operations or external processes. By calling reload(), you ensure that your object reflects the current state of the corresponding database record.\n\n",
       "returntype": "void",
       "slug": "model.reload",
       "parameters": [],
@@ -10177,10 +10177,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Remove a single column from a table\nremoveColumn(table=&quot;users&quot;, columnName=&quot;middleName&quot;);\n\n2. Remove a foreign key reference column\nremoveColumn(table=&quot;orders&quot;, referenceName=&quot;customerId&quot;);\n\n3. Remove multiple columns in separate calls\nremoveColumn(table=&quot;products&quot;, columnName=&quot;oldPrice&quot;);\nremoveColumn(table=&quot;products&quot;, columnName=&quot;discountRate&quot;);\n</code></pre>"
       },
-      "hint": "Removes a column from a database table\nOnly available in a migration CFC\n\n",
+      "hint": "Used to delete a column from a database table within a migration CFC. This is useful when you need to remove obsolete or incorrectly added columns during schema evolution. Optionally, you can also remove a reference column by specifying its referenceName. Only available in a migration CFC.\n\n",
       "returntype": "void",
       "slug": "migration.removeColumn",
       "parameters": [
@@ -10219,9 +10219,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>removeIndex(table='members',indexName='members_username');\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Remove an index from the members table\nremoveIndex(table=&quot;members&quot;, indexName=&quot;members_username&quot;);\n\n2. Remove an index from the orders table\nremoveIndex(table=&quot;orders&quot;, indexName=&quot;orders_createdAt_idx&quot;);\n\n3. Remove multiple indexes in separate calls\nremoveIndex(table=&quot;products&quot;, indexName=&quot;products_name_idx&quot;);\nremoveIndex(table=&quot;products&quot;, indexName=&quot;products_category_idx&quot;);\n</code></pre>"
       },
-      "hint": "Remove a database index\nOnly available in a migration CFC\n\n",
+      "hint": "Used to delete an index from a database table within a migration CFC. Indexes are typically added to improve query performance, but there are scenarios where an index becomes unnecessary or needs to be replaced. Using removeIndex() allows you to safely remove an index while maintaining database integrity. Only available in a migration CFC.\n\n",
       "returntype": "void",
       "slug": "migration.removeIndex",
       "parameters": [
@@ -10251,10 +10251,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Remove a specific record by ID\nremoveRecord(table=&quot;users&quot;, where=&quot;id = 42&quot;);\n\n2. Remove multiple records matching a condition\nremoveRecord(table=&quot;orders&quot;, where=&quot;status = 'cancelled'&quot;);\n\n3. Remove all records from a table (use with caution)\nremoveRecord(table=&quot;temporary_data&quot;, where=&quot;1=1&quot;);\n</code></pre>"
       },
-      "hint": "Removes existing records from a table\nOnly available in a migration CFC\n\n",
+      "hint": "Used to delete specific records from a database table within a migration CFC. This is useful when you need to clean up obsolete data, remove test data, or correct records as part of a schema migration. You can optionally provide a where clause to target specific rows. If no where clause is provided, the behavior depends on the database; usually, no records are removed unless explicitly specified. Only available in a migration CFC.\n\n",
       "returntype": "void",
       "slug": "migration.removeRecord",
       "parameters": [
@@ -10285,10 +10285,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Rename a column in the users table\nrenameColumn(table=&quot;users&quot;, columnName=&quot;username&quot;, newColumnName=&quot;user_name&quot;);\n\n2. Rename a column in the orders table\nrenameColumn(table=&quot;orders&quot;, columnName=&quot;createdAt&quot;, newColumnName=&quot;order_created_at&quot;);\n\n3. Rename multiple columns in separate migration calls\nrenameColumn(table=&quot;products&quot;, columnName=&quot;oldPrice&quot;, newColumnName=&quot;price_old&quot;);\nrenameColumn(table=&quot;products&quot;, columnName=&quot;discountRate&quot;, newColumnName=&quot;discount_percent&quot;);\n</code></pre>"
       },
-      "hint": "Renames a table column\nOnly available in a migration CFC\n\n",
+      "hint": "Used to change the name of an existing column in a database table within a migration CFC. This is useful when you need to standardize column names, correct naming mistakes, or improve clarity in your database schema. Renaming a column preserves the existing data and column type while updating the schema. Only available in a migration CFC.\n\n",
       "returntype": "void",
       "slug": "migration.renameColumn",
       "parameters": [
@@ -10324,10 +10324,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Rename the users table\nrenameTable(oldName=&quot;users&quot;, newName=&quot;app_users&quot;);\n\n2. Rename the orders table\nrenameTable(oldName=&quot;orders&quot;, newName=&quot;customer_orders&quot;);\n\n3. Rename multiple tables in separate migration calls\nrenameTable(oldName=&quot;products_old&quot;, newName=&quot;products&quot;);\nrenameTable(oldName=&quot;temp_data&quot;, newName=&quot;archived_data&quot;);\n</code></pre>"
       },
-      "hint": "Renames a table\nOnly available in a migration CFC\n\n",
+      "hint": "Used to change the name of an existing database table within a migration CFC. This is helpful when you want to standardize table names, correct naming mistakes, or improve clarity in your database schema. This operation preserves all the existing data, indexes, and constraints in the table while updating its name. Only available in a migration CFC.\n\n",
       "returntype": "void",
       "slug": "migration.renameTable",
       "parameters": [
@@ -10358,9 +10358,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Render a blank white page to the client\nrenderNothing();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Render an empty page with default status (200 OK)\nrenderNothing();\n\n2. Render nothing with a 204 No Content status\nrenderNothing(status=&quot;204&quot;);\n\n3. Use renderNothing in an API endpoint after deleting a resource\nfunction deleteResource() {\n    resource = model(&quot;resource&quot;).findByKey(params.id);\n    resource.delete();\n    renderNothing(status=&quot;204&quot;);\n}\n</code></pre>"
       },
-      "hint": "Instructs the controller to render an empty string when it's finished processing the action.\nThis is very similar to calling <code>cfabort</code> with the advantage that any after filters you have set on the action will still be run.\n\n",
+      "hint": "Instructs the controller to render an empty response when an action completes. Unlike using cfabort, which stops request processing immediately, renderNothing() ensures that any after filters associated with the action still execute. You can optionally provide an HTTP status code to indicate the type of response being returned. This is useful for APIs or endpoints that need to signal a specific status without returning a body.\n\n",
       "returntype": "void",
       "slug": "controller.renderNothing",
       "parameters": [
@@ -10386,9 +10386,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Render the partial `_comment.cfm` located in the current controller's view folder\nrenderPartial(&quot;comment&quot;);\n\n// Render the partial at `views/shared/_comment.cfm`\nrenderPartial(&quot;/shared/comment&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Render a partial in the current controller's view folder\nrenderPartial(&quot;comment&quot;);\n\n2. Render a partial from the shared folder\nrenderPartial(&quot;/shared/comment&quot;);\n\n3. Render a partial without a layout\nrenderPartial(partial=&quot;/shared/comment&quot;, layout=false);\n\n4. Render a partial and return it as a string\ncommentHtml = renderPartial(partial=&quot;comment&quot;, returnAs=&quot;string&quot;);\n\n5. Render a partial with caching for 15 minutes\nrenderPartial(partial=&quot;comment&quot;, cache=15);\n\n6. Render a partial with a custom HTTP status code\nrenderPartial(partial=&quot;comment&quot;, status=&quot;202&quot;);\n</code></pre>"
       },
-      "hint": "Instructs the controller to render a partial when it's finished processing the action.\n\n",
+      "hint": "Instructs the controller to render a partial view when an action completes. Partials are reusable view fragments, typically prefixed with an underscore (e.g., _comment.cfm). This function allows you to render these fragments either directly to the client or capture them as a string for further processing. You can control caching, layouts, HTTP status codes, and data-loading behavior, making it flexible for both full-page updates and AJAX responses.\n\n",
       "returntype": "any",
       "slug": "controller.renderPartial",
       "parameters": [
@@ -10448,9 +10448,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Render just the text &quot;Done!&quot; to the client\nrenderText(&quot;Done!&quot;);\n\n// Render serialized product data to the client\nproducts = model(&quot;product&quot;).findAll();\nrenderText(SerializeJson(products));</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Render a simple message\nrenderText(&quot;Done!&quot;);\n\n2. Render serialized product data as JSON\nproducts = model(&quot;product&quot;).findAll();\nrenderText(SerializeJson(products));\n\n3. Render a message with a custom HTTP status code\nrenderText(text=&quot;Unauthorized access&quot;, status=401);\n\n4. Use in an API endpoint\nfunction checkStatus() {\n    if (someCondition()) {\n        renderText(text=&quot;OK&quot;, status=200);\n    } else {\n        renderText(text=&quot;Error&quot;, status=500);\n    }\n}\n</code></pre>"
       },
-      "hint": "Instructs the controller to render specified text when it's finished processing the action.\n\n",
+      "hint": "Instructs the controller to output plain text as the response when an action completes. Unlike rendering a view or partial, this sends the specified text directly to the client. This is especially useful for APIs, AJAX responses, or simple status messages. You can also provide an HTTP status code to control the response status.\n\n",
       "returntype": "void",
       "slug": "controller.renderText",
       "parameters": [
@@ -10483,7 +10483,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Render a view page for a different action within the same controller.\nrenderView(action=&quot;edit&quot;);\n\n// Render a view page for a different action within a different controller.\nrenderView(controller=&quot;blog&quot;, action=&quot;new&quot;);\n\n// Another way to render the blog/new template from within a different controller.\nrenderView(template=&quot;/blog/new&quot;);\n\n// Render the view page for the current action but without a layout and cache it for 60 minutes.\nrenderView(layout=false, cache=60);\n\n// Load a layout from a different folder within `views`.\nrenderView(layout=&quot;/layouts/blog&quot;);\n\n// Don't render the view immediately but rather return and store in a variable for further processing.\nmyView = renderView(returnAs=&quot;string&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Render a view page for a different action within the same controller.\nrenderView(action=&quot;edit&quot;);\n\n2. Render a view page for a different action within a different controller.\nrenderView(controller=&quot;blog&quot;, action=&quot;new&quot;);\n\n3. Another way to render the blog/new template from within a different controller.\nrenderView(template=&quot;/blog/new&quot;);\n\n4. Render the view page for the current action but without a layout and cache it for 60 minutes.\nrenderView(layout=false, cache=60);\n\n5. Load a layout from a different folder within `views`.\nrenderView(layout=&quot;/layouts/blog&quot;);\n\n6. Don't render the view immediately but rather return and store in a variable for further processing.\nmyView = renderView(returnAs=&quot;string&quot;);\n</code></pre>"
       },
       "hint": "Instructs the controller which view template and layout to render when it's finished processing the action.\nNote that when passing values for controller and / or action, this function does not execute the actual action but rather just loads the corresponding view template.\n\n",
       "returntype": "any",
@@ -10560,9 +10560,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// This will provide the formats defined in the `config()` function.\nproducts = model(&quot;product&quot;).findAll();\nrenderWith(products);\n\n// Provide a 403 status code for a json response (for example)\nmsg={\n\t&quot;status&quot; : &quot;Error&quot;,\n\t&quot;message&quot;: &quot;Not Authenticated&quot;\n}\nrenderWith(data=msg, status=403)\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Render all products in the requested format (json, xml, etc.)\nproducts = model(&quot;product&quot;).findAll();\nrenderWith(products);\n\n2. Render a JSON error message with a 403 status code\nmsg = {\n    &quot;status&quot; : &quot;Error&quot;,\n    &quot;message&quot;: &quot;Not Authenticated&quot;\n};\nrenderWith(data=msg, status=403);\n\n3. Render with a custom layout\nproducts = model(&quot;product&quot;).findAll();\nrenderWith(data=products, layout=&quot;/layouts/api&quot;);\n\n4. Render a view template from a different controller\ndata = model(&quot;order&quot;).findAll();\nrenderWith(data=data, controller=&quot;orders&quot;, action=&quot;list&quot;);\n\n5. Capture the output as a string instead of sending it to the client\noutput = renderWith(data=products, returnAs=&quot;string&quot;);\n</code></pre>"
       },
-      "hint": "Instructs the controller to render the data passed in to the format that is requested.\nIf the format requested is <code>json</code> or <code>xml</code>, Wheels will transform the data into that format automatically.\nFor other formats (or to override the automatic formatting), you can also create a view template in this format: <code>nameofaction.xml.cfm</code>, <code>nameofaction.json.cfm</code>, <code>nameofaction.pdf.cfm</code>, etc.\n\n",
+      "hint": "Instructs the controller to render the given data in the format requested by the client. If the requested format is json or xml, Wheels automatically converts the data into the appropriate format. For other formats—or to override automatic formatting—you can create a view template matching the requested format, such as nameofaction.json.cfm, nameofaction.xml.cfm, or nameofaction.pdf.cfm. This function is especially useful in APIs, AJAX endpoints, or situations where you need to respond dynamically in multiple formats based on client preferences. You can also control caching, layout, HTTP status codes, and whether to return the result as a string for further processing.\n\n",
       "returntype": "any",
       "slug": "controller.renderWith",
       "parameters": [
@@ -10645,7 +10645,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>// alternating row colors and shrinking emphasis\n&lt;cfoutput query=&quot;employees&quot; group=&quot;departmentId&quot;&gt;\n\t&lt;div class=&quot;#cycle(values=&quot;even,odd&quot;, name=&quot;row&quot;)#&quot;&gt;\n\t\t&lt;ul&gt;\n\t\t\t&lt;cfoutput&gt;\n\t\t\t\trank = cycle(values=&quot;president,vice-president,director,manager,specialist,intern&quot;, name=&quot;position&quot;)&gt;\n\t\t\t\t&lt;li class=&quot;#rank#&quot;&gt;#categories.categoryName#&lt;/li&gt;\n\t\t\t\tresetCycle(&quot;emphasis&quot;)&gt;\n\t\t\t&lt;/cfoutput&gt;\n\t\t&lt;/ul&gt;\n\t&lt;/div&gt;\n&lt;/cfoutput&gt;</code></pre>"
       },
-      "hint": "Resets a cycle so that it starts from the first list value the next time it is called.\n\n",
+      "hint": "Rsets a named cycle, allowing it to start from the first value the next time it is called. In Wheels, cycle() is often used to alternate values in a repeated pattern, such as CSS classes for table rows, positions, or emphasis levels. By calling resetCycle(), you ensure that the cycle begins again from its initial value, which is useful when looping through nested structures or when a new grouping starts.\n\n",
       "returntype": "void",
       "slug": "controller.resetCycle",
       "parameters": [
@@ -10887,9 +10887,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>wheelsResponse = response();</code></pre>"
+        "docs": "<pre><code class='javascript'>// Render a view for the current action\nrenderView(action=\"show\");\n\n// Capture the response content\nwheelsResponse = response();\n\n// Log or inspect the response\nwriteDump(wheelsResponse);</code></pre>"
       },
-      "hint": "Returns content that Wheels will send to the client in response to the request.\n\n",
+      "hint": "Returns the content that Wheels is preparing to send back to the client for the current request. This can include the output generated by renderView(), renderPartial(), renderText(), or any other rendering function that has been called during the request lifecycle. Essentially, response() lets you inspect or manipulate the final output before it is sent to the client, which can be particularly useful in testing, debugging, or middleware-style functions.\n\n",
       "returntype": "string",
       "slug": "controller.response",
       "parameters": [],
@@ -10907,9 +10907,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\n\nmapper()\n    .namespace(&quot;api&quot;)\n        // Map the root of the `api` folder to the `index` action of the `apis`\n        // controller.\n        .root(controller=&quot;apis&quot;, action=&quot;index&quot;)\n    .end()\n\n    // Map the root of the application to the `show` action of the `dashboards`\n    // controller.\n    .root(to=&quot;dashboards##show&quot;)\n.end();\n\n&lt;/cfscript&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Application Home Page\nMap the root of the application (/) to a controller action:\n\n&lt;cfscript&gt;\nmapper()\n    .root(to=&quot;dashboards##show&quot;)\n.end();\n&lt;/cfscript&gt;\n\n2. Root of a Namespaced Section (API)\nMap /api to an API controller:\n\n&lt;cfscript&gt;\nmapper()\n    .namespace(&quot;api&quot;)\n        .root(controller=&quot;apis&quot;, action=&quot;index&quot;)\n    .end();\n&lt;/cfscript&gt;\n\n3. Root with Optional Format\nEnable clients to request JSON or XML directly:\n\n&lt;cfscript&gt;\nmapper()\n    .namespace(&quot;api&quot;)\n        .root(controller=&quot;apis&quot;, action=&quot;index&quot;, mapFormat=true)\n    .end();\n&lt;/cfscript&gt;\n\n4. Root for Nested Resources\nUse root() inside a nested scope:\n\n&lt;cfscript&gt;\nmapper()\n    .namespace(&quot;admin&quot;)\n        .root(controller=&quot;dashboard&quot;, action=&quot;index&quot;)\n    .end();\n.end();\n&lt;/cfscript&gt;\n</code></pre>"
       },
-      "hint": "Create a route that matches the root of its current context. This mapper can be used for the application's web root (or home page), or it can generate a route for the root of a namespace or other path scoping mapper.\n\n",
+      "hint": "Defines a route that matches the root of the current context. This could be the root of the entire application (like the home page) or the root of a namespaced section of your routes. It is commonly used to map a controller action to the main entry point of your application or a subsection of it. You can specify the controller and action either using the to argument (controller##action) or by passing controller and action separately. Optionally, mapFormat can be set to true to allow a format suffix like .json or .xml in the URL.\n\n",
       "returntype": "struct",
       "slug": "mapper.root",
       "parameters": [
