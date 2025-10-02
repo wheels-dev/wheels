@@ -47,7 +47,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	
 	public function tests_testbox(){
 		// Set proper HTTP status first
-		cfheader(statuscode="200", statustext="OK");
+		cfheader(statuscode="200");
 		
 		// Simple test to ensure the endpoint works
 		if (structKeyExists(url, "test") && url.test == "simple") {
@@ -202,7 +202,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			cffile(action="readBinary", file=assetPath, variable="imgData");
 			cfcontent(type=mime, variable=imgData);
 		} else {
-			cfheader(statusCode=404, statusText="Not Found");
+			cfheader(statusCode=404);
 			writeOutput("Image not found");
 		}
 	}

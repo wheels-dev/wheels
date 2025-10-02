@@ -96,7 +96,18 @@ component output="false" {
 	}
 
 	public void function $header(){
-    cfheader(attributeCollection="#arguments#");
+		// Adobe CF 2025 removed statusText attribute - remove it if present
+		if (structKeyExists(arguments, "statusText")) {
+			local.args = {};
+			for (local.key in arguments) {
+				if (local.key != "statusText") {
+					local.args[local.key] = arguments[local.key];
+				}
+			}
+			cfheader(attributeCollection="#local.args#");
+		} else {
+			cfheader(attributeCollection="#arguments#");
+		}
 	}
 
 	public void function $include(required string template){
@@ -829,13 +840,13 @@ component output="false" {
 		) {
 			if (StructKeyExists(application, "wheels")) {
 				if (StructKeyExists(application.wheels, "showErrorInformation") && !application.wheels.showErrorInformation) {
-					$header(statusCode = 404, statustext = "Not Found");
+					$header(statusCode = 404);
 				}
 				if (StructKeyExists(application.wheels, "eventPath")) {
 					$includeAndOutput(template = "#application.wheels.eventPath#/onmissingtemplate.cfm");
 				}
 			}
-			$header(statusCode = 404, statustext = "Not Found");
+			$header(statusCode = 404);
 			abort;
 		}
 	}
@@ -1697,7 +1708,7 @@ component output="false" {
 	 * Otherwise show the 404 page for end users (typically in production mode).
 	 */
 	public void function $throwErrorOrShow404Page(required string type, required string message, string extendedInfo = "") {
-		$header(statusCode = 404, statustext = "Not Found");
+		$header(statusCode = 404);
 		if ($get("showErrorInformation")) {
 			Throw(type = arguments.type, message = arguments.message, extendedInfo = arguments.extendedInfo);
 		} else {
@@ -2259,7 +2270,7 @@ component output="false" {
 
 		// Set back the status code to 200 so the test suite does not use the same code that the action that was tested did.
 		// If the test suite fails it will set the status code to 500 later.
-		$header(statusCode = 200, statusText = "OK");
+		$header(statusCode = 200);
 
 		// Set the Content-Type header in case it was set to something else (e.g. application/json) during processing.
 		// It's fine to do this because we always want to return the test page as text/html.
