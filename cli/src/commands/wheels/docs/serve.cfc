@@ -198,37 +198,4 @@ component extends="../base" {
         
         return html;
     }
-    
-    private function watchDocumentation(docRoot, serverName) {
-        var fileWatcher = getInstance("FileWatcher");
-        
-        fileWatcher.watch(
-            paths = ["app/models/**", "app/controllers/**", "app/views/**", "app/services/**"],
-            callback = function(changes) {
-                print.line()
-                     .cyanLine("Source files changed, regenerating documentation...")
-                     .line();
-                
-                // Regenerate documentation
-                command("wheels docs generate")
-                    .params(output = arguments.docRoot, serve = false)
-                    .run();
-                
-                print.greenLine("Documentation updated!")
-                     .line();
-            }
-        );
-        
-        // Keep watching
-        while (true) {
-            sleep(5000);
-            
-            // Check if server is still running
-            var serverInfo = serverService.getServerInfo(arguments.serverName);
-            if (!structKeyExists(serverInfo, "status") || serverInfo.status != "running") {
-                print.redLine("Server stopped");
-                break;
-            }
-        }
-    }
 }
