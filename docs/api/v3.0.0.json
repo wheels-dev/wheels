@@ -10940,9 +10940,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Save the user object to the database (will automatically do an `INSERT` or `UPDATE` statement depending on if the record is new or already exists\nuser.save();\n\n// Save the user object directly in an if statement without using `cfqueryparam` and take appropriate action based on the result\nif(user.save(parameterize=false)){\n\tflashInsert(notice=&quot;The user was saved!&quot;);\n\tredirectTo(action=&quot;edit&quot;);\n} else {\n\tflashInsert(alert=&quot;Error, please correct!&quot;);\n\trenderView(action=&quot;edit&quot;);\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic Save (Automatic INSERT/UPDATE)\n\n&lt;cfscript&gt;\nuser = model(&quot;user&quot;).new();\nuser.firstName = &quot;Alice&quot;;\nuser.lastName = &quot;Smith&quot;;\nuser.email = &quot;alice@example.com&quot;;\n\nif(user.save()){\n    writeOutput(&quot;User saved successfully!&quot;);\n} else {\n    writeOutput(&quot;Error saving user. Please check validations.&quot;);\n}\n&lt;/cfscript&gt;\n\n2. Save Without Validations\n\n&lt;cfscript&gt;\nuser = model(&quot;user&quot;).findByKey(1);\nuser.firstName = &quot;&quot;; // Normally fails validation\n\n// Save without running validations\nuser.save(validate=false);\n&lt;/cfscript&gt;\n\n3. Save Using Specific cfqueryparam Columns\n\n&lt;cfscript&gt;\nuser = model(&quot;user&quot;).new();\nuser.firstName = &quot;Bob&quot;;\nuser.lastName = &quot;Jones&quot;;\nuser.email = &quot;bob@example.com&quot;;\n\n// Only parameterize the `email` field\nuser.save(parameterize=&quot;email&quot;);\n&lt;/cfscript&gt;\n\n4. Save Within a Transaction\n\n&lt;cfscript&gt;\nuser = model(&quot;user&quot;).new();\nuser.firstName = &quot;Charlie&quot;;\nuser.lastName = &quot;Brown&quot;;\nuser.email = &quot;charlie@example.com&quot;;\n\n// Attempt to save, but roll back instead of committing\nuser.save(transaction=&quot;rollback&quot;);\n&lt;/cfscript&gt;\n\n5. Save and Handle Callbacks Manually\n\n&lt;cfscript&gt;\nuser = model(&quot;user&quot;).new();\nuser.firstName = &quot;Dana&quot;;\nuser.lastName = &quot;White&quot;;\nuser.email = &quot;dana@example.com&quot;;\n\n// Save without triggering beforeSave/afterSave callbacks\nuser.save(callbacks=false);\n&lt;/cfscript&gt;\n</code></pre>"
       },
-      "hint": "Saves the object if it passes validation and callbacks.\nReturns <code>true</code> if the object was saved successfully to the database, <code>false</code> if not.\n\n",
+      "hint": "Saves the current model object to the database, with Wheels automatically determining whether to perform an INSERT for new objects or an UPDATE for existing ones. It returns true if the object was successfully saved, and false if the object failed validation or could not be saved. By default, save() also respects callbacks, validations, and parameterization, though these behaviors can be customized through optional arguments.\n\n",
       "returntype": "boolean",
       "slug": "model.save",
       "parameters": [
@@ -10996,9 +10996,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\n\nmapper()\n    // All routes inside will use the `freeForAll` controller.\n    .scope(controller=&quot;freeForAll&quot;)\n        .get(name=&quot;bananas&quot;, action=&quot;bananas&quot;)\n        .root(action=&quot;index&quot;)\n    .end()\n\n    // All routes's controllers inside will be inside the `public` package/subfolder.\n    .scope(package=&quot;public&quot;)\n        .resource(name=&quot;search&quot;, only=&quot;show,create&quot;)\n    .end()\n\n    // All routes inside will be prepended with a URL path of `phones/`.\n    .scope(path=&quot;phones&quot;)\n        .get(name=&quot;newest&quot;, to=&quot;phones##newest&quot;)\n        .get(name=&quot;sortOfNew&quot;, to=&quot;phones##sortOfNew&quot;)\n    .end()\n.end();\n\n&lt;/cfscript&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Set a default controller for multiple routes\n\n&lt;cfscript&gt;\nmapper()\n    .scope(controller=&quot;freeForAll&quot;)\n        .get(name=&quot;bananas&quot;, action=&quot;bananas&quot;)\n        .root(action=&quot;index&quot;)\n    .end()\n.end();\n&lt;/cfscript&gt;\n\n2. Apply a package/subfolder to multiple resources\n\n&lt;cfscript&gt;\nmapper()\n    .scope(package=&quot;public&quot;)\n        .resource(name=&quot;search&quot;, only=&quot;show,create&quot;)\n    .end()\n.end();\n&lt;/cfscript&gt;\n\n3. Add a common URL path prefix\n\n&lt;cfscript&gt;\nmapper()\n    .scope(path=&quot;phones&quot;)\n        .get(name=&quot;newest&quot;, to=&quot;phones##newest&quot;)\n        .get(name=&quot;sortOfNew&quot;, to=&quot;phones##sortOfNew&quot;)\n    .end()\n.end();\n&lt;/cfscript&gt;\n\n4. Combine controller and path scoping\n\n&lt;cfscript&gt;\nmapper()\n    .scope(controller=&quot;products&quot;, path=&quot;shop&quot;)\n        .get(name=&quot;featured&quot;, action=&quot;featured&quot;)\n        .get(name=&quot;sale&quot;, action=&quot;sale&quot;)\n    .end()\n.end();\n&lt;/cfscript&gt;\n\n5. Use constraints for route variables\n\n&lt;cfscript&gt;\nmapper()\n    .scope(path=&quot;users&quot;, constraints={userId=&quot;\\d+&quot;})\n        .get(name=&quot;profile&quot;, pattern=&quot;[userId]/profile&quot;, action=&quot;show&quot;)\n    .end()\n.end();\n&lt;/cfscript&gt;\n</code></pre>"
       },
-      "hint": "Set any number of parameters to be inherited by mappers called within this matcher's block. For example, set a package or URL path to be used by all child routes.\n\n",
+      "hint": "The scope() function in Wheels is used to define a block of routes that share common parameters such as controller, package, path, or naming prefixes. All routes defined inside a scope() block automatically inherit these parameters unless explicitly overridden, making it easier to manage related routes. This is particularly useful for grouping routes under the same controller or package, adding a common URL prefix to multiple routes, applying shallow routing to nested resources, and reducing repetition while improving the maintainability of route definitions.\n\n",
       "returntype": "struct",
       "slug": "mapper.scope",
       "parameters": [
@@ -11071,9 +11071,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- This &quot;Tag&quot; version of the function accepts a `name` and `selected` instead of binding to a model object ---&gt;\n#secondSelectTag(name=&quot;secondsToLaunch&quot;, selected=params.secondsToLaunch)#\n&lt;/cfoutput&gt;\n\n&lt;!--- Only show 15-second intervals ---&gt;\n#secondSelectTag(name=&quot;secondsToLaunch&quot;, value=params.secondsToLaunch, secondStep=15)# </code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic select for seconds (0–59)\nsecondSelectTag(name=&quot;secondsToLaunch&quot;)\n\n2. Pre-select a second based on a parameter\nsecondSelectTag(name=&quot;secondsToLaunch&quot;, selected=params.secondsToLaunch)\n\n3. Only show 15-second intervals\nsecondSelectTag(name=&quot;secondsToLaunch&quot;, selected=params.secondsToLaunch, secondStep=15)\n\n4. Include a blank option with custom text\nsecondSelectTag(name=&quot;secondsToLaunch&quot;, includeBlank=&quot;- Select Seconds -&quot;)\n\n5. Add a label around the select control\nsecondSelectTag(name=&quot;secondsToLaunch&quot;, label=&quot;Launch Second&quot;, labelPlacement=&quot;around&quot;)</code></pre>"
       },
-      "hint": "Builds and returns a string containing one <code>select</code> form control for the seconds of a minute based on the supplied name.\n\n",
+      "hint": "Generates an HTML &lt;select&gt; form control populated with seconds (0–59) for a minute. You can bind it to a form parameter or manually set a selected value, control the step interval, include a blank option, and customize labels and HTML attributes. This is especially useful for time selection forms, like setting the seconds for a scheduled task or timestamp input.\n\n",
       "returntype": "string",
       "slug": "controller.secondSelectTag",
       "parameters": [
@@ -11174,9 +11174,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Example 1: Basic `select` field with `label` and required `objectName` and `property` arguments\n// - Controller code\nauthors = model(&quot;author&quot;).findAll();\n\n&lt;!--- View code---&gt;\n#select(objectName=&quot;book&quot;, property=&quot;authorId&quot;, options=authors)#\n\n&lt;!---\n\tDo this when Wheels isn't grabbing the correct values for the `option`s' values and display texts\n\tNote that `valueField` and `textField` are both required when using this option\n---&gt;\n#select(objectName=&quot;book&quot;, property=&quot;authorId&quot;, options=authors, valueField=&quot;id&quot;, textField=&quot;authorfullname&quot;)#\n\n// Example 2: Shows `select` fields for selecting order statuses for all shipments provided by the `orders` association and nested properties\n// Controller code\nshipment = model(&quot;shipment&quot;).findByKey(key=params.key, where=&quot;shipments.statusId=#application.NEW_STATUS_ID#&quot;, include=&quot;order&quot;);\nstatuses = model(&quot;status&quot;).findAll(order=&quot;name&quot;);\n\n&lt;!--- View code---&gt;\n&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(shipments.orders)#&quot; index=&quot;i&quot;&gt;\n\t#select(label=&quot;Order #shipments.orders[i].orderNum#&quot;, objectName=&quot;shipment&quot;, association=&quot;orders&quot;, position=i, property=&quot;statusId&quot;, options=statuses)#\n&lt;/cfloop&gt;\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic select bound to a model property\nauthors = model(&quot;author&quot;).findAll();\n\n&lt;!--- View code ---&gt;\n#select(objectName=&quot;book&quot;, property=&quot;authorId&quot;, options=authors)#\n\n2. Using valueField and textField\nselect(\n    objectName=&quot;book&quot;,\n    property=&quot;authorId&quot;,\n    options=authors,\n    valueField=&quot;id&quot;,\n    textField=&quot;authorfullname&quot;\n)\n\n3. Include blank option\nselect(\n    objectName=&quot;book&quot;,\n    property=&quot;authorId&quot;,\n    options=authors,\n    valueField=&quot;id&quot;,\n    textField=&quot;authorfullname&quot;,\n    includeBlank=&quot;- Select Author -&quot;\n)\n\n4. Nested hasMany association\n&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(shipments.orders)#&quot; index=&quot;i&quot;&gt;\n    select(\n        label=&quot;Order #shipments.orders[i].orderNum#&quot;,\n        objectName=&quot;shipment&quot;,\n        association=&quot;orders&quot;,\n        position=i,\n        property=&quot;statusId&quot;,\n        options=statuses,\n        valueField=&quot;id&quot;,\n        textField=&quot;name&quot;\n    )\n&lt;/cfloop&gt;\n\n5. Custom label and placement\nselect(\n    objectName=&quot;book&quot;,\n    property=&quot;authorId&quot;,\n    options=authors,\n    valueField=&quot;id&quot;,\n    textField=&quot;authorfullname&quot;,\n    label=&quot;Choose Author&quot;,\n    labelPlacement=&quot;before&quot;\n)</code></pre>"
       },
-      "hint": "Builds and returns a string containing a select form control based on the supplied objectName and property.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Builds and returns an HTML &lt;select&gt; element bound to a model object property. It automatically handles nested associations, labels, options, and error highlighting. You can provide a list of options as a query, array of objects, or simple array, and customize labels, HTML attributes, and encoding. It is especially useful for forms where a user must select a value from a predefined list that is related to a database model.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
       "slug": "controller.select",
       "parameters": [
@@ -11309,9 +11309,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Controller code\ncities = model(&quot;city&quot;).findAll()&gt;\n\n&lt;!--- View code---&gt;\n#selectTag(name=&quot;cityId&quot;, options=cities)#\n\n&lt;!---\n\tDo this when Wheels isn't grabbing the correct values for the `option`s' values and display texts\n\tNote that `valueField` and `textField` are both required when using this option\n---&gt;\n#selectTag(name=&quot;cityId&quot;, options=cities, valueField=&quot;id&quot;, textField=&quot;name&quot;)#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic selectTag with a query\ncities = model(&quot;city&quot;).findAll();\n\n&lt;!--- View code ---&gt;\n#selectTag(name=&quot;cityId&quot;, options=cities)#\n\n2. SelectTag with valueField and textField\nselectTag(\n    name=&quot;cityId&quot;,\n    options=cities,\n    valueField=&quot;id&quot;,\n    textField=&quot;name&quot;\n)\n\n3. Including a blank option\nselectTag(\n    name=&quot;cityId&quot;,\n    options=cities,\n    valueField=&quot;id&quot;,\n    textField=&quot;name&quot;,\n    includeBlank=&quot;- Select a City -&quot;\n)\n\n4. Multiple selection\nselectTag(\n    name=&quot;cityIds&quot;,\n    options=cities,\n    valueField=&quot;id&quot;,\n    textField=&quot;name&quot;,\n    multiple=true\n)\n\n5. Custom label and HTML wrapping\nselectTag(\n    name=&quot;cityId&quot;,\n    options=cities,\n    valueField=&quot;id&quot;,\n    textField=&quot;name&quot;,\n    label=&quot;Choose a City&quot;,\n    labelPlacement=&quot;before&quot;,\n    prepend=&quot;&lt;div class='input-group'&gt;&quot;,\n    append=&quot;&lt;/div&gt;&quot;\n)</code></pre>"
       },
-      "hint": "Builds and returns a string containing a select form control based on the supplied name and options.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Builds an HTML &lt;select&gt; element using a name and a set of options. Unlike select(), it does not require a model object and is not bound to a property. It is useful for standalone select controls or when you want full manual control over the field.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
       "slug": "controller.selectTag",
       "parameters": [
@@ -11426,7 +11426,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a member and send a welcome email, passing in a few custom variables to the template\nnewMember = model(&quot;member&quot;).findByKey(params.member.id);\nsendEmail(\n\tto=newMember.email,\n\ttemplate=&quot;myemailtemplate&quot;,\n\tsubject=&quot;Thank You for Becoming a Member&quot;,\n\trecipientName=newMember.name,\n\tstartDate=newMember.startDate\n);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic email to a new user\nnewMember = model(&quot;member&quot;).findByKey(params.member.id);\n\nsendEmail(\n    to=newMember.email,\n    template=&quot;welcomeEmail&quot;,\n    subject=&quot;Thank You for Joining!&quot;,\n    recipientName=newMember.name,\n    startDate=newMember.startDate\n);\n\n2. Multipart email (HTML + text)\nsendEmail(\n    to=&quot;user@example.com&quot;,\n    template=&quot;welcomeEmailText, welcomeEmailHTML&quot;,\n    subject=&quot;Welcome!&quot;,\n    detectMultipart=true\n);\n\n3. Email with a layout\nsendEmail(\n    to=&quot;user@example.com&quot;,\n    template=&quot;newsletter&quot;,\n    layout=&quot;emailLayout&quot;,\n    subject=&quot;Monthly Newsletter&quot;,\n    userName=&quot;Salman&quot;\n);\n\n4. Email with attachments\nsendEmail(\n    to=&quot;user@example.com&quot;,\n    template=&quot;reportEmail&quot;,\n    subject=&quot;Your Monthly Report&quot;,\n    file=&quot;report.pdf, summary.xlsx&quot;\n);\n\n5. Write email to a file without sending\nsendEmail(\n    to=&quot;user@example.com&quot;,\n    template=&quot;testEmail&quot;,\n    subject=&quot;Testing Email&quot;,\n    writeToFile=&quot;#expandPath('./tmp/testEmail.eml')#&quot;,\n    deliver=false\n);</code></pre>"
       },
       "hint": "Sends an email using a template and an optional layout to wrap it in.\nBesides the Wheels-specific arguments documented here, you can also pass in any argument that is accepted by the <code>cfmail</code> tag as well as your own arguments to be used by the view.\n\n",
       "returntype": "any",
@@ -11510,9 +11510,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Send a PDF file to the user\nsendFile(file=&quot;wheels_tutorial_20081028_J657D6HX.pdf&quot;);\n\n// Send the same file but give the user a different name in the browser dialog window\nsendFile(file=&quot;wheels_tutorial_20081028_J657D6HX.pdf&quot;, name=&quot;Tutorial.pdf&quot;);\n\n// Send a file that is located outside of the web root\nsendFile(file=&quot;../../tutorials/wheels_tutorial_20081028_J657D6HX.pdf&quot;);\n\n// Send a file that is located in ram://\nsendFile(file=&quot;ram://wheels_tutorial_20081028_J657D6HX.pdf&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Send a file for download from the files folder\nsendFile(file=&quot;wheels_tutorial_20081028_J657D6HX.pdf&quot;);\n\n2. Rename the file for the client\nsendFile(\n    file=&quot;wheels_tutorial_20081028_J657D6HX.pdf&quot;,\n    name=&quot;Tutorial.pdf&quot;\n);\n\n3. Send a file located outside the web root\nsendFile(\n    file=&quot;../../tutorials/wheels_tutorial_20081028_J657D6HX.pdf&quot;\n);\n\n4. Inline display instead of download\nsendFile(\n    file=&quot;brochure.pdf&quot;,\n    disposition=&quot;inline&quot;,\n    type=&quot;application/pdf&quot;\n);\n\n5. Delete file after sending\nsendFile(\n    file=&quot;temporary_report.xlsx&quot;,\n    deleteFile=true\n);</code></pre>"
       },
-      "hint": "Sends a file to the user (from the <code>files</code> folder or a path relative to it by default).\n\n",
+      "hint": "Sends a file to the client. By default, it serves files from the <code>public/files</code> folder in your project or a path relative to it. You can control how the file is presented to the user (download dialog vs inline display), set the content type, rename it for the client, or even delete it from the server after delivery.\n\n",
       "returntype": "any",
       "slug": "controller.sendFile",
       "parameters": [
@@ -11578,9 +11578,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Example 1: Set the `URLRewriting` setting to `Partial`.\nset(URLRewriting=&quot;Partial&quot;);\n\n// Example 2: Set default values for the arguments in the `buttonTo` view helper. This works for the majority of Wheels functions/arguments.\nset(functionName=&quot;buttonTo&quot;, onlyPath=true, host=&quot;&quot;, protocol=&quot;&quot;, port=0, text=&quot;&quot;, confirm=&quot;&quot;, image=&quot;&quot;, disable=&quot;&quot;);\n\n// Example 3: Set the default values for a form helper to get the form marked up to your preferences.\nset(functionName=&quot;textField&quot;, labelPlacement=&quot;before&quot;, prependToLabel=&quot;&lt;div&gt;&quot;, append=&quot;&lt;/div&gt;&quot;, appendToLabel=&quot;&lt;br&gt;&quot;):\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Set the `URLRewriting` setting to `Partial`.\nset(URLRewriting=&quot;Partial&quot;);\n\n2. Set default values for the arguments in the `buttonTo` view helper. This works for the majority of Wheels functions/arguments.\nset(functionName=&quot;buttonTo&quot;, onlyPath=true, host=&quot;&quot;, protocol=&quot;&quot;, port=0, text=&quot;&quot;, confirm=&quot;&quot;, image=&quot;&quot;, disable=&quot;&quot;);\n\n3. Set the default values for a form helper to get the form marked up to your preferences.\nset(functionName=&quot;textField&quot;, labelPlacement=&quot;before&quot;, prependToLabel=&quot;&lt;div&gt;&quot;, append=&quot;&lt;/div&gt;&quot;, appendToLabel=&quot;&lt;br&gt;&quot;):\n</code></pre>"
       },
-      "hint": "Use to configure a global setting or set a default for a function.\n\n",
+      "hint": "Used to configure global settings or set default argument values for Wheels functions. It can be applied to core functions, helpers, and even migrations. This allows you to define a standard behavior across your application without repeating arguments every time a function is called.\n\n",
       "returntype": "void",
       "slug": "controller.set",
       "parameters": [],
@@ -11603,9 +11603,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Set filter chain directly in an array.\nsetFilterChain([\n\t{through=&quot;restrictAccess&quot;},\n\t{through=&quot;isLoggedIn, checkIPAddress&quot;, except=&quot;home, login&quot;},\n\t{type=&quot;after&quot;, through=&quot;logConversion&quot;, only=&quot;thankYou&quot;}\n]);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic filter chain\n// Set filter chain directly\nsetFilterChain([\n    {through=&quot;restrictAccess&quot;}, // runs for all actions by default\n    {through=&quot;isLoggedIn, checkIPAddress&quot;, except=&quot;home, login&quot;}, // exclude certain actions\n    {type=&quot;after&quot;, through=&quot;logConversion&quot;, only=&quot;thankYou&quot;} // after filter for specific action\n]);\n\n//First filter: restrictAccess runs before all actions.\n//Second filter: isLoggedIn and checkIPAddress run before all actions except home and login.\n//Third filter: logConversion runs after the thankYou action only.\n\n2. Using only and except with different filter types\nsetFilterChain([\n    {through=&quot;authenticateUser&quot;, only=&quot;edit, update, delete&quot;}, // only for sensitive actions\n    {through=&quot;trackActivity&quot;, except=&quot;index, show&quot;},           // for most actions except viewing\n    {type=&quot;after&quot;, through=&quot;sendAnalytics&quot;}                   // after all actions\n]);\n\n//Demonstrates selective filtering with only and except.\n//Can combine before (default) and after filters in the same chain.\n\n3. Multiple filters in one chain struct\nsetFilterChain([\n    {through=&quot;validateSession, checkPermissions&quot;, only=&quot;admin, settings&quot;},\n    {through=&quot;logRequest&quot;},\n    {type=&quot;after&quot;, through=&quot;cleanupTempFiles&quot;}\n]);\n\n//Multiple filters can run together (validateSession and checkPermissions).\n//Mix of before and after filters ensures proper order and execution context.</code></pre>"
       },
-      "hint": "Use this function if you need a more low level way of setting the entire filter chain for a controller.\n\n",
+      "hint": "Provides a low-level way to define the complete filter chain for a controller. This lets you explicitly specify the sequence of filters, their scope, and the actions they apply to, all in a single configuration. Filters are functions that run before, after, or around actions to handle tasks such as authentication, logging, or IP restrictions.\n\n",
       "returntype": "void",
       "slug": "controller.setFilterChain",
       "parameters": [
@@ -11630,9 +11630,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Set the flash to cookie for the current controller only.\nsetFlashStorage(&quot;cookie&quot;);\n\n// Set the flash to session for the current controller and application\nsetFlashStorage(&quot;session&quot;, true);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Set the flash to cookie for the current controller only.\nsetFlashStorage(&quot;cookie&quot;);\n\n2. Set the flash to session for the current controller and application\nsetFlashStorage(&quot;session&quot;, true);</code></pre>"
       },
-      "hint": "Dynamically sets flashStorage during request lifecycle.\n\n",
+      "hint": "Dynamically sets the storage mechanism for flash messages during the current request lifecycle. Flash messages are temporary messages (e.g., success or error notifications) that persist across requests.\n\n",
       "returntype": "void",
       "slug": "controller.setFlashStorage",
       "parameters": [
@@ -11667,7 +11667,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>/* Note that there are two ways to do pagination yourself using a custom query.\n\t1) Do a query that grabs everything that matches and then use\n\tthe `cfouput` or `cfloop` tag to page through the results.\n\t2) Use your database to make 2 queries. The first query\n\tbasically does a count of the total number of records that match\n\tthe criteria and the second query actually selects the page of\n\trecords for retrieval.\n\tIn the example below, we will show how to write a custom query\n\tusing both of these methods. Note that the syntax where your\n\tdatabase performs the pagination will differ depending on the\n\tdatabase engine you are using. Plese consult your database\n\tengine's documentation for the correct syntax.\n\tAlso note that the view code will differ depending on the method\n\tused.\n*/\n\n//=================== First method: Handle the pagination through your CFML engine\n\n// Model code: In your model (ie. User.cfc), create a custom method for your custom query\nfunction myCustomQuery(required numeric page, numeric perPage=25){\n\tlocal.customQuery=QueryExecute(&quot;SELECT * FROM users&quot;, [], { datasource=get('dataSourceName') });\n\tsetPagination(\n\t\ttotalRecords=local.customQuery.RecordCount,\n\t\tcurrentPage=arguments.page,\n\t\tperPage=arguments.perPage,\n\t\thandle=&quot;myCustomQueryHandle&quot;);\n\treturn local.customQuery;\n}\n\n// Controller code\nfunction list(){\n\tparam name=&quot;params.page&quot; default=&quot;1;\n\tparam name=&quot;params.perPage&quot; default=&quot;25&quot;;\n\tallUsers = model(&quot;user&quot;).myCustomQuery( page=params.page, perPage=params.perPage);\n\n\t// Because we're going to let `cfoutput`/`cfloop` handle the pagination,\n\t// we're going to need to get some addition information about the pagination.\n\tpaginationData = pagination(&quot;myCustomQueryHandle&quot;)\n}\n\n&lt;!--- View code (using `cfloop`): Use the information from `paginationData` to page through the records ---&gt;\n&lt;ul&gt;\n\t&lt;cfloop query=&quot;allUsers&quot; startrow=&quot;#paginationData.startrow#&quot; endrow=&quot;#paginationData.endrow#&quot; &gt;\n\t&lt;li&gt; #allUsers.firstName# #allUsers.lastName# &lt;/li&gt;\n\t&lt;/cfloop&gt;\n&lt;/ul&gt;\n#paginationLinks(handle=&quot;myCustomQueryHandle&quot;)#\n\n&lt;!--- View code (using `cfoutput`) Use the information from `paginationData` to page through the records---&gt;\n&lt;ul&gt;\n\t&lt;cfoutput query=&quot;allUsers&quot; startrow=&quot;#paginationData.startrow#&quot; maxrows=&quot;#paginationData.maxrows#&quot; &gt;\n\t&lt;li&gt; #allUsers.firstName# #allUsers.lastName# &lt;/li&gt;\n\t&lt;/cfoutput&gt;\n&lt;/ul&gt;\n#paginationLinks(handle=&quot;myCustomQueryHandle&quot;)#\n\n//=================== Second method: Handle the pagination through the database\n\n// Model code: In your model (ie. `User.cfc`), create a custom method for your custom query\n\nfunction myCustomQuery(required numeric page, numeric perPage=25){\n\tlocal.customQueryCount=QueryExecute(&quot;SELECT COUNT(*) AS theCount FROM users&quot;,\n\t\t\t\t\t\t\t\t\t\t[], { datasource=get('dataSourceName') });\n\tlocal.customQuery=QueryExecute(&quot;SELECT * FROM users LIMIT ? OFFSET ?&quot;,\n\t\t\t\t\t\t\t\t\t[arguments.page, arguments.perPage],\n\t\t\t\t\t\t\t\t\t{ datasource=get('dataSourceName') });\n\n\t//Notice the we use the value from the first query for `totalRecords`\n\tsetPagination(\n\t\ttotalRecords=local.customQueryCount.theCount,\n\t\tcurrentPage=arguments.page,\n\t\tperPage=arguments.perPage,\n\t\thandle=&quot;myCustomQueryHandle&quot; );\n\n\t// We return the second query\n\treturn local.customQuery;\n}\n\n// Controller code\nfunction list(){\n\tparam name=&quot;params.page&quot; default=&quot;1;\n\tparam name=&quot;params.perPage&quot; default=&quot;25&quot;;\n\tallUsers = model(&quot;user&quot;).myCustomQuery( page=params.page, perPage=params.perPage);\n}\n\n&lt;!--- View code (using `cfloop`)---&gt;\n&lt;ul&gt;\n\t&lt;cfloop query=&quot;allUsers&quot;&gt;\n\t&lt;li&gt; #allUsers.firstName# #allUsers.lastName# &lt;/li&gt;\n\t&lt;/cfloop&gt;\n&lt;/ul&gt;\n#paginationLinks(handle=&quot;myCustomQueryHandle&quot;)#\n\n&lt;!--- View code (using `cfoutput`)---&gt;\n&lt;ul&gt;\n\t&lt;cfoutput query=&quot;allUsers&quot;&gt;\n\t&lt;li&gt; #allUsers.firstName# #allUsers.lastName# &lt;/li&gt;\n\t&lt;/cfoutput&gt;\n&lt;/ul&gt;\n#paginationLinks(handle=&quot;myCustomQueryHandle&quot;)#\n\n</code></pre>"
       },
-      "hint": "Allows you to set a pagination handle for a custom query so you can perform pagination on it in your view with <code>paginationLinks</code>.\n\n",
+      "hint": "Aallows you to define a pagination handle for a custom query so that you can easily generate paginated links and manage page offsets in your views. It’s useful when you want manual or database-driven pagination instead of relying on built-in model queries. This works in combination with the <code>pagination()</code> function to retrieve pagination metadata (like startRow, endRow, maxRows) and <code>paginationLinks()</code> to render links in your view.\n\n",
       "returntype": "void",
       "slug": "controller.setPagination",
       "parameters": [
@@ -11718,9 +11718,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// In `models/User.cfc`, define the primary key as a column called `userID`.\nfunction config(){\n\tsetPrimaryKey(&quot;userID&quot;);\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Single primary key\ncomponent extends=&quot;Model&quot; {\n    function config() {\n        // The primary key for this table is `userID`\n        setPrimaryKey(&quot;userID&quot;);\n    }\n}\n\n2. Composite primary key\ncomponent extends=&quot;Model&quot; {\n    function config() {\n        // The combination of `orderID` and `productID` uniquely identifies a record\n        setPrimaryKey(&quot;orderID,productID&quot;);\n    }\n}\n\n3. Using the alias setPrimaryKeys()\ncomponent extends=&quot;Model&quot; {\n    function config() {\n        // Alias works the same as `setPrimaryKey()`\n        setPrimaryKeys(&quot;customerID&quot;);\n    }\n}</code></pre>"
       },
-      "hint": "Allows you to pass in the name(s) of the property(s) that should be used as the primary key(s).\nPass as a list if defining a composite primary key.\nThis function is also aliased as <code>setPrimaryKeys()</code>.\n\n",
+      "hint": "The setPrimaryKey() function allows you to define which property (or properties) of a model represent the primary key in the database. This is crucial for Wheels to correctly handle CRUD operations, updates, and record lookups. For single-column primary keys, pass the property name as a string. For composite primary keys (multiple columns together form the key), pass a comma-separated list of property names. Alias: <code>setPrimaryKeys()</code>\n\n",
       "returntype": "void",
       "slug": "model.setPrimaryKey",
       "parameters": [
@@ -11772,9 +11772,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Update the properties of the object with the params struct containing the values of a form post\nuser = model(&quot;user&quot;).findByKey(1);\nuser.setProperties(params.user);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Using a struct (common scenario with form submission)\n// Controller code: create new user\nuser = model(&quot;user&quot;).new();\n\n// Set properties from a submitted form\nuser.setProperties(params.user);\n\n// Save the updated user\nuser.save();\n\n2. Using named arguments\nuser = model(&quot;user&quot;).new();\n\n// Set properties directly using named arguments\nuser.setProperties(\n    firstName=&quot;John&quot;,\n    lastName=&quot;Doe&quot;,\n    email=&quot;john.doe@example.com&quot;\n);\n\n// Save changes\nuser.save();\n\n3. Using with validations\nuser = model(&quot;user&quot;).new();\n\n// Set multiple properties, skipping one intentionally\nuser.setProperties({\n    firstName = &quot;Jane&quot;,\n    lastName = &quot;Smith&quot;\n});\n\n// Only save if validations pass\nif(user.save()){\n    writeOutput(&quot;User updated successfully!&quot;);\n} else {\n    writeDump(user.errors);\n}</code></pre>"
       },
-      "hint": "Allows you to set all the properties of an object at once by passing in a structure with keys matching the property names.\n\n",
+      "hint": "Allows you to set multiple properties of a model object at once. It is useful when you want to update a model with a structure (struct) of key/value pairs instead of assigning each property individually. The keys of the struct should match the property names of the model. You can also pass named arguments directly instead of a struct.\n\n",
       "returntype": "void",
       "slug": "model.setProperties",
       "parameters": [
@@ -11800,9 +11800,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>setResponse(newReponse);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Sending plain text\nfunction myAction() {\n    setResponse(&quot;This is a custom response sent directly to the client.&quot;);\n}\n\n2. Sending JSON content\nfunction getUserData() {\n    user = model(&quot;user&quot;).findByKey(1);\n    \n    // Convert the user object to JSON\n    jsonData = serializeJson(user);\n    \n    // Set the JSON response\n    setResponse(jsonData);\n}\ncfheader(name=&quot;Content-Type&quot;, value=&quot;application/json&quot;);\n\n3. Sending HTML content\nfunction showCustomHtml() {\n    htmlContent = &quot;&lt;h1&gt;Welcome!&lt;/h1&gt;&lt;p&gt;This is a custom HTML response.&lt;/p&gt;&quot;;\n    setResponse(htmlContent);\n}</code></pre>"
       },
-      "hint": "Sets content that Wheels will send to the client in response to the request.\n\n",
+      "hint": "Allows you to manually set the content that Wheels will send back to the client for a given request. Unlike <code>renderView()</code> or <code>renderText()</code>, which automatically generate output from templates or data, <code>setResponse()</code> gives you full control over the response content.\n\n",
       "returntype": "void",
       "slug": "controller.setResponse",
       "parameters": [
@@ -11827,9 +11827,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// In `models/User.cfc`, add a prefix to the default table name of `tbl`.\nfunction config(){\n\tsetTableNamePrefix(&quot;tbl&quot;);\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic prefix\n// In app/models/User.cfc\nfunction config(){\n    // All queries will now target 'tblUsers' instead of 'users'\n    setTableNamePrefix(&quot;tbl&quot;);\n}\n\n2. Using a custom prefix for multiple models\n// app/models/Product.cfc\nfunction config(){\n    setTableNamePrefix(&quot;tbl&quot;);\n}\n\n// app/models/Order.cfc\nfunction config(){\n    setTableNamePrefix(&quot;tbl&quot;);\n}</code></pre>"
       },
-      "hint": "Sets a prefix to prepend to the table name when this model runs SQL queries.\n\n",
+      "hint": "Allows you to add a prefix to the table name used by a model when performing SQL queries. This is useful if your database uses a consistent naming convention, such as <code>tblUsers</code> instead of <code>Users</code>. By default, Wheels infers the table name from the model name (e.g., User -> users). Using a prefix ensures that all queries automatically reference the correctly prefixed table.\n\n",
       "returntype": "void",
       "slug": "model.setTableNamePrefix",
       "parameters": [
@@ -11853,10 +11853,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic setup for a test suite\ncomponent extends=&quot;app.tests.Test&quot; {\n\n    function setup() {\n        // Initialize a new user object before each test\n        variables.user = model(&quot;user&quot;).new();\n    }\n\n    function test_User_Creation() {\n        variables.user.firstName = &quot;John&quot;;\n        variables.user.lastName = &quot;Doe&quot;;\n\n        assert(&quot;variables.user.save() eq true&quot;);\n    }\n\n    function test_User_Email_Validation() {\n        variables.user.email = &quot;invalid-email&quot;;\n\n        assert(&quot;variables.user.valid() eq false&quot;);\n    }\n}\n\n2. Reset database table before each test\ncomponent extends=&quot;app.tests.Test&quot; {\n\n    function setup() {\n        // Delete all records in the users table before each test\n        model(&quot;user&quot;).deleteAll();\n    }\n\n    function test_User_Insert() {\n        newUser = model(&quot;user&quot;).new(firstName=&quot;Alice&quot;, lastName=&quot;Smith&quot;);\n        assert(&quot;newUser.save() eq true&quot;);\n    }\n\n    function test_User_Count() {\n        count = model(&quot;user&quot;).count();\n        assert(&quot;count eq 0&quot;);\n    }\n}</code></pre>"
       },
-      "hint": "Executes before every test case.\n\n",
+      "hint": "Callback used in Wheels legacy testing framework. It runs before every individual test case within a test suite. This allows you to prepare the test environment, initialize objects, or reset state before each test executes.\n\n",
       "returntype": "any",
       "slug": "test.setup",
       "parameters": [],
@@ -11874,9 +11874,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Set verification chain directly in an array.\nsetVerificationChain([\n\t{only=&quot;handleForm&quot;, post=true},\n\t{only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;},\n\t{only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, handler=&quot;index&quot;, error=&quot;Invalid userId&quot;}\n]);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic verification chain\ncomponent extends=&quot;Controller&quot; {\n\n    function init() {\n        // Set verification rules for multiple actions\n        setVerificationChain([\n            {only=&quot;handleForm&quot;, post=true},\n            {only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;}\n        ]);\n    }\n\n    function handleForm() {\n        // Action logic here\n    }\n\n    function edit() {\n        // Action logic here\n    }\n}\n\n2. Adding custom error handling\ncomponent extends=&quot;Controller&quot; {\n\n    function init() {\n        setVerificationChain([\n            {only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, handler=&quot;index&quot;, error=&quot;Invalid userId&quot;},\n            {only=&quot;delete&quot;, post=true, params=&quot;id&quot;, paramsTypes=&quot;integer&quot;, error=&quot;Missing or invalid id&quot;}\n        ]);\n    }\n\n    function edit() {\n        /* edit logic */ \n    }\n    function delete() {\n        /* delete logic */ \n    }\n}</code></pre>"
       },
-      "hint": "Use this function if you need a more low level way of setting the entire verification chain for a controller.\n\n",
+      "hint": "Allows you to define the entire verification chain for a controller in a low-level, structured way. Verification chains are used to validate requests, ensuring they meet specific requirements (like HTTP method, parameters, or types) before the controller action executes. Instead of defining individual <code>verifies()</code> calls in each action, you can use <code>setVerificationChain()</code> to set all verifications at once.\n\n",
       "returntype": "void",
       "slug": "controller.setVerificationChain",
       "parameters": [
@@ -11901,9 +11901,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- How most of your calls will look. ---&gt;\n#simpleFormat(post.bodyText)#\n\n&lt;!--- Demonstrates what output looks like with specific data. ---&gt;\n&lt;cfsavecontent variable=&quot;comment&quot;&gt;\n\tI love this post!\n\n\tHere's why:\n\t* Short\n\t* Succinct\n\t* Awesome\n&lt;/cfsavecontent&gt;\n#simpleFormat(comment)#\n\n&lt;!---\n\t&lt;p&gt;I love this post!&lt;/p&gt;\n\n\t&lt;p&gt;Here's why:&lt;br&gt;\n\t* Short&lt;br&gt;\n\t* Succinct&lt;br&gt;\n\t* Awesome&lt;/p&gt;\n---&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Typical usage\n#simpleFormat(post.bodyText)#\n\nIf post.bodyText =\nThis is the first line.\n\nThis is the second paragraph.\n\nOutput:\n\n&lt;p&gt;This is the first line.&lt;/p&gt;\n&lt;p&gt;This is the second paragraph.&lt;/p&gt;\n\n2. Demonstrating line breaks\n&lt;cfsavecontent variable=&quot;comment&quot;&gt;\nI love this post!\n\nHere's why:\n* Short\n* Succinct\n* Awesome\n&lt;/cfsavecontent&gt;\n\n#simpleFormat(comment)#\n\nOutput:\n\n&lt;p&gt;I love this post!&lt;/p&gt;\n&lt;p&gt;Here's why:&lt;br&gt;\n* Short&lt;br&gt;\n* Succinct&lt;br&gt;\n* Awesome&lt;/p&gt;\n\n3. Disable paragraph wrapping\n&lt;cfsavecontent variable=&quot;bio&quot;&gt;\nHello, I’m Salman.\nI write about ColdFusion and backend development.\n&lt;/cfsavecontent&gt;\n\n#simpleFormat(bio, wrap=false)#\n\nOutput:\n\nHello, I’m Salman.&lt;br&gt;\nI write about ColdFusion and backend development.\n\n//No &lt;p&gt; tags, only &lt;br&gt; for newlines.\n\n4. Handling user input safely\nWhen you’re rendering user-submitted text in HTML attributes, simpleFormat() alone is not enough:\n\n&lt;!-- Incorrect usage in an attribute --&gt;\n&lt;div title=&quot;#simpleFormat(userInput)#&quot;&gt;...&lt;/div&gt;\n\nInstead, combine with EncodeForHtmlAttribute():\n\n&lt;div title=&quot;#EncodeForHtmlAttribute(simpleFormat(userInput))#&quot;&gt;...&lt;/div&gt;</code></pre>"
       },
-      "hint": "Returns formatted text using HTML break tags (<code><br></code>) and HTML paragraph elements (<code><p></p></code>) based on the newline characters and carriage returns in the <code>text</code> that is passed in.\n\n",
+      "hint": "Takes plain text and converts newline and carriage return characters into HTML <code>&lt;br&gt;</code> and <code>&lt;p&gt;</code> tags for display in a browser. This is particularly useful for rendering user-submitted text (like blog posts, comments, or descriptions) in a way that respects the author’s formatting. By default, the text is wrapped in a <code>&lt;p&gt;</code> element and URL parameters are encoded for safety.\n\n",
       "returntype": "string",
       "slug": "controller.simpleFormat",
       "parameters": [
@@ -11942,9 +11942,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Singularize a word, will result in &quot;language&quot; \n#singularize(&quot;languages&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Simple plural -&gt; singular\n#singularize(&quot;languages&quot;)#\n\nOutput:\nlanguage\n\n2. Words ending in -ies\n#singularize(&quot;companies&quot;)#\n\nOutput:\ncompany\n\n3. Words ending in -es\n#singularize(&quot;boxes&quot;)#\n\nOutput:\nbox\n\n4. Irregular plural\n#singularize(&quot;children&quot;)#\n\nOutput:\nchild</code></pre>"
       },
-      "hint": "Returns the singular form of the passed in word.\n\n",
+      "hint": "Converts a plural word into its singular form. It uses Wheels’ built-in inflection rules, handling common English pluralization cases as well as irregular words. This is useful when dynamically generating model names, table names, or working with resource naming conventions.\n\n",
       "returntype": "string",
       "slug": "controller.singularize",
       "parameters": [
@@ -11974,9 +11974,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- View Code ---&gt;\n#startFormTag(action=&quot;create&quot;)#\n    &lt;!--- your form controls ---&gt;\n#endFormTag()#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic form for create action\n#startFormTag(action=&quot;create&quot;)#\n    #textFieldTag(name=&quot;firstName&quot;)#\n    #submitTag(value=&quot;Save&quot;)#\n#endFormTag()#\n\n2. Form with file upload\n#startFormTag(action=&quot;upload&quot;, multipart=true)#\n    #fileFieldTag(name=&quot;profilePicture&quot;)#\n    #submitTag(value=&quot;Upload&quot;)#\n#endFormTag()#\n\n3. Using a named route\n#startFormTag(route=&quot;registerUser&quot;)#\n    #textFieldTag(name=&quot;email&quot;)#\n    #passwordFieldTag(name=&quot;password&quot;)#\n    #submitTag(value=&quot;Register&quot;)#\n#endFormTag()#\n\n4. Passing keys and params\n#startFormTag(controller=&quot;posts&quot;, action=&quot;edit&quot;, key=42, params=&quot;draft=true&quot;)#\n    #textAreaTag(name=&quot;content&quot;)#\n    #submitTag(value=&quot;Update Post&quot;)#\n#endFormTag()#\n\n5. Custom attributes\n#startFormTag(action=&quot;search&quot;, id=&quot;searchForm&quot;, class=&quot;inline-form&quot;)#\n    #textFieldTag(name=&quot;q&quot;)#\n    #submitTag(value=&quot;Search&quot;)#\n#endFormTag()#</code></pre>"
       },
-      "hint": "Builds and returns a string containing the opening <code>form</code> tag.\nThe form's action will be built according to the same rules as <code>URLFor</code>.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Builds and returns an opening &lt;form&gt; tag. The form’s action URL is automatically generated following the same rules as <code>urlFor()</code>. You can pass standard Wheels routing arguments (controller, action, route, key, params) as well as custom HTML attributes (id, class, rel, etc.). Use this in combination with <code>endFormTag()</code> to wrap your form controls.\n\n",
       "returntype": "string",
       "slug": "controller.startFormTag",
       "parameters": [
@@ -12099,10 +12099,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a simple string column\nt.string(&quot;username&quot;);\n\n2. Limit the length of the string\nt.string(columnNames=&quot;email&quot;, limit=255);\n\n3. Set default values\nt.string(columnNames=&quot;status&quot;, default=&quot;active&quot;);\n\n4. Multiple columns in one call\nt.string(columnNames=&quot;firstName,lastName&quot;);\n\n5. Nullable vs non-nullable\nt.string(columnNames=&quot;configKey&quot;, allowNull=false);\nt.string(columnNames=&quot;configValue&quot;, allowNull=true);</code></pre>"
       },
-      "hint": "adds string columns to table definition\n\n",
+      "hint": "Used to add one or more string (VARCHAR) columns to a database table. It supports specifying default values, nullability, and a maximum length (limit). Only available in a migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.string",
       "parameters": [
@@ -12141,9 +12141,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Will output: &lt;strong&gt;Wheels&lt;/strong&gt; is a framework for ColdFusion. ---&gt;\n#stripLinks('&lt;strong&gt;Wheels&lt;/strong&gt; is a framework for &lt;a href=&quot;http://www.adobe.com/products/coldfusion&quot;&gt;ColdFusion&lt;/a&gt;.')#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Remove links but keep text\n#stripLinks('&lt;strong&gt;Wheels&lt;/strong&gt; is a framework for &lt;a href=&quot;http://www.adobe.com/products/coldfusion&quot;&gt;ColdFusion&lt;/a&gt;.')#\n\nOutput:\n&lt;strong&gt;Wheels&lt;/strong&gt; is a framework for ColdFusion.\n\n2. Strip links from user-submitted content\nuserComment = '&lt;p&gt;Check out &lt;a href=&quot;http://spam.com&quot;&gt;this link&lt;/a&gt;!&lt;/p&gt;';\n#stripLinks(userComment)#\n\nOutput:\n&lt;p&gt;Check out this link!&lt;/p&gt;\n\n3. Encoding URLs (optional)\n#stripLinks('&lt;a href=&quot;http://example.com/page?param=value&amp;another=1&quot;&gt;Example&lt;/a&gt;', encode=false)#\n\nOutput:\nExample</code></pre>"
       },
-      "hint": "Removes all links from an HTML string, leaving just the link text.\n\n",
+      "hint": "Removes all &lt;a&gt; tags (hyperlinks) from an HTML string while preserving the inner text. This is useful when you want to display content without clickable links but still retain the text inside them.\n\n",
       "returntype": "string",
       "slug": "controller.stripLinks",
       "parameters": [
@@ -12175,9 +12175,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Will output: Wheels is a framework for ColdFusion. ---&gt;\n#stripTags('&lt;strong&gt;Wheels&lt;/strong&gt; is a framework for &lt;a href=&quot;http://www.adobe.com/products/coldfusion&quot;&gt;ColdFusion&lt;/a&gt;.')#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Remove all tags from a string\n#stripTags('&lt;strong&gt;Wheels&lt;/strong&gt; is a framework for &lt;a href=&quot;http://www.adobe.com/products/coldfusion&quot;&gt;ColdFusion&lt;/a&gt;.')#\n\nOutput:\nWheels is a framework for ColdFusion.\n\n2. Sanitize user input\nuserInput = '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;Normal text';\n#stripTags(userInput)#\n\nOutput:\nNormal text\n\n3. With encoding\n#stripTags('&lt;a href=&quot;http://example.com/page?param=value&amp;another=1&quot;&gt;Example&lt;/a&gt;')#\n\nOutput:\nExample</code></pre>"
       },
-      "hint": "Removes all HTML tags from a string.\n\n",
+      "hint": "Removes all HTML tags from a string, leaving only the raw text content. Use this when you need to sanitize HTML by completely removing formatting and markup.\n\n",
       "returntype": "string",
       "slug": "controller.stripTags",
       "parameters": [
@@ -12209,9 +12209,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- view code ---&gt;\n&lt;head&gt;\n    &lt;!--- Includes `stylesheets/styles.css` ---&gt;\n    #styleSheetLinkTag(&quot;styles&quot;)#\n    &lt;!--- Includes `stylesheets/blog.css` and `stylesheets/comments.css` ---&gt;\n    #styleSheetLinkTag(&quot;blog,comments&quot;)#\n    &lt;!--- Includes printer style sheet ---&gt;\n    #styleSheetLinkTag(sources=&quot;print&quot;, media=&quot;print&quot;)#\n    &lt;!--- Includes external style sheet ---&gt;\n    #styleSheetLinkTag(&quot;http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.0/themes/cupertino/jquery-ui.css&quot;)#\n&lt;/head&gt;\n\n&lt;body&gt;\n    &lt;!--- This will still appear in the `head` ---&gt;\n    #styleSheetLinkTag(sources=&quot;tabs&quot;, head=true)#\n&lt;/body&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>&lt;!--- view code ---&gt;\n&lt;head&gt;\n    &lt;!--- Includes `public/stylesheets/styles.css` ---&gt;\n    #styleSheetLinkTag(&quot;styles&quot;)#\n    &lt;!--- Includes `public/stylesheets/blog.css` and `public/stylesheets/comments.css` ---&gt;\n    #styleSheetLinkTag(&quot;blog,comments&quot;)#\n    &lt;!--- Includes printer style sheet ---&gt;\n    #styleSheetLinkTag(sources=&quot;print&quot;, media=&quot;print&quot;)#\n    &lt;!--- Includes external style sheet ---&gt;\n    #styleSheetLinkTag(&quot;http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.0/themes/cupertino/jquery-ui.css&quot;)#\n&lt;/head&gt;\n\n&lt;body&gt;\n    &lt;!--- This will still appear in the `head` ---&gt;\n    #styleSheetLinkTag(sources=&quot;tabs&quot;, head=true)#\n&lt;/body&gt;</code></pre>"
       },
-      "hint": "Returns a <code>link</code> tag for a stylesheet (or several) based on the supplied arguments.\n\n",
+      "hint": "Generates one or more &lt;link&gt; tags for including CSS stylesheets in your application. By default, it looks in the <code>publicstylesheets</code> folder of your app but can also handle external URLs or place stylesheets directly in the &lt;head&gt; section when needed.\n\n",
       "returntype": "string",
       "slug": "controller.styleSheetLinkTag",
       "parameters": [
@@ -12278,7 +12278,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>#startFormTag(action=&quot;something&quot;)#\n    &lt;!--- form controls go here ---&gt;\n    #submitTag()#\n#endFormTag()#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Default submit button\n#startFormTag(action=&quot;save&quot;)##submitTag()##endFormTag()#\n2. Custom button label\n#submitTag(value=&quot;Register Now&quot;)#\n3. Submit button with CSS class and ID\n#submitTag(value=&quot;Update Profile&quot;, class=&quot;btn btn-primary&quot;, id=&quot;updateBtn&quot;)#\n4. Submit as an image button\n#submitTag(image=&quot;submit-icon.png&quot;, value=&quot;Submit Form&quot;)#\n5. Wrapping with prepend and append\n#submitTag(value=&quot;Send Message&quot;, prepend=&quot;&lt;div class='form-actions'&gt;&quot;, append=&quot;&lt;/div&gt;&quot;)#</code></pre>"
       },
       "hint": "Builds and returns a string containing a submit button form control.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -12334,9 +12334,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get the sum of all salaries\nallSalaries = model(&quot;employee&quot;).sum(&quot;salary&quot;);\n\n// Get the sum of all salaries for employees in a given country\nallAustralianSalaries = model(&quot;employee&quot;).sum(property=&quot;salary&quot;, include=&quot;country&quot;, where=&quot;countryname='Australia'&quot;);\n\n// Make sure a numeric value is always returned, even if there are no records analyzed by the query\nsalarySum = model(&quot;employee&quot;).sum(property=&quot;salary&quot;, where=&quot;salary BETWEEN #params.min# AND #params.max#&quot;, ifNull=0);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic sum\nallSalaries = model(&quot;employee&quot;).sum(&quot;salary&quot;);\n\n2. With filtering (where)\nallAustralianSalaries = model(&quot;employee&quot;).sum(\n property=&quot;salary&quot;,\n include=&quot;country&quot;,\n where=&quot;countryname='Australia'&quot;\n);\n\n3. With ifNull safeguard\nsalarySum = model(&quot;employee&quot;).sum(\n property=&quot;salary&quot;,\n where=&quot;salary BETWEEN #params.min# AND #params.max#&quot;,\n ifNull=0\n);\n\n4. Sum with grouping\nsalariesByDept = model(&quot;employee&quot;).sum(\n property=&quot;salary&quot;,\n group=&quot;departmentId&quot;\n);\n\n5. Distinct sum\nuniqueSalaries = model(&quot;employee&quot;).sum(\n property=&quot;salary&quot;,\n distinct=true\n);\n</code></pre>"
       },
-      "hint": "Calculates the sum of values for a given property.\nUses the SQL function <code>SUM</code>.\nIf no records can be found to perform the calculation on you can use the <code>ifNull</code> argument to decide what should be returned.\n\n",
+      "hint": "Calculates the total of all values for a given property (column) using SQL’s <code>SUM()</code> function. It’s typically used to aggregate numeric values across a set of records (e.g., summing salaries, prices, or quantities). You can add filtering with where, group results with group, or join associations using include. If no records are found, use the ifNull argument to return a safe default (commonly 0 for numeric sums).\n\n",
       "returntype": "any",
       "slug": "model.sum",
       "parameters": [
@@ -12409,9 +12409,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// In models/User.cfc.\nfunction config() {\n\t// Tell Wheels to use the `tbl_USERS` table in the database for the `user` model instead of the default (which would be `users`).\n\ttable(&quot;tbl_USERS&quot;);\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic override for custom table name\n// In app/models/User.cfc\nfunction config() {\n // Tell Wheels to use the `tbl_USERS` table instead of the default `users`.\n table(&quot;tbl_USERS&quot;);\n}\n\n2. Using a table with a completely different name\n// In app/models/Order.cfc\nfunction config() {\n // Map the Order model to a table named `sales_transactions`.\n table(&quot;sales_transactions&quot;);\n}\n\n3. Disabling table mapping for a non-database model\n// In app/models/Notification.cfc\nfunction config() {\n // This model will not connect to any table.\n table(false);\n}\n\n4. Working with legacy naming conventions\n// In app/models/Product.cfc\nfunction config() {\n // The database uses uppercase with prefixes for tables.\n table(&quot;LEGACY_PRODUCTS_TABLE&quot;);\n}\n</code></pre>"
       },
-      "hint": "Use this method to tell Wheels what database table to connect to for this model.\nYou only need to use this method when your table naming does not follow the standard Wheels convention of a singular object name mapping to a plural table name.\nTo not use a table for your model at all, call <code>table(false)</code>.\n\n",
+      "hint": "Used to tell Wheels which database table a model should connect to. Normally, Wheels automatically maps a model name to a plural table name (for example, a model named <code>User</code> maps to the <code>users</code> table). However, when your database uses custom naming conventions that do not match the Wheels defaults, you can override the mapping by explicitly specifying the table name with <code>table()</code>. If you want a model to not be tied to any database table at all, you can set <code>table(false)</code>. This is useful for models that are used purely for logic, service layers, or scenarios where the model acts as a data wrapper without persistence.\n\n",
       "returntype": "void",
       "slug": "model.table",
       "parameters": [
@@ -12438,7 +12438,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>// Check what table the user model uses\nwhatAmIMappedTo = model(&quot;user&quot;).tableName();</code></pre>"
       },
-      "hint": "Returns the name of the database table that this model is mapped to.\n\n",
+      "hint": "Returns the name of the database table that a model is mapped to. Wheels automatically determines the table name based on its naming convention, where a singular model name maps to a plural table name (for example, a model named User maps to the users table). If the table has been explicitly overridden using the <code>table()</code> function in the model’s <code>config()</code>, then <code>tableName()</code> will return the custom mapping instead. This function is useful when you want to programmatically check or log the database table a model is connected to, especially in projects with mixed or legacy naming conventions.\n\n",
       "returntype": "string",
       "slug": "model.tableName",
       "parameters": [],
@@ -12455,10 +12455,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Basic cleanup after tests\nfunction teardown() {\n // Remove temporary data created during the test\n queryExecute(&quot;DELETE FROM users WHERE email LIKE 'testuser%@example.com'&quot;);\n}\n\n2. Resetting application variables\nfunction teardown() {\n // Clear session values to avoid leaking between tests\n structClear(session);\n}\n\n3. Rolling back test data with transactions\nfunction teardown() {\n // Roll back the transaction started in setup\n transaction action=&quot;rollback&quot;;\n}\n\n4. Cleaning up mock objects or stubs\nfunction teardown() {\n // Reset mock services after each test\n variables.mockService.reset();\n}\n</code></pre>"
       },
-      "hint": "Executes after every test case.\n\n",
+      "hint": "Callback that executes after every test case when using Wheels’ legacy testing framework. It is typically used to clean up any data, variables, or state changes made during a test, ensuring that each test runs in isolation and does not interfere with subsequent tests. This helps maintain reliability and consistency across the test suite.\n\n",
       "returntype": "any",
       "slug": "test.teardown",
       "parameters": [],
@@ -12475,30 +12475,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. In a migration file\nt.text(&quot;description&quot;);\n\n2. Creates both summary and notes columns as text types\nt.text(&quot;summary,notes&quot;);\n\n3. Adds a column with a default placeholder text\nt.text(columnNames=&quot;details&quot;, default=&quot;N/A&quot;);\n\n4. Adds a text column that must always have a value\nt.text(columnNames=&quot;bio&quot;, allowNull=false);\n\n5. Adds a column with a default value and disallows nulls\nt.text(columnNames=&quot;comments&quot;, default=&quot;No comments provided&quot;, allowNull=false);\n</code></pre>"
       },
-      "hint": "An example test.",
-      "returntype": "any",
-      "slug": "test.testExample",
-      "parameters": [],
-      "availableIn": [
-        "test"
-      ],
-      "name": "testExample",
-      "tags": {
-        "categoryClass": "",
-        "sectionClass": "",
-        "category": "",
-        "section": ""
-      }
-    },
-    {
-      "extended": {
-        "hasExtended": false,
-        "docs": ""
-      },
-      "hint": "adds text columns to table definition\n\n",
+      "hint": "Used within a migration to add one or more text columns to a database table definition. Text columns are designed for storing larger amounts of character data compared to standard string or varchar columns. This function allows you to define the column name, set a default value, and control whether the column allows null values.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.text",
       "parameters": [
@@ -12532,9 +12512,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- \tProvide `label` and required `objectName` and `property` ---&gt;\n#textArea(label=&quot;Overview&quot;, objectName=&quot;article&quot;, property=&quot;overview&quot;)#\n\n&lt;!--- Display fields for photos provided by the `screenshots` association and nested properties ---&gt;\n&lt;fieldset&gt;\n\t&lt;legend&gt;Screenshots&lt;/legend&gt;\n\t&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(site.screenshots)#&quot; index=&quot;i&quot;&gt;\n\t\t#fileField(label=&quot;File #i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;file&quot;)#\n\t\t#textArea(label=&quot;Caption ##i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;caption&quot;)#\n\t&lt;/cfloop&gt;\n&lt;/fieldset&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic textarea with label\n#textArea(label=&quot;Overview&quot;, objectName=&quot;article&quot;, property=&quot;overview&quot;)#\n\n2. Customizing with HTML attributes\n#textArea(\n label=&quot;Comments&quot;, \n objectName=&quot;post&quot;, \n property=&quot;comments&quot;, \n class=&quot;form-control&quot;, \n id=&quot;commentsBox&quot;, \n rows=&quot;5&quot;, \n cols=&quot;50&quot;\n)#\n\n3. Using with nested associations\n&lt;fieldset&gt;\n &lt;legend&gt;Screenshots&lt;/legend&gt;\n &lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(site.screenshots)#&quot; index=&quot;i&quot;&gt;\n #fileField(label=&quot;File #i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;file&quot;)#\n #textArea(label=&quot;Caption #i#&quot;, objectName=&quot;site&quot;, association=&quot;screenshots&quot;, position=i, property=&quot;caption&quot;)#\n &lt;/cfloop&gt;\n&lt;/fieldset&gt;\n\n4. Controlling label placement\n#textArea(\n label=&quot;Details&quot;, \n objectName=&quot;project&quot;, \n property=&quot;details&quot;, \n labelPlacement=&quot;before&quot;\n)#\n\n5. Prepending and appending HTML\n#textArea(\n label=&quot;Notes&quot;, \n objectName=&quot;task&quot;, \n property=&quot;notes&quot;, \n prepend=&quot;&lt;div class='input-wrapper'&gt;&quot;, \n append=&quot;&lt;/div&gt;&quot;\n)#\n\n6. Handling validation errors\n#textArea(\n label=&quot;Description&quot;, \n objectName=&quot;product&quot;, \n property=&quot;description&quot;, \n errorElement=&quot;div&quot;, \n errorClass=&quot;input-error&quot;\n)#\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a text area field form control based on the supplied objectName and property.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Builds and returns an HTML <code>&lt;textarea&gt;</code> form control for a given model object and property. It is commonly used when you need a larger text input field, such as for descriptions, comments, or notes. The function automatically binds the value of the specified property from the object to the textarea. You can also pass additional attributes like class, id, or rel to customize the generated HTML. When working with nested forms or associations, you can specify the association and position arguments to bind the field to related objects. Wheels also provides options to add labels, control label placement, prepend or append HTML around the field, and handle error display automatically.\n\n",
       "returntype": "string",
       "slug": "controller.textArea",
       "parameters": [
@@ -12640,9 +12620,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Basic usage usually involves a `label`, `name`, and `password` ---&gt;\n#textAreaTag(label=&quot;Description&quot;, name=&quot;description&quot;, content=params.description)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic textarea with label\n#textAreaTag(label=&quot;Description&quot;, name=&quot;description&quot;, content=params.description)#\n\n2. Textarea with custom attributes\n#textAreaTag(\n label=&quot;Notes&quot;, \n name=&quot;notes&quot;, \n class=&quot;form-control&quot;, \n id=&quot;notesBox&quot;, \n rows=&quot;6&quot;, \n cols=&quot;60&quot;\n)#\n\n3. Textarea without label\n#textAreaTag(name=&quot;feedback&quot;, content=&quot;Enter your feedback here...&quot;)#\n\n4. Custom label placement\n#textAreaTag(\n label=&quot;Comments&quot;, \n name=&quot;comments&quot;, \n labelPlacement=&quot;before&quot;\n)#\n\n5. Prepending and appending HTML\n#textAreaTag(\n label=&quot;Message&quot;, \n name=&quot;message&quot;, \n prepend=&quot;&lt;div class='input-wrapper'&gt;&quot;, \n append=&quot;&lt;/div&gt;&quot;\n)#\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a text area form control based on the supplied name.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Builds and returns an HTML <code>&lt;textarea&gt;</code> form control based only on the supplied field name, rather than being tied to a specific model object. It is useful when you want to generate a standalone text area not bound to an object, such as for ad-hoc forms, search boxes, or generic input fields. You can set the initial content of the textarea, add a label, and pass in additional attributes like class, id, or rel. Options are also available to control label placement, prepend or append HTML wrappers, and configure whether output should be encoded for XSS protection.\n\n",
       "returntype": "string",
       "slug": "controller.textAreaTag",
       "parameters": [
@@ -12723,9 +12703,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Provide a `label` and the required `objectName` and `property` ---&gt;\n#textField(label=&quot;First Name&quot;, objectName=&quot;user&quot;, property=&quot;firstName&quot;)#\n\n&lt;!--- Display fields for phone numbers provided by the `phoneNumbers` association and nested properties ---&gt;\n&lt;fieldset&gt;\n\t&lt;legend&gt;Phone Numbers&lt;/legend&gt;\n\t&lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(contact.phoneNumbers)#&quot; index=&quot;i&quot;&gt;\n\t\t#textField(label=&quot;Phone ##i#&quot;, objectName=&quot;contact&quot;, association=&quot;phoneNumbers&quot;, position=i, property=&quot;phoneNumber&quot;)#\n\t&lt;/cfloop&gt;\n&lt;/fieldset&gt;</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic text field with label\n#textField(label=&quot;First Name&quot;, objectName=&quot;user&quot;, property=&quot;firstName&quot;)#\n\n2. Using a custom input type\n#textField(\n label=&quot;Email Address&quot;, \n objectName=&quot;user&quot;, \n property=&quot;email&quot;, \n type=&quot;email&quot;\n)#\n\n3. Adding CSS classes and attributes\n#textField(\n label=&quot;Phone&quot;, \n objectName=&quot;contact&quot;, \n property=&quot;phoneNumber&quot;, \n class=&quot;form-control&quot;, \n placeholder=&quot;Enter phone number&quot;\n)#\n\n4. Nested form with hasMany association\n&lt;fieldset&gt;\n &lt;legend&gt;Phone Numbers&lt;/legend&gt;\n &lt;cfloop from=&quot;1&quot; to=&quot;#ArrayLen(contact.phoneNumbers)#&quot; index=&quot;i&quot;&gt;\n #textField(\n label=&quot;Phone ##i#&quot;, \n objectName=&quot;contact&quot;, \n association=&quot;phoneNumbers&quot;, \n position=i, \n property=&quot;phoneNumber&quot;\n )#\n &lt;/cfloop&gt;\n&lt;/fieldset&gt;\n\n5. Prepending and appending HTML wrappers\n#textField(\n label=&quot;Website&quot;, \n objectName=&quot;company&quot;, \n property=&quot;website&quot;, \n prepend=&quot;&lt;div class='field-wrapper'&gt;&quot;, \n append=&quot;&lt;/div&gt;&quot;\n)#\n\n6. Handling validation errors\n#textField(\n label=&quot;Username&quot;, \n objectName=&quot;user&quot;, \n property=&quot;username&quot;, \n errorElement=&quot;div&quot;, \n errorClass=&quot;input-error&quot;\n)#\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing a text field form control based on the supplied objectName and property.\nNote: Pass any additional arguments like class, rel, and id, and the generated tag will also include those values as HTML attributes.\n\n",
+      "hint": "Builds and returns an HTML text field form control that is bound to a model object and one of its properties. By default, it will populate the value of the field from the property on the object. You can pass additional attributes such as class, id, or rel to customize the rendered tag. When working with nested associations or hasMany relationships, you can use the association and position arguments to bind the field to related properties. Wheels also supports automatically generating and placing labels, wrapping controls with custom HTML, and marking fields with errors when validation fails. The type argument lets you adjust the input type for use with HTML5 attributes like email, tel, or url.\n\n",
       "returntype": "string",
       "slug": "controller.textField",
       "parameters": [
@@ -12838,7 +12818,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Basic usage usually involves a `label`, `name`, and `value` ---&gt;\n#textFieldTag(label=&quot;Search&quot;, name=&quot;q&quot;, value=params.q)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage with label, name, and value\ntextFieldTag(label=&quot;Search&quot;, name=&quot;q&quot;, value=params.q)\n\n2. Email input with placeholder and custom class\ntextFieldTag(name=&quot;email&quot;, label=&quot;Email Address&quot;, type=&quot;email&quot;, class=&quot;form-control&quot;, placeholder=&quot;you@example.com&quot;)\n\n3. Label placed after the input\ntextFieldTag(name=&quot;username&quot;, label=&quot;Username&quot;, labelPlacement=&quot;after&quot;)\n\n4. Wrapped with prepend/append for Bootstrap styling\ntextFieldTag(name=&quot;price&quot;, label=&quot;Price&quot;, prepend=&quot;&lt;div class='input-group'&gt;&quot;, append=&quot;&lt;/div&gt;&quot;, prependToLabel=&quot;&lt;span class='icon'&gt;$&lt;/span&gt;&quot;)\n</code></pre>"
       },
       "hint": "Builds and returns a string containing a text field form control based on the supplied name.\nNote: Pass any additional arguments like <code>class</code>, <code>rel</code>, and <code>id</code>, and the generated tag will also include those values as HTML attributes.\n\n",
       "returntype": "string",
@@ -12927,10 +12907,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a simple time column\nt.time(&quot;startTime&quot;)\n\n2. Add multiple time columns\nt.time(&quot;opensAt, closesAt&quot;)\n\n3. Add a time column with a default value\nt.time(columnNames=&quot;reminderAt&quot;, default=&quot;09:00:00&quot;)\n\n4. Add a nullable time column\nt.time(columnNames=&quot;lunchBreak&quot;, allowNull=true)\n</code></pre>"
       },
-      "hint": "adds time columns to table definition\n\n",
+      "hint": "Adds one or more TIME columns to a table definition in a migration. Only available in a migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.time",
       "parameters": [
@@ -12964,9 +12944,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Controller code.\naWhileAgo = DateAdd(&quot;d&quot;, -90, Now());\n\n// View code.\n&lt;!--- Will output: 3 months ---&gt;\n#timeAgoInWords(aWhileAgo)#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Example in a controller (outputs: &quot;3 months&quot;)\naWhileAgo = DateAdd(&quot;d&quot;, -90, Now());\ntimeAgoInWords(aWhileAgo)\n\n2. Including seconds (outputs: &quot;less than 5 seconds&quot;)\ntimeAgoInWords(DateAdd(&quot;s&quot;, -3, Now()), includeSeconds=true)\n\n3. Comparing two specific dates (Outputs: &quot;5 months&quot;)\npast = CreateDateTime(2024, 01, 01, 12, 0, 0);\nfuture = CreateDateTime(2024, 06, 01, 12, 0, 0);\ntimeAgoInWords(fromTime=past, toTime=future)\n</code></pre>"
       },
-      "hint": "Returns a string describing the approximate time difference between the date passed in and the current date.\n\n",
+      "hint": "Returns a human-friendly string describing the approximate time difference between two dates (defaults to comparing against the current time).\n\n",
       "returntype": "any",
       "slug": "controller.timeAgoInWords",
       "parameters": [
@@ -13010,9 +12990,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!---View code ---&gt;\n#timeSelect(objectName=&quot;business&quot;, property=&quot;openUntil&quot;)#\n\n&lt;!---Show fields for hour and minute ---&gt;\n#timeSelect(objectName=&quot;business&quot;, property=&quot;openUntil&quot;, order=&quot;hour,minute&quot;)#\n\n&lt;!---Only show 15-minute intervals ---&gt;\n#timeSelect(objectName=&quot;appointment&quot;, property=&quot;dateTimeStart&quot;, minuteStep=15)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: create hour, minute, and second selects for a property\ntimeSelect(objectName=&quot;business&quot;, property=&quot;openUntil&quot;)\n\n2. Only display hour and minute selectors\ntimeSelect(objectName=&quot;business&quot;, property=&quot;openUntil&quot;, order=&quot;hour,minute&quot;)\n\n3. Limit minutes to 15-minute intervals (00, 15, 30, 45)\ntimeSelect(objectName=&quot;appointment&quot;, property=&quot;dateTimeStart&quot;, minuteStep=15)\n\n4. Use 12-hour format with AM/PM\ntimeSelect(objectName=&quot;event&quot;, property=&quot;startTime&quot;, twelveHour=true)\n\n5. Add a blank option at the top\ntimeSelect(objectName=&quot;schedule&quot;, property=&quot;startTime&quot;, includeBlank=&quot;- Select Time -&quot;)\n\n6. Customize the label and append helper text\ntimeSelect(objectName=&quot;meeting&quot;, property=&quot;endTime&quot;, label=&quot;End Time&quot;, append=&quot;(select carefully)&quot;)\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing three <code>select</code> form controls for hour, minute, and second based on the supplied objectName and property.\n\n",
+      "hint": "Builds and returns three select form controls for hours, minutes, and seconds, based on the supplied object name and property. It is useful when you want users to input a time in a structured way without manually typing values. You can configure it to display only specific units (such as hours and minutes), control step intervals for minutes or seconds, display in 12-hour format with AM/PM, and customize labels, error handling, and additional HTML wrapping. By default, the three selects are ordered as hour, minute, and second, but you can change this order or exclude parts completely.\n\n",
       "returntype": "string",
       "slug": "controller.timeSelect",
       "parameters": [
@@ -13168,9 +13148,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- This &quot;Tag&quot; version of function accepts `name` and `selected` instead of binding to a model object ---&gt;\n#timeSelectTags(name=&quot;timeOfMeeting&quot; selected=params.timeOfMeeting)#\n\n&lt;!--- Show fields for `hour` and `minute` only ---&gt;\n#timeSelectTags(name=&quot;timeOfMeeting&quot;, selected=params.timeOfMeeting, order=&quot;hour,minute&quot;)#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: creates hour, minute, and second selects\ntimeSelectTags(name=&quot;timeOfMeeting&quot;, selected=params.timeOfMeeting)\n\n2. Only show hour and minute selects\ntimeSelectTags(name=&quot;timeOfMeeting&quot;, selected=params.timeOfMeeting, order=&quot;hour,minute&quot;)\n\n3. Show 15-minute intervals\ntimeSelectTags(name=&quot;reminderTime&quot;, minuteStep=15)\n\n4. Display in 12-hour format with AM/PM\ntimeSelectTags(name=&quot;eventStart&quot;, twelveHour=true)\n\n5. Include a blank option\ntimeSelectTags(name=&quot;timeSlot&quot;, includeBlank=&quot;- Select Time -&quot;)\n\n6. Add a label and append helper text\ntimeSelectTags(name=&quot;appointmentEnd&quot;, label=&quot;End Time&quot;, append=&quot;(HH:MM:SS)&quot;)\n</code></pre>"
       },
-      "hint": "Builds and returns a string containing three <code>select</code> form controls for hour, minute, and second based on name.\n\n",
+      "hint": "Builds and returns three <code>&lt;select&gt;</code> form controls for hours, minutes, and seconds based on the supplied name. This is the tag-based version of <code>timeSelect()</code>, meaning it does not bind to a model object but instead works with raw form field names. You can control the order of the selects, limit minute and second intervals, display in 12-hour format with AM/PM, and include custom labels, error handling, and HTML wrappers.\n\n",
       "returntype": "string",
       "slug": "controller.timeSelectTags",
       "parameters": [
@@ -13298,10 +13278,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a basic timestamp column\nt.timestamp(&quot;createdAt&quot;)\n\n2. Add multiple timestamp columns\nt.timestamp(&quot;createdAt, updatedAt&quot;)\n\n3. Add a timestamp column with a default value\nt.timestamp(columnNames=&quot;createdAt&quot;, default=&quot;CURRENT_TIMESTAMP&quot;)\n\n4. Add a nullable timestamp column\nt.timestamp(columnNames=&quot;deletedAt&quot;, allowNull=true)\n\n5. Override column type to use TIMESTAMP instead of DATETIME\nt.timestamp(columnNames=&quot;syncedAt&quot;, columnType=&quot;timestamp&quot;)\n</code></pre>"
       },
-      "hint": "adds timestamp columns to table definition\n\n",
+      "hint": "Used to add one or more <code>TIMESTAMP</code> (or <code>DATETIME</code>) columns to a table definition. It lets you specify default values, whether the column allows NULL, and even override the underlying SQL type through the columnType argument. This is especially useful when you need to track creation and update times or work with custom timestamp fields. Only available in a migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.timestamp",
       "parameters": [
@@ -13340,10 +13320,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add createdAt, updatedAt, and deletedAt columns to the users table\nt.timestamps()</code></pre>"
       },
-      "hint": "adds Wheels convention automatic timestamp and soft delete columns to table definition\n\n",
+      "hint": "Shortcut for adding Wheels’ convention-based automatic timestamp and soft delete columns to a table definition during migrations. Instead of defining each field manually, this function quickly sets up the standard fields that are commonly used across models to track record lifecycle and soft deletion. By default, it adds createdAt, updatedAt, and deletedAt columns with appropriate types, making your migrations more concise and consistent. Only available in a migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.timestamps",
       "parameters": [],
@@ -13361,9 +13341,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Controller code.\naLittleAhead = DateAdd(&quot;d&quot;, 365, Now());\n\n// View code.\n&lt;!--- Will output: about 1 year ---&gt;\n#timeUntilInWords(aLittleAhead)#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Example in a controller (outputs: &quot;about 1 year&quot;)\naLittleAhead = DateAdd(&quot;d&quot;, 365, Now());\ntimeUntilInWords(aLittleAhead)\n\n2. Including seconds (outputs: &quot;less than 5 seconds&quot;)\ntimeUntilInWords(DateAdd(&quot;s&quot;, 3, Now()), includeSeconds=true)\n\n3. Comparing between two specific dates (Outputs: &quot;5 months&quot;)\nfromDate = CreateDateTime(2024, 01, 01, 12, 0, 0);\ntoDate = CreateDateTime(2024, 06, 01, 12, 0, 0);\ntimeUntilInWords(toTime=toDate, fromTime=fromDate)\n</code></pre>"
       },
-      "hint": "Returns a string describing the approximate time difference between the current date and the date passed in.\n\n",
+      "hint": "Returns a human-readable string describing the approximate time difference between the current date (or another starting point you provide) and a future date. It is the inverse of <code>timeAgoInWords()</code>, focusing on how long until something happens instead of how long ago it occurred. You can optionally include seconds for more precise descriptions.\n\n",
       "returntype": "string",
       "slug": "controller.timeUntilInWords",
       "parameters": [
@@ -13407,9 +13387,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Will output: Wheels Is A Framework For ColdFusion ---&gt;\n#titleize(&quot;Wheels is a framework for ColdFusion&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage\ntitleize(\"Wheels is a framework for ColdFusion\")\n// Output: \"Wheels Is A Framework For ColdFusion\"\n\n2. Works with single words\ntitleize(\"hello\")\n// Output: \"Hello\"\n\n3. Works with multiple words including numbers\ntitleize(\"coldfusion 2025 features\")\n// Output: \"Coldfusion 2025 Features\"\n\n4. Can be used in views for dynamic labels\n&lt;h1&gt;titleize(article.title)&lt;/h1&gt;</code></pre>"
       },
-      "hint": "Capitalizes all words in the text to create a nicer looking title.\n\n",
+      "hint": "Converts a string so that the first letter of each word is capitalized, producing a cleaner, title-like appearance. It is useful for formatting headings, labels, or any text that should follow title case conventions.\n\n",
       "returntype": "string",
       "slug": "controller.titleize",
       "parameters": [
@@ -13440,7 +13420,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get an object, and toggle a boolean property\nuser = model(&quot;user&quot;).findByKey(58);\nisSuccess = user.toggle(&quot;isActive&quot;); // returns whether the object was saved properly\n\n// You can also use a dynamic helper for this\nisSuccess = user.toggleIsActive();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Fetch a user object and toggle a boolean property\nuser = model(\"user\").findByKey(58);\nisSuccess = user.toggle(\"isActive\");\n// Returns true if saved successfully, false otherwise\n\n2. Disable automatic saving\nuser = model(\"user\").findByKey(58);\nuser.toggle(property=\"isActive\", save=false);\n// Returns the user object without saving\n\n3. Use a dynamic helper method for convenience\nuser = model(\"user\").findByKey(58);\nisSuccess = user.toggleIsActive();\n// Returns whether the save was successful</code></pre>"
       },
       "hint": "Assigns to the property specified the opposite of the property's current boolean value.\nThrows an error if the property cannot be converted to a boolean value.\nReturns this object if save called internally is <code>false</code>.\n\n",
       "returntype": "boolean",
@@ -13473,9 +13453,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Will output: Wheels is a fra... ---&gt;\n#truncate(text=&quot;Wheels is a framework for ColdFusion&quot;, length=20)#\n\n&lt;!--- Will output: Wheels is a framework (more) ---&gt;\n#truncate(text=&quot;Wheels is a framework for ColdFusion&quot;, truncateString=&quot; (more)&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Truncate text to 20 characters, default truncation string \"...\"\ntruncate(text=\"Wheels is a framework for ColdFusion\", length=20)\n/* Output: \"Wheels is a fra...\" */\n\n2. Use a custom truncation string\ntruncate(text=\"Wheels is a framework for ColdFusion\", truncateString=\" (more)\")\n/* Output: \"Wheels is a framework (more)\" */\n\n3. Short text does not get truncated\ntruncate(text=\"Short text\", length=20)\n/* Output: \"Short text\" */\n\n4. Display in a view for previews\n&lt;p&gt;truncate(article.content, 100)&lt;/p&gt;</code></pre>"
       },
-      "hint": "Truncates text to the specified length and replaces the last characters with the specified truncate string (which defaults to \"...\").\n\n",
+      "hint": "Shortens a given text string to a specified length and appends a replacement string (by default \"...\") at the end to indicate truncation. It is useful for displaying previews of longer text in UIs, summaries, or reports while keeping the output concise.\n\n",
       "returntype": "string",
       "slug": "controller.truncate",
       "parameters": [
@@ -13518,10 +13498,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Add a single UUID column\nt.uniqueidentifier(&quot;uuid&quot;)\n\n2. Add multiple UUID columns\nt.uniqueidentifier(&quot;uuid, externalId&quot;)\n\n3. Add a UUID column with default UUID generation\nt.uniqueidentifier(columnNames=&quot;uuid&quot;, default=&quot;newid()&quot;)\n\n4. Add a nullable UUID column\nt.uniqueidentifier(columnNames=&quot;optionalUuid&quot;, allowNull=true)\n</code></pre>"
       },
-      "hint": "adds UUID columns to table definition\n\n",
+      "hint": "Used to add one or more UUID (Universally Unique Identifier) columns to a table definition. These columns are useful for generating globally unique keys for records instead of relying on auto-incrementing integers. By default, the function uses newid() to populate the column with a UUID, and you can also configure whether the column allows NULL. Only available in a migrator CFC.\n\n",
       "returntype": "any",
       "slug": "tabledefinition.uniqueidentifier",
       "parameters": [
@@ -13558,7 +13538,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>function up() {\n\ttransaction {\n\t\ttry {\n\t\t\t// your code goes here\n\t\t\tt = createTable(name='myTable');\n\t\t\tt.timestamps();\n\t\t\tt.create();\n\t\t} catch (any e) {\n\t\t\tlocal.exception = e;\n\t\t}\n\n\t\tif (StructKeyExists(local, &quot;exception&quot;)) {\n\t\t\ttransaction action=&quot;rollback&quot;;\n\t\t\tthrow(errorCode=&quot;1&quot;, detail=local.exception.detail, message=local.exception.message, type=&quot;any&quot;);\n\t\t} else {\n\t\t\ttransaction action=&quot;commit&quot;;\n\t\t}\n\t}\n}\n</code></pre>"
       },
-      "hint": "Migrates up: will be executed when migrating your schema forward\nAlong with down(), these are the two main functions in any migration file\nOnly available in a migration CFC\n\n",
+      "hint": "Defines the actions to migrate your database schema forward. It is called when applying a migration and is typically paired with the <code>down()</code> function, which rolls back the migration. All schema changes, such as creating tables, adding columns, or setting up indexes, should be placed inside <code>up()</code>. Wrapping your migration code in a transaction block ensures that changes are either fully applied or rolled back in case of errors. Only available in a migration CFC.\n\n",
       "returntype": "void",
       "slug": "migration.up",
       "parameters": [],
@@ -13576,9 +13556,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get a post object and then update its title in the database\npost = model(&quot;post&quot;).findByKey(33);\npost.update(title=&quot;New version of Wheels just released&quot;);\n\n// Get a post object and then update its title and other properties based on what is pased in from the URL/form\npost = model(&quot;post&quot;).findByKey(params.key);\npost.update(title=&quot;New version of Wheels just released&quot;, properties=params.post);\n\n// If you have a `hasOne` association setup from `author` to `bio`, you can do a scoped call. (The `setBio` method below will call `bio.update(authorId=anAuthor.id)` internally.)\nauthor = model(&quot;author&quot;).findByKey(params.authorId); \nbio = model(&quot;bio&quot;).findByKey(params.bioId); \nauthor.setBio(bio); \n\n// If you have a `hasMany` association setup from `owner` to `car`, you can do a scoped call. (The `addCar` method below will call `car.update(ownerId=anOwner.id)` internally.)\nanOwner = model(&quot;owner&quot;).findByKey(params.ownerId); \naCar = model(&quot;car&quot;).findByKey(params.carId); \nanOwner.addCar(aCar); \n\n// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `removeComment` method below will call `comment.update(postId=&quot;&quot;)` internally.)\naPost = model(&quot;post&quot;).findByKey(params.postId); \naComment = model(&quot;comment&quot;).findByKey(params.commentId); \naPost.removeComment(aComment); // Get an object, and toggle a boolean property\nuser = model(&quot;user&quot;).findByKey(58); \nisSuccess = user.toggle(&quot;isActive&quot;); // returns whether the object was saved properly\n\n// You can also use a dynamic helper for this\nisSuccess = user.toggleIsActive(); \n\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get a post object and then update its title in the database\npost = model(&quot;post&quot;).findByKey(33);\npost.update(title=&quot;New version of Wheels just released&quot;);\n\n2. Get a post object and then update its title and other properties based on what is pased in from the URL/form\npost = model(&quot;post&quot;).findByKey(params.key);\npost.update(title=&quot;New version of Wheels just released&quot;, properties=params.post);\n\n3. If you have a `hasOne` association setup from `author` to `bio`, you can do a scoped call. (The `setBio` method below will call `bio.update(authorId=anAuthor.id)` internally.)\nauthor = model(&quot;author&quot;).findByKey(params.authorId); \nbio = model(&quot;bio&quot;).findByKey(params.bioId); \nauthor.setBio(bio); \n\n4. If you have a `hasMany` association setup from `owner` to `car`, you can do a scoped call. (The `addCar` method below will call `car.update(ownerId=anOwner.id)` internally.)\nanOwner = model(&quot;owner&quot;).findByKey(params.ownerId); \naCar = model(&quot;car&quot;).findByKey(params.carId); \nanOwner.addCar(aCar); \n\n5. If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `removeComment` method below will call `comment.update(postId=&quot;&quot;)` internally.)\naPost = model(&quot;post&quot;).findByKey(params.postId); \naComment = model(&quot;comment&quot;).findByKey(params.commentId); \naPost.removeComment(aComment); // Get an object, and toggle a boolean property\nuser = model(&quot;user&quot;).findByKey(58); \nisSuccess = user.toggle(&quot;isActive&quot;); // returns whether the object was saved properly\n\n// You can also use a dynamic helper for this\nisSuccess = user.toggleIsActive(); \n\n</code></pre>"
       },
-      "hint": "Updates the object with the supplied <code>properties</code> and saves it to the database.\nReturns <code>true</code> if the object was saved successfully to the database and <code>false</code> otherwise.\n\n",
+      "hint": "Updates an existing model object with the supplied properties and saves the changes to the database. It returns true if the save was successful and false otherwise. You can pass properties directly as named arguments or as a struct. Additional options allow you to control validation, callbacks, transactions, parameterization, cache reloading, and explicit timestamp handling. This method also works seamlessly with associations, making it possible to update related objects in hasOne or hasMany relationships.\n\n",
       "returntype": "boolean",
       "slug": "model.update",
       "parameters": [
@@ -13646,7 +13626,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Update the `published` and `publishedAt` properties for all records that have `published=0`  \nrecordsUpdated = model(&quot;post&quot;).updateAll( published=1, publishedAt=Now(), where=&quot;published=0&quot; );\n\n// If you have a `hasMany` association setup from `post` to `comment`, you can do a scoped call. (The `removeAllComments` method below will call `model(&quot;comment&quot;).updateAll(postid=&quot;&quot;, where=&quot;postId=#post.id#&quot;)` internally.)  \npost = model(&quot;post&quot;).findByKey(params.postId);\npost.removeAllComments();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Update all posts that are unpublished\nrecordsUpdated = model(&quot;post&quot;).updateAll(\n published=1,\n publishedAt=Now(),\n where=&quot;published=0&quot;\n)\n\n2. Scoped update for a hasMany association (removing all comments)\npost = model(&quot;post&quot;).findByKey(params.postId);\npost.removeAllComments(); \n// Internally calls: model(&quot;comment&quot;).updateAll(postId=&quot;&quot;, where=&quot;postId=#post.id#&quot;)\n\n3. Update all users and force validations and callbacks\nrecordsUpdated = model(&quot;user&quot;).updateAll(\n properties={isActive=true},\n instantiate=true,\n validate=true\n)\n\n4. Using index hints for MySQL\nrecordsUpdated = model(&quot;user&quot;).updateAll(\n properties={isVerified=true},\n where=&quot;isVerified=0&quot;,\n useIndex={user=&quot;idx_users_isVerified&quot;}\n)\n</code></pre>"
       },
       "hint": "Updates all properties for the records that match the <code>where</code> argument.\nProperty names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument.\nBy default, objects will not be instantiated and therefore callbacks and validations are not invoked.\nYou can change this behavior by passing in <code>instantiate=true</code>.\nThis method returns the number of records that were updated.\n\n",
       "returntype": "numeric",
@@ -13744,7 +13724,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Updates the object with `33` as the primary key value with values passed in through the URL/form\nresult = model(&quot;post&quot;).updateByKey(33, params.post);\n\n// Updates the object with `33` as the primary key using named arguments\nresult = model(&quot;post&quot;).updateByKey(key=33, title=&quot;New version of Wheels just released&quot;, published=1);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Update a record by key using a struct of properties\nresult = model(&quot;post&quot;).updateByKey(33, params.post);\n// Returns true if the update was successful\n\n2. Update a record by key using named arguments\nresult = model(&quot;post&quot;).updateByKey(\n key=33,\n title=&quot;New version of Wheels just released&quot;,\n published=1\n)\n\n3. Include soft-deleted records in the update\nresult = model(&quot;user&quot;).updateByKey(\n key=42,\n properties={isActive=true},\n includeSoftDeletes=true\n)\n\n4. Disable validation and callbacks\nresult = model(&quot;post&quot;).updateByKey(\n key=33,\n properties={title=&quot;Force Update&quot;},\n validate=false,\n callbacks=false\n)\n</code></pre>"
       },
       "hint": "Finds the object with the supplied <code>key</code> and saves it (if validation permits it) with the supplied <code>properties</code> and / or named arguments.\nProperty names and values can be passed in either using named arguments or as a struct to the <code>properties</code> argument.\nReturns <code>true</code> if the object was found and updated successfully, <code>false</code> otherwise.\n\n",
       "returntype": "boolean",
@@ -13813,9 +13793,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Sets the `new` property to `1` on the most recently released product\nresult = model(&quot;product&quot;).updateOne(order=&quot;releaseDate DESC&quot;, new=1);\n\n// If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `removeProfile` method below will call `model(&quot;profile&quot;).updateOne(where=&quot;userId=#aUser.id#&quot;, userId=&quot;&quot;)` internally.)\naUser = model(&quot;user&quot;).findByKey(params.userId);\naUser.removeProfile();</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Sets the `new` property to `1` on the most recently released product\nresult = model(&quot;product&quot;).updateOne(order=&quot;releaseDate DESC&quot;, new=1);\n\n2. If you have a `hasOne` association setup from `user` to `profile`, you can do a scoped call. (The `removeProfile` method below will call `model(&quot;profile&quot;).updateOne(where=&quot;userId=#aUser.id#&quot;, userId=&quot;&quot;)` internally.)\naUser = model(&quot;user&quot;).findByKey(params.userId);\naUser.removeProfile();</code></pre>"
       },
-      "hint": "Gets an object based on the arguments used and updates it with the supplied <code>properties</code>.\nReturns <code>true</code> if an object was found and updated successfully, <code>false</code> otherwise.\n\n",
+      "hint": "Retrieves a single model object based on the supplied arguments and updates it with the specified properties. It returns true if an object was found and updated successfully, and false if no object matched the criteria or the update failed. This method is useful when you want to update a single record that matches a certain condition without fetching multiple records. By default, objects are not instantiated, so validations and callbacks are applied only if enabled. Additional options allow control over query ordering, transactions, cache reloading, index hints, and inclusion of soft-deleted records.\n\n",
       "returntype": "boolean",
       "slug": "model.updateOne",
       "parameters": [
@@ -13896,9 +13876,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Sets the `new` property to `1` through updateProperty()\nproduct = model(&quot;product&quot;).findByKey(56);\nproduct.updateProperty(&quot;new&quot;, 1);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Update a single property on an existing product\nproduct = model(\"product\").findByKey(56);\nproduct.updateProperty(\"new\", 1);\n\n2. Update a boolean flag without callbacks or validations\nuser = model(\"user\").findByKey(42);\nuser.updateProperty(property=\"isActive\", value=false, callbacks=false);</code></pre>"
       },
-      "hint": "Updates a single <code>property</code> and saves the record without going through the normal validation procedure.\nThis is especially useful for boolean flags on existing records.\n\n",
+      "hint": "Updates a single property on a model object and saves the record immediately without running the normal validation procedures. This method is particularly useful for quickly updating flags or boolean values on existing records where full validation is not necessary. You can control transaction behavior, parameterization, and callback execution when using this method.\n\n",
       "returntype": "boolean",
       "slug": "model.updateProperty",
       "parameters": [
@@ -13949,10 +13929,10 @@
     },
     {
       "extended": {
-        "hasExtended": false,
-        "docs": ""
+        "hasExtended": true,
+        "docs": "<pre><code class='javascript'>1. Update the `active` column to 0 for all admin users in a migration\nupdateRecord(table=\"users\", where=\"admin = 1\", active=0);\n\n2. Update a specific product record by ID\nupdateRecord(table=\"products\", where=\"id = 42\", price=19.99, stock=100);</code></pre>"
       },
-      "hint": "Updates an existing record in a table\nOnly available in a migration CFC\n\n",
+      "hint": "Allows you to update an existing record in a database table directly from within a migration CFC. This function is particularly useful when you need to modify data as part of a schema migration, such as setting default values, correcting legacy data, or updating specific records based on certain conditions. The function requires the table name and optionally allows a where clause to target specific rows. Only available in a migrator CFC.\n\n",
       "returntype": "void",
       "slug": "migration.updateRecord",
       "parameters": [
@@ -13984,9 +13964,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Create the URL for the `logOut` action on the `account` controller, typically resulting in `/account/log-out` ---&gt;\n#urlFor(controller=&quot;account&quot;, action=&quot;logOut&quot;)#\n\n&lt;!--- Create a URL with an anchor set on it ---&gt;\n#urlFor(action=&quot;comments&quot;, anchor=&quot;comment10&quot;)#\n\n&lt;!--- Create a URL based on a route called `products`, which expects params for `categorySlug` and `productSlug` ---&gt;\n#urlFor(route=&quot;product&quot;, categorySlug=&quot;accessories&quot;, productSlug=&quot;battery-charger&quot;)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Create the URL for the `logOut` action on the `account` controller, typically resulting in `/account/log-out`\n#urlFor(controller=&quot;account&quot;, action=&quot;logOut&quot;)#\n\n2. Create a URL with an anchor set on it\n#urlFor(action=&quot;comments&quot;, anchor=&quot;comment10&quot;)#\n\n3. Create a URL based on a route called `products`, which expects params for `categorySlug` and `productSlug`\n#urlFor(route=&quot;product&quot;, categorySlug=&quot;accessories&quot;, productSlug=&quot;battery-charger&quot;)#</code></pre>"
       },
-      "hint": "Creates an internal URL based on supplied arguments.\n\n",
+      "hint": "Generates an internal URL based on the supplied arguments. It can create URLs using a named route, or by specifying a controller and action directly. Additional options let you include keys, query parameters, anchors, and override protocol, host, or port. By default, the function returns a relative URL, but you can configure it to return a fully qualified URL. URL parameters are automatically encoded for safety, but for HTML attribute safety, further encoding is recommended.\n\n",
       "returntype": "string",
       "slug": "controller.URLFor",
       "parameters": [
@@ -14099,9 +14079,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// We want this layout to be used as the default throughout the \n// entire controller, except for the `myAjax` action. \nusesLayout(template=&quot;myLayout&quot;, except=&quot;myAjax&quot;); \n\n// Use a custom layout for these actions but use the default \n// `layout.cfm` for the rest. \nusesLayout(template=&quot;myLayout&quot;, only=&quot;termsOfService,shippingPolicy&quot;); \n\n// Define a custom function to decide which layout to display.\n// The `setLayout` function should return the name of the layout \n// to use or `true` to use the default one. \nusesLayout(&quot;setLayout&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. We want this layout to be used as the default throughout the entire controller, except for the `myAjax` action. \nusesLayout(template=&quot;myLayout&quot;, except=&quot;myAjax&quot;); \n\n2. Use a custom layout for these actions but use the default `layout.cfm` for the rest. \nusesLayout(template=&quot;myLayout&quot;, only=&quot;termsOfService,shippingPolicy&quot;); \n\n3. Define a custom function to decide which layout to display.\n// The `setLayout` function should return the name of the layout to use or `true` to use the default one. \nusesLayout(&quot;setLayout&quot;);</code></pre>"
       },
-      "hint": "Used within a controller's <code>config()</code> function to specify controller- or action-specific layouts.\n\n",
+      "hint": "Used inside a controller's <code>config()</code> function to specify which layout template should be applied to the controller or specific actions. You can define a default layout for the entire controller, specify layouts only for certain actions, exclude specific actions from using a layout, or even provide a custom function to determine which layout to use dynamically. This allows fine-grained control over your page structure and helps maintain consistent design while accommodating exceptions.\n\n",
       "returntype": "void",
       "slug": "controller.usesLayout",
       "parameters": [
@@ -14152,7 +14132,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Check if a user is valid before proceeding with execution\nuser = model(&quot;user&quot;).new(params.user);\n\nif user.valid(){\n    // Do something here\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>// Check if a user is valid before proceeding with execution\nuser = model(&quot;user&quot;).new(params.user);\n\nif(user.valid()){\n    // Do something here\n}</code></pre>"
       },
       "hint": "Runs the validation on the object and returns <code>true</code> if it passes it.\nWheels will run the validation process automatically whenever an object is saved to the database, but sometimes it's useful to be able to run this method to see if the object is valid without saving it to the database.\n\n",
       "returntype": "boolean",
@@ -14186,9 +14166,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>function config() {\n\t// Register the `checkPhoneNumber` method below to be called to validate objects before they are saved.\n\tvalidate(&quot;checkPhoneNumber&quot;);\n}\n\nfunction checkPhoneNumber() {\n\t// Make sure area code is `614`.\n\treturn Left(this.phoneNumber, 3) == &quot;614&quot;;\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Register a method to validate objects before saving\nfunction config() {\n validate(&quot;checkPhoneNumber&quot;);\n}\n\nfunction checkPhoneNumber() {\n // Make sure area code is '614'\n return Left(this.phoneNumber, 3) == &quot;614&quot;;\n}\n\n2. Register multiple validation methods\nfunction config() {\n validate(&quot;checkPhoneNumber, checkEmailFormat&quot;);\n}\n\nfunction checkEmailFormat() {\n // Ensure email contains '@'\n return Find(&quot;@&quot;, this.email);\n}\n\n3. Conditional validation using `condition`\nfunction config() {\n // Only validate phone numbers if the user is in the US\n validate(&quot;checkPhoneNumber&quot;, condition=&quot;this.country == 'US'&quot;);\n}\n\n4. Skip validation under certain conditions using `unless`\nfunction config() {\n // Skip phone number validation if the user is a guest\n validate(&quot;checkPhoneNumber&quot;, unless=&quot;this.isGuest&quot;);\n}\n\n5. Run validation only on create or update\nfunction config() {\n // Validate email only when creating a new record\n validate(&quot;checkEmailFormat&quot;, when=&quot;onCreate&quot;);\n\n // Validate password only on update\n validate(&quot;checkPasswordStrength&quot;, when=&quot;onUpdate&quot;);\n}\n</code></pre>"
       },
-      "hint": "Registers method(s) that should be called to validate objects before they are saved.\n\n",
+      "hint": "Used to register one or more validation methods that will be executed on a model object before it is saved to the database. This allows you to define custom validation logic beyond the built-in validations like presence or uniqueness. You can also control when the validation runs (on create, update, or both) and under what conditions using condition and unless.\n\n",
       "returntype": "void",
       "slug": "model.validate",
       "parameters": [
@@ -14235,9 +14215,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>function config(){\n\t// Register the `checkPhoneNumber` method below to be called to validate new objects before they are inserted.\n\tvalidateOnCreate(&quot;checkPhoneNumber&quot;);\n}\n\nfunction checkPhoneNumber(){\n\t// Make sure area code is `614`.\n\treturn Left(this.phoneNumber, 3) == &quot;614&quot;;\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Validate new objects before insertion\nfunction config() {\n validateOnCreate(&quot;checkPhoneNumber&quot;);\n}\n\nfunction checkPhoneNumber() {\n // Ensure area code is '614'\n return Left(this.phoneNumber, 3) == &quot;614&quot;;\n}\n\n2. Register multiple methods for validation on creation\nfunction config() {\n validateOnCreate(&quot;checkPhoneNumber, checkEmailFormat&quot;);\n}\n\nfunction checkEmailFormat() {\n // Ensure email contains '@'\n return Find(&quot;@&quot;, this.email);\n}\n\n3. Conditional validation using `condition`\nfunction config() {\n // Only validate phone number if the country is US\n validateOnCreate(&quot;checkPhoneNumber&quot;, condition=&quot;this.country == 'US'&quot;);\n}\n\n4. Skip validation under certain conditions using `unless`\nfunction config() {\n // Skip phone number validation if user is a guest\n validateOnCreate(&quot;checkPhoneNumber&quot;, unless=&quot;this.isGuest&quot;);\n}\n</code></pre>"
       },
-      "hint": "Registers method(s) that should be called to validate new objects before they are inserted.\n\n",
+      "hint": "Registers one or more validation methods that will be executed only when a new object is being inserted into the database. This is useful for rules that should apply strictly at creation and not during updates. You can also control whether the validation runs using the condition and unless arguments.\n\n",
       "returntype": "void",
       "slug": "model.validateOnCreate",
       "parameters": [
@@ -14277,9 +14257,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>function config(){\n\t// Register the `check` method below to be called to validate existing objects before they are updated.\n\tvalidateOnUpdate(&quot;checkPhoneNumber&quot;);\n}\n\nfunction checkPhoneNumber(){\n\t// Make sure area code is `614`\n\treturn Left(this.phoneNumber, 3) == &quot;614&quot;;\n}</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic usage: validate existing objects before update\nfunction config() {\n validateOnUpdate(&quot;checkPhoneNumber&quot;);\n}\n\nfunction checkPhoneNumber() {\n // Ensure area code is '614'\n return Left(this.phoneNumber, 3) == &quot;614&quot;;\n}\n\n2. Register multiple methods for validation on update\nfunction config() {\n validateOnUpdate(&quot;checkPhoneNumber, checkEmailFormat&quot;);\n}\n\nfunction checkEmailFormat() {\n // Ensure email contains '@'\n return Find(&quot;@&quot;, this.email);\n}\n\n3. Conditional validation using `condition`\nfunction config() {\n // Only validate phone number if the country is US\n validateOnUpdate(&quot;checkPhoneNumber&quot;, condition=&quot;this.country == 'US'&quot;);\n}\n\n4. Skip validation under certain conditions using `unless`\nfunction config() {\n // Skip phone number validation if the user is an admin\n validateOnUpdate(&quot;checkPhoneNumber&quot;, unless=&quot;this.isAdmin&quot;);\n}\n</code></pre>"
       },
-      "hint": "Registers method(s) that should be called to validate existing objects before they are updated.\n\n",
+      "hint": "Registers one or more validation methods that will be executed only when an existing object is being updated in the database. This allows you to enforce rules that apply strictly to updates, without affecting the creation of new records. You can also control whether the validation runs using the condition and unless arguments.\n\n",
       "returntype": "void",
       "slug": "model.validateOnUpdate",
       "parameters": [
@@ -14319,7 +14299,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Make sure that the user has to confirm their password correctly the first time they register (usually done by typing it again in a second form field)\nvalidatesConfirmationOf(property=&quot;password&quot;, when=&quot;onCreate&quot;, message=&quot;Your password and its confirmation do not match. Please try again.&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Validate password confirmation on user creation\nvalidatesConfirmationOf(\n    property=&quot;password&quot;,\n    when=&quot;onCreate&quot;,\n    message=&quot;Your password and its confirmation do not match. Please try again.&quot;\n);\n\n2. Validate multiple fields at once: password and email\nvalidatesConfirmationOf(\n    properties=&quot;password,email&quot;,\n    when=&quot;onCreate&quot;,\n    message=&quot;Fields must match their confirmation.&quot;\n);\n\n3. Case-sensitive validation\nvalidatesConfirmationOf(\n    property=&quot;password&quot;,\n    caseSensitive=true,\n    message=&quot;Password and confirmation must match exactly, including case.&quot;\n);\n\n4. Conditional validation using `condition`\nvalidatesConfirmationOf(\n    property=&quot;email&quot;,\n    condition=&quot;this.isNewsletterSubscriber&quot;,\n    message=&quot;Email confirmation required for newsletter subscription.&quot;\n);\n\n5. Skip validation for admin users using `unless`\nvalidatesConfirmationOf(\n    property=&quot;password&quot;,\n    unless=&quot;this.isAdmin&quot;,\n    message=&quot;Admins do not need to confirm their password.&quot;\n);\n</code></pre>"
       },
       "hint": "Validates that the value of the specified property also has an identical confirmation value.\nThis is common when having a user type in their email address a second time to confirm, confirming a password by typing it a second time, etc.\nThe confirmation value only exists temporarily and never gets saved to the database.\nBy convention, the confirmation property has to be named the same as the property with \"Confirmation\" appended at the end.\nUsing the password example, to confirm our password property, we would create a property called <code>passwordConfirmation</code>.\n\n",
       "returntype": "void",
@@ -14382,9 +14362,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Do not allow &quot;PHP&quot; or &quot;Fortran&quot; to be saved to the database as a cool language\nvalidatesExclusionOf(property=&quot;coolLanguage&quot;, list=&quot;php,fortran&quot;, message=&quot;Haha, you can not be serious. Try again, please.&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Prevent users from selecting certain programming languages\nvalidatesExclusionOf(\n    property=&quot;coolLanguage&quot;,\n    list=&quot;php,fortran&quot;,\n    message=&quot;Haha, you can not be serious. Try again, please.&quot;\n);\n\n2. Validate multiple properties at once\nvalidatesExclusionOf(\n    properties=&quot;username,email&quot;,\n    list=&quot;admin,root,system&quot;,\n    message=&quot;This value is reserved. Please choose another.&quot;\n);\n\n3. Only apply validation on object creation\nvalidatesExclusionOf(\n    property=&quot;username&quot;,\n    list=&quot;admin,root&quot;,\n    when=&quot;onCreate&quot;,\n    message=&quot;Username is reserved and cannot be used.&quot;\n);\n\n4. Skip validation if the property is blank\nvalidatesExclusionOf(\n    property=&quot;nickname&quot;,\n    list=&quot;boss,chief&quot;,\n    allowBlank=true\n);\n\n5. Conditional validation using `condition`\nvalidatesExclusionOf(\n    property=&quot;category&quot;,\n    list=&quot;deprecated,legacy&quot;,\n    condition=&quot;this.isArchived&quot;,\n    message=&quot;Archived items cannot use deprecated categories.&quot;\n);\n\n6. Skip validation for admin users using `unless`\nvalidatesExclusionOf(\n    property=&quot;role&quot;,\n    list=&quot;banned,guest&quot;,\n    unless=&quot;this.isAdmin&quot;,\n    message=&quot;This role is restricted for regular users.&quot;\n);\n</code></pre>"
       },
-      "hint": "Validates that the value of the specified property does not exist in the supplied list.\n\n",
+      "hint": "Ensures that the value of a specified property is not included in a given list of disallowed values. This is commonly used to prevent reserved words, restricted entries, or disallowed values from being saved to the database. You can specify when the validation should run, allow blank values to skip validation, or conditionally run it.\n\n",
       "returntype": "void",
       "slug": "model.validatesExclusionOf",
       "parameters": [
@@ -14451,7 +14431,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Make sure that the user has entered a correct credit card validatesFormatOf(property=&quot;cc&quot;, type=&quot;creditcard&quot;); /*  * Make sure that the user has entered an email address ending with the  * `.se` domain when the `ipCheck()` method returns `true`, and it's not  * Sunday. Also supply a custom error message that overrides the Wheels  * default one  */ validatesFormatOf( property=&quot;email&quot;, regEx=&quot;^.*@.*\\.se$&quot;, condition=&quot;ipCheck()&quot;, unless=&quot;DayOfWeek() eq 1&quot; message=&quot;Sorry, you must have a Swedish email address to use this website.&quot; );</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Validate that a credit card number is correct\nvalidatesFormatOf(property=&quot;cc&quot;, type=&quot;creditcard&quot;);\n\n2. Validate that a US zipcode matches 5 or 9 digit format\nvalidatesFormatOf(property=&quot;zipcode&quot;, type=&quot;zipcode&quot;);\n\n3. Ensure that an email ends with `.se` when IP check returns true and today is not Sunday\nvalidatesFormatOf(\n    property=&quot;email&quot;,\n    regEx=&quot;^.*@.*\\.se$&quot;,\n    condition=&quot;ipCheck()&quot;,\n    unless=&quot;DayOfWeek() eq 1&quot;,\n    message=&quot;Sorry, you must have a Swedish email address to use this website.&quot;\n);\n\n4. Validate that a username contains only letters, numbers, or underscores\nvalidatesFormatOf(\n    property=&quot;username&quot;,\n    regEx=&quot;^[a-zA-Z0-9_]+$&quot;,\n    message=&quot;Username can only contain letters, numbers, and underscores.&quot;\n);\n\n5. Validate multiple properties at once using built-in CFML types\nvalidatesFormatOf(\n    properties=&quot;phone,email&quot;,\n    type=&quot;telephone,email&quot;,\n    allowBlank=true\n);\n\n6. Validate only when updating an existing object\nvalidatesFormatOf(\n    property=&quot;ssn&quot;,\n    type=&quot;social_security_number&quot;,\n    when=&quot;onUpdate&quot;,\n    message=&quot;Invalid SSN format for updating records.&quot;\n);\n</code></pre>"
       },
       "hint": "Validates that the value of the specified property is formatted correctly by matching it against a regular expression using the regEx argument and / or against a built-in CFML validation type using the type argument (creditcard, date, email, etc.).\n\n",
       "returntype": "void",
@@ -14528,9 +14508,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Make sure that the user selects either &quot;Wheels&quot; or &quot;Rails&quot; as their framework \nvalidatesInclusionOf(property=&quot;frameworkOfChoice&quot;, list=&quot;wheels,rails&quot;, message=&quot;Please try again, and this time, select a decent framework!&quot; );</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Ensure that the user selects either &quot;Wheels&quot; or &quot;Rails&quot; as their framework\nvalidatesInclusionOf(\n    property=&quot;frameworkOfChoice&quot;,\n    list=&quot;wheels,rails&quot;,\n    message=&quot;Please try again, and this time, select a decent framework!&quot;\n);\n\n2. Validate multiple properties at once\nvalidatesInclusionOf(\n    properties=&quot;frameworkOfChoice,editorChoice&quot;,\n    list=&quot;wheels,rails,vsCode,sublime&quot;,\n    message=&quot;Invalid selection.&quot;\n);\n\n3. Only validate when creating a new object\nvalidatesInclusionOf(\n    property=&quot;subscriptionType&quot;,\n    list=&quot;free,premium,enterprise&quot;,\n    when=&quot;onCreate&quot;,\n    message=&quot;You must choose a valid subscription type.&quot;\n);\n\n4. Skip validation if property is blank\nvalidatesInclusionOf(\n    property=&quot;preferredLanguage&quot;,\n    list=&quot;cfml,python,javascript&quot;,\n    allowBlank=true\n);\n\n5. Conditionally validate only for users in Europe\nvalidatesInclusionOf(\n    property=&quot;currency&quot;,\n    list=&quot;EUR,GBP,CHF&quot;,\n    condition=&quot;this.region eq 'Europe'&quot;,\n    message=&quot;Invalid currency for European users.&quot;\n);\n</code></pre>"
       },
-      "hint": "Validates that the value of the specified property exists in the supplied list.\n\n",
+      "hint": "Ensures that a property’s value exists in a predefined list of allowed values. It is commonly used for dropdowns, radio buttons, or any scenario where only specific values are acceptable.\n\n",
       "returntype": "void",
       "slug": "model.validatesInclusionOf",
       "parameters": [
@@ -14597,7 +14577,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Make sure that the `firstname` and `lastName` properties are not more than\n// 50 characters and use square brackets to dynamically insert the property\n// name when the error message is displayed to the user. (The `firstName`\n// property will be displayed as &quot;first name&quot;.)\nvalidatesLengthOf(\n    properties=&quot;firstName,lastName&quot;,\n    maximum=50,\n    message=&quot;Please shorten your [property] please (50 characters max).&quot;\n);\n\n// Make sure that the `password` property is between 4 and 15 characters\nvalidatesLengthOf(\n    property=&quot;password&quot;,\n    within=&quot;4,20&quot;,\n    message=&quot;The password length must be between 4 and 20 characters.&quot;\n);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Ensure that `firstName` and `lastName` are no more than 50 characters\nvalidatesLengthOf(\n    properties=&quot;firstName,lastName&quot;,\n    maximum=50,\n    message=&quot;Please shorten your [property] please (50 characters max).&quot;\n);\n\n2. Ensure `password` is between 4 and 20 characters\nvalidatesLengthOf(\n    property=&quot;password&quot;,\n    within=&quot;4,20&quot;,\n    message=&quot;The password length must be between 4 and 20 characters.&quot;\n);\n\n3. Ensure `username` is exactly 8 characters\nvalidatesLengthOf(\n    property=&quot;username&quot;,\n    exactly=8,\n    message=&quot;Username must be exactly 8 characters.&quot;\n);\n\n4. Only validate if `region` is 'US'\nvalidatesLengthOf(\n    property=&quot;zipCode&quot;,\n    exactly=5,\n    condition=&quot;this.region eq 'US'&quot;,\n    message=&quot;US zip codes must be exactly 5 digits.&quot;\n);\n\n5. Skip validation if property is blank\nvalidatesLengthOf(\n    property=&quot;nickname&quot;,\n    maximum=15,\n    allowBlank=true\n);\n</code></pre>"
       },
       "hint": "Validates that the value of the specified property matches the length requirements supplied.\nUse the <code>exactly</code>, <code>maximum</code>, <code>minimum</code> and <code>within</code> arguments to specify the length requirements.\n\n",
       "returntype": "void",
@@ -14688,9 +14668,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Make sure that the score is a number with no decimals but only when a score is supplied. (Tetting `allowBlank` to `true` means that objects are allowed to be saved without scores, typically resulting in `NULL` values being inserted in the database table)\nvalidatesNumericalityOf(property=&quot;score&quot;, onlyInteger=true, allowBlank=true, message=&quot;Please enter a correct score.&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Score must be an integer, but allow blank values\nvalidatesNumericalityOf(\n    property=&quot;score&quot;,\n    onlyInteger=true,\n    allowBlank=true,\n    message=&quot;Please enter a correct score.&quot;\n);\n\n2. Age must be a number greater than or equal to 18\nvalidatesNumericalityOf(\n    property=&quot;age&quot;,\n    greaterThanOrEqualTo=18,\n    message=&quot;You must be at least 18 years old.&quot;\n);\n\n3. Price must be a positive number less than 1000\nvalidatesNumericalityOf(\n    property=&quot;price&quot;,\n    greaterThan=0,\n    lessThan=1000,\n    message=&quot;Price must be between 0 and 1000.&quot;\n);\n\n4. Ensure a number is odd and an integer\nvalidatesNumericalityOf(\n    property=&quot;lotteryNumber&quot;,\n    odd=true,\n    onlyInteger=true,\n    message=&quot;Lottery number must be an odd integer.&quot;\n);\n\n5. Validate only when a specific condition is true\nvalidatesNumericalityOf(\n    property=&quot;discount&quot;,\n    greaterThanOrEqualTo=0,\n    lessThanOrEqualTo=50,\n    condition=&quot;this.isOnSale()&quot;,\n    message=&quot;Discount must be between 0 and 50 for sale items.&quot;\n);\n</code></pre>"
       },
-      "hint": "Validates that the value of the specified property is numeric.\n\n",
+      "hint": "Ensures that a property’s value is numeric. You can also enforce additional constraints such as integer-only values, odd/even numbers, and comparison limits (greaterThan, lessThan, etc.).\n\n",
       "returntype": "void",
       "slug": "model.validatesNumericalityOf",
       "parameters": [
@@ -14805,9 +14785,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Make sure that the user data can not be saved to the database without the `emailAddress` property. (It must exist and not be an empty string)\nvalidatesPresenceOf(&quot;emailAddress&quot;);</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Ensure the `emailAddress` property is not blank\nvalidatesPresenceOf(&quot;emailAddress&quot;);\n\n2. Ensure multiple properties are present\nvalidatesPresenceOf(&quot;firstName,lastName,emailAddress&quot;);\n\n3. Use a custom error message for missing email\nvalidatesPresenceOf(\n    property=&quot;emailAddress&quot;,\n    message=&quot;Email is required to create your account.&quot;\n);\n\n4. Validate only on create, not on update\nvalidatesPresenceOf(\n    properties=&quot;password&quot;,\n    when=&quot;onCreate&quot;,\n    message=&quot;Password is required when registering a new user.&quot;\n);\n\n5. Conditional validation based on a method\nvalidatesPresenceOf(\n    properties=&quot;discountCode&quot;,\n    condition=&quot;this.isOnSale()&quot;,\n    message=&quot;Discount code must be present for sale items.&quot;\n);\n</code></pre>"
       },
-      "hint": "Validates that the specified property exists and that its value is not blank.\n\n",
+      "hint": "Ensures that the specified property (or properties) exists and is not blank. It is commonly used to enforce required fields before saving an object to the database.\n\n",
       "returntype": "void",
       "slug": "model.validatesPresenceOf",
       "parameters": [
@@ -14861,7 +14841,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Make sure that two users with the same username won't ever exist in the database table\nvalidatesUniquenessOf(property=&quot;username&quot;, message=&quot;Sorry, that username is already taken.&quot;);\n\n// Same as above but allow identical usernames as long as they belong to a different account\nvalidatesUniquenessOf(property=&quot;username&quot;, scope=&quot;accountId&quot;);\n\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Ensure that usernames are unique across all users\nvalidatesUniquenessOf(\n    property=&quot;username&quot;,\n    message=&quot;Sorry, that username is already taken.&quot;\n);\n\n2. Ensure that email addresses are unique\nvalidatesUniquenessOf(\n    property=&quot;emailAddress&quot;,\n    message=&quot;This email has already been registered.&quot;\n);\n\n3. Allow the same username in different accounts but unique within an account\nvalidatesUniquenessOf(\n    property=&quot;username&quot;,\n    scope=&quot;accountId&quot;,\n    message=&quot;This username is already used in this account.&quot;\n);\n\n4. Only enforce uniqueness if the user is active\nvalidatesUniquenessOf(\n    property=&quot;username&quot;,\n    condition=&quot;this.isActive&quot;,\n    message=&quot;Active users must have a unique username.&quot;\n);\n\n5. Skip uniqueness check if the field is blank\nvalidatesUniquenessOf(\n    property=&quot;nickname&quot;,\n    allowBlank=true,\n    message=&quot;Nickname must be unique if supplied.&quot;\n);\n</code></pre>"
       },
       "hint": "Validates that the value of the specified property is unique in the database table.\nUseful for ensuring that two users can't sign up to a website with identical usernames for example.\nWhen a new record is created, a check is made to make sure that no record already exists in the database table with the given value for the specified property.\nWhen the record is updated, the same check is made but disregarding the record itself.\n\n",
       "returntype": "void",
@@ -14938,9 +14918,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// first name is a varchar(50) column\nemployee = model(&quot;employee&quot;).new();\n\n&lt;!--- would output &quot;string&quot;---&gt;\n#employee.validationTypeForProperty(&quot;firstName&quot;)#\n</code></pre>"
+        "docs": "<pre><code class='javascript'>// Create a new employee object\nemployee = model(&quot;employee&quot;).new();\n\n1. Assume 'firstName' is a varchar(50) column\nemployee.validationTypeForProperty(&quot;firstName&quot;) (This will output: &quot;string&quot;)\n\n2. Assume 'hireDate' is a datetime column\nemployee.validationTypeForProperty(&quot;hireDate&quot;) (This will output: &quot;date&quot;)\n\n3. Assume 'salary' is a numeric column\nemployee.validationTypeForProperty(&quot;salary&quot;) (This will output: &quot;numeric&quot;)\n</code></pre>"
       },
-      "hint": "Returns the validation type for the property.\n\n",
+      "hint": "Returns the type of validation that Wheels would apply for a given property. This is useful if you want to dynamically inspect a model's property type or apply logic based on the property's expected format.\n\n",
       "returntype": "any",
       "slug": "model.validationTypeForProperty",
       "parameters": [
@@ -14965,9 +14945,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Get verification chain, remove the first item, and set it back.\nmyVerificationChain = verificationChain();\nArrayDeleteAt(myVerificationChain, 1);\nsetVerificationChain(myVerificationChain);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Get verification chain, remove the first item, and set it back.\nmyVerificationChain = verificationChain();\nArrayDeleteAt(myVerificationChain, 1);\nsetVerificationChain(myVerificationChain);\n</code></pre>"
       },
-      "hint": "Returns an array of all the verifications set on this controller in the order in which they will be executed.\n\n",
+      "hint": "Returns an array of all verifications (filters, before-actions, or checks) that are configured for the current controller, in the order they will be executed. This allows you to inspect, modify, or reorder the verifications dynamically.\n\n",
       "returntype": "array",
       "slug": "controller.verificationChain",
       "parameters": [],
@@ -14985,9 +14965,9 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>// Tell Wheels to verify that the `handleForm` action is always a `POST` request when executed.\nverifies(only=&quot;handleForm&quot;, post=true);\n\n// Make sure that the edit action is a `GET` request, that `userId` exists in the `params` struct, and that it's an integer.\nverifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;);\n\n// Just like above, only this time we want to invoke a custom function in our controller to handle the request when it is invalid.\nverifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, handler=&quot;myCustomFunction&quot;);\n\n// Just like above, only this time instead of specifying a handler, we want to `redirect` the visitor to the index action of the controller and show an error in The Flash when the request is invalid.\nverifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, action=&quot;index&quot;, error=&quot;Invalid userId&quot;);\n</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Tell Wheels to verify that the `handleForm` action is always a `POST` request when executed.\nverifies(only=&quot;handleForm&quot;, post=true);\n\n2. Make sure that the edit action is a `GET` request, that `userId` exists in the `params` struct, and that it's an integer.\nverifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;);\n\n3. Just like above, only this time we want to invoke a custom function in our controller to handle the request when it is invalid.\nverifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, handler=&quot;myCustomFunction&quot;);\n\n4. Just like above, only this time instead of specifying a handler, we want to `redirect` the visitor to the index action of the controller and show an error in The Flash when the request is invalid.\nverifies(only=&quot;edit&quot;, get=true, params=&quot;userId&quot;, paramsTypes=&quot;integer&quot;, action=&quot;index&quot;, error=&quot;Invalid userId&quot;);\n</code></pre>"
       },
-      "hint": "Instructs Wheels to verify that some specific criterias are met before running an action.\nNote that all undeclared arguments will be passed to <code>redirectTo()</code> call if a <code>handler</code> is not specified.\n\n",
+      "hint": "Instructs a Wheels controller to check that certain criteria are met before executing an action. This is useful for enforcing request types, required parameters, session/cookie values, or custom verifications. Note that all undeclared arguments will be passed to <code>redirectTo()</code> call if a <code>handler</code> is not specified.\n\n",
       "returntype": "void",
       "slug": "controller.verifies",
       "parameters": [
@@ -15092,7 +15072,7 @@
         "hasExtended": true,
         "docs": "<pre><code class='javascript'>&lt;cfscript&gt;\n\nmapper()\n    // Enables `[controller]` and `[controller]/[action]`, only via `GET` requests.\n    .wildcard()\n\n    // Enables `[controller]/[action]/[key]` as well.\n    .wildcard(mapKey=true)\n\n    // Also enables patterns like `[controller].[format]` and\n    // `[controller]/[action].[format]`\n    .wildcard(mapFormat=true)\n\n    // Allow additional methods beyond just `GET`\n    //\n    // Note that this can open some serious security holes unless you use `verifies`\n    // in the controller to make sure that requests changing data can only occur\n    // with a `POST` method.\n    .wildcard(methods=&quot;get,post&quot;)\n.end();\n\n&lt;/cfscript&gt;</code></pre>"
       },
-      "hint": "Special wildcard matching generates routes with `\n",
+      "hint": "Automatically generates dynamic routes for your controllers using placeholders like [controller], [action], and optionally [key] or [format]. This allows you to quickly map standard URL patterns to controllers and actions without explicitly defining every route.\n",
       "returntype": "struct",
       "slug": "mapper.wildcard",
       "parameters": [
@@ -15139,7 +15119,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- Outputs &quot;Wheels is a framework...&quot; ---&gt;\n#wordTruncate(text=&quot;Wheels is a framework for ColdFusion&quot;, length=4)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic truncation (default truncate string &quot;...&quot;)\nwordTruncate(text=&quot;Wheels is a framework for ColdFusion&quot;, length=4)\n// Output:\n// Wheels is a framework...\n\n2. Truncate with a custom string\nwordTruncate(text=&quot;Wheels is a framework for ColdFusion&quot;, length=3, truncateString=&quot; (more)&quot;)\n// Output:\n// Wheels is a (more)\n\n3. Using with shorter text than length (no truncation applied)\nwordTruncate(text=&quot;Hello world&quot;, length=5)\n// Output:\n// Hello world\n\n4. Dynamic usage in a view\n&lt;cfoutput&gt;\n    wordTruncate(text=post.content, length=10)\n&lt;/cfoutput&gt;\n// Useful for showing previews of long content while preserving word boundaries.\n</code></pre>"
       },
       "hint": "Truncates text to the specified length of words and replaces the remaining characters with the specified truncate string (which defaults to \"...\").\n\n",
       "returntype": "string",
@@ -15185,7 +15165,7 @@
     {
       "extended": {
         "hasExtended": true,
-        "docs": "<pre><code class='javascript'>&lt;!--- View Code ---&gt;\n#yearSelectTag(name=&quot;yearOfBirthday&quot;, selected=params.yearOfBirthday)#\n\n// Only allow selection of year to be for the past 50 years, minimum being 18 years ago\nfiftyYearsAgo = Now() - 50;\neighteenYearsAgo = Now() - 18;\n\n&lt;!--- View Code ---&gt;\n#yearSelectTag(name=&quot;yearOfBirthday&quot;, selected=params.yearOfBirthday, startYear=fiftyYearsAgo, endYear=eighteenYearsAgo)#</code></pre>"
+        "docs": "<pre><code class='javascript'>1. Basic year dropdown\nyearSelectTag(name=&quot;yearOfBirthday&quot;, selected=params.yearOfBirthday)\n\n2. Custom range (past 50 years, at least 18 years ago)\nfiftyYearsAgo = Year(Now()) - 50;\neighteenYearsAgo = Year(Now()) - 18;\n\nyearSelectTag(\n    name=&quot;yearOfBirthday&quot;,\n    selected=params.yearOfBirthday,\n    startYear=fiftyYearsAgo,\n    endYear=eighteenYearsAgo\n)\n\n3. Include a blank option\nyearSelectTag(name=&quot;graduationYear&quot;, includeBlank=&quot;- Select Year -&quot;)\n\n4. Add label with custom placement\nyearSelectTag(\n    name=&quot;yearOfHiring&quot;,\n    label=&quot;Hiring Year&quot;,\n    labelPlacement=&quot;aroundRight&quot;\n)\n</code></pre>"
       },
       "hint": "Builds and returns a string containing a <code>select</code> form control for a range of years based on the supplied name.\n\n",
       "returntype": "string",
