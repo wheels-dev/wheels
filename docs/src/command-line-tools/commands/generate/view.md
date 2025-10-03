@@ -20,6 +20,7 @@ The `wheels generate view` command creates view files for controllers. It can ge
 | `objectName` | View path folder (e.g., user) | Required |
 | `name` | Name of the file to create (e.g., edit) | Required |
 | `template` | Optional template to use | |
+| `--force` | Overwrite existing code | false |
 
 ## Template Options
 
