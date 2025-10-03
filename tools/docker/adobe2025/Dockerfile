@@ -1,4 +1,4 @@
-FROM ortussolutions/commandbox:jdk17
+FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
