@@ -22,7 +22,6 @@ jobs:
         jdkVersion: ["21"]
         experimental: [false]
         include:
-          
           - cfengine: adobe2025
             dbengine: mysql
           - cfengine: adobe2025
