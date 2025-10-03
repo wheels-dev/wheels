@@ -1,7 +1,4 @@
 # Wheels env Show
-*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
-
-
 
 ## Overview
 
@@ -16,9 +13,12 @@ wheels env show [options]
 ## Parameters
 
 ### Optional Parameters
-- **`--key`** - Show a specific environment variable by key name
-- **`--format`** - Output format: `table` (default) or `json`
-- **`--file`** - Specific .env file to read (default: `.env`)
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--key` | Show a specific environment variable by key name | - |
+| `--format` | Output format: `table` or `json` | `table` |
+| `--file` | Specific .env file to read | `.env` |
 
 ## Basic Usage Examples
 

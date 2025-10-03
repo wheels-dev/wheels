@@ -81,11 +81,8 @@ component extends="../base" {
                 }
                 
                 if (arguments.format == "json") {
-                    print.line(serializeJSON({
-                        key: arguments.key,
-                        value: displayValue,
-                        source: arguments.file
-                    }, true));
+                    local.jsonData = serializeJSON({Key: arguments.key,value: displayValue,source: arguments.file}, true);
+                    print.line(deserializeJSON(local.jsonData));
                 } else {
                     var rows = [
                         { "Variable" = arguments.key, "Value" = displayValue, "Source" = arguments.file }

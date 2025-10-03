@@ -520,8 +520,8 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			unique: local.totalUnique,
 			similarity: local.grandTotal > 0 ? Round((local.totalIdentical / local.grandTotal) * 100) : 0
 		};
-
-		print.line(SerializeJSON(local.output, false, false));
+		local.jsonData = SerializeJSON(local.output, false, false);
+		print.line(deserializeJSON(local.jsonData));
 	}
 
 	private string function maskSensitiveValue(required string key, required any value) {
