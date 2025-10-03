@@ -103,8 +103,6 @@ jobs:
             dbengine: h2
           - cfengine: boxlang
             dbengine: h2
-          - cfengine: adobe2025
-            dbengine: oracle
     env:
       # Port mappings for each CF engine
       PORT_lucee5: 60005
