@@ -22,6 +22,8 @@ jobs:
         jdkVersion: ["21"]
         experimental: [false]
         include:
+          - cfengine: lucee7
+            dbengine: mysql
           - cfengine: adobe2025
             dbengine: mysql
           - cfengine: adobe2025
@@ -31,8 +33,6 @@ jobs:
           - cfengine: adobe2025
             dbengine: oracle
         exclude:
-          - cfengine: lucee7
-            dbengine: mysql
           - cfengine: lucee7
             dbengine: postgres
           - cfengine: lucee7
