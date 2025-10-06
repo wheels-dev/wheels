@@ -86,7 +86,7 @@ component aliases='wheels test:coverage' extends="../base" {
         
         // Add test filtering parameters
         if (len(arguments.bundles)) {
-            params.bundles = arguments.bundles;
+            params.testbundles = arguments.bundles;
         }
         
         if (len(arguments.directory) && arguments.directory != "tests/specs") {

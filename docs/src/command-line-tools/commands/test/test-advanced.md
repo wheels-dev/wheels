@@ -14,19 +14,20 @@ wheels test:all
 
 #### Options
 
-- `--type` - Type of tests to run: (app, core, plugin) - default: app
-- `--format` - Output format (txt, json, junit, html) - default: txt
-- `--coverage` - Generate coverage report
-- `--coverageReporter` - Coverage reporter format (html, json, xml)
-- `--coverageOutputDir` - Directory for coverage output
-- `--verbose` - Verbose output
-- `--failFast` - Stop on first test failure
-- `--directory` - Test directory to run (default: tests/specs)
-- `--recurse` - Recurse into subdirectories
-- `--bundles` - Comma-delimited list of test bundles to run
-- `--labels` - Comma-delimited list of test labels to run
-- `--excludes` - Comma-delimited list of test labels to exclude
-- `--filter` - Test filter pattern
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--type` | string | app | Type of tests to run: (app, core) |
+| `--format` | string | txt | Output format (txt, json, junit, html) |
+| `--coverage` | boolean | false | Generate coverage report |
+| `--coverageReporter` | string | - | Coverage reporter format (html, json, xml) |
+| `--coverageOutputDir` | string | - | Directory for coverage output |
+| `--verbose` | boolean | true | Display extra details including passing and skipped tests |
+| `--directory` | string | tests/specs | The directory to use to discover test bundles and specs to test. Mutually exclusive with `bundles`. Example: `directory=tests.specs` |
+| `--recurse` | boolean | true | Recurse the directory mapping or not |
+| `--bundles` | string | - | The path or list of paths of the spec bundle CFCs to run and test ONLY |
+| `--labels` | string | - | The list of labels that a suite or spec must have in order to execute |
+| `--excludes` | string | - | The list of labels that a suite or spec must not have in order to execute |
+| `--filter` | string | - | Test filter pattern |
 
 #### Examples
 
@@ -60,15 +61,16 @@ wheels test:unit
 
 #### Options
 
-- `--type` - Type of tests to run: (app, core, plugin) - default: app
-- `--format` - Output format (txt, json, junit, html) - default: txt
-- `--verbose` - Verbose output
-- `--failFast` - Stop on first test failure
-- `--bundles` - Comma-delimited list of test bundles to run
-- `--labels` - Comma-delimited list of test labels to run
-- `--excludes` - Comma-delimited list of test labels to exclude
-- `--filter` - Test filter pattern
-- `--directory` - Unit test directory (default: tests/specs/unit)
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--type` | string | app | Type of tests to run: (app, core) |
+| `--format` | string | txt | Output format (txt, json, junit, html) |
+| `--verbose` | boolean | true | Display extra details including passing and skipped tests |
+| `--bundles` | string | - | The path or list of paths of the spec bundle CFCs to run and test ONLY |
+| `--labels` | string | - | The list of labels that a suite or spec must have in order to execute |
+| `--excludes` | string | - | The list of labels that a suite or spec must not have in order to execute |
+| `--filter` | string | - | Test filter pattern |
+| `--directory` | string | tests/specs/unit | The directory to use to discover test bundles and specs to test. Mutually exclusive with `bundles`. Example: `directory=tests.specs` |
 
 #### Examples
 
@@ -81,9 +83,6 @@ wheels test:unit --format=json
 
 # Filter specific tests
 wheels test:unit --filter=UserModelTest
-
-# Verbose output with fail fast
-wheels test:unit --verbose --failFast
 
 # Run core unit tests
 wheels test:unit --type=core
@@ -113,8 +112,8 @@ wheels test:integration --filter=UserWorkflowTest
 # With verbose output and JUnit format
 wheels test:integration --verbose --format=junit
 
-# Run plugin integration tests
-wheels test:integration --type=plugin
+# Run integration tests
+wheels test:integration --type=app
 ```
 
 ### test:watch - Watch Mode
@@ -127,17 +126,19 @@ wheels test:watch
 
 #### Options
 
-- `--type` - Type of tests to run: (app, core, plugin) - default: app
-- `--directory` - Test directory to watch (default: tests/specs)
-- `--format` - Output format (txt, json, junit, html) - default: txt
-- `--verbose` - Verbose output
-- `--delay` - Delay in milliseconds before rerunning tests (default: 1000)
-- `--watchPaths` - Additional paths to watch (comma-separated)
-- `--excludePaths` - Paths to exclude from watching (comma-separated)
-- `--bundles` - Test bundles to run
-- `--labels` - Test labels to run
-- `--excludes` - Test bundles to exclude
-- `--filter` - Test filter pattern
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--type` | string | app | Type of tests to run: (app, core) |
+| `--directory` | string | tests/specs | The directory to use to discover test bundles and specs to test. Mutually exclusive with `bundles`. Example: `directory=tests.specs` |
+| `--format` | string | txt | Output format (txt, json, junit, html) |
+| `--verbose` | boolean | true | Display extra details including passing and skipped tests |
+| `--delay` | integer | 1000 | Delay in milliseconds before rerunning tests |
+| `--watchPaths` | string | - | Additional paths to watch (comma-separated) |
+| `--excludePaths` | string | - | Paths to exclude from watching (comma-separated) |
+| `--bundles` | string | - | The path or list of paths of the spec bundle CFCs to run and test ONLY |
+| `--labels` | string | - | The list of labels that a suite or spec must have in order to execute |
+| `--excludes` | string | - | The list of labels that a suite or spec must not have in order to execute |
+| `--filter` | string | - | Test filter pattern |
 
 #### Examples
 
@@ -168,19 +169,21 @@ wheels test:coverage
 
 #### Options
 
-- `--type` - Type of tests to run: (app, core, plugin) - default: app
-- `--directory` - Test directory to run (default: tests/specs)
-- `--format` - Output format (txt, json, junit, html) - default: txt
-- `--outputDir` - Directory to output the coverage report (default: tests/results/coverage)
-- `--threshold` - Coverage percentage threshold (0-100)
-- `--pathsToCapture` - Paths to capture for coverage (default: /app)
-- `--whitelist` - Whitelist paths for coverage (default: *.cfc)
-- `--blacklist` - Blacklist paths from coverage (default: *Test.cfc,*Spec.cfc)
-- `--bundles` - Test bundles to run
-- `--labels` - Test labels to run
-- `--excludes` - Test bundles to exclude
-- `--filter` - Test filter pattern
-- `--verbose` - Verbose output
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--type` | string | app | Type of tests to run: (app, core) |
+| `--directory` | string | tests/specs | The directory to use to discover test bundles and specs to test. Mutually exclusive with `bundles`. Example: `directory=tests.specs` |
+| `--format` | string | txt | Output format (txt, json, junit, html) |
+| `--outputDir` | string | tests/results/coverage | Directory to output the coverage report |
+| `--threshold` | integer | - | Coverage percentage threshold (0-100) |
+| `--pathsToCapture` | string | /app | Paths to capture for coverage |
+| `--whitelist` | string | *.cfc | Whitelist paths for coverage |
+| `--blacklist` | string | *Test.cfc,*Spec.cfc | Blacklist paths from coverage |
+| `--bundles` | string | - | The path or list of paths of the spec bundle CFCs to run and test ONLY |
+| `--labels` | string | - | The list of labels that a suite or spec must have in order to execute |
+| `--excludes` | string | - | The list of labels that a suite or spec must not have in order to execute |
+| `--filter` | string | - | Test filter pattern |
+| `--verbose` | boolean | true | Display extra details including passing and skipped tests |
 
 #### Examples
 
@@ -195,7 +198,7 @@ wheels test:coverage --threshold=80 --directory=tests/specs/unit
 wheels test:coverage --pathsToCapture=/models,/controllers
 
 # With JUnit output
-wheels test:coverage --format=junit --outputDir=coverage-reports
+wheels test:coverage --format=json --outputDir=coverage-reports
 ```
 
 ## Test Organization
@@ -266,7 +269,6 @@ All test commands support multiple output formats via the `--format` parameter:
 5. **CI/CD Integration**
    - Use `--format=junit` for CI systems
    - Generate coverage reports with `--coverageReporter=xml`
-   - Use `--failFast` for faster feedback
 
 ## Coverage Requirements
 
