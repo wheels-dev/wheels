@@ -75,7 +75,7 @@
         }
 
         if (!hasFusionReactor) {
-            cfheader(statustext="Expectation Failed", statuscode=417);
+            cfheader(statuscode=417);
             writeOutput("Warning: Code coverage requested but FusionReactor not detected. Please install FusionReactor first.#Chr(10)#");
             abort;
         }
@@ -127,9 +127,9 @@
         DeJsonResult = DeserializeJSON(result);
         
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
-            cfheader(statustext="Expectation Failed", statuscode=417);
+            cfheader(statuscode=417);
         } else {
-            cfheader(statustext="OK", statuscode=200);
+            cfheader(statuscode=200);
         }
         
         // Check if 'only' parameter is provided in the URL

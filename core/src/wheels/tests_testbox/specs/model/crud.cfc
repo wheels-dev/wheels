@@ -590,6 +590,7 @@ component extends="wheels.Testbox" {
 				isACF2018 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2018
 				isACF2021 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2021
 				isACF2023 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2023
+				isACF2025 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2025
 			})
 
 			it("is selecting distinct addresses", () => {
@@ -875,7 +876,7 @@ component extends="wheels.Testbox" {
 
 				expect(actual).toBeStruct()
 
-				if (isACF2021 || isACF2023) {
+				if (isACF2021 || isACF2023 || isACF2025) {
 					expect(actual.resultset['1']).toBeStruct()
 				} else if (structKeyExists(server, "boxlang")) {
 					expect(actual['1']['1']).toBeStruct()
