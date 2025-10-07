@@ -95,7 +95,7 @@ wheels-cli/
 {
     "name": "wheels-cli",
     "version": "3.0.0",
-    "author": "CFWheels Team",
+    "author": "Wheels Team",
     "homepage": "https://cfwheels.org",
     "documentation": "https://wheels.dev/3.0.0/guides/command-line-tools/commands/README",
     "repository": {
@@ -104,7 +104,7 @@ wheels-cli/
     },
     "bugs": "https://github.com/cfwheels/wheels-cli/issues",
     "slug": "wheels-cli",
-    "shortDescription": "Official CLI for CFWheels Framework",
+    "shortDescription": "Official CLI for Wheels Framework",
     "type": "commandbox-modules",
     "keywords": [
         "cfwheels",
@@ -2239,7 +2239,7 @@ component extends="wheels.Testbox" {
 ## Requirements & Version Management
 
 ### System Requirements
-- CFWheels 3.0 or higher
+- Wheels 3.0 or higher
 - CommandBox 5.0 or higher
 - Project must follow Wheels 3.0+ structure with framework in vendor/wheels/
 - SQLite JDBC driver (auto-installed) for default database support
@@ -2282,7 +2282,7 @@ The CLI will use this file to:
 ### Distribution & Installation
 
 ### Requirements
-- CFWheels 3.0 or higher
+- Wheels 3.0 or higher
 - CommandBox 5.0 or higher
 - Project must follow Wheels 3.0+ structure with framework in vendor/wheels/
 

@@ -1,6 +1,6 @@
 # AI-MIGRATIONS.md
 
-This guide provides comprehensive migration patterns and best practices for AI assistants working with CFWheels migrations.
+This guide provides comprehensive migration patterns and best practices for AI assistants working with Wheels migrations.
 
 ## Critical Information
 

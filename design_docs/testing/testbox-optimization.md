@@ -1,8 +1,8 @@
-# TestBox Integration Optimization for CFWheels 3.0
+# TestBox Integration Optimization for Wheels 3.0
 
 ## Executive Summary
 
-CFWheels 3.0 is transitioning from RocketUnit to TestBox as its testing framework. This document analyzes the current integration state and provides actionable recommendations to optimize the testing experience for developers, making it more enjoyable, efficient, and maintainable.
+Wheels 3.0 is transitioning from RocketUnit to TestBox as its testing framework. This document analyzes the current integration state and provides actionable recommendations to optimize the testing experience for developers, making it more enjoyable, efficient, and maintainable.
 
 ## Current State Analysis
 
@@ -70,7 +70,7 @@ Create a new `BaseSpec.cfc` that bridges Wheels and TestBox:
 component extends="testbox.system.BaseSpec" {
 
     // Wheels application reference
-    property name="app" inject="wirebox:CFWheels";
+    property name="app" inject="wirebox:Wheels";
 
     function beforeAll() {
         // Store original application state
@@ -545,7 +545,7 @@ component {
 
 ## Conclusion
 
-By following these recommendations, CFWheels 3.0 can provide a modern, enjoyable testing experience that:
+By following these recommendations, Wheels 3.0 can provide a modern, enjoyable testing experience that:
 - Leverages TestBox's full capabilities
 - Maintains backward compatibility during transition
 - Improves developer productivity

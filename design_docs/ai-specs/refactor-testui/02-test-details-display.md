@@ -1,6 +1,6 @@
 # Test Details Display Enhancement Specification
 
-This document details the design for enhancing the test results display in the CFWheels TestUI, including improved visualization, detailed error information, and interactive exploration features.
+This document details the design for enhancing the test results display in the Wheels TestUI, including improved visualization, detailed error information, and interactive exploration features.
 
 ## Current Test Display Assessment
 

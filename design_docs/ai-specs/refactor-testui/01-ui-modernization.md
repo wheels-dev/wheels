@@ -1,6 +1,6 @@
 # UI Modernization Specification
 
-This document details the UI modernization plan for the CFWheels TestUI, including theme support, component design, and overall visual refresh.
+This document details the UI modernization plan for the Wheels TestUI, including theme support, component design, and overall visual refresh.
 
 ## Current UI Assessment
 
@@ -195,7 +195,7 @@ The current TestUI uses:
 <template>
   <header class="app-header">
     <div class="logo-container">
-      <img src="/wheels_logo.png" alt="CFWheels Logo" class="logo">
+      <img src="/wheels_logo.png" alt="Wheels Logo" class="logo">
       <h1 class="app-title">Test UI</h1>
     </div>
     

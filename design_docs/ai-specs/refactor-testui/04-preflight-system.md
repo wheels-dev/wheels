@@ -1,6 +1,6 @@
 # Pre-flight Container Check and Startup System Specification
 
-This document details the design for a pre-flight check system that will automatically verify and manage the required containers before running tests in the CFWheels TestUI.
+This document details the design for a pre-flight check system that will automatically verify and manage the required containers before running tests in the Wheels TestUI.
 
 ## Current State Assessment
 

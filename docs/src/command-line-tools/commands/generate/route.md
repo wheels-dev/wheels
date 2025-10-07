@@ -235,7 +235,7 @@ For custom routes, you'll need to manually create route names in your routes.cfm
 
 ### Command Line Parameter Formats
 
-Building on CommandBox's parameter syntax, CFWheels route generation supports:
+Building on CommandBox's parameter syntax, Wheels route generation supports:
 
 #### 1. Named Parameters (Recommended)
 ```bash
@@ -391,7 +391,7 @@ wheels generate route --post="shop/checkout,shop.checkout##process"
 #### Internal Parameter Handling
 1. **reconstructArgs()**: Processes CommandBox parameter format
 2. **Validation**: Checks required parameters are present
-3. **Route Generation**: Formats parameters for CFWheels router syntax
+3. **Route Generation**: Formats parameters for Wheels router syntax
 4. **File Injection**: Places routes at correct position in routes.cfm
 
 ## Integration with Routes.cfm
@@ -676,7 +676,7 @@ If you encounter issues not covered here:
 1. **Check the debug footer**: Shows all registered routes
 2. **Verify controller exists**: Match route handler to actual controller/action
 3. **Test with simple routes first**: Basic patterns before complex ones
-4. **Check CFWheels routing guide**: For advanced routing features
+4. **Check Wheels routing guide**: For advanced routing features
 5. **Reload frequently**: Always reload after route changes
 
 ## See Also
@@ -684,4 +684,4 @@ If you encounter issues not covered here:
 - [wheels generate scaffold](scaffold.md) - Generate complete CRUD with routes
 - [wheels generate controller](controller.md) - Generate controllers
 - [wheels generate model](model.md) - Generate models
-- [CFWheels Routing Guide](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) - Complete routing documentation
+- [Wheels Routing Guide](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) - Complete routing documentation

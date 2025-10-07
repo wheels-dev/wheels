@@ -1120,9 +1120,9 @@ These commands provide advanced functionality including plugin management, maint
 **Status**: ✅ Success
 **Output**: Shows 24 available plugins from ForgeBox including:
 - Shortcodes
-- CFWheels FlashMessages Bootstrap
-- CFWheels JWT
-- CFWheels HTMX Plugin
+- Wheels FlashMessages Bootstrap
+- Wheels JWT
+- Wheels HTMX Plugin
 - And 20 others
 **Notes**: Successfully retrieves and displays available plugins from ForgeBox
 

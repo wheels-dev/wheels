@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ----
+## About the CFWheels → Wheels Rebrand
+
+**Note:** Starting with version 3.0.0, the project has been renamed from "CFWheels" to "Wheels" as part of our evolution and modernization efforts. This rebrand includes:
+
+- **Project Name**: CFWheels → Wheels
+- **GitHub Organization**: `cfwheels/cfwheels` → `wheels-dev/wheels`
+- **Domain**: `cfwheels.org` → `wheels.dev`
+
+All historical references to "CFWheels" in this changelog have been preserved for accuracy. When you see "CFWheels" in entries below, that was the project name at the time of that release.
+
+----
+
 
 # [3.0.0-SNAPSHOT](https://github.com/wheels-dev/wheels/tree/develop) => TBD
 
