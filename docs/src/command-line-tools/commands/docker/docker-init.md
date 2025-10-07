@@ -1,7 +1,6 @@
 # wheels docker init
-*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
-Initialize Docker configuration for your Wheels application.
+Initialize Docker configuration for your Wheels application with support for multiple databases, CF engines, production mode, and Nginx reverse proxy.
 
 ## Synopsis
 
@@ -11,94 +10,223 @@ wheels docker init [options]
 
 ## Description
 
-The `wheels docker init` command creates Docker configuration files for containerizing your Wheels application. It generates a `Dockerfile`, `docker-compose.yml`, and supporting configuration files optimized for Wheels applications.
+The `wheels docker init` command creates Docker configuration files for containerizing your Wheels application. It generates a `Dockerfile`, `docker-compose.yml`, `.dockerignore`, configures datasources in `CFConfig.json`, and optionally creates Nginx configuration for reverse proxy support.
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--engine` | CFML engine (lucee5, lucee6, adobe2018, adobe2021, adobe2023) | `lucee6` |
-| `--database` | Database system (mysql, postgresql, sqlserver, none) | `mysql` |
-| `--port` | Application port | `8080` |
-| `--with-nginx` | Include Nginx reverse proxy | `false` |
-| `--with-redis` | Include Redis for caching | `false` |
-| `--production` | Generate production-ready configuration | `false` |
-| `--force` | Overwrite existing Docker files | `false` |
-| `--help` | Show help information |
+| Option | Description | Default | Valid Values |
+|--------|-------------|---------|--------------|
+| `--db` | Database system to use | `mysql` | `h2`, `mysql`, `postgres`, `mssql` |
+| `--dbVersion` | Database version to use | varies by db | Any valid version for the selected database |
+| `--cfengine` | CFML engine to use | `lucee` | `lucee`, `adobe` |
+| `--cfVersion` | CFML engine version | `6` | Any valid version for the selected engine |
+| `--port` | Custom application port (overrides server.json) | from server.json or `8080` | Any valid port number |
+| `--force` | Overwrite existing Docker files without confirmation | `false` | `true`, `false` |
+| `--production` | Generate production-ready configuration | `false` | `true`, `false` |
+| `--nginx` | Include Nginx reverse proxy | `false` | `true`, `false` |
+
+**Default Database Versions:**
+- MySQL: `8.0`
+- PostgreSQL: `15`
+- MSSQL: `2019-latest`
+- H2: embedded (no version needed)
 
 ## Examples
 
-### Basic initialization
+### Basic initialization (MySQL with Lucee 6)
 ```bash
 wheels docker init
 ```
 
-### Initialize with Adobe ColdFusion
-```bash
-wheels docker init --engine=adobe2023
-```
-
-### Production setup with Nginx
-```bash
-wheels docker init --production --with-nginx --port=80
-```
-
 ### Initialize with PostgreSQL
 ```bash
-wheels docker init --database=postgresql
+wheels docker init --db=postgres
 ```
 
-### Full stack with Redis
+### Initialize with specific database version
 ```bash
-wheels docker init --with-nginx --with-redis --database=postgresql
+wheels docker init --db=postgres --dbVersion=13
+```
+
+### Initialize with Adobe ColdFusion
+```bash
+wheels docker init --cfengine=adobe --cfVersion=2023
+```
+
+### Initialize with H2 embedded database
+```bash
+wheels docker init --db=h2
+```
+
+### Custom port
+```bash
+wheels docker init --port=3000
+```
+
+### Force overwrite existing files
+```bash
+wheels docker init --force
+```
+
+### Production configuration
+```bash
+wheels docker init --production
+```
+
+### Production with Nginx reverse proxy
+```bash
+wheels docker init --production --nginx
+```
+
+### Development with Nginx on custom port
+```bash
+wheels docker init --nginx --port=8080
+```
+
+### Full custom configuration
+```bash
+wheels docker init --db=postgres --dbVersion=15 --cfengine=lucee --cfVersion=6 --port=8888 --production --nginx
 ```
 
 ## What It Does
 
-1. **Creates Dockerfile** optimized for CFML applications:
-   - Base image selection based on engine
-   - Dependency installation
-   - Application file copying
-   - Environment configuration
+1. **Checks for existing files** (unless `--force` is used):
+   - Detects existing `Dockerfile`, `docker-compose.yml`, and `.dockerignore`
+   - Prompts before overwriting existing Docker configuration
+   - Lists all files that will be replaced
+   - Allows cancellation to prevent accidental overwrites
 
-2. **Generates docker-compose.yml** with:
-   - Application service
-   - Database service (if selected)
-   - Nginx service (if selected)
-   - Redis service (if selected)
-   - Network configuration
-   - Volume mappings
+2. **Creates Dockerfile** optimized for CFML applications:
+   - **Development mode** (default):
+     - Hot-reload enabled
+     - Development tools installed (curl, nano)
+     - Source code mounted for live updates
+     - `BOX_INSTALL=TRUE` for automatic dependency installation
+   - **Production mode** (`--production`):
+     - Security hardened with non-root user (UID 1001)
+     - `box install --production` for optimized dependencies
+     - Health checks configured (30s interval, 10s timeout, 3 retries)
+     - Production environment variables set
+     - No source volume mounts
+     - Optimized image size
+   - Based on `ortussolutions/commandbox:latest`
+   - Installs H2 extension for Lucee if H2 database selected
+   - Exposes application port (custom, from server.json, or defaults to 8080)
 
-3. **Additional files**:
-   - `.dockerignore` - Excludes unnecessary files
-   - `docker-entrypoint.sh` - Container startup script
-   - Configuration files for selected services
+3. **Generates docker-compose.yml** with:
+   - Application service with port mapping or internal exposure
+   - Database service (mysql, postgres, or mssql) if selected
+   - Nginx reverse proxy service (if `--nginx`)
+   - Environment variables for database connection
+   - Volume mappings for data persistence
+   - **Development mode**: Source code mounted for hot-reload, development command
+   - **Production mode**: No source mounts, `restart: always` policies
+
+4. **Creates Nginx configuration** (if `--nginx`):
+   - Reverse proxy to application backend
+   - Load balancing ready upstream configuration
+   - WebSocket support with upgrade headers
+   - Static asset caching with 1-day expiration
+   - Custom upload size limits (100MB)
+   - Health check endpoint at `/health`
+   - **Production mode only**:
+     - Security headers (X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy)
+     - Gzip compression for text content types
+   - **Port configuration**:
+     - Development: Nginx on port 8080
+     - Production: Nginx on port 80
+
+5. **Creates .dockerignore** excluding:
+   - `.git` and `.gitignore`
+   - `node_modules`
+   - `.CommandBox`
+   - `server.json`
+   - `logs` and `*.log`
+   - `tests`
+   - `.env`
+   - **Production mode only**: README files, IDE configs (`.vscode`, `.idea`), `.DS_Store`
+
+6. **Updates CFConfig.json**:
+   - Configures `wheels-dev` datasource for selected database
+   - Sets up proper JDBC drivers and connection strings:
+     - MySQL: `com.mysql.cj.jdbc.Driver`
+     - PostgreSQL: `org.postgresql.Driver`
+     - MSSQL: `com.microsoft.sqlserver.jdbc.SQLServerDriver`
+   - Uses Docker service name `db` for host resolution
+   - Configures appropriate ports and credentials
+
+7. **Updates server.json**:
+   - Reads existing port or sets custom port or defaults to 8080
+   - Sets CFEngine version (e.g., `lucee@6` or `adobe@2023`)
+   - Adds `CFConfigFile` reference if missing
 
 ## Generated Files
 
-### Dockerfile Example
+### Development Dockerfile
 ```dockerfile
-FROM ortussolutions/commandbox:lucee5
+FROM ortussolutions/commandbox:latest
 
-# Set working directory
+## Install curl and nano
+RUN apt-get update && apt-get install -y curl nano
+
+## Clean up the image
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+## Copy application files
+COPY . /app
 WORKDIR /app
 
-# Copy application files
-COPY . /app
+## Install Dependencies
+ENV BOX_INSTALL             TRUE
 
-# Install dependencies
-RUN box install
-
-# Expose port
+## Expose port
 EXPOSE 8080
 
-# Start server
+## Set Healthcheck URI
+ENV HEALTHCHECK_URI         "http://127.0.0.1:8080/"
+
+## Start the application
+CMD ["box", "server", "start", "--console", "--force"]
+```
+
+### Production Dockerfile
+```dockerfile
+FROM ortussolutions/commandbox:latest
+
+## Install required packages
+RUN apt-get update && apt-get install -y curl nano && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+## Copy application files
+COPY . /app
+WORKDIR /app
+
+## Install Dependencies
+RUN box install --production
+
+## Production optimizations
+ENV ENVIRONMENT             production
+ENV BOX_SERVER_PROFILE      production
+
+## Security: Run as non-root user
+RUN useradd -m -u 1001 appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
+## Expose port
+EXPOSE 8080
+
+## Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://127.0.0.1:8080/ || exit 1
+
+## Start the application
 CMD ["box", "server", "start", "--console"]
 ```
 
-### docker-compose.yml Example
+### docker-compose.yml (Development with MySQL)
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   app:
@@ -106,18 +234,30 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - WHEELS_ENV=development
-      - DB_HOST=database
-    depends_on:
-      - database
+      ENVIRONMENT: development
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: wheels
+      DB_USER: wheels
+      DB_PASSWORD: wheels
     volumes:
-      - ./:/app
+      - .:/app
+      - ../../../core/src/wheels:/app/vendor/wheels
+      - ../../../docs:/app/vendor/wheels/docs
+      - ../../../tests:/app/tests
+    command: sh -c "box install && box server start --console --force"
+    depends_on:
+      - db
 
-  database:
+  db:
     image: mysql:8.0
     environment:
-      - MYSQL_ROOT_PASSWORD=wheels
-      - MYSQL_DATABASE=wheels_app
+      MYSQL_ROOT_PASSWORD: wheels
+      MYSQL_DATABASE: wheels
+      MYSQL_USER: wheels
+      MYSQL_PASSWORD: wheels
+    ports:
+      - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
 
@@ -125,51 +265,370 @@ volumes:
   db_data:
 ```
 
-## Configuration Options
+### docker-compose.yml (Production with Nginx)
+```yaml
+version: "3.8"
 
-### Development Mode
-- Hot reload enabled
-- Source code mounted as volume
-- Debug ports exposed
-- Development databases
+services:
+  app:
+    build: .
+    expose:
+      - 8080
+    environment:
+      ENVIRONMENT: production
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: wheels
+      DB_USER: wheels
+      DB_PASSWORD: wheels
+    restart: always
+    depends_on:
+      - db
 
-### Production Mode
-- Optimized image size
-- Security hardening
-- Health checks
-- Restart policies
-- Resource limits
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: always
+    depends_on:
+      - app
 
-## Use Cases
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: wheels
+      MYSQL_DATABASE: wheels
+      MYSQL_USER: wheels
+      MYSQL_PASSWORD: wheels
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
 
-1. **Local Development**: Consistent development environment across team
-2. **Testing**: Isolated test environments with different configurations
-3. **CI/CD**: Containerized testing in pipelines
-4. **Deployment**: Production-ready containers for cloud deployment
+volumes:
+  db_data:
+```
+
+### nginx.conf (Generated with --nginx)
+```nginx
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Logging
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+
+    # Performance
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+
+    upstream app_backend {
+        server app:8080;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # Max upload size
+        client_max_body_size 100M;
+
+        # Security headers (production only)
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+
+        # Gzip compression (production only)
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/json;
+
+        location / {
+            proxy_pass http://app_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # WebSocket support
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+
+            # Timeouts
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+
+        # Static assets caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            proxy_pass http://app_backend;
+            proxy_cache_valid 200 1d;
+            expires 1d;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # Health check endpoint
+        location /health {
+            access_log off;
+            proxy_pass http://app_backend;
+        }
+    }
+}
+```
+
+## Database Configurations
+
+### MySQL
+- **Image**: `mysql:8.0` (default)
+- **Port**: 3306
+- **Credentials**: wheels/wheels
+- **Database**: wheels
+- **Root Password**: wheels
+
+### PostgreSQL
+- **Image**: `postgres:15` (default)
+- **Port**: 5432
+- **Credentials**: wheels/wheels
+- **Database**: wheels
+
+### MSSQL
+- **Image**: `mcr.microsoft.com/mssql/server:2019-latest` (default)
+- **Port**: 1433
+- **Credentials**: sa/Wheels123!
+- **Database**: wheels
+- **Note**: Requires EULA acceptance
+
+### H2
+- **Embedded**: No separate container needed
+- **Extension**: Automatically added to Lucee deployments via Dockerfile
+- **Connection**: Configured in CFConfig.json
+- **Storage**: Within application container filesystem
+
+## Production vs Development Mode
+
+### Development Mode (default)
+- Source code mounted as volumes for hot-reload
+- Full development tools installed (curl, nano)
+- Debugging and verbose logging enabled
+- No restart policies
+- Direct port exposure (app accessible on configured port)
+- Development-friendly error messages
+- `box install` runs on container start with `--force` flag
+- Volume mounts for Wheels core, docs, and tests (framework development)
+
+### Production Mode (`--production`)
+- **No source code volume mounts** - code baked into image
+- Security hardened Dockerfile with non-root user (UID 1001)
+- Automatic restart policies (`restart: always`)
+- Health checks configured (30s interval, 10s timeout, 60s start period, 3 retries)
+- Optimized image size with `box install --production`
+- Production environment variable set
+- Additional .dockerignore exclusions (docs, IDE configs)
+- `BOX_SERVER_PROFILE=production` environment
+- No command override in docker-compose (uses CMD from Dockerfile)
+
+### Comparison Table
+
+| Feature | Development | Production |
+|---------|-------------|------------|
+| Source Volume Mount | ✅ Yes | ❌ No |
+| Hot Reload | ✅ Enabled | ❌ Disabled |
+| User | root | appuser (1001) |
+| Restart Policy | none | always |
+| Health Checks | ❌ No | ✅ Yes |
+| Security Headers | ❌ No | ✅ Yes (with nginx) |
+| Gzip Compression | ❌ No | ✅ Yes (with nginx) |
+| Install Command | `box install` | `box install --production` |
+| Image Size | Larger | Optimized |
+
+## Nginx Reverse Proxy
+
+When using `--nginx`, an Nginx reverse proxy is configured between clients and your application.
+
+### Benefits
+- **Load balancing ready**: Upstream configuration supports multiple app instances
+- **SSL termination point**: Add SSL certificates to nginx without app changes
+- **Static asset caching**: 1-day cache for images, CSS, JS
+- **Security headers**: Production mode adds security headers
+- **Gzip compression**: Production mode compresses responses
+- **WebSocket support**: Upgrade headers configured
+- **Request buffering**: Better handling of slow clients
+- **Health checks**: Dedicated `/health` endpoint
+
+### Port Configuration
+- **Development mode**: Nginx listens on port 8080, app exposed internally
+- **Production mode**: Nginx listens on port 80, app exposed internally
+- App is only accessible through nginx when `--nginx` is used
+
+### Nginx Configuration Details
+The generated `nginx.conf` includes:
+- **Upstream**: `app_backend` pointing to `app:8080` (Docker service)
+- **Worker connections**: 1024 concurrent connections
+- **Client max body size**: 100MB for file uploads
+- **Proxy headers**: Host, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto
+- **WebSocket support**: HTTP/1.1 with Upgrade and Connection headers
+- **Timeouts**: 60s for connect, send, and read operations
+- **Static caching**: 1 day expiration for assets
+- **Health check**: `/health` endpoint with no access logging
+
+### Production Security Headers (with --production --nginx)
+```
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Referrer-Policy: no-referrer-when-downgrade
+```
+
+### Production Gzip Compression (with --production --nginx)
+Enabled for:
+- text/plain
+- text/css
+- text/xml
+- text/javascript
+- application/x-javascript
+- application/xml+rss
+- application/json
 
 ## Environment Variables
 
-Common environment variables configured:
+The following environment variables are configured in docker-compose.yml:
 
-| Variable | Description |
-|----------|-------------|
-| `WHEELS_ENV` | Application environment |
-| `WHEELS_DATASOURCE` | Database connection name |
-| `DB_HOST` | Database hostname |
-| `DB_PORT` | Database port |
-| `DB_NAME` | Database name |
-| `DB_USER` | Database username |
-| `DB_PASSWORD` | Database password |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `ENVIRONMENT` | Application environment mode | `development` or `production` |
+| `BOX_SERVER_PROFILE` | CommandBox server profile (production only) | `production` |
+| `DB_HOST` | Database hostname (Docker service name) | `db` |
+| `DB_PORT` | Database port | `3306`, `5432`, `1433` |
+| `DB_NAME` | Database name | `wheels` |
+| `DB_USER` | Database username | `wheels` or `sa` |
+| `DB_PASSWORD` | Database password | `wheels` or `Wheels123!` |
+| `DB_TYPE` | Database type (H2 only) | `h2` |
+
+## Starting Your Docker Environment
+
+After running `wheels docker init`, start your containers:
+
+```bash
+# Start in detached mode
+docker-compose up -d
+
+# Start with build (after code changes in production)
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f app
+docker-compose logs -f nginx
+
+# Stop containers
+docker-compose down
+
+# Stop and remove volumes (WARNING: deletes database data)
+docker-compose down -v
+
+# Restart a specific service
+docker-compose restart app
+
+# Rebuild and restart
+docker-compose up -d --build --force-recreate
+```
 
 ## Notes
 
 - Requires Docker and Docker Compose installed
-- Database passwords are set to defaults in development
-- Production configurations should use secrets management
-- The command detects existing Docker files and prompts before overwriting
+- Use `--force` to skip confirmation prompts when overwriting existing files
+- Custom `--port` overrides the port from `server.json`
+- Port priority: `--port` argument > `server.json` > default (8080)
+- Database passwords are set to defaults suitable for **development only**
+- **Production deployments MUST use secrets management and secure passwords**
+- Production mode creates security-hardened configurations with non-root users
+- Nginx adds reverse proxy capabilities for load balancing, caching, and security
+- H2 database runs embedded within the application container
+- Volume mounts in development assume Wheels framework development structure
+- When using `--nginx`, the app is only exposed internally to nginx
+- CFConfig.json is updated with datasource configuration (skipped for H2)
+- server.json is updated with CF engine version and port configuration
+
+## Troubleshooting
+
+### Port conflicts
+**Problem**: Port already in use on host machine
+
+**Solutions**:
+- Update the port in `server.json` before running `wheels docker init`
+- Use `--port` argument to specify a different port
+- Manually edit the ports in `docker-compose.yml` after generation
+- Stop the conflicting service: `lsof -ti:8080 | xargs kill`
+
+### Database connection issues
+**Problem**: Application cannot connect to database
+
+**Solutions**:
+- Ensure the database container is fully started: `docker-compose logs db`
+- Check for initialization errors in database logs
+- Verify CFConfig.json has correct datasource configuration
+- Confirm the `wheels-dev` datasource name matches your application config
+- For MSSQL, ensure password meets complexity requirements
+- Wait for database to fully initialize (can take 30-60 seconds first time)
+
+### Permission issues
+**Problem**: Permission denied errors in production mode
+
+**Solutions**:
+- The generated files have `777` permissions for development convenience
+- Production Dockerfile runs as `appuser` (UID 1001)
+- Ensure all files are readable by UID 1001
+- Check volume mount permissions on host
+- Adjust file permissions: `chmod -R 755 /path/to/app`
+
+### Nginx not routing requests
+**Problem**: 502 Bad Gateway or connection refused
+
+**Solutions**:
+- Verify app service is running: `docker-compose ps`
+- Check app service logs: `docker-compose logs app`
+- Ensure app is listening on the correct port internally
+- Verify nginx config syntax: `docker-compose exec nginx nginx -t`
+- Check nginx logs: `docker-compose logs nginx`
+- Restart services: `docker-compose restart app nginx`
+
+### Force overwrite not working
+**Problem**: Still getting prompted despite using `--force`
+
+**Solutions**:
+- Ensure correct syntax: `wheels docker init --force` (not `--force=true`)
+- Check for boolean parameter issues in command
+- Use the exact parameter name: `--force`
+
+### H2 database not working
+**Problem**: H2 extension not loading or database errors
+
+**Solutions**:
+- Verify H2 extension was added to Dockerfile
+- Check Lucee admin for H2 extension installation
+- Ensure CFConfig.json doesn't have conflicting datasource config
+- Check application logs for H2 initialization errors
+- H2 works with Lucee only (not Adobe ColdFusion)
 
 ## See Also
 
 - [wheels docker deploy](docker-deploy.md) - Deploy using Docker
 - [wheels deploy](../deploy/deploy.md) - General deployment commands
-- [wheels ci init](../ci/ci-init.md) - Initialize CI configuration
+- [CommandBox Docker Images](https://hub.docker.com/r/ortussolutions/commandbox) - Official CommandBox images
+- [Docker Compose Documentation](https://docs.docker.com/compose/) - Docker Compose reference
+- [Nginx Documentation](https://nginx.org/en/docs/) - Nginx configuration reference
