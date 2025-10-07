@@ -37,7 +37,7 @@
 	<cfset local.identityColumnType = "int NOT NULL AUTO_INCREMENT">
 	<cfset local.storageEngine = "ENGINE=InnoDB">
 <cfelseif local.db IS "h2">
-	<cfset local.identityColumnType = "int NOT NULL IDENTITY">
+	<cfset local.identityColumnType = "INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY">
 <cfelseif local.db IS "postgresql">
 	<cfset local.identityColumnType = "SERIAL NOT NULL">
 	<cfset local.dateTimeColumnType = "timestamp">

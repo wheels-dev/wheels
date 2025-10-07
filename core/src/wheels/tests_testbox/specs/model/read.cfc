@@ -208,7 +208,7 @@ component extends="wheels.Testbox" {
 			sql = "
 				CREATE TABLE IF NOT EXISTS c_o_r_e_authors
 				(
-					id int NOT NULL IDENTITY
+					id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY
 					,firstname varchar(100) NOT NULL
 					,lastname varchar(100) NOT NULL
 					,PRIMARY KEY(id)

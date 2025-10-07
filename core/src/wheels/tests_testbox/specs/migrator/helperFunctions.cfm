@@ -66,6 +66,7 @@
 	private string function getBinaryType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
+				return "BINARY LARGE OBJECT";
 			case "MySQL":
 				return "BLOB";
 			case "MicrosoftSQLServer":
@@ -144,7 +145,7 @@
 	private string function getFloatType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
-				return "DOUBLE";
+				return "DOUBLE PRECISION";
 			case "MicrosoftSQLServer":
 			case "MySQL":
 			case "PostgreSQL":
@@ -171,6 +172,7 @@
 	private string function getStringType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
+				return "CHARACTER VARYING";
 			case "MicrosoftSQLServer":
 			case "MySQL":
 			case "PostgreSQL":
@@ -183,7 +185,7 @@
 	private array function getTextType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
-				return ["CLOB"];
+				return ["CLOB", "CHARACTER LARGE OBJECT"];
 			case "MySQL":
 			case "PostgreSQL":
 				return ["TEXT"];

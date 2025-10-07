@@ -19,6 +19,7 @@ component extends="Base" output=false {
 			case "boolean":
 				local.rv = "cf_sql_bit";
 				break;
+			case "binary large object":
 			case "blob":
 			case "tinyblob":
 			case "mediumblob":
