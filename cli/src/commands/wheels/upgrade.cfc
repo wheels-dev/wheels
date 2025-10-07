@@ -319,7 +319,7 @@ component extends="base" {
 	private array function getPostUpgradeRecommendations(required string version) {
 		local.recommendations = [
 			"Run your test suite to ensure everything works",
-			"Check the upgrade guide at https://guides.wheels.dev/upgrading",
+			"Check the upgrade guide at https://wheels.dev/guides/introduction/upgrading",
 			"Review deprecated features that may be removed in future versions",
 			"Update your plugins to compatible versions"
 		];
