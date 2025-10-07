@@ -1,29 +1,23 @@
-# This workflow is used to release master releases and also by the snapshot workflow
-# to release snapshots.
-name: Wheels Release
+# Release Candidate Workflow
+# This workflow builds and publishes Release Candidates for testing before final releases
+# Triggers on release candidate branches (e.g., release/3.0.0-rc.1)
+
+name: Wheels Release Candidate
 
 on:
   push:
     branches:
-      - main
-  workflow_call:
-    secrets:
-      SLACK_WEBHOOK_URL:
-        required: true
-      FORGEBOX_API_TOKEN:
-        required: true
-      FORGEBOX_PASS:
-        required: true
+      - 'release/**-rc.*'
 
 env:
-  WHEELS_PRERELEASE: false
+  WHEELS_PRERELEASE: true
 
 jobs:
   #############################################
-  # Build Snapshot or Final Release
+  # Build & Publish Release Candidate
   #############################################
   build:
-    name: Build & Publish Release
+    name: Build & Publish Release Candidate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -38,46 +32,48 @@ jobs:
           cd ./templates/base/src
           pwd
           cat box.json
-          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
-          # main or snapshot
-          echo "BRANCH=main" >> $GITHUB_ENV
-          if [ $GITHUB_REF == 'refs/heads/develop' ]
-          then
-            echo "BRANCH=develop" >> $GITHUB_ENV
-          fi
+
+          # Extract version from box.json (should be something like 3.0.0-rc.1)
+          VERSION=$(cat box.json | jq '.version' -r)
+          echo "WHEELS_VERSION=${VERSION}+${{ github.run_number }}" >> $GITHUB_ENV
+
+          # Extract branch name
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "BRANCH=${BRANCH}" >> $GITHUB_ENV
+
+          echo "Building Release Candidate: ${VERSION}"
+          echo "Branch: ${BRANCH}"
 
       - name: Make build scripts executable
         run: |
           chmod +x tools/build/scripts/*.sh
-          # List scripts for verification
           ls -la tools/build/scripts/
 
       #############################################
-      # Pre-Release Validation (main branch only)
+      # Validate Release Candidate
       #############################################
 
-      - name: Validate Release Checklist
-        if: github.ref == 'refs/heads/main'
+      - name: Validate Release Candidate Version
         run: |
           echo "=========================================="
-          echo "Validating Release Checklist"
+          echo "Validating Release Candidate"
           echo "=========================================="
 
-          # Check that CHANGELOG doesn't contain TBD for this version
-          if grep -q "# \[${WHEELS_VERSION%+*}\].*=> TBD" CHANGELOG.md; then
-            echo "ERROR: CHANGELOG still contains 'TBD' for version ${WHEELS_VERSION%+*}"
-            echo "Please update CHANGELOG.md with the actual release date before releasing."
+          # Check that version contains -rc.
+          if ! echo "$WHEELS_VERSION" | grep -q "\-rc\."; then
+            echo "ERROR: Version must contain '-rc.X' suffix for release candidates"
+            echo "Current version: $WHEELS_VERSION"
             exit 1
           fi
 
-          # Check that version doesn't contain SNAPSHOT for main releases
-          if echo "$WHEELS_VERSION" | grep -qi "snapshot"; then
-            echo "ERROR: Version contains SNAPSHOT but this is a main branch release"
-            echo "Please remove SNAPSHOT suffix from box.json files before releasing."
+          # Check that CHANGELOG contains RC entry
+          BASE_VERSION="${WHEELS_VERSION%%+*}"
+          if ! grep -q "# \[${BASE_VERSION}\]" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG.md must contain entry for ${BASE_VERSION}"
             exit 1
           fi
 
-          echo "✓ Release checklist validation passed"
+          echo "✓ Release Candidate validation passed"
 
       #############################################
       # Prepare and Publish to ForgeBox
@@ -112,10 +108,9 @@ jobs:
       - name: Validate Package Structure and Versions
         run: |
           echo "=========================================="
-          echo "Validating Packages Before ForgeBox Publish"
+          echo "Validating RC Packages Before ForgeBox Publish"
           echo "=========================================="
 
-          # Function to validate a package
           validate_package() {
             local PACKAGE_DIR=$1
             local PACKAGE_NAME=$2
@@ -123,34 +118,28 @@ jobs:
             echo ""
             echo "Validating $PACKAGE_NAME..."
 
-            # Check if directory exists
             if [ ! -d "$PACKAGE_DIR" ]; then
               echo "ERROR: Directory $PACKAGE_DIR does not exist!"
               exit 1
             fi
 
-            # Check if box.json exists
             if [ ! -f "$PACKAGE_DIR/box.json" ]; then
               echo "ERROR: box.json not found in $PACKAGE_DIR!"
               exit 1
             fi
 
-            # Validate box.json syntax
             if ! jq empty "$PACKAGE_DIR/box.json" 2>/dev/null; then
               echo "ERROR: Invalid JSON in $PACKAGE_DIR/box.json"
               exit 1
             fi
 
-            # Extract and display version
             local VERSION=$(jq -r '.version' "$PACKAGE_DIR/box.json")
             echo "  Version: $VERSION"
 
-            # Check that version matches expected version
             if [[ "$VERSION" != "${{ env.WHEELS_VERSION }}" ]]; then
               echo "  WARNING: Version mismatch! Expected ${{ env.WHEELS_VERSION }}, got $VERSION"
             fi
 
-            # Count files
             local FILE_COUNT=$(find "$PACKAGE_DIR" -type f | wc -l)
             echo "  Files: $FILE_COUNT"
 
@@ -162,7 +151,6 @@ jobs:
             echo "  ✓ Package validated successfully"
           }
 
-          # Validate all packages
           validate_package "build-wheels-base" "Wheels Base Template"
           validate_package "build-wheels-core/wheels" "Wheels Core"
           validate_package "build-wheels-cli/wheels-cli" "Wheels CLI"
@@ -170,7 +158,7 @@ jobs:
 
           echo ""
           echo "=========================================="
-          echo "All packages validated successfully!"
+          echo "All RC packages validated successfully!"
           echo "=========================================="
 
       - name: Publish All Packages to ForgeBox
@@ -191,47 +179,43 @@ jobs:
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-base-template
+          name: rc-build-artifacts-base-template
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
-            artifacts/wheels/wheels-base-template-be.zip
 
       - name: Upload Wheels Core Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-core
+          name: rc-build-artifacts-core
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
-            artifacts/wheels/wheels-core-be.zip
 
       - name: Upload Wheels CLI Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-cli
+          name: rc-build-artifacts-cli
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
-            artifacts/wheels/wheels-cli-be.zip
-      
+
       - name: Upload Wheels Starter App Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-starter-app
+          name: rc-build-artifacts-starter-app
           path: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
-            artifacts/wheels/wheels-starter-app-be.zip
-      
+
       - name: Upload All Wheels Artifacts (Combined)
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-all
+          name: rc-build-artifacts-all
           path: |
             artifacts/**/*
 
@@ -239,33 +223,32 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: logs-release
+          name: logs-release-candidate
           path: |
             ${{ runner.temp }}/_runner_diag/
             ${{ runner.temp }}/_github_workflow/
 
       #############################################
-      # Create GitHub Release (main branch only)
+      # Create GitHub Prerelease
       #############################################
 
       - name: Extract Release Notes from CHANGELOG
-        if: github.ref == 'refs/heads/main'
         id: extract-release-notes
         run: |
-          # Extract the release notes for the current version from CHANGELOG.md
-          awk '/^# \[3\.0\.0\]/,/^---$/ {print}' CHANGELOG.md | sed '1d;$d' > release-notes.md
+          # Extract the RC release notes from CHANGELOG.md
+          BASE_VERSION="${WHEELS_VERSION%%+*}"
+          awk "/^# \[${BASE_VERSION}\]/,/^---$/ {print}" CHANGELOG.md | sed '1d;$d' > release-notes.md
           echo "Release notes extracted to release-notes.md"
           cat release-notes.md
 
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main'
+      - name: Create GitHub Prerelease
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.WHEELS_VERSION }}
-          name: Wheels ${{ env.WHEELS_VERSION }}
+          name: Wheels ${{ env.WHEELS_VERSION }} (Release Candidate)
           body_path: release-notes.md
           draft: false
-          prerelease: ${{ env.WHEELS_PRERELEASE }}
+          prerelease: true
           files: |
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
             artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
