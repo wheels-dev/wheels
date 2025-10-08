@@ -81,6 +81,16 @@
 			"clob":true,
 			"blob":true
 		},
+		"wheelstestdb_h2_sqlserver": {
+			"class":"org.h2.Driver",
+			"dbdriver":"H2",
+			"custom":"mode=MSSQLServer&path=./tools/docker/lucee7/H2.db/",
+			"database":"wheelstestdb",
+			"dsn":"jdbc:h2:{path}{database};MODE={mode}",
+			"allow":"511",
+			"clob":true,
+			"blob":true
+		},
 		"wheelstestdb_oracle": {
 			"blob": "false",
 			"class": "oracle.jdbc.OracleDriver",
