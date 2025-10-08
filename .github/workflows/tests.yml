@@ -24,6 +24,58 @@ jobs:
         include:
           - cfengine: lucee7
             dbengine: mysql
+          - cfengine: lucee7
+            dbengine: postgres
+          - cfengine: lucee7
+            dbengine: sqlserver
+          - cfengine: lucee7
+            dbengine: h2
+          - cfengine: lucee7
+            dbengine: oracle
+          - cfengine: lucee5
+            dbengine: mysql
+          - cfengine: lucee5
+            dbengine: postgres
+          - cfengine: lucee5
+            dbengine: sqlserver
+          - cfengine: lucee5
+            dbengine: h2
+          - cfengine: lucee5
+            dbengine: oracle
+          - cfengine: lucee6
+            dbengine: mysql
+          - cfengine: lucee6
+            dbengine: postgres
+          - cfengine: lucee6
+            dbengine: sqlserver
+          - cfengine: lucee6
+            dbengine: h2
+          - cfengine: lucee6
+            dbengine: oracle
+          - cfengine: adobe2018
+            dbengine: mysql
+          - cfengine: adobe2018
+            dbengine: postgres
+          - cfengine: adobe2018
+            dbengine: sqlserver
+          - cfengine: adobe2018
+            dbengine: oracle
+          - cfengine: adobe2021
+            dbengine: mysql
+          - cfengine: adobe2021
+            dbengine: postgres
+          - cfengine: adobe2021
+            dbengine: sqlserver
+          - cfengine: adobe2021
+            dbengine: oracle
+          - cfengine: adobe2023
+            dbengine: mysql
+          - cfengine: adobe2023
+            dbengine: postgres
+          - cfengine: adobe2023
+            dbengine: sqlserver
+          - cfengine: adobe2023
+            dbengine: oracle
           - cfengine: adobe2025
             dbengine: mysql
           - cfengine: adobe2025
@@ -31,68 +83,16 @@ jobs:
           - cfengine: adobe2025
             dbengine: sqlserver
           - cfengine: adobe2025
+            dbengine: oracle
+          - cfengine: boxlang
+            dbengine: mysql
+          - cfengine: boxlang
+            dbengine: sqlserver
+          - cfengine: boxlang
+            dbengine: postgres
+          - cfengine: boxlang
             dbengine: oracle
         exclude:
-          - cfengine: lucee7
-            dbengine: postgres
-          - cfengine: lucee7
-            dbengine: sqlserver
-          - cfengine: lucee7
-            dbengine: h2
-          - cfengine: lucee7
-            dbengine: oracle
-          - cfengine: lucee5
-            dbengine: mysql
-          - cfengine: lucee5
-            dbengine: postgres
-          - cfengine: lucee5
-            dbengine: sqlserver
-          - cfengine: lucee5
-            dbengine: h2
-          - cfengine: lucee5
-            dbengine: oracle
-          - cfengine: lucee6
-            dbengine: mysql
-          - cfengine: lucee6
-            dbengine: postgres
-          - cfengine: lucee6
-            dbengine: sqlserver
-          - cfengine: lucee6
-            dbengine: h2
-          - cfengine: lucee6
-            dbengine: oracle
-          - cfengine: adobe2018
-            dbengine: mysql
-          - cfengine: adobe2018
-            dbengine: postgres
-          - cfengine: adobe2018
-            dbengine: sqlserver
-          - cfengine: adobe2018
-            dbengine: oracle
-          - cfengine: adobe2021
-            dbengine: mysql
-          - cfengine: adobe2021
-            dbengine: postgres
-          - cfengine: adobe2021
-            dbengine: sqlserver
-          - cfengine: adobe2021
-            dbengine: oracle
-          - cfengine: adobe2023
-            dbengine: mysql
-          - cfengine: adobe2023
-            dbengine: postgres
-          - cfengine: adobe2023
-            dbengine: sqlserver
-          - cfengine: adobe2023
-            dbengine: oracle
-          - cfengine: boxlang
-            dbengine: mysql
-          - cfengine: boxlang
-            dbengine: sqlserver
-          - cfengine: boxlang
-            dbengine: postgres
-          - cfengine: boxlang
-            dbengine: oracle
           - cfengine: adobe2018
             dbengine: h2
           - cfengine: adobe2021
