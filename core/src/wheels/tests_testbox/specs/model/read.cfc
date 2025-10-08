@@ -203,12 +203,19 @@ component extends="wheels.Testbox" {
 	}
 
 	function db_setup(){
+		local.dbInfo = g.$dbinfo(datasource=altDatasource, type="version");
+		local.dbVersion = listToArray(local.dbInfo["DATABASE_VERSION"], " ")[1];
+		if(local.dbVersion eq '2.1.214'){
+			local.intColumnType = "INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY";
+		} else if(local.dbVersion eq '1.3.172') {
+			local.intColumnType = "int NOT NULL IDENTITY";
+		}
 		// ensure the authors table exists in the alt datasource
 		g.$query(
 			sql = "
 				CREATE TABLE IF NOT EXISTS c_o_r_e_authors
 				(
-					id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY
+					id #local.intColumnType#
 					,firstname varchar(100) NOT NULL
 					,lastname varchar(100) NOT NULL
 					,PRIMARY KEY(id)
