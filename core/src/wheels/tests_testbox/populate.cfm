@@ -37,7 +37,12 @@
 	<cfset local.identityColumnType = "int NOT NULL AUTO_INCREMENT">
 	<cfset local.storageEngine = "ENGINE=InnoDB">
 <cfelseif local.db IS "h2">
-	<cfset local.identityColumnType = "int NOT NULL IDENTITY">
+	<cfset local.dbVersion = listToArray(local.dbInfo["DATABASE_VERSION"], " ")[1]>
+	<cfif local.dbVersion eq '2.1.214'>
+		<cfset local.identityColumnType = "INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY">
+	<cfelseif local.dbVersion eq '1.3.172'>
+		<cfset local.identityColumnType = "int NOT NULL IDENTITY">
+	</cfif>
 <cfelseif local.db IS "postgresql">
 	<cfset local.identityColumnType = "SERIAL NOT NULL">
 	<cfset local.dateTimeColumnType = "timestamp">

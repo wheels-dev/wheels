@@ -8,7 +8,7 @@ on:
       - develop
 
 env:
-  WHEELS_PRERELEASE: false
+  WHEELS_PRERELEASE: true
 
 jobs:
   tests:
