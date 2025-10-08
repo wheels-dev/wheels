@@ -119,25 +119,56 @@ component extends="base" {
 			name = "Unknown",
 			version = "Unknown"
 		};
-		
+
+		// First try CommandBox server details (most accurate for version)
 		try {
-			// Try to get server info
-			local.serverDetails = serverService.resolveServerDetails(serverProps = {webroot = getCWD()});
-			if (StructKeyExists(local.serverDetails, "serverInfo")) {
-				local.result.name = local.serverDetails.serverInfo.name ?: "Unknown";
-				local.result.version = local.serverDetails.serverInfo.version ?: "Unknown";
+			local.serverDetails = serverService.resolveServerDetails({});
+
+			// Check if SERVERINFO exists (it contains engineName and engineVersion)
+			if (StructKeyExists(local.serverDetails, "SERVERINFO")) {
+				local.serverInfo = local.serverDetails.SERVERINFO;
+
+				if (StructKeyExists(local.serverInfo, "engineName") && StructKeyExists(local.serverInfo, "engineVersion")) {
+					// Get engine name
+					if (local.serverInfo.engineName == "lucee") {
+						local.result.name = "Lucee";
+					} else if (local.serverInfo.engineName == "adobe") {
+						local.result.name = "Adobe ColdFusion";
+					} else if (local.serverInfo.engineName == "boxlang") {
+						local.result.name = "BoxLang";
+					} else {
+						local.result.name = local.serverInfo.engineName;
+					}
+
+					// Get version
+					if (Len(local.serverInfo.engineVersion) && local.serverInfo.engineVersion != "Unknown") {
+						local.result.version = local.serverInfo.engineVersion;
+					}
+
+					return local.result;
+				}
 			}
 		} catch (any e) {
-			// Fall back to basic detection
+			// Continue to direct server detection
+		}
+
+		// Fallback to direct server scope detection
+		try {
 			if (StructKeyExists(server, "lucee")) {
 				local.result.name = "Lucee";
-				local.result.version = server.lucee.version;
+				if (StructKeyExists(server.lucee, "version")) {
+					local.result.version = server.lucee.version;
+				}
 			} else if (StructKeyExists(server, "coldfusion")) {
-				local.result.name = server.coldfusion.productname;
-				local.result.version = server.coldfusion.productversion;
+				local.result.name = server.coldfusion.productname ?: "Adobe ColdFusion";
+				if (StructKeyExists(server.coldfusion, "productversion")) {
+					local.result.version = server.coldfusion.productversion;
+				}
 			}
+		} catch (any e) {
+			// Use defaults
 		}
-		
+
 		return local.result;
 	}
 
@@ -151,19 +182,26 @@ component extends="base" {
 	}
 
 	private string function getApplicationName(required string appPath) {
-		// Try to read from Application.cfc
-		local.appFile = arguments.appPath & "/Application.cfc";
-		if (FileExists(local.appFile)) {
-			try {
-				local.appContent = FileRead(local.appFile);
-				local.nameMatch = REMatchNoCase('this\.name\s*=\s*["'']([^"'']+)["'']', local.appContent);
-				if (ArrayLen(local.nameMatch)) {
-					return REReplace(local.nameMatch[1], 'this\.name\s*=\s*["'']([^"'']+)["'']', "\1");
+		// Try to read from Application.cfc in different locations
+		local.appFiles = [
+			arguments.appPath & "/public/Application.cfc",  // Wheels app location
+			arguments.appPath & "/Application.cfc"           // Root location (fallback)
+		];
+
+		for (local.appFile in local.appFiles) {
+			if (FileExists(local.appFile)) {
+				try {
+					local.appContent = FileRead(local.appFile);
+					local.nameMatch = REMatchNoCase('this\.name\s*=\s*["'']([^"'']+)["'']', local.appContent);
+					if (ArrayLen(local.nameMatch)) {
+						return REReplace(local.nameMatch[1], 'this\.name\s*=\s*["'']([^"'']+)["'']', "\1");
+					}
+				} catch (any e) {
+					// Continue to next location
 				}
-			} catch (any e) {
-				// Continue
 			}
 		}
+
 		return "";
 	}
 
@@ -254,11 +292,17 @@ component extends="base" {
 				local.stats.tests = ArrayLen(local.tests);
 			}
 			
-			// Count migrations
-			local.migrationsPath = arguments.appPath & "/db/migrate";
-			if (DirectoryExists(local.migrationsPath)) {
-				local.migrations = DirectoryList(local.migrationsPath, false, "name", "*.cfc");
-				local.stats.migrations = ArrayLen(local.migrations);
+			// Count migrations (check both common locations)
+			local.migrationPaths = [
+				arguments.appPath & "/app/migrator/migrations",  // Wheels default location
+				arguments.appPath & "/db/migrate"                // Alternative location
+			];
+
+			for (local.migrationsPath in local.migrationPaths) {
+				if (DirectoryExists(local.migrationsPath)) {
+					local.migrations = DirectoryList(local.migrationsPath, false, "name", "*.cfc");
+					local.stats.migrations += ArrayLen(local.migrations);
+				}
 			}
 			
 		} catch (any e) {
