@@ -63,16 +63,16 @@
 		}
 	}
 
-	private string function getBinaryType() {
+	private array function getBinaryType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
-				return "BINARY LARGE OBJECT";
+				return ["BINARY LARGE OBJECT", "blob"];
 			case "MySQL":
-				return "BLOB";
+				return ["BLOB"];
 			case "MicrosoftSQLServer":
-				return "IMAGE";
+				return ["IMAGE"];
 			case "PostgreSQL":
-				return "BYTEA";
+				return ["BYTEA"];
 			default:
 				return "`addbinary()` not supported for " & migration.adapter.adapterName();
 		}
@@ -145,7 +145,7 @@
 	private string function getFloatType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
-				return "DOUBLE PRECISION";
+				return "DOUBLE,DOUBLE PRECISION";
 			case "MicrosoftSQLServer":
 			case "MySQL":
 			case "PostgreSQL":
@@ -169,14 +169,13 @@
 		}
 	}
 
-	private string function getStringType() {
+	private array function getStringType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
-				return "CHARACTER VARYING";
 			case "MicrosoftSQLServer":
 			case "MySQL":
 			case "PostgreSQL":
-				return "VARCHAR";
+				return ["VARCHAR", "CHARACTER VARYING"];
 			default:
 				return "`addstring()` not supported for " & migration.adapter.adapterName();
 		}
