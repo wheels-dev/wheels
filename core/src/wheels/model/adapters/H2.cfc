@@ -12,6 +12,7 @@ component extends="Base" output=false {
 			case "binary":
 			case "bytea":
 			case "raw":
+			case "binary varying":
 				local.rv = "cf_sql_binary";
 				break;
 			case "bit":
@@ -44,6 +45,7 @@ component extends="Base" output=false {
 				local.rv = "cf_sql_decimal";
 				break;
 			case "double":
+			case "double precision":
 				local.rv = "cf_sql_double";
 				break;
 			case "float":
@@ -94,6 +96,8 @@ component extends="Base" output=false {
 			case "longtext":
 			case "ntext":
 			case "enum":
+			case "character varying":
+			case "character large object":
 				local.rv = "cf_sql_varchar";
 				break;
 			case "nvarchar_casesensitive":
