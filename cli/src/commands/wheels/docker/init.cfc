@@ -84,6 +84,10 @@ component extends="../base" {
             local.appPort = getAppPortFromServerJson();
         }
 
+        // Update server.json for Docker compatibility (host and port)
+        updateServerJsonForDocker(local.appPort);
+
+        // Set CF engine
         setCFengine(arguments.cfengine, arguments.cfVersion);
         // Create Docker configuration files
         createDockerfile(arguments.cfengine, arguments.cfVersion, local.appPort, arguments.db, arguments.production);
@@ -285,6 +289,14 @@ CMD ["box", "server", "start", "--console", "--force"]';
       - ../../../tests:/app/tests';
         }
 
+        // Build app depends_on based on database
+        local.appDependsOn = '';
+        if (len(local.dbService)) {
+            local.appDependsOn = '
+    depends_on:
+      - db';
+        }
+
         // Build app service
         local.composeContent = 'version: "3.8"
 
@@ -292,11 +304,18 @@ services:
   app:
     build: .#local.appPorts#
     environment:
-      ENVIRONMENT: #local.envMode##local.dbEnvironment##local.volumes##local.restartPolicy#';
+      ENVIRONMENT: #local.envMode##local.dbEnvironment##local.volumes##local.restartPolicy##local.appDependsOn#';
 
         if (!arguments.production) {
             local.composeContent &= '
     command: sh -c "box install && box server start --console --force"';
+        }
+
+        // Add database service if needed
+        if (len(local.dbService)) {
+            local.composeContent &= '
+
+#local.dbService#';
         }
 
         // Add nginx service if requested
@@ -312,15 +331,6 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro#local.restartPolicy#
     depends_on:
       - app';
-        }
-
-        // Add database dependencies
-        if (len(local.dbService)) {
-            local.composeContent &= '
-    depends_on:
-      - db
-
-#local.dbService#';
         }
 
         local.composeContent &= '
@@ -407,7 +417,7 @@ http {
 #local.productionHeaders#
 
         location / {
-            proxy_pass http://app_backend;
+            proxy_pass http://app:#arguments.appPort#;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -426,7 +436,7 @@ http {
 
         ## Static assets caching
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            proxy_pass http://app_backend;
+            proxy_pass http://app:#arguments.appPort#;
             proxy_cache_valid 200 1d;
             expires 1d;
             add_header Cache-Control "public, immutable";
@@ -435,7 +445,7 @@ http {
         ## Health check endpoint
         location /health {
             access_log off;
-            proxy_pass http://app_backend;
+            proxy_pass http://app:#arguments.appPort#;
         }
     }
 }';
@@ -447,31 +457,21 @@ http {
     private function getAppPortFromServerJson() {
         local.serverJsonPath = fileSystemUtil.resolvePath("server.json");
         local.appPort = 8080; // Default port
-        
-        // Check if server.json exists
+
+        // Check if server.json exists and try to extract port
         if (fileExists(local.serverJsonPath)) {
             try {
                 local.serverContent = fileRead(local.serverJsonPath);
                 local.serverData = deserializeJSON(local.serverContent);
-                
-                // Extract port from server.json
-                if (structKeyExists(local.serverData, "web") && 
-                    structKeyExists(local.serverData.web, "http") && 
+
+                // Extract port from server.json if available
+                if (structKeyExists(local.serverData, "web") &&
+                    structKeyExists(local.serverData.web, "http") &&
                     structKeyExists(local.serverData.web.http, "port")) {
                     local.appPort = val(local.serverData.web.http.port);
                     print.greenLine("Using port #local.appPort# from existing server.json");
                 } else {
-                    // Port not found, update server.json with default port
-                    updateServerJsonPort(local.serverData, local.appPort);
-                    print.yellowLine("Updated server.json with default port #local.appPort#");
-                }
-                
-                // Check for CFConfigFile setting
-                if (!structKeyExists(local.serverData, "CFConfigFile")) {
-                    local.serverData["CFConfigFile"] = "CFConfig.json";
-                    local.updatedContent = serializeJSON(local.serverData);
-                    file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
-                    print.greenLine("Added CFConfigFile setting to server.json");
+                    print.yellowLine("Port not found in server.json, using default port #local.appPort#");
                 }
             } catch (any e) {
                 print.redLine("Error reading server.json: #e.message#");
@@ -480,26 +480,8 @@ http {
         } else {
             print.yellowLine("server.json not found, using default port #local.appPort#");
         }
-        
+
         return local.appPort;
-    }
-    
-    private function updateServerJsonPort(struct serverData, numeric port) {
-        // Ensure the structure exists
-        if (!structKeyExists(arguments.serverData, "web")) {
-            arguments.serverData.web = {};
-        }
-        if (!structKeyExists(arguments.serverData.web, "http")) {
-            arguments.serverData.web.http = {};
-        }
-        
-        // Set the port
-        arguments.serverData.web.http.port = toString(arguments.port);
-        
-        // Write back to server.json
-        local.serverJsonPath = fileSystemUtil.resolvePath("server.json");
-        local.updatedContent = serializeJSON(arguments.serverData);
-        file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
     }
     
     private function configureDatasource(string db) {
@@ -584,6 +566,57 @@ http {
         local.updatedContent = serializeJSON(local.cfconfigData);
         file action='write' file='#local.cfconfigPath#' mode='777' output='#local.updatedContent#';
         print.greenLine("Updated CFConfig.json with #arguments.db# datasource configuration");
+    }
+
+    private function updateServerJsonForDocker(required numeric port) {
+        local.serverJsonPath = fileSystemUtil.resolvePath("server.json");
+
+        // Check if server.json exists
+        if (!fileExists(local.serverJsonPath)) {
+            print.yellowLine("server.json not found, creating new one with Docker settings");
+            local.serverContent = {};
+        } else {
+            try {
+                local.serverContent = deserializeJSON(fileRead(local.serverJsonPath));
+            } catch (any e) {
+                print.redLine("Error reading server.json: #e.message#");
+                print.yellowLine("Creating new server.json with Docker settings");
+                local.serverContent = {};
+            }
+        }
+
+        // Ensure web structure exists
+        if (!structKeyExists(local.serverContent, "web")) {
+            local.serverContent.web = {};
+        }
+
+        // Update host to 0.0.0.0 for Docker compatibility
+        local.serverContent.web.host = "0.0.0.0";
+
+        // Disable browser opening in Docker (no GUI available)
+        local.serverContent.openBrowser = false;
+
+        // Ensure HTTP structure exists
+        if (!structKeyExists(local.serverContent.web, "http")) {
+            local.serverContent.web.http = {};
+        }
+
+        // Update or set port
+        local.serverContent.web.http.port = toString(arguments.port);
+
+        // Add CFConfigFile if not present
+        if (!structKeyExists(local.serverContent, "CFConfigFile")) {
+            local.serverContent.CFConfigFile = "CFConfig.json";
+        }
+
+        // Write updated server.json
+        try {
+            local.updatedContent = serializeJSON(local.serverContent);
+            file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
+            print.greenLine("Updated server.json for Docker (host: 0.0.0.0, port: #arguments.port#, openBrowser: false)");
+        } catch (any e) {
+            print.redLine("Error writing server.json: #e.message#");
+        }
     }
 
     private function setCFengine(string cfengine, string cfVersion){

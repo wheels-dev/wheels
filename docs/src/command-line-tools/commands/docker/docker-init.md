@@ -155,8 +155,10 @@ wheels docker init --db=postgres --dbVersion=15 --cfengine=lucee --cfVersion=6 -
    - Uses Docker service name `db` for host resolution
    - Configures appropriate ports and credentials
 
-7. **Updates server.json**:
-   - Reads existing port or sets custom port or defaults to 8080
+7. **Updates server.json for Docker compatibility**:
+   - Sets `web.host` to `0.0.0.0` (required for Docker containers to accept external connections)
+   - Sets `openBrowser` to `false` (Docker containers have no GUI)
+   - Configures port from `--port` argument, existing server.json, or defaults to 8080
    - Sets CFEngine version (e.g., `lucee@6` or `adobe@2023`)
    - Adds `CFConfigFile` reference if missing
 
@@ -502,6 +504,63 @@ Enabled for:
 - application/xml+rss
 - application/json
 
+## server.json Docker Configuration
+
+The command automatically updates your `server.json` with Docker-specific settings:
+
+### Before Docker Init
+```json
+{
+  "name": "myapp",
+  "web": {
+    "host": "localhost",
+    "http": {
+      "port": "8080"
+    }
+  },
+  "openBrowser": true
+}
+```
+
+### After Docker Init
+```json
+{
+  "name": "myapp",
+  "web": {
+    "host": "0.0.0.0",
+    "http": {
+      "port": "8080"
+    }
+  },
+  "openBrowser": false,
+  "CFConfigFile": "CFConfig.json",
+  "app": {
+    "cfengine": "lucee@6"
+  }
+}
+```
+
+### Why These Changes?
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `web.host` | `0.0.0.0` | Docker containers must bind to all interfaces to accept external connections. Using `localhost` or `127.0.0.1` prevents access from outside the container. |
+| `openBrowser` | `false` | Docker containers run in headless mode with no GUI. Attempting to open a browser will fail and cause errors. |
+| `web.http.port` | (from --port or existing) | Ensures the application port matches the Dockerfile EXPOSE and docker-compose port mapping. |
+| `CFConfigFile` | `CFConfig.json` | Required for datasource configuration to work properly. |
+
+### Port Priority
+
+The port configuration follows this priority order:
+1. `--port` command argument (highest priority)
+2. Existing value in `server.json`
+3. Default: `8080` (lowest priority)
+
+If you specify `--port=9000`, the command will:
+- Update `server.json` with port `9000`
+- Configure Dockerfile to `EXPOSE 9000`
+- Set docker-compose port mapping to `9000:9000`
+
 ## Environment Variables
 
 The following environment variables are configured in docker-compose.yml:
@@ -552,6 +611,12 @@ docker-compose up -d --build --force-recreate
 
 - Requires Docker and Docker Compose installed
 - Use `--force` to skip confirmation prompts when overwriting existing files
+- **server.json is automatically configured for Docker compatibility**:
+  - `web.host` changed to `0.0.0.0` (required for Docker networking)
+  - `openBrowser` set to `false` (no GUI in containers)
+  - `web.http.port` updated to match --port or existing value
+  - `CFConfigFile` added if missing
+  - CF engine version set (e.g., `lucee@6`)
 - Custom `--port` overrides the port from `server.json`
 - Port priority: `--port` argument > `server.json` > default (8080)
 - Database passwords are set to defaults suitable for **development only**
@@ -562,7 +627,6 @@ docker-compose up -d --build --force-recreate
 - Volume mounts in development assume Wheels framework development structure
 - When using `--nginx`, the app is only exposed internally to nginx
 - CFConfig.json is updated with datasource configuration (skipped for H2)
-- server.json is updated with CF engine version and port configuration
 
 ## Troubleshooting
 
@@ -624,6 +688,26 @@ docker-compose up -d --build --force-recreate
 - Ensure CFConfig.json doesn't have conflicting datasource config
 - Check application logs for H2 initialization errors
 - H2 works with Lucee only (not Adobe ColdFusion)
+
+### Container not accessible from host
+**Problem**: Cannot access the application at http://localhost:8080
+
+**Solutions**:
+- Verify `server.json` has `web.host` set to `0.0.0.0` (not `localhost` or `127.0.0.1`)
+- Check if port is already in use: `lsof -ti:8080` (Unix) or `netstat -ano | findstr :8080` (Windows)
+- Ensure docker-compose port mapping matches server.json port
+- Check container logs: `docker-compose logs app`
+- Restart containers: `docker-compose restart app`
+- If manually edited, run `wheels docker init --force` to regenerate proper configuration
+
+### Application attempts to open browser
+**Problem**: Errors about browser opening or display issues
+
+**Solutions**:
+- Verify `server.json` has `openBrowser: false`
+- Run `wheels docker init --force` to update server.json automatically
+- Manually set `"openBrowser": false` in server.json
+- Rebuild containers: `docker-compose up -d --build`
 
 ## See Also
 
