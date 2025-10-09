@@ -141,10 +141,10 @@ You can also run tests directly via command line for specific engine-database co
 
 ```bash
 # Connect to the Lucee 5 container
-docker exec -it cfwheels-test-lucee5 /bin/bash
+docker exec -it wheels-test-lucee5 /bin/bash
 
 # Run all tests
-cd /cfwheels-test-suite
+cd /wheels-test-suite
 box wheels test app
 
 # Run a specific test bundle
@@ -155,10 +155,10 @@ box wheels test app --testBundles=controllers
 
 ```bash
 # Connect to the Adobe 2021 container
-docker exec -it cfwheels-test-adobe2021 /bin/bash
+docker exec -it wheels-test-adobe2021 /bin/bash
 
 # Run all tests
-cd /cfwheels-test-suite
+cd /wheels-test-suite
 box wheels test app
 
 # Specify a test bundle
@@ -169,10 +169,10 @@ box wheels test app --testBundles=models
 
 ```bash
 # Connect to the Lucee 6 container
-docker exec -it cfwheels-test-lucee6 /bin/bash
+docker exec -it wheels-test-lucee6 /bin/bash
 
 # Run all tests
-cd /cfwheels-test-suite
+cd /wheels-test-suite
 box wheels test app
 
 # Run a specific test with specific options
@@ -208,13 +208,13 @@ box wheels test app --testBundles=controllers
 
 | Engine | Container Name | Port |
 |--------|----------------|------|
-| Lucee 5 | cfwheels-test-lucee5 | 60005 |
-| Lucee 6 | cfwheels-test-lucee6 | 60006 |
-| Lucee 7 | cfwheels-test-lucee7 | 60007 |
-| Adobe 2018 | cfwheels-test-adobe2018 | 62018 |
-| Adobe 2021 | cfwheels-test-adobe2021 | 62021 |
-| Adobe 2023 | cfwheels-test-adobe2023 | 62023 |
-| Boxlang 1 | cfwheels-test-boxlang | 60001 |
+| Lucee 5 | wheels-test-lucee5 | 60005 |
+| Lucee 6 | wheels-test-lucee6 | 60006 |
+| Lucee 7 | wheels-test-lucee7 | 60007 |
+| Adobe 2018 | wheels-test-adobe2018 | 62018 |
+| Adobe 2021 | wheels-test-adobe2021 | 62021 |
+| Adobe 2023 | wheels-test-adobe2023 | 62023 |
+| Boxlang 1 | wheels-test-boxlang | 60001 |
 
 ### Databases
 
@@ -303,17 +303,17 @@ component extends="wheels.Testbox" {
 
 ```bash
 # View logs from a specific container
-docker logs cfwheels-test-lucee5
+docker logs wheels-test-lucee5
 
 # Follow logs in real-time
-docker logs -f cfwheels-test-lucee5
+docker logs -f wheels-test-lucee5
 ```
 
 ### Container Shell Access
 
 ```bash
 # Connect to a running container
-docker exec -it cfwheels-test-lucee5 /bin/bash
+docker exec -it wheels-test-lucee5 /bin/bash
 ```
 
 ## Keeping the Test Environment Updated
