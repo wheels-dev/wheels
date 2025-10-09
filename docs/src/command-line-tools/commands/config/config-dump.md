@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `wheels config dump` command exports your CFWheels application configuration settings for inspection, backup, or migration purposes. It can display configurations in multiple formats and optionally mask sensitive values for security.
+The `wheels config dump` command exports your Wheels application configuration settings for inspection, backup, or migration purposes. It can display configurations in multiple formats and optionally mask sensitive values for security.
 
 ## Basic Usage
 
@@ -41,7 +41,7 @@ Specifies the output format for the configuration dump:
 - **`table`**: Formatted tables organized by category (best for console viewing)
 - **`json`**: Structured JSON format (best for programmatic use and file storage)
 - **`env`**: Environment variables format (.env compatible)
-- **`cfml`**: CFWheels set() statements format
+- **`cfml`**: Wheels set() statements format
 
 #### `--output`
 When specified, saves the configuration to a file instead of displaying to console. If no format is explicitly specified with `--output`, JSON format is automatically used for better file compatibility.
@@ -82,7 +82,7 @@ ENVIRONMENT=development
 ```
 
 ### CFML Format
-Exports as CFWheels `set()` statements:
+Exports as Wheels `set()` statements:
 ```cfml
 // Wheels Configuration Export
 set(datasource = "myapp");
@@ -245,7 +245,7 @@ wheels config dump production --format=env --output=/tmp/app.env
 
 ### No settings.cfm file found
 **Error**: "No settings.cfm file found in config directory"
-**Solution**: Ensure you're running the command from your CFWheels application root directory
+**Solution**: Ensure you're running the command from your Wheels application root directory
 
 ### Invalid format specified
 **Error**: "Invalid format: [format]. Valid formats are: table, json, env, cfml"
@@ -270,7 +270,7 @@ wheels config dump production --format=env --output=/tmp/app.env
 ## Support
 
 For issues or questions about the `wheels config dump` command:
-1. Check the CFWheels documentation
-2. Verify your CFWheels and CommandBox versions are compatible
+1. Check the Wheels documentation
+2. Verify your Wheels and CommandBox versions are compatible
 3. Ensure proper file permissions and paths
 4. Review the command output for specific error messages

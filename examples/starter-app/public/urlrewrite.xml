@@ -22,12 +22,12 @@ In order to use this file with commandbox, we recommend creating a server.json f
     }
 }
 
-See more at http://docs.cfwheels.org/docs/commandbox and https://ortus.gitbooks.io/commandbox-documentation/content/embedded_server/serverjson.html
+See more at http://docs.wheels.dev/docs/commandbox and https://ortus.gitbooks.io/commandbox-documentation/content/embedded_server/serverjson.html
 If you do not use Tuckey or Commandbox, this file can be safely deleted.
 -->
 <urlrewrite>
   <rule enabled="true">
-    <name>CFWheels pretty URLs</name>
+    <name>Wheels pretty URLs</name>
     <condition type="request-uri" operator="notequal">^/(cf_script|flex2gateway|jrunscripts|CFIDE/administrator|lucee/admin|cfformgateway|cffileservlet|lucee|files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots.txt|favicon.ico|sitemap.xml|index.cfm)</condition>
     <from>^/(.*)$</from>
     <to type="passthrough">/index.cfm/$1</to>

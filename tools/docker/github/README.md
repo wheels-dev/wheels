@@ -72,13 +72,13 @@ strategy:
 
 | Engine | Container Name | Port | Docker Image |
 |--------|----------------|------|--------------|
-| Lucee 5 | `cfwheels-test-lucee5` | 60005 | `cfwheels-test-lucee5:v1.0.2` |
-| Lucee 6 | `cfwheels-test-lucee6` | 60006 | `cfwheels-test-lucee6:v1.0.2` |
-| Lucee 7 | `cfwheels-test-lucee7` | 60007 | `cfwheels-test-lucee7:v1.0.0` |
-| Adobe 2018 | `cfwheels-test-adobe2018` | 62018 | `cfwheels-test-adobe2018:v1.0.2` |
-| Adobe 2021 | `cfwheels-test-adobe2021` | 62021 | `cfwheels-test-adobe2021:v1.0.2` |
-| Adobe 2023 | `cfwheels-test-adobe2023` | 62023 | `cfwheels-test-adobe2023:v1.0.1` |
-| BoxLang | `cfwheels-test-boxlang` | 60001 | `cfwheels-test-boxlang:v1.0.0` |
+| Lucee 5 | `wheels-test-lucee5` | 60005 | `wheels-test-lucee5:v1.0.2` |
+| Lucee 6 | `wheels-test-lucee6` | 60006 | `wheels-test-lucee6:v1.0.2` |
+| Lucee 7 | `wheels-test-lucee7` | 60007 | `wheels-test-lucee7:v1.0.0` |
+| Adobe 2018 | `wheels-test-adobe2018` | 62018 | `wheels-test-adobe2018:v1.0.2` |
+| Adobe 2021 | `wheels-test-adobe2021` | 62021 | `wheels-test-adobe2021:v1.0.2` |
+| Adobe 2023 | `wheels-test-adobe2023` | 62023 | `wheels-test-adobe2023:v1.0.1` |
+| BoxLang | `wheels-test-boxlang` | 60001 | `wheels-test-boxlang:v1.0.0` |
 
 ### Database Containers
 
@@ -239,7 +239,7 @@ docker compose up -d adobe2021 mysql
 docker exec -it wheels-adobe2021-1 bash
 
 # Navigate to test suite
-cd /cfwheels-test-suite
+cd /wheels-test-suite
 
 # Run the same test
 box wheels test run --testBundles=YourTest
@@ -319,7 +319,7 @@ docker compose up -d lucee5 mysql
    # Use same engine/database combination that failed
    docker compose up -d adobe2021 mysql
    docker exec -it wheels-adobe2021-1 bash
-   cd /cfwheels-test-suite
+   cd /wheels-test-suite
    box wheels test run
    ```
 
@@ -358,7 +358,7 @@ Some combinations may occasionally fail due to:
 
 ```bash
 # Build and tag new images
-docker build -t cfwheels-test-lucee7:v1.0.1 .
+docker build -t wheels-test-lucee7:v1.0.1 .
 
 # Update references in:
 # - compose.yml (image: tags)

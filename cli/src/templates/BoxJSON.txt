@@ -18,9 +18,9 @@
     "documentation":"https://docs.wheels.dev/",
     "repository":{
         "type":"git",
-        "URL":"https://github.com/cfwheels/cfwheels"
+        "URL":"https://github.com/wheels-dev/wheels"
     },
-    "bugs":"https://github.com/cfwheels/cfwheels/issues",
+    "bugs":"https://github.com/wheels-dev/wheels/issues",
     "contributors":[
         "Peter Amiri <peter@alurium.com>"
     ],
@@ -41,7 +41,7 @@
     "license":[
         {
             "type":"Apache License 2.0",
-            "URL":"https://github.com/cfwheels/cfwheels/blob/master/LICENSE"
+            "URL":"https://github.com/wheels-dev/wheels/blob/master/LICENSE"
         }
     ],
     "scripts":{}
