@@ -1,5 +1,5 @@
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/wheels-dev/wheels/snapshot.yml?style=flat-square&logo=github&label=Wheels%20Snapshots)
-<img src="https://www.forgebox.io/api/v1/entry/cfwheels/badges/version" />
+<img src="https://www.forgebox.io/api/v1/entry/wheels-core/badges/version" />
 <img src="https://www.forgebox.io/api/v1/entry/wheels-core/badges/downloads" />
 ![Dynamic JSON Badge](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fwww.forgebox.io%2Fapi%2Fv1%2Fentry%2Fwheels-core%2Fbadges%2F&query=%24.data.versions.0.version&style=flat-square&label=Bleeding%20Edge%20Release)
 

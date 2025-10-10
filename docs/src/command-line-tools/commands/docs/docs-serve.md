@@ -5,15 +5,15 @@ Serves generated documentation locally for development and review.
 ## Usage
 
 ```bash
-wheels docs serve [--root=<dir>] [--port=<port>] [--open] [--watch]
+wheels docs serve [--root=<dir>] [--port=<port>] [--open]
 ```
-
 ## Parameters
 
-- `--root` - (Optional) Root directory to serve. Default: `docs/api`
-- `--port` - (Optional) Port to serve on. Default: `35729`
-- `--open` - (Optional) Open browser automatically. Default: `true`
-- `--watch` - (Optional) Watch for changes and regenerate. Default: `false`
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--root` | Root directory to serve | `docs/api` |
+| `--port` | Port to serve on | `35729` |
+| `--open` | Open browser automatically | `true` |
 
 ## Description
 
@@ -37,11 +37,6 @@ wheels docs serve --port=8080
 wheels docs serve --root=public/api-docs
 ```
 
-### Serve with file watching
-```bash
-wheels docs serve --watch
-```
-
 ### Serve without opening browser
 ```bash
 wheels docs serve --open=false
@@ -49,7 +44,7 @@ wheels docs serve --open=false
 
 ### Custom configuration
 ```bash
-wheels docs serve --root=docs/generated --port=3000 --watch
+wheels docs serve --root=docs/generated --port=3000
 ```
 
 ## Server Output
@@ -83,9 +78,6 @@ Documentation directory not found: /docs/api
 ```
 
 ## Features
-
-### File Watching
-When `--watch` is enabled, the server monitors documentation files for changes and can trigger regeneration.
 
 ### Browser Integration
 With `--open=true` (default), the server automatically opens your default browser to the documentation URL.

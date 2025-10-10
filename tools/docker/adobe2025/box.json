@@ -1,5 +1,5 @@
 {
-    "name": "cfwheels-test-suite-adobe2025",
+    "name": "wheels-test-suite-adobe2025",
     "version": "1.0.0",
     "dependencies": {
         "wirebox": "^7.0.0",

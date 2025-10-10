@@ -16,20 +16,45 @@ The default layout at `/app/views/layout.cfm` wraps all views unless overridden:
         #includeContent()#
     </cfoutput>
 <cfelse>
-    <html>
-        <head>
-            <title>My App</title>
-            <cfoutput>#csrfMetaTags()#</cfoutput>
-        </head>
-        <body>
-            <cfoutput>
-                #flashMessages()#
-                #includeContent()#
-            </cfoutput>
-        </body>
-    </html>
+<cfoutput>
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        #csrfMetaTags()#
+        <title>#contentFor("title", "My App")#</title>
+    </head>
+    <body>
+        <nav>
+            <a href="#urlFor(controller='home', action='index')#">Home</a>
+        </nav>
+
+        #flashMessages()#
+
+        <main>
+            #includeContent()#
+        </main>
+
+        <footer>
+            &copy; #Year(Now())# My App
+        </footer>
+    </body>
+</html>
+</cfoutput>
 </cfif>
 ```
+
+**Critical Rules:**
+- ✅ **Open `<cfoutput>` immediately after `<cfelse>`** - wraps entire HTML
+- ✅ **Close `</cfoutput>` immediately before `</cfif>`** - at end of layout
+- ❌ **Do NOT nest `<cfoutput>` blocks** - single block for all HTML
+- ✅ **All CFML expressions must be inside the cfoutput block** (`#urlFor()#`, `#Year()#`, etc.)
+
+**Why This Structure:**
+- The `application.contentOnly` branch handles API/JSON responses (no HTML wrapper)
+- The main HTML branch needs all dynamic content in one `<cfoutput>` block
+- Nested cfoutput blocks are redundant and can cause issues
 
 ## Controller-Specific Layout
 

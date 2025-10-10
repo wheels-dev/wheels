@@ -3,17 +3,17 @@ FROM ortussolutions/commandbox:latest
 LABEL maintainer "Wheels Core Team"
 
 #Add the H2 extension
-ADD https://ext.lucee.org/org.h2-1.3.172.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.h2-1.3.172.lex
-# ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
+# ADD https://ext.lucee.org/org.h2-1.3.172.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.h2-1.3.172.lex
+ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
 
 #Add the Oracle extension
 ADD https://ext.lucee.org/org.lucee.oracle-21.8.0.0-ojdbc11.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.oracle-21.8.0.0-ojdbc11.lex
 
 ENV PORT 60007
-ENV APP_DIR                 "/cfwheels-test-suite"
+ENV APP_DIR                 "/wheels-test-suite"
 ENV HEALTHCHECK_URI         "http://127.0.0.1:60007/"
 ENV ENV_MODE                "remote"
-ENV BOX_SERVER_CFCONFIGFILE "/cfwheels-test-suite/CFConfig.json"
+ENV BOX_SERVER_CFCONFIGFILE "/wheels-test-suite/CFConfig.json"
 ENV BOX_SERVER_PROFILE      "none"
 ENV BOX_INSTALL             TRUE
 ENV BOX_SERVER_APP_CFENGINE "lucee@7.0.0-SNAPSHOT+317"

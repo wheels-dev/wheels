@@ -142,10 +142,10 @@ You can also run tests directly via command line for specific engine-database co
 
 ```bash
 # Connect to the Lucee 5 container
-docker exec -it cfwheels-test-lucee5 /bin/bash
+docker exec -it wheels-test-lucee5 /bin/bash
 
 # Run all tests
-cd /cfwheels-test-suite
+cd /wheels-test-suite
 box wheels test app
 
 # Run a specific test bundle
@@ -156,10 +156,10 @@ box wheels test app --testBundles=controllers
 
 ```bash
 # Connect to the Adobe 2021 container
-docker exec -it cfwheels-test-adobe2021 /bin/bash
+docker exec -it wheels-test-adobe2021 /bin/bash
 
 # Run all tests
-cd /cfwheels-test-suite
+cd /wheels-test-suite
 box wheels test app
 
 # Specify a test bundle
@@ -170,10 +170,10 @@ box wheels test app --testBundles=models
 
 ```bash
 # Connect to the Lucee 6 container
-docker exec -it cfwheels-test-lucee6 /bin/bash
+docker exec -it wheels-test-lucee6 /bin/bash
 
 # Run all tests
-cd /cfwheels-test-suite
+cd /wheels-test-suite
 box wheels test app
 
 # Run a specific test with specific options
@@ -305,17 +305,17 @@ component extends="wheels.Testbox" {
 
 ```bash
 # View logs from a specific container
-docker logs cfwheels-test-lucee5
+docker logs wheels-test-lucee5
 
 # Follow logs in real-time
-docker logs -f cfwheels-test-lucee5
+docker logs -f wheels-test-lucee5
 ```
 
 ### Container Shell Access
 
 ```bash
 # Connect to a running container
-docker exec -it cfwheels-test-lucee5 /bin/bash
+docker exec -it wheels-test-lucee5 /bin/bash
 ```
 
 ## Keeping the Test Environment Updated

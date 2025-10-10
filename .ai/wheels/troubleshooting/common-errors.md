@@ -392,6 +392,97 @@ comment = model("Comment").new(commentData);
 
 **Best Practice:** Always merge related parameters into single structure before model creation.
 
+## Layout Template Errors
+
+### CFML Expressions Not Rendering in Layout
+**Error:** Navigation links, flash messages, or dynamic content appearing as literal text (e.g., `#urlFor(...)#` displays as-is instead of generating URLs)
+
+**Symptom:** When viewing source, you see `#urlFor(controller='posts', action='index')#` instead of `/posts`
+
+**Cause:** CFML expressions (`#variable#`) placed outside `<cfoutput>` blocks in layout.cfm
+
+**Bad Code:**
+```cfm
+<cfif application.contentOnly>
+    <cfoutput>
+        #flashMessages()#
+        #includeContent()#
+    </cfoutput>
+<cfelse>
+<!DOCTYPE html>
+<html>
+<head>
+    #csrfMetaTags()#  <!-- NOT in cfoutput block -->
+    <title>#contentFor("title", "My App")#</title>  <!-- NOT in cfoutput block -->
+</head>
+<body>
+    <nav>
+        <a href="#urlFor(controller='posts')#">Posts</a>  <!-- NOT in cfoutput block -->
+    </nav>
+
+    <cfoutput>
+        #includeContent()#
+    </cfoutput>
+
+    <footer>
+        &copy; #Year(Now())# My App  <!-- NOT in cfoutput block -->
+    </footer>
+</body>
+</html>
+</cfif>
+```
+
+**Solution:**
+```cfm
+<cfif application.contentOnly>
+    <cfoutput>
+        #flashMessages()#
+        #includeContent()#
+    </cfoutput>
+<cfelse>
+<cfoutput>
+<!DOCTYPE html>
+<html>
+<head>
+    #csrfMetaTags()#
+    <title>#contentFor("title", "My App")#</title>
+</head>
+<body>
+    <nav>
+        <a href="#urlFor(controller='posts')#">Posts</a>
+    </nav>
+
+    #includeContent()#
+
+    <footer>
+        &copy; #Year(Now())# My App
+    </footer>
+</body>
+</html>
+</cfoutput>
+</cfif>
+```
+
+**Key Points:**
+- Open `<cfoutput>` immediately after `<cfelse>` on line following the else
+- Close `</cfoutput>` immediately before `</cfif>` at end of file
+- Do NOT create nested `<cfoutput>` blocks around `#includeContent()#`
+- All `#expression#` syntax must be inside `<cfoutput>` blocks
+- The `application.contentOnly` branch is for API/JSON responses and has its own cfoutput block
+
+**Why This Matters:**
+- Without proper cfoutput blocks, URLs won't generate: navigation breaks
+- Flash messages won't display: user feedback fails
+- CSRF tokens won't render: forms become insecure
+- Dynamic content appears as code: unprofessional appearance
+
+**Testing:**
+```bash
+# View page source - should NOT see literal # expressions
+curl -s http://localhost:8080 | grep '#urlFor'  # Should return nothing
+curl -s http://localhost:8080 | grep 'href="/posts"'  # Should find actual URLs
+```
+
 ## Important Notes
 - Always consult CFWheels documentation rather than assuming Rails conventions
 - Test association definitions in simple form before adding complexity
@@ -399,3 +490,4 @@ comment = model("Comment").new(commentData);
 - CFWheels form helpers are more limited than Rails - supplement with HTML when needed
 - Use null coalescing operators (`?:`) when embedding model data in JavaScript/Alpine.js contexts
 - Store association query results in variables before looping to avoid method call errors
+- **Wrap entire layout HTML in single cfoutput block** - most common layout mistake

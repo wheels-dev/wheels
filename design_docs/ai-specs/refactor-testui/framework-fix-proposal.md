@@ -1,4 +1,4 @@
-# CFWheels Framework Fix Proposal: renderText/renderWith Bug
+# Wheels Framework Fix Proposal: renderText/renderWith Bug
 
 ## Problem Description
 
@@ -21,7 +21,7 @@ public void function $callAction(required string action) {
         Throw(
             type = "Wheels.ActionNotAllowed",
             message = "You are not allowed to execute the `#arguments.action#` method as an action.",
-            extendedInfo = "Make sure your action does not have the same name as any of the built-in CFWheels functions."
+            extendedInfo = "Make sure your action does not have the same name as any of the built-in Wheels functions."
         );
     }
     if (StructKeyExists(this, arguments.action) && IsCustomFunction(this[arguments.action])) {
@@ -223,7 +223,7 @@ private function renderSuccess(any data = {}, numeric statusCode = 200) {
     // ... existing code ...
     renderText(SerializeJSON(response));
     
-    // Workaround for CFWheels bug
+    // Workaround for Wheels bug
     renderNothing();
 }
 ```

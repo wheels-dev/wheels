@@ -12,11 +12,10 @@ wheels env set KEY=VALUE [KEY2=VALUE2 ...] [--file=filename]
 
 ## Parameters
 
-### Required Parameters
-- **`KEY=VALUE`** - One or more environment variable assignments in KEY=VALUE format
-
-### Optional Parameters
-- **`--file`** - The .env file to update (default: `.env`)
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| KEY=VALUE | KEY=VALUE | Yes | One or more environment variable assignments in KEY=VALUE format |
+| --file | string | No | The .env file to update (default: `.env`) |
 
 ## Basic Usage Examples
 

@@ -1,5 +1,5 @@
 {
-  "projectTitle": "Wheels.dev (formerly CFWheels)",
+  "projectTitle": "Wheels.dev",
   "description": "An open source CFML framework inspired by Ruby on Rails for rapid web application development",
   "folders": [
     "docs/api",
@@ -45,7 +45,7 @@
     },
     {
       "tag": "v2.5.0",
-      "description": "Stable release with traditional CFWheels structure"
+      "description": "Stable release with traditional structure"
     }
   ]
 }

@@ -1,5 +1,4 @@
 # Wheels env validate
-*This command works correctly without options (parameters). Option support is under development and will be **available soon**.*
 
 ## Overview
 
@@ -11,12 +10,13 @@ The `wheels env validate` command validates the format and content of `.env` fil
 wheels env validate [options]
 ```
 
-## Parameters
+## Options
 
-### Optional Parameters
-- **`--file`** - The .env file to validate (default: `.env`)
-- **`--required`** - Comma-separated list of required keys that must be present
-- **`--verbose`** - Show detailed validation information including all variables
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--file` | Name of the .env file to validate | `.env` |
+| `--required` | Comma-separated list of required keys that must be present| empty |
+| `--verbose` | Show detailed validation information including all variables | `false` |
 
 ## Basic Usage Examples
 

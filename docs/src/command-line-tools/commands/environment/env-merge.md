@@ -12,14 +12,13 @@ wheels env merge <source1> <source2> [source3...] [options]
 
 ## Parameters
 
-### Required Parameters
-- **`source1`** - First source .env file to merge
-- **`source2`** - Second source .env file to merge
-
-### Optional Parameters
-- **`source3, source4, ...`** - Additional source .env files to merge (unlimited)
-- **`--output`** - Output file name (default: `.env.merge`)
-- **`--dryRun`** - Show what would be merged without actually writing the file
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| source1 | string | Yes | First source .env file to merge |
+| source2 | string | Yes | Second source .env file to merge |
+| source3, source4, ... | string | No | Additional source .env files to merge (unlimited) |
+| --output | string | No | Output file name (default: .env.merge) |
+| --dryRun | flag | No | Show what would be merged without actually writing the file |
 
 ## Basic Usage Examples
 

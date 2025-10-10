@@ -1,5 +1,5 @@
-site_name: CFWheels Guides
-site_url: https://guides.cfwheels.org/
+site_name: Wheels Guides
+site_url: https://guides.wheels.dev/
 site_dir: ../docs/public
 docs_dir: ../guides/src
 
@@ -70,7 +70,7 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/wheels-dev/wheels
     - icon: fontawesome/brands/twitter
-      link: https://twitter.com/cfwheels
+      link: https://twitter.com/wheelscfml
 nav:
   - INTRODUCTION:
     - 'Getting Started': 'README.md'

@@ -77,8 +77,7 @@ component extends="wheels.Testbox" {
 				migration.dropTable(tableName)
 
 				expected = getBinaryType()
-
-				expect(actual).toBe(expected)
+				expect(ArrayContainsNoCase(expected,actual)).toBeTrue()
 			})
 
 			it("is being added multiple", () => {
@@ -98,8 +97,8 @@ component extends="wheels.Testbox" {
 
 				expected = getBinaryType()
 
-				expect(actual[2]).toBe(expected)
-				expect(actual[3]).toBe(expected)
+				expect(ArrayContainsNoCase(expected,actual[2])).toBeTrue()
+				expect(ArrayContainsNoCase(expected,actual[3])).toBeTrue()
 			})
 		})
 
@@ -429,8 +428,7 @@ component extends="wheels.Testbox" {
 				migration.dropTable(tableName)
 
 				expected = getStringType()
-
-				expect(actual).toBe(expected)
+				expect(ArrayContainsNoCase(expected, actual)).toBeTrue()
 			})
 
 			it("is being added multiple", () => {
@@ -450,8 +448,8 @@ component extends="wheels.Testbox" {
 
 				expected = getStringType()
 
-				expect(ListFindNoCase(expected, actual[2])).toBeTrue()
-				expect(ListFindNoCase(expected, actual[3])).toBeTrue()
+				expect(ArrayContainsNoCase(expected, actual[2])).toBeTrue()
+				expect(ArrayContainsNoCase(expected, actual[3])).toBeTrue()
 			})
 		})
 

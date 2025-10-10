@@ -1,6 +1,6 @@
 # Docker Container Profile Integration Specification
 
-This document details the plan for integrating Docker container profile management directly into the CFWheels TestUI, allowing for seamless control of test environments.
+This document details the plan for integrating Docker container profile management directly into the Wheels TestUI, allowing for seamless control of test environments.
 
 ## Current Docker Integration Assessment
 

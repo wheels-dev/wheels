@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `wheels config check` command validates your CFWheels application configuration settings across different environments. It performs comprehensive checks on security settings, database configuration, environment-specific settings, and more, helping you identify potential issues before deployment.
+The `wheels config check` command validates your Wheels application configuration settings across different environments. It performs comprehensive checks on security settings, database configuration, environment-specific settings, and more, helping you identify potential issues before deployment.
 
 ## Command Syntax
 

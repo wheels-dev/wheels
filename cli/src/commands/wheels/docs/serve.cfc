@@ -3,7 +3,6 @@
  * Examples:
  * wheels docs serve
  * wheels docs serve --port=8080 --root=docs/api
- * wheels docs serve --open --watch
  */
 component extends="../base" {
     
@@ -13,13 +12,11 @@ component extends="../base" {
      * @root.hint Root directory to serve (default: docs/api)
      * @port.hint Port to serve on
      * @open.hint Open browser automatically
-     * @watch.hint Watch for changes and regenerate
      */
     function run(
         string root = "docs/api",
         numeric port = 35729,
-        boolean open = true,
-        boolean watch = false
+        boolean open = true
     ) {
         var docRoot = fileSystemUtil.resolvePath(arguments.root);
         
@@ -64,46 +61,39 @@ component extends="../base" {
                 print.line("Opening browser...");
             }
             
-            if (arguments.watch) {
-                print.line();
-                print.yellowLine("Watching for changes...");
-                watchDocumentation(docRoot, serverArgs.name);
-            } else {
-                print.line();
-                print.line("Press Ctrl+C to stop the server");
-                
-                // Keep the command running
-                while (true) {
-                    sleep(5000); // wait for 5 seconds
+            print.line();
+            
+            // Keep the command running
+            while (true) {
+                sleep(5000); // wait for 5 seconds
 
-                    // Check if server is still running or still starting
-                    var serverInfo = serverService.getServerInfo(name=serverArgs.name, webroot=docRoot);
-                    systemOutput("Status: " & serverInfo.status & chr(10));
+                // Check if server is still running or still starting
+                var serverInfo = serverService.getServerInfo(name=serverArgs.name, webroot=docRoot);
+                systemOutput("Status: " & serverInfo.status & chr(10));
 
-                    // If status is missing or server crashed, break
-                    if (!structKeyExists(serverInfo, "status")) {
-                        systemOutput("Server info missing. Exiting..."& chr(10));
-                        break;
-                    }
-
-                    // If server is fully running, continue
-                    if (serverInfo.status == "running") {
-                        systemOutput("Server is up and running!"& chr(10));
-                        break;
-                    }
-
-                    // If still starting, just wait and continue
-                    if (serverInfo.status == "starting") {
-                        systemOutput("Server is still starting... waiting..."& chr(10));
-                        continue;
-                    }
-
-                    // Any other status (like "stopped", "error", etc.)
-                    print.redLine("Unexpected server status: " & serverInfo.status);
+                // If status is missing or server crashed, break
+                if (!structKeyExists(serverInfo, "status")) {
+                    systemOutput("Server info missing. Exiting..."& chr(10));
                     break;
                 }
 
+                // If server is fully running, continue
+                if (serverInfo.status == "running") {
+                    systemOutput("Server is up and running!"& chr(10));
+                    break;
+                }
+
+                // If still starting, just wait and continue
+                if (serverInfo.status == "starting") {
+                    systemOutput("Server is still starting... waiting..."& chr(10));
+                    continue;
+                }
+
+                // Any other status (like "stopped", "error", etc.)
+                print.redLine("Unexpected server status: " & serverInfo.status);
+                break;
             }
+
             
         } catch (any e) {
             print.redLine("Failed to start server: #e.message#");
@@ -207,38 +197,5 @@ component extends="../base" {
         }
         
         return html;
-    }
-    
-    private function watchDocumentation(docRoot, serverName) {
-        var fileWatcher = getInstance("FileWatcher@commandbox-core");
-        
-        fileWatcher.watch(
-            paths = ["app/models/**", "app/controllers/**", "app/views/**", "app/services/**"],
-            callback = function(changes) {
-                print.line()
-                     .cyanLine("Source files changed, regenerating documentation...")
-                     .line();
-                
-                // Regenerate documentation
-                command("wheels docs generate")
-                    .params(output = arguments.docRoot, serve = false)
-                    .run();
-                
-                print.greenLine("Documentation updated!")
-                     .line();
-            }
-        );
-        
-        // Keep watching
-        while (true) {
-            sleep(5000);
-            
-            // Check if server is still running
-            var serverInfo = serverService.getServerInfo(arguments.serverName);
-            if (!structKeyExists(serverInfo, "status") || serverInfo.status != "running") {
-                print.redLine("Server stopped");
-                break;
-            }
-        }
     }
 }

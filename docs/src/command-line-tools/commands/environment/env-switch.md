@@ -27,7 +27,6 @@ The `wheels env switch` command changes the active environment for your Wheels a
 | `--backup` | Backup current environment | `false` |
 | `--force` | Force switch even with issues | `false` |
 | `--quiet` | Suppress output | `false` |
-| `--help` | Show help information |
 
 ## Examples
 
