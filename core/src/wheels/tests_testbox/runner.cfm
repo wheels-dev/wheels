@@ -7,7 +7,7 @@
             options={ coverage = { enabled = false } }
         );
     } catch (any e) {
-        cfheader(statuscode="500", statustext="Internal Server Error");
+        cfheader(statuscode="500");
         cfcontent(type="application/json");
         writeOutput('{"success":false,"error":"Failed to create TestBox instance: ' & replace(e.message, '"', '\"', "all") & '"}');
         abort;
@@ -33,10 +33,10 @@
         DeJsonResult = DeserializeJSON(result);
         if (DeJsonResult.totalFail > 0 || DeJsonResult.totalError > 0) {
             if(!structKeyExists(url, "cli") || !url.cli){
-                cfheader(statustext="Expectation Failed", statuscode=417);
+                cfheader(statuscode=417);
             }
         } else {
-            cfheader(statustext="OK", statuscode=200);
+            cfheader(statuscode=200);
         }
         // Check if 'only' parameter is provided in the URL
         if (structKeyExists(url, "only") && url.only eq "failure,error") {

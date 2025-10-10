@@ -249,7 +249,7 @@ Hendrerit nostrud abigo vicis<br>
 augue validus cui lucidus.</p>"
 				r = Replace(r, Chr(13), "", "all")
 
-				expect(htmleditformat(e)).toBe(htmleditformat(r))
+				expect(encodeForHtml(e)).toBe(encodeForHtml(r))
 			})
 
 			it("is encoding", () => {

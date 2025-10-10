@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         cfengine:
-          ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023", "boxlang"]
+          ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023", "adobe2025", "boxlang"]
         dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
@@ -76,6 +76,14 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2023
             dbengine: oracle
+          - cfengine: adobe2025
+            dbengine: mysql
+          - cfengine: adobe2025
+            dbengine: postgres
+          - cfengine: adobe2025
+            dbengine: sqlserver
+          - cfengine: adobe2025
+            dbengine: oracle
           - cfengine: boxlang
             dbengine: mysql
           - cfengine: boxlang
@@ -95,14 +103,6 @@ jobs:
             dbengine: h2
           - cfengine: boxlang
             dbengine: h2
-          - cfengine: adobe2025
-            dbengine: oracle
-          - cfengine: adobe2025
-            dbengine: mysql
-          - cfengine: adobe2025
-            dbengine: postgres
-          - cfengine: adobe2025
-            dbengine: sqlserver
     env:
       # Port mappings for each CF engine
       PORT_lucee5: 60005

@@ -246,7 +246,7 @@ component extends="Controller" {
         resource = model("Resource").findByKey(params.key);
         local.status = IsObject(resource) ? 200 : 404;
 
-        cfheader(statusCode=local.status, statusText="");
+        cfheader(statusCode=local.status);
         abort;
     }
 

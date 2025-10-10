@@ -9,7 +9,7 @@ cfheader(name="Access-Control-Allow-Headers", value="Content-Type, Accept, Mcp-S
 
 // Handle OPTIONS preflight requests
 if (cgi.request_method == "OPTIONS") {
-	cfheader(statusCode="200", statusText="OK");
+	cfheader(statusCode="200");
 	abort;
 }
 
@@ -77,7 +77,7 @@ try {
 				abort;
 			} else {
 				// Return 405 Method Not Allowed for non-SSE GET requests
-				cfheader(statusCode="405", statusText="Method Not Allowed");
+				cfheader(statusCode="405");
 				writeOutput("GET requests must accept text/event-stream");
 				abort;
 			}
@@ -103,7 +103,7 @@ try {
 
 		if (len(trim(local.requestBody)) == 0) {
 			// Return 400 Bad Request for empty body
-			cfheader(statusCode="400", statusText="Bad Request");
+			cfheader(statusCode="400");
 			cfheader(name="Content-Type", value="application/json");
 			local.errorResponse = {
 				"jsonrpc": "2.0",
@@ -123,7 +123,7 @@ try {
 			local.jsonRpcRequest = deserializeJSON(local.requestBody);
 		} catch (any e) {
 			// Return 400 Bad Request for invalid JSON
-			cfheader(statusCode="400", statusText="Bad Request");
+			cfheader(statusCode="400");
 			cfheader(name="Content-Type", value="application/json");
 			local.errorResponse = {
 				"jsonrpc": "2.0",
@@ -144,7 +144,7 @@ try {
 		// Set response headers
 		cfheader(name="Mcp-Session-Id", value=local.sessionId);
 		cfheader(name="Content-Type", value="application/json");
-		cfheader(statusCode="200", statusText="OK");
+		cfheader(statusCode="200");
 
 		// Return JSON-RPC response
 		writeOutput(serializeJSON(local.response));
@@ -152,7 +152,7 @@ try {
 	}
 
 	// Return 405 Method Not Allowed for other methods
-	cfheader(statusCode="405", statusText="Method Not Allowed");
+	cfheader(statusCode="405");
 	cfheader(name="Content-Type", value="application/json");
 	writeOutput(serializeJSON({
 		"error": "Only GET and POST methods are supported",
@@ -161,7 +161,7 @@ try {
 
 } catch (any e) {
 	// Handle unexpected errors
-	cfheader(statusCode="500", statusText="Internal Server Error");
+	cfheader(statusCode="500");
 	cfheader(name="Content-Type", value="application/json");
 	writeOutput(serializeJSON({
 		"error": "Internal server error",

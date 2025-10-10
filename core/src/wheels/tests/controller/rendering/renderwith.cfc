@@ -3,7 +3,7 @@ component extends="wheels.tests.Test" {
 	function setup() {
 		include "setup.cfm";
 		params = {controller = "test", action = "test"};
-		cfheader(statustext="OK", statuscode=200); // start with a fresh status code
+		cfheader(statuscode=200); // start with a fresh status code
 	}
 
 	function teardown() {

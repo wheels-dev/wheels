@@ -133,7 +133,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that hasChanged", () => {
 
 			it("handles boolean properly", () => {
-				sqltype = g.model("Sqltype").findOne()
+				sqltype = g.model("Sqltype").findOne();
 				sqltype.booleanType = "false"
 
 				expect(sqltype.hasChanged()).toBeFalse()
@@ -409,7 +409,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("return true when property is blank", () => {
-				_model = g.model("author").new()
+				_model = g.model("author").new();
 				_model.lastName = ""
 
 				expect(_model.propertyIsBlank("lastName")).toBeTrue()
@@ -442,7 +442,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("return false when property is blank", () => {
-				_model = g.model("author").new()
+				_model = g.model("author").new();
 				_model.lastName = ""
 
 				expect(_model.propertyIsPresent("lastName")).toBeFalse()
@@ -508,7 +508,7 @@ component extends="wheels.Testbox" {
 
 			it("local works", () => {
 				transaction {
-					localtime = Now()
+					localtime = Now();
 					g.model("Post").getClass().timeStampMode = "local"
 					author = g.model("Author").findOne()
 					post = author.createPost(title = "test post", body = "here is some text")
@@ -522,7 +522,7 @@ component extends="wheels.Testbox" {
 
 			it("epoch works", () => {
 				transaction {
-					epochtime = Now().getTime()
+					epochtime = Now().getTime();
 					g.model("Post").getClass().timeStampOnCreateProperty = "createdAtEpoch"
 					g.model("Post").getClass().timeStampOnUpdateProperty = "updatedAtEpoch"
 					g.model("Post").getClass().timeStampMode = "epoch"

@@ -23,7 +23,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("is inserting", () => {
-				gallery = g.model("gallery").findOne(include = "user", where = "c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id")
+				gallery = g.model("gallery").findOne(include = "user", where = "c_o_r_e_users.lastname = 'Petruzzi'", order = "id")
 				transaction action="begin" {
 					photo = g.model("photo").create(
 						galleryid = "#gallery.id#",
@@ -43,7 +43,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that changes", () => {
 
 			it("is clearing all change info", () => {
-				author = g.model("author").findOne(select = "firstName")
+				author = g.model("author").findOne(select = "firstName");
 				author.firstName = "asfdg9876asdgf"
 				author.lastName = "asfdg9876asdgf"
 				result = author.hasChanged()
@@ -57,7 +57,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("is clearing property change info", () => {
-				author = g.model("author").findOne(select = "firstName")
+				author = g.model("author").findOne(select = "firstName");
 				author.firstName = "asfdg9876asdgf"
 				author.lastName = "asfdg9876asdgf"
 				result = author.hasChanged(property = "firstName")
@@ -79,7 +79,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("is comparing existing properties only", () => {
-				author = g.model("author").findOne(select = "firstName")
+				author = g.model("author").findOne(select = "firstName");
 				result = author.hasChanged()
 
 				expect(result).toBeFalse()
@@ -104,7 +104,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("function allChanges is working", () => {
-				author = g.model("author").findOne(order = "id")
+				author = g.model("author").findOne(order = "id");
 				author.firstName = "a"
 				author.lastName = "b"
 				compareWith.firstName.changedFrom = "Per"
@@ -117,7 +117,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("function changedProperties is working", () => {
-				author = g.model("author").findOne()
+				author = g.model("author").findOne();
 				author.firstName = "a"
 				author.lastName = "b"
 				result = ListSort(author.changedProperties(), "textnocase")
@@ -126,14 +126,14 @@ component extends="wheels.Testbox" {
 			})
 
 			it("function changedProperties without changes is working", () => {
-				author = g.model("author").findOne()
+				author = g.model("author").findOne();
 				result = author.changedProperties()
 
 				expect(result).toBe("")
 			})
 
 			it("function changedProperties change and back is working", () => {
-				author = g.model("author").findOne()
+				author = g.model("author").findOne();
 				author.oldFirstName = author.firstName
 				author.firstName = "a"
 				result = author.changedProperties()
@@ -162,7 +162,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("function isNew with find is working", () => {
-				author = g.model("author").findOne()
+				author = g.model("author").findOne();
 				result = author.isNew()
 
 				expect(result).toBeFalse()
@@ -185,7 +185,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("function isPersisted with find is working", () => {
-				author = g.model("author").findOne()
+				author = g.model("author").findOne();
 				result = author.isPersisted()
 
 				expect(result).toBeTrue()
@@ -590,6 +590,7 @@ component extends="wheels.Testbox" {
 				isACF2018 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2018
 				isACF2021 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2021
 				isACF2023 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2023
+				isACF2025 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2025
 			})
 
 			it("is selecting distinct addresses", () => {
@@ -875,7 +876,7 @@ component extends="wheels.Testbox" {
 
 				expect(actual).toBeStruct()
 
-				if (isACF2021 || isACF2023) {
+				if (isACF2021 || isACF2023 || isACF2025) {
 					expect(actual.resultset['1']).toBeStruct()
 				} else if (structKeyExists(server, "boxlang")) {
 					expect(actual['1']['1']).toBeStruct()
@@ -1453,7 +1454,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("works when specify where on joined table", () => {
-				q = gallery.findOne(include = "user", where = "c_o_r_e_users.lastname = 'Petruzzi'", orderby = "id")
+				q = gallery.findOne(include = "user", where = "c_o_r_e_users.lastname = 'Petruzzi'", order = "id")
 
 				/* 10 records, 2 perpage, 5 pages */
 				args = {
@@ -1664,7 +1665,7 @@ component extends="wheels.Testbox" {
 
 			it("works", () => {
 				transaction action="begin" {
-					author = g.model("Author").findOne()
+					author = g.model("Author").findOne();
 					author.update(firstName = "Kermit", lastName = "Frog")
 					allKermits = g.model("Author").findAll(where = "firstName='Kermit' AND lastName='Frog'")
 					transaction action="rollback";
@@ -1675,7 +1676,7 @@ component extends="wheels.Testbox" {
 
 			it("dynamic update with named argument works", () => {
 				transaction action="begin" {
-					author = g.model("author").findOne(where = "firstName='Andy'")
+					author = g.model("author").findOne(where = "firstName='Andy'");
 					profile = g.model("profile").findOne(where = "bio LIKE 'ColdFusion Developer'")
 					author.setProfile(profile = profile)
 					updatedProfile = g.model("profile").findByKey(profile.id)
@@ -1687,7 +1688,7 @@ component extends="wheels.Testbox" {
 
 			it("dynamic update with unnamed argument works", () => {
 				transaction action="begin" {
-					author = g.model("author").findOne(where = "firstName='Andy'")
+					author = g.model("author").findOne(where = "firstName='Andy'");
 					profile = g.model("profile").findOne(where = "bio LIKE 'ColdFusion Developer'")
 					author.setProfile(profile)
 					updatedProfile = g.model("profile").findByKey(profile.id)
@@ -1699,7 +1700,7 @@ component extends="wheels.Testbox" {
 
 			it("function updateOne works", () => {
 				transaction action="begin" {
-					g.model("Author").updateOne(where = "firstName='Andy'", firstName = "Kermit", lastName = "Frog")
+					g.model("Author").updateOne(where = "firstName='Andy'", firstName = "Kermit", lastName = "Frog");
 					allKermits = g.model("Author").findAll(where = "firstName='Kermit' AND lastName='Frog'")
 					transaction action="rollback";
 				}
@@ -1709,7 +1710,7 @@ component extends="wheels.Testbox" {
 
 			it("function updateOne works for soft deleted records", () => {
 				transaction action="begin" {
-					post = g.model("Post").deleteOne(where = "views=0")
+					post = g.model("Post").deleteOne(where = "views=0");
 					g.model("Post").updateOne(where = "views=0", title = "This is a new title", includeSoftDeletes = true)
 					changedPosts = g.model("Post").findAll(where = "title='This is a new title'", includeSoftDeletes = true)
 					transaction action="rollback";
@@ -1720,7 +1721,7 @@ component extends="wheels.Testbox" {
 
 			it("function updateByKey works", () => {
 				transaction action="begin" {
-					author = g.model("Author").findOne()
+					author = g.model("Author").findOne();
 					g.model("Author").updateByKey(key = author.id, firstName = "Kermit", lastName = "Frog")
 					allKermits = g.model("Author").findAll(where = "firstName='Kermit' AND lastName='Frog'")
 					transaction action="rollback";
@@ -1731,7 +1732,7 @@ component extends="wheels.Testbox" {
 
 			it("function updateByKey works for soft deleted records", () => {
 				transaction action="begin" {
-					post = g.model("Post").findOne(where = "views=0")
+					post = g.model("Post").findOne(where = "views=0");
 					g.model("Post").updateByKey(key = post.id, title = "This is a new title", includeSoftDeletes = true)
 					changedPosts = g.model("Post").findAll(where = "title='This is a new title'", includeSoftDeletes = true)
 					transaction action="rollback";
@@ -1742,7 +1743,7 @@ component extends="wheels.Testbox" {
 
 			it("function updateAll works", () => {
 				transaction action="begin" {
-					g.model("Author").updateAll(firstName = "Kermit", lastName = "Frog")
+					g.model("Author").updateAll(firstName = "Kermit", lastName = "Frog");
 					allKermits = g.model("Author").findAll(where = "firstName='Kermit' AND lastName='Frog'")
 					transaction action="rollback";
 				}
@@ -1752,7 +1753,7 @@ component extends="wheels.Testbox" {
 
 			it("function updateAll works for soft delete records", () => {
 				transaction action="begin" {
-					g.model("Post").updateAll(title = "This is a new title", includeSoftDeletes = true)
+					g.model("Post").updateAll(title = "This is a new title", includeSoftDeletes = true);
 					changedPosts = g.model("Post").findAll(where = "title='This is a new title'", includeSoftDeletes = true)
 					transaction action="rollback";
 				}

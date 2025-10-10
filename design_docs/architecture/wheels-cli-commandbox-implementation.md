@@ -119,7 +119,7 @@ wheels-cli/
         "sqlite-jdbc": "^3.40.0"
     },
     "devDependencies": {
-        "testbox": "^4.0.0"
+        "testbox": "^6.0.0"
     },
     "installPaths": {
         "commandbox-migrations": "modules/commandbox-migrations/",
@@ -465,7 +465,7 @@ component extends="commands.wheels.BaseCommand" {
                 "wheels": "^3.0.0"
             },
             "devDependencies": {
-                "testbox": "^4.0.0"
+                "testbox": "^6.0.0"
             }
         };
 

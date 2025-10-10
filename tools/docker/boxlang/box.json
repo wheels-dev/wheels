@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "dependencies": {
         "wirebox": "^7.0.0",
-        "testbox": "^5.0.0",
+        "testbox": "^6.0.0",
         "bx-compat-cfml":"^1.27.0+35",
         "bx-csrf":"^1.2.0+3",
         "bx-esapi":"^1.6.0+9",

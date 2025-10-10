@@ -23,7 +23,7 @@ component extends="wheels.tests.Test" {
 	}
 
 	function test_render_text_with_doesnt_hijack_status() {
-		cfheader(statustext="Leave me be", statuscode=403);
+		cfheader(statuscode=403);
 		_controller.renderText(text = "OMG!");
 		actual = $statusCode();
 		expected = 403;

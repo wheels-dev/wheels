@@ -13,7 +13,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("model valid returns whether associations are not valid", () => {
-				user.author = g.model("author").new()
+				user.author = g.model("author").new();
 				user.author.firstname = ""
 				userValid = user.valid(validateAssociations = true)
 
@@ -32,7 +32,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("model valid returns whether associations are not valid with errors on parent and associations", () => {
-				user.author = g.model("author").new()
+				user.author = g.model("author").new();
 				user.author.firstname = ""
 				user.author.profile = g.model("profile").new()
 				user.author.$classData().associations.profile.nested.allow = true
@@ -231,7 +231,7 @@ component extends="wheels.Testbox" {
 		describe("Tests default validations", () => {
 
 			beforeEach(() => {
-				user = g.model("UserBlank").new()
+				user = g.model("UserBlank").new();
 				user.username = "gavin@cfwheels.org"
 				user.password = "disismypassword"
 				user.firstName = "Gavin"
@@ -256,7 +256,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("validates presence of valid with default on update", () => {
-				user = g.model("UserBlank").findOne() // use existing user to test update
+				user = g.model("UserBlank").findOne(); // use existing user to test update
 				user.birthtime = ""
 				user.save(transaction = "rollback")
 				arrResult = user.errorsOn("birthtime")
@@ -464,7 +464,7 @@ component extends="wheels.Testbox" {
 			it("validatesConfirmationOf_valid", () => {
 				user.password = "hamsterjelly"
 				user.passwordConfirmation = "hamsterjelly"
-				user.validatesConfirmationOf(property = "password")
+				user.validatesConfirmationOf(properties = "password")
 				expect(user.valid()).toBeTrue()
 				expect(user.allErrors()).toHaveLength(0)
 			})
@@ -473,7 +473,7 @@ component extends="wheels.Testbox" {
 			it("validatesConfirmationOf_valid_allowcase", () => {
 				user.password = "hamsterjelly"
 				user.passwordConfirmation = "hamsterJelly"
-				user.validatesConfirmationOf(property = "password")
+				user.validatesConfirmationOf(properties = "password")
 				expect(user.valid()).toBeTrue()
 				expect(user.allErrors()).toHaveLength(0)
 			})
@@ -482,7 +482,7 @@ component extends="wheels.Testbox" {
 			it("validatesConfirmationOf_invalid", () => {
 				user.password = "hamsterjelly"
 				user.passwordConfirmation = "hamsterjellysucks"
-				user.validatesConfirmationOf(property = "password")
+				user.validatesConfirmationOf(properties = "password")
 				expect(user.valid()).toBeFalse()
 				expect(user.allErrors()).toHaveLength(1)
 			})
@@ -490,7 +490,7 @@ component extends="wheels.Testbox" {
 			// ConfirmProperty doesn't exist. No other checks are made. - INVALID (check errors array length is 1)
 			it("validatesConfirmationOf_missing_property_confirmation_invalid", () => {
 				user.password = "hamsterjelly"
-				user.validatesConfirmationOf(property = "password")
+				user.validatesConfirmationOf(properties = "password")
 				expect(user.valid()).toBeFalse()
 				expect(user.allErrors()).toHaveLength(1)
 			})
@@ -499,7 +499,7 @@ component extends="wheels.Testbox" {
 			it("validatesConfirmationOf_valid_case", () => {
 				user.password = "HamsterJelly"
 				user.passwordConfirmation = "HamsterJelly"
-				user.validatesConfirmationOf(property = "password", caseSensitive = true)
+				user.validatesConfirmationOf(properties = "password", caseSensitive = true)
 				expect(user.valid()).toBeTrue()
 				expect(user.allErrors()).toHaveLength(0)
 			})
@@ -508,7 +508,7 @@ component extends="wheels.Testbox" {
 			it("validatesConfirmationOf_invalid_case", () => {
 				user.password = "HamsterJelly"
 				user.passwordConfirmation = "hamsterjelly"
-				user.validatesConfirmationOf(property = "password", caseSensitive = true)
+				user.validatesConfirmationOf(properties = "password", caseSensitive = true)
 				expect(user.valid()).toBeFalse()
 				expect(user.allErrors()).toHaveLength(1)
 			})
@@ -517,7 +517,7 @@ component extends="wheels.Testbox" {
 			it("validatesConfirmationOf_invalid_no_matchcase", () => {
 				user.password = "HamsterJelly"
 				user.passwordConfirmation = "duckjelly"
-				user.validatesConfirmationOf(property = "password", caseSensitive = true)
+				user.validatesConfirmationOf(properties = "password", caseSensitive = true)
 				expect(user.valid()).toBeFalse()
 				expect(user.allErrors()).toHaveLength(1)
 			})
@@ -527,7 +527,7 @@ component extends="wheels.Testbox" {
 			// can be overridden by the developer
 			it("validatesConfirmationOf_missing_property_confirmation_msg", () => {
 				user.password = "hamsterjelly"
-				user.validatesConfirmationOf(property = "password")
+				user.validatesConfirmationOf(properties = "password")
 				expect(user.valid()).toBeFalse()
 				expect(user.allErrors()[1]["property"]).toBe("passwordConfirmation")
 				expect(user.allErrors()[1]["message"]).toBe("Password should match confirmation")
@@ -536,350 +536,350 @@ component extends="wheels.Testbox" {
 			/* validatesExclusionOf */
 			it("validatesExclusionOf_valid", () => {
 				user.firstname = "tony"
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesExclusionOf_invalid", () => {
 				user.firstname = "tony"
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris, tony")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris, tony")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesExclusionOf_missing_property_invalid", () => {
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris, tony")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris, tony")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesExclusionOf_missing_property_valid", () => {
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris, tony", allowblank = "true")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris, tony", allowblank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesExclusionOf_allowblank_valid", () => {
 				user.firstname = ""
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris", allowblank = "true")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris", allowblank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesExclusionOf_allowblank_invalid", () => {
 				user.firstname = ""
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris", allowblank = "false")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris", allowblank = "false")
 				expect(user.valid()).toBeFalse()
 			})
 
 			/* validatesFormatOf */
 			it("validatesFormatOf_valid", () => {
 				user.phone = "954-555-1212"
-				user.validatesFormatOf(property = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}")
+				user.validatesFormatOf(properties = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesFormatOf_invalid", () => {
 				user.phone = "(954) 555-1212"
-				user.validatesFormatOf(property = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}")
+				user.validatesFormatOf(properties = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesFormatOf_missing_property_invalid", () => {
-				user.validatesFormatOf(property = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}")
+				user.validatesFormatOf(properties = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesFormatOf_missing_property_valid", () => {
-				user.validatesFormatOf(property = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}", allowBlank = "true")
+				user.validatesFormatOf(properties = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}", allowBlank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesFormatOf_allowblank_valid", () => {
 				user.phone = ""
-				user.validatesFormatOf(property = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}", allowBlank = "true")
+				user.validatesFormatOf(properties = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}", allowBlank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesFormatOf_allowblank_invalid", () => {
 				user.phone = ""
-				user.validatesFormatOf(property = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}", allowBlank = "false")
+				user.validatesFormatOf(properties = "phone", regex = "(\d{3,3}-){2,2}\d{4,4}", allowBlank = "false")
 				expect(user.valid()).toBeFalse()
 			})
 
 			/* validatesInclusionOf */
 			it("validatesInclusionOf_invalid", () => {
 				user.firstname = "tony"
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesInclusionOf_valid", () => {
 				user.firstname = "tony"
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris, tony")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris, tony")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesInclusionOf_missing_property_invalid", () => {
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris, tony")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris, tony")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesInclusionOf_missing_property_valid", () => {
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris, tony", allowblank = "true")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris, tony", allowblank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesInclusionOf_allowblank_valid", () => {
 				user.firstname = ""
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris", allowblank = "true")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris", allowblank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesInclusionOf_allowblank_invalid", () => {
 				user.firstname = ""
-				user.validatesExclusionOf(property = "firstname", list = "per, raul, chris", allowblank = "false")
+				user.validatesExclusionOf(properties = "firstname", list = "per, raul, chris", allowblank = "false")
 				expect(user.valid()).toBeFalse()
 			})
 
 			/* validatesLengthOf */
 			it("validatesLengthOf_maximum_minimum_invalid", () => {
 				user.firstname = "thi"
-				user.validatesLengthOf(property = "firstname", minimum = "5", maximum = "20")
+				user.validatesLengthOf(properties = "firstname", minimum = "5", maximum = "20")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesLengthOf_maximum_valid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", maximum = "20")
+				user.validatesLengthOf(properties = "firstname", maximum = "20")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesLengthOf_maximum_invalid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", maximum = "15")
+				user.validatesLengthOf(properties = "firstname", maximum = "15")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesLengthOf_missing_property_invalid", () => {
-				user.validatesLengthOf(property = "firstname", maximum = "15")
+				user.validatesLengthOf(properties = "firstname", maximum = "15")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesLengthOf_missing_property_valid", () => {
-				user.validatesLengthOf(property = "firstname", maximum = "15", allowblank = "true")
+				user.validatesLengthOf(properties = "firstname", maximum = "15", allowblank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesLengthOf_minimum_valid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", minimum = "15")
+				user.validatesLengthOf(properties = "firstname", minimum = "15")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesLengthOf_minimum_invalid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", minimum = "20")
+				user.validatesLengthOf(properties = "firstname", minimum = "20")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesLengthOf_within_valid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", within = "15,20")
+				user.validatesLengthOf(properties = "firstname", within = "15,20")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesLengthOf_within_invalid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", within = "10,15")
+				user.validatesLengthOf(properties = "firstname", within = "10,15")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesLengthOf_exactly_valid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", exactly = "16")
+				user.validatesLengthOf(properties = "firstname", exactly = "16")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesLengthOf_exactly_invalid", () => {
 				user.firstname = "thisisatestagain"
-				user.validatesLengthOf(property = "firstname", exactly = "20")
+				user.validatesLengthOf(properties = "firstname", exactly = "20")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesLengthOf_allowblank_valid", () => {
 				user.firstname = ""
-				user.validatesLengthOf(property = "firstname", allowblank = "true")
+				user.validatesLengthOf(properties = "firstname", allowblank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesLengthOf_allowblank_invalid", () => {
 				user.firstname = ""
-				user.validatesLengthOf(property = "firstname", allowblank = "false")
+				user.validatesLengthOf(properties = "firstname", allowblank = "false")
 				expect(user.valid()).toBeFalse()
 			})
 
 			/* validatesNumericalityOf */
 			it("validatesNumericalityOf_valid", () => {
 				user.birthdaymonth = "10"
-				user.validatesNumericalityOf(property = "birthdaymonth")
+				user.validatesNumericalityOf(properties = "birthdaymonth")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_invalid", () => {
 				user.birthdaymonth = "1,000.00"
-				user.validatesNumericalityOf(property = "birthdaymonth")
+				user.validatesNumericalityOf(properties = "birthdaymonth")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_missing_property_invalid", () => {
-				user.validatesNumericalityOf(property = "birthdaymonth", onlyInteger = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", onlyInteger = "true")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_missing_property_valid", () => {
-				user.validatesNumericalityOf(property = "birthdaymonth", onlyInteger = "true", allowblank = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", onlyInteger = "true", allowblank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_onlyInteger_valid", () => {
 				user.birthdaymonth = "1000"
-				user.validatesNumericalityOf(property = "birthdaymonth", onlyInteger = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", onlyInteger = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_onlyInteger_invalid", () => {
 				user.birthdaymonth = "1000.25"
-				user.validatesNumericalityOf(property = "birthdaymonth", onlyInteger = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", onlyInteger = "true")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_allowBlank_valid", () => {
 				user.birthdaymonth = ""
-				user.validatesNumericalityOf(property = "birthdaymonth", allowBlank = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", allowBlank = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_allowBlank_invalid", () => {
 				user.birthdaymonth = ""
-				user.validatesNumericalityOf(property = "birthdaymonth", allowBlank = "false")
+				user.validatesNumericalityOf(properties = "birthdaymonth", allowBlank = "false")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_greaterThan_valid", () => {
 				user.birthdaymonth = "11"
-				user.validatesNumericalityOf(property = "birthdaymonth", greatThan = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", greaterThan = "10")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_greaterThan_invalid", () => {
 				user.birthdaymonth = "10"
-				user.validatesNumericalityOf(property = "birthdaymonth", greaterThan = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", greaterThan = "10")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_greaterThanOrEqualTo_valid", () => {
 				user.birthdaymonth = "10"
-				user.validatesNumericalityOf(property = "birthdaymonth", greaterThanOrEqualTo = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", greaterThanOrEqualTo = "10")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_greaterThanOrEqualTo_invalid", () => {
 				user.birthdaymonth = "9"
-				user.validatesNumericalityOf(property = "birthdaymonth", greaterThanOrEqualTo = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", greaterThanOrEqualTo = "10")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_greaterThanOrEqualTo_invalid_float", () => {
 				user.birthdaymonth = "11.25"
-				user.validatesNumericalityOf(property = "birthdaymonth", greaterThanOrEqualTo = "11.30")
+				user.validatesNumericalityOf(properties = "birthdaymonth", greaterThanOrEqualTo = "11.30")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_equalTo_valid", () => {
 				user.birthdaymonth = "10"
-				user.validatesNumericalityOf(property = "birthdaymonth", equalTo = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", equalTo = "10")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_equalTo_invalid", () => {
 				user.birthdaymonth = "9"
-				user.validatesNumericalityOf(property = "birthdaymonth", equalTo = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", equalTo = "10")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_lessThan_valid", () => {
 				user.birthdaymonth = "9"
-				user.validatesNumericalityOf(property = "birthdaymonth", lessThan = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", lessThan = "10")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_lessThan_invalid", () => {
 				user.birthdaymonth = "10"
-				user.validatesNumericalityOf(property = "birthdaymonth", lessThan = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", lessThan = "10")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_lessThanOrEqualTo_valid", () => {
 				user.birthdaymonth = "10"
-				user.validatesNumericalityOf(property = "birthdaymonth", lessThanOrEqualTo = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", lessThanOrEqualTo = "10")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_lessThanOrEqualTo_invalid", () => {
 				user.birthdaymonth = "11"
-				user.validatesNumericalityOf(property = "birthdaymonth", lessThanOrEqualTo = "10")
+				user.validatesNumericalityOf(properties = "birthdaymonth", lessThanOrEqualTo = "10")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_odd_valid", () => {
 				user.birthdaymonth = "13"
-				user.validatesNumericalityOf(property = "birthdaymonth", odd = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", odd = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_odd_invalid", () => {
 				user.birthdaymonth = "14"
-				user.validatesNumericalityOf(property = "birthdaymonth", odd = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", odd = "true")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesNumericalityOf_even_valid", () => {
 				user.birthdaymonth = "14"
-				user.validatesNumericalityOf(property = "birthdaymonth", even = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", even = "true")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesNumericalityOf_even_invalid", () => {
 				user.birthdaymonth = "13"
-				user.validatesNumericalityOf(property = "birthdaymonth", even = "true")
+				user.validatesNumericalityOf(properties = "birthdaymonth", even = "true")
 				expect(user.valid()).toBeFalse()
 			})
 
 			/* validatesPresenceOf */
 			it("validatesPresenceOf_valid", () => {
 				user.firstname = "tony"
-				user.validatesPresenceOf(property = "firstname")
+				user.validatesPresenceOf(properties = "firstname")
 				expect(user.valid()).toBeTrue()
 			})
 
 			it("validatesPresenceOf_invalid", () => {
-				user.validatesPresenceOf(property = "firstname")
+				user.validatesPresenceOf(properties = "firstname")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesPresenceOf_invalid_when_blank", () => {
 				user.firstname = ""
-				user.validatesPresenceOf(property = "firstname")
+				user.validatesPresenceOf(properties = "firstname")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesPresenceOf_does_not_trim_properties", () => {
 				user.firstname = " "
-				user.validatesPresenceOf(property = "firstname")
+				user.validatesPresenceOf(properties = "firstname")
 				expect(user.valid()).toBeTrue()
 			})
 
 			/* validatesUniquenessOf */
 			it("validatesUniquenessOf_valid", () => {
 				user.firstname = "Tony"
-				user.validatesUniquenessOf(property = "firstname")
+				user.validatesUniquenessOf(properties = "firstname")
 				if (!IsBoolean(user.tableName()) OR user.tableName()) {
 					expect(user.valid()).toBeFalse()
 				} else {
@@ -889,7 +889,7 @@ component extends="wheels.Testbox" {
 
 			it("validatesUniquenessOf_valids_when_updating_existing_record", () => {
 				user = g.model("user").findOne(where = "firstName = 'Tony'")
-				user.validatesUniquenessOf(property = "firstName")
+				user.validatesUniquenessOf(properties = "firstName")
 				expect(user.valid()).toBeTrue()
 				// Special case for testing when we already have duplicates in the database:
 				// https://github.com/wheels-dev/wheels/issues/480
@@ -922,21 +922,21 @@ component extends="wheels.Testbox" {
 
 			it("validatesUniquenessOf_with_blank_property_value", () => {
 				user.blank = ""
-				user.validatesUniquenessOf(property = "blank")
+				user.validatesUniquenessOf(properties = "blank")
 				expect(user.valid()).toBeFalse()
 			})
 
 			it("validatesUniquenessOf_with_blank_property_value_with_allowBlank", () => {
 				user.blank = ""
-				user.validatesUniquenessOf(property = "blank", allowBlank = true)
+				user.validatesUniquenessOf(properties = "blank", allowBlank = true)
 				expect(user.valid()).toBeTrue()
 			})
 
 			/* validate */
 			it("validate_registering_methods", () => {
 				user.firstname = "tony"
-				user.validate(method = "fakemethod")
-				user.validate(method = "fakemethod2", when = "onCreate")
+				user.validate(methods = "fakemethod")
+				user.validate(methods = "fakemethod2", when = "onCreate")
 				v = user.$classData().validations
 				onsave = v["onsave"]
 				oncreate = v["oncreate"]

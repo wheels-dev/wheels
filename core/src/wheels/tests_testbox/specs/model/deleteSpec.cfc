@@ -63,7 +63,7 @@ component extends="wheels.Testbox" {
 
 			it("works", () => {
 				transaction action="begin" {
-					g.model("author").deleteAll()
+					g.model("author").deleteAll();
 					allAuthors = g.model("author").findAll()
 					transaction action="rollback";
 				}
@@ -97,7 +97,7 @@ component extends="wheels.Testbox" {
 
 			it("permanent deletes all of soft deleted records", () => {
 				transaction action="begin" {
-					g.model("post").deleteAll()
+					g.model("post").deleteAll();
 					g.model("post").deleteAll(includeSoftDeletes = true, softDelete = false)
 					postsWithoutSoftDeletes = g.model("post").findAll()
 					postsWithSoftDeletes = g.model("post").findAll(includeSoftDeletes = true)
@@ -113,7 +113,7 @@ component extends="wheels.Testbox" {
 
 			it("works", () => {
 				transaction action="begin" {
-					local.author = g.model("author").findOne()
+					local.author = g.model("author").findOne();
 					g.model("author").deleteByKey(local.author.id)
 					allAuthors = g.model("author").findAll()
 					transaction action="rollback";
@@ -124,7 +124,7 @@ component extends="wheels.Testbox" {
 
 			it("soft works", () => {
 				transaction action="begin" {
-					local.post = g.model("post").findOne()
+					local.post = g.model("post").findOne();
 					g.model("post").deleteByKey(local.post.id)
 					postsWithoutSoftDeletes = g.model("post").findAll(includeSoftDeletes = false)
 					postsWithSoftDeletes = g.model("post").findAll(includeSoftDeletes = true)
@@ -137,7 +137,7 @@ component extends="wheels.Testbox" {
 
 			it("permanent works", () => {
 				transaction action="begin" {
-					local.post = g.model("post").findOne()
+					local.post = g.model("post").findOne();
 					g.model("post").deleteByKey(key = local.post.id, softDelete = false)
 					postsWithoutSoftDeletes = g.model("post").findAll()
 					postsWithSoftDeletes = g.model("post").findAll(includeSoftDeletes = true)
@@ -153,7 +153,7 @@ component extends="wheels.Testbox" {
 
 			it("works", () => {
 				transaction action="begin" {
-					g.model("author").deleteOne()
+					g.model("author").deleteOne();
 					allAuthors = g.model("author").findAll()
 					transaction action="rollback";
 				}
@@ -163,7 +163,7 @@ component extends="wheels.Testbox" {
 
 			it("soft works", () => {
 				transaction action="begin" {
-					g.model("post").deleteOne()
+					g.model("post").deleteOne();
 					postsWithoutSoftDeletes = g.model("post").findAll()
 					postsWithSoftDeletes = g.model("post").findAll(includeSoftDeletes = true)
 					transaction action="rollback";
@@ -175,7 +175,7 @@ component extends="wheels.Testbox" {
 
 			it("permanent works", () => {
 				transaction action="begin" {
-					g.model("post").deleteOne(softDelete = false)
+					g.model("post").deleteOne(softDelete = false);
 					postsWithoutSoftDeletes = g.model("post").findAll()
 					postsWithSoftDeletes = g.model("post").findAll(includeSoftDeletes = true)
 					transaction action="rollback";
@@ -187,7 +187,7 @@ component extends="wheels.Testbox" {
 
 			it("permanent deletes one of soft deleted records", () => {
 				transaction action="begin" {
-					local.post = g.model("post").findOne()
+					local.post = g.model("post").findOne();
 					g.model("post").deleteOne(where = "id = #local.post.id#")
 					g.model("post").deleteOne(where = "id = #local.post.id#", includeSoftDeletes = true, softDelete = false)
 					postsWithoutSoftDeletes = g.model("post").findAll()
