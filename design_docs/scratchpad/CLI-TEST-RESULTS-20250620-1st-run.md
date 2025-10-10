@@ -24,9 +24,9 @@
 
 **Output**:
 ```
-CFWheels CLI Module 3.0.0-SNAPSHOT
+Wheels CLI Module 3.0.0-SNAPSHOT
 
-CFWheels Version: 3.0.0-SNAPSHOT
+Wheels Version: 3.0.0-SNAPSHOT
 CFML Engine: wheels Unknown
 CommandBox Version: 6.2.1+00830
 ```
@@ -195,7 +195,7 @@ Issues Found (4):
 Warnings (4):
   ⚠ Missing recommended directory: db/migrate
   ⚠ No database configuration found
-  ⚠ CFWheels not listed in dependencies
+  ⚠ Wheels not listed in dependencies
   ⚠ Modules not installed (run 'box install')
 
 ======================================================================

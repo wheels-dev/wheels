@@ -90,7 +90,7 @@ wheels generate scaffold Category --properties="name:string" --migrate=true
 
 ### Command Line Parameter Formats
 
-Building on CommandBox's parameter syntax, CFWheels scaffold generation supports:
+Building on CommandBox's parameter syntax, Wheels scaffold generation supports:
 
 #### 1. Positional Parameters (Basic)
 ```bash
@@ -696,7 +696,7 @@ wheels generate scaffold Product --properties="name:string,price:decimal"
 # Use colon separator and comma between properties
 wheels generate scaffold Product --properties="name:string,price:decimal,stock:integer"
 
-# Use valid CFWheels property types
+# Use valid Wheels property types
 wheels generate scaffold Product --properties="name:string,price:decimal,description:text,active:boolean"
 ```
 

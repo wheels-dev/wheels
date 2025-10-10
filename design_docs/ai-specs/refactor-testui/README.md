@@ -1,6 +1,6 @@
-# CFWheels TestUI Modernization Plan
+# Wheels TestUI Modernization Plan
 
-This document outlines the comprehensive plan for modernizing the CFWheels TestUI, including a fresh visual design, improved functionality, and Docker container integration.
+This document outlines the comprehensive plan for modernizing the Wheels TestUI, including a fresh visual design, improved functionality, and Docker container integration.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ This document outlines the comprehensive plan for modernizing the CFWheels TestU
 
 ## Current State Assessment
 
-The existing CFWheels TestUI is a basic web interface that provides functionality for running tests against different CFML engines and database combinations. Its limitations include:
+The existing Wheels TestUI is a basic web interface that provides functionality for running tests against different CFML engines and database combinations. Its limitations include:
 
 - Outdated visual design (Bootstrap 4.4.1)
 - Limited user feedback and interaction

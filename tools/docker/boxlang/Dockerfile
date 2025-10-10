@@ -3,10 +3,10 @@ FROM ortussolutions/commandbox:latest
 LABEL maintainer "Wheels Core Team"
 
 ENV PORT 60001
-ENV APP_DIR                 "/cfwheels-test-suite"
+ENV APP_DIR                 "/wheels-test-suite"
 ENV HEALTHCHECK_URI         "http://127.0.0.1:60001/"
 ENV ENV_MODE                "remote"
-ENV BOX_SERVER_CFCONFIGFILE "/cfwheels-test-suite/CFConfig.json"
+ENV BOX_SERVER_CFCONFIGFILE "/wheels-test-suite/CFConfig.json"
 ENV BOX_SERVER_PROFILE      "none"
 ENV BOX_INSTALL             TRUE
 

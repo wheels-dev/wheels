@@ -1,6 +1,6 @@
 # wheels test run
 
-Run TestBox tests for your CFWheels application using the TestBox CLI integration.
+Run TestBox tests for your Wheels application using the TestBox CLI integration.
 
 > **Note:** This command replaces the deprecated `wheels test` command.
 

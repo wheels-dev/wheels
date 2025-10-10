@@ -1,5 +1,5 @@
 {
-    "name": "cfwheels-test-suite-lucee5",
+    "name": "wheels-test-suite-lucee5",
     "version": "1.0.0",
     "dependencies": {
         "wirebox": "^7.0.0",
