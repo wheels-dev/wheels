@@ -70,7 +70,6 @@
     * [wheels config dump](command-line-tools/commands/config/config-dump.md)
   * Docker Commands
     * [wheels docker init](command-line-tools/commands/docker/docker-init.md)
-    * [wheels docker deploy](command-line-tools/commands/docker/docker-deploy.md)
   * Get Commands
     * [wheels get environment](command-line-tools/commands/get/get-environment.md)
     * [wheels get settings](command-line-tools/commands/get/get-settings.md)
