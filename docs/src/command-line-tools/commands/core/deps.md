@@ -180,7 +180,7 @@ The command manages two dependency sections in box.json:
 ```json
 {
   "devDependencies": {
-    "testbox": "^5",
+    "testbox": "^6",
     "commandbox-cfformat": "*"
   }
 }

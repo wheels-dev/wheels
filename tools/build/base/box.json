@@ -42,7 +42,7 @@
     "dependencies":{
         "wheels-core":"@build.version@",
 				"wirebox":"^7",
-				"testbox":"^5"
+				"testbox":"^6"
     },
     "private":false,
     "license":[

@@ -1,10 +1,10 @@
 # Testing Your Application
 
-This guide provides comprehensive instructions for testing your Wheels 3.0 application using TestBox 5. Wheels 3.0 now includes TestBox integration as an enabled option, moving beyond the legacy RocketUnit framework. TestBox is already included in your installation through box.json dependency management.
+This guide provides comprehensive instructions for testing your Wheels 3.0 application using TestBox 6. Wheels 3.0 now includes TestBox integration as an enabled option, moving beyond the legacy RocketUnit framework. TestBox is already included in your installation through box.json dependency management.
 
 ## Overview
 
-TestBox 5 is a next-generation testing framework for ColdFusion (CFML) based on BDD (Behavior Driven Development) and TDD (Test Driven Development), providing a clean, obvious syntax for writing tests. It serves as a comprehensive testing engine with multi-format output capabilities and database testing support.
+TestBox 65 is a next-generation testing framework for ColdFusion (CFML) based on BDD (Behavior Driven Development) and TDD (Test Driven Development), providing a clean, obvious syntax for writing tests. It serves as a comprehensive testing engine with multi-format output capabilities and database testing support.
 
 For comprehensive TestBox documentation, refer to the [official TestBox documentation](https://testbox.ortusbooks.com/).
 
@@ -19,7 +19,7 @@ For comprehensive TestBox documentation, refer to the [official TestBox document
 - Test skipping and labels
 - Code coverage via FusionReactor
 
-For a complete list of features, see the [TestBox Features documentation](https://testbox.ortusbooks.com/v5.x/overview/features).
+For a complete list of features, see the [TestBox Features documentation](https://testbox.ortusbooks.com/v6.x/getting-started/overview).
 
 ## Project Directory Structure
 
@@ -55,7 +55,7 @@ your-app/
 
 Update `tests/runner.cfm`:
 
-For detailed information on TestBox runners and configuration options, refer to the [TestBox Runners documentation](https://testbox.ortusbooks.com/v5.x/getting-started/running-tests).
+For detailed information on TestBox runners and configuration options, refer to the [TestBox Runners documentation](https://testbox.ortusbooks.com/v6.x/getting-started/running-tests).
 
 ```cfscript
 <!--- TestBox Test Runner for Wheels 3.0 --->
@@ -284,9 +284,9 @@ Update `tests/populate.cfm` for test database setup:
 
 ## Writing Controller Tests
 
-TestBox 5 test bundles should extend `wheels.Testbox` and use BDD syntax with `describe()`, `it()`, and `expect()`.
+TestBox 6 test bundles should extend `wheels.Testbox` and use BDD syntax with `describe()`, `it()`, and `expect()`.
 
-For comprehensive information on TestBox BDD syntax and expectations, see the [TestBox BDD documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer) and [TestBox Expectations documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer/expectations).
+For comprehensive information on TestBox BDD syntax and expectations, see the [TestBox BDD documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer) and [TestBox Expectations documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations).
 
 ### Example Controller Testing
 
@@ -543,7 +543,7 @@ component extends="wheels.Testbox" {
 
 ## Writing Function Tests
 
-For detailed information on testing functions and utility methods, refer to the [TestBox Unit Testing documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-xunit-primer).
+For detailed information on testing functions and utility methods, refer to the [TestBox Unit Testing documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-xunit-primer).
 
 ### Example Function Testing
 
@@ -642,7 +642,7 @@ http://localhost:8080/wheels/app/tests?format=json
 http://localhost:8080/wheels/app/tests?format=txt
 ```
 
-For more information on running tests and available formats, see the [TestBox Web Runner documentation](https://testbox.ortusbooks.com/v5.x/getting-started/running-tests/test-runner).
+For more information on running tests and available formats, see the [TestBox Web Runner documentation](https://testbox.ortusbooks.com/v6.x/getting-started/running-tests/test-runner).
 
 ### Framework Core Testing
 
@@ -718,11 +718,17 @@ Your test suite should provide comprehensive coverage for:
 - Validation rules
 - Custom algorithms
 
-For detailed guidance on what to test and testing strategies, see the [TestBox Testing Code Coverage documentation](https://testbox.ortusbooks.com/v5.x/digging-deeper/introduction).
+For detailed guidance on what to test and testing strategies, see the [TestBox Testing Code Coverage documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/introduction).
 
 ## Best Practices
 
-For comprehensive testing best practices and advanced techniques, refer to the [TestBox Testing documentation](https://testbox.ortusbooks.com/v5.x/digging-deeper/life-cycle-methods).
+For comprehensive testing best practices and advanced techniques, refer to the [TestBox Testing documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods).
+
+{% hint style="info" %}
+**Naming Convention for Test Specs**
+
+Always name your test specs with `Test` or `Spec` in their filename, otherwise TestBox 6 won’t detect and run them.
+{% endhint %}
 
 ---
 
@@ -1096,7 +1102,7 @@ The RocketUnit framework was tightly integrated with the Wheels framework, provi
 
 ### Migration from Legacy RocketUnit to TestBox
 
-When migrating from the legacy RocketUnit system to TestBox 5, consider the following mapping:
+When migrating from the legacy RocketUnit system to TestBox 6, consider the following mapping:
 
 #### Syntax Migration
 
@@ -1110,6 +1116,7 @@ When migrating from the legacy RocketUnit system to TestBox 5, consider the foll
 - `tests/functions/` → `tests/specs/functions/`
 - `tests/requests/` → `tests/specs/controllers/`
 - Component extensions change from `app.tests.Test` to `wheels.Testbox`
+- File names changed to include `Spec` or `Test` to align with TestBox 6 naming requirements
 
 #### Lifecycle Migration
 
