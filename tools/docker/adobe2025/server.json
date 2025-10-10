@@ -18,6 +18,12 @@
 			"libDirs":"tools/docker/adobe2025/lib",
 			"serverHomeDirectory":".engine/adobe2025"
 	},
+	"jvm":{
+        "javaVersion":"openjdk21_jdk"
+    },
+	"runwar":{
+       		"version":"^6.0.0"
+   	},
 	"cfconfigFile":"CFConfig.json",
 	"scripts":{
         "onServerInstall":"cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle"

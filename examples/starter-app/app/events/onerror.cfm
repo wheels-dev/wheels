@@ -1,7 +1,7 @@
 <!--- Place HTML here that should be displayed when an error is encountered while running in "production" mode. --->
 <cfswitch expression="#arguments.exception.cause.type#">
 	<cfcase value="app.AccessDenied">
-		<cfheader statuscode="403" statustext="Access Denied">
+		<cfheader statuscode="403">
 		<h1>Denied!</h1>
 		<p>
 			Sorry, but you're not allowed to access that.

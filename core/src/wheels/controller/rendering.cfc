@@ -728,7 +728,7 @@ component {
 			local.statusText = local.status;
 		}
 		if (local.statusCode != $statusCode()) {
-			$header(statusCode = local.statusCode, statusText = local.statusText);
+			$header(statusCode = local.statusCode);
 		}
 	}
 

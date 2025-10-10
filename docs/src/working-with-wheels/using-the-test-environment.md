@@ -6,7 +6,7 @@ Wheels includes a comprehensive test environment specifically designed for testi
 
 The Wheels test environment uses Docker containers to provide a standardized setup for testing core framework functionality across:
 
-- Multiple CFML engines (Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023, BoxLang 1.x)
+- Multiple CFML engines (Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023/2025, BoxLang 1.x)
 - Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2, Oracle)
 - A modern test user interface (TestUI)
 - Automated test execution capabilities
@@ -108,6 +108,7 @@ Besides this, test environment supports multiple profiles that you can run indiv
 | `adobe2018` | Adobe ColdFusion 2018 engine |
 | `adobe2021` | Adobe ColdFusion 2021 engine |
 | `adobe2023` | Adobe ColdFusion 2023 engine |
+| `adobe2025` | Adobe ColdFusion 2025 engine |
 | `boxlang` | BoxLang 1 engine |
 | `mysql` | MySQL database only |
 | `postgres` | PostgreSQL database only |
@@ -208,13 +209,14 @@ box wheels test app --testBundles=controllers
 
 | Engine | Container Name | Port |
 |--------|----------------|------|
-| Lucee 5 | wheels-test-lucee5 | 60005 |
-| Lucee 6 | wheels-test-lucee6 | 60006 |
-| Lucee 7 | wheels-test-lucee7 | 60007 |
-| Adobe 2018 | wheels-test-adobe2018 | 62018 |
-| Adobe 2021 | wheels-test-adobe2021 | 62021 |
-| Adobe 2023 | wheels-test-adobe2023 | 62023 |
-| Boxlang 1 | wheels-test-boxlang | 60001 |
+| Lucee 5 | cfwheels-test-lucee5 | 60005 |
+| Lucee 6 | cfwheels-test-lucee6 | 60006 |
+| Lucee 7 | cfwheels-test-lucee7 | 60007 |
+| Adobe 2018 | cfwheels-test-adobe2018 | 62018 |
+| Adobe 2021 | cfwheels-test-adobe2021 | 62021 |
+| Adobe 2023 | cfwheels-test-adobe2023 | 62023 |
+| Adobe 2025 | cfwheels-test-adobe2025 | 62025 |
+| Boxlang 1 | cfwheels-test-boxlang | 60001 |
 
 ### Databases
 

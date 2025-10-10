@@ -1,8 +1,8 @@
 <cfsilent>
 <cfif testResults.numErrors || testResults.numFailures>
-	<cfheader statuscode="417" statustext="Expectation Failed" />
+	<cfheader statuscode="417" />
 <cfelse>
-	<cfheader statuscode="200" statustext="OK" />
+	<cfheader statuscode="200" />
 </cfif>
 <!---cfscript>
   content(type="text/json");

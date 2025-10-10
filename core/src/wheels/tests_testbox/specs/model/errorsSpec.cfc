@@ -7,7 +7,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that associatedErrors", () => {
 
 			it("returns array including associated model errors", () => {
-				user = g.model("user").findOne()
+				user = g.model("user").findOne();
 				user.addError("firstname", "firstname error1")
 				user.author = g.model("author").findOne(include = "profile")
 				user.author.addError("lastname", "lastname error1")
@@ -17,7 +17,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("returns array including associated model errors deeply", () => {
-				user = g.model("user").findOne()
+				user = g.model("user").findOne();
 				user.addError("firstname", "firstname error1")
 				user.author = g.model("author").findOne(include = "profile")
 				user.author.addError("lastname", "lastname error1")
@@ -28,7 +28,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("returns array including associated model errors and handles circular reference", () => {
-				user = g.model("user").findOne()
+				user = g.model("user").findOne();
 				user.addError("firstname", "firstname error1")
 				user.author = g.model("author").findOne(include = "profile")
 				user.author.addError("lastname", "lastname error1")

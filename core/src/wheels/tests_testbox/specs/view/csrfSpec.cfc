@@ -22,7 +22,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that csrfMetaTags", () => {
 
 			it("contains csrfparam meta tag", () => {
-				tags = _controller.csrfMetaTags()
+				tags = _controller.csrfMetaTags();
 				csrfParamTag = '<meta content="authenticityToken" name="csrf-param">'
 
 				expect(tags).toInclude(csrfParamTag)

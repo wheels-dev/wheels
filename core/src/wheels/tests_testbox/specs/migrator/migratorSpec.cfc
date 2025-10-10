@@ -24,7 +24,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that getAvailableMigrations", () => {
 
 			it("is returning expected value", () => {
-				available = migrator.getAvailableMigrations()
+				available = migrator.getAvailableMigrations();
 				actual = ""
 				for (local.i in available) {
 					actual = ListAppend(actual, local.i.version)

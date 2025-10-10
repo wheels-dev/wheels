@@ -8,7 +8,7 @@ cfheader(name="Access-Control-Allow-Methods", value="GET, POST, OPTIONS");
 cfheader(name="Access-Control-Allow-Headers", value="Content-Type, Accept, Mcp-Session-Id");
 
 if (cgi.request_method == "OPTIONS") {
-	cfheader(statusCode="200", statusText="OK");
+	cfheader(statusCode="200");
 	abort;
 }
 

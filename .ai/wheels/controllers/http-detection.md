@@ -182,7 +182,7 @@ component extends="Controller" {
             user = model("User").findByKey(params.key);
             local.status = IsObject(user) ? 200 : 404;
 
-            cfheader(statusCode=local.status, statusText="");
+            cfheader(statusCode=local.status);
             abort;
 
         } else {

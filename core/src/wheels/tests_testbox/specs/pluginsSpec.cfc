@@ -361,7 +361,7 @@ component extends="wheels.Testbox" {
 	}
 
 	function $readTestFile() {
-		return FileRead($testFile())
+		return trim(FileRead($testFile()))
 	}
 
 	function $testFile() {

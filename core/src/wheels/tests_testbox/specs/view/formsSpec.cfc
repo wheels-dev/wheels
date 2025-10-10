@@ -61,7 +61,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("works with defaults", () => {
-				r = _controller.buttonTag()
+				r = _controller.buttonTag();
 				e = '<button type="submit" value="save">Save changes</button>'
 
 				expect(e).toBe(r)
@@ -508,7 +508,7 @@ component extends="wheels.Testbox" {
 
 			it("adds automatic label in error message", () => {
 				tag = tagModel.new()
-				tag.validatesPresenceOf(property = "name")
+				tag.validatesPresenceOf(properties = "name")
 				tag.valid()
 				errors = tag.errorsOn(property = "name")
 
@@ -518,7 +518,7 @@ component extends="wheels.Testbox" {
 
 			it("adds automatic label in error message with non persisted property", () => {
 				tag = tagModel.new()
-				tag.validatesPresenceOf(property = "virtual")
+				tag.validatesPresenceOf(properties = "virtual")
 				tag.valid()
 				errors = tag.errorsOn(property = "virtual")
 
@@ -988,7 +988,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("works with defaults", () => {
-				actual = _controller.submitTag()
+				actual = _controller.submitTag();
 				expected = '<input type="submit" value="Save changes">'
 
 				expect(actual).toBe(expected)

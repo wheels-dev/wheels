@@ -89,11 +89,11 @@ component extends="wheels.Global" {
 				} else {
 					if (local.format == "json") {
 						$header(name = "Content-Type", value = "application/json");
-						$header(statusCode = 500, statusText = "Internal Server Error");
+						$header(statusCode = 500);
 						local.rv = SerializeJSON(arguments.exception);
 					} else if (local.format == "xml") {
 						$header(name = "Content-Type", value = "text/xml");
-						$header(statusCode = 500, statusText = "Internal Server Error");
+						$header(statusCode = 500);
 						local.rv = $toXml(arguments.exception);
 					} else {
 						// Default behavior: throw the exception for HTML display
@@ -101,7 +101,7 @@ component extends="wheels.Global" {
 					}
 				}
 			} else {
-				$header(statusCode = 500, statusText = "Internal Server Error");
+				$header(statusCode = 500);
 				
 				local.format = $getRequestFormat();
 				local.formatSpecificTemplate = "#application.wheels.eventPath#/onerror.#local.format#.cfm";
@@ -186,7 +186,7 @@ component extends="wheels.Global" {
 				}
 			}
 			if (!local.makeException) {
-				$header(statusCode = 503, statustext = "Service Unavailable");
+				$header(statusCode = 503);
 
 				// Set the content to be displayed in maintenance mode to a request variable and exit the function.
 				// This variable is then checked in the Wheels $request function (which is what sets what to render).
@@ -259,7 +259,7 @@ component extends="wheels.Global" {
 
 	public void function $runOnMissingTemplate(required targetpage) {
 		if (!application.wheels.showErrorInformation) {
-			$header(statusCode = 404, statustext = "Not Found");
+			$header(statusCode = 404);
 		}
 		$includeAndOutput(template = "#application.wheels.eventPath#/onmissingtemplate.cfm");
 		abort;
