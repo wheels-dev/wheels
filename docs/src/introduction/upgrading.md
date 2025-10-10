@@ -60,7 +60,7 @@ It covers compatibility changes, the new folder structure, and the **CommandBox 
 * **No longer supported:** Adobe ColdFusion 2016 and earlier.
 * **Supported engines:**
 
-  * Adobe ColdFusion 2018+ (except Adobe ColdFusion 2025)
+  * Adobe ColdFusion 2018+
   * Lucee 5+
   * BoxLang
 

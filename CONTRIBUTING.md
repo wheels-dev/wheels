@@ -43,7 +43,7 @@ We welcome contributions via **Issues** and **Pull Requests (PRs)**. Before you 
 
 **System Requirements:**
 
-* Adobe ColdFusion 2018/2021/2023 OR Lucee 5/6/7
+* Adobe ColdFusion 2018/2021/2023/2025 OR Lucee 5/6/7
 * Supported database: H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle
 * Git for version control
 
@@ -191,10 +191,9 @@ Wheels 3.0 includes these core dependencies (automatically managed):
 
 **CFML Engine Compatibility:**
 
-* Adobe ColdFusion 2018+ (2018,2021,2023)
+* Adobe ColdFusion 2018+ (2018,2021,2023,2025)
 * Lucee 5+ (5,6,7)
 * ❌ Adobe ColdFusion 2016 (deprecated)
-* ❌ Adobe ColdFusion 2025 (not yet supported)
 
 ---
 

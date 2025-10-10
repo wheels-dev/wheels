@@ -27,7 +27,7 @@ In this [Beginner Tutorial: Hello World][2], we'll be writing a simple applicati
 
 **CFML Engines:**
 
-- **Adobe ColdFusion**: 2018, 2021, 2023
+- **Adobe ColdFusion**: 2018, 2021, 2023, 2025
 - **Lucee**: 5.x, 6.x, 7.x
 - **BoxLang**: 1.x
 
@@ -148,7 +148,7 @@ Please report any errors you encounter on our [issue tracker][4]. When reporting
 
 Wheels supports the following CFML engines:
 
-- **Adobe ColdFusion**: 2018, 2021, 2023
+- **Adobe ColdFusion**: 2018, 2021, 2023, 2025
 - **Lucee**: 5.x, 6.x, 7.x
 - **BoxLang**: 1.x
 
