@@ -1346,7 +1346,7 @@ Using `application.wo` effectively in your tests provides deep access to the Whe
 
 ### Documentation Links
 - [TestBox Documentation](https://testbox.ortusbooks.com/) - Complete TestBox guide
-- [MockBox Documentation](https://testbox.ortusbooks.com/v5.x/mockbox) - Mocking framework
+- [MockBox Documentation](https://testbox.ortusbooks.com/v6.x/mockbox) - Mocking framework
 - [Wheels Testing Guide](https://wheels.dev/3.0.0/guides/working-with-wheels/testing-your-application) - Framework-specific testing
 
 ### Common Matchers
