@@ -129,7 +129,7 @@ At your project root, define dependencies and where they should be installed:
     "version": "1.0.0",
     "dependencies": {
         "wirebox": "^7.0.0",
-        "testbox": "^5.0.0",
+        "testbox": "^6.0.0",
         "wheels-core": "^3.0.0-SNAPSHOT"
     },
     "installPaths": {

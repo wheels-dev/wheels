@@ -561,10 +561,10 @@ curl -s http://localhost:8080/posts | grep -c '<article' && echo "posts displaye
 ## Modern TestBox Resources
 
 For comprehensive TestBox 5 documentation:
-- [TestBox BDD Documentation](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer)
-- [TestBox Expectations](https://testbox.ortusbooks.com/v5.x/getting-started/testbox-bdd-primer/expectations)
-- [MockBox Documentation](https://testbox.ortusbooks.com/v5.x/mocking/mockbox)
-- [TestBox Life-cycle Methods](https://testbox.ortusbooks.com/v5.x/digging-deeper/life-cycle-methods)
+- [TestBox BDD Documentation](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer)
+- [TestBox Expectations](https://testbox.ortusbooks.com/v6.x/getting-started/testbox-bdd-primer/expectations)
+- [MockBox Documentation](https://testbox.ortusbooks.com/v6.x/mocking/mockbox)
+- [TestBox Life-cycle Methods](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods)
 
 ## Related Documentation
 - [View Architecture](./architecture.md)
