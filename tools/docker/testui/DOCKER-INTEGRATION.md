@@ -92,7 +92,7 @@ If the container cannot access services on the host machine:
 
 2. Check if the host services are running and accessible from the container:
    ```bash
-   docker exec -it cfwheels-testui curl host.docker.internal:60005
+   docker exec -it wheels-testui curl host.docker.internal:60005
    ```
 
 ### API Proxy Issues
@@ -101,12 +101,12 @@ If API requests are not being properly proxied:
 
 1. Check the NGINX configuration in the container:
    ```bash
-   docker exec -it cfwheels-testui cat /etc/nginx/conf.d/default.conf
+   docker exec -it wheels-testui cat /etc/nginx/conf.d/default.conf
    ```
 
 2. Check the NGINX logs:
    ```bash
-   docker exec -it cfwheels-testui tail -f /var/log/nginx/error.log
+   docker exec -it wheels-testui tail -f /var/log/nginx/error.log
    ```
 
 ## Docker Socket Integration
@@ -139,18 +139,18 @@ If the TestUI cannot access the Docker socket:
 
 1. Check if the Docker socket is properly mounted:
    ```bash
-   docker exec -it cfwheels-testui ls -la /var/run/docker.sock
+   docker exec -it wheels-testui ls -la /var/run/docker.sock
    ```
 
 2. Verify the entrypoint script ran correctly:
    ```bash
-   docker logs cfwheels-testui
+   docker logs wheels-testui
    ```
 
 3. Check NGINX permissions:
    ```bash
-   docker exec -it cfwheels-testui id nginx
-   docker exec -it cfwheels-testui ls -la /var/run/docker.sock
+   docker exec -it wheels-testui id nginx
+   docker exec -it wheels-testui ls -la /var/run/docker.sock
    ```
 
 ## Container Management Features
@@ -219,7 +219,7 @@ docker compose logs testui
 curl http://localhost:3001/health
 
 # Test from inside testui container
-docker exec -it cfwheels-testui-1 wget -qO- http://testui-api:3001/health
+docker exec -it wheels-testui-1 wget -qO- http://testui-api:3001/health
 
 # Test NGINX proxy
 curl http://localhost:3000/api/compose/health
@@ -245,8 +245,8 @@ If you see "Mounts denied" errors when the API tries to start containers:
 - The COMPOSE_PROJECT_DIRECTORY environment variable helps Docker resolve relative paths
 
 #### NGINX proxy errors
-- Verify NGINX config: `docker exec -it cfwheels-testui-1 cat /etc/nginx/conf.d/default.conf | grep testui-api`
-- Check NGINX error logs: `docker exec -it cfwheels-testui-1 cat /var/log/nginx/error.log`
+- Verify NGINX config: `docker exec -it wheels-testui-1 cat /etc/nginx/conf.d/default.conf | grep testui-api`
+- Check NGINX error logs: `docker exec -it wheels-testui-1 cat /var/log/nginx/error.log`
 
 ### 4. Monitoring Logs
 

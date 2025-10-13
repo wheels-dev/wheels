@@ -683,7 +683,7 @@ component {
             var boxJson = deserializeJSON(fileRead(boxJsonPath));
 
             // Update wheels dependency
-            boxJson.dependencies.cfwheels = "^#version#";
+            boxJson.dependencies.wheels = "^#version#";
 
             fileWrite(boxJsonPath, serializeJSON(boxJson, false, false));
         }

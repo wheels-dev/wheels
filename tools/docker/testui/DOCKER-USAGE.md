@@ -39,7 +39,7 @@ If you encounter issues:
 
 1. **Container not starting**: Check Docker logs
    ```bash
-   docker logs cfwheels-testui-1
+   docker logs wheels-testui-1
    ```
 
 2. **API Proxy Issues**: The container is configured to proxy API requests to the appropriate CFML engines. Make sure those engines are running:

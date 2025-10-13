@@ -55,7 +55,7 @@ CommandBox Version: 6.2.1+00830
 '--'   '--'`--' `--' `----' `----'`--'`----'      `-----'`-----'`--' 
 ============================ Wheels CLI ============================
 Current Working Directory: /Users/peter/projects/wheels/
-CommandBox Module Root: /cfwheels-cli/
+CommandBox Module Root: /wheels-cli/
 Current Wheels Version in this directory: 3.0.0-SNAPSHOT
 ====================================================================
 ```
@@ -89,7 +89,7 @@ Wheels Framework
 
 Wheels CLI
   Version: 3.0.0-SNAPSHOT
-  Location: /cfwheels-cli/
+  Location: /wheels-cli/
 
 Application
   Path: /Users/peter/projects/wheels/

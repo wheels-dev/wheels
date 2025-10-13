@@ -560,7 +560,7 @@ component extends="Model" {
         // Nested properties for associations
         nestedProperties(association="addresses", allowDelete=true, autoSave=true);
 
-        // Custom finder methods (CFWheels doesn't have scope() - use custom finder methods instead)
+        // Custom finder methods (Wheels doesn't have scope() - use custom finder methods instead)
     }
 
     function findByEmail(required string email) {
@@ -1030,7 +1030,7 @@ function onError(exception, eventname) {
 
 ### Association Errors
 **"Missing argument name" in hasMany()**
-This error occurs when mixing positional and named parameters in CFWheels function calls:
+This error occurs when mixing positional and named parameters in Wheels function calls:
 
 ❌ **Incorrect (mixed parameter styles):**
 ```cfm
@@ -1047,11 +1047,11 @@ hasMany(name="comments", dependent="delete");
 hasMany("comments");
 ```
 
-CFWheels requires consistent parameter syntax - either all positional or all named parameters.
+Wheels requires consistent parameter syntax - either all positional or all named parameters.
 
 ### Routing Issues
 **Incorrect .resources() syntax**
-CFWheels resource routing syntax differs from Rails:
+Wheels resource routing syntax differs from Rails:
 
 ❌ **Incorrect (Rails-style nested):**
 ```cfm
@@ -1069,7 +1069,7 @@ CFWheels resource routing syntax differs from Rails:
 **Route ordering matters:** resources → custom routes → root → wildcard
 
 ### Form Helper Limitations
-CFWheels has more limited form helpers compared to Rails:
+Wheels has more limited form helpers compared to Rails:
 
 ❌ **Not available:**
 ```cfm
@@ -1097,7 +1097,7 @@ execute("INSERT INTO posts (title, createdAt, updatedAt) VALUES ('My Post', NOW(
 ```
 
 ### Debugging Tips
-1. Check CFWheels documentation - don't assume Rails conventions work
+1. Check Wheels documentation - don't assume Rails conventions work
 2. Use simple patterns first, add complexity incrementally
 3. Test associations and routes in isolation
 4. Use `?reload=true` after configuration changes

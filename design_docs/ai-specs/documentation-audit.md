@@ -71,7 +71,7 @@ Conduct a comprehensive audit of Wheels 3.0 documentation while simultaneously i
 **Tasks**:
 
 - Validate all internal links between documentation files
-- Check external links (especially to cfwheels.org, GitHub, ForgeBox, etc.)
+- Check external links (especially to wheels.dev, GitHub, ForgeBox, etc.)
 - Verify code examples compile and work correctly
 - Check image references and embedded media
 - Validate configuration examples and file paths
@@ -110,7 +110,7 @@ Conduct a comprehensive audit of Wheels 3.0 documentation while simultaneously i
 
 - “Wheels” → “Wheels” (in most contexts)
 - “cfwheels.org” → “wheels.dev”
-- “github.com/cfwheels/” → Keep as-is (repository URLs)
+- “github.com/wheels/” → Keep as-is (repository URLs)
 - Context-sensitive handling for:
   - Code examples with variable names
   - Historical blog posts or changelogs

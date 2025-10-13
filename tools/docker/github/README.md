@@ -72,22 +72,22 @@ strategy:
 
 | Engine | Container Name | Port | Docker Image |
 |--------|----------------|------|--------------|
-| Lucee 5 | `wheels-test-lucee5` | 60005 | `wheels-test-lucee5:v1.0.2` |
-| Lucee 6 | `wheels-test-lucee6` | 60006 | `wheels-test-lucee6:v1.0.2` |
-| Lucee 7 | `wheels-test-lucee7` | 60007 | `wheels-test-lucee7:v1.0.0` |
-| Adobe 2018 | `wheels-test-adobe2018` | 62018 | `wheels-test-adobe2018:v1.0.2` |
-| Adobe 2021 | `wheels-test-adobe2021` | 62021 | `wheels-test-adobe2021:v1.0.2` |
-| Adobe 2023 | `wheels-test-adobe2023` | 62023 | `wheels-test-adobe2023:v1.0.1` |
-| BoxLang | `wheels-test-boxlang` | 60001 | `wheels-test-boxlang:v1.0.0` |
+| Lucee 5 | `wheels-lucee5-1` | 60005 | `wheels-test-lucee5:v1.0.2` |
+| Lucee 6 | `wheels-lucee6-1` | 60006 | `wheels-test-lucee6:v1.0.2` |
+| Lucee 7 | `wheels-lucee7-1` | 60007 | `wheels-test-lucee7:v1.0.0` |
+| Adobe 2018 | `wheels-adobe2018-1` | 62018 | `wheels-test-adobe2018:v1.0.2` |
+| Adobe 2021 | `wheels-adobe2021-1` | 62021 | `wheels-test-adobe2021:v1.0.2` |
+| Adobe 2023 | `wheels-adobe2023-1` | 62023 | `wheels-test-adobe2023:v1.0.1` |
+| BoxLang | `wheels-boxlang-1` | 60001 | `wheels-test-boxlang:v1.0.0` |
 
 ### Database Containers
 
 | Database | Container Name | Port Mapping | Image |
 |----------|----------------|--------------|-------|
-| MySQL | `mysql` | 3307→3306 | `mysql:9.3` |
-| PostgreSQL | `postgres` | 5433→5432 | `postgres:14` |
-| SQL Server | `sqlserver_cicd` | 1434→1433 | `cfwheels-sqlserver:v1.0.2` |
-| Oracle | `oracle` | 1522→1521 | `gvenzl/oracle-free:23-slim` |
+| MySQL | `wheels-mysql-1` | 3307→3306 | `mysql:9.3` |
+| PostgreSQL | `wheels-postgres-1` | 5433→5432 | `postgres:14` |
+| SQL Server | `wheels-sqlserver-1` | 1434→1433 | `wheels-sqlserver:v1.0.2` |
+| Oracle | `wheels-oracle-1` | 1522→1521 | `gvenzl/oracle-free:23-slim` |
 | H2 | (embedded) | n/a | Built into CFML engines |
 
 ## Test Execution Process

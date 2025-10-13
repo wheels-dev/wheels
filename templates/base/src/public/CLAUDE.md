@@ -87,7 +87,7 @@ public/
 ```xml
 <urlrewrite>
   <rule enabled="true">
-    <name>CFWheels pretty URLs</name>
+    <name>Wheels pretty URLs</name>
     <condition type="request-uri" operator="notequal">^/(cf_script|flex2gateway|jrunscripts|CFIDE/administrator|lucee/admin|cfformgateway|cffileservlet|lucee|files|images|javascripts|miscellaneous|stylesheets|wheels/public/assets|robots.txt|favicon.ico|sitemap.xml|index.cfm)</condition>
     <from>^/(.*)$</from>
     <to type="passthrough">/index.cfm/$1</to>

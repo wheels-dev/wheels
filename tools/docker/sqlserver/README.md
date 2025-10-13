@@ -103,11 +103,11 @@ For debugging or direct access:
 
 ```bash
 # Connect using sqlcmd within the container
-docker exec -it cfwheels-sqlserver_cicd-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P 'x!bsT8t60yo0cTVTPq' -C
+docker exec -it wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P 'x!bsT8t60yo0cTVTPq' -C
 
 # List databases
-docker exec cfwheels-sqlserver_cicd-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P 'x!bsT8t60yo0cTVTPq' -Q "SELECT name FROM sys.databases" -C
+docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P 'x!bsT8t60yo0cTVTPq' -Q "SELECT name FROM sys.databases" -C
 
 # Create a table
-docker exec cfwheels-sqlserver_cicd-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P 'x!bsT8t60yo0cTVTPq' -Q "USE wheelstestdb; CREATE TABLE test (id INT, name NVARCHAR(100));" -C
+docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P 'x!bsT8t60yo0cTVTPq' -Q "USE wheelstestdb; CREATE TABLE test (id INT, name NVARCHAR(100));" -C
 ```

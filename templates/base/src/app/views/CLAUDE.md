@@ -31,7 +31,7 @@ The following files contain comprehensive view guidance:
 - `architecture.md` - View structure and file organization
 - `layouts.md` - Layout patterns and inheritance
 - `partials.md` - Partial usage and patterns
-- `forms.md` - Form helpers and CFWheels limitations
+- `forms.md` - Form helpers and Wheels limitations
 - `helpers.md` - View helpers and custom helpers
 - `advanced-patterns.md` - AJAX, performance, caching
 - `testing.md` - View testing patterns
@@ -39,9 +39,9 @@ The following files contain comprehensive view guidance:
 
 🚨 **DO NOT use code from this file - read the complete documentation first!**
 
-### ⚡ Critical CFWheels View Patterns
+### ⚡ Critical Wheels View Patterns
 
-**REMEMBER:** CFWheels associations return QUERIES, not arrays:
+**REMEMBER:** Wheels associations return QUERIES, not arrays:
 ```cfm
 <!-- ✅ CORRECT -->
 <cfif posts.recordCount gt 0>

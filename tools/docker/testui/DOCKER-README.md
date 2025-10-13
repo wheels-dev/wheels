@@ -104,6 +104,6 @@ If the container cannot access the Docker API:
 
 ## Further Reading
 
-- [NGINX Configuration](/Users/peter/projects/cfwheels/docker/testui-new/nginx.conf)
-- [Docker Entrypoint Script](/Users/peter/projects/cfwheels/docker/testui-new/docker-entrypoint.sh)
-- [Docker Service Implementation](/Users/peter/projects/cfwheels/docker/testui-new/src/services/docker.service.ts)
+- [NGINX Configuration](nginx.conf)
+- [Docker Entrypoint Script](docker-entrypoint.sh)
+- [Docker Service Implementation](src/services/docker.service.ts)
