@@ -19,7 +19,7 @@ component extends="../base" {
      * @force.hint Overwrite existing configuration
      */
     function run(
-        required string environment,
+        string environment,
         string template = "local",
         string dbtype = "H2",
         string database = "",
