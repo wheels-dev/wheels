@@ -8,7 +8,7 @@
  * | data-type   | true     |         | The column type to add                              |
  * | column-name | false    |         | The column name to add                              |
  * | default     | false    |         | The default value to set for the column             |
- * | null        | false    | true    | Should the column allow nulls                       |
+ * | allowNull   | false    | true    | Should the column allow nulls                       |
  * | limit       | false    |         | The character limit of the column                   |
  * | precision   | false    |         | The precision of the numeric column                 |
  * | scale       | false    |         | The scale of the numeric column                     |
@@ -29,7 +29,7 @@
 	 * @dataType.hint The column type to add
 	 * @columnName.hint The column name to add
 	 * @default.hint The default value to set for the column
-	 * @null.hint Should the column allow nulls
+	 * @allowNull.hint Should the column allow nulls
 	 * @limit.hint The character limit of the column
 	 * @precision.hint The precision of the numeric column
 	 * @scale.hint The scale of the numeric column
@@ -39,7 +39,7 @@
 		required string dataType,
 		required string columnName,
 		any default,
-		boolean null=true,
+		boolean allowNull=true,
 		number limit,
 		number precision,
 		number scale) {
@@ -69,8 +69,8 @@
 			arrayAppend(argumentArr, "default = '#arguments.default#'");
 			}
 		}
-		if(structKeyExists(arguments,"null") && len(arguments.null) && isBoolean(arguments.null)){
-			arrayAppend(argumentArr, "allowNull = #arguments.null#");
+		if(structKeyExists(arguments,"allowNull") && len(arguments.allowNull) && isBoolean(arguments.allowNull)){
+			arrayAppend(argumentArr, "allowNull = #arguments.allowNull#");
 		}
 		if(structKeyExists(arguments,"limit") && len(arguments.limit) && isnumeric(arguments.limit) && arguments.limit != 0){
 			arrayAppend(argumentArr, "limit = #arguments.limit#");

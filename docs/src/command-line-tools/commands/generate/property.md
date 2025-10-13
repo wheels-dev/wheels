@@ -16,7 +16,7 @@ wheels g property name=<modelName> columnName=<propertyName> [options]
 CommandBox supports multiple parameter formats:
 
 - **Named parameters**: `name=value` (e.g., `name=User`, `columnName=email`)
-- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--null` equals `null=true`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--allowNull` equals `allowNull=true`)
 - **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--dataType=boolean`)
 
 **Note**: Flag syntax (`--flag`) avoids positional/named parameter conflicts and is recommended for boolean options.
@@ -38,7 +38,7 @@ The `wheels generate property` command generates a database migration to add a p
 |--------|-------------|--------------|---------|
 | `dataType` | Type of column | `biginteger`, `binary`, `boolean`, `date`, `datetime`, `decimal`, `float`, `integer`, `string`, `text`, `time`, `timestamp`, `uuid` | `string` |
 | `default` | Default value for column | Any valid default value | `""` |
-| `null` | Whether to allow null values | `true`, `false` | `true` |
+| `allowNull` | Whether to allow null values | `true`, `false` | `true` |
 | `limit` | Character or integer size limit | Numeric value | `0` |
 | `precision` | Precision for decimal columns | Numeric value | `0` |
 | `scale` | Scale for decimal columns | Numeric value | `0` |
@@ -89,7 +89,7 @@ Creates a decimal property with 10 total digits and 2 decimal places.
 
 ### String with character limit
 ```bash
-wheels generate property name=User columnName=username --dataType=string --limit=50 --null=false
+wheels generate property name=User columnName=username --dataType=string --limit=50 --allowNull=false
 ```
 Creates a required string property with maximum 50 characters.
 
