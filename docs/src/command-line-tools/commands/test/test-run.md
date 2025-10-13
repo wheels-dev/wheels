@@ -24,14 +24,18 @@ The `wheels test run` command executes your application's TestBox test suite wit
 
 ## Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `filter` | Filter tests by pattern or name | |
-| `group` | Run specific test group | |
-| `--coverage` | Generate coverage report (boolean flag) | `false` |
-| `format` | Test  format format:txt, junit, json | `txt` |
-| `--verbose` | Verbose output (boolean flag) | `true` |
-| `--failFast` | Stop on first test failure (boolean flag) | `false` |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `type` | string | app | Type of tests to run |
+| `format` | string | txt | Test output format: txt, junit, json |
+| `bundles` | string | - | The path or list of paths of the spec bundle CFCs to run and test ONLY |
+| `directory` | string | - | The directory to use to discover test bundles and specs to test |
+| `recurse` | boolean | true | Recurse the directory mapping or not |
+| `verbose` | boolean | true | Display extra details including passing and skipped tests |
+| `servername` | string | - | Server name for test execution |
+| `filter` | string | - | Filter tests by pattern or name |
+| `labels` | string | - | The list of labels that a suite or spec must have in order to execute |
+| `coverage` | boolean | false | Enable code coverage with FusionReactor |
 
 ## Examples
 
@@ -46,10 +50,16 @@ wheels test run filter="User"
 wheels test run filter="test_user_validation"
 ```
 
-### Run specific test group
+### Run specific bundles
 ```bash
-wheels test run group="unit"
-wheels test run group="integration"
+wheels test run bundles="tests.models"
+wheels test run bundles="tests.models,tests.controllers"
+```
+
+### Run tests with specific labels
+```bash
+wheels test run labels="unit"
+wheels test run labels="critical,auth"
 ```
 
 ### Generate coverage report
@@ -57,21 +67,27 @@ wheels test run group="integration"
 wheels test run --coverage
 ```
 
-### Use different  format
+### Use different output format
 ```bash
-wheels test run  format=json
-wheels test run  format=junit
-wheels test run  format=tap
+wheels test run format=json
+wheels test run format=junit
 ```
 
-### Stop on first failure
+### Run tests from specific directory
 ```bash
-wheels test run --fail-fast
+wheels test run directory="tests/specs"
+wheels test run directory="tests/specs/unit" recurse=false
 ```
 
 ### Verbose output with coverage
 ```bash
-wheels test run --verbose --coverage  format=console
+wheels test run --verbose --coverage format=txt
+```
+
+### Run tests for different type
+```bash
+wheels test run type=core
+wheels test run type=app
 ```
 
 ## Test Structure
@@ -197,7 +213,7 @@ component {
     this.testbox = {
         testBundles = "tests",
         recurse = true,
-         format = "simple",
+        format = "simple",
         labels = "",
         options = {}
     };
@@ -206,17 +222,9 @@ component {
 
 ## Reporters
 
-### Simple (Default)
+### txt (Default)
 ```bash
-wheels test run  format=simple
-```
-- Colored console output
-- Shows progress dots
-- Summary at end
-
-### txt
-```bash
-wheels test run  format=txt
+wheels test run format=txt
 ```
 - Plain txt output
 - Good for CI systems
@@ -224,7 +232,7 @@ wheels test run  format=txt
 
 ### JSON
 ```bash
-wheels test run  format=json
+wheels test run format=json
 ```
 ```
 √ tests.specs.functions.Example (3 ms)
@@ -241,40 +249,32 @@ wheels test run  format=json
 
 ### JUnit
 ```bash
-wheels test run  format=junit outputFile=results.xml
+wheels test run format=junit
 ```
 - JUnit XML format
 - For CI integration
 - Jenkins compatible
 
-### TAP
-```bash
-wheels test run  format=tap
-```
-- Test Anything Protocol
-- Cross-language format
 
 ## Filtering Tests
 
 ### By Bundle
 ```bash
 # Run only model tests
-wheels test run bundles=models
+wheels test run bundles=tests.models
 
 # Run multiple bundles
-wheels test run bundles=models,controllers
+wheels test run bundles=tests.models,tests.controllers
 ```
 
 ### By Label
 ```cfc
-it("can authenticate", function() {
-    // test code
-}).labels("auth,critical");
+component extends="wheels.Testbox" labels="label title"
 ```
 
 ```bash
 # Run only critical tests
-wheels test run labels=critical
+wheels test run labels="label title"
 
 # Run auth OR api tests
 wheels test run labels=auth,api
@@ -287,18 +287,6 @@ wheels test run filter="user"
 wheels test run filter="validate*"
 ```
 
-### Exclude Patterns
-```bash
-# Skip slow tests
-wheels test run excludes="*slow*,*integration*"
-```
-
-## Parallel Execution
-
-Run tests in parallel threads:
-```bash
-wheels test run threads=4
-```
 
 Benefits:
 - Faster execution
@@ -407,25 +395,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 ```
-
-## Performance Tips
-
-1. **Use labels** for fast feedback
-   ```bash
-   wheels test run labels=unit  # Fast
-   wheels test run labels=integration  # Slow
-   ```
-
-2. **Parallel execution**
-   ```bash
-   wheels test run threads=4
-   ```
-
-
-4. **Skip slow tests during development**
-   ```bash
-   wheels test run excludes="*integration*"
-   ```
 
 ## Common Issues
 

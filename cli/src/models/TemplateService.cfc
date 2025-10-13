@@ -157,7 +157,8 @@ component {
 
         // Process form fields if properties are provided (must happen before object name replacements)
         if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties) && structKeyExists(arguments.context, "modelName")) {
-            var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName);
+            var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
+            var formFieldsCode = generateFormFieldsCode(arguments.context.properties, arguments.context.modelName, belongsToList);
             processed = replace(processed, "|FormFields|", formFieldsCode, "all");
         } else {
             processed = replace(processed, "|FormFields|", "", "all");
@@ -170,22 +171,24 @@ component {
 
         // Process CLI-Appends markers for index and show views BEFORE replacing object name placeholders
         if (structKeyExists(arguments.context, "properties") && isArray(arguments.context.properties) && arrayLen(arguments.context.properties)) {
+            var belongsToList = structKeyExists(arguments.context, "belongsTo") ? arguments.context.belongsTo : "";
+
             // Process index view table headers
             if (find("<!--- CLI-Appends-thead-Here --->", processed)) {
-                var theadCode = generateIndexTableHeaders(arguments.context.properties);
+                var theadCode = generateIndexTableHeaders(arguments.context.properties, belongsToList);
                 processed = replace(processed, "<!--- CLI-Appends-thead-Here --->", theadCode, "all");
             }
 
             // Process index view table body
             if (find("<!--- CLI-Appends-tbody-Here --->", processed)) {
-                var tbodyCode = generateIndexTableBody(arguments.context.properties);
+                var tbodyCode = generateIndexTableBody(arguments.context.properties, belongsToList);
                 processed = replace(processed, "<!--- CLI-Appends-tbody-Here --->", tbodyCode, "all");
             }
 
             // Process show view properties - only for show.txt template, not for form templates
             if (find("<!--- CLI-Appends-Here --->", processed)) {
                 if (structKeyExists(arguments.context, "action") && arguments.context.action == "show") {
-                    var showCode = generateShowViewProperties(arguments.context.properties, arguments.context.modelName);
+                    var showCode = generateShowViewProperties(arguments.context.properties, arguments.context.modelName, belongsToList);
                     processed = replace(processed, "<!--- CLI-Appends-Here --->", showCode, "all");
                 } else {
                     // Remove the marker from non-show templates (like forms) without adding content
@@ -254,9 +257,18 @@ component {
     /**
      * Generate form fields code based on properties with association support
      */
-    private function generateFormFieldsCode(required array properties, required string modelName) {
+    private function generateFormFieldsCode(required array properties, required string modelName, string belongsTo = "") {
         var fields = [];
         var objectName = lCase(arguments.modelName);
+
+        // Build list of actual foreign key fields from belongsTo relationships
+        var foreignKeys = [];
+        if (len(arguments.belongsTo)) {
+            var parents = listToArray(arguments.belongsTo);
+            for (var parent in parents) {
+                arrayAppend(foreignKeys, lCase(trim(parent)) & "Id");
+            }
+        }
 
         for (var prop in arguments.properties) {
             var fieldCode = "";
@@ -264,8 +276,8 @@ component {
             var fieldType = prop.keyExists("type") ? prop.type : "string";
             var fieldLabel = variables.helpers.capitalize(fieldName);
 
-            // Check if this is a foreign key field (ends with "Id")
-            if (right(fieldName, 2) == "Id" && len(fieldName) > 2) {
+            // Check if this is an actual foreign key field from belongsTo relationships
+            if (arrayFindNoCase(foreignKeys, fieldName)) {
                 // This is a foreign key - generate a select field
                 var associationName = left(fieldName, len(fieldName) - 2);
                 var associationModel = variables.helpers.capitalize(associationName);
@@ -377,14 +389,23 @@ component {
     /**
      * Generate table headers for index view with association support
      */
-    private function generateIndexTableHeaders(required array properties) {
+    private function generateIndexTableHeaders(required array properties, string belongsTo = "") {
         var headers = [];
+
+        // Build list of actual foreign key fields from belongsTo relationships
+        var foreignKeys = [];
+        if (len(arguments.belongsTo)) {
+            var parents = listToArray(arguments.belongsTo);
+            for (var parent in parents) {
+                arrayAppend(foreignKeys, lCase(trim(parent)) & "Id");
+            }
+        }
 
         for (var prop in arguments.properties) {
             var headerName = variables.helpers.capitalize(prop.name);
 
-            // Check if this is a foreign key field (ends with "Id")
-            if (right(prop.name, 2) == "Id" && len(prop.name) > 2) {
+            // Check if this is an actual foreign key field from belongsTo relationships
+            if (arrayFindNoCase(foreignKeys, prop.name)) {
                 // Show association name instead of foreign key
                 var associationName = left(prop.name, len(prop.name) - 2);
                 headerName = variables.helpers.capitalize(associationName);
@@ -399,14 +420,23 @@ component {
     /**
      * Generate table body cells for index view with association support
      */
-    private function generateIndexTableBody(required array properties) {
+    private function generateIndexTableBody(required array properties, string belongsTo = "") {
         var cells = [];
+
+        // Build list of actual foreign key fields from belongsTo relationships
+        var foreignKeys = [];
+        if (len(arguments.belongsTo)) {
+            var parents = listToArray(arguments.belongsTo);
+            for (var parent in parents) {
+                arrayAppend(foreignKeys, lCase(trim(parent)) & "Id");
+            }
+        }
 
         for (var prop in arguments.properties) {
             var cellCode = '<td>' & chr(10);
 
-            // Check if this is a foreign key field (ends with "Id")
-            if (right(prop.name, 2) == "Id" && len(prop.name) > 2) {
+            // Check if this is an actual foreign key field from belongsTo relationships
+            if (arrayFindNoCase(foreignKeys, prop.name)) {
                 // Display association name instead of foreign key ID
                 var associationName = left(prop.name, len(prop.name) - 2);
                 cellCode &= chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & chr(9) & '##|ObjectNamePlural|.' & associationName & '.name##' & chr(10);
@@ -424,15 +454,24 @@ component {
     /**
      * Generate property display for show view with association support
      */
-    private function generateShowViewProperties(required array properties, required string modelName) {
+    private function generateShowViewProperties(required array properties, required string modelName, string belongsTo = "") {
         var displayCode = [];
         var objectName = lCase(arguments.modelName);
+
+        // Build list of actual foreign key fields from belongsTo relationships
+        var foreignKeys = [];
+        if (len(arguments.belongsTo)) {
+            var parents = listToArray(arguments.belongsTo);
+            for (var parent in parents) {
+                arrayAppend(foreignKeys, lCase(trim(parent)) & "Id");
+            }
+        }
 
         for (var prop in arguments.properties) {
             var propDisplay = '<p>' & chr(10);
 
-            // Check if this is a foreign key field (ends with "Id")
-            if (right(prop.name, 2) == "Id" && len(prop.name) > 2) {
+            // Check if this is an actual foreign key field from belongsTo relationships
+            if (arrayFindNoCase(foreignKeys, prop.name)) {
                 // Display association name instead of foreign key ID
                 var associationName = left(prop.name, len(prop.name) - 2);
                 var displayLabel = variables.helpers.capitalize(associationName);

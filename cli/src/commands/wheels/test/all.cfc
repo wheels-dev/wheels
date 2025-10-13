@@ -83,10 +83,9 @@ component aliases='wheels test:all' extends="../base" {
         if (len(arguments.directory)) {
             params.directory = arguments.directory;
         }
-        
         // Add optional filtering parameters
         if (len(arguments.bundles)) {
-            params.bundles = arguments.bundles;
+            params.testbundles = arguments.bundles;
         }
         
         if (len(arguments.labels)) {

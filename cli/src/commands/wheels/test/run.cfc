@@ -6,7 +6,6 @@
  * wheels test run type=core
  * wheels test run --verbose --debug
  * wheels test run filter="User*" --coverage
- * wheels test run group="unit" --failFast
  */
 component extends="../base" {
     
@@ -17,9 +16,8 @@ component extends="../base" {
      * @verbose.hint Verbose output
      * @servername.hint Name of server to use
      * @filter.hint Filter tests by pattern or name
-     * @group.hint Run specific test group
+     * @lables.hint Run specific test lables
      * @coverage.hint Generate coverage report (boolean flag)
-     * @failFast.hint Stop on first test failure (boolean flag)
      */
     function run(
         string type = "app",
@@ -30,10 +28,9 @@ component extends="../base" {
         boolean verbose = true,
         string servername = "",
         string filter = "",
-        string group = "",
+        string lables = "",
         boolean coverage = false,
         string reporter = "",
-        boolean failFast = false
     ) {
         arguments = reconstructArgs(arguments);
         arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
@@ -78,7 +75,7 @@ component extends="../base" {
         
         // Add bundles if specified
         if (len(arguments.bundles)) {
-            params.bundles = arguments.bundles;
+            params.testbundles = arguments.bundles;
         }
         
         // Add directory if specified
@@ -98,9 +95,9 @@ component extends="../base" {
             }
         }
         
-        // Handle group parameter (maps to labels in TestBox)
-        if (len(arguments.group)) {
-            params.labels = arguments.group;
+        // Handle lables parameter
+        if (len(arguments.lables)) {
+            params.labels = arguments.lables;
         }
         
         // Handle coverage parameter
@@ -108,12 +105,6 @@ component extends="../base" {
             // Add coverage parameters to the URL since TestBox CLI doesn't directly support coverage
             // You'll need to handle this in your runner.cfm
             testUrl &= "&coverage=true";
-        }
-        
-        // Handle fail-fast parameter (maps to bail in TestBox)
-        if (arguments.failFast) {
-            // Add bail parameter to stop on first failure
-            testUrl &= "&bail=true";
         }
         
         // Update the runner URL in params
@@ -128,14 +119,11 @@ component extends="../base" {
             if (len(arguments.filter)) {
                 print.line("Filter: #arguments.filter#").toConsole();
             }
-            if (len(arguments.group)) {
-                print.line("Group: #arguments.group#").toConsole();
+            if (len(arguments.lables)) {
+                print.line("lables: #arguments.lables#").toConsole();
             }
             if (arguments.coverage) {
                 print.line("Coverage: Enabled").toConsole();
-            }
-            if (arguments.failFast) {
-                print.line("Fail Fast: Enabled").toConsole();
             }
         }
         

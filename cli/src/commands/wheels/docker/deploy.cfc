@@ -14,12 +14,14 @@ component extends="../base" {
      * @db Database to use (h2, mysql, postgres, mssql)
      * @cfengine ColdFusion engine to use (lucee, adobe)
      * @optimize Enable production optimizations
+     * @force Overwrite existing Docker files without confirmation
      */
     function run(
         string environment="production",
         string db="mysql",
         string cfengine="lucee",
-        boolean optimize=true
+        boolean optimize=true,
+        boolean force=false
     ) {
         // Welcome message
         print.line();
@@ -30,6 +32,40 @@ component extends="../base" {
         local.supportedEnvironments = ["production", "staging"];
         if (!arrayContains(local.supportedEnvironments, lCase(arguments.environment))) {
             error("Unsupported environment: #arguments.environment#. Please choose from: #arrayToList(local.supportedEnvironments)#");
+        }
+
+        // Check for existing files if force is not set
+        if (!arguments.force) {
+            local.existingFiles = [];
+            if (fileExists(fileSystemUtil.resolvePath("Dockerfile.production"))) {
+                arrayAppend(local.existingFiles, "Dockerfile.production");
+            }
+            if (fileExists(fileSystemUtil.resolvePath("docker-compose.production.yml"))) {
+                arrayAppend(local.existingFiles, "docker-compose.production.yml");
+            }
+            if (fileExists(fileSystemUtil.resolvePath("nginx.conf"))) {
+                arrayAppend(local.existingFiles, "nginx.conf");
+            }
+            if (fileExists(fileSystemUtil.resolvePath("deploy.sh"))) {
+                arrayAppend(local.existingFiles, "deploy.sh");
+            }
+            if (fileExists(fileSystemUtil.resolvePath(".env.#arguments.environment#.example"))) {
+                arrayAppend(local.existingFiles, ".env.#arguments.environment#.example");
+            }
+
+            if (arrayLen(local.existingFiles)) {
+                print.line();
+                print.yellowLine("The following production Docker files already exist:");
+                for (local.file in local.existingFiles) {
+                    print.line("  - #local.file#");
+                }
+                print.line();
+
+                if (!confirm("Do you want to overwrite these files? [y/n]")) {
+                    print.redLine("Operation cancelled.");
+                    return;
+                }
+            }
         }
 
         // Create production Docker files

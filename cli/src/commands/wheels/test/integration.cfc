@@ -15,7 +15,6 @@ component aliases='wheels test:integration' extends="../base" {
      * @format.hint Output format (txt, json, junit, html)
      * @format.options txt,json,junit,html
      * @verbose.hint Verbose output
-     * @failFast.hint Stop on first test failure
      * @bundles.hint Comma-delimited list of test bundles to run
      * @labels.hint Comma-delimited list of test labels to run
      * @excludes.hint Comma-delimited list of test labels to exclude
@@ -27,7 +26,6 @@ component aliases='wheels test:integration' extends="../base" {
         string type = "app",
         string format = "txt",
         boolean verbose = false,
-        boolean failFast = false,
         string bundles = "",
         string labels = "",
         string excludes = "",
@@ -57,11 +55,6 @@ component aliases='wheels test:integration' extends="../base" {
             format = arguments.format
         );
         
-        // Add fail-fast parameter if specified
-        if (arguments.failFast) {
-            testUrl &= "&bail=true";
-        }
-        
         // Build TestBox command parameters
         var params = {
             runner = testUrl,
@@ -72,7 +65,7 @@ component aliases='wheels test:integration' extends="../base" {
         
         // Add optional filtering parameters
         if (len(arguments.bundles)) {
-            params.bundles = arguments.bundles;
+            params.testbundles = arguments.bundles;
         }
         
         if (len(arguments.labels)) {
