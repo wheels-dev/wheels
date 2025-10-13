@@ -23,7 +23,7 @@ The `dbmigrate create column` command generates a migration file that adds a col
 | `dataType` | string | Yes | - | The column type to add |
 | `columnName` | string | Yes | - | The column name to add |
 | `default` | any | No | - | The default value to set for the column |
-| `--null` | boolean | No | true | Should the column allow nulls |
+| `allowNull` | boolean | No | true | Should the column allow nulls |
 | `limit` | number | No | - | The character limit of the column |
 | `precision` | number | No | - | The precision of the numeric column |
 | `scale` | number | No | - | The scale of the numeric column |
@@ -69,7 +69,7 @@ wheels dbmigrate create column name=user dataType=boolean columnName=is_active d
 
 ### Add nullable column with limit
 ```bash
-wheels dbmigrate create column name=user dataType=string columnName=bio --null=true limit=500
+wheels dbmigrate create column name=user dataType=string columnName=bio allowNull=true limit=500
 ```
 
 ### Add decimal column with precision
@@ -81,7 +81,7 @@ wheels dbmigrate create column name=product dataType=decimal columnName=price pr
 
 For the command:
 ```bash
-wheels dbmigrate create column name=user dataType=string columnName=phone --null=true
+wheels dbmigrate create column name=user dataType=string columnName=phone allowNull=true
 ```
 
 Generates:
@@ -116,8 +116,8 @@ wheels dbmigrate create column name=user dataType=string columnName=theme_prefer
 ### Adding Audit Fields
 Add tracking column to any table:
 ```bash
-wheels dbmigrate create column name=product dataType=integer columnName=last_modified_by --null=true
-wheels dbmigrate create column name=product dataType=datetime columnName=last_modified_at --null=true
+wheels dbmigrate create column name=product dataType=integer columnName=last_modified_by allowNull=true
+wheels dbmigrate create column name=product dataType=datetime columnName=last_modified_at allowNull=true
 ```
 
 ### Adding Price Fields
@@ -133,7 +133,7 @@ wheels dbmigrate create column name=product dataType=decimal columnName=cost pre
 For existing tables with data, make new columns nullable or provide defaults:
 ```bash
 # Good - nullable
-wheels dbmigrate create column name=user dataType=text columnName=bio --null=true
+wheels dbmigrate create column name=user dataType=text columnName=bio allowNull=true
 
 # Good - with default
 wheels dbmigrate create column name=user dataType=string columnName=status default="active"
