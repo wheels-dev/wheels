@@ -70,10 +70,10 @@ Run SQL commands against the SQL Server container:
 
 ```bash
 # Interactive sqlcmd session
-docker exec -it cfwheels-sqlserver_cicd-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -C
+docker exec -it wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -C
 
 # Run a single query
-docker exec cfwheels-sqlserver_cicd-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "SELECT @@VERSION" -C
+docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "SELECT @@VERSION" -C
 ```
 
 ## Performance Considerations
@@ -111,17 +111,17 @@ If you encounter issues:
 
 3. Check database status:
    ```bash
-   docker exec cfwheels-sqlserver_cicd-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "SELECT name FROM sys.databases" -C
+   docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "SELECT name FROM sys.databases" -C
    ```
 
 4. If needed, manually create the wheelstestdb database:
    ```bash
-   docker exec cfwheels-sqlserver_cicd-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "CREATE DATABASE wheelstestdb" -C
+   docker exec wheels-sqlserver-1 /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "x!bsT8t60yo0cTVTPq" -Q "CREATE DATABASE wheelstestdb" -C
    ```
 
 5. For severe issues, reset the SQL Server volume:
    ```bash
    docker compose down
-   docker volume rm cfwheels_sqlserver_data
+   docker volume rm wheels_sqlserver_data
    docker compose --profile sqlserver up --build
    ```

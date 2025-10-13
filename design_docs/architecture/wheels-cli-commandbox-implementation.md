@@ -96,13 +96,13 @@ wheels-cli/
     "name": "wheels-cli",
     "version": "3.0.0",
     "author": "Wheels Team",
-    "homepage": "https://cfwheels.org",
+    "homepage": "https://wheels.dev",
     "documentation": "https://wheels.dev/3.0.0/guides/command-line-tools/commands/README",
     "repository": {
         "type": "git",
-        "url": "https://github.com/cfwheels/wheels-cli"
+        "url": "https://github.com/wheels/wheels-cli"
     },
-    "bugs": "https://github.com/cfwheels/wheels-cli/issues",
+    "bugs": "https://github.com/wheels/wheels-cli/issues",
     "slug": "wheels-cli",
     "shortDescription": "Official CLI for Wheels Framework",
     "type": "commandbox-modules",
@@ -110,7 +110,8 @@ wheels-cli/
         "cfwheels",
         "mvc",
         "cli",
-        "scaffolding"
+        "scaffolding",
+        "wheels"
     ],
     "private": false,
     "dependencies": {
@@ -246,7 +247,7 @@ component extends="commandbox.system.BaseCommand" {
             if (isLegacyWheelsProject()) {
                 error("This appears to be a legacy Wheels project (pre-3.0). Please upgrade to Wheels 3.0+ to use this CLI.");
             } else if (mightBeWheelsProject()) {
-                error("This appears to be a Wheels project but the framework is not installed in vendor/wheels/. Please run 'box install cfwheels' to install the framework.");
+                error("This appears to be a Wheels project but the framework is not installed in vendor/wheels/. Please run 'box install wheels-core' to install the framework.");
             } else {
                 error("This command must be run from a Wheels project root directory. Look for vendor/wheels/ folder.");
             }
@@ -2292,7 +2293,7 @@ The CLI will use this file to:
 box install wheels-cli
 
 # Install from GitHub
-box install cfwheels/wheels-cli
+box install wheels/wheels-cli
 
 # Install specific version
 box install wheels-cli@3.0.0

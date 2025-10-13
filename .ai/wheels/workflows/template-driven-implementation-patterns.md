@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document defines the template-driven implementation system for the `/wheels_execute` workflow. It provides code generation patterns, error recovery mechanisms, and quality assurance integration to ensure consistent, high-quality CFWheels implementations.
+This document defines the template-driven implementation system for the `/wheels_execute` workflow. It provides code generation patterns, error recovery mechanisms, and quality assurance integration to ensure consistent, high-quality Wheels implementations.
 
 ## Core Implementation Principles
 

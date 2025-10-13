@@ -131,7 +131,7 @@ wheels version.
 box wheels version
 
 # Install Wheels CLI module (usually automatic with box install)
-box install cfwheels-cli
+box install wheels-cli
 
 # Verify installation
 wheels version
@@ -1412,10 +1412,10 @@ The `wheels log:tail` command color-codes log entries:
 box install
 
 # Install specific package
-box install cfwheels
+box install wheels-core
 
 # Install and save as dependency
-box install cfwheels --save
+box install wheels-core --save
 
 # Install development dependency
 box install testbox --saveDev
@@ -3067,7 +3067,7 @@ CommandBox has strict parameter requirements that must be followed:
 
 ```bash
 # If 'wheels' command not found
-box install cfwheels-cli --force
+box install wheels-cli --force
 box reload
 
 # Verify installation
@@ -3131,8 +3131,8 @@ box reload
 box restart
 
 # Complete reinstall
-box uninstall cfwheels-cli
-box install cfwheels-cli
+box uninstall wheels-cli
+box install wheels-cli
 ```
 
 ## Advanced Usage

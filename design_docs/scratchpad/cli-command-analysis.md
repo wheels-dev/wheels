@@ -26,7 +26,7 @@
 
 ### Wheels CLI Installation (5 permutations)
 - `box wheels version` - 1
-- `box install cfwheels-cli` - 1 
+- `box install wheels-cli` - 1 
 - `wheels version` - 1
 - `wheels help` - 1
 - `wheels help [command]` - 1

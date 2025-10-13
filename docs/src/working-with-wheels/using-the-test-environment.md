@@ -209,14 +209,14 @@ box wheels test app --testBundles=controllers
 
 | Engine | Container Name | Port |
 |--------|----------------|------|
-| Lucee 5 | cfwheels-test-lucee5 | 60005 |
-| Lucee 6 | cfwheels-test-lucee6 | 60006 |
-| Lucee 7 | cfwheels-test-lucee7 | 60007 |
-| Adobe 2018 | cfwheels-test-adobe2018 | 62018 |
-| Adobe 2021 | cfwheels-test-adobe2021 | 62021 |
-| Adobe 2023 | cfwheels-test-adobe2023 | 62023 |
-| Adobe 2025 | cfwheels-test-adobe2025 | 62025 |
-| Boxlang 1 | cfwheels-test-boxlang | 60001 |
+| Lucee 5 | wheels-lucee5-1 | 60005 |
+| Lucee 6 | wheels-lucee6-1 | 60006 |
+| Lucee 7 | wheels-lucee7-1 | 60007 |
+| Adobe 2018 | wheels-adobe2018-1 | 62018 |
+| Adobe 2021 | wheels-adobe2021-1 | 62021 |
+| Adobe 2023 | wheels-adobe2023-1 | 62023 |
+| Adobe 2025 | wheels-adobe2025-1 | 62025 |
+| Boxlang 1 | wheels-boxlang-1 | 60001 |
 
 ### Databases
 

@@ -285,7 +285,7 @@ component extends="models.Model" {
 
 ### Example: Migration Template
 ```javascript
-component extends="cfwheels.migrator.Migration" {
+component extends="wheels.migrator.Migration" {
     
     function up() {
         createTable(name="users") {

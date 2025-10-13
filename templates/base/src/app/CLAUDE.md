@@ -39,7 +39,7 @@
 ## 🔍 Critical Anti-Pattern Prevention
 
 **Before writing ANY code in the app directory:**
-- [ ] ❌ **NO** mixed argument styles in CFWheels functions
+- [ ] ❌ **NO** mixed argument styles in Wheels functions
 - [ ] ❌ **NO** ArrayLen() on model associations
 - [ ] ❌ **NO** array loops on query objects
 - [ ] ❌ **NO** Rails-style nested resource routing
