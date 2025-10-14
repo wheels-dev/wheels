@@ -285,7 +285,7 @@ services:
       - wheels-network
 
   mysql:
-    image: mysql:8.0
+    image: mysql:9
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: wheelstestdb
@@ -306,7 +306,7 @@ services:
       - wheels-network
 
   postgres:
-    image: postgres:14
+    image: postgres:18
     restart: always
     environment:
       POSTGRES_USER: wheelstestdb
