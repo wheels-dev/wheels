@@ -1,0 +1,341 @@
+#!/bin/bash
+
+#
+# Wheels macOS Installer - CLI Version
+# Version: 1.0.0
+#
+# This script can be called from the Swift GUI or run directly from command line
+#
+
+set -e  # Exit on error
+set -u  # Exit on undefined variable
+
+# =============================
+# Configuration
+# =============================
+readonly COMMANDBOX_VERSION="6.2.1"
+readonly WHEELS_CLI_PACKAGE="wheels-cli"
+readonly COMMANDBOX_DOWNLOAD_URL="https://downloads.ortussolutions.com/ortussolutions/commandbox/${COMMANDBOX_VERSION}/commandbox-bin-${COMMANDBOX_VERSION}.zip"
+
+# =============================
+# Default Values
+# =============================
+INSTALL_PATH="/usr/local/commandbox"
+APP_NAME="MyWheelsApp"
+TEMPLATE="wheels-base-template@BE"
+RELOAD_PASSWORD="changeMe"
+DATASOURCE_NAME="MyWheelsApp"
+CFML_ENGINE="lucee"
+USE_H2=false
+USE_BOOTSTRAP=true
+INIT_PACKAGE=true
+APP_BASE_PATH="$HOME/Sites"
+FORCE=false
+SKIP_PATH=false
+
+START_TIME=$(date +%s)
+LOG_FILE="${TMPDIR}wheels-installation.log"
+TEMP_FILES=()
+
+# =============================
+# Parse Command Line Arguments
+# =============================
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --install-path)
+            INSTALL_PATH="$2"
+            shift 2
+            ;;
+        --app-name)
+            APP_NAME="$2"
+            shift 2
+            ;;
+        --reload-password)
+            RELOAD_PASSWORD="$2"
+            shift 2
+            ;;
+        --datasource-name)
+            DATASOURCE_NAME="$2"
+            shift 2
+            ;;
+        --template)
+            TEMPLATE="$2"
+            shift 2
+            ;;
+        --engine)
+            CFML_ENGINE="$2"
+            shift 2
+            ;;
+        --app-base-path)
+            APP_BASE_PATH="$2"
+            shift 2
+            ;;
+        --use-h2)
+            USE_H2=true
+            shift
+            ;;
+        --use-bootstrap)
+            USE_BOOTSTRAP=true
+            shift
+            ;;
+        --init-package)
+            INIT_PACKAGE=true
+            shift
+            ;;
+        --force)
+            FORCE=true
+            shift
+            ;;
+        --skip-path)
+            SKIP_PATH=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+# =============================
+# Logging Functions
+# =============================
+
+log_info() {
+    echo "[$(date '+%H:%M:%S')] INFO: $1"
+    echo "[$(date '+%H:%M:%S')] INFO: $1" >> "$LOG_FILE"
+}
+
+log_success() {
+    echo "[$(date '+%H:%M:%S')] SUCCESS: $1"
+    echo "[$(date '+%H:%M:%S')] SUCCESS: $1" >> "$LOG_FILE"
+}
+
+log_error() {
+    echo "[$(date '+%H:%M:%S')] ERROR: $1" >&2
+    echo "[$(date '+%H:%M:%S')] ERROR: $1" >> "$LOG_FILE"
+}
+
+log_section() {
+    echo ""
+    echo "================================================================================"
+    echo "$1"
+    echo "================================================================================"
+    echo "" >> "$LOG_FILE"
+    echo "================================================================================" >> "$LOG_FILE"
+    echo "$1" >> "$LOG_FILE"
+    echo "================================================================================" >> "$LOG_FILE"
+}
+
+# =============================
+# Utility Functions
+# =============================
+
+add_temp_file() {
+    TEMP_FILES+=("$1")
+}
+
+cleanup_temp_files() {
+    for temp_file in "${TEMP_FILES[@]}"; do
+        [[ -e "$temp_file" ]] && rm -rf "$temp_file"
+    done
+}
+
+stop_with_error() {
+    log_error "CRITICAL: $1"
+    cleanup_temp_files
+    exit 1
+}
+
+# =============================
+# Installation Functions
+# =============================
+
+install_commandbox() {
+    log_section "COMMANDBOX INSTALLATION"
+
+    local box_path="${INSTALL_PATH}/box"
+
+    # Check existing installation
+    if [[ -f "$box_path" ]] && ! $FORCE; then
+        if "$box_path" version &> /dev/null; then
+            log_success "CommandBox already installed"
+            return 0
+        fi
+    fi
+
+    # Create directory
+    log_info "Creating installation directory: $INSTALL_PATH"
+    mkdir -p "$INSTALL_PATH" || stop_with_error "Failed to create installation directory"
+
+    # Download
+    log_info "Downloading CommandBox ${COMMANDBOX_VERSION}..."
+    local temp_zip="${TMPDIR}commandbox.zip"
+    add_temp_file "$temp_zip"
+
+    if ! curl -L -o "$temp_zip" "$COMMANDBOX_DOWNLOAD_URL" --progress-bar 2>&1; then
+        stop_with_error "Failed to download CommandBox"
+    fi
+
+    # Extract
+    log_info "Extracting CommandBox..."
+    if ! unzip -o -q "$temp_zip" -d "$INSTALL_PATH"; then
+        stop_with_error "Failed to extract CommandBox"
+    fi
+
+    chmod +x "$box_path"
+    log_success "CommandBox installed successfully"
+}
+
+add_to_path() {
+    if $SKIP_PATH; then
+        log_info "Skipping PATH update (as requested)"
+        return 0
+    fi
+
+    local shell_rc="$HOME/.zshrc"
+    [[ "$SHELL" == */bash ]] && shell_rc="$HOME/.bash_profile"
+
+    if grep -q "export PATH=\"$INSTALL_PATH:\$PATH\"" "$shell_rc" 2>/dev/null; then
+        log_success "Already in PATH"
+        return 0
+    fi
+
+    echo "" >> "$shell_rc"
+    echo "# CommandBox (Wheels Installer)" >> "$shell_rc"
+    echo "export PATH=\"$INSTALL_PATH:\$PATH\"" >> "$shell_rc"
+
+    export PATH="$INSTALL_PATH:$PATH"
+    log_success "Added to PATH"
+}
+
+install_wheels_cli() {
+    log_section "WHEELS CLI INSTALLATION"
+
+    local box_path="${INSTALL_PATH}/box"
+
+    log_info "Installing Wheels CLI from ForgeBox..."
+    if "$box_path" install "$WHEELS_CLI_PACKAGE" --force 2>&1; then
+        log_success "Wheels CLI installed"
+    else
+        log_error "Wheels CLI installation had issues"
+    fi
+}
+
+create_application() {
+    log_section "WHEELS APPLICATION CREATION"
+
+    local box_path="${INSTALL_PATH}/box"
+    local app_path="${APP_BASE_PATH}/${APP_NAME}"
+
+    log_info "Creating Wheels application: $APP_NAME"
+    log_info "Location: $app_path"
+    log_info "Template: $TEMPLATE"
+
+    # Check existing
+    if [[ -d "$app_path" ]]; then
+        stop_with_error "Application directory already exists: $app_path"
+    fi
+
+    mkdir -p "$APP_BASE_PATH"
+    cd "$APP_BASE_PATH"
+
+    # Build command
+    local cmd=("$box_path" "wheels" "generate" "app" "name=$APP_NAME" "template=$TEMPLATE" "force=true")
+    [[ -n "$RELOAD_PASSWORD" ]] && cmd+=("reloadPassword=$RELOAD_PASSWORD")
+    [[ "$DATASOURCE_NAME" != "$APP_NAME" ]] && cmd+=("datasourceName=$DATASOURCE_NAME")
+    [[ "$CFML_ENGINE" != "lucee" ]] && cmd+=("cfmlEngine=$CFML_ENGINE")
+    $USE_H2 && cmd+=("setupH2=true")
+    $USE_BOOTSTRAP && cmd+=("useBootstrap=true")
+    $INIT_PACKAGE && cmd+=("initPackage=true")
+
+    log_info "Executing: ${cmd[*]}"
+    if "${cmd[@]}" 2>&1; then
+        log_success "Application created"
+    else
+        stop_with_error "Failed to create application"
+    fi
+}
+
+start_server() {
+    log_section "DEVELOPMENT SERVER"
+
+    local box_path="${INSTALL_PATH}/box"
+    local app_path="${APP_BASE_PATH}/${APP_NAME}"
+
+    cd "$app_path"
+
+    log_info "Starting server..."
+    "$box_path" server start 2>&1
+
+    sleep 3
+
+    local server_url=$("$box_path" server status --json 2>/dev/null | grep -o '"defaultBaseURL":"[^"]*"' | cut -d'"' -f4 || echo "")
+
+    if [[ -n "$server_url" ]]; then
+        log_success "Server running at: $server_url"
+        echo "$server_url" > "${TMPDIR}wheels-server-url.txt"
+    fi
+}
+
+show_completion() {
+    local duration=$(($(date +%s) - START_TIME))
+
+    log_section "INSTALLATION COMPLETE"
+    log_success "CommandBox installed: $INSTALL_PATH"
+    log_success "Wheels CLI installed"
+    log_success "Application created: ${APP_BASE_PATH}/${APP_NAME}"
+
+    if [[ -f "${TMPDIR}wheels-server-url.txt" ]]; then
+        local url=$(cat "${TMPDIR}wheels-server-url.txt")
+        log_success "Server running: $url"
+    fi
+
+    echo ""
+    echo "Installation completed in ${duration} seconds"
+    echo ""
+}
+
+# =============================
+# Main
+# =============================
+
+main() {
+    # Initialize
+    echo "" > "$LOG_FILE"
+
+    log_section "WHEELS INSTALLER FOR macOS"
+    log_info "Version: 1.0.0"
+    echo ""
+
+    # Show configuration
+    log_info "Configuration:"
+    log_info "  CommandBox: $INSTALL_PATH"
+    log_info "  Application: $APP_NAME"
+    log_info "  Template: $TEMPLATE"
+    log_info "  Engine: $CFML_ENGINE"
+    log_info "  Location: ${APP_BASE_PATH}/${APP_NAME}"
+    echo ""
+
+    # Perform installation
+    install_commandbox
+    add_to_path
+    install_wheels_cli
+    create_application
+    start_server
+
+    # Cleanup
+    cleanup_temp_files
+
+    # Show completion
+    show_completion
+
+    exit 0
+}
+
+# Error handling
+trap 'stop_with_error "Installation interrupted"' INT TERM
+trap 'stop_with_error "Unexpected error occurred"' ERR
+
+# Run
+main "$@"
