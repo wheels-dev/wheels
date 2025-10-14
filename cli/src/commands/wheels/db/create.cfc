@@ -37,30 +37,49 @@ component extends="../base" {
 			if (!Len(arguments.datasource)) {
 				arguments.datasource = getDataSourceName(local.appPath, arguments.environment);
 			}
-			
+
 			if (!Len(arguments.datasource)) {
 				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
 				return;
 			}
-			
+
 			printHeader("Database Creation Process");
 			printInfo("Datasource", arguments.datasource);
 			printInfo("Environment", arguments.environment);
 			printDivider();
-			
+
 			// Get datasource configuration
 			local.dsInfo = getDatasourceInfo(arguments.datasource);
-			
+
 			if (StructIsEmpty(local.dsInfo)) {
-				systemOutput("Please create the datasource in your CFML server admin first.", true, true);
-				error("Datasource '" & arguments.datasource & "' not found in server configuration");
-				return;
+				print.line();
+				print.yellowLine("Datasource '" & arguments.datasource & "' not found in server configuration.");
+				print.line();
+
+				// Ask if user wants to create datasource
+				if (ask("Would you like to create this datasource now? [y/n]: ") == "y") {
+					local.dsInfo = createInteractiveDatasource(arguments.datasource, local.appPath, arguments.environment);
+					if (StructIsEmpty(local.dsInfo)) {
+						error("Datasource creation cancelled or failed");
+						return;
+					}
+				} else {
+					systemOutput("Please create the datasource in your CFML server admin first.", true, true);
+					error("Datasource '" & arguments.datasource & "' not found in server configuration");
+					return;
+				}
 			}
 			
 			// Extract database name and connection info
-			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels-dev";
+			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels_dev";
 			local.dbType = local.dsInfo.driver;
-			
+
+			// Validate Oracle identifier (no hyphens or special characters allowed)
+			if (local.dbType == "Oracle" && reFind("[^a-zA-Z0-9_$##]", local.dbName)) {
+				error("Invalid Oracle identifier: '#local.dbName#' - Oracle usernames can only contain letters, numbers, and underscores. Use underscores instead of hyphens (e.g., 'wheels_dev' instead of 'wheels-dev')");
+				return;
+			}
+
 			printInfo("Database Type", local.dbType);
 			printInfo("Database Name", local.dbName);
 			printDivider();
@@ -77,6 +96,9 @@ component extends="../base" {
 				case "MSSQLServer":
 				case "MSSQL":
 					createDatabase(local.dsInfo, local.dbName, arguments.force, "SQLServer");
+					break;
+				case "Oracle":
+					createDatabase(local.dsInfo, local.dbName, arguments.force, "Oracle");
 					break;
 				case "H2":
 					printWarning("H2 databases are created automatically on first connection");
@@ -210,7 +232,7 @@ component extends="../base" {
 	 */
 	private void function dropDatabase(required any conn, required string dbName, required string dbType) {
 		local.stmt = arguments.conn.createStatement();
-		
+
 		switch (arguments.dbType) {
 			case "MySQL":
 				local.stmt.executeUpdate("DROP DATABASE `" & arguments.dbName & "`");
@@ -221,8 +243,23 @@ component extends="../base" {
 			case "SQLServer":
 				local.stmt.execute("DROP DATABASE [" & arguments.dbName & "]");
 				break;
+			case "Oracle":
+				// Oracle uses DROP USER CASCADE to remove tablespace and objects
+				// Oracle 12c+ CDB requires _ORACLE_SCRIPT for non-C## users
+				try {
+					local.alterSession = "ALTER SESSION SET ""_ORACLE_SCRIPT""=true";
+					local.stmt.execute(local.alterSession);
+				} catch (any e) {
+					// Ignore if this fails
+				}
+
+				// Drop user with CASCADE to remove all objects
+				local.dropSQL = "DROP USER " & UCASE(arguments.dbName) & " CASCADE";
+				systemOutput("DEBUG - Executing DROP SQL: " & local.dropSQL, true);
+				local.stmt.execute(local.dropSQL);
+				break;
 		}
-		
+
 		local.stmt.close();
 	}
 
@@ -240,7 +277,7 @@ component extends="../base" {
 								"COLLATE utf8mb4_unicode_ci";
 				local.stmt.executeUpdate(local.createSQL);
 				break;
-				
+
 			case "PostgreSQL":
 				local.createSQL = 'CREATE DATABASE "' & arguments.dbName & '" ' &
 								'WITH ENCODING ''UTF8'' ' &
@@ -249,11 +286,33 @@ component extends="../base" {
 								'TEMPLATE template0';
 				local.stmt.executeUpdate(local.createSQL);
 				break;
-				
+
 			case "SQLServer":
 				local.createSQL = "CREATE DATABASE [" & arguments.dbName & "]";
 				local.stmt.execute(local.createSQL);
 				break;
+
+			case "Oracle":
+				// Oracle 12c+ CDB requires either C## prefix or _ORACLE_SCRIPT session variable
+				// Enable creation of non-C## users in CDB (for development)
+				try {
+					local.alterSession = "ALTER SESSION SET ""_ORACLE_SCRIPT""=true";
+					local.stmt.execute(local.alterSession);
+				} catch (any e) {
+					// Ignore if this fails (non-CDB Oracle or insufficient privileges)
+					systemOutput("Note: Could not set _ORACLE_SCRIPT (may not be needed)", true);
+				}
+
+				// Create Oracle user (schema)
+				local.createSQL = "CREATE USER #arguments.dbName# IDENTIFIED BY #arguments.dbName#_pass";
+				systemOutput("DEBUG - Executing SQL: " & local.createSQL, true);
+				local.stmt.execute(local.createSQL);
+
+				// Grant privileges
+				local.grantSQL = "GRANT CONNECT, RESOURCE TO #arguments.dbName#";
+				local.stmt.execute(local.grantSQL);
+				break;
+
 		}
 		
 		local.stmt.close();
@@ -264,6 +323,54 @@ component extends="../base" {
 	 */
 	private boolean function verifyDatabaseCreated(required any conn, required string dbName, required string dbType) {
 		return checkDatabaseExists(arguments.conn, arguments.dbName, arguments.dbType);
+	}
+
+	/**
+	 * Check if database exists
+	 */
+	private boolean function checkDatabaseExists(required any conn, required string dbName, required string dbType) {
+		local.exists = false;
+
+		switch (arguments.dbType) {
+			case "MySQL":
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+
+			case "PostgreSQL":
+				local.stmt = arguments.conn.prepareStatement("SELECT 1 FROM pg_database WHERE datname = ?");
+				local.stmt.setString(1, arguments.dbName);
+				local.rs = local.stmt.executeQuery();
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+
+			case "SQLServer":
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT name FROM sys.databases WHERE name = '" & arguments.dbName & "'";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+
+			case "Oracle":
+				// Oracle checks for USER existence (schema)
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT username FROM dba_users WHERE username = UPPER('" & arguments.dbName & "')";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
+		}
+
+		return local.exists;
 	}
 
 	/**
@@ -295,7 +402,7 @@ component extends="../base" {
 					local.errorHandled = true;
 				}
 				break;
-				
+
 			case "PostgreSQL":
 				if (FindNoCase("already exists", arguments.e.message)) {
 					printError("Database already exists: " & arguments.dbName);
@@ -311,13 +418,43 @@ component extends="../base" {
 					local.errorHandled = true;
 				}
 				break;
-				
+
 			case "SQLServer":
 				if (FindNoCase("database exists", arguments.e.message)) {
 					printError("Database already exists: " & arguments.dbName);
 					local.errorHandled = true;
 				} else if (FindNoCase("Login failed", arguments.e.message)) {
 					printError("Login failed - check SQL Server credentials");
+					local.errorHandled = true;
+				}
+				break;
+
+			case "Oracle":
+				if (FindNoCase("ORA-01920", arguments.e.message) || FindNoCase("user name conflicts", arguments.e.message)) {
+					printError("User (schema) already exists: " & arguments.dbName);
+					printWarning("Use force=true to drop and recreate the user");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-28014", arguments.e.message) || FindNoCase("cannot drop administrative user", arguments.e.message)) {
+					printError("Cannot drop administrative/system user: " & arguments.dbName);
+					printWarning("Please choose a different database name (e.g., 'myapp_dev', 'wheels_dev')");
+					printWarning("Oracle system users like SYS, SYSTEM, ADMIN, XDB, ORACLE_OCM, etc. cannot be dropped");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-65096", arguments.e.message) || FindNoCase("common user or role name", arguments.e.message)) {
+					printError("Oracle CDB requires C## prefix for common users");
+					printWarning("This may indicate insufficient privileges to set _ORACLE_SCRIPT session variable");
+					printWarning("Try using a database name starting with 'C##' (e.g., 'C##MYAPP')");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-01017", arguments.e.message) || FindNoCase("invalid username/password", arguments.e.message)) {
+					printError("Invalid username/password - check Oracle credentials");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-12505", arguments.e.message) || FindNoCase("TNS:listener", arguments.e.message)) {
+					printError("Cannot connect to Oracle server - check SID and connection settings");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-01031", arguments.e.message) || FindNoCase("insufficient privileges", arguments.e.message)) {
+					printError("Insufficient privileges - user must have CREATE USER and GRANT privileges");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-28001", arguments.e.message) || FindNoCase("password has expired", arguments.e.message)) {
+					printError("Password has expired - please update the password in Oracle");
 					local.errorHandled = true;
 				}
 				break;
@@ -329,6 +466,391 @@ component extends="../base" {
 				printError("Detail: " & arguments.e.detail);
 			}
 			throw(message=arguments.e.message, detail=(isDefined("arguments.e.detail") ? arguments.e.detail : ""));
+		}
+	}
+
+	/**
+	 * Create datasource interactively
+	 */
+	private struct function createInteractiveDatasource(required string datasourceName, required string appPath, required string environment) {
+		print.line();
+		print.cyanBoldLine("=== Interactive Datasource Creation ===");
+		print.line();
+
+		// Ask for database type
+		print.yellowLine("Supported database types:");
+		print.line("  1. MySQL");
+		print.line("  2. PostgreSQL");
+		print.line("  3. SQL Server (MSSQL)");
+		print.line("  4. Oracle");
+		print.line("  5. H2");
+		print.line();
+
+		local.dbTypeChoice = ask("Select database type [1-5]: ");
+		local.dbType = "";
+		local.templateKey = "";
+
+		switch (local.dbTypeChoice) {
+			case "1":
+				local.dbType = "MySQL";
+				local.templateKey = "mysql";
+				break;
+			case "2":
+				local.dbType = "PostgreSQL";
+				local.templateKey = "postgre";
+				break;
+			case "3":
+				local.dbType = "MSSQLServer";
+				local.templateKey = "mssql";
+				break;
+			case "4":
+				local.dbType = "Oracle";
+				local.templateKey = "oracle";
+				break;
+			case "5":
+				local.dbType = "H2";
+				local.templateKey = "h2";
+				break;
+			default:
+				printError("Invalid choice!");
+				return {};
+		}
+
+		print.line();
+		print.greenLine("Selected: " & local.dbType);
+		print.line();
+
+		// Get datasource templates
+		local.templates = getDatasourceTemplates();
+		if (!structKeyExists(local.templates, local.templateKey)) {
+			printError("Template not found for " & local.dbType);
+			return {};
+		}
+
+		local.template = local.templates[local.templateKey];
+
+		// Prompt for connection details
+		print.cyanLine("Enter connection details:");
+		print.line();
+
+		// H2 is embedded - only needs database name and username (optional password)
+		if (local.dbType == "H2") {
+			local.database = ask("Database name [wheels_dev]: ");
+			if (!len(local.database)) {
+				local.database = "wheels_dev";
+			}
+
+			local.username = ask("Username [root]: ");
+			if (!len(local.username)) {
+				local.username = "root";
+			}
+
+			local.password = ask("Password (optional): ", "", true);
+
+			// H2 doesn't use host/port
+			local.host = "";
+			local.port = "";
+
+		} else {
+			// For server-based databases (MySQL, PostgreSQL, MSSQL, Oracle)
+			local.host = ask("Host [" & getDefaultValue(local.template, "host", "localhost") & "]: ");
+			if (!len(local.host)) {
+				local.host = getDefaultValue(local.template, "host", "localhost");
+			}
+
+			local.port = ask("Port [" & getDefaultValue(local.template, "port", getDefaultPort(local.dbType)) & "]: ");
+			if (!len(local.port)) {
+				local.port = getDefaultValue(local.template, "port", getDefaultPort(local.dbType));
+			}
+
+			local.database = ask("Database name [wheels_dev]: ");
+			if (!len(local.database)) {
+				local.database = "wheels_dev";
+			}
+
+			local.username = ask("Username [" & getDefaultValue(local.template, "username", "root") & "]: ");
+			if (!len(local.username)) {
+				local.username = getDefaultValue(local.template, "username", "root");
+			}
+
+			local.password = ask("Password: ", "", true);  // true for password masking
+
+			// For Oracle, ask for SID
+			if (local.dbType == "Oracle") {
+				local.sid = ask("SID [FREE]: ");
+				if (!len(local.sid)) {
+					local.sid = "FREE";
+				}
+			}
+		}
+
+		// Build connection string
+		local.connectionString = buildConnectionString(local.dbType, local.host, local.port, local.database, local.sid ?: "");
+
+		print.line();
+		print.yellowLine("Review datasource configuration:");
+		print.line("  Datasource Name: " & arguments.datasourceName);
+		print.line("  Database Type: " & local.dbType);
+
+		// Only show host/port for server-based databases
+		if (local.dbType != "H2") {
+			print.line("  Host: " & local.host);
+			print.line("  Port: " & local.port);
+		}
+
+		print.line("  Database: " & local.database);
+		print.line("  Username: " & local.username);
+		print.line("  Connection String: " & local.connectionString);
+		print.line();
+
+		if (ask("Create this datasource? [y/n]: ") != "y") {
+			printWarning("Datasource creation cancelled");
+			return {};
+		}
+
+		// Create datasource configuration
+		local.dsConfig = {
+			class: local.template.class,
+			bundleName: local.template.bundleName,
+			bundleVersion: local.template.bundleVersion,
+			connectionString: local.connectionString,
+			username: local.username,
+			password: local.password,
+			connectionLimit: -1,
+			liveTimeout: 15,
+			validate: false
+		};
+
+		// Save to app.cfm
+		if (!saveDatasourceToAppCfm(arguments.datasourceName, local.dsConfig, arguments.appPath)) {
+			printError("Failed to save datasource to app.cfm");
+			return {};
+		}
+
+		// Save to CFConfig.json
+		if (!saveDatasourceToCFConfig(arguments.datasourceName, local.dsConfig, local.dbType, local.host, local.port, local.database, arguments.appPath)) {
+			printWarning("Failed to save datasource to CFConfig.json (non-critical)");
+		}
+
+		print.line();
+		printSuccess("Datasource created successfully!");
+		print.line();
+
+		// Return datasource info in the format expected by the rest of the code
+		return {
+			driver: local.dbType,
+			database: local.database,
+			host: local.host,
+			port: local.port,
+			username: local.username,
+			password: local.password,
+			sid: local.sid ?: ""
+		};
+	}
+
+	/**
+	 * Get datasource templates from app.cfm
+	 */
+	private struct function getDatasourceTemplates() {
+		return {
+			mysql: {
+				class: "com.mysql.cj.jdbc.Driver",
+				bundleName: "com.mysql.cj",
+				bundleVersion: "9.1.0",
+				host: "localhost",
+				port: "3306",
+				username: "root"
+			},
+			postgre: {
+				class: "org.postgresql.Driver",
+				bundleName: "org.postgresql.jdbc",
+				bundleVersion: "42.7.4",
+				host: "localhost",
+				port: "5432",
+				username: "postgres"
+			},
+			mssql: {
+				class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+				bundleName: "org.lucee.mssql",
+				bundleVersion: "12.6.3.jre11",
+				host: "localhost",
+				port: "1433",
+				username: "admin"
+			},
+			oracle: {
+				class: "oracle.jdbc.OracleDriver",
+				bundleName: "org.lucee.oracle",
+				bundleVersion: "21.8.0.0-ojdbc11",
+				host: "localhost",
+				port: "1521",
+				username: "system"
+			},
+			h2: {
+				class: "org.h2.Driver",
+				bundleName: "org.h2",
+				bundleVersion: "1.3.172",
+				host: "",
+				port: "",
+				username: "root"
+			}
+		};
+	}
+
+	/**
+	 * Get default port for database type
+	 */
+	private string function getDefaultPort(required string dbType) {
+		switch (arguments.dbType) {
+			case "MySQL":
+				return "3306";
+			case "PostgreSQL":
+				return "5432";
+			case "MSSQLServer":
+				return "1433";
+			case "Oracle":
+				return "1521";
+			default:
+				return "";
+		}
+	}
+
+	/**
+	 * Get default value from template
+	 */
+	private string function getDefaultValue(required struct template, required string key, string defaultValue = "") {
+		return structKeyExists(arguments.template, arguments.key) ? arguments.template[arguments.key] : arguments.defaultValue;
+	}
+
+	/**
+	 * Build connection string
+	 */
+	private string function buildConnectionString(required string dbType, required string host, required string port, required string database, string sid = "") {
+		switch (arguments.dbType) {
+			case "MySQL":
+				return "jdbc:mysql://#arguments.host#:#arguments.port#/#arguments.database#?characterEncoding=UTF-8&serverTimezone=UTC&maxReconnects=3";
+			case "PostgreSQL":
+				return "jdbc:postgresql://#arguments.host#:#arguments.port#/#arguments.database#";
+			case "MSSQLServer":
+				return "jdbc:sqlserver://#arguments.host#:#arguments.port#;DATABASENAME=#arguments.database#;trustServerCertificate=true;SelectMethod=direct";
+			case "Oracle":
+				return "jdbc:oracle:thin:@#arguments.host#:#arguments.port#:#arguments.sid#";
+			case "H2":
+				local.appPath = getCWD();
+				return "jdbc:h2:#local.appPath#db/h2/#arguments.database#;MODE=MySQL";
+			default:
+				return "";
+		}
+	}
+
+	/**
+	 * Save datasource to app.cfm
+	 */
+	private boolean function saveDatasourceToAppCfm(required string dsName, required struct dsConfig, required string appPath) {
+		try {
+			local.appCfmPath = arguments.appPath & "/config/app.cfm";
+			if (!fileExists(local.appCfmPath)) {
+				printError("app.cfm not found at: " & local.appCfmPath);
+				return false;
+			}
+
+			local.content = fileRead(local.appCfmPath);
+
+			// Build datasource definition
+			local.dsDefinition = '
+	this.datasources["#arguments.dsName#"] = {
+		class: "#arguments.dsConfig.class#",
+		bundleName: "#arguments.dsConfig.bundleName#",
+		bundleVersion: "#arguments.dsConfig.bundleVersion#",
+		connectionString: "#arguments.dsConfig.connectionString#",
+		username: "#arguments.dsConfig.username#",
+		password: "#arguments.dsConfig.password#",
+
+		// optional settings
+		connectionLimit:#arguments.dsConfig.connectionLimit#,
+		liveTimeout:#arguments.dsConfig.liveTimeout#,
+		validate:#arguments.dsConfig.validate#
+	};
+';
+
+			// Check if datasource already exists
+			if (find('this.datasources["#arguments.dsName#"]', local.content)) {
+				printWarning("Datasource already exists in app.cfm - skipping");
+				return true;
+			}
+
+			// Insert before CLI-Appends-Here marker
+			if (find("// CLI-Appends-Here", local.content)) {
+				local.content = replace(local.content, "// CLI-Appends-Here", local.dsDefinition & chr(10) & chr(9) & "// CLI-Appends-Here");
+			} else {
+				// Insert before closing cfscript tag
+				local.closingTag = "<" & "/cfscript>";
+				local.content = replace(local.content, local.closingTag, local.dsDefinition & local.closingTag);
+			}
+
+			fileWrite(local.appCfmPath, local.content);
+			printSuccess("Datasource added to app.cfm");
+			return true;
+
+		} catch (any e) {
+			printError("Error saving to app.cfm: " & e.message);
+			return false;
+		}
+	}
+
+	/**
+	 * Save datasource to CFConfig.json
+	 */
+	private boolean function saveDatasourceToCFConfig(required string dsName, required struct dsConfig, required string dbType, required string host, required string port, required string database, required string appPath) {
+		try {
+			local.cfconfigPath = arguments.appPath & "/CFConfig.json";
+			if (!fileExists(local.cfconfigPath)) {
+				printWarning("CFConfig.json not found - skipping");
+				return true; // Not critical
+			}
+
+			local.cfconfig = deserializeJSON(fileRead(local.cfconfigPath));
+
+			if (!structKeyExists(local.cfconfig, "datasources")) {
+				local.cfconfig.datasources = {};
+			}
+
+			// Map driver to CFConfig class
+			local.cfconfigClass = "";
+			switch (arguments.dbType) {
+				case "MySQL":
+					local.cfconfigClass = "com.mysql.cj.jdbc.Driver";
+					break;
+				case "PostgreSQL":
+					local.cfconfigClass = "org.postgresql.Driver";
+					break;
+				case "MSSQLServer":
+					local.cfconfigClass = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+					break;
+				case "Oracle":
+					local.cfconfigClass = "oracle.jdbc.OracleDriver";
+					break;
+				case "H2":
+					local.cfconfigClass = "org.h2.Driver";
+					break;
+			}
+
+			local.cfconfig.datasources[arguments.dsName] = {
+				class: local.cfconfigClass,
+				connectionString: arguments.dsConfig.connectionString,
+				username: arguments.dsConfig.username,
+				password: arguments.dsConfig.password,
+				host: arguments.host,
+				port: val(arguments.port),
+				database: arguments.database
+			};
+
+			fileWrite(local.cfconfigPath, serializeJSON(local.cfconfig));
+			printSuccess("Datasource added to CFConfig.json");
+			return true;
+
+		} catch (any e) {
+			printWarning("Error saving to CFConfig.json: " & e.message);
+			return false; // Non-critical
 		}
 	}
 

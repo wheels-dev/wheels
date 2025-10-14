@@ -730,6 +730,10 @@ component excludeFromHelp=true {
 							case "com.microsoft.sqlserver.jdbc.SQLServerDriver":
 								local.dsInfo.driver = "MSSQL";
 								break;
+							case "oracle.jdbc.OracleDriver":
+							case "oracle.jdbc.driver.OracleDriver":
+								local.dsInfo.driver = "Oracle";
+								break;
 						}
 					}
 					
@@ -926,7 +930,7 @@ component excludeFromHelp=true {
 		local.driver = arguments.dsInfo.driver;
 		local.host = arguments.dsInfo.host ?: "localhost";
 		local.port = arguments.dsInfo.port ?: "";
-		
+
 		switch (local.driver) {
 			case "MySQL":
 			case "MySQL5":
@@ -942,6 +946,11 @@ component excludeFromHelp=true {
 				if (!Len(local.port)) local.port = "1433";
 				// Connect to master system database
 				return "jdbc:sqlserver://#local.host#:#local.port#;databaseName=master;encrypt=false;trustServerCertificate=true";
+			case "Oracle":
+				if (!Len(local.port)) local.port = "1521";
+				// Connect using SID (Oracle system identifier)
+				local.sid = arguments.dsInfo.sid ?: "FREE";
+				return "jdbc:oracle:thin:@#local.host#:#local.port#:#local.sid#";
 			case "H2":
 				// H2 databases are created automatically, no system database needed
 				local.database = arguments.dsInfo.database ?: "";
@@ -1040,45 +1049,6 @@ component excludeFromHelp=true {
 	}
 
 	/**
-	 * Get database-specific configuration
-	 */
-	private struct function getDatabaseConfig(required string dbType, required struct dsInfo) {
-		local.config = {
-			tempDS: Duplicate(arguments.dsInfo),
-			driverClasses: []
-		};
-		
-		switch (arguments.dbType) {
-			case "MySQL":
-				local.config.tempDS.database = "information_schema"; // Connect to system database
-				local.config.driverClasses = [
-					"com.mysql.cj.jdbc.Driver",      // MySQL 8.0+
-					"com.mysql.jdbc.Driver",         // MySQL 5.x
-					"org.mariadb.jdbc.Driver"        // MariaDB
-				];
-				break;
-				
-			case "PostgreSQL":
-				local.config.tempDS.database = "postgres"; // Connect to system database
-				local.config.driverClasses = [
-					"org.postgresql.Driver",         // Standard PostgreSQL driver
-					"postgresql.Driver"              // Alternative name
-				];
-				break;
-				
-			case "SQLServer":
-				local.config.tempDS.database = "master"; // Connect to system database
-				local.config.driverClasses = [
-					"com.microsoft.sqlserver.jdbc.SQLServerDriver"
-				];
-				break;
-		}
-		
-		return local.config;
-	}
-
-
-		/**
 	 * Get list of available databases
 	 */
 	private array function getAvailableDatabases(required struct dsInfo) {
@@ -1379,7 +1349,7 @@ component excludeFromHelp=true {
 			tempDS: Duplicate(arguments.dsInfo),
 			driverClasses: []
 		};
-		
+
 		switch (arguments.dbType) {
 			case "MySQL":
 				if (Len(arguments.systemDatabase)) {
@@ -1393,7 +1363,7 @@ component excludeFromHelp=true {
 					"org.mariadb.jdbc.Driver"
 				];
 				break;
-				
+
 			case "PostgreSQL":
 				if (Len(arguments.systemDatabase)) {
 					local.config.tempDS.database = arguments.systemDatabase;
@@ -1405,7 +1375,7 @@ component excludeFromHelp=true {
 					"postgresql.Driver"
 				];
 				break;
-				
+
 			case "SQLServer":
 			case "MSSQL":
 				if (Len(arguments.systemDatabase)) {
@@ -1417,7 +1387,20 @@ component excludeFromHelp=true {
 					"com.microsoft.sqlserver.jdbc.SQLServerDriver"
 				];
 				break;
-				
+
+			case "Oracle":
+				// Oracle uses SID instead of database
+				if (Len(arguments.systemDatabase)) {
+					local.config.tempDS.database = arguments.systemDatabase;
+				} else if (!Len(local.config.tempDS.database)) {
+					local.config.tempDS.database = arguments.dsInfo.sid ?: "FREE"; // Default system SID
+				}
+				local.config.driverClasses = [
+					"oracle.jdbc.OracleDriver",
+					"oracle.jdbc.driver.OracleDriver"
+				];
+				break;
+
 			case "H2":
 				// H2 doesn't need a system database
 				local.config.driverClasses = [
@@ -1425,7 +1408,7 @@ component excludeFromHelp=true {
 				];
 				break;
 		}
-		
+
 		return local.config;
 	}
 
