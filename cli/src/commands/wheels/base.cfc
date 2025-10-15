@@ -680,22 +680,22 @@ component excludeFromHelp=true {
 			// Try to get datasource info from app.cfm
 			local.appPath = getCWD();
 			local.appCfcPath = local.appPath & "/config/app.cfm";
-			
+
 			if (fileExists(local.appCfcPath)) {
 				local.content = fileRead(local.appCfcPath);
-				
+
 				// Remove all types of comments before parsing
 				// 1. Remove CFML multi-line comments: <!--- ... --->
 				local.content = REReplace(local.content, "<!---[\s\S]*?--->", "", "all");
-				
+
 				// 2. Remove JavaScript/CFScript multi-line comments: /* ... */
 				local.content = REReplace(local.content, "/\*[\s\S]*?\*/", "", "all");
-				
+
 				// 3. Remove JavaScript/CFScript single-line comments: // ...
 				// BUT we need to be careful not to remove // from URLs (http://, jdbc:mysql://, etc.)
 				// Only remove // that appears at the beginning of a line or after whitespace
 				local.content = REReplace(local.content, "(^|\s)//[^\r\n]*", "\1", "all");
-				
+
 				// Look for datasource definition in this.datasources['name']
 				local.pattern = "this\.datasources\[['""]#arguments.datasourceName#['""]]\s*=\s*\{([^}]+)\}";
 				local.match = reFindNoCase(local.pattern, local.content, 1, true);
@@ -711,7 +711,7 @@ component excludeFromHelp=true {
 						"username": "",
 						"password": ""
 					};
-					
+
 					// Extract driver class - handle both single and double quotes
 					local.classMatch = reFindNoCase("class\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
 					if (arrayLen(local.classMatch.pos) >= 2 && local.classMatch.pos[2] > 0) {
@@ -736,7 +736,60 @@ component excludeFromHelp=true {
 								break;
 						}
 					}
-					
+
+					// ENHANCEMENT: Check if .env file exists and read actual credentials from there
+					// This solves the issue where app.cfm has environment variable placeholders like ##this.env.MSSQL_HOST##
+					local.environment = getEnvironment(local.appPath);
+					local.envFile = local.appPath & "/.env." & local.environment;
+					local.useEnvFile = fileExists(local.envFile) && Len(local.dsInfo.driver);
+
+					if (local.useEnvFile) {
+						// Read actual values from .env file using GENERIC DB_* variables
+						local.envContent = fileRead(local.envFile);
+
+						// Extract host
+						local.hostMatch = REFind("(?im)^DB_HOST\s*=\s*([^\r\n]+)", local.envContent, 1, true);
+						if (ArrayLen(local.hostMatch.pos) >= 2 && local.hostMatch.pos[2] > 0) {
+							local.dsInfo.host = Trim(Mid(local.envContent, local.hostMatch.pos[2], local.hostMatch.len[2]));
+						}
+
+						// Extract port
+						local.portMatch = REFind("(?im)^DB_PORT\s*=\s*([^\r\n]+)", local.envContent, 1, true);
+						if (ArrayLen(local.portMatch.pos) >= 2 && local.portMatch.pos[2] > 0) {
+							local.dsInfo.port = Trim(Mid(local.envContent, local.portMatch.pos[2], local.portMatch.len[2]));
+						}
+
+						// Extract database
+						local.dbMatch = REFind("(?im)^DB_DATABASE\s*=\s*([^\r\n]+)", local.envContent, 1, true);
+						if (ArrayLen(local.dbMatch.pos) >= 2 && local.dbMatch.pos[2] > 0) {
+							local.dsInfo.database = Trim(Mid(local.envContent, local.dbMatch.pos[2], local.dbMatch.len[2]));
+						}
+
+						// Extract username (DB_USER maps to dsInfo.username, not dsInfo.user)
+						local.userMatch = REFind("(?im)^DB_USER\s*=\s*([^\r\n]+)", local.envContent, 1, true);
+						if (ArrayLen(local.userMatch.pos) >= 2 && local.userMatch.pos[2] > 0) {
+							local.dsInfo.username = Trim(Mid(local.envContent, local.userMatch.pos[2], local.userMatch.len[2]));
+						}
+
+						// Extract password
+						local.passMatch = REFind("(?im)^DB_PASSWORD\s*=\s*([^\r\n]+)", local.envContent, 1, true);
+						if (ArrayLen(local.passMatch.pos) >= 2 && local.passMatch.pos[2] > 0) {
+							local.dsInfo.password = Trim(Mid(local.envContent, local.passMatch.pos[2], local.passMatch.len[2]));
+						}
+
+						// Extract SID for Oracle
+						if (local.dsInfo.driver == "Oracle") {
+							local.sidMatch = REFind("(?im)^DB_SID\s*=\s*([^\r\n]+)", local.envContent, 1, true);
+							if (ArrayLen(local.sidMatch.pos) >= 2 && local.sidMatch.pos[2] > 0) {
+								local.dsInfo.sid = Trim(Mid(local.envContent, local.sidMatch.pos[2], local.sidMatch.len[2]));
+							}
+						}
+
+						// Successfully loaded from .env file - return immediately
+						return local.dsInfo;
+					}
+
+
 					// Extract connection string - handle both single and double quotes
 					local.connMatch = reFindNoCase("connectionString\s*:\s*['""]([^'""]+)['""]", local.dsDefinition, 1, true);
 					if (arrayLen(local.connMatch.pos) >= 2 && local.connMatch.pos[2] > 0) {
@@ -840,28 +893,49 @@ component excludeFromHelp=true {
 		local.envFile = arguments.appPath & "/.env";
 		if (FileExists(local.envFile)) {
 			local.envContent = FileRead(local.envFile);
-			local.envMatch = REFind("(?m)^WHEELS_ENV\s*=\s*(.+)$", local.envContent, 1, true);
-			if (local.envMatch.pos[1] > 0) {
+
+			// Case-insensitive, multiline match; stop at line break
+			local.envMatch = REFind("(?im)^\s*wheels_env\s*=\s*([^\r\n##]+)", local.envContent, 1, true);
+
+			if (StructKeyExists(local.envMatch, "pos") && local.envMatch.pos[1] > 0) {
 				local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));
+
+				// Remove quotes if value is quoted
+				if (Left(local.environment, 1) == '"' && Right(local.environment, 1) == '"') {
+					local.environment = Mid(local.environment, 2, Len(local.environment) - 2);
+				}
 			}
 		}
-		
-		// Check environment variable
+
+		// Check environment variable (case-insensitive)
 		if (!Len(local.environment)) {
 			local.sysEnv = CreateObject("java", "java.lang.System");
-			local.wheelsEnv = local.sysEnv.getenv("WHEELS_ENV");
-			if (!IsNull(local.wheelsEnv) && Len(local.wheelsEnv)) {
-				local.environment = local.wheelsEnv;
+			local.envMap = local.sysEnv.getenv();
+			for (local.k in local.envMap.keySet()) {
+				if (CompareNoCase(local.k, "WHEELS_ENV") == 0) {
+					local.environment = local.envMap.get(local.k);
+					break;
+				}
 			}
 		}
-		
+
 		// Default to development
 		if (!Len(local.environment)) {
 			local.environment = "development";
 		}
-		
+
+		// Include all files from folder matching environment (if exists)
+		local.envFolder = arguments.appPath & "/" & local.environment;
+		if (DirectoryExists(local.envFolder)) {
+			local.files = DirectoryList(local.envFolder, false, "path", "*.cfm");
+			for (local.file in local.files) {
+				include local.file;
+			}
+		}
 		return local.environment;
 	}
+
+
 
 	private string function getDataSourceName(required string appPath, required string environment) {
 		// Check environment-specific settings first
@@ -1526,6 +1600,33 @@ component excludeFromHelp=true {
 		}
 
 		return baseDirectory;
+	}
+
+	/**
+	 * Normalize database type parameter
+	 * Converts user input like "h2", "mysql", "postgres" to proper driver names
+	 * Also normalizes driver names for consistent comparisons
+	 */
+	private string function normalizeDbType(required string dbtype) {
+		switch (lCase(arguments.dbtype)) {
+			case "h2":
+				return "H2";
+			case "mysql":
+			case "mysql5":
+				return "MySQL";
+			case "postgres":
+			case "postgresql":
+				return "PostgreSQL";
+			case "mssql":
+			case "sqlserver":
+			case "mssqlserver":
+				return "MSSQLServer";
+			case "oracle":
+				return "Oracle";
+			default:
+				// Return as-is if already proper case
+				return arguments.dbtype;
+		}
 	}
 
 }

@@ -13,11 +13,17 @@ component {
         required string dbtype,
         string database = "",
         string datasource = "",
+        string host = "",
+        string port = "",
+        string username = "",
+        string password = "",
+        string sid = "",
         boolean force = false,
         string base = "",
         boolean debug = false,
         boolean cache = false,
         string reloadPassword = "",
+        boolean skipDatabase = false,
         boolean help = false
     ) {
 
@@ -59,10 +65,28 @@ component {
                 createEnvironmentFile(arguments.environment, result.config, projectRoot);
                 createEnvironmentSettings(argumentCollection = arguments, config = result.config, rootPath = projectRoot);
 
+                // Write datasource to app.cfm with environment variables
+                // Skip if skipDatabase=true (called from wheels db create) to avoid loading unresolved placeholders
+                if (result.config.keyExists("datasourceInfo") && !arguments.skipDatabase) {
+                    writeDatasourceToAppCfm(
+                        arguments.environment,
+                        result.config,
+                        projectRoot
+                    );
+                }
+
                 // Update server.json if needed
                 updateServerConfig(arguments.environment, result.config, projectRoot);
 
                 result.nextSteps = generateNextSteps(arguments.template, arguments.environment);
+
+                // Add note if skipDatabase=true
+                if (arguments.skipDatabase) {
+                    if (!structKeyExists(result, "notes")) {
+                        result.notes = [];
+                    }
+                    arrayAppend(result.notes, "Datasource configuration will be added to app.cfm after database is created successfully");
+                }
             }
 
             return result;
@@ -295,6 +319,9 @@ component {
                 // Non-critical error, continue
             }
         }
+
+        // Update settings.cfm file to reflect the new environment
+        updateEnvironmentInSettingsFile(arguments.environment, projectRoot);
         
         // Try to read additional environment-specific file if it exists
         var specificEnvFile = "#projectRoot#/.env.#arguments.environment#";
@@ -366,13 +393,13 @@ component {
     private function setupLocalEnvironment(argumentCollection) {
 
         // Default database name if not provided
-        var databaseName = len(trim(arguments.database)) ? 
-            arguments.database : 
+        var databaseName = len(trim(arguments.database)) ?
+            arguments.database :
             "wheels_#arguments.environment#";
-        var datasourceName = len(trim(arguments.datasource)) ? 
-            arguments.datasource : 
+        var datasourceName = len(trim(arguments.datasource)) ?
+            arguments.datasource :
             "wheels_#arguments.environment#";
-            
+
         var config = {
             template: "local",
             dbtype: arguments.dbtype,
@@ -381,39 +408,58 @@ component {
             cfengine: "lucee5"
         };
 
+        // Use provided values or defaults
+        var dbHost = len(trim(arguments.host)) ? arguments.host : "localhost";
+        var dbPort = len(trim(arguments.port)) ? arguments.port : getDatabasePort(arguments.dbtype);
+        var dbUsername = len(trim(arguments.username)) ? arguments.username : getDefaultUsername(arguments.dbtype);
+        var dbPassword = len(trim(arguments.password)) ? arguments.password : getDefaultPassword(arguments.dbtype);
+        var dbSid = len(trim(arguments.sid)) ? arguments.sid : "ORCL";
+
         // Database-specific configuration
         switch (arguments.dbtype) {
             case "mysql":
                 config.datasourceInfo = {
                     driver: "MySQL",
-                    host: "localhost",
-                    port: 3306,
+                    host: dbHost,
+                    port: dbPort,
                     database: databaseName,
                     datasource: datasourceName,
-                    username: "wheels",
-                    password: "wheels_password"
+                    username: dbUsername,
+                    password: dbPassword
                 };
                 break;
             case "postgres":
                 config.datasourceInfo = {
                     driver: "PostgreSQL",
-                    host: "localhost",
-                    port: 5432,
+                    host: dbHost,
+                    port: dbPort,
                     database: databaseName,
                     datasource: datasourceName,
-                    username: "wheels",
-                    password: "wheels_password"
+                    username: dbUsername,
+                    password: dbPassword
                 };
                 break;
             case "mssql":
                 config.datasourceInfo = {
                     driver: "MSSQL",
-                    host: "localhost",
-                    port: 1433,
+                    host: dbHost,
+                    port: dbPort,
                     database: databaseName,
                     datasource: datasourceName,
-                    username: "sa",
-                    password: "Wheels_Pass123!"
+                    username: dbUsername,
+                    password: dbPassword
+                };
+                break;
+            case "oracle":
+                config.datasourceInfo = {
+                    driver: "Oracle",
+                    host: dbHost,
+                    port: dbPort,
+                    database: databaseName,
+                    datasource: datasourceName,
+                    username: dbUsername,
+                    password: dbPassword,
+                    sid: dbSid
                 };
                 break;
             default: // h2
@@ -421,12 +467,12 @@ component {
                     driver: "H2",
                     host:"",
                     port:"",
-                    database: len(trim(arguments.database)) ? 
-                        "./db/#arguments.database#" : 
+                    database: len(trim(arguments.database)) ?
+                        "./db/#arguments.database#" :
                         "./db/wheels_#arguments.environment#",
                     datasource:datasourceName,
-                    username: "sa",
-                    password: ""
+                    username: dbUsername,
+                    password: dbPassword
                 };
         }
 
@@ -434,6 +480,46 @@ component {
             success: true,
             config: config
         };
+    }
+
+    /**
+     * Get default username for database type
+     */
+    private string function getDefaultUsername(required string dbtype) {
+        switch (arguments.dbtype) {
+            case "mysql":
+                return "wheels";
+            case "postgres":
+                return "wheels";
+            case "mssql":
+                return "sa";
+            case "oracle":
+                return "wheels";
+            case "h2":
+                return "sa";
+            default:
+                return "wheels";
+        }
+    }
+
+    /**
+     * Get default password for database type
+     */
+    private string function getDefaultPassword(required string dbtype) {
+        switch (arguments.dbtype) {
+            case "mysql":
+                return "wheels_password";
+            case "postgres":
+                return "wheels_password";
+            case "mssql":
+                return "Wheels_Pass123!";
+            case "oracle":
+                return "wheels_password";
+            case "h2":
+                return "";
+            default:
+                return "wheels_password";
+        }
     }
 
     /**
@@ -528,19 +614,40 @@ component {
         arrayAppend(envContent, "WHEELS_RELOAD_PASSWORD=wheels#arguments.environment#");
         arrayAppend(envContent, "");
 
-        // Database settings
+        // Database settings - Use GENERIC variable names for all database types
         if (arguments.config.keyExists("datasourceInfo")) {
             arrayAppend(envContent, "## Database Settings");
+
+            // Use generic DB_* prefix for all database types
             arrayAppend(envContent, "DB_TYPE=#arguments.config.dbtype#");
-            arrayAppend(envContent, "DB_DRIVER=#arguments.config.datasourceInfo.driver#");
-            arrayAppend(envContent, "DB_HOST=#arguments.config.datasourceInfo.host#");
-            // Only add port if it's not empty (H2 doesn't use ports)
+
+            // Add host (if applicable - H2 doesn't use host)
+            if (len(trim(arguments.config.datasourceInfo.host))) {
+                arrayAppend(envContent, "DB_HOST=#arguments.config.datasourceInfo.host#");
+            }
+
+            // Add port (if applicable - H2 doesn't use port)
             if (len(trim(arguments.config.datasourceInfo.port))) {
                 arrayAppend(envContent, "DB_PORT=#arguments.config.datasourceInfo.port#");
             }
-            arrayAppend(envContent, "DB_NAME=#arguments.config.datasourceInfo.database#");
+
+            // Database name
+            arrayAppend(envContent, "DB_DATABASE=#arguments.config.datasourceInfo.database#");
+
+            // Credentials
             arrayAppend(envContent, "DB_USER=#arguments.config.datasourceInfo.username#");
             arrayAppend(envContent, "DB_PASSWORD=#arguments.config.datasourceInfo.password#");
+
+            // Add Oracle SID if exists
+            if (arguments.config.dbtype == "oracle" && structKeyExists(arguments.config.datasourceInfo, "sid")) {
+                arrayAppend(envContent, "DB_SID=#arguments.config.datasourceInfo.sid#");
+            }
+
+            // Add datasource name
+            if (structKeyExists(arguments.config.datasourceInfo, "datasource")) {
+                arrayAppend(envContent, "DB_DATASOURCE=#arguments.config.datasourceInfo.datasource#");
+            }
+
             arrayAppend(envContent, "");
         }
 
@@ -633,6 +740,119 @@ component {
             success: true,
             message: "settings.cfm created at /config/#arguments.environment#/ with debug=#arguments.debug#, cache=#arguments.cache#"
         };
+    }
+
+    /**
+     * Write datasource to app.cfm using environment variables
+     * PUBLIC: Called from create.cfc after database creation
+     */
+    public function writeDatasourceToAppCfm(
+        required string environment,
+        required struct config,
+        required string rootPath
+    ) {
+        try {
+            var appCfmPath = arguments.rootPath & "/config/app.cfm";
+            if (!fileExists(appCfmPath)) {
+                return { success: false, message: "app.cfm not found" };
+            }
+
+            var content = fileRead(appCfmPath);
+            var datasourceName = arguments.config.datasourceInfo.datasource;
+
+            // Check if datasource already exists
+            if (find('this.datasources["#datasourceName#"]', content)) {
+                return { success: true, message: "Datasource already exists in app.cfm" };
+            }
+
+            // Build datasource configuration using GENERIC environment variables
+            var dsConfig = getDatasourceConfigForEnvVars(arguments.config.dbtype);
+
+            // Build datasource definition using generic DB_* environment variables
+            var dsDefinition = chr(10) & chr(9) & "// #arguments.config.datasourceInfo.driver# Datasource - Uses generic DB_* environment variables" & chr(10);
+            dsDefinition &= chr(9) & "if (structKeyExists(this.env, ""DB_HOST"") && len(trim(this.env.DB_HOST))) {" & chr(10);
+            dsDefinition &= chr(9) & chr(9) & 'this.datasources["#datasourceName#"] = {' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'class: "#dsConfig.class#",' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'bundleName: "#dsConfig.bundleName#",' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'bundleVersion: "#dsConfig.bundleVersion#",' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'connectionString: "#dsConfig.connectionString#",' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'username: "##this.env.DB_USER##",' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'password: "##this.env.DB_PASSWORD##",' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'connectionLimit: -1,' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'liveTimeout: 15,' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & chr(9) & 'validate: false' & chr(10);
+            dsDefinition &= chr(9) & chr(9) & '};' & chr(10);
+            dsDefinition &= chr(9) & '}' & chr(10);
+
+            // Insert before CLI-Appends-Here marker or before closing cfscript tag
+            if (find("// CLI-Appends-Here", content)) {
+                content = replace(content, "// CLI-Appends-Here", dsDefinition & chr(9) & "// CLI-Appends-Here");
+            } else {
+                var closingTag = "<" & "/cfscript>";
+                content = replace(content, closingTag, dsDefinition & closingTag);
+            }
+
+            fileWrite(appCfmPath, content);
+            return { success: true, message: "Datasource added to app.cfm with environment variables" };
+
+        } catch (any e) {
+            return { success: false, message: "Error writing datasource to app.cfm: " & e.message };
+        }
+    }
+
+    /**
+     * Get datasource configuration template using GENERIC DB_* environment variables
+     * All database types now use DB_HOST, DB_PORT, DB_DATABASE, DB_USER, DB_PASSWORD
+     */
+    private struct function getDatasourceConfigForEnvVars(required string dbtype) {
+        var config = {};
+
+        switch (lCase(arguments.dbtype)) {
+            case "mysql":
+                config = {
+                    class: "com.mysql.cj.jdbc.Driver",
+                    bundleName: "com.mysql.cj",
+                    bundleVersion: "9.1.0",
+                    connectionString: "jdbc:mysql://##this.env.DB_HOST##:##this.env.DB_PORT##/##this.env.DB_DATABASE##?characterEncoding=UTF-8&serverTimezone=UTC&maxReconnects=3"
+                };
+                break;
+            case "postgres":
+            case "postgresql":
+                config = {
+                    class: "org.postgresql.Driver",
+                    bundleName: "org.postgresql.jdbc",
+                    bundleVersion: "42.7.4",
+                    connectionString: "jdbc:postgresql://##this.env.DB_HOST##:##this.env.DB_PORT##/##this.env.DB_DATABASE##"
+                };
+                break;
+            case "mssql":
+            case "mssqlserver":
+                config = {
+                    class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+                    bundleName: "org.lucee.mssql",
+                    bundleVersion: "12.6.3.jre11",
+                    connectionString: "jdbc:sqlserver://##this.env.DB_HOST##:##this.env.DB_PORT##;DATABASENAME=##this.env.DB_DATABASE##;trustServerCertificate=true;SelectMethod=direct"
+                };
+                break;
+            case "oracle":
+                config = {
+                    class: "oracle.jdbc.OracleDriver",
+                    bundleName: "org.lucee.oracle",
+                    bundleVersion: "21.8.0.0-ojdbc11",
+                    connectionString: "jdbc:oracle:thin:@##this.env.DB_HOST##:##this.env.DB_PORT##:##this.env.DB_SID##"
+                };
+                break;
+            case "h2":
+                config = {
+                    class: "org.h2.Driver",
+                    bundleName: "org.h2",
+                    bundleVersion: "1.3.172",
+                    connectionString: "jdbc:h2:./db/##this.env.DB_DATABASE##;MODE=MySQL"
+                };
+                break;
+        }
+
+        return config;
     }
 
     /**
@@ -850,6 +1070,7 @@ box server start port=8080 host=0.0.0.0";
             case "mysql": return "MySQL";
             case "postgres": return "PostgreSQL";
             case "mssql": return "MSSQL";
+            case "oracle": return "Oracle";
             default: return "H2";
         }
     }
@@ -859,6 +1080,7 @@ box server start port=8080 host=0.0.0.0";
             case "mysql": return 3306;
             case "postgres": return 5432;
             case "mssql": return 1433;
+            case "oracle": return 1521;
             case "h2": return ""; // H2 is embedded, no port
             default: return "";
         }
@@ -869,6 +1091,7 @@ box server start port=8080 host=0.0.0.0";
             case "mysql": return "mysql:8";
             case "postgres": return "postgres:14";
             case "mssql": return "mcr.microsoft.com/mssql/server:2019-latest";
+            case "oracle": return "gvenzl/oracle-xe:latest";
             default: return "oscarfonts/h2:latest";
         }
     }
@@ -887,6 +1110,11 @@ box server start port=8080 host=0.0.0.0";
             case "mssql":
                 return "ACCEPT_EULA=Y
       SA_PASSWORD=Wheels_Pass123!";
+            case "oracle":
+                return "ORACLE_PASSWORD=wheels_password
+      ORACLE_DATABASE=#arguments.databaseName#
+      APP_USER=wheels
+      APP_USER_PASSWORD=wheels_password";
             default:
                 return "H2_OPTIONS=-ifNotExists";
         }
@@ -897,6 +1125,7 @@ box server start port=8080 host=0.0.0.0";
             case "mysql": return "mysql";
             case "postgres": return "postgresql/data";
             case "mssql": return "mssql";
+            case "oracle": return "oracle/oradata";
             default: return "h2";
         }
     }
@@ -913,6 +1142,10 @@ mysql -e ""GRANT ALL ON #arguments.databaseName#.* TO 'wheels'@'localhost';""";
 sudo -u postgres createdb #arguments.databaseName#
 sudo -u postgres psql -c ""CREATE USER wheels WITH PASSWORD 'wheels_password';""
 sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseName# TO wheels;""";
+            case "oracle":
+                return "## Oracle database will be provisioned via Docker container
+## User 'wheels' with password 'wheels_password' will be created automatically
+## Connect to SID: ORCL or Service Name: XEPDB1";
             default:
                 return "## H2 database will be created automatically";
         }
@@ -1476,12 +1709,12 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
     */
     function getCurrentEnvironment(projectRoot) {
         var currentEnv = "";
-        
+
         // Use current directory if projectRoot not provided
         if (!len(projectRoot)) {
             projectRoot = getCurrentDirectory();
         }
-        
+
         // First, try to read from .env file (same as this.env in Application.cfc)
         var envFilePath = projectRoot & "/.env";
         if (fileExists(envFilePath)) {
@@ -1495,6 +1728,39 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         }
 
         return currentEnv;
+    }
+
+    /**
+     * Update the environment value in /config/environment.cfm
+     * This ensures set(environment="...") matches the current environment
+     */
+    private function updateEnvironmentInSettingsFile(required string environment, required string projectRoot) {
+        try {
+            var environmentFile = "#arguments.projectRoot#/config/environment.cfm";
+
+            // Check if environment.cfm exists
+            if (!fileExists(environmentFile)) {
+                return; // File doesn't exist, nothing to update
+            }
+
+            // Read current environment.cfm content
+            var content = fileRead(environmentFile);
+
+            // Update the set(environment="...") line
+            // Match both set(environment="...") and set(environment = "...")
+            var pattern = 'set\s*\(\s*environment\s*=\s*[""'']([^""'']+)[""'']\s*\)';
+            var replacement = 'set(environment="#arguments.environment#")';
+
+            // Replace the environment setting
+            content = reReplaceNoCase(content, pattern, replacement, "all");
+
+            // Write back to file
+            fileWrite(environmentFile, content);
+
+        } catch (any e) {
+            // Non-critical error - settings file update is optional
+            // Don't throw, just continue
+        }
     }
 
 }

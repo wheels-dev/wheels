@@ -8,15 +8,19 @@
  */
 component extends="../base" {
 
+	property name="environmentService" inject="EnvironmentService@wheels-cli";
+
 	/**
 	 * @datasource Optional datasource name (defaults to current datasource setting)
 	 * @environment Optional environment (defaults to current environment)
+	 * @dbtype Optional database type (h2, mysql, postgres, mssql, oracle)
 	 * @help Create a new database
 	 */
 	public void function run(
 		string datasource = "",
 		string environment = "",
 		string database = "",
+		string dbtype = "",
 		boolean force = false
 	) {
 		arguments = reconstructArgs(arguments);
@@ -48,6 +52,11 @@ component extends="../base" {
 			printInfo("Environment", arguments.environment);
 			printDivider();
 
+			// Normalize dbtype parameter
+			if (Len(arguments.dbtype)) {
+				arguments.dbtype = normalizeDbType(arguments.dbtype);
+			}
+
 			// Get datasource configuration
 			local.dsInfo = getDatasourceInfo(arguments.datasource);
 
@@ -58,7 +67,12 @@ component extends="../base" {
 
 				// Ask if user wants to create datasource
 				if (ask("Would you like to create this datasource now? [y/n]: ") == "y") {
-					local.dsInfo = createInteractiveDatasource(arguments.datasource, local.appPath, arguments.environment);
+					local.dsInfo = createInteractiveDatasource(
+						datasourceName = arguments.datasource,
+						appPath = local.appPath,
+						environment = arguments.environment,
+						dbtype = arguments.dbtype
+					);
 					if (StructIsEmpty(local.dsInfo)) {
 						error("Datasource creation cancelled or failed");
 						return;
@@ -68,8 +82,17 @@ component extends="../base" {
 					error("Datasource '" & arguments.datasource & "' not found in server configuration");
 					return;
 				}
+			} else {
+				// Datasource found - check if dbtype parameter matches datasource type
+				// Normalize both for comparison to avoid false mismatches (MSSQL vs MSSQLServer)
+				if (Len(arguments.dbtype) && normalizeDbType(arguments.dbtype) != normalizeDbType(local.dsInfo.driver)) {
+					print.line();
+					print.yellowLine("WARNING: dbtype parameter ('#arguments.dbtype#') does not match datasource type ('#local.dsInfo.driver#')");
+					print.yellowLine("Using datasource type: #local.dsInfo.driver#");
+					print.line();
+				}
 			}
-			
+
 			// Extract database name and connection info
 			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels_dev";
 			local.dbType = local.dsInfo.driver;
@@ -108,12 +131,18 @@ component extends="../base" {
 					systemOutput("Please create the database manually using your database management tools.", true, true);
 					error("Database creation not supported for driver: " & local.dbType);
 			}
-			
+
+			// After database creation, ensure environment setup exists
+			ensureEnvironmentSetup(local.appPath, arguments.environment, arguments.datasource, local.dbType, local.dsInfo);
+
+			// Now write datasource to app.cfm using environment variables
+			// This is done AFTER database creation so the actual values from dsInfo were used for DB creation
+			writeDatasourceToAppCfmWithEnvVars(local.appPath, arguments.datasource, local.dbType, arguments.environment);
+
 		} catch (any e) {
-			printError("Error creating database: " & e.message);
-			if (StructKeyExists(e, "detail") && Len(e.detail)) {
-				printError("Details: " & e.detail);
-			}
+			// Errors are already handled and displayed by handleDatabaseError() function
+			// Just set exit code to indicate failure
+			setExitCode(1);
 		}
 	}
 
@@ -126,7 +155,6 @@ component extends="../base" {
 			
 			// Get database-specific configuration (don't pass target dbName, use system DB)
 			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo);
-			
 			// Build connection URL to system database (not the target database)
 			local.url = buildSystemJDBCUrl(local.dbConfig.tempDS);
 			local.username = local.dbConfig.tempDS.username ?: "";
@@ -462,63 +490,100 @@ component extends="../base" {
 		
 		if (!local.errorHandled) {
 			printError(arguments.dbType & " Error: " & arguments.e.message);
-			if (isDefined("arguments.e.detail")) {
-				printError("Detail: " & arguments.e.detail);
-			}
-			throw(message=arguments.e.message, detail=(isDefined("arguments.e.detail") ? arguments.e.detail : ""));
 		}
+
+		// Always throw to propagate the error up (prevents duplicate error messages)
+		throw(message=arguments.e.message, detail=(isDefined("arguments.e.detail") ? arguments.e.detail : ""));
 	}
 
 	/**
 	 * Create datasource interactively
 	 */
-	private struct function createInteractiveDatasource(required string datasourceName, required string appPath, required string environment) {
+	private struct function createInteractiveDatasource(
+		required string datasourceName,
+		required string appPath,
+		required string environment,
+		string dbtype = ""
+	) {
 		print.line();
 		print.cyanBoldLine("=== Interactive Datasource Creation ===");
 		print.line();
 
-		// Ask for database type
-		print.yellowLine("Supported database types:");
-		print.line("  1. MySQL");
-		print.line("  2. PostgreSQL");
-		print.line("  3. SQL Server (MSSQL)");
-		print.line("  4. Oracle");
-		print.line("  5. H2");
-		print.line();
-
-		local.dbTypeChoice = ask("Select database type [1-5]: ");
 		local.dbType = "";
 		local.templateKey = "";
 
-		switch (local.dbTypeChoice) {
-			case "1":
-				local.dbType = "MySQL";
-				local.templateKey = "mysql";
-				break;
-			case "2":
-				local.dbType = "PostgreSQL";
-				local.templateKey = "postgre";
-				break;
-			case "3":
-				local.dbType = "MSSQLServer";
-				local.templateKey = "mssql";
-				break;
-			case "4":
-				local.dbType = "Oracle";
-				local.templateKey = "oracle";
-				break;
-			case "5":
-				local.dbType = "H2";
-				local.templateKey = "h2";
-				break;
-			default:
-				printError("Invalid choice!");
-				return {};
-		}
+		// If dbtype parameter was provided, use it directly
+		if (Len(arguments.dbtype)) {
+			local.dbType = arguments.dbtype;
 
-		print.line();
-		print.greenLine("Selected: " & local.dbType);
-		print.line();
+			// Map to template key
+			switch (local.dbType) {
+				case "MySQL":
+				case "MySQL5":
+					local.templateKey = "mysql";
+					break;
+				case "PostgreSQL":
+					local.templateKey = "postgre";
+					break;
+				case "MSSQLServer":
+				case "MSSQL":
+					local.templateKey = "mssql";
+					break;
+				case "Oracle":
+					local.templateKey = "oracle";
+					break;
+				case "H2":
+					local.templateKey = "h2";
+					break;
+				default:
+					printError("Invalid dbtype: " & local.dbType);
+					return {};
+			}
+
+			print.greenLine("Using database type from parameter: " & local.dbType);
+			print.line();
+		} else {
+			// Ask for database type interactively
+			print.yellowLine("Supported database types:");
+			print.line("  1. MySQL");
+			print.line("  2. PostgreSQL");
+			print.line("  3. SQL Server (MSSQL)");
+			print.line("  4. Oracle");
+			print.line("  5. H2");
+			print.line();
+
+			local.dbTypeChoice = ask("Select database type [1-5]: ");
+
+			switch (local.dbTypeChoice) {
+				case "1":
+					local.dbType = "MySQL";
+					local.templateKey = "mysql";
+					break;
+				case "2":
+					local.dbType = "PostgreSQL";
+					local.templateKey = "postgre";
+					break;
+				case "3":
+					local.dbType = "MSSQLServer";
+					local.templateKey = "mssql";
+					break;
+				case "4":
+					local.dbType = "Oracle";
+					local.templateKey = "oracle";
+					break;
+				case "5":
+					local.dbType = "H2";
+					local.templateKey = "h2";
+					break;
+				default:
+					printError("Invalid choice!");
+					return {};
+			}
+
+			print.line();
+			print.greenLine("Selected: " & local.dbType);
+			print.line();
+		}
 
 		// Get datasource templates
 		local.templates = getDatasourceTemplates();
@@ -621,20 +686,36 @@ component extends="../base" {
 			validate: false
 		};
 
-		// Save to app.cfm
-		if (!saveDatasourceToAppCfm(arguments.datasourceName, local.dsConfig, arguments.appPath)) {
-			printError("Failed to save datasource to app.cfm");
-			return {};
-		}
-
-		// Save to CFConfig.json
-		if (!saveDatasourceToCFConfig(arguments.datasourceName, local.dsConfig, local.dbType, local.host, local.port, local.database, arguments.appPath)) {
-			printWarning("Failed to save datasource to CFConfig.json (non-critical)");
-		}
-
+		// Instead of saving hardcoded values, call wheels env setup to create proper environment-based configuration
 		print.line();
-		printSuccess("Datasource created successfully!");
+		print.yellowLine("Setting up environment configuration with environment variables...");
 		print.line();
+
+		try {
+			command("wheels env setup")
+				.params(
+					environment = arguments.environment,
+					dbtype = local.dbType,
+					datasource = arguments.datasourceName,
+					database = local.database,
+					host = local.host,
+					port = local.port,
+					username = local.username,
+					password = local.password,
+					sid = local.sid ?: "",
+					skipDatabase = true,
+					force = true
+				)
+				.run();
+
+			print.line();
+			printSuccess("Environment configuration created with environment variables!");
+			print.line();
+
+		} catch (any e) {
+			printError("Failed to create environment configuration: " & e.message);
+			printWarning("You may need to manually run: wheels env setup environment=#arguments.environment#");
+		}
 
 		// Return datasource info in the format expected by the rest of the code
 		return {
@@ -851,6 +932,85 @@ component extends="../base" {
 		} catch (any e) {
 			printWarning("Error saving to CFConfig.json: " & e.message);
 			return false; // Non-critical
+		}
+	}
+
+	/**
+	 * Ensure environment setup exists after database creation
+	 * If .env files don't exist, call wheels env setup with --skipDatabase to avoid infinite loops
+	 */
+	private void function ensureEnvironmentSetup(required string appPath, required string environment, required string datasource, required string dbType, required struct dsInfo) {
+		try {
+			// Check if .env file exists for this environment
+			local.envFile = arguments.appPath & "/.env." & arguments.environment;
+
+			if (!fileExists(local.envFile)) {
+				print.line();
+				print.yellowLine("Environment files not found for: " & arguments.environment);
+				print.yellowLine("Creating environment configuration...");
+				print.line();
+
+				// Call wheels env setup with skipDatabase to avoid infinite loop
+				command("wheels env setup")
+					.params(
+						environment = arguments.environment,
+						dbtype = arguments.dbType,
+						datasource = arguments.datasource,
+						database = arguments.dsInfo.database,
+						host = arguments.dsInfo.host ?: "localhost",
+						port = arguments.dsInfo.port ?: "",
+						username = arguments.dsInfo.username ?: "root",
+						password = arguments.dsInfo.password ?: "",
+						sid = arguments.dsInfo.sid ?: "",
+						skipDatabase = true,
+						force = true
+					)
+					.run();
+
+				print.line();
+				printSuccess("Environment configuration created!");
+			}
+
+		} catch (any e) {
+			printWarning("Could not create environment setup: " & e.message);
+			printWarning("You may need to run: wheels env setup environment=#arguments.environment#");
+		}
+	}
+
+	/**
+	 * Write datasource to app.cfm using environment variables
+	 * This is called AFTER database creation to ensure .env files exist first
+	 */
+	private void function writeDatasourceToAppCfmWithEnvVars(required string appPath, required string datasourceName, required string dbType, required string environment) {
+		try {
+			print.line();
+			printStep("Writing datasource to app.cfm...");
+
+			// Build config structure expected by writeDatasourceToAppCfm
+			local.config = {
+				"dbtype": arguments.dbType,
+				"datasourceInfo": {
+					"datasource": arguments.datasourceName,
+					"driver": arguments.dbType
+				}
+			};
+
+			// Call writeDatasourceToAppCfm from EnvironmentService using injected property
+			local.result = variables.environmentService.writeDatasourceToAppCfm(
+				arguments.environment,
+				local.config,
+				arguments.appPath
+			);
+
+			if (local.result.success) {
+				printSuccess(local.result.message);
+			} else {
+				printWarning(local.result.message);
+			}
+
+		} catch (any e) {
+			printWarning("Could not write datasource to app.cfm: " & e.message);
+			printWarning("You may need to manually add the datasource configuration");
 		}
 	}
 

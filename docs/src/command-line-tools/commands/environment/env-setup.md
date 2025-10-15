@@ -11,12 +11,24 @@ wheels env setup environment=<name> [options]
 ## Description
 
 The `wheels env setup` command creates and configures new environments for your Wheels application. It generates:
-- Environment-specific `.env.[environment]` files with database and server settings
+- Environment-specific `.env.[environment]` files with database and server settings using **generic `DB_*` variable names**
 - Configuration files at `config/[environment]/settings.cfm` with Wheels settings
 - Template-specific files (Docker, Vagrant) if requested
 - Server.json updates for environment-specific configurations
+- Updates `config/environment.cfm` with the current environment setting
 
 The command supports copying configurations from existing environments and allows full customization of database types, templates, and framework settings.
+
+### Interactive Database Credentials
+
+When setting up environments with non-H2 databases (MySQL, PostgreSQL, MSSQL, Oracle), if database credentials are not provided as command arguments, the command will **interactively prompt** you to enter:
+- Database host (default: localhost)
+- Database port (database-specific defaults)
+- Database username (default: varies by database type)
+- Database password (masked input)
+- Oracle SID (Oracle only)
+
+This ensures you never use incorrect default credentials that could cause authentication failures.
 
 ## Arguments
 
@@ -31,14 +43,20 @@ The command supports copying configurations from existing environments and allow
 | Option | Description | Default | Valid Values |
 |--------|-------------|---------|--------------|
 | `--template` | Deployment template type | `local` | `local`, `docker`, `vagrant` |
-| `--dbtype` | Database type | `h2` | `h2`, `mysql`, `postgres`, `mssql` |
+| `--dbtype` | Database type | `h2` | `h2`, `mysql`, `postgres`, `mssql`, `oracle` |
 | `--database` | Custom database name | `wheels_[environment]` | Any valid database name |
 | `--datasource` | ColdFusion datasource name | `wheels_[environment]` | Any valid datasource name |
+| `--host` | Database host | `localhost` (or prompted) | Any valid hostname/IP |
+| `--port` | Database port | Database-specific (or prompted) | Valid port number |
+| `--username` | Database username | Database-specific (or prompted) | Any valid username |
+| `--password` | Database password | *(prompted if not provided)* | Any string |
+| `--sid` | Oracle SID (Oracle only) | `ORCL` (or prompted) | Any valid SID |
 | `--base` | Base environment to copy from | *(none)* | Any existing environment name |
 | `--force` | Overwrite existing environment | `false` | `true`, `false` |
 | `--debug` | Enable debug settings | `false` | `true`, `false` |
 | `--cache` | Enable cache settings | `false` | `true`, `false` |
 | `--reloadPassword` | Custom reload password | `wheels[environment]` | Any string |
+| `--skipDatabase` | Skip database creation | `false` | `true`, `false` |
 | `--help` | Show detailed help information | `false` | - |
 
 ## Examples
@@ -48,11 +66,35 @@ The command supports copying configurations from existing environments and allow
 # Create development environment with H2 database (default)
 wheels env setup environment=development
 
-# Create staging environment with MySQL
+# Create staging environment with MySQL (will prompt for credentials)
 wheels env setup environment=staging --dbtype=mysql
 
 # Create production environment with PostgreSQL and caching enabled
 wheels env setup environment=production --dbtype=postgres --cache=true --debug=false
+
+# Create environment with explicit credentials (no prompting)
+wheels env setup environment=test --dbtype=mssql --host=localhost --port=1433 --username=sa --password=MyPassword123!
+```
+
+### Interactive Credential Example
+```bash
+# Running without credentials prompts interactively
+wheels env setup environment=production --dbtype=mssql
+
+# Output:
+# Setting up production environment...
+#
+# Database credentials not provided for mssql database
+# Would you like to enter database credentials now? [y/n] y
+#
+# Please provide database connection details:
+#
+# Database Host [localhost]: localhost
+# Database Port [1433]: 1433
+# Database Username [sa]: sa
+# Database Password: ************
+#
+# Database credentials captured successfully!
 ```
 
 ### Using Base Environment
@@ -95,6 +137,8 @@ wheels env setup environment=vm-test --template=vagrant --dbtype=postgres
 
 ### 1. Environment Variables File (`.env.[environment]`)
 
+**Note**: All database types now use **generic `DB_*` variable names** for portability and consistency.
+
 For H2 database:
 ```bash
 ## Wheels Environment: development
@@ -106,11 +150,12 @@ WHEELS_RELOAD_PASSWORD=wheelsdevelopment
 
 ## Database Settings
 DB_TYPE=h2
-DB_DRIVER=H2
 DB_HOST=
-DB_NAME=./db/wheels_development
+DB_PORT=
+DB_DATABASE=./db/wheels_development
 DB_USER=sa
 DB_PASSWORD=
+DB_DATASOURCE=wheels_development
 
 ## Server Settings
 SERVER_PORT=8080
@@ -128,12 +173,35 @@ WHEELS_RELOAD_PASSWORD=wheelsproduction
 
 ## Database Settings
 DB_TYPE=mysql
-DB_DRIVER=MySQL
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=wheels_production
+DB_DATABASE=wheels_production
 DB_USER=wheels
 DB_PASSWORD=wheels_password
+DB_DATASOURCE=wheels_production
+
+## Server Settings
+SERVER_PORT=8080
+SERVER_CFENGINE=lucee5
+```
+
+For Microsoft SQL Server:
+```bash
+## Wheels Environment: staging
+## Generated on: 2025-01-18 12:30:00
+
+## Application Settings
+WHEELS_ENV=staging
+WHEELS_RELOAD_PASSWORD=wheelsstaging
+
+## Database Settings
+DB_TYPE=mssql
+DB_HOST=localhost
+DB_PORT=1433
+DB_DATABASE=wheels_staging
+DB_USER=sa
+DB_PASSWORD=MySecurePassword123!
+DB_DATASOURCE=wheels_staging
 
 ## Server Settings
 SERVER_PORT=8080

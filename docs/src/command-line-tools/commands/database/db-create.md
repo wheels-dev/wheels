@@ -14,6 +14,14 @@ wheels db create [--datasource=<name>] [--environment=<env>] [--database=<dbname
 
 The `wheels db create` command creates a new database using the connection information from your configured datasource. If the datasource doesn't exist, the command offers an interactive wizard to create it for you, supporting MySQL, PostgreSQL, SQL Server, Oracle, and H2 databases.
 
+### Key Features
+
+- **Automatic .env file reading**: Reads actual database credentials from `.env.{environment}` files using generic `DB_*` variable names
+- **Interactive datasource creation**: Prompts for credentials when datasource doesn't exist
+- **Environment validation**: Checks if environment exists before prompting for credentials
+- **Smart error handling**: Single, clear error messages without duplication
+- **Post-creation setup**: Automatically creates environment files and writes datasource to `app.cfm` after successful database creation
+
 ## Options
 
 | Option | Type | Default | Description |
@@ -292,17 +300,49 @@ wheels db create --database=myapp_dev --force
 
 ## Configuration Detection
 
-The command automatically detects datasource configuration from:
-1. Environment-specific settings: `/config/[environment]/settings.cfm`
-2. General settings: `/config/settings.cfm`
-3. Datasource definitions: `/config/app.cfm`
+The command intelligently detects datasource configuration from multiple sources:
 
-It extracts:
-- Database driver type
-- Connection string details
-- Host and port information
-- Username and password
-- Database name (if specified in connection string)
+### Priority Order:
+
+1. **`.env.{environment}` file** (highest priority - NEW!)
+   - Reads actual credential values using generic `DB_*` variable names
+   - Example: `DB_HOST=localhost`, `DB_USER=sa`, `DB_PASSWORD=MyPass123!`
+   - Solves the issue where `app.cfm` contains unresolved placeholders like `##this.env.DB_HOST##`
+
+2. **Datasource definitions in `/config/app.cfm`**
+   - Falls back to parsing connection strings if `.env` file doesn't exist
+   - Maintains backward compatibility
+
+3. **Environment-specific settings: `/config/[environment]/settings.cfm`**
+   - Detects datasource name from `set(dataSourceName="...")`
+
+4. **General settings: `/config/settings.cfm`**
+   - Global datasource configuration
+
+### What It Extracts:
+
+- Database driver type (MySQL, PostgreSQL, MSSQL, Oracle, H2)
+- Connection details:
+  - Host and port
+  - Database name
+  - Username and password
+  - Oracle SID (if applicable)
+
+### Generic Variable Names
+
+All database types now use **consistent `DB_*` variable names** in `.env` files:
+
+```bash
+DB_TYPE=mssql           # Database type
+DB_HOST=localhost       # Host (not MSSQL_HOST)
+DB_PORT=1433            # Port (not MSSQL_PORT)
+DB_DATABASE=wheels_dev  # Database name (not MSSQL_DATABASE)
+DB_USER=sa              # Username (not MSSQL_USER)
+DB_PASSWORD=Pass123!    # Password (not MSSQL_PASSWORD)
+DB_DATASOURCE=wheels_dev
+```
+
+This makes it easy to switch database types without changing variable names.
 
 ## Related Commands
 
