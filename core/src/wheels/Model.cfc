@@ -382,11 +382,13 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.adapterName = "H2";
 		} else if (FindNoCase("Oracle", local.info.driver_name)) {
 			local.adapterName = "Oracle";
+		} else if (FindNoCase("SQLite", local.info.driver_name)) {
+			local.adapterName = "SQLite";
 		} else {
 			Throw(
 				type = "Wheels.DatabaseNotSupported",
 				message = "#local.info.database_productname# is not supported by Wheels.",
-				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL or H2."
+				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, Oracle, SQLite or H2."
 			);
 		}
 		$set(adapterName = local.adapterName);

@@ -59,6 +59,17 @@
 	<cfset local.textColumnType = "VARCHAR2(255)">
 	<cfset local.dateTimeDefault = "TIMESTAMP '2000-01-01 18:26:08.490'">
 	<cfset local.charType = "VARCHAR2(9)">
+<cfelseif local.db IS "sqlite">
+	<cfset local.identityColumnType = "INTEGER">
+	<cfset local.dateTimeColumnType = "TEXT">
+	<cfset local.dateTimeDefault = "'2000-01-01 18:26:08'">
+	<cfset local.binaryColumnType = "BLOB">
+	<cfset local.textColumnType = "TEXT">
+	<cfset local.intColumnType = "INTEGER">
+	<cfset local.floatColumnType = "REAL">
+	<cfset local.bitColumnType = "INTEGER">
+	<cfset local.bitColumnDefault = 0>
+	<cfset local.charType = "TEXT">
 </cfif>
 
 <!--- get a listing of all the tables and view in the database --->
