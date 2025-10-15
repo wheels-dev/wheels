@@ -36,7 +36,7 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
                          styleMask: [.titled, .closable, .miniaturizable],
                          backing: .buffered,
                          defer: false)
-        window.title = "Wheels Framework Installer"
+        window.title = "Wheels Application Installer"
         window.center()
 
         // Set icon if available
@@ -52,7 +52,7 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
         var yPosition: CGFloat = windowRect.height - 40
 
         // Title
-        let titleLabel = createLabel("Wheels Framework Installer", fontSize: 18, bold: true)
+        let titleLabel = createLabel("Wheels Application Installer", fontSize: 18, bold: true)
         titleLabel.frame = NSRect(x: 20, y: yPosition, width: 560, height: 30)
         contentView.addSubview(titleLabel)
         yPosition -= 35
@@ -70,7 +70,7 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
 
         // Install Path
         installPathField = NSTextField(frame: NSRect(x: 180, y: yPosition - 3, width: 320, height: 22))
-        installPathField.stringValue = "/usr/local/commandbox"
+        installPathField.stringValue = NSHomeDirectory() + "/Desktop/commandbox"
         yPosition = addLabeledFieldWithBrowse(to: contentView, label: "Installation Path:", y: yPosition, textField: installPathField, isDirectory: true)
         yPosition -= 25
 
@@ -174,7 +174,7 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
 
         // App Base Path
         appBasePathField = NSTextField(frame: NSRect(x: 180, y: yPosition - 3, width: 320, height: 22))
-        appBasePathField.stringValue = NSHomeDirectory() + "/Sites"
+        appBasePathField.stringValue = NSHomeDirectory() + "/Desktop/Sites"
         yPosition = addLabeledFieldWithBrowse(to: contentView, label: "Application Directory:", y: yPosition, textField: appBasePathField, isDirectory: true)
         yPosition -= 40
 
@@ -304,7 +304,7 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
                                  styleMask: [.titled, .closable],
                                  backing: .buffered,
                                  defer: false)
-        progressWindow?.title = "Installing Wheels Framework"
+        progressWindow?.title = "Installing Wheels Application"
         progressWindow?.center()
 
         let contentView = NSView(frame: windowRect)

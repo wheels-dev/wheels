@@ -14,13 +14,14 @@ set -u  # Exit on undefined variable
 # Configuration
 # =============================
 readonly COMMANDBOX_VERSION="6.2.1"
+readonly MINIMUM_JAVA_VERSION=17
 readonly WHEELS_CLI_PACKAGE="wheels-cli"
 readonly COMMANDBOX_DOWNLOAD_URL="https://downloads.ortussolutions.com/ortussolutions/commandbox/${COMMANDBOX_VERSION}/commandbox-bin-${COMMANDBOX_VERSION}.zip"
 
 # =============================
 # Default Values
 # =============================
-INSTALL_PATH="/usr/local/commandbox"
+INSTALL_PATH="$HOME/Desktop/commandbox"
 APP_NAME="MyWheelsApp"
 TEMPLATE="wheels-base-template@BE"
 RELOAD_PASSWORD="changeMe"
@@ -29,7 +30,7 @@ CFML_ENGINE="lucee"
 USE_H2=false
 USE_BOOTSTRAP=true
 INIT_PACKAGE=true
-APP_BASE_PATH="$HOME/Sites"
+APP_BASE_PATH="$HOME/Desktop/Sites"
 FORCE=false
 SKIP_PATH=false
 
@@ -136,9 +137,11 @@ add_temp_file() {
 }
 
 cleanup_temp_files() {
-    for temp_file in "${TEMP_FILES[@]}"; do
-        [[ -e "$temp_file" ]] && rm -rf "$temp_file"
-    done
+    if [[ ${#TEMP_FILES[@]} -gt 0 ]]; then
+        for temp_file in "${TEMP_FILES[@]}"; do
+            [[ -e "$temp_file" ]] && rm -rf "$temp_file"
+        done
+    fi
 }
 
 stop_with_error() {
@@ -150,6 +153,98 @@ stop_with_error() {
 # =============================
 # Installation Functions
 # =============================
+
+check_java() {
+    log_section "JAVA VERSION CHECK"
+
+    local java_found=false
+    local java_version=0
+    local needs_install=false
+
+    # Check if Java is installed
+    if command -v java &> /dev/null; then
+        # Get Java version
+        local java_version_output=$(java -version 2>&1 | head -n 1)
+
+        # Parse version (handles both old format "1.8.0" and new format "17.0.1")
+        if [[ $java_version_output =~ \"([0-9]+)\.([0-9]+) ]]; then
+            local major="${BASH_REMATCH[1]}"
+            local minor="${BASH_REMATCH[2]}"
+
+            # Old format: "1.8.0" means Java 8
+            if [[ $major == "1" ]]; then
+                java_version=$minor
+            else
+                # New format: "17.0.1" means Java 17
+                java_version=$major
+            fi
+            java_found=true
+            log_info "Found Java version: $java_version"
+        fi
+    fi
+
+    # Check if Java meets requirements
+    if [[ $java_found == false ]] || [[ $java_version -lt $MINIMUM_JAVA_VERSION ]]; then
+        needs_install=true
+
+        if [[ $java_found == true ]]; then
+            log_error "Java version $java_version is below minimum requirement (${MINIMUM_JAVA_VERSION})"
+        else
+            log_error "Java not found in PATH"
+        fi
+
+        echo ""
+        echo "CommandBox requires Java ${MINIMUM_JAVA_VERSION} or higher."
+        echo ""
+
+        # Check if Homebrew is available for automatic installation
+        if command -v brew &> /dev/null; then
+            log_info "Homebrew detected - installing Java ${MINIMUM_JAVA_VERSION} automatically..."
+            echo ""
+
+            if brew install openjdk@${MINIMUM_JAVA_VERSION} 2>&1; then
+                # Add to PATH for current session
+                if [[ -d "/opt/homebrew/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin" ]]; then
+                    export PATH="/opt/homebrew/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin:$PATH"
+                elif [[ -d "/usr/local/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin" ]]; then
+                    export PATH="/usr/local/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin:$PATH"
+                fi
+
+                # Verify installation
+                if command -v java &> /dev/null; then
+                    local new_version_output=$(java -version 2>&1 | head -n 1)
+                    log_success "Java ${MINIMUM_JAVA_VERSION} installed successfully"
+                    log_info "Version: $new_version_output"
+                    echo ""
+                    return 0
+                else
+                    log_error "Java installation completed but 'java' command not found in PATH"
+                    stop_with_error "Please restart your terminal and run the installer again"
+                fi
+            else
+                log_error "Failed to install Java via Homebrew"
+                stop_with_error "Please install Java manually and try again"
+            fi
+        else
+            # No Homebrew - stop with instructions
+            log_error "Homebrew not found - cannot auto-install Java"
+            echo ""
+            echo "Please install Java ${MINIMUM_JAVA_VERSION} or higher manually:"
+            echo ""
+            echo "Option 1 - Install Homebrew first (recommended):"
+            echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            echo "  brew install openjdk@${MINIMUM_JAVA_VERSION}"
+            echo ""
+            echo "Option 2 - Download Java directly:"
+            echo "  - Temurin (recommended): https://adoptium.net/temurin/releases/"
+            echo "  - Oracle: https://www.oracle.com/java/technologies/downloads/"
+            echo ""
+            stop_with_error "Java ${MINIMUM_JAVA_VERSION}+ is required"
+        fi
+    fi
+
+    log_success "Java version meets requirements (>= ${MINIMUM_JAVA_VERSION})"
+}
 
 install_commandbox() {
     log_section "COMMANDBOX INSTALLATION"
@@ -231,6 +326,13 @@ create_application() {
     log_info "Creating Wheels application: $APP_NAME"
     log_info "Location: $app_path"
     log_info "Template: $TEMPLATE"
+    echo ""
+    echo "This process may take 2-5 minutes..."
+    echo "  - Installing dependencies"
+    echo "  - Configuring application"
+    echo "  - Setting up development server"
+    echo "  Please be patient..."
+    echo ""
 
     # Check existing
     if [[ -d "$app_path" ]]; then
@@ -280,19 +382,33 @@ start_server() {
 
 show_completion() {
     local duration=$(($(date +%s) - START_TIME))
+    local box_path="${INSTALL_PATH}/box"
+    local app_path="${APP_BASE_PATH}/${APP_NAME}"
 
     log_section "INSTALLATION COMPLETE"
-    log_success "CommandBox installed: $INSTALL_PATH"
-    log_success "Wheels CLI installed"
-    log_success "Application created: ${APP_BASE_PATH}/${APP_NAME}"
 
-    if [[ -f "${TMPDIR}wheels-server-url.txt" ]]; then
-        local url=$(cat "${TMPDIR}wheels-server-url.txt")
-        log_success "Server running: $url"
+    echo ""
+    echo "Installation Summary:"
+    echo "  - CommandBox: ${INSTALL_PATH}"
+    echo "  - Wheels CLI: Installed"
+    echo "  - Application: ${APP_BASE_PATH}/${APP_NAME}"
+
+    # Get server URL from running server
+    cd "$app_path" 2>/dev/null || true
+    local server_url=$("$box_path" server status --json 2>/dev/null | grep -o '"defaultBaseURL":"[^"]*"' | cut -d'"' -f4 || echo "")
+
+    if [[ -n "$server_url" ]]; then
+        echo "  - Development Server: ${server_url}"
     fi
 
     echo ""
-    echo "Installation completed in ${duration} seconds"
+    echo "Completed in ${duration} seconds"
+    echo ""
+    echo "Next Steps:"
+    echo "  1. cd ${APP_BASE_PATH}/${APP_NAME}"
+    echo "  2. Generate a model:      box wheels generate model User"
+    echo "  3. Generate a controller: box wheels generate controller Users"
+    echo "  4. Learn more:            https://guides.wheels.dev"
     echo ""
 }
 
@@ -318,11 +434,11 @@ main() {
     echo ""
 
     # Perform installation
+    check_java
     install_commandbox
     add_to_path
     install_wheels_cli
     create_application
-    start_server
 
     # Cleanup
     cleanup_temp_files

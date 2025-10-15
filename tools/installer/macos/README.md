@@ -1,659 +1,635 @@
 # Wheels macOS Installer - Developer Guide
 
-This document is for developers working on the Wheels macOS installer.
+Welcome! This guide will help you understand and work with the Wheels macOS installer.
 
 ## What This Is
 
-A **GUI-based macOS installer** that automates the complete setup of Wheels Framework. The installer:
-- ✅ Collects user preferences through native macOS dialogs
-- ✅ Downloads and installs CommandBox
-- ✅ Installs Wheels CLI from ForgeBox
-- ✅ Creates a complete Wheels application from templates
-- ✅ Starts the development server automatically
-- ✅ Provides detailed logging and error handling
+A **native macOS installer** that makes it easy to install Wheels Framework on Mac computers.
 
-**Architecture:**
-- **Shell Script** (`install-wheels.sh`) - Core installation logic in Bash
-- **Platypus Wrapper** - Converts shell script into native macOS app
-- **Native Dialogs** - Uses macOS `osascript` for user input
+The installer has two main parts:
+- **Swift GUI**: A user-friendly interface built with SwiftUI
+- **Bash Script**: The installation logic that does the actual work
 
-**Why this architecture?**
-- Minimal files in Git (shell script + config = 2 files)
-- Native macOS look and feel
-- No compilation required (just shell scripting)
-- Easy to maintain and debug
-- Professional GUI with Platypus
+The installer automatically:
+- Downloads and installs CommandBox
+- Installs the Wheels CLI
+- Creates a new Wheels application
+- Starts your development server
 
-## File Structure
+Works on both Intel and Apple Silicon Macs.
+
+## File Overview
 
 ```
 tools/installer/macos/
-├── install-wheels.sh              # Main installation script (~800 lines)
-├── WheelsInstaller.platypus       # Platypus configuration
-├── build.sh                       # Build script (creates .app)
-├── create-dmg.sh                  # DMG creation script
-├── README.md                      # This file
-│
-├── build/                         # Build output (not in Git)
-│   └── WheelsInstaller.app        # Built application
-│
-└── dmg/                           # Distribution (not in Git)
-    └── WheelsInstaller.dmg        # Distributable DMG
+├── WheelsInstallerApp.swift    # Swift GUI application
+├── install-wheels              # Bash installation script
+├── Info.plist                  # App bundle configuration
+├── build-swift.sh              # Build script (creates .app)
+├── create-dmg.sh               # DMG creation script
+├── assets/                     # App icons and resources
+│   └── wheels_logo.icns        # Built application
+├── installer/                  # Build output directory
+│   ├── wheels-installer.app    # Built application
+│   └── wheels-installer.dmg    # Distributable DMG
+└── README.md                   # This developer guide
 ```
 
-## Development Setup
+## Code Architecture
 
-### Prerequisites
+### 1. Swift GUI Application (`WheelsInstallerApp.swift`)
+**Language**: Swift
+**Purpose**: Native macOS UI that collects parameters and executes Bash script
 
-1. **macOS 10.13+** (High Sierra or later)
-2. **Platypus** - App wrapper tool
-3. **CommandBox** (for testing)
-4. **Git**
+#### Key Components:
 
-### Install Platypus
+**Main Window (`ContentView`)**:
+- Welcome screen
+- Configuration form with text fields and pickers
+- Real-time validation
+- Native macOS controls (TextField, Picker, Toggle, Button)
 
-```bash
-# Option 1: Homebrew (recommended)
-brew install platypus
-
-# Option 2: Download from website
-# https://sveinbjorn.org/platypus
+**Configuration Options**:
+```swift
+- installPath: CommandBox installation location
+- appName: Wheels application name
+- reloadPassword: Application reload password
+- datasourceName: Database datasource name
+- template: Wheels app template selection (5 options)
+- cfmlEngine: CFML engine selection (7 options)
+- appBasePath: Application installation location
+- useH2: Use H2 embedded database (Lucee only)
+- useBootstrap: Include Bootstrap CSS
+- initPackage: Initialize as CommandBox package
+- force: Force reinstall CommandBox
 ```
 
-Verify installation:
-```bash
-platypus --version
-# Should output: Platypus 5.x
-```
+**Installation Process (`InstallationView`)**:
+- Real-time output display from Bash script
+- Progress monitoring
+- Scrollable output window
+- Success/error handling
+- Server URL capture and display
 
-### Clone Repository
-
-```bash
-git clone https://github.com/wheels-dev/wheels.git
-cd wheels/tools/installer/macos
-```
-
-## Building the Installer
-
-### Quick Build
-
-```bash
-# Build the app
-./build.sh
-
-# Output: build/WheelsInstaller.app
-```
-
-### Create Distributable DMG
-
-```bash
-# Create DMG package
-./create-dmg.sh
-
-# Output: dmg/WheelsInstaller.dmg
-```
-
-### Complete Build Process
-
-```bash
-# 1. Build the app
-./build.sh
-
-# 2. Test the app
-open build/WheelsInstaller.app
-
-# 3. Create DMG for distribution
-./create-dmg.sh
-
-# 4. Upload DMG to GitHub Releases
-```
-
-## How It Works
-
-### Installation Flow
-
-```
-User opens WheelsInstaller.app
-        ↓
-Shell script runs with GUI dialogs (Platypus)
-        ↓
-Collect user preferences via osascript dialogs:
-  - CommandBox installation path
-  - Application name and configuration
-  - Template selection (5 options)
-  - CFML engine selection (7 options)
-  - Additional options
-        ↓
-Download CommandBox from Ortus Solutions
-        ↓
-Install CommandBox to specified path
-        ↓
-Add CommandBox to PATH (~/.zshrc or ~/.bash_profile)
-        ↓
-Install Wheels CLI from ForgeBox
-        ↓
-Create Wheels application using selected template
-        ↓
-Configure application (datasource, password, etc.)
-        ↓
-Start development server
-        ↓
-Show completion dialog with server URL
-        ↓
-Open browser to Wheels documentation
-```
-
-### User Interface (Native Dialogs)
-
-The installer uses macOS native dialogs via `osascript`:
-
-**Text Input:**
-```bash
-APP_NAME=$(osascript -e 'text returned of (display dialog "Application Name:" default answer "MyWheelsApp")')
-```
-
-**Yes/No Question:**
-```bash
-osascript -e 'button returned of (display dialog "Force reinstall CommandBox?" buttons {"Yes", "No"} default button "No")'
-```
-
-**Choice Selection:**
-```bash
-osascript -e 'choose from list {"Template 1", "Template 2"} with prompt "Select Template:"'
-```
-
-**Progress Notification:**
-```bash
-osascript -e 'display notification "Installing CommandBox..." with title "Wheels Installer"'
-```
-
-## Making Changes
-
-### Adding New Templates
-
-Edit `install-wheels.sh`, find the template selection section:
-
-```bash
-# Around line 580
-local templates=(
-    "wheels-base-template@BE - 3.0.x Bleeding Edge"
-    "wheels-base-template@stable - 2.5.x Stable"
-    "wheels-htmx-template - HTMX + Alpine.js"
-    "wheels-starter-template - Starter App"
-    "wheels-todomvc-template - TodoMVC Demo"
-    "your-new-template - Your New Template"  # Add here
-)
-```
-
-Then add the mapping:
-
-```bash
-# Around line 600
-case "$selected_template" in
-    *"Your New Template"*) TEMPLATE="your-new-template" ;;
-    # ...
-esac
-```
-
-### Adding New CFML Engines
-
-Edit `install-wheels.sh`, find the engine selection section:
-
-```bash
-# Around line 620
-local engines=(
-    "Lucee (Latest)"
-    "Adobe ColdFusion (Latest)"
-    "Your New Engine"  # Add here
-)
-```
-
-Then add the mapping:
-
-```bash
-# Around line 640
-case "$selected_engine" in
-    "Your New Engine") CFML_ENGINE="your-engine@version" ;;
-    # ...
-esac
-```
-
-### Modifying Installation Logic
-
-The script is organized into sections (search for `# ===`):
-
-```bash
-# Configuration
-# Global Variables
-# GUI Detection
-# Logging Functions
-# GUI Functions
-# Utility Functions
-# System Detection
-# Download Functions
-# Installation Functions
-# Application Creation
-# User Configuration
-# Main Installation
-```
-
-Add your functions to the appropriate section and maintain the logging pattern:
-
-```bash
-my_custom_function() {
-    log_info "Starting custom operation..."
-    show_progress "Processing..." 50
-
-    # Your logic here
-
-    if ! some_command; then
-        stop_with_error "Operation failed" "Details..."
-    fi
-
-    log_success "Custom operation completed"
-    show_progress "Complete" 100
+**Process Management**:
+```swift
+func runInstaller() {
+    // Builds command with parameters
+    // Executes install-wheels script
+    // Captures output in real-time
+    // Detects server URL from output
+    // Shows completion status
 }
 ```
 
-### Updating Configuration
-
-Edit the Configuration section at the top of `install-wheels.sh`:
-
-```bash
-# =============================
-# Configuration
-# =============================
-readonly COMMANDBOX_VERSION="6.2.1"          # Update version here
-readonly MINIMUM_JAVA_VERSION=11              # Update minimum Java
-readonly WHEELS_CLI_PACKAGE="wheels-cli"
-readonly COMMANDBOX_DOWNLOAD_URL="https://..."  # Update URL
+#### Parameter Flow:
+```
+UI Controls → Swift State → Command Line Arguments → install-wheels script
 ```
 
-## Testing
-
-### Manual Testing
-
+**Example Command Generated**:
 ```bash
-# Test shell script directly (no GUI)
-bash install-wheels.sh
-
-# Test with GUI (built app)
-open build/WheelsInstaller.app
-
-# Test DMG
-open dmg/WheelsInstaller.dmg
-# Then double-click WheelsInstaller.app
+/path/to/install-wheels \
+  --install-path "/Users/username/Desktop/commandbox" \
+  --app-name "MyWheelsApp" \
+  --reload-password "changeMe" \
+  --datasource-name "MyWheelsApp" \
+  --template "wheels-base-template@BE" \
+  --engine "lucee" \
+  --app-base-path "/Users/username/Desktop/Sites" \
+  --use-h2 \
+  --use-bootstrap \
+  --init-package
 ```
 
-### Testing Checklist
+### 2. Bash Installation Script (`install-wheels`)
+**Language**: Bash
+**Purpose**: Actual installation logic, downloads, and configuration
 
-- [ ] Fresh installation (no existing CommandBox)
-- [ ] Upgrade scenario (CommandBox already installed)
-- [ ] Force reinstallation option
-- [ ] All 5 template options
-- [ ] All 7 CFML engine options
-- [ ] H2 database option (Lucee only)
-- [ ] Bootstrap option (enabled/disabled)
-- [ ] Package initialization option
-- [ ] Custom installation paths
-- [ ] Application name validation
-- [ ] Network failure handling
-- [ ] User cancellation at various stages
-- [ ] Permissions handling
-- [ ] Server startup verification
-- [ ] PATH addition to shell config
+#### Key Architecture:
+```bash
+#!/bin/bash
+set -e  # Exit on error
+set -u  # Exit on undefined variable
 
-### Log Files
+# Configuration constants
+readonly COMMANDBOX_VERSION="6.2.1"
+readonly MINIMUM_JAVA_VERSION=17
 
-Check logs during testing:
+# Logging functions
+log_info()
+log_success()
+log_error()
+log_section()
+
+# Installation functions
+check_java()              # Verify/install Java 17+
+install_commandbox()      # Download and install CommandBox
+add_to_path()            # Add CommandBox to shell PATH
+install_wheels_cli()     # Install Wheels CLI from ForgeBox
+create_application()     # Create Wheels app from template
+start_server()           # Start development server
+show_completion()        # Display success message
+```
+
+## Communication Between Components
+
+### Command Line Arguments
+**Method**: Swift passes configuration as command-line arguments
+**Format**: `--flag value` or `--boolean-flag`
+
+Swift builds the command dynamically:
+```swift
+var command = [scriptPath]
+command.append(contentsOf: ["--install-path", installPath])
+command.append(contentsOf: ["--app-name", appName])
+if useH2 { command.append("--use-h2") }
+// etc...
+```
+
+Bash parses arguments:
+```bash
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --install-path)
+            INSTALL_PATH="$2"
+            shift 2
+            ;;
+        --use-h2)
+            USE_H2=true
+            shift
+            ;;
+    esac
+done
+```
+
+### Real-time Output Streaming
+
+Swift captures stdout/stderr in real-time:
+```swift
+let pipe = Pipe()
+process.standardOutput = pipe
+process.standardError = pipe
+
+let outputHandle = pipe.fileHandleForReading
+outputHandle.readabilityHandler = { handle in
+    let data = handle.availableData
+    if let output = String(data: data, encoding: .utf8) {
+        DispatchQueue.main.async {
+            self.output += output
+            self.parseServerURL(from: output)
+        }
+    }
+}
+```
+
+### Server URL Detection
+
+Swift monitors output for server URL pattern:
+```swift
+func parseServerURL(from output: String) {
+    let pattern = #"http://[^\s]+"#
+    if let range = output.range(of: pattern, options: .regularExpression) {
+        serverURL = String(output[range])
+    }
+}
+```
+
+### Logging System
+**File**: `/tmp/wheels-installation.log`
+**Format**: `[HH:MM:SS] LEVEL: Message`
+
+**Features**:
+- Persistent across runs
+- Session markers separate attempts
+- Multiple levels: INFO, SUCCESS, ERROR
+
+## Quick Start for Developers
+
+### First Time Setup
+
+1. **Install Xcode Command Line Tools**
+   ```bash
+   xcode-select --install
+   ```
+
+2. **Clone the Repository**
+   ```bash
+   git clone https://github.com/wheels-dev/wheels.git
+   cd wheels/tools/installer/macos
+   ```
+
+3. **Build the Installer**
+   ```bash
+   ./build-swift.sh
+   ```
+
+4. **Test It**
+   ```bash
+   open installer/wheels-installer.app
+   ```
+
+That's it! You're ready to develop.
+
+## Making Changes
+
+### You Changed the Swift UI
+
+After editing `WheelsInstallerApp.swift`:
 
 ```bash
-# View installation log
-cat /tmp/wheels-installation.log
+# Rebuild
+./build-swift.sh
 
-# View status file
-cat /tmp/wheels-install-status.txt
+# Test
+open installer/wheels-installer.app
+```
 
-# Monitor log in real-time
+### You Changed the Bash Script
+
+After editing `install-wheels`:
+
+```bash
+# Option 1: Test the script directly (no GUI)
+./install-wheels --app-name "TestApp" --template "wheels-base-template@BE"
+
+# Option 2: Rebuild and test with GUI
+./build-swift.sh
+open installer/wheels-installer.app
+```
+
+### You Changed the Configuration
+
+After editing `Info.plist`:
+
+```bash
+# Rebuild
+./build-swift.sh
+
+# Verify
+open installer/wheels-installer.app
+```
+
+## Creating a Release
+
+### For Testing (Internal)
+
+```bash
+# Build
+./build-swift.sh
+
+# Share the .app file
+open installer/
+# Send wheels-installer.app to testers
+```
+
+### For Distribution (Public)
+
+```bash
+# 1. Update version in Info.plist
+# Edit CFBundleShortVersionString
+
+# 2. Build
+./build-swift.sh
+
+# 3. Create DMG
+./create-dmg.sh
+
+# 4. Test DMG
+open installer/wheels-installer.dmg
+
+# 5. Upload to GitHub Releases
+# The DMG is at: installer/wheels-installer.dmg
+```
+
+## Common Tasks
+
+### Add a New Template Option
+
+**Edit:** `WheelsInstallerApp.swift`
+
+Find the template Picker (around line 150):
+```swift
+Picker("Template:", selection: $template) {
+    Text("3.0.x Bleeding Edge").tag("wheels-base-template@BE")
+    Text("2.5.x Stable").tag("wheels-base-template@stable")
+    Text("Your New Template").tag("your-template-name")  // Add here
+}
+```
+
+**Then:**
+```bash
+./build-swift.sh
+open installer/wheels-installer.app
+```
+
+### Add a New CFML Engine
+
+**Edit:** `WheelsInstallerApp.swift`
+
+Find the engine Picker (around line 160):
+```swift
+Picker("CFML Engine:", selection: $cfmlEngine) {
+    Text("Lucee (Latest)").tag("lucee")
+    Text("Adobe ColdFusion").tag("adobe")
+    Text("Your Engine").tag("your-engine")  // Add here
+}
+```
+
+**Then:**
+```bash
+./build-swift.sh
+open installer/wheels-installer.app
+```
+
+### Change CommandBox Version
+
+**Edit:** `install-wheels`
+
+Find (around line 16):
+```bash
+readonly COMMANDBOX_VERSION="6.2.1"
+```
+
+Change to new version:
+```bash
+readonly COMMANDBOX_VERSION="6.3.0"
+```
+
+**Then:**
+```bash
+./build-swift.sh
+open installer/wheels-installer.app
+```
+
+### Change Minimum Java Version
+
+**Edit:** `install-wheels`
+
+Find (around line 17):
+```bash
+readonly MINIMUM_JAVA_VERSION=17
+```
+
+Change to new version:
+```bash
+readonly MINIMUM_JAVA_VERSION=21
+```
+
+**Then:**
+```bash
+./build-swift.sh
+open installer/wheels-installer.app
+```
+
+## Testing Your Changes
+
+### Quick Test (Just the Script)
+
+```bash
+./install-wheels \
+  --app-name "TestApp" \
+  --template "wheels-base-template@BE"
+```
+
+### Full Test (With GUI)
+
+```bash
+# Build
+./build-swift.sh
+
+# Run
+open installer/wheels-installer.app
+
+# Check logs
 tail -f /tmp/wheels-installation.log
 ```
 
-### Testing on Different macOS Versions
+### Test on Different macOS Versions
 
-Test on:
-- macOS 10.13 (High Sierra) - Minimum supported
+Recommended test matrix:
 - macOS 11 (Big Sur)
 - macOS 12 (Monterey)
 - macOS 13 (Ventura)
 - macOS 14 (Sonoma)
-- macOS 15 (Sequoia)
 
-## Code Quality Standards
+Test on both:
+- Intel Mac
+- Apple Silicon Mac (M1/M2/M3)
 
-### Shell Script Best Practices
+## Troubleshooting
 
+### Build Error: "Swift compiler not found"
+
+**Solution:**
 ```bash
-# ✅ Good: Use strict mode
-set -e  # Exit on error
-set -u  # Exit on undefined variable
-
-# ✅ Good: Use readonly for constants
-readonly COMMANDBOX_VERSION="6.2.1"
-
-# ✅ Good: Quote variables
-if [[ "$APP_NAME" == "test" ]]; then
-
-# ❌ Bad: Unquoted variables
-if [[ $APP_NAME == test ]]; then
-
-# ✅ Good: Use [[ ]] instead of [ ]
-if [[ -f "$file" ]]; then
-
-# ✅ Good: Use functions for reusability
-download_file() {
-    local url="$1"
-    local output="$2"
-    # ...
-}
-
-# ✅ Good: Error handling
-if ! some_command; then
-    log_error "Command failed"
-    return 1
-fi
+xcode-select --install
+swift --version
 ```
 
-### Logging Standards
+### App Won't Open: "Unidentified developer"
 
+**Solution:**
 ```bash
-# Use consistent logging functions
-log_info "Information message"
-log_success "Success message"
-log_warning "Warning message"
-log_error "Error message"
-
-# Use log sections for major steps
-log_section "COMMANDBOX INSTALLATION"
-
-# Always log before operations
-log_info "Downloading CommandBox..."
-download_file "$url" "$output"
-log_success "Download complete"
+xattr -d com.apple.quarantine installer/wheels-installer.app
+# Or: Right-click → Open
 ```
 
-### Error Handling
+### Installation Fails
 
+**Check logs:**
 ```bash
-# Always check command success
-if ! command_that_might_fail; then
-    stop_with_error "Operation failed" "Additional details..."
-fi
-
-# Use trap for cleanup
-trap cleanup_temp_files EXIT
-
-# Provide helpful error messages
-stop_with_error "Failed to create directory" \
-    "Path: $dir\nThis could be due to insufficient permissions."
+cat /tmp/wheels-installation.log
 ```
 
-## Distribution
+### Script Changes Not Working
 
-### Creating Release DMG
-
+**Make sure you rebuilt:**
 ```bash
-# 1. Build the app
-./build.sh
-
-# 2. Create DMG
-./create-dmg.sh
-
-# 3. DMG is ready at: dmg/WheelsInstaller.dmg
+./build-swift.sh
 ```
 
-### Code Signing (Optional)
+The script is embedded in the .app, so you must rebuild after changes.
 
-For distribution outside the Mac App Store:
+## How It Works
 
-```bash
-# Sign the app
-codesign --deep --force --verify --verbose \
-         --sign "Developer ID Application: Your Name" \
-         build/WheelsInstaller.app
+### The Simple Version
 
-# Verify signature
-codesign --verify --verbose build/WheelsInstaller.app
-spctl --assess --verbose build/WheelsInstaller.app
+1. User opens `wheels-installer.app`
+2. Swift GUI collects preferences
+3. GUI runs the `install-wheels` bash script
+4. Script downloads CommandBox
+5. Script installs Wheels CLI
+6. Script creates the application
+7. Script starts the server
+8. GUI shows the results
+
+### Command Flow
+
+```
+User Input → Swift GUI → Bash Script → Installation
 ```
 
-### Notarization (Required for macOS 10.15+)
-
+Example command generated:
 ```bash
-# 1. Create a zip for notarization
-ditto -c -k --keepParent build/WheelsInstaller.app WheelsInstaller.zip
+/path/to/install-wheels \
+  --install-path "/Users/john/Desktop/commandbox" \
+  --app-name "MyApp" \
+  --template "wheels-base-template@BE" \
+  --engine "lucee" \
+  --use-bootstrap
+```
 
-# 2. Submit for notarization
-xcrun notarytool submit WheelsInstaller.zip \
+## Important Files Explained
+
+### `WheelsInstallerApp.swift`
+The GUI. Written in Swift/SwiftUI. Collects user input and runs the bash script.
+
+**Main sections:**
+- `ContentView`: The configuration form
+- `InstallationView`: Shows output during installation
+- `runInstaller()`: Executes the bash script
+
+### `install-wheels`
+The installation script. Written in Bash. Does the actual work.
+
+**Main functions:**
+- `check_java()`: Verifies/installs Java
+- `install_commandbox()`: Downloads and installs CommandBox
+- `install_wheels_cli()`: Installs Wheels CLI
+- `create_application()`: Creates the Wheels app
+- `start_server()`: Starts the dev server
+
+### `Info.plist`
+App metadata. Contains version, name, permissions.
+
+**Key fields:**
+- `CFBundleShortVersionString`: Version number (e.g., "1.0.0")
+- `CFBundleIdentifier`: App ID (com.wheels.installer)
+- `CFBundleName`: Display name
+
+### `build-swift.sh`
+Automates the build process. Compiles Swift, creates .app bundle, embeds script.
+
+### `create-dmg.sh`
+Creates distributable DMG file for end users.
+
+## Code Signing & Notarization
+
+For public distribution, you need:
+
+1. **Apple Developer Account** ($99/year)
+2. **Developer ID Certificate**
+3. **Code signing**
+4. **Notarization**
+
+**Basic code signing:**
+```bash
+codesign --deep --force --sign "Developer ID Application: Your Name" \
+         installer/wheels-installer.app
+```
+
+**Notarization (required for macOS 10.15+):**
+```bash
+# Create ZIP
+ditto -c -k --keepParent installer/wheels-installer.app wheels-installer.zip
+
+# Submit for notarization
+xcrun notarytool submit wheels-installer.zip \
     --apple-id "your@email.com" \
     --team-id "TEAM_ID" \
     --password "app-specific-password" \
     --wait
 
-# 3. Staple the notarization ticket
-xcrun stapler staple build/WheelsInstaller.app
+# Staple ticket
+xcrun stapler staple installer/wheels-installer.app
 
-# 4. Now create DMG
+# Then create DMG
 ./create-dmg.sh
 ```
 
-### GitHub Release Process
+## GitHub Workflow
 
-1. Build and test the installer
-2. Create DMG package
-3. Create GitHub release/tag
-4. Upload DMG as release asset
-5. Update installation documentation
+### Making Changes
 
-## Troubleshooting
-
-### Common Issues
-
-#### Issue: "WheelsInstaller.app" can't be opened because it is from an unidentified developer
-
-**Solution for users:**
 ```bash
-# Right-click → Open, or:
-xattr -cr WheelsInstaller.app
+# 1. Create feature branch
+git checkout -b fix/my-improvement
+
+# 2. Make changes
+# Edit files...
+
+# 3. Build and test
+./build-swift.sh
+open installer/wheels-installer.app
+
+# 4. Commit
+git add .
+git commit -m "Improve installer UI"
+
+# 5. Push and create PR
+git push origin fix/my-improvement
 ```
 
-**Solution for developers:** Code sign and notarize the app
+### Creating a Release
 
-#### Issue: Platypus not found
-
-**Solution:**
 ```bash
-brew install platypus
+# 1. Update version in Info.plist
+# 2. Commit version bump
+git commit -am "Bump version to 1.1.0"
+
+# 3. Create tag
+git tag -a macos-installer-v1.1.0 -m "macOS Installer v1.1.0"
+git push origin macos-installer-v1.1.0
+
+# 4. Build release
+./build-swift.sh
+./create-dmg.sh
+
+# 5. Upload installer/wheels-installer.dmg to GitHub Releases
 ```
 
-#### Issue: CommandBox download fails
+## Logs & Debugging
 
-**Solution:**
-- Check internet connection
-- Verify CommandBox download URL is current
-- Check firewall/proxy settings
-
-#### Issue: Permission denied when installing
-
-**Solution:**
-- Choose a user-writable installation path
-- Or run with admin privileges (not recommended)
-
-#### Issue: Server doesn't start
-
-**Solution:**
-- Check port 8080 is not in use
-- Check Java is installed (or CommandBox JRE works)
-- Check application was created successfully
-
-### Debugging
-
-#### Enable Debug Mode
-
+### Installation Log
 ```bash
-# Add to top of install-wheels.sh
-set -x  # Print commands as they execute
-```
+# View full log
+cat /tmp/wheels-installation.log
 
-#### View Detailed Logs
-
-```bash
-# Watch log in real-time
+# Watch in real-time
 tail -f /tmp/wheels-installation.log
 
 # Search for errors
 grep "ERROR" /tmp/wheels-installation.log
-
-# View last 50 lines
-tail -n 50 /tmp/wheels-installation.log
 ```
 
-#### Test Script Without GUI
+### Debug Mode
 
+Enable in `install-wheels`:
 ```bash
-# Run script directly (bypasses Platypus)
-bash install-wheels.sh
-
-# This runs without GUI dialogs and shows all output
+# Add at top of file
+set -x  # Shows each command as it runs
 ```
 
-## Contributing
-
-### Contribution Process
-
-1. **Open an Issue** - Describe proposed changes
-2. **Get Approval** - Wait for core team approval
-3. **Fork and Branch** - Create feature branch from `develop`
-4. **Make Changes** - Follow shell scripting best practices
-5. **Test Thoroughly** - Test on multiple macOS versions
-6. **Submit PR** - Create pull request to `develop` branch
-
-### Pull Request Guidelines
-
-- Reference issue number in PR description
-- Test on at least 2 different macOS versions
-- Update README for user-facing changes
-- Maintain code style consistency
-- Add comments for complex logic
-- Update version number if needed
-
-### Code Review Checklist
-
-- [ ] Shell script follows best practices
-- [ ] Error handling is comprehensive
-- [ ] Logging is consistent and helpful
-- [ ] User dialogs are clear and friendly
-- [ ] Changes are tested on real hardware
-- [ ] Documentation is updated
-- [ ] No breaking changes without discussion
-
-## Architecture Decisions
-
-### Why Platypus?
-
-- ✅ Minimal files in Git (just shell script + config)
-- ✅ Native macOS look and feel
-- ✅ No compilation required
-- ✅ Easy to maintain (shell scripting)
-- ✅ Professional progress bars and UI
-- ✅ Free and open source
-
-### Why Shell Script Instead of Swift?
-
-- ✅ Minimal repository footprint (1 file vs hundreds)
-- ✅ No Xcode project files
-- ✅ Easy to edit and test
-- ✅ No compilation step
-- ✅ Portable (runs on any macOS with Bash)
-- ✅ Easy to debug
-
-### Why Native Dialogs (osascript)?
-
-- ✅ Built into macOS (no dependencies)
-- ✅ Familiar macOS UI
-- ✅ AppleScript is stable and well-documented
-- ✅ Works on all macOS versions
+### Run Script Without GUI
+```bash
+# Test installation logic directly
+./install-wheels \
+  --app-name "DevTest" \
+  --template "wheels-base-template@BE" \
+  --engine "lucee"
+```
 
 ## Resources
 
-### Documentation
-
-- **Platypus Documentation**: https://sveinbjorn.org/platypus
-- **Bash Scripting Guide**: https://www.gnu.org/software/bash/manual/
-- **AppleScript Guide**: https://developer.apple.com/library/archive/documentation/AppleScript/
-- **CommandBox Documentation**: https://commandbox.ortusbooks.com/
 - **Wheels Documentation**: https://wheels.dev
+- **Swift Guide**: https://docs.swift.org/swift-book/
+- **Bash Reference**: https://www.gnu.org/software/bash/manual/
+- **CommandBox Docs**: https://commandbox.ortusbooks.com/
 
-### Tools
+## Getting Help
 
-- **Platypus**: App wrapper for shell scripts
-- **VSCode**: Good editor for shell scripts
-- **ShellCheck**: Shell script linter (`brew install shellcheck`)
-
-### Testing Tools
-
-```bash
-# Validate shell script syntax
-bash -n install-wheels.sh
-
-# Run ShellCheck
-shellcheck install-wheels.sh
-
-# Test with different shells
-bash install-wheels.sh
-zsh install-wheels.sh
-```
-
-## Comparing to Windows Installer
-
-### Similarities
-
-- Both use GUI wizards
-- Both collect same configuration options
-- Both perform same installation steps
-- Both provide progress feedback
-- Both have comprehensive logging
-- Both handle errors gracefully
-
-### Differences
-
-| Feature | Windows | macOS |
-|---------|---------|-------|
-| **GUI Technology** | Inno Setup (Pascal) | Platypus + osascript |
-| **Script Language** | PowerShell | Bash |
-| **Files in Git** | 2 files (.iss + .ps1) | 2 files (.sh + .platypus) |
-| **Package Format** | .exe installer | .dmg disk image |
-| **Code Signing** | Authenticode | Apple Developer ID |
-| **Distribution** | Direct .exe | DMG with .app inside |
-
-## Future Enhancements
-
-### Potential Improvements
-
-1. **Custom Icons** - Add Wheels logo to app and DMG
-2. **Progress Percentages** - More granular progress reporting
-3. **Resume Capability** - Resume interrupted installations
-4. **Update Checker** - Check for newer versions before installing
-5. **Multiple Languages** - i18n support for dialogs
-6. **Silent Mode** - Command-line mode with no GUI
-7. **Uninstaller** - App to remove Wheels installation
-
-### Extension Points
-
-- Add templates by updating template array and case statement
-- Add engines by updating engine array and case statement
-- Add options by adding new dialog prompts
-- Customize downloads by updating download URLs
+- **Issues**: https://github.com/wheels-dev/wheels/issues
+- **Discussions**: https://github.com/wheels-dev/wheels/discussions
 
 ---
-
-**Remember**: This installer is a user's first impression of Wheels on macOS. Make it reliable, user-friendly, and delightful!
