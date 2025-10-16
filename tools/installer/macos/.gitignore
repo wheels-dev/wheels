@@ -1,16 +1,11 @@
-# Build outputs
-installer/
-dmg/
-dmg-temp/
-
 # Temporary files
 *.log
 *.tmp
 .DS_Store
 
 # DMG artifacts
-*.dmg
 *.zip
+*.app
 
 # Test installations
 test-install/
