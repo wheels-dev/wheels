@@ -1,5 +1,11 @@
 # Change Log
 
+## [1.0.7] - 2025-10-16
+
+### Changed
+- **Updated API Documentation**: Refreshed all function snippets with enhanced descriptions and improved parameter details
+- **Improved Snippets**: All 300+ function snippets now include updated documentation reflecting the latest Wheels API changes
+
 ## [1.0.6] - 2025-10-01
 
 ### Added
