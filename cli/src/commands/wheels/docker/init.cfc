@@ -5,12 +5,14 @@
  * wheels docker:init
  * wheels docker:init --db=mysql
  * wheels docker:init --db=postgres --dbVersion=13
+ * wheels docker:init --db=oracle
+ * wheels docker:init --db=oracle --dbVersion=23-slim
  * {code}
  */
 component extends="../base" {
 
     /**
-     * @db Database to use (h2, mysql, postgres, mssql)
+     * @db Database to use (h2, mysql, postgres, mssql, oracle)
      * @dbVersion Database version to use
      * @cfengine ColdFusion engine to use (lucee, adobe)
      * @cfVersion ColdFusion engine version
@@ -65,7 +67,7 @@ component extends="../base" {
         print.line();
 
         // Validate database selection
-        local.supportedDatabases = ["h2", "mysql", "postgres", "mssql"];
+        local.supportedDatabases = ["h2", "mysql", "postgres", "mssql", "oracle"];
         if (!arrayContains(local.supportedDatabases, lCase(arguments.db))) {
             error("Unsupported database: #arguments.db#. Please choose from: #arrayToList(local.supportedDatabases)#");
         }
@@ -240,12 +242,32 @@ CMD ["box", "server", "start", "--console", "--force"]';
       - "1433:1433"
     volumes:
       - db_data:/var/opt/mssql';
-                local.dbEnvironment = '      
+                local.dbEnvironment = '
       DB_HOST: db
       DB_PORT: 1433
       DB_NAME: wheels
       DB_USER: sa
       DB_PASSWORD: Wheels123!';
+                break;
+
+            case "oracle":
+                local.dbVersion = len(arguments.dbVersion) ? arguments.dbVersion : "latest";
+                local.dbService = '  db:
+    image: gvenzl/oracle-free:#local.dbVersion#
+    environment:
+      ORACLE_PASSWORD: wheels
+      APP_USER: wheels
+      APP_USER_PASSWORD: wheels
+    ports:
+      - "1521:1521"
+    volumes:
+      - db_data:/opt/oracle/oradata';
+                local.dbEnvironment = '
+      DB_HOST: db
+      DB_PORT: 1521
+      DB_SID: FREE
+      DB_USER: wheels
+      DB_PASSWORD: wheels';
                 break;
 
             case "h2":
@@ -555,6 +577,21 @@ http {
                     "password":"Wheels123!",
                     "port":"1433",
                     "username":"sa"
+                };
+                break;
+
+            case "oracle":
+                local.datasourceConfig = {
+                    "class":"oracle.jdbc.OracleDriver",
+                    "connectionLimit":"-1",
+                    "connectionTimeout":"1",
+                    "database":"FREE",
+                    "dbdriver":"Oracle",
+                    "dsn":"jdbc:oracle:thin:@{host}:{port}/{database}",
+                    "host":"db",
+                    "password":"wheels",
+                    "port":"1521",
+                    "username":"wheels"
                 };
                 break;
         }
