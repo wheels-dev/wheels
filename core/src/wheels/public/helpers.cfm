@@ -282,6 +282,8 @@ function $$getAllDatabaseInformation() {
 		local.adapterName = "H2";
 	} else if (local.info.driver_name Contains "Oracle") {
 		local.adapterName = "Oracle";
+	} else if (local.info.driver_name Contains "SQLite") {
+		local.adapterName = "SQLite";
 	}
 	return local;
 }

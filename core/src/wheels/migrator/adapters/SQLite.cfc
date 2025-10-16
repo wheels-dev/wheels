@@ -85,6 +85,13 @@ component extends="Abstract" {
 	}
 
 	/**
+	 * generates sql to rename a table
+	 */
+	public string function renameTable(required string oldName, required string newName) {
+		return "ALTER TABLE #quoteTableName(arguments.oldName)# RENAME TO #quoteTableName(arguments.newName)#";
+	}
+
+	/**
 	 * SQLite supports simple RENAME COLUMN syntax from version 3.25.0+.
 	 */
 	public string function renameColumnInTable(
