@@ -411,13 +411,29 @@ class WheelsParameterTypoDetector {
             if (jsonData.functions && Array.isArray(jsonData.functions)) {
                 jsonData.functions.forEach(func => {
                     if (func.name && func.parameters && Array.isArray(func.parameters)) {
-                        parameters[func.name] = func.parameters.map(p => p.name.toLowerCase());
+                        // Collect parameter names including aliases
+                        const allParamNames = [];
+                        func.parameters.forEach(p => {
+                            // Add the main parameter name
+                            allParamNames.push(p.name.toLowerCase());
+
+                            // Check for aliases in the hint field
+                            if (p.hint) {
+                                const aliasMatch = p.hint.match(/aliased as `([^`]+)`/i);
+                                if (aliasMatch) {
+                                    // Add the alias
+                                    allParamNames.push(aliasMatch[1].toLowerCase());
+                                }
+                            }
+                        });
+
+                        parameters[func.name] = allParamNames;
                         count++;
                     }
                 });
             }
 
-            console.log(`Loaded ${count} Wheels functions for typo detection`);
+            console.log(`Loaded ${count} Wheels functions for typo detection (with aliases)`);
             this.wheelsParameters = parameters;
 
         } catch (error) {
@@ -577,13 +593,29 @@ class WheelsParameterCompletionProvider {
             if (jsonData.functions && Array.isArray(jsonData.functions)) {
                 jsonData.functions.forEach(func => {
                     if (func.name && func.parameters && Array.isArray(func.parameters)) {
-                        parameters[func.name] = func.parameters.map(p => p.name);
+                        // Collect parameter names including aliases
+                        const allParamNames = [];
+                        func.parameters.forEach(p => {
+                            // Add the main parameter name
+                            allParamNames.push(p.name);
+
+                            // Check for aliases in the hint field
+                            if (p.hint) {
+                                const aliasMatch = p.hint.match(/aliased as `([^`]+)`/i);
+                                if (aliasMatch) {
+                                    // Add the alias (preserve original casing for completion)
+                                    allParamNames.push(aliasMatch[1]);
+                                }
+                            }
+                        });
+
+                        parameters[func.name] = allParamNames;
                         count++;
                     }
                 });
             }
 
-            console.log(`Loaded ${count} Wheels functions for parameter completion`);
+            console.log(`Loaded ${count} Wheels functions for parameter completion (with aliases)`);
             this.wheelsParameters = parameters;
 
         } catch (error) {
@@ -1323,20 +1355,42 @@ class WheelsSignatureHelpProvider {
             if (jsonData.functions && Array.isArray(jsonData.functions)) {
                 jsonData.functions.forEach(func => {
                     if (func.name && func.parameters) {
-                        // Build signature from parameters
+                        // Build signature from parameters (including aliases in documentation)
                         const params = func.parameters.map(p => {
                             const optional = p.required === false ? '?' : '';
                             const type = p.type || 'any';
-                            return `${p.name}${optional}: ${type}`;
+
+                            // Check for alias in hint
+                            let paramLabel = p.name;
+                            if (p.hint) {
+                                const aliasMatch = p.hint.match(/aliased as `([^`]+)`/i);
+                                if (aliasMatch) {
+                                    paramLabel = `${p.name} (or ${aliasMatch[1]})`;
+                                }
+                            }
+
+                            return `${paramLabel}${optional}: ${type}`;
                         }).join(', ');
 
                         const signature = `${func.name}(${params})${func.returntype ? ': ' + func.returntype : ''}`;
 
                         // Convert parameters for VS Code
-                        const parameters = func.parameters.map(p => ({
-                            label: p.name,
-                            documentation: this.cleanParameterDescription(p.hint) || `${p.name} parameter`
-                        }));
+                        const parameters = func.parameters.map(p => {
+                            let paramDoc = this.cleanParameterDescription(p.hint) || `${p.name} parameter`;
+
+                            // Add alias info to documentation
+                            if (p.hint) {
+                                const aliasMatch = p.hint.match(/aliased as `([^`]+)`/i);
+                                if (aliasMatch) {
+                                    paramDoc = `${paramDoc}\n\nAlias: ${aliasMatch[1]}`;
+                                }
+                            }
+
+                            return {
+                                label: p.name,
+                                documentation: paramDoc
+                            };
+                        });
 
                         signatures[func.name] = {
                             signature: signature,
@@ -1348,7 +1402,7 @@ class WheelsSignatureHelpProvider {
                 });
             }
 
-            console.log(`Loaded ${count} Wheels function signatures`);
+            console.log(`Loaded ${count} Wheels function signatures (with aliases)`);
             this.wheelsSignatures = signatures;
 
         } catch (error) {
