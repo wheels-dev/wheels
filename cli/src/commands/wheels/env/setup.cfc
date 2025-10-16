@@ -119,9 +119,9 @@ component extends="../base" {
 
                 // Prompt for SID if Oracle
                 if (lCase(arguments.dbtype) == "oracle" && !len(trim(arguments.sid))) {
-                    arguments.sid = ask("Oracle SID [ORCL]: ");
+                    arguments.sid = ask("SID [FREE]: ");
                     if (!len(trim(arguments.sid))) {
-                        arguments.sid = "ORCL";
+                        arguments.sid = "FREE";
                     }
                 }
 
