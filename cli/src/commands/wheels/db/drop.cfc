@@ -62,9 +62,15 @@ component extends="../base" {
 			}
 			
 			// Extract database name with priority: argument > config > default
-			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels-dev";
+			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels_dev";
 			local.dbType = local.dsInfo.driver;
-			
+
+			// Validate Oracle identifier (no hyphens or special characters allowed)
+			if (local.dbType == "Oracle" && reFind("[^a-zA-Z0-9_$##]", local.dbName)) {
+				error("Invalid Oracle identifier: '#local.dbName#' - Oracle usernames can only contain letters, numbers, and underscores. Use underscores instead of hyphens (e.g., 'wheels_dev' instead of 'wheels-dev')");
+				return;
+			}
+
 			printInfo("Database Type", local.dbType);
 			printInfo("Database Name", local.dbName);
 			printDivider();
@@ -90,6 +96,9 @@ component extends="../base" {
 				case "MSSQLServer":
 				case "MSSQL":
 					dropDatabase(local.dsInfo, local.dbName, "SQLServer");
+					break;
+				case "Oracle":
+					dropDatabase(local.dsInfo, local.dbName, "Oracle");
 					break;
 				case "H2":
 					dropH2Database(local.dsInfo, local.dbName);
@@ -256,7 +265,7 @@ component extends="../base" {
 	 */
 	private boolean function checkDatabaseExists(required any conn, required string dbName, required string dbType) {
 		local.exists = false;
-		
+
 		switch (arguments.dbType) {
 			case "MySQL":
 				local.stmt = arguments.conn.createStatement();
@@ -266,7 +275,7 @@ component extends="../base" {
 				local.rs.close();
 				local.stmt.close();
 				break;
-				
+
 			case "PostgreSQL":
 				local.stmt = arguments.conn.prepareStatement("SELECT 1 FROM pg_database WHERE datname = ?");
 				local.stmt.setString(1, arguments.dbName);
@@ -275,7 +284,7 @@ component extends="../base" {
 				local.rs.close();
 				local.stmt.close();
 				break;
-				
+
 			case "SQLServer":
 				local.stmt = arguments.conn.createStatement();
 				local.query = "SELECT name FROM sys.databases WHERE name = '" & arguments.dbName & "'";
@@ -284,8 +293,18 @@ component extends="../base" {
 				local.rs.close();
 				local.stmt.close();
 				break;
+
+			case "Oracle":
+				// Oracle checks for USER existence (schema)
+				local.stmt = arguments.conn.createStatement();
+				local.query = "SELECT username FROM dba_users WHERE username = UPPER('" & arguments.dbName & "')";
+				local.rs = local.stmt.executeQuery(local.query);
+				local.exists = local.rs.next();
+				local.rs.close();
+				local.stmt.close();
+				break;
 		}
-		
+
 		return local.exists;
 	}
 
@@ -294,7 +313,7 @@ component extends="../base" {
 	 */
 	private void function executeDropDatabase(required any conn, required string dbName, required string dbType) {
 		local.stmt = arguments.conn.createStatement();
-		
+
 		switch (arguments.dbType) {
 			case "MySQL":
 				local.stmt.executeUpdate("DROP DATABASE IF EXISTS `" & arguments.dbName & "`");
@@ -305,8 +324,23 @@ component extends="../base" {
 			case "SQLServer":
 				local.stmt.executeUpdate("DROP DATABASE IF EXISTS [" & arguments.dbName & "]");
 				break;
+			case "Oracle":
+				// Oracle uses DROP USER CASCADE to remove user/schema and all objects
+				// Oracle 12c+ CDB requires _ORACLE_SCRIPT for non-C## users
+				try {
+					local.alterSession = "ALTER SESSION SET ""_ORACLE_SCRIPT""=true";
+					local.stmt.execute(local.alterSession);
+				} catch (any e) {
+					// Ignore if this fails
+				}
+
+				// Drop user with CASCADE to remove all objects
+				local.dropSQL = "DROP USER " & UCASE(arguments.dbName) & " CASCADE";
+				systemOutput("DEBUG - Executing DROP SQL: " & local.dropSQL, true);
+				local.stmt.execute(local.dropSQL);
+				break;
 		}
-		
+
 		local.stmt.close();
 	}
 
@@ -339,7 +373,7 @@ component extends="../base" {
 	 */
 	private void function handleDatabaseError(required any e, required string dbType, required string dbName) {
 		local.errorHandled = false;
-		
+
 		switch (arguments.dbType) {
 			case "MySQL":
 				if (FindNoCase("Access denied", arguments.e.message)) {
@@ -350,7 +384,7 @@ component extends="../base" {
 					local.errorHandled = true;
 				}
 				break;
-				
+
 			case "PostgreSQL":
 				if (FindNoCase("does not exist", arguments.e.message)) {
 					printError("Database does not exist: " & arguments.dbName);
@@ -366,15 +400,39 @@ component extends="../base" {
 					local.errorHandled = true;
 				}
 				break;
-				
+
 			case "SQLServer":
 				if (FindNoCase("Login failed", arguments.e.message)) {
 					printError("Login failed - check SQL Server credentials");
 					local.errorHandled = true;
 				}
 				break;
+
+			case "Oracle":
+				if (FindNoCase("ORA-01918", arguments.e.message) || FindNoCase("user does not exist", arguments.e.message)) {
+					printError("User (schema) does not exist: " & arguments.dbName);
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-28014", arguments.e.message) || FindNoCase("cannot drop administrative user", arguments.e.message)) {
+					printError("Cannot drop administrative/system user: " & arguments.dbName);
+					printWarning("Oracle system users like SYS, SYSTEM, ADMIN, XDB cannot be dropped");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-01017", arguments.e.message) || FindNoCase("invalid username/password", arguments.e.message)) {
+					printError("Invalid username/password - check Oracle credentials");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-12505", arguments.e.message) || FindNoCase("TNS:listener", arguments.e.message)) {
+					printError("Cannot connect to Oracle server - check SID and connection settings");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-01031", arguments.e.message) || FindNoCase("insufficient privileges", arguments.e.message)) {
+					printError("Insufficient privileges - user must have DROP USER privilege");
+					local.errorHandled = true;
+				} else if (FindNoCase("ORA-65096", arguments.e.message) || FindNoCase("common user or role name", arguments.e.message)) {
+					printError("Oracle CDB requires C## prefix or _ORACLE_SCRIPT session variable");
+					printWarning("This may indicate insufficient privileges");
+					local.errorHandled = true;
+				}
+				break;
 		}
-		
+
 		if (!local.errorHandled) {
 			printError(arguments.dbType & " Error: " & arguments.e.message);
 			if (isDefined("arguments.e.detail")) {

@@ -14,9 +14,10 @@ component extends="../base" {
      * @environment.options development,staging,production
      * @template.hint Environment template (local, docker, vagrant)
      * @template.options local,docker,vagrant
-     * @dbtype.hint Database type (h2, mysql, postgres, mssql)
-     * @dbtype.options h2,mysql,postgres,mssql
+     * @dbtype.hint Database type (h2, mysql, postgres, mssql, oracle)
+     * @dbtype.options h2,mysql,postgres,mssql,oracle
      * @force.hint Overwrite existing configuration
+     * @skipDatabase.hint Skip database creation (only create .env file)
      */
     function run(
         string environment,
@@ -24,11 +25,17 @@ component extends="../base" {
         string dbtype = "H2",
         string database = "",
         string datasource = "",
+        string host = "",
+        string port = "",
+        string username = "",
+        string password = "",
+        string sid = "",
         boolean force = false,
         string base = "",
         boolean debug = false,
         boolean cache = false,
         string reloadPassword = "",
+        boolean skipDatabase = false,
         boolean help = false
     ) {
         var projectRoot = resolvePath(".");
@@ -47,17 +54,124 @@ component extends="../base" {
 
         print.yellowLine("Setting up #arguments.environment# environment...")
              .line();
-        
+
+        // CHECK ENVIRONMENT EXISTENCE FIRST - before prompting for credentials
+        var envFile = projectRoot & "/.env." & arguments.environment;
+        if (fileExists(envFile) && !arguments.force) {
+            print.redLine("Setup failed: Environment '#arguments.environment#' already exists. Use --force to overwrite.");
+            setExitCode(1);
+            return;
+        }
+
+        // Check if we need interactive datasource configuration
+        // Only prompt if: not H2, no credentials provided, and not skipping database
+        var needsInteractiveDatasource = !arguments.skipDatabase &&
+                                          lCase(arguments.dbtype) != "h2" &&
+                                          (!len(trim(arguments.host)) ||
+                                           !len(trim(arguments.username)) ||
+                                           !len(trim(arguments.password)));
+
+        if (needsInteractiveDatasource) {
+            print.line();
+            print.yellowLine("Database credentials not provided for #arguments.dbtype# database");
+
+            if (confirm("Would you like to enter database credentials now? [y/n]")) {
+                print.line();
+                print.cyanLine("Please provide database connection details:");
+                print.line();
+
+                // Prompt for host
+                if (!len(trim(arguments.host))) {
+                    arguments.host = ask("Database Host [localhost]: ");
+                    if (!len(trim(arguments.host))) {
+                        arguments.host = "localhost";
+                    }
+                }
+
+                // Prompt for port
+                if (!len(trim(arguments.port))) {
+                    var defaultPort = "";
+                    switch (lCase(arguments.dbtype)) {
+                        case "mysql": defaultPort = "3306"; break;
+                        case "postgres": defaultPort = "5432"; break;
+                        case "mssql": defaultPort = "1433"; break;
+                        case "oracle": defaultPort = "1521"; break;
+                    }
+                    arguments.port = ask("Database Port [#defaultPort#]: ");
+                    if (!len(trim(arguments.port))) {
+                        arguments.port = defaultPort;
+                    }
+                }
+
+                // Prompt for username
+                if (!len(trim(arguments.username))) {
+                    var defaultUser = lCase(arguments.dbtype) == "mssql" ? "sa" : "wheels";
+                    arguments.username = ask("Database Username [#defaultUser#]: ");
+                    if (!len(trim(arguments.username))) {
+                        arguments.username = defaultUser;
+                    }
+                }
+
+                // Prompt for password
+                if (!len(trim(arguments.password))) {
+                    arguments.password = ask(message="Database Password: ", mask="*");
+                }
+
+                // Prompt for SID if Oracle
+                if (lCase(arguments.dbtype) == "oracle" && !len(trim(arguments.sid))) {
+                    arguments.sid = ask("SID [FREE]: ");
+                    if (!len(trim(arguments.sid))) {
+                        arguments.sid = "FREE";
+                    }
+                }
+
+                print.line();
+                print.greenLine("Database credentials captured successfully!");
+                print.line();
+            } else {
+                print.yellowLine("Using default credentials. You can update them in .env.#arguments.environment# later.");
+                print.line();
+            }
+        }
+
         var result = environmentService.setup(argumentCollection = arguments, rootPath=projectRoot );
 
         if (result.success) {
             print.greenLine("Environment setup complete!")
                  .line();
-            
+
+            // Create database if not skipped
+            if (!arguments.skipDatabase && result.keyExists("config") && result.config.keyExists("datasourceInfo")) {
+                var datasourceName = result.config.datasourceInfo.keyExists("datasource") ?
+                    result.config.datasourceInfo.datasource : "wheels_#arguments.environment#";
+                var databaseName = result.config.datasourceInfo.database;
+
+                print.yellowLine("Creating database '#databaseName#'...")
+                     .line();
+
+                try {
+                    command("wheels db create")
+                        .params(
+                            datasource = datasourceName,
+                            database = databaseName,
+                            environment = arguments.environment,
+                            dbtype = arguments.dbtype,
+                            force = true
+                        )
+                        .run();
+                } catch (any e) {
+                    print.yellowLine("Warning: Database creation failed - #e.message#")
+                         .line()
+                         .yellowLine("You can create it manually with:")
+                         .line("  wheels db create datasource=#datasourceName# database=#databaseName# environment=#arguments.environment# dbtype=#arguments.dbtype#")
+                         .line();
+                }
+            }
+
             if (result.keyExists("nextSteps") && arrayLen(result.nextSteps)) {
                 print.yellowBoldLine("Next Steps:")
                      .line();
-                
+
                 for (var step in result.nextSteps) {
                     print.line(step);
                 }
@@ -68,7 +182,7 @@ component extends="../base" {
         }
     }
 
-    // Generate instructions 
+    // Generate instructions
     private function showSetupHelp() {
         // ANSI color codes as strings
         var reset = chr(27) & "[0m";
@@ -111,16 +225,17 @@ component extends="../base" {
                               " & red & "Note: Use named syntax environment=name to avoid parameter conflicts" & reset & "
 
         " & bold & yellow & "OPTIONS:" & reset & "
-            " & cyan & "--template" & reset & "      Template type: " & magenta & "local" & reset & ", " & magenta & "docker" & reset & ", " & magenta & "vagrant" & reset & " " & dim & "(default: local)" & reset & "
-            " & cyan & "--dbtype" & reset & "        Database type: " & magenta & "h2" & reset & ", " & magenta & "mysql" & reset & ", " & magenta & "postgres" & reset & ", " & magenta & "mssql" & reset & " " & dim & "(default: h2)" & reset & "
-            " & cyan & "--database" & reset & "      Custom database name " & dim & "(default: wheels_[environment])" & reset & "
-            " & cyan & "--datasource" & reset & "    ColdFusion datasource name " & dim & "(default: wheels_[environment])" & reset & "
-            " & cyan & "--base" & reset & "          Base environment to copy settings from " & dim & "(copies config)" & reset & "
-            " & cyan & "--force" & reset & "         Overwrite existing environment " & dim & "(default: false)" & reset & "
-            " & cyan & "--debug" & reset & "         Enable debug settings " & dim & "(default: false)" & reset & "
-            " & cyan & "--cache" & reset & "         Enable cache settings " & dim & "(default: false)" & reset & "
-            " & cyan & "--reloadPassword" & reset & "  Custom reload password " & dim & "(default: wheels[environment])" & reset & "
-            " & cyan & "--help" & reset & "          Show this detailed help message
+            " & cyan & "--template" & reset & "       Template type: " & magenta & "local" & reset & ", " & magenta & "docker" & reset & ", " & magenta & "vagrant" & reset & " " & dim & "(default: local)" & reset & "
+            " & cyan & "--dbtype" & reset & "         Database type: " & magenta & "h2" & reset & ", " & magenta & "mysql" & reset & ", " & magenta & "postgres" & reset & ", " & magenta & "mssql" & reset & " " & dim & "(default: h2)" & reset & "
+            " & cyan & "--database" & reset & "       Custom database name " & dim & "(default: wheels_[environment])" & reset & "
+            " & cyan & "--datasource" & reset & "     ColdFusion datasource name " & dim & "(default: wheels_[environment])" & reset & "
+            " & cyan & "--base" & reset & "           Base environment to copy settings from " & dim & "(copies config)" & reset & "
+            " & cyan & "--force" & reset & "          Overwrite existing environment " & dim & "(default: false)" & reset & "
+            " & cyan & "--skipDatabase" & reset & "   Skip database creation (only create .env file) " & dim & "(default: false)" & reset & "
+            " & cyan & "--debug" & reset & "          Enable debug settings " & dim & "(default: false)" & reset & "
+            " & cyan & "--cache" & reset & "          Enable cache settings " & dim & "(default: false)" & reset & "
+            " & cyan & "--reloadPassword" & reset & " Custom reload password " & dim & "(default: wheels[environment])" & reset & "
+            " & cyan & "--help" & reset & "           Show this detailed help message
 
         " & bold & yellow & "BASIC EXAMPLES:" & reset & "
             " & green & "wheels env setup environment=development" & reset & "        ## H2 database (default)
@@ -147,6 +262,7 @@ component extends="../base" {
             " & magenta & "mysql" & reset & "     - MySQL database server " & dim & "(port 3306)" & reset & "
             " & magenta & "postgres" & reset & "  - PostgreSQL database server " & dim & "(port 5432)" & reset & "
             " & magenta & "mssql" & reset & "     - Microsoft SQL Server " & dim & "(port 1433)" & reset & "
+            " & magenta & "oracle" & reset & "    - Oracle Database " & dim & "(port 1521)" & reset & "
 
         " & bold & yellow & "BASE ENVIRONMENT COPYING:" & reset & "
             When using " & cyan & "--base" & reset & ", the command copies existing configuration:
