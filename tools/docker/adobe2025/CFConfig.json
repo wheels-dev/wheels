@@ -94,6 +94,17 @@
 			"port": "1521",
 			"username": "wheelstestdb",
 			"validate": "false"
+		},
+		"wheelstestdb_sqlite":{
+			"blob":false,
+			"class":"org.sqlite.JDBC",
+			"clob":false,
+			"database":"wheelstestdb",
+			"dbdriver":"Other",
+			"dsn":"jdbc:sqlite:/app/wheelstestdb.db",
+			"host":"",
+			"password":"",
+			"username":""
 		}
 	}
 }

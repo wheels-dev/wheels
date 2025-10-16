@@ -12,8 +12,8 @@
         "bx-mssql":"^1.4.0+11",
         "bx-mysql":"^1.0.1+7",
         "bx-postgresql":"^1.0.0+2",
-        "bx-oracle":"^1.5.0+10"
-       
+        "bx-oracle":"^1.5.0+10",
+        "bx-sqlite":"^1.1.0+2"
     },
     "installPaths": {
         "wirebox": "vendor/wirebox/",
