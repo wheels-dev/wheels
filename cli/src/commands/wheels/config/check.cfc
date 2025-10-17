@@ -232,7 +232,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		if (StructKeyExists(arguments.config, "dataSourceName") && Len(arguments.config.dataSourceName)) {
 			try {
 				// Try to get datasource info
-				local.datasources = getDatasourceInfo(arguments.config.dataSourceName);
+				local.datasources = getDatasourceInfo(arguments.config.dataSourceName, local.env);
 				if (!len(local.datasources.datasource)) {
 					ArrayAppend(arguments.issues, {
 						type: "error",

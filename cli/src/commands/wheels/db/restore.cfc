@@ -102,7 +102,7 @@ component extends="../base" {
 			print.line();
 			
 			// Get datasource configuration
-			local.dsInfo = getDatasourceInfo(arguments.datasource);
+			local.dsInfo = getDatasourceInfo(arguments.datasource, arguments.environment);
 			
 			if (StructIsEmpty(local.dsInfo)) {
 				error("Datasource '" & arguments.datasource & "' not found in server configuration");
@@ -311,11 +311,6 @@ component extends="../base" {
 				error: e.message
 			};
 		}
-	}
-
-	private struct function getDatasourceInfo(required string datasourceName) {
-		// Placeholder implementation
-		return {};
 	}
 
 	private string function getEnvironment(required string appPath) {

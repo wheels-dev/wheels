@@ -58,7 +58,7 @@ component extends="../base" {
 			}
 
 			// Get datasource configuration
-			local.dsInfo = getDatasourceInfo(arguments.datasource);
+			local.dsInfo = getDatasourceInfo(arguments.datasource, arguments.environment);
 
 			if (StructIsEmpty(local.dsInfo)) {
 				print.line();

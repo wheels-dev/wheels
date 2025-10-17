@@ -16,7 +16,7 @@ The `wheels docker init` command creates Docker configuration files for containe
 
 | Option | Description | Default | Valid Values |
 |--------|-------------|---------|--------------|
-| `--db` | Database system to use | `mysql` | `h2`, `mysql`, `postgres`, `mssql` |
+| `--db` | Database system to use | `mysql` | `h2`, `mysql`, `postgres`, `mssql`, `oracle` |
 | `--dbVersion` | Database version to use | varies by db | Any valid version for the selected database |
 | `--cfengine` | CFML engine to use | `lucee` | `lucee`, `adobe` |
 | `--cfVersion` | CFML engine version | `6` | Any valid version for the selected engine |
@@ -29,6 +29,7 @@ The `wheels docker init` command creates Docker configuration files for containe
 - MySQL: `8.0`
 - PostgreSQL: `15`
 - MSSQL: `2019-latest`
+- Oracle: `latest` (Oracle Database 23c Free)
 - H2: embedded (no version needed)
 
 ## Examples
@@ -56,6 +57,16 @@ wheels docker init --cfengine=adobe --cfVersion=2023
 ### Initialize with H2 embedded database
 ```bash
 wheels docker init --db=h2
+```
+
+### Initialize with Oracle
+```bash
+wheels docker init --db=oracle
+```
+
+### Initialize with specific Oracle version
+```bash
+wheels docker init --db=oracle --dbVersion=23-slim
 ```
 
 ### Custom port
@@ -152,6 +163,7 @@ wheels docker init --db=postgres --dbVersion=15 --cfengine=lucee --cfVersion=6 -
      - MySQL: `com.mysql.cj.jdbc.Driver`
      - PostgreSQL: `org.postgresql.Driver`
      - MSSQL: `com.microsoft.sqlserver.jdbc.SQLServerDriver`
+     - Oracle: `oracle.jdbc.OracleDriver`
    - Uses Docker service name `db` for host resolution
    - Configures appropriate ports and credentials
 
@@ -413,6 +425,14 @@ http {
 - **Database**: wheels
 - **Note**: Requires EULA acceptance
 
+### Oracle
+- **Image**: `gvenzl/oracle-free:latest` (default - Oracle Database 23c Free)
+- **Port**: 1521
+- **Credentials**: wheels/wheels
+- **SID**: FREE
+- **Note**: Uses lightweight Oracle Free container image
+- **Available tags**: `latest`, `23`, `23-slim`, `23-faststart`, `23-slim-faststart`
+
 ### H2
 - **Embedded**: No separate container needed
 - **Extension**: Automatically added to Lucee deployments via Dockerfile
@@ -570,10 +590,11 @@ The following environment variables are configured in docker-compose.yml:
 | `ENVIRONMENT` | Application environment mode | `development` or `production` |
 | `BOX_SERVER_PROFILE` | CommandBox server profile (production only) | `production` |
 | `DB_HOST` | Database hostname (Docker service name) | `db` |
-| `DB_PORT` | Database port | `3306`, `5432`, `1433` |
+| `DB_PORT` | Database port | `3306`, `5432`, `1433`, `1521` |
 | `DB_NAME` | Database name | `wheels` |
 | `DB_USER` | Database username | `wheels` or `sa` |
 | `DB_PASSWORD` | Database password | `wheels` or `Wheels123!` |
+| `DB_SID` | Oracle SID (Oracle only) | `FREE` |
 | `DB_TYPE` | Database type (H2 only) | `h2` |
 
 ## Starting Your Docker Environment
