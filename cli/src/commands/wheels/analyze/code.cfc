@@ -89,7 +89,7 @@ component extends="wheels-cli.models.BaseCommand" {
         }
         
         print.line();
-        displayResults(results, arguments.format);
+        displayResults(results, arguments.format, arguments.severity);
         
         if (arguments.report) {
             generateReport(results);
@@ -137,7 +137,7 @@ component extends="wheels-cli.models.BaseCommand" {
 	}
 
     
-    private function displayResults(results, format) {
+    private function displayResults(results, format, severity = "warning") {
         switch (format) {
             case "json":
                 print.line(generateBeautifiedJSON(results));
@@ -146,39 +146,53 @@ component extends="wheels-cli.models.BaseCommand" {
                 print.line(generateBeautifiedJUnitXML(results));
                 break;
             default:
-                displayConsoleResults(results);
+                displayConsoleResults(results, severity);
         }
     }
     
-    private function displayConsoleResults(results) {
+    private function displayConsoleResults(results, severity = "warning") {
         // Display header with grade
         print.line();
         displayCodeHealthHeader(results);
-        
-        if (results.totalIssues == 0 && results.metrics.duplicateBlocks == 0) {
+
+        // Display metrics summary first (always shown)
+        displayMetricsSummary(results);
+
+        // If no issues AND good grade, show success message and return early
+        if (results.totalIssues == 0 &&
+            results.metrics.duplicateBlocks == 0 &&
+            results.metrics.deprecatedCalls == 0 &&
+            results.metrics.codeSmells == 0 &&
+            results.metrics.grade == "A") {
+            print.line();
             print.greenBoldLine("Excellent! No issues found. Your code is pristine!");
-            displayMetricsSummary(results);
             return;
         }
         
-        // Display metrics summary
-        displayMetricsSummary(results);
-        
-        // Display issue summary
-        print.boldLine("Issue Summary");
-        print.line(repeatString("-", 50));
-        
-        if (results.summary.errors > 0) {
-            print.redLine("Errors:   #padString(results.summary.errors, 5)# (Critical issues requiring immediate attention)");
+        // Display issue summary only if there are issues at the filtered severity level
+        if (results.totalIssues > 0) {
+            print.boldLine("Issue Summary");
+            print.line(repeatString("-", 50));
+
+            if (results.summary.errors > 0) {
+                print.redLine("Errors:   #padString(results.summary.errors, 5)# (Critical issues requiring immediate attention)");
+            }
+            if (results.summary.warnings > 0) {
+                print.yellowLine("Warnings: #padString(results.summary.warnings, 5)# (Issues that should be addressed)");
+            }
+            if (results.summary.info > 0) {
+                print.blueLine("Info:     #padString(results.summary.info, 5)# (Suggestions for improvement)");
+            }
+
+            print.line();
+        } else {
+            // No issues at filtered severity, but check for other problems
+            if (results.metrics.deprecatedCalls > 0 || results.metrics.codeSmells > 0) {
+                print.line();
+                print.yellowLine("No issues found at '#severity#' severity level, but other code quality concerns exist:");
+                print.line();
+            }
         }
-        if (results.summary.warnings > 0) {
-            print.yellowLine("Warnings: #padString(results.summary.warnings, 5)# (Issues that should be addressed)");
-        }
-        if (results.summary.info > 0) {
-            print.blueLine("Info:     #padString(results.summary.info, 5)# (Suggestions for improvement)");
-        }
-        
-        print.line();
         
         // Display complexity analysis
         if (arrayLen(results.complexFunctions) > 0) {
