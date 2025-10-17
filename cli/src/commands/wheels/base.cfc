@@ -675,7 +675,7 @@ component excludeFromHelp=true {
     }
 
 	// Copy helper functions from create.cfc
-	private struct function getDatasourceInfo(required string datasourceName) {
+	private struct function getDatasourceInfo(required string datasourceName, string environment = "") {
 		try {
 			// Try to get datasource info from app.cfm
 			local.appPath = getCWD();
@@ -739,8 +739,9 @@ component excludeFromHelp=true {
 
 					// ENHANCEMENT: Check if .env file exists and read actual credentials from there
 					// This solves the issue where app.cfm has environment variable placeholders like ##this.env.MSSQL_HOST##
-					local.environment = getEnvironment(local.appPath);
-					local.envFile = local.appPath & "/.env." & local.environment;
+					// Use passed environment parameter, or fall back to current environment
+					local.targetEnvironment = Len(arguments.environment) ? arguments.environment : getEnvironment(local.appPath);
+					local.envFile = local.appPath & "/.env." & local.targetEnvironment;
 					local.useEnvFile = fileExists(local.envFile) && Len(local.dsInfo.driver);
 
 					if (local.useEnvFile) {

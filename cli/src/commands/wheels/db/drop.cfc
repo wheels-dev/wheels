@@ -53,7 +53,7 @@ component extends="../base" {
 			printDivider();
 			
 			// Get datasource configuration
-			local.dsInfo = getDatasourceInfo(arguments.datasource);
+			local.dsInfo = getDatasourceInfo(arguments.datasource, arguments.environment);
 			
 			if (StructIsEmpty(local.dsInfo)) {
 				error("Datasource '" & arguments.datasource & "' not found in server configuration");

@@ -52,7 +52,7 @@ component extends="../base" {
 			print.line();
 			
 			// Get datasource configuration
-			local.dsInfo = getDatasourceInfo(arguments.datasource);
+			local.dsInfo = getDatasourceInfo(arguments.datasource, arguments.environment);
 			
 			if (StructIsEmpty(local.dsInfo)) {
 				// Try to get from Wheels configuration
@@ -540,11 +540,6 @@ component extends="../base" {
 		} catch (any e) {
 			error("Command execution failed: " & e.message);
 		}
-	}
-
-	private struct function getDatasourceInfo(required string datasourceName) {
-		// Placeholder - would need proper implementation
-		return {};
 	}
 
 	private string function getEnvironment(required string appPath) {
