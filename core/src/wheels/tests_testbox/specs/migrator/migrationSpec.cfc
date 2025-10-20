@@ -653,6 +653,13 @@ component extends="wheels.Testbox" {
 		describe("Tests addForeignKey", () => {
 
 			it("creates a foregin key constraint", () => {
+				local.info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+				local.db = LCase(Replace(local.info.database_productname, " ", "", "all"))
+
+				if(local.db eq 'sqlite'){
+					skip("SQLite does not allow altering CONSTRAINTS.")
+				}
+
 				tableName = "dbm_afk_foos"
 				referenceTableName = "dbm_afk_bars"
 

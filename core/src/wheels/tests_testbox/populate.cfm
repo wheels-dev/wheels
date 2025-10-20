@@ -63,7 +63,7 @@
 	<cfset local.identityColumnType = "INTEGER">
 	<cfset local.dateTimeColumnType = "TEXT">
 	<cfset local.dateTimeDefault = "'2000-01-01 18:26:08'">
-	<cfset local.binaryColumnType = "BLOB">
+	<cfset local.binaryColumnType = "TEXT">
 	<cfset local.textColumnType = "TEXT">
 	<cfset local.intColumnType = "INTEGER">
 	<cfset local.floatColumnType = "REAL">
