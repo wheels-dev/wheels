@@ -163,7 +163,8 @@ jobs:
 
       - name: Publish All Packages to ForgeBox
         run: |
-          ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true"
+          # Publish RC packages and mark as stable so they become the default version
+          ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true" "true"
 
       #############################################
       # Build Artifacts for GitHub
