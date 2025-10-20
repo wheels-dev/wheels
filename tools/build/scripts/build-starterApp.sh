@@ -2,33 +2,31 @@
 set -e
 
 # Build script for Wheels Starter App
-# Usage: ./build-base.sh <version> <branch> <build_number> <is_prerelease>
+# This script creates GitHub artifacts (ZIP files) from the directory prepared by prepare-starterApp.sh
+# Usage: ./build-starterApp.sh <version>
 
 VERSION=$1
 
-echo "Building Wheels Starter App v${VERSION}"
+echo "Building Wheels Starter App v${VERSION} artifacts from prepared directory"
 
 # Setup directories
 BUILD_DIR="build-wheels-starterApp"
 EXPORT_DIR="artifacts/wheels/${VERSION}"
 BE_EXPORT_DIR="artifacts/wheels"
 
-# Cleanup and create directories
-rm -rf "${BUILD_DIR}"
-mkdir -p "${BUILD_DIR}"
+# Verify that prepare-starterApp.sh has been run
+if [ ! -d "${BUILD_DIR}" ]; then
+    echo "ERROR: ${BUILD_DIR} does not exist!"
+    echo "Please run prepare-starterApp.sh first to create the build directory."
+    exit 1
+fi
+
+# Create export directories
 mkdir -p "${EXPORT_DIR}"
 mkdir -p "${BE_EXPORT_DIR}"
 
-# Create build label file
-BUILD_LABEL="wheels-starter-app-${VERSION}-$(date +%Y%m%d%H%M%S)"
-echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
-
-# Copy Starter App files
-echo "Copying Starter App files..."
-cp -r examples/starter-app/* "${BUILD_DIR}/"
-
 # Create ZIP file
-echo "Creating ZIP package..."
+echo "Creating ZIP package from prepared directory..."
 cd "${BUILD_DIR}" && zip -r "../${EXPORT_DIR}/wheels-starter-app-${VERSION}.zip" ./ && cd ..
 
 # Generate checksums

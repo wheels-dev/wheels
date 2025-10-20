@@ -186,7 +186,7 @@ jobs:
           ./tools/build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}"
+          ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
