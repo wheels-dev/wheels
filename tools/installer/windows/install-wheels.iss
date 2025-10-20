@@ -6,6 +6,7 @@ DisableDirPage=yes
 DisableProgramGroupPage=yes
 OutputDir=installer
 OutputBaseFilename=wheels-installer
+SetupIconFile=assets\wheels_logo.ico
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
