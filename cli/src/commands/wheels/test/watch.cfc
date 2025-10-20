@@ -17,8 +17,6 @@ component aliases='wheels test:watch' extends="../base" {
      * @format.options txt,json,junit,html
      * @verbose.hint Verbose output
      * @delay.hint Delay in milliseconds before rerunning tests (default: 1000)
-     * @watchPaths.hint Additional paths to watch (comma-separated)
-     * @excludePaths.hint Paths to exclude from watching (comma-separated)
      * @bundles.hint Comma-delimited list of test bundles to run
      * @labels.hint Comma-delimited list of test labels to run
      * @excludes.hint Comma-delimited list of test labels to exclude
@@ -31,8 +29,6 @@ component aliases='wheels test:watch' extends="../base" {
         string format = "txt",
         boolean verbose = false,
         numeric delay = 1000,
-        string watchPaths = "",
-        string excludePaths = "",
         string bundles = "",
         string labels = "",
         string excludes = "",
@@ -70,16 +66,6 @@ component aliases='wheels test:watch' extends="../base" {
             verbose = arguments.verbose
         };
         
-        // Add additional watch paths if specified
-        if (len(arguments.watchPaths)) {
-            params.paths = arguments.watchPaths;
-        }
-        
-        // Add exclude paths if specified
-        if (len(arguments.excludePaths)) {
-            params.excludePaths = arguments.excludePaths;
-        }
-        
         // Add optional filtering parameters
         if (len(arguments.bundles)) {
             params.bundles = arguments.bundles;
@@ -108,14 +94,6 @@ component aliases='wheels test:watch' extends="../base" {
         print.line("  Directory: #arguments.directory#");
         print.line("  Format: #arguments.format#");
         print.line("  Delay: #arguments.delay#ms");
-        
-        if (len(arguments.watchPaths)) {
-            print.line("  Additional paths: #arguments.watchPaths#");
-        }
-        
-        if (len(arguments.excludePaths)) {
-            print.line("  Excluded paths: #arguments.excludePaths#");
-        }
         
         if (len(arguments.filter)) {
             print.line("  Filter: #arguments.filter#");

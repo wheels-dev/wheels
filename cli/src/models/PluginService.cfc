@@ -82,41 +82,68 @@ component {
     /**
      * Remove a Wheels CLI plugin
      */
-    function remove(required string name, boolean global = false) {
+    function remove(required string name) {
         try {
             var boxJsonPath = resolvePath("box.json");
-            
-            if (arguments.global) {
-                // Uninstall globally
+            var pluginFound = false;
+
+            // Get current working directory
+            var currentDir = fileSystemUtil.resolvePath("");
+
+            // Check if plugin exists in box.json
+            if (fileExists(boxJsonPath)) {
+                var boxJson = deserializeJSON(fileRead(boxJsonPath));
+
+                // Check dependencies
+                if (boxJson.keyExists("dependencies") && boxJson.dependencies.keyExists(arguments.name)) {
+                    boxJson.dependencies.delete(arguments.name);
+                    pluginFound = true;
+                }
+
+                // Check devDependencies
+                if (boxJson.keyExists("devDependencies") && boxJson.devDependencies.keyExists(arguments.name)) {
+                    boxJson.devDependencies.delete(arguments.name);
+                    pluginFound = true;
+                }
+
+                if (!pluginFound) {
+                    // Check if plugin is in /plugins folder (Wheels application plugin)
+                    var pluginsDir = fileSystemUtil.resolvePath("plugins");
+                    if (directoryExists(pluginsDir)) {
+                        var pluginPath = pluginsDir & "/" & arguments.name;
+                        if (directoryExists(pluginPath)) {
+                            pluginFound = true;
+                        }
+                    }
+                }
+
+                if (!pluginFound) {
+                    return {
+                        success: false,
+                        error: "Plugin '#arguments.name#' is not installed"
+                    };
+                }
+
+                // Write updated box.json
+                fileWrite(boxJsonPath, serializeJSON(boxJson, true));
+
+                // Uninstall via CommandBox
                 packageService.uninstallPackage(
                     ID = arguments.name,
-                    global = true
+                    currentWorkingDirectory = currentDir
                 );
             } else {
-                // Remove from box.json
-                if (fileExists(boxJsonPath)) {
-                    var boxJson = deserializeJSON(fileRead(boxJsonPath));
-                    
-                    // Remove from dependencies
-                    if (boxJson.keyExists("dependencies") && boxJson.dependencies.keyExists(arguments.name)) {
-                        boxJson.dependencies.delete(arguments.name);
-                    }
-                    
-                    // Remove from devDependencies
-                    if (boxJson.keyExists("devDependencies") && boxJson.devDependencies.keyExists(arguments.name)) {
-                        boxJson.devDependencies.delete(arguments.name);
-                    }
-                    
-                    // Write updated box.json
-                    fileWrite(boxJsonPath, serializeJSON(boxJson, true));
-                    
-                    // Uninstall via CommandBox
-                    packageService.uninstallPackage(ID = arguments.name);
-                }
+                return {
+                    success: false,
+                    error: "No box.json found. Plugin '#arguments.name#' is not installed"
+                };
             }
-            
-            return { success: true };
-            
+
+            return {
+                success: true,
+                pluginName: arguments.name
+            };
+
         } catch (any e) {
             return {
                 success: false,
