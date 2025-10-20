@@ -64,7 +64,7 @@ your-app/
 
 ## Monorepo Structure
 
-This repository contains the complete Wheels ecosystem in a monorepo structure:
+This repository contains the complete Wheels ecosystem in a monorepo structure. All components are developed together but distributed as separate ForgeBox packages.
 
 ```
 wheels-monorepo/
@@ -85,11 +85,17 @@ wheels-monorepo/
 **Key Components:**
 - **CLI** (`wheels-cli`): Development tools and generators (CommandBox module)
 - **Core** (`wheels-core`): Framework runtime installed in `/vendor/wheels`
-- **Base Template** (`wheels-base-template`): Starting structure downloaded by CLI for new applications  
+- **Base Template** (`wheels-base-template`): Starting structure downloaded by CLI for new applications
 - **Documentation**: Comprehensive guides published to wheels.dev/guides
 - **Build System**: Automated packaging and ForgeBox distribution
 
-**Package Flow**: CLI downloads base template from ForgeBox during `wheels g app`, which includes dependency on core framework. Documentation is automatically published to wheels.dev/guides. All components are versioned together and distributed as separate ForgeBox packages that work seamlessly together.
+**Package Flow**: CLI downloads base template from ForgeBox during `wheels new myapp`, which includes dependency on core framework. Documentation is automatically published to wheels.dev/guides. All components are versioned together and distributed as separate ForgeBox packages that work seamlessly together.
+
+**For detailed monorepo documentation**, see [MONOREPO.md](MONOREPO.md) which includes:
+- Complete directory structure breakdown
+- Component relationships and dependency graphs
+- Development workflow and testing procedures
+- Build and distribution pipeline details
 
 ## Contributing
 
