@@ -1,7 +1,7 @@
 # Controller Testing
 
 ## Description
-Comprehensive guide to testing CFWheels controllers using TestBox 5 with modern BDD (Behavior Driven Development) syntax. Wheels 3.0 uses TestBox integration for testing controllers with `describe()`, `it()`, and `expect()` patterns.
+Comprehensive guide to testing Wheels controllers using TestBox 5 with modern BDD (Behavior Driven Development) syntax. Wheels 3.0 uses TestBox integration for testing controllers with `describe()`, `it()`, and `expect()` patterns.
 
 ## TestBox BDD Testing Structure
 

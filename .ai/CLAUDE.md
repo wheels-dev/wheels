@@ -1,8 +1,8 @@
-# CFWheels Documentation Index
+# Wheels Documentation Index
 
 🚨 **COMPREHENSIVE DOCUMENTATION INDEX** 🚨
 
-This file provides the complete index of CFWheels documentation for AI assistants. All technical content has been organized into the structured `.ai` folder for maximum efficiency and accuracy.
+This file provides the complete index of Wheels documentation for AI assistants. All technical content has been organized into the structured `.ai` folder for maximum efficiency and accuracy.
 
 ⛔ **CRITICAL: ALWAYS READ RELEVANT DOCUMENTATION BEFORE WRITING CODE** ⛔
 
@@ -46,7 +46,7 @@ This file provides the complete index of CFWheels documentation for AI assistant
 4. `.ai/wheels/configuration/best-practices.md` - Configuration guidelines
 
 ### 🔍 STEP 3: Anti-Pattern Validation (BEFORE WRITING CODE)
-- [ ] ❌ **NO** mixed argument styles in CFWheels functions
+- [ ] ❌ **NO** mixed argument styles in Wheels functions
 - [ ] ❌ **NO** ArrayLen() usage on model associations (use .recordCount)
 - [ ] ❌ **NO** Rails-style nested resource routing
 - [ ] ❌ **NO** emailField() or passwordField() helpers (don't exist)
@@ -87,7 +87,7 @@ This file provides the complete index of CFWheels documentation for AI assistant
 - `architecture.md` - View structure and file organization
 - `layouts.md` - Layout patterns and inheritance
 - `partials.md` - Partial usage and patterns
-- `forms.md` - Form helpers and CFWheels limitations
+- `forms.md` - Form helpers and Wheels limitations
 - `helpers.md` - View helpers and custom helpers
 - `advanced-patterns.md` - AJAX, performance, caching
 - `testing.md` - View testing patterns
@@ -105,7 +105,7 @@ This file provides the complete index of CFWheels documentation for AI assistant
 
 ## 🚨 Critical Anti-Pattern Prevention
 
-### Most Common CFWheels Errors
+### Most Common Wheels Errors
 1. **Mixed Arguments**: `hasMany("comments", dependent="delete")` ❌
 2. **Query vs Array Confusion**: `ArrayLen(posts)` on query objects ❌
 3. **Rails-style Routing**: Nested resource functions ❌
@@ -115,7 +115,7 @@ This file provides the complete index of CFWheels documentation for AI assistant
 1. **Consistent Arguments**: `hasMany(name="comments", dependent="delete")` ✅
 2. **Query Methods**: `posts.recordCount` ✅
 3. **Separate Resources**: `.resources("posts").resources("comments")` ✅
-4. **CFWheels Helpers**: `textField(type="email")` ✅
+4. **Wheels Helpers**: `textField(type="email")` ✅
 
 ## 🛠️ AI Assistant Implementation Guidelines
 
@@ -130,7 +130,7 @@ This file provides the complete index of CFWheels documentation for AI assistant
 1. **Documentation First**: Always consult .ai documentation before coding
 2. **Pattern Consistency**: Follow established patterns from .ai documentation
 3. **Security Awareness**: Apply security practices from .ai documentation
-4. **Convention Adherence**: Follow CFWheels naming and structure conventions
+4. **Convention Adherence**: Follow Wheels naming and structure conventions
 5. **Validation**: Test implementations against documented standards
 
 ## 🚀 Quick Reference Dispatchers
@@ -174,6 +174,6 @@ wheels test run
 - [ ] No anti-patterns are present in the code
 - [ ] Patterns match those documented in .ai folder
 - [ ] Validation commands pass successfully
-- [ ] Code follows CFWheels conventions and best practices
+- [ ] Code follows Wheels conventions and best practices
 
 🚨 **REMEMBER: The .ai folder contains the definitive, comprehensive documentation. ALWAYS use it as your primary reference!**

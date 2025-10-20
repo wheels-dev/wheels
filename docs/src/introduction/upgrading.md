@@ -283,7 +283,7 @@ We've updated our minimum requirements to match officially supported versions fr
 * The global setting `cacheModelInitialization` has been renamed to `cacheModelConfig`.
 * The global setting `clearServerCache` has been renamed to `clearTemplateCache`.
 * The `updateProperties()` method has been removed, use `update()` instead.
-* JavaScript arguments like `confirm` and `disable` have been removed from the link and form helper functions (use the [JS Confirm](https://github.com/perdjurner/cfwheels-js-confirm) and [JS Disable](https://github.com/perdjurner/cfwheels-js-disable) plugins to reinstate the old behavior).
+* JavaScript arguments like `confirm` and `disable` have been removed from the link and form helper functions (use the [JS Confirm](https://github.com/perdjurner/Wheels-js-confirm) and [JS Disable](https://github.com/perdjurner/Wheels-js-disable) plugins to reinstate the old behavior).
 * The `renderPage` function has been renamed to `renderView`
 * `includePartial()` now requires the `partial` and `query` arguments to be set (if using a query)
 

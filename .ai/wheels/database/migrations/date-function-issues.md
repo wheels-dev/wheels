@@ -1,4 +1,4 @@
-# CFWheels Migration Date Function Issues
+# Wheels Migration Date Function Issues
 
 ## Critical Problem: CFML Date Functions in Migrations
 
@@ -199,9 +199,9 @@ component extends="wheels.migrator.Migration" hint="SeedBlogPosts" {
             try {
                 // Insert posts with static dates
                 execute("INSERT INTO posts (title, content, slug, published, publishedAt, createdAt, updatedAt) VALUES (
-                    'Getting Started with CFWheels',
-                    '<p>CFWheels is a powerful CFML framework...</p>',
-                    'getting-started-cfwheels',
+                    'Getting Started with Wheels',
+                    '<p>Wheels is a powerful CFML framework...</p>',
+                    'getting-started-Wheels',
                     1,
                     '2025-09-01 09:00:00',
                     '2025-09-01 09:00:00',
@@ -209,9 +209,9 @@ component extends="wheels.migrator.Migration" hint="SeedBlogPosts" {
                 )");
 
                 execute("INSERT INTO posts (title, content, slug, published, publishedAt, createdAt, updatedAt) VALUES (
-                    'Advanced CFWheels Patterns',
-                    '<p>Learn advanced patterns for CFWheels development...</p>',
-                    'advanced-cfwheels-patterns',
+                    'Advanced Wheels Patterns',
+                    '<p>Learn advanced patterns for Wheels development...</p>',
+                    'advanced-Wheels-patterns',
                     1,
                     '2025-09-02 10:00:00',
                     '2025-09-02 10:00:00',
@@ -235,8 +235,8 @@ component extends="wheels.migrator.Migration" hint="SeedBlogPosts" {
         transaction {
             try {
                 execute("DELETE FROM posts WHERE slug IN (
-                    'getting-started-cfwheels',
-                    'advanced-cfwheels-patterns'
+                    'getting-started-Wheels',
+                    'advanced-Wheels-patterns'
                 )");
             } catch (any e) {
                 local.exception = e;

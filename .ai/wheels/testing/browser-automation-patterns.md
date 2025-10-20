@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides systematic browser testing patterns for CFWheels applications using the Puppeteer MCP tools. These patterns ensure every user interaction is tested automatically as part of the enhanced `mcp__wheels__develop` workflow.
+This document provides systematic browser testing patterns for Wheels applications using the Puppeteer MCP tools. These patterns ensure every user interaction is tested automatically as part of the enhanced `mcp__wheels__develop` workflow.
 
 ## Core Testing Principles
 
@@ -658,4 +658,4 @@ async function validateTestResults() {
 3. **Run on schedule**: Regular testing to catch regressions
 4. **Run on demand**: Manual testing for specific features or bug investigation
 
-This comprehensive browser testing framework ensures that every aspect of your CFWheels application is thoroughly tested automatically, providing confidence that all user interactions work correctly across all devices and scenarios.
+This comprehensive browser testing framework ensures that every aspect of your Wheels application is thoroughly tested automatically, providing confidence that all user interactions work correctly across all devices and scenarios.

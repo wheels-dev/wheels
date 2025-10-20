@@ -2,7 +2,7 @@
 
 ## Overview
 
-This engine provides automated analysis and planning capabilities for the enhanced `mcp__wheels__develop` workflow. It analyzes natural language requirements, maps them to CFWheels components, identifies dependencies, and creates detailed implementation plans with comprehensive testing scenarios.
+This engine provides automated analysis and planning capabilities for the enhanced `mcp__wheels__develop` workflow. It analyzes natural language requirements, maps them to Wheels components, identifies dependencies, and creates detailed implementation plans with comprehensive testing scenarios.
 
 ## Core Analysis Components
 
@@ -865,12 +865,12 @@ class ImplementationPlanner {
     defineQualityGates(components) {
         return {
             syntax: {
-                description: 'All generated code must pass CFWheels syntax validation',
+                description: 'All generated code must pass Wheels syntax validation',
                 automated: true,
                 blocking: true
             },
             antipatterns: {
-                description: 'No common CFWheels anti-patterns detected',
+                description: 'No common Wheels anti-patterns detected',
                 automated: true,
                 blocking: true,
                 checks: [

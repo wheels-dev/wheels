@@ -1,7 +1,7 @@
 # Validation Templates
 
 ## Description
-Pre-code validation checklists, code review templates, and anti-pattern detection for ensuring CFWheels code quality.
+Pre-code validation checklists, code review templates, and anti-pattern detection for ensuring Wheels code quality.
 
 ## Key Points
 - Mandatory validation checklists for each component type
@@ -186,7 +186,7 @@ BEFORE COMMITTING MODEL CODE, VERIFY:
 
 □ Validation Check:
   - Required validations present
-  - No Rails-style validation options that don't exist in CFWheels
+  - No Rails-style validation options that don't exist in Wheels
 
 □ File Location Check:
   - File in /app/models/ directory
@@ -227,7 +227,7 @@ BEFORE COMMITTING VIEW CODE, VERIFY:
   - Proper empty state handling
 
 □ Form Helper Check:
-  - Using available CFWheels form helpers correctly
+  - Using available Wheels form helpers correctly
   - No Rails-style helpers that don't exist
 
 □ Output Escaping Check:
@@ -284,7 +284,7 @@ Controllers: UsersController.cfc, PostsController.cfc
 hasMany("comments", className="Comment", foreignKey="post_id")
 
 ✅ PREFER:
-hasMany("comments") // CFWheels handles conventions
+hasMany("comments") // Wheels handles conventions
 ```
 
 **2. Complex Migration Parameters**
@@ -318,7 +318,7 @@ grep -r "renderText(" app/controllers/ # Check for consistent arguments
 #!/bin/bash
 # Pre-commit validation script
 
-echo "🔍 Checking for CFWheels anti-patterns..."
+echo "🔍 Checking for Wheels anti-patterns..."
 
 # Check for mixed arguments
 if grep -r "hasMany(\"[^\"]*\",[[:space:]]*[a-zA-Z]" app/models/; then
@@ -338,7 +338,7 @@ if find app/models/ -name "*s.cfc"; then
     exit 1
 fi
 
-echo "✅ CFWheels pattern validation passed"
+echo "✅ Wheels pattern validation passed"
 ```
 
 ## Integration with Development Workflow
@@ -355,7 +355,7 @@ Add validation script to git pre-commit hook:
 ```bash
 #!/bin/sh
 # .git/hooks/pre-commit
-./validate-cfwheels-patterns.sh
+./validate-Wheels-patterns.sh
 ```
 
 ### Documentation References

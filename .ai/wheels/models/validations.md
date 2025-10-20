@@ -1,7 +1,7 @@
 # Model Validations
 
 ## Description
-Comprehensive guide to CFWheels model validation system, including built-in validations, custom validations, and validation patterns.
+Comprehensive guide to Wheels model validation system, including built-in validations, custom validations, and validation patterns.
 
 ## Built-in Validation Methods
 

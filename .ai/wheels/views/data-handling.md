@@ -1,8 +1,8 @@
 # Data Handling in Views
 
-## 🚨 CRITICAL: CFWheels Data Types
+## 🚨 CRITICAL: Wheels Data Types
 
-**CFWheels associations and model methods return QUERIES, not ARRAYS. This is the #2 most common view error.**
+**Wheels associations and model methods return QUERIES, not ARRAYS. This is the #2 most common view error.**
 
 ### ❌ WRONG - Treating Queries as Arrays
 
@@ -81,7 +81,7 @@
 </cfif>
 ```
 
-**⚡ MEMORY RULE**: In CFWheels views, if it comes from a model (associations, finders), it's a QUERY. Use `.recordCount` and `<cfloop query="...">`.
+**⚡ MEMORY RULE**: In Wheels views, if it comes from a model (associations, finders), it's a QUERY. Use `.recordCount` and `<cfloop query="...">`.
 
 ## Variable Scoping
 

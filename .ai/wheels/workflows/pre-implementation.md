@@ -1,7 +1,7 @@
 # Pre-Implementation Workflow
 
 ## Description
-Mandatory step-by-step workflow that AI assistants MUST follow before writing any CFWheels code. This workflow prevents the two most common CFWheels errors through systematic documentation consultation and validation.
+Mandatory step-by-step workflow that AI assistants MUST follow before writing any Wheels code. This workflow prevents the two most common Wheels errors through systematic documentation consultation and validation.
 
 ## Key Points
 - Decision tree for determining documentation requirements
@@ -25,7 +25,7 @@ MUST READ FIRST:
 2. .ai/wheels/patterns/validation-templates.md
 ```
 
-**Purpose:** Prevent the two most common CFWheels errors:
+**Purpose:** Prevent the two most common Wheels errors:
 1. **Argument mixing** (`hasMany("comments", dependent="delete")`)
 2. **Query/Array confusion** (`ArrayLen(model.comments())`)
 
@@ -309,7 +309,7 @@ For EVERY function call you write, check:
 **STOP and consult documentation if you:**
 1. Get ANY error about "Missing argument name"
 2. Get ANY error about "Can't cast Object type [Query] to Array"
-3. Are unsure about argument syntax for any CFWheels function
+3. Are unsure about argument syntax for any Wheels function
 4. Are looping over model results or associations
 5. Are counting records or checking if data exists
 
@@ -426,4 +426,4 @@ When reviewing AI-generated code, verify:
 - Skipping steps WILL result in broken code
 - New error patterns must be documented immediately
 - Workflow compliance is required for all AI-generated code
-- This workflow prevents 90%+ of CFWheels development errors
+- This workflow prevents 90%+ of Wheels development errors

@@ -167,7 +167,7 @@ mapper()
 
 ```cfm
 .resources("posts", function(nested) {
-    nested.resources("comments");  // This doesn't work in CFWheels
+    nested.resources("comments");  // This doesn't work in Wheels
 })
 ```
 

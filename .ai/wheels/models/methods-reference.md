@@ -1,7 +1,7 @@
 # Model Methods Reference
 
 ## Description
-Comprehensive reference for all CFWheels model methods including CRUD operations, associations, validations, and advanced features.
+Comprehensive reference for all Wheels model methods including CRUD operations, associations, validations, and advanced features.
 
 ## Key Points
 - All models extend `wheels.Model` for ORM functionality
@@ -67,7 +67,7 @@ Comprehensive reference for all CFWheels model methods including CRUD operations
 - **`[property]ChangedFrom()`** - Dynamic previous value check for specific property
 
 ## Important Notes
-- CFWheels models do NOT have a `scope()` function (use custom finder methods)
+- Wheels models do NOT have a `scope()` function (use custom finder methods)
 - Associations return QUERY objects, use `.recordCount` not `ArrayLen()`
 - Always use consistent argument syntax in method calls
 - Model names are SINGULAR (User.cfc → users table)

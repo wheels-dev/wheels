@@ -1,4 +1,4 @@
-# CFWheels Form Helper Common Errors
+# Wheels Form Helper Common Errors
 
 ## Critical Anti-Pattern: submitTag Parameter Issues
 
@@ -19,7 +19,7 @@
 ```
 
 ## Why This Happens
-CFWheels requires **consistent parameter syntax** - either all positional or all named parameters. The `submitTag()` function expects the first parameter to be named `value=` when using named parameters.
+Wheels requires **consistent parameter syntax** - either all positional or all named parameters. The `submitTag()` function expects the first parameter to be named `value=` when using named parameters.
 
 ## Other Form Helper Patterns
 
@@ -90,7 +90,7 @@ CFWheels requires **consistent parameter syntax** - either all positional or all
 
 2. **"Function [HELPER] not found"**
    - **Cause**: Using non-existent helper functions
-   - **Fix**: Check CFWheels documentation for available helpers
+   - **Fix**: Check Wheels documentation for available helpers
 
 3. **"Parameter [PROPERTY] is required"**
    - **Cause**: Missing required parameters
@@ -121,4 +121,4 @@ CFWheels requires **consistent parameter syntax** - either all positional or all
 #submitTag(value="Save Post", class="btn btn-primary")#
 ```
 
-This pattern was discovered during a real CFWheels blog development session and prevented multiple form submission errors.
+This pattern was discovered during a real Wheels blog development session and prevented multiple form submission errors.

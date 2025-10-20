@@ -1,7 +1,7 @@
 # Model Performance and Optimization
 
 ## Description
-Best practices and techniques for optimizing CFWheels model performance, including query optimization, caching strategies, and efficient data loading patterns.
+Best practices and techniques for optimizing Wheels model performance, including query optimization, caching strategies, and efficient data loading patterns.
 
 ## Query Optimization
 

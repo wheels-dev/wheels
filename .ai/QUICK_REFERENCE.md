@@ -1,4 +1,4 @@
-# CFWheels Quick Reference - Most Common Issues
+# Wheels Quick Reference - Most Common Issues
 
 ## 🔴 Top 5 Critical Patterns (Learn These First!)
 
@@ -241,4 +241,4 @@ When something doesn't work, check in this order:
 
 ---
 
-**Remember**: These 5 patterns solve 80%+ of common CFWheels issues. Master them first!
+**Remember**: These 5 patterns solve 80%+ of common Wheels issues. Master them first!

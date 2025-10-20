@@ -2,7 +2,7 @@
 
 ## Critical Understanding
 
-**🚨 CRITICAL**: Association methods in CFWheels return QUERY objects, not arrays. This is essential to understand for views and controllers.
+**🚨 CRITICAL**: Association methods in Wheels return QUERY objects, not arrays. This is essential to understand for views and controllers.
 
 ## Association Return Types and Usage
 
@@ -137,7 +137,7 @@ if (isObject(user.profile())) {
 
 ### Many-to-Many Associations
 
-CFWheels handles many-to-many relationships through join tables and shortcut associations.
+Wheels handles many-to-many relationships through join tables and shortcut associations.
 
 **Setup with Join Table:**
 ```cfm
@@ -187,7 +187,7 @@ if (isObject(adminRole)) {
 
 ## Dynamic Association Methods
 
-CFWheels automatically creates dynamic methods for each association:
+Wheels automatically creates dynamic methods for each association:
 
 ### hasMany Dynamic Methods
 ```cfm

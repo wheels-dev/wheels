@@ -1,7 +1,7 @@
 # Controller Security
 
 ## Description
-Comprehensive guide to securing CFWheels controllers including parameter verification, CSRF protection, authentication patterns, input validation, and security best practices.
+Comprehensive guide to securing Wheels controllers including parameter verification, CSRF protection, authentication patterns, input validation, and security best practices.
 
 ## Parameter Verification
 

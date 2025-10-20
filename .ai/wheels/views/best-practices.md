@@ -354,4 +354,4 @@ function testEmptyQueryDisplay() {
 </cfoutput>
 ```
 
-This comprehensive approach ensures your views are secure, performant, maintainable, and follow CFWheels best practices.
+This comprehensive approach ensures your views are secure, performant, maintainable, and follow Wheels best practices.

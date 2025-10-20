@@ -1,7 +1,7 @@
 # Model Testing
 
 ## Description
-Comprehensive guide to testing CFWheels models using TestBox 5 with modern BDD (Behavior Driven Development) syntax. This guide covers validation testing, association testing, business logic testing, and callback testing using `describe()`, `it()`, and `expect()` patterns.
+Comprehensive guide to testing Wheels models using TestBox 5 with modern BDD (Behavior Driven Development) syntax. This guide covers validation testing, association testing, business logic testing, and callback testing using `describe()`, `it()`, and `expect()` patterns.
 
 ## TestBox BDD Model Test Structure
 

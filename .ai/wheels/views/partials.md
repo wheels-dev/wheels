@@ -1,4 +1,4 @@
-# Partials in CFWheels
+# Partials in Wheels
 
 ## Overview
 

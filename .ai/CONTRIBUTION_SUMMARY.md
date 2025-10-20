@@ -2,7 +2,7 @@
 
 ## Overview
 
-This `.ai` folder contains comprehensive CFWheels framework documentation extracted from real-world development sessions. The patterns, best practices, and solutions documented here are production-tested and ready for contribution to the CFWheels project.
+This `.ai` folder contains comprehensive Wheels framework documentation extracted from real-world development sessions. The patterns, best practices, and solutions documented here are production-tested and ready for contribution to the Wheels project.
 
 ## Generic Patterns Integrated (Ready for Wheels Project)
 
@@ -11,7 +11,7 @@ This `.ai` folder contains comprehensive CFWheels framework documentation extrac
 #### 1. **Layout cfoutput Block Coverage** → [views/layouts.md](wheels/views/layouts.md)
 - **Issue**: Most common beginner error - CFML expressions not rendering
 - **Solution**: Single `<cfoutput>` block wrapping entire HTML layout
-- **Impact**: Affects 90%+ of new CFWheels developers
+- **Impact**: Affects 90%+ of new Wheels developers
 - **Location**: Enhanced in `common-errors.md` and `views/layouts.md`
 
 #### 2. **Form Helper Duplicate Labels** → [views/forms.md](wheels/views/forms.md)
@@ -101,7 +101,7 @@ This `.ai` folder contains comprehensive CFWheels framework documentation extrac
 - ❌ `wheels/troubleshooting/session-learnings-2024-09-17.md` - Patterns integrated
 - ❌ `wheels/troubleshooting/session-learnings-2025-10-01.md` - Patterns integrated
 
-## Value Proposition for CFWheels Project
+## Value Proposition for Wheels Project
 
 ### Documentation Improvements:
 1. **Common Mistakes Guide** - Layout cfoutput, duplicate labels, query vs object
@@ -121,19 +121,19 @@ This `.ai` folder contains comprehensive CFWheels framework documentation extrac
 
 ## Usage
 
-This documentation is **project-agnostic** and represents patterns discovered through multiple CFWheels implementations. Each pattern:
+This documentation is **project-agnostic** and represents patterns discovered through multiple Wheels implementations. Each pattern:
 
 - ✅ Has been tested in real applications
 - ✅ Solves documented pain points
 - ✅ Includes clear examples and anti-patterns
-- ✅ Benefits the entire CFWheels community
+- ✅ Benefits the entire Wheels community
 
 ## Contribution Path
 
-### For CFWheels Core Team:
+### For Wheels Core Team:
 
 **Immediate Documentation Additions:**
-1. Add to official CFWheels documentation site
+1. Add to official Wheels documentation site
 2. Create "Common Mistakes" guide
 3. Enhance migration documentation with best practices
 4. Add modern frontend integration examples
@@ -143,20 +143,20 @@ This documentation is **project-agnostic** and represents patterns discovered th
 2. Improve generator schema detection
 3. Enhance form helper documentation
 
-### For CFWheels Community:
+### For Wheels Community:
 
 **Share as Community Resources:**
-1. CFWheels GitHub Discussions
-2. CFWheels Slack/Discord channels
+1. Wheels GitHub Discussions
+2. Wheels Slack/Discord channels
 3. Blog posts and tutorials
 4. Conference presentations
 
 ## License & Attribution
 
-These patterns are contributed to the CFWheels project under the same license as CFWheels (Apache 2.0). They represent collective knowledge from production implementations and are freely available for the community.
+These patterns are contributed to the Wheels project under the same license as Wheels (Apache 2.0). They represent collective knowledge from production implementations and are freely available for the community.
 
 ---
 
 **Generated**: 2025-10-02
-**Source**: Multiple production CFWheels applications
-**Status**: Ready for contribution to CFWheels project
+**Source**: Multiple production Wheels applications
+**Status**: Ready for contribution to Wheels project

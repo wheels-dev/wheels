@@ -447,7 +447,7 @@ Application Dependencies
 Project: testapp
 Version: 1.0.0
 
-├── cfwheels-flashmessages-bootstrap @ ^1.0.4 [not installed]
+├── Wheels-flashmessages-bootstrap @ ^1.0.4 [not installed]
 ├── commandbox-cfconfig @ * [not installed]
 ├── commandbox-cfformat @ * [not installed]
 ├── commandbox-dotenv @ * [not installed]

@@ -274,7 +274,7 @@ component extends="testbox.system.BaseSpec" {
 ```
 
 #### B. VS Code Integration
-Create `.vscode/cfwheels-test.code-snippets`:
+Create `.vscode/Wheels-test.code-snippets`:
 
 ```json
 {

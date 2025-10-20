@@ -107,7 +107,7 @@ wheels-cli/
     "shortDescription": "Official CLI for Wheels Framework",
     "type": "commandbox-modules",
     "keywords": [
-        "cfwheels",
+        "Wheels",
         "mvc",
         "cli",
         "scaffolding",

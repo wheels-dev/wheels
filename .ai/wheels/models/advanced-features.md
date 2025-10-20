@@ -1,7 +1,7 @@
 # Advanced Model Features
 
 ## Description
-Advanced CFWheels model features including timestamps, statistics, calculated properties, change tracking, dynamic finders, nested properties, transactions, and other sophisticated functionality.
+Advanced Wheels model features including timestamps, statistics, calculated properties, change tracking, dynamic finders, nested properties, transactions, and other sophisticated functionality.
 
 ## Automatic Time Stamps
 
@@ -557,18 +557,18 @@ recentTitles = model("Post").findAll(
 );
 ```
 
-## CFWheels vs Ruby on Rails - Common Mistakes to Avoid
+## Wheels vs Ruby on Rails - Common Mistakes to Avoid
 
 **❌ INCORRECT (Rails-style):**
 ```cfm
-// These Rails patterns DO NOT work in CFWheels:
+// These Rails patterns DO NOT work in Wheels:
 scope(name="active", where="isactive = 1");           // ❌ No scope() in models
 function scopeActive() { return this.where(...); }   // ❌ No scopeXXX() methods
 User.active.published                                 // ❌ No chainable scopes
 has_many :posts, dependent: :destroy                 // ❌ Wrong syntax
 ```
 
-**✅ CORRECT (CFWheels-style):**
+**✅ CORRECT (Wheels-style):**
 ```cfm
 // Use custom finder methods instead:
 function findActive() {
@@ -579,16 +579,16 @@ function findPublished() {
     return findAll(where="status = 'published'");
 }
 
-// Proper CFWheels associations:
+// Proper Wheels associations:
 hasMany("posts");                                   // ✅ Correct syntax - positional parameters
 hasMany(name="posts", dependent="delete");         // ✅ Correct syntax - named parameters with options
 ```
 
 ## Model Feature Comparison
 
-### CFWheels Model Features
+### Wheels Model Features
 
-**✅ Available in CFWheels:**
+**✅ Available in Wheels:**
 - Active Record pattern
 - Associations (belongsTo, hasMany, hasOne)
 - Validations (presence, format, uniqueness, etc.)
@@ -605,7 +605,7 @@ hasMany(name="posts", dependent="delete");         // ✅ Correct syntax - named
 - Statistical functions
 - Multiple data sources
 
-**❌ NOT Available in CFWheels:**
+**❌ NOT Available in Wheels:**
 - ActiveRecord scopes (use custom finder methods)
 - Chainable query methods (use single findAll call)
 - Migration rollback (Wheels has up/down methods)

@@ -1,7 +1,7 @@
 # Controller Rendering and Response Methods
 
 ## Description
-Comprehensive guide to rendering views, handling different response formats, redirects, and managing HTTP responses in CFWheels controllers.
+Comprehensive guide to rendering views, handling different response formats, redirects, and managing HTTP responses in Wheels controllers.
 
 ## Rendering Views
 

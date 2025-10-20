@@ -1,7 +1,7 @@
 # Model Architecture
 
 ## Description
-CFWheels model architecture, structure patterns, and basic implementation guidelines.
+Wheels model architecture, structure patterns, and basic implementation guidelines.
 
 ## Key Points
 - Models implement the Active Record pattern

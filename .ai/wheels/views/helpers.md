@@ -236,7 +236,7 @@ function statusBadge(required string status) {
 
 ### Understanding the `encode` Attribute
 
-**Most CFWheels view helpers have an `encode` attribute that controls HTML rendering:**
+**Most Wheels view helpers have an `encode` attribute that controls HTML rendering:**
 
 - **`encode=true`** (DEFAULT): HTML tags are escaped and displayed as literal text
 - **`encode=false`**: HTML tags are rendered as actual HTML

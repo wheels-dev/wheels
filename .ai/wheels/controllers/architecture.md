@@ -1,7 +1,7 @@
 # Controller Architecture
 
 ## Description
-CFWheels controller fundamentals, including structure, conventions, basic patterns, and the MVC request lifecycle.
+Wheels controller fundamentals, including structure, conventions, basic patterns, and the MVC request lifecycle.
 
 ## Controller Overview
 
@@ -225,7 +225,7 @@ component extends="Controller" {
 
 ## Argument Consistency Rules
 
-**🚨 CRITICAL**: NEVER mix positional and named arguments in ANY CFWheels function call.
+**🚨 CRITICAL**: NEVER mix positional and named arguments in ANY Wheels function call.
 
 ### ❌ WRONG - Mixed Arguments (WILL CAUSE ERRORS)
 ```cfm

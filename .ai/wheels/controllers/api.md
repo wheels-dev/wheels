@@ -1,7 +1,7 @@
 # API Controllers
 
 ## Description
-Comprehensive guide to building JSON and XML APIs with CFWheels controllers, including REST patterns, error handling, authentication, and response formatting.
+Comprehensive guide to building JSON and XML APIs with Wheels controllers, including REST patterns, error handling, authentication, and response formatting.
 
 ## Basic API Controller Pattern
 

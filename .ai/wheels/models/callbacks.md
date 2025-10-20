@@ -1,7 +1,7 @@
 # Model Callbacks
 
 ## Description
-CFWheels model callbacks allow you to execute code at specific points in a model's lifecycle, enabling automatic data processing, validation, logging, and business logic execution.
+Wheels model callbacks allow you to execute code at specific points in a model's lifecycle, enabling automatic data processing, validation, logging, and business logic execution.
 
 ## Available Callback Points
 

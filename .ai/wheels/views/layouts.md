@@ -1,8 +1,8 @@
-# Layouts in CFWheels
+# Layouts in Wheels
 
 ## Layout System Overview
 
-Layouts in CFWheels provide a way to wrap your view content with common HTML structure, navigation, headers, and footers. The layout system supports global layouts, controller-specific layouts, and nested layouts.
+Layouts in Wheels provide a way to wrap your view content with common HTML structure, navigation, headers, and footers. The layout system supports global layouts, controller-specific layouts, and nested layouts.
 
 ## Global Layout
 

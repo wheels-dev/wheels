@@ -1,7 +1,7 @@
 # User Authentication Model
 
 ## Description
-Comprehensive user authentication and profile management model demonstrating advanced CFWheels patterns including security, validation, callbacks, and role-based permissions.
+Comprehensive user authentication and profile management model demonstrating advanced Wheels patterns including security, validation, callbacks, and role-based permissions.
 
 ## Full Implementation Example
 

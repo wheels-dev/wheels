@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Conduct a comprehensive audit of Wheels 3.0 documentation while simultaneously implementing a rebranding from “Wheels” to “Wheels” and updating domain references from “cfwheels.org” to “wheels.dev”. This is a multi-faceted project requiring systematic analysis, content updates, and quality assurance.
+Conduct a comprehensive audit of Wheels 3.0 documentation while simultaneously implementing a rebranding from “Wheels” to “Wheels” and updating domain references from “Wheels.org” to “wheels.dev”. This is a multi-faceted project requiring systematic analysis, content updates, and quality assurance.
 
 ## Primary Objectives
 
@@ -98,7 +98,7 @@ Conduct a comprehensive audit of Wheels 3.0 documentation while simultaneously i
 **Tasks**:
 
 - Find all instances of “Wheels” and determine appropriate replacement with “Wheels”
-- Locate all “cfwheels.org” references for replacement with “wheels.dev”
+- Locate all “Wheels.org” references for replacement with “wheels.dev”
 - Handle edge cases and context-sensitive replacements:
   - Repository names (wheels-dev/wheels)
   - Package names and namespaces
@@ -109,7 +109,7 @@ Conduct a comprehensive audit of Wheels 3.0 documentation while simultaneously i
 **Replacement Strategy**:
 
 - “Wheels” → “Wheels” (in most contexts)
-- “cfwheels.org” → “wheels.dev”
+- “Wheels.org” → “wheels.dev”
 - “github.com/wheels/” → Keep as-is (repository URLs)
 - Context-sensitive handling for:
   - Code examples with variable names
@@ -163,7 +163,7 @@ Conduct a comprehensive audit of Wheels 3.0 documentation while simultaneously i
 ### Rebranding Specifications
 
 - **Product Name**: “Wheels” → “Wheels”
-- **Domain**: “cfwheels.org” → “wheels.dev”
+- **Domain**: “Wheels.org” → “wheels.dev”
 - **Preserve**: GitHub repository URLs, package names where needed for functionality
 - **Context Sensitivity**: Maintain historical accuracy in changelogs/release notes
 

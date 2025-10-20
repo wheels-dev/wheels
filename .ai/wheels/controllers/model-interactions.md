@@ -1,7 +1,7 @@
 # Controller Model Interactions
 
 ## Description
-Comprehensive guide to how controllers interact with models in CFWheels, including CRUD operations, association handling, validation, and data loading patterns.
+Comprehensive guide to how controllers interact with models in Wheels, including CRUD operations, association handling, validation, and data loading patterns.
 
 ## 🚨 CRITICAL REMINDERS
 

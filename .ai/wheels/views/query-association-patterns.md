@@ -1,4 +1,4 @@
-# CFWheels Query vs Association Handling Patterns
+# Wheels Query vs Association Handling Patterns
 
 ## Critical Anti-Pattern: Association Query Confusion
 
@@ -31,7 +31,7 @@
 </cfif>
 ```
 
-## Understanding CFWheels Associations
+## Understanding Wheels Associations
 
 ### How Associations Return Data
 ```cfm

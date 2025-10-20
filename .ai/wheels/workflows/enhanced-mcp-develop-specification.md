@@ -2,12 +2,12 @@
 
 ## Overview
 
-This specification defines the enhanced `mcp__wheels__develop` tool that provides a comprehensive, systematic development workflow for CFWheels applications. The goal is to create a bulletproof development process that produces professional-quality, thoroughly tested features consistently.
+This specification defines the enhanced `mcp__wheels__develop` tool that provides a comprehensive, systematic development workflow for Wheels applications. The goal is to create a bulletproof development process that produces professional-quality, thoroughly tested features consistently.
 
 ## Core Principles
 
 1. **Documentation-Driven Development**: Always consult .ai documentation before implementation
-2. **Anti-Pattern Prevention**: Systematically prevent common CFWheels errors
+2. **Anti-Pattern Prevention**: Systematically prevent common Wheels errors
 3. **Comprehensive Testing**: Every button, form, and link must be tested
 4. **Template-Based Implementation**: Use established patterns from .ai documentation
 5. **Error Recovery**: Intelligent error handling with documentation re-consultation
@@ -22,7 +22,7 @@ This specification defines the enhanced `mcp__wheels__develop` tool that provide
 - `.ai/wheels/troubleshooting/common-errors.md`
 - `.ai/wheels/patterns/validation-templates.md`
 
-**Purpose**: Prevent the two most common CFWheels errors:
+**Purpose**: Prevent the two most common Wheels errors:
 - Mixed argument styles (`hasMany("comments", dependent="delete")`)
 - Query/Array confusion (`ArrayLen(post.comments())`)
 
@@ -151,7 +151,7 @@ component extends="Model" {
 
 #### 3.2 Incremental Validation
 **After each component generation:**
-1. Syntax validation using CFWheels parser
+1. Syntax validation using Wheels parser
 2. Anti-pattern detection scan
 3. Consistency check against existing code
 4. Security pattern verification
@@ -214,7 +214,7 @@ component extends="wheels.Testbox" {
 - Validate foreign key constraints
 
 #### 4.4 Syntax and Configuration Testing
-- CFWheels syntax validation
+- Wheels syntax validation
 - Route configuration testing
 - Application startup testing
 - Framework setting validation
@@ -425,7 +425,7 @@ Error: ArrayLen() on query object detected
 - [ ] ✅ Performance is acceptable
 - [ ] ✅ Error scenarios are handled properly
 - [ ] ✅ Screenshot evidence exists for all user flows
-- [ ] ✅ Implementation follows CFWheels conventions
+- [ ] ✅ Implementation follows Wheels conventions
 
 ### Quality Gates
 
@@ -477,4 +477,4 @@ Error: ArrayLen() on query object detected
 - Integrate with existing test commands
 - Add automated test generation
 
-This specification provides a comprehensive framework for creating a robust, systematic development workflow that produces professional-quality, thoroughly tested CFWheels applications consistently.
+This specification provides a comprehensive framework for creating a robust, systematic development workflow that produces professional-quality, thoroughly tested Wheels applications consistently.

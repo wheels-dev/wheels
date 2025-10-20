@@ -1,7 +1,7 @@
 # Model Best Practices
 
 ## Description
-Essential best practices for developing maintainable, secure, and performant CFWheels models.
+Essential best practices for developing maintainable, secure, and performant Wheels models.
 
 ## Model Organization and Structure
 
@@ -494,7 +494,7 @@ component extends="tests.Test" {
 
 ## Naming and Convention Best Practices
 
-### 1. Follow CFWheels Conventions
+### 1. Follow Wheels Conventions
 ```cfm
 // ✅ GOOD: Proper naming conventions
 
@@ -658,7 +658,7 @@ component extends="Model" {
 7. **Optimize performance** with caching and query optimization
 
 ### 2. Code Review Checklist
-- [ ] Follows CFWheels naming conventions
+- [ ] Follows Wheels naming conventions
 - [ ] Uses consistent argument styles
 - [ ] Includes appropriate validations
 - [ ] Has proper error handling

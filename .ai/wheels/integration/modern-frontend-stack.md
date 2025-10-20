@@ -1,8 +1,8 @@
-# CFWheels Modern Frontend Integration
+# Wheels Modern Frontend Integration
 
-## Integrating Tailwind CSS, HTMX, and Alpine.js with CFWheels
+## Integrating Tailwind CSS, HTMX, and Alpine.js with Wheels
 
-This guide documents successful patterns for integrating modern frontend technologies with CFWheels applications, based on real-world blog development.
+This guide documents successful patterns for integrating modern frontend technologies with Wheels applications, based on real-world blog development.
 
 ## Complete Stack Integration
 
@@ -15,7 +15,7 @@ This guide documents successful patterns for integrating modern frontend technol
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <cfoutput>#csrfMetaTags()#</cfoutput>
-    <title><cfoutput>#contentFor("title", "My CFWheels App")#</cfoutput></title>
+    <title><cfoutput>#contentFor("title", "My Wheels App")#</cfoutput></title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -99,7 +99,7 @@ This guide documents successful patterns for integrating modern frontend technol
     <footer class="bg-white border-t mt-12">
         <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div class="text-center text-gray-600">
-                <p>&copy; <cfoutput>#Year(Now())#</cfoutput> My App. Built with CFWheels, Tailwind CSS, HTMX, and Alpine.js.</p>
+                <p>&copy; <cfoutput>#Year(Now())#</cfoutput> My App. Built with Wheels, Tailwind CSS, HTMX, and Alpine.js.</p>
             </div>
         </div>
     </footer>
@@ -374,7 +374,7 @@ This guide documents successful patterns for integrating modern frontend technol
 </script>
 ```
 
-## Integration with CFWheels Features
+## Integration with Wheels Features
 
 ### Flash Messages with Tailwind Styling
 ```cfm
@@ -484,7 +484,7 @@ This guide documents successful patterns for integrating modern frontend technol
 </main>
 ```
 
-This integration pattern was successfully tested in a real CFWheels blog application, demonstrating seamless compatibility between traditional server-side rendering and modern frontend technologies.
+This integration pattern was successfully tested in a real Wheels blog application, demonstrating seamless compatibility between traditional server-side rendering and modern frontend technologies.
 
 ## Key Findings from Real-World Implementation
 
@@ -493,7 +493,7 @@ This integration pattern was successfully tested in a real CFWheels blog applica
 1. **No Build Process Required**: All three technologies (Tailwind, Alpine.js, HTMX) work perfectly via CDN without any build configuration
 2. **Zero Conflicts**: Alpine.js directives (`x-data`, `@click`, `x-show`) don't conflict with CFML templating
 3. **CFML Integration**: Tailwind utility classes work seamlessly within `<cfoutput>` blocks
-4. **Form Enhancement**: CFWheels form helpers integrate smoothly with Tailwind styling
+4. **Form Enhancement**: Wheels form helpers integrate smoothly with Tailwind styling
 5. **Responsive Design**: Tailwind's responsive classes work out-of-the-box for mobile/desktop views
 
 ### 🎯 Best Practices Validated
@@ -504,7 +504,7 @@ This integration pattern was successfully tested in a real CFWheels blog applica
 - **CDN Approach**: Perfect for rapid development and prototyping
 - **Progressive Enhancement**: Start with server-side rendering, add interactivity incrementally
 - **Component Reusability**: Alpine.js components work consistently across all views
-- **HTMX + CFWheels**: Natural fit for partial updates and form submissions
+- **HTMX + Wheels**: Natural fit for partial updates and form submissions
 
 ### 📊 Performance Characteristics
 
@@ -528,8 +528,8 @@ This integration pattern was successfully tested in a real CFWheels blog applica
 ### 💡 Common Integration Patterns
 
 1. **Mobile-First Navigation**: Alpine.js for mobile menu, Tailwind for responsive layout
-2. **Form Validation**: CFWheels validation + Tailwind error states
+2. **Form Validation**: Wheels validation + Tailwind error states
 3. **Dynamic Content**: HTMX for partial updates, Alpine.js for UI state
-4. **Flash Messages**: CFWheels flash system + Tailwind alert styling
+4. **Flash Messages**: Wheels flash system + Tailwind alert styling
 
-This approach enables modern, interactive UIs while maintaining CFWheels' server-side strengths.
+This approach enables modern, interactive UIs while maintaining Wheels' server-side strengths.

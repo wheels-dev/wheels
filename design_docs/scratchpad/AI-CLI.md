@@ -1623,7 +1623,7 @@ box package publish
 ### Plugin Best Practices
 
 1. **Naming Convention**: Prefix with `wheels-` (e.g., `wheels-auth`)
-2. **Type Declaration**: Set type as `commandbox-modules,cfwheels-plugins`
+2. **Type Declaration**: Set type as `commandbox-modules,Wheels-plugins`
 3. **Documentation**: Include comprehensive README.md
 4. **Testing**: Include test suite in `/tests/`
 5. **Versioning**: Follow semantic versioning (major.minor.patch)

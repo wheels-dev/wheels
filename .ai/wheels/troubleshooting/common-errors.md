@@ -1,12 +1,12 @@
 # Common Errors and Solutions
 
 ## Description
-Frequent issues encountered when developing CFWheels applications and their solutions, based on real development experiences.
+Frequent issues encountered when developing Wheels applications and their solutions, based on real development experiences.
 
 ## Key Points
-- CFWheels differs from Rails in several key areas
+- Wheels differs from Rails in several key areas
 - Form helpers have different capabilities than Rails
-- Association syntax has specific CFWheels conventions
+- Association syntax has specific Wheels conventions
 - Migration parameter binding can be unreliable
 
 ## Common Association Errors
@@ -18,7 +18,7 @@ Complex object types cannot be converted to simple values.
 The expression has requested a variable or an intermediate expression result as a simple value. However, the result cannot be converted to a simple value. Simple values are strings, numbers, boolean values, and date/time values. Queries, arrays, and COM objects are examples of complex values.
 ```
 
-**Cause:** Mixing positional and named parameters in CFWheels function calls.
+**Cause:** Mixing positional and named parameters in Wheels function calls.
 
 **Bad Code:**
 ```cfm
@@ -42,7 +42,7 @@ component extends="Model" {
 }
 ```
 
-**Related:** CFWheels requires consistent parameter syntax - either all positional or all named parameters, not mixed.
+**Related:** Wheels requires consistent parameter syntax - either all positional or all named parameters, not mixed.
 
 ### "Can't cast Object type [Query] to a value of type [Array]"
 **Error:**
@@ -51,7 +51,7 @@ Can't cast Object type [Query] to a value of type [Array]
 Detail: Java type of the object is lucee.runtime.type.QueryImpl
 ```
 
-**Cause:** Treating CFWheels association results as arrays when they return query objects.
+**Cause:** Treating Wheels association results as arrays when they return query objects.
 
 **Bad Code:**
 ```cfm
@@ -84,19 +84,19 @@ Detail: Java type of the object is lucee.runtime.type.QueryImpl
 ```
 
 **Key Points:**
-- All CFWheels association methods return **Query objects**, not arrays
+- All Wheels association methods return **Query objects**, not arrays
 - Use `.recordCount` for counts, not `ArrayLen()`
 - Use `<cfloop query="...">` for iteration, not `<cfloop array="...">`
 - Model finder methods also return queries: `model("User").findAll()` returns Query
 
-**Related:** This is the #2 most common CFWheels error after argument mixing.
+**Related:** This is the #2 most common Wheels error after argument mixing.
 
 ## Form Helper Errors
 
 ### "No matching function [LABEL] found"
 **Error:** When using `label()` with `text` parameter.
 
-**Cause:** CFWheels `label()` helper doesn't accept a `text` parameter like Rails does.
+**Cause:** Wheels `label()` helper doesn't accept a `text` parameter like Rails does.
 
 **Bad Code:**
 ```cfm
@@ -112,7 +112,7 @@ Detail: Java type of the object is lucee.runtime.type.QueryImpl
 ### "No matching function [EMAILFIELD] found"
 **Error:** When trying to use specialized form helpers.
 
-**Cause:** CFWheels doesn't have specialized form helpers like `emailField()` or `passwordField()`.
+**Cause:** Wheels doesn't have specialized form helpers like `emailField()` or `passwordField()`.
 
 **Bad Code:**
 ```cfm
@@ -124,7 +124,7 @@ Detail: Java type of the object is lucee.runtime.type.QueryImpl
 #textField(objectName="comment", property="email", type="email")#
 ```
 
-**Available Form Helpers in CFWheels:**
+**Available Form Helpers in Wheels:**
 - `textField()`
 - `passwordField()` - **Wait, this does exist!**
 - `hiddenField()`
@@ -183,7 +183,7 @@ mapper()
 .end();
 ```
 
-**Note:** CFWheels routing syntax differs from Rails - always check the CFWheels documentation for exact syntax rather than assuming Rails patterns work.
+**Note:** Wheels routing syntax differs from Rails - always check the Wheels documentation for exact syntax rather than assuming Rails patterns work.
 
 ### buttonTo() HTTP Method Routing Errors
 **Error:**
@@ -215,7 +215,7 @@ Ensure you are using the correct HTTP Verb and that your config/routes.cfm file 
 
 **Key Points:**
 - `buttonTo()` defaults to POST method if no `method` parameter is specified
-- CFWheels resource routing expects specific HTTP methods for each action
+- Wheels resource routing expects specific HTTP methods for each action
 - DELETE actions MUST use `method="delete"`
 - PUT/PATCH actions MUST use `method="put"` or `method="patch"`
 - Always test delete functionality in browser to catch these errors early
@@ -250,18 +250,18 @@ execute("INSERT INTO posts (title, slug, body, createdAt, updatedAt)
 ### Duplicate Labels in Forms
 **Symptom:** Form labels appear twice (e.g., "Title Title" or "Content Content")
 
-**Cause:** Using both manual HTML `<label>` tags AND CFWheels' automatic label generation in form helpers.
+**Cause:** Using both manual HTML `<label>` tags AND Wheels' automatic label generation in form helpers.
 
 **Bad Code:**
 ```cfm
 <!-- This creates duplicate labels -->
 <div>
     <label for="post-title">Title</label>
-    #textField(objectName="post", property="title")#  <!-- CFWheels also generates a label -->
+    #textField(objectName="post", property="title")#  <!-- Wheels also generates a label -->
 </div>
 ```
 
-**Solution 1:** Disable CFWheels automatic labels with `label=false`:
+**Solution 1:** Disable Wheels automatic labels with `label=false`:
 ```cfm
 <!-- Use custom labels with label=false -->
 <div>
@@ -270,9 +270,9 @@ execute("INSERT INTO posts (title, slug, body, createdAt, updatedAt)
 </div>
 ```
 
-**Solution 2:** Use CFWheels built-in labels only:
+**Solution 2:** Use Wheels built-in labels only:
 ```cfm
-<!-- Let CFWheels handle labels automatically -->
+<!-- Let Wheels handle labels automatically -->
 <div>
     #textField(objectName="post", property="title", label="Title", class="form-control")#
 </div>
@@ -284,13 +284,13 @@ execute("INSERT INTO posts (title, slug, body, createdAt, updatedAt)
 
 ### Check Function Availability
 When encountering "No matching function" errors:
-1. Check CFWheels documentation for exact function names
+1. Check Wheels documentation for exact function names
 2. Verify parameter names and types
-3. Consider that CFWheels may differ from Rails conventions
+3. Consider that Wheels may differ from Rails conventions
 
 ### Association Debugging
 When models fail to load:
-1. Check association syntax matches CFWheels conventions
+1. Check association syntax matches Wheels conventions
 2. Remove Rails-style options like `dependent`, `class_name`, etc.
 3. Use simple association definitions first, then add complexity
 
@@ -304,15 +304,15 @@ When migrations fail:
 
 ### Association Options
 - **Rails:** `has_many :comments, dependent: :destroy`
-- **CFWheels:** `hasMany("comments")` - no dependent options
+- **Wheels:** `hasMany("comments")` - no dependent options
 
 ### Form Helpers
 - **Rails:** Rich set of specialized helpers (`email_field`, `password_field`, etc.)
-- **CFWheels:** More limited set, use `textField()` with `type` parameter
+- **Wheels:** More limited set, use `textField()` with `type` parameter
 
 ### Parameter Names
 - **Rails:** Uses symbols and underscores (`:text => "Label"`)
-- **CFWheels:** Uses strings and camelCase (`text="Label"`)
+- **Wheels:** Uses strings and camelCase (`text="Label"`)
 
 ## Related
 - [Model Associations](../database/associations/)
@@ -370,7 +370,7 @@ When migrations fail:
 **Key Points:**
 - Store association query result in variable before looping
 - Access columns directly from query variable, not association method
-- This is CFWheels-specific behavior - differs from Rails
+- This is Wheels-specific behavior - differs from Rails
 
 ## Controller Parameter Handling
 
@@ -484,10 +484,10 @@ curl -s http://localhost:8080 | grep 'href="/posts"'  # Should find actual URLs
 ```
 
 ## Important Notes
-- Always consult CFWheels documentation rather than assuming Rails conventions
+- Always consult Wheels documentation rather than assuming Rails conventions
 - Test association definitions in simple form before adding complexity
 - For migrations, prefer direct SQL over parameter binding for data seeding
-- CFWheels form helpers are more limited than Rails - supplement with HTML when needed
+- Wheels form helpers are more limited than Rails - supplement with HTML when needed
 - Use null coalescing operators (`?:`) when embedding model data in JavaScript/Alpine.js contexts
 - Store association query results in variables before looping to avoid method call errors
 - **Wrap entire layout HTML in single cfoutput block** - most common layout mistake

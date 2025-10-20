@@ -1,7 +1,7 @@
 # Controller Filters
 
 ## Description
-CFWheels filters allow you to run code before or after actions without explicit calls, enabling cross-cutting concerns like authentication, logging, data loading, and authorization.
+Wheels filters allow you to run code before or after actions without explicit calls, enabling cross-cutting concerns like authentication, logging, data loading, and authorization.
 
 ## Filter Basics
 

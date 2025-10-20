@@ -1,10 +1,10 @@
-# Rails vs CFWheels Comparison
+# Rails vs Wheels Comparison
 
 ## Description
-Key differences between Ruby on Rails and CFWheels frameworks to help Rails developers transition to CFWheels development.
+Key differences between Ruby on Rails and Wheels frameworks to help Rails developers transition to Wheels development.
 
 ## Language Fundamentals
-| Aspect | Rails (Ruby) | CFWheels (CFML) |
+| Aspect | Rails (Ruby) | Wheels (CFML) |
 |--------|--------------|------------------|
 | **Syntax** | Ruby blocks, symbols | CFScript, tag-based templates |
 | **Variables** | Instance variables `@user` | Regular variables `user` |
@@ -14,7 +14,7 @@ Key differences between Ruby on Rails and CFWheels frameworks to help Rails deve
 ## Model Associations
 
 ### Basic Associations
-| Rails | CFWheels |
+| Rails | Wheels |
 |-------|----------|
 | `has_many :comments` | `hasMany("comments")` |
 | `belongs_to :user` | `belongsTo("user")` |
@@ -27,14 +27,14 @@ has_many :comments, dependent: :destroy, class_name: "Comment"
 belongs_to :user, foreign_key: "author_id"
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 hasMany(name="comments", dependent="delete"); // Named parameters required for options
 belongsTo(name="user", foreignKey="authorId");
 ```
 
 **Key Differences:**
-- CFWheels supports `dependent` options but requires consistent named parameter syntax
+- Wheels supports `dependent` options but requires consistent named parameter syntax
 - Use `foreignKey` instead of `foreign_key` (camelCase)
 - No `class_name` option - uses `modelName` instead
 - Cannot mix positional and named parameters
@@ -42,7 +42,7 @@ belongsTo(name="user", foreignKey="authorId");
 ## Form Helpers
 
 ### Available Helpers
-| Rails | CFWheels | Notes |
+| Rails | Wheels | Notes |
 |-------|----------|-------|
 | `text_field` | `textField()` | ✅ Available |
 | `email_field` | ❌ Not available | Use `textField(type="email")` |
@@ -59,7 +59,7 @@ belongsTo(name="user", foreignKey="authorId");
 <% end %>
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 #startFormTag(route="user", method="put", key=user.id)#
   <label for="user-name">Full Name</label>
@@ -80,7 +80,7 @@ Rails.application.routes.draw do
 end
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 mapper()
   .resources("posts")
@@ -89,7 +89,7 @@ mapper()
 .end();
 ```
 
-**Important:** CFWheels nested resource syntax is different from Rails. Use separate `.resources()` declarations instead of nested functions.
+**Important:** Wheels nested resource syntax is different from Rails. Use separate `.resources()` declarations instead of nested functions.
 
 ### Custom Routes
 **Rails:**
@@ -97,7 +97,7 @@ mapper()
 get '/login', to: 'sessions#new', as: 'login'
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 .get(name="login", pattern="/login", to="sessions##new")
 ```
@@ -117,7 +117,7 @@ class PostsController < ApplicationController
 end
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 component extends="Controller" {
   function config() {
@@ -145,7 +145,7 @@ def user_params
 end
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 function create() {
   user = model("User").new(params.user);
@@ -165,7 +165,7 @@ class Post < ApplicationRecord
 end
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 component extends="Model" {
   function config() {
@@ -178,7 +178,7 @@ component extends="Model" {
 ```
 
 ### Validations
-| Rails | CFWheels |
+| Rails | Wheels |
 |-------|----------|
 | `validates :email, presence: true` | `validatesPresenceOf("email")` |
 | `validates :email, uniqueness: true` | `validatesUniquenessOf(property="email")` |
@@ -196,7 +196,7 @@ component extends="Model" {
 <% end %>
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 <cfoutput>
 <h1>#post.title#</h1>
@@ -214,7 +214,7 @@ component extends="Model" {
 <%= yield %>
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 <!-- app/views/layout.cfm -->
 #includeContent()#
@@ -236,7 +236,7 @@ class CreatePosts < ActiveRecord::Migration[7.0]
 end
 ```
 
-**CFWheels:**
+**Wheels:**
 ```cfm
 component extends="wheels.migrator.Migration" {
   function up() {
@@ -254,7 +254,7 @@ component extends="wheels.migrator.Migration" {
 ```
 
 ### Running Migrations
-| Rails | CFWheels |
+| Rails | Wheels |
 |-------|----------|
 | `rails db:migrate` | `wheels dbmigrate latest` |
 | `rails db:rollback` | `wheels dbmigrate down` |
@@ -262,20 +262,20 @@ component extends="wheels.migrator.Migration" {
 
 ## Key Differences Summary
 
-1. **Association Options**: CFWheels doesn't support Rails-style `dependent` options
-2. **Form Helpers**: More limited in CFWheels - supplement with HTML
-3. **Parameter Names**: Rails uses underscores, CFWheels uses camelCase
-4. **Syntax Style**: Rails uses symbols and blocks, CFWheels uses strings and functions
-5. **Variable Scope**: Rails uses instance variables, CFWheels uses regular variables
-6. **Migration Binding**: CFWheels migration parameter binding can be unreliable
+1. **Association Options**: Wheels doesn't support Rails-style `dependent` options
+2. **Form Helpers**: More limited in Wheels - supplement with HTML
+3. **Parameter Names**: Rails uses underscores, Wheels uses camelCase
+4. **Syntax Style**: Rails uses symbols and blocks, Wheels uses strings and functions
+5. **Variable Scope**: Rails uses instance variables, Wheels uses regular variables
+6. **Migration Binding**: Wheels migration parameter binding can be unreliable
 
 ## Migration Tips for Rails Developers
 
-1. **Start Simple**: Begin with basic CFWheels patterns before adding complexity
-2. **Check Documentation**: Don't assume Rails conventions work in CFWheels
+1. **Start Simple**: Begin with basic Wheels patterns before adding complexity
+2. **Check Documentation**: Don't assume Rails conventions work in Wheels
 3. **Use HTML Fallbacks**: When form helpers are limited, use standard HTML
 4. **Test Incrementally**: Test each component before combining features
-5. **Leverage Conventions**: CFWheels has strong conventions - follow them
+5. **Leverage Conventions**: Wheels has strong conventions - follow them
 
 ## Related
 - [Troubleshooting Common Errors](../troubleshooting/common-errors.md)
@@ -284,7 +284,7 @@ component extends="wheels.migrator.Migration" {
 - [Routing Resources](./routing/resources.md)
 
 ## Important Notes
-- CFWheels is inspired by Rails but has different limitations and capabilities
-- Always consult CFWheels documentation rather than assuming Rails patterns
+- Wheels is inspired by Rails but has different limitations and capabilities
+- Always consult Wheels documentation rather than assuming Rails patterns
 - CFML syntax and conventions differ significantly from Ruby
-- Some Rails features don't have CFWheels equivalents - use workarounds
+- Some Rails features don't have Wheels equivalents - use workarounds

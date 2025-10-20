@@ -94,7 +94,7 @@ Wheels form helpers generate HTML form elements tied to model objects with autom
 ## ⚠️ CRITICAL: Form Helper Limitations
 
 **Label Helper Issues:**
-The `label()` helper in CFWheels does NOT accept a `text` parameter like in Rails:
+The `label()` helper in Wheels does NOT accept a `text` parameter like in Rails:
 
 ```cfm
 <!-- ❌ INCORRECT - This will cause errors -->
@@ -106,7 +106,7 @@ The `label()` helper in CFWheels does NOT accept a `text` parameter like in Rail
 ```
 
 **Email Field Limitation:**
-CFWheels does NOT have an `emailField()` helper:
+Wheels does NOT have an `emailField()` helper:
 
 ```cfm
 <!-- ❌ INCORRECT - emailField() doesn't exist -->
@@ -120,7 +120,7 @@ CFWheels does NOT have an `emailField()` helper:
 ```
 
 **Password Field Limitation:**
-CFWheels does NOT have a `passwordField()` helper:
+Wheels does NOT have a `passwordField()` helper:
 
 ```cfm
 <!-- ❌ INCORRECT - passwordField() doesn't exist -->

@@ -23,7 +23,7 @@ This strategy defines how the enhanced `mcp__wheels__develop` workflow automatic
 3. .ai/wheels/workflows/pre-implementation.md          [WORKFLOW - Process Validation]
 ```
 
-**Purpose**: Prevent the two most common CFWheels errors:
+**Purpose**: Prevent the two most common Wheels errors:
 - Mixed argument styles in function calls
 - Query/Array confusion in loops and counts
 
@@ -507,4 +507,4 @@ function loadErrorRecoveryDocumentation(errorType, originalComponents) {
 3. **Error recovery phase**: Automatically load error-specific documentation
 4. **Validation phase**: Use documentation for anti-pattern checking
 
-This systematic documentation loading strategy ensures that AI assistants always have the right knowledge available at the right time, preventing common errors and ensuring consistent, high-quality implementations that follow established CFWheels patterns and best practices.
+This systematic documentation loading strategy ensures that AI assistants always have the right knowledge available at the right time, preventing common errors and ensuring consistent, high-quality implementations that follow established Wheels patterns and best practices.

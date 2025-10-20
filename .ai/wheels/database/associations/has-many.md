@@ -71,7 +71,7 @@ commentCount = post.comments().recordCount;
 ## ⚠️ CRITICAL: Association Parameter Syntax
 
 **The Real Issue: Mixed Positional and Named Parameters**
-CFWheels DOES support the `dependent` parameter, but requires consistent parameter syntax:
+Wheels DOES support the `dependent` parameter, but requires consistent parameter syntax:
 
 ```cfm
 <!-- ❌ INCORRECT - Mixed positional and named parameters -->
@@ -128,17 +128,17 @@ function delete() {
 }
 ```
 
-## Rails vs CFWheels Association Differences
+## Rails vs Wheels Association Differences
 
-CFWheels associations are simpler than Rails but lack some advanced features:
+Wheels associations are simpler than Rails but lack some advanced features:
 
 ```cfm
-// ✅ CFWheels - Simple and clean
+// ✅ Wheels - Simple and clean
 hasMany("comments");
 hasMany("tags", through="postTags");
 hasMany("activeComments", modelName="Comment", where="approved = 1");
 
-// ❌ Rails syntax that doesn't work in CFWheels
+// ❌ Rails syntax that doesn't work in Wheels
 hasMany("comments", dependent: :destroy, validate: false, autosave: true);
 hasMany("comments", -> { where(approved: true) }, dependent: :delete_all);
 ```

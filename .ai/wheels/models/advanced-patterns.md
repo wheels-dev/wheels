@@ -4,7 +4,7 @@
 Complex model patterns for real-world applications including e-commerce, blog systems, and user authentication.
 
 ## Key Points
-- Demonstrates advanced CFWheels features: callbacks, custom properties, business logic
+- Demonstrates advanced Wheels features: callbacks, custom properties, business logic
 - Shows proper validation patterns for complex data
 - Illustrates performance optimization techniques
 - Includes security best practices

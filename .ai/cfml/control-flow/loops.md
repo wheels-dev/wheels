@@ -331,13 +331,13 @@ for (var item in data) {
 }
 ```
 
-## CFWheels Query Loops (CRITICAL)
+## Wheels Query Loops (CRITICAL)
 
-**⚠️ CFWheels associations return Query objects, not arrays. This is essential for proper iteration.**
+**⚠️ Wheels associations return Query objects, not arrays. This is essential for proper iteration.**
 
-### CFWheels Association Loops
+### Wheels Association Loops
 ```cfm
-<!-- In CFWheels views/controllers -->
+<!-- In Wheels views/controllers -->
 <cfset post = model("Post").findByKey(1)>
 
 <!-- ❌ WRONG - Treating association as array -->
@@ -366,7 +366,7 @@ for (var item in data) {
 </cfif>
 ```
 
-### CFWheels Model Finder Loops
+### Wheels Model Finder Loops
 ```cfm
 <!-- Model finders also return queries -->
 <cfset users = model("User").findAll()>
@@ -381,7 +381,7 @@ for (var item in data) {
 </cfloop>
 ```
 
-**Key CFWheels Points:**
+**Key Wheels Points:**
 - All association methods return Query objects: `post.comments()`, `user.orders()`
 - All model finders return Query objects: `model("User").findAll()`
 - Use `.recordCount` for counts, not `ArrayLen()`
@@ -396,7 +396,7 @@ for (var item in data) {
 - Consider functional approaches (`each`, `map`, `filter`) for data processing
 - Always handle potential errors in loops processing external data
 - Cache array lengths and expensive calculations outside loops
-- **CFWheels**: Always treat model results as queries, not arrays
+- **Wheels**: Always treat model results as queries, not arrays
 
 ## Related Concepts
 
