@@ -115,10 +115,15 @@ publish_package() {
         PUBLISH_CMD="$PUBLISH_CMD --force"
     fi
 
-    # Add stableVersion flag if requested
+    # Note: ForgeBox automatically determines version stability based on semver rules
+    # Versions with pre-release identifiers (-rc, -beta, -SNAPSHOT) are never "stable"
+    # Only versions without pre-release identifiers (e.g., 3.0.0) are marked as stable/current
     if [ "$MARK_STABLE" == "true" ]; then
-        PUBLISH_CMD="$PUBLISH_CMD --stableVersion"
-        echo "Note: This version will be marked as stable/current in ForgeBox"
+        echo "Note: MARK_STABLE parameter is set, but ForgeBox automatically determines"
+        echo "      version stability based on semantic versioning rules:"
+        echo "      - Versions like '3.0.0-rc.1' are pre-release (not default)"
+        echo "      - Versions like '3.0.0' are stable (default for installation)"
+        echo "      - Pre-release versions must be explicitly specified when installing"
     fi
 
     # Execute the publish command
