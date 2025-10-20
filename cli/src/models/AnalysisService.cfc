@@ -338,8 +338,9 @@ component {
         if (arrayLen(filteredIssues)) {
             arguments.results.files[arguments.path] = filteredIssues;
 
-            // Update summary
+            // Update summary counters based on filtered issues
             for (var issue in filteredIssues) {
+                // Update severity summary
                 if (structKeyExists(arguments.results.summary, issue.severity)) {
                     arguments.results.summary[issue.severity]++;
                 }
@@ -537,7 +538,6 @@ component {
                     rule = "long-parameter-list",
                     fixable = false
                 });
-                arguments.results.metrics.codeSmells++;
             }
         }
         
@@ -551,7 +551,6 @@ component {
                 rule = "nested-loops",
                 fixable = false
             });
-            arguments.results.metrics.codeSmells++;
         }
         
         // Large files
@@ -565,7 +564,6 @@ component {
                 rule = "max-file-length",
                 fixable = false
             });
-            arguments.results.metrics.codeSmells++;
         }
         
         // TODO comments (technical debt)
@@ -581,7 +579,6 @@ component {
                 rule = "todo-comment",
                 fixable = false
             });
-            arguments.results.metrics.codeSmells++;
         }
         
         return issues;
@@ -595,14 +592,8 @@ component {
         
         // List of deprecated functions (example - adjust based on Wheels version)
         var deprecatedFunctions = {
-            "findAll": "Use findAll() with new syntax",
-            "findByKey": "Use findOne() instead",
-            "updateByKey": "Use updateOne() instead",
-            "deleteByKey": "Use deleteOne() instead",
-            "renderNothing": "Use renderText('') instead",
-            "sendEmail": "Use sendMail() instead",
-            "includePartial": "Use renderPartial() instead",
-            "contentForLayout": "Use includeContent() instead"
+            // List of deprecated functions and their alternatives (Add list in json format as below example)
+            // "findAll": "Use findAll() with new syntax",
         };
         
         for (var funcName in deprecatedFunctions) {
@@ -618,7 +609,6 @@ component {
                     rule = "no-deprecated",
                     fixable = false
                 });
-                arguments.results.metrics.deprecatedCalls++;
             }
         }
         
@@ -809,11 +799,32 @@ component {
         for (var func in arguments.results.complexFunctions) {
             totalComplexity += func.complexity;
         }
-        
+
         if (arrayLen(arguments.results.complexFunctions) > 0) {
             arguments.results.metrics.averageComplexity = round(totalComplexity / arrayLen(arguments.results.complexFunctions));
         }
-        
+
+        // Reset and recalculate code smells and deprecated calls from actual filtered issues
+        arguments.results.metrics.codeSmells = 0;
+        arguments.results.metrics.deprecatedCalls = 0;
+
+        // Count specific metrics from the filtered issues in results.files
+        for (var filePath in arguments.results.files) {
+            for (var issue in arguments.results.files[filePath]) {
+                // Count code smells based on rule type
+                if (issue.rule == "long-parameter-list" ||
+                    issue.rule == "nested-loops" ||
+                    issue.rule == "max-file-length" ||
+                    issue.rule == "todo-comment") {
+                    arguments.results.metrics.codeSmells++;
+                }
+                // Count deprecated function calls
+                else if (issue.rule == "no-deprecated") {
+                    arguments.results.metrics.deprecatedCalls++;
+                }
+            }
+        }
+
         // Add code health score (0-100)
         var score = 100;
         score -= arguments.results.summary.errors * 10;
@@ -822,9 +833,9 @@ component {
         score -= arguments.results.metrics.duplicateBlocks * 2;
         score -= arguments.results.metrics.codeSmells * 3;
         score -= arguments.results.metrics.deprecatedCalls * 5;
-        
+
         arguments.results.metrics.healthScore = max(0, score);
-        
+
         // Add grade
         if (score >= 90) {
             arguments.results.metrics.grade = "A";
@@ -1123,7 +1134,7 @@ component {
                 fileWrite(filePath, content);
                 arrayAppend(fixed.files, filePath);
                 if (isObject(arguments.printer)) {
-                    arguments.printer.greenLine("✓ Fixed").toConsole();
+                    arguments.printer.greenLine("Fixed").toConsole();
                 }
             } else if (isObject(arguments.printer)) {
                 arguments.printer.line("no fixes applied").toConsole();
