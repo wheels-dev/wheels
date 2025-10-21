@@ -208,6 +208,52 @@ Generate documentation comments, READMEs, and API documentation.
 - README templates
 - API documentation
 
+#### 13. [wheels-plugin-generator](wheels-plugin-generator/SKILL.md)
+Generate Wheels plugins with proper structure and ForgeBox packaging.
+
+**Activates when:**
+- Creating plugins
+- Extending Wheels functionality
+- Packaging reusable components
+
+**Features:**
+- Plugin directory structure
+- Plugin configuration
+- ForgeBox packaging
+- Event handlers
+- Mixin methods
+
+#### 14. [wheels-email-generator](wheels-email-generator/SKILL.md)
+Generate email functionality including mailers, templates, and configuration.
+
+**Activates when:**
+- Sending emails
+- Creating notifications
+- Implementing transactional emails
+
+**Features:**
+- Mailer controllers
+- Email templates (HTML/text)
+- Email layouts
+- SMTP configuration
+- Attachment handling
+
+#### 15. [wheels-routing-generator](wheels-routing-generator/SKILL.md)
+Generate RESTful routes, nested routes, and custom routing patterns.
+
+**Activates when:**
+- Creating routes
+- Defining URL structure
+- Implementing RESTful resources
+
+**Features:**
+- RESTful resource routes
+- Nested routing
+- Route constraints
+- API versioning
+- Named routes
+- Route namespacing
+
 ## How Skills Work
 
 ### Automatic Activation

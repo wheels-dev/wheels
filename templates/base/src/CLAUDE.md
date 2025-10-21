@@ -27,6 +27,9 @@ mcp__wheels__wheels_server(action="status")
 - `wheels-controller-generator` - Controllers, actions, filters
 - `wheels-view-generator` - Views, forms, layouts, partials
 - `wheels-migration-generator` - Database migrations
+- `wheels-routing-generator` - RESTful routes, nested routes
+- `wheels-email-generator` - Mailers, email templates
+- `wheels-plugin-generator` - Create Wheels plugins
 - `wheels-test-generator` - TestBox tests
 - `wheels-debugging` - Troubleshoot errors (use during testing!)
 - `wheels-auth-generator` - Authentication systems
@@ -34,6 +37,7 @@ mcp__wheels__wheels_server(action="status")
 - `wheels-anti-pattern-detector` - Prevent common errors
 - `wheels-refactoring` - Optimize code
 - `wheels-deployment` - Production configuration
+- `wheels-documentation-generator` - Generate documentation
 
 **When to Invoke:**
 - ✅ Before generating ANY Wheels code
