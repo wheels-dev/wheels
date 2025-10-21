@@ -28,8 +28,8 @@ RELOAD_PASSWORD="changeMe"
 DATASOURCE_NAME="MyWheelsApp"
 CFML_ENGINE="lucee"
 USE_H2=false
-USE_BOOTSTRAP=true
-INIT_PACKAGE=true
+USE_BOOTSTRAP=false
+INIT_PACKAGE=false
 APP_BASE_PATH="$HOME/Desktop/Sites"
 FORCE=false
 SKIP_PATH=false
@@ -146,6 +146,20 @@ cleanup_temp_files() {
 
 stop_with_error() {
     log_error "CRITICAL: $1"
+    echo ""
+    echo "================================================================================"
+    echo "Installation Failed"
+    echo "================================================================================"
+    echo ""
+    echo "Error: $1"
+    echo ""
+    echo "Need Help?"
+    echo "  • Documentation: https://wheels.dev/guides"
+    echo "  • Report Issues: https://github.com/wheels-dev/wheels/issues"
+    echo "  • Discussion:     https://github.com/wheels-dev/wheels/discussions"
+    echo ""
+    echo "Log file saved to: $LOG_FILE"
+    echo ""
     cleanup_temp_files
     exit 1
 }
@@ -352,9 +366,31 @@ create_application() {
     $INIT_PACKAGE && cmd+=("initPackage=true")
 
     log_info "Executing: ${cmd[*]}"
-    if "${cmd[@]}" 2>&1; then
+
+    # Capture output to check for specific errors
+    local output
+    if output=$("${cmd[@]}" 2>&1); then
         log_success "Application created"
+        echo "$output"
     else
+        echo "$output"
+
+        # Check for version mismatch error
+        if echo "$output" | grep -q "Exact version.*not found for package"; then
+            echo ""
+            echo "================================================================================"
+            echo "Package Version Mismatch Detected"
+            echo "================================================================================"
+            echo ""
+            echo "The template you selected has a dependency version mismatch."
+            echo ""
+            echo "Possible solutions:"
+            echo "  1. Try the stable template instead: wheels-base-template@stable"
+            echo "  2. Wait a few minutes and try again (ForgeBox may be updating)"
+            echo "  3. Report this issue with the template maintainers"
+            echo ""
+        fi
+
         stop_with_error "Failed to create application"
     fi
 }
