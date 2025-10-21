@@ -61,6 +61,32 @@ function config() {
 }
 ```
 
+### ❌ ANTI-PATTERN 3: Wrong Parameter Names (CRITICAL)
+
+**🚨 PRODUCTION FINDING: Wheels validation functions use "properties" (PLURAL), not "property"!**
+
+**WRONG:**
+```cfm
+validatesPresenceOf(property="username,email")  // ❌ "property" parameter doesn't exist!
+validatesUniquenessOf(property="email")         // ❌ Wrong parameter name
+validatesFormatOf(property="email", regEx="...")  // ❌ Won't work
+validatesLengthOf(property="username", minimum=3)  // ❌ Parameter not recognized
+```
+
+**CORRECT:**
+```cfm
+validatesPresenceOf(properties="username,email")  // ✅ Use "properties" (plural)
+validatesUniquenessOf(properties="email")         // ✅ Correct
+validatesFormatOf(properties="email", regEx="...")  // ✅ Works
+validatesLengthOf(properties="username", minimum=3)  // ✅ Recognized
+```
+
+**Similarly for custom validation:**
+```cfm
+validate(methods="customValidation")  // ✅ "methods" (plural)
+validate(method="customValidation")   // ❌ "method" doesn't exist
+```
+
 ## Model Generation Template
 
 ### Basic Model Structure

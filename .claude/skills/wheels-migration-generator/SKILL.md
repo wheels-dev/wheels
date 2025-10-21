@@ -321,6 +321,98 @@ t.string(columnNames="uuid", limit=36);
 t.timestamps();
 ```
 
+## 🚨 Production-Tested Best Practices
+
+### 1. Composite Index Ordering (CRITICAL)
+
+**❌ WRONG ORDER - Causes Index Conflicts:**
+```cfm
+addIndex(table="likes", columnNames="userId");      // ❌ Creates duplicate
+addIndex(table="likes", columnNames="tweetId");
+addIndex(table="likes", columnNames="userId,tweetId", unique=true);
+```
+
+**✅ CORRECT ORDER - Composite First:**
+```cfm
+// Composite index FIRST - it covers queries on the first column too!
+addIndex(table="likes", columnNames="userId,tweetId", unique=true);
+// Then add index for second column only
+addIndex(table="likes", columnNames="tweetId");
+```
+
+**Why:** A composite index on `(userId, tweetId)` can be used for queries filtering by `userId` alone, making a separate `userId` index redundant.
+
+### 2. Foreign Key Naming for Self-Referential Tables
+
+**Problem:** Multiple foreign keys to the same table generate duplicate constraint names in H2:
+
+```cfm
+// ❌ Both try to create "FK_FOLLOWS_USERS" - conflict!
+addForeignKey(table="follows", referenceTable="users", column="followerId")
+addForeignKey(table="follows", referenceTable="users", column="followingId")
+```
+
+**Solution A: Explicit Key Names (Preferred for Production)**
+```cfm
+addForeignKey(
+    table="follows",
+    referenceTable="users",
+    column="followerId",
+    referenceColumn="id",
+    keyName="FK_follows_follower",  // Explicit unique name
+    onDelete="cascade"
+);
+
+addForeignKey(
+    table="follows",
+    referenceTable="users",
+    column="followingId",
+    referenceColumn="id",
+    keyName="FK_follows_following",  // Different unique name
+    onDelete="cascade"
+);
+```
+
+**Solution B: Skip Foreign Keys (Acceptable for Development)**
+```cfm
+// Rely on application-layer validation instead
+// Indexes provide query performance, foreign keys are optional
+addIndex(table="follows", columnNames="followerId,followingId", unique=true);
+addIndex(table="follows", columnNames="followingId");
+// Note: Foreign keys omitted to avoid H2 naming conflicts
+// Application validates referential integrity
+```
+
+### 3. Migration Retry with force=true
+
+When migrations fail mid-transaction (common during development):
+
+```cfm
+// Use force=true to drop and recreate if table exists
+t = createTable(name="likes", force=true);  // Drops existing table first
+```
+
+**When to use:**
+- ✅ After failed migration leaves partial tables
+- ✅ During development when iterating on schema
+- ❌ NOT recommended for production (use proper versioning)
+
+### 4. Join Table Pattern
+
+For many-to-many relationships (e.g., likes, follows):
+
+```cfm
+t = createTable(name="likes", force=true);
+t.integer(columnNames="userId", allowNull=false);
+t.integer(columnNames="tweetId", allowNull=false);
+t.datetime(columnNames="createdAt", allowNull=false);  // Track when relationship created
+t.create();
+
+// IMPORTANT: Composite unique index FIRST
+addIndex(table="likes", columnNames="userId,tweetId", unique=true);
+addIndex(table="likes", columnNames="tweetId");  // For reverse lookups
+```
+
 ## Index Management
 
 ```cfm

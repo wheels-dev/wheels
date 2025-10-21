@@ -65,6 +65,107 @@ Activate automatically when:
 #textField(objectName="user", property="age", type="number")#  ✅
 ```
 
+## 🚨 Production-Tested Best Practices
+
+### 1. Association Access in Query Loops (CRITICAL)
+
+**❌ WRONG - Associations Don't Work on Query Columns:**
+```cfm
+<cfloop query="tweets">
+    #tweets.user()#  ❌ FAILS - tweets is a query, not an object
+    #tweets.likesCount()#  ❌ FAILS - no such method on query
+</cfloop>
+```
+
+**✅ CORRECT - Load Object First:**
+```cfm
+<cfloop query="tweets">
+    <cfset tweetObj = model("Tweet").findByKey(tweets.id)>
+    <cfset tweetUser = tweetObj.user()>  ✅ Works!
+    <p>By: #tweetUser.username#</p>
+    <p>Likes: #tweetObj.likesCount#</p>
+</cfloop>
+```
+
+**✅ BETTER - Preload with include (Prevents N+1):**
+```cfm
+<!--- In Controller --->
+tweets = model("Tweet").findAll(include="user", order="createdAt DESC");
+
+<!--- In View --->
+<cfloop query="tweets">
+    <!--- User data already joined, no extra queries --->
+    <p>By: #tweets.username#</p>
+    <p>Tweet: #tweets.content#</p>
+</cfloop>
+```
+
+### 2. Checking if Query Has Records
+
+```cfm
+<!--- ✅ CORRECT --->
+<cfif tweets.recordCount>
+    <cfloop query="tweets">...</cfloop>
+</cfif>
+
+<!--- ❌ WRONG - queries are not arrays --->
+<cfif ArrayLen(tweets)>  ❌ Error!
+```
+
+### 3. Counter Access Patterns
+
+**Direct column access (if eager loaded):**
+```cfm
+tweets = model("Tweet").findAll(select="id,content,likesCount");
+<cfloop query="tweets">
+    <p>#tweets.likesCount# likes</p>  ✅ Direct access
+</cfloop>
+```
+
+**Association count (if not loaded):**
+```cfm
+<cfloop query="tweets">
+    <cfset tweet = model("Tweet").findByKey(tweets.id)>
+    <cfset likeCount = tweet.likes(returnAs="count")>  ✅ Count association
+    <p>#likeCount# likes</p>
+</cfloop>
+```
+
+### 4. Boolean Checks in Views
+
+```cfm
+<!--- ✅ CORRECT --->
+<cfif user.active>
+<cfif structKeyExists(user, "bio") && len(user.bio)>
+
+<!--- ❌ WRONG --->
+<cfif user.active == true>  // Redundant
+<cfif user.bio>  // Fails if bio doesn't exist
+```
+
+### 5. Date Formatting
+
+```cfm
+<!--- ✅ CORRECT - Use CFML functions --->
+#dateFormat(tweet.createdAt, "mmm dd, yyyy")#
+#timeFormat(tweet.createdAt, "h:mm tt")#
+
+<!--- Use custom model methods for consistency --->
+#tweet.timeAgo()#  // "5m", "2h", "3d"
+```
+
+### 6. Loop Query vs Loop Array
+
+```cfm
+<!--- ✅ CORRECT - Wheels returns queries --->
+<cfloop query="tweets">
+    #tweets.content#
+</cfloop>
+
+<!--- ❌ WRONG - Not an array! --->
+<cfloop array="#tweets#" index="tweet">  ❌ Error!
+```
+
 ## Index View Template (List View)
 
 ```cfm

@@ -1200,6 +1200,256 @@ function onError(exception, eventname) {
 }
 ```
 
+## Production-Tested Best Practices
+
+**The following patterns were validated during real-world Twitter clone development:**
+
+### Migration Best Practices
+
+#### 1. Foreign Key Naming Conflicts (H2 Database)
+
+When creating multiple foreign keys to the same reference table, H2 database may generate duplicate constraint names.
+
+**Problem:**
+```cfm
+// Both try to create "FK_FOLLOWS_USERS" - conflict!
+addForeignKey(table="follows", referenceTable="users", column="followerId")
+addForeignKey(table="follows", referenceTable="users", column="followingId")
+```
+
+**Solution A: Explicit Key Names (Preferred)**
+```cfm
+addForeignKey(
+    table="follows",
+    referenceTable="users",
+    column="followerId",
+    referenceColumn="id",
+    keyName="FK_follows_follower",
+    onDelete="cascade"
+);
+
+addForeignKey(
+    table="follows",
+    referenceTable="users",
+    column="followingId",
+    referenceColumn="id",
+    keyName="FK_follows_following",
+    onDelete="cascade"
+);
+```
+
+**Solution B: Skip Foreign Keys for Self-Referential Tables**
+```cfm
+// For self-referential tables, rely on application-layer validation
+// Indexes provide query performance, foreign keys are optional
+addIndex(table="follows", columnNames="followerId,followingId", unique=true);
+addIndex(table="follows", columnNames="followingId");
+// Note: Foreign keys omitted to avoid naming conflicts
+```
+
+#### 2. Composite Index Best Practices
+
+**Problem:** Creating individual indexes before composite unique index causes conflicts:
+```cfm
+// ❌ WRONG ORDER - causes duplicate index errors
+addIndex(table="likes", columnNames="userId");     // Conflict!
+addIndex(table="likes", columnNames="tweetId");
+addIndex(table="likes", columnNames="userId,tweetId", unique=true);
+```
+
+**Solution:** Create composite index FIRST (it covers the first column):
+```cfm
+// ✅ CORRECT ORDER
+addIndex(table="likes", columnNames="userId,tweetId", unique=true);  // First - covers userId queries too
+addIndex(table="likes", columnNames="tweetId");  // Then add for second column queries
+```
+
+**Why:** A composite index on (userId, tweetId) can be used for queries filtering by userId alone, so a separate userId index is redundant.
+
+#### 3. Migration Retry Strategy
+
+When migrations fail mid-transaction, use `force=true` to clean up:
+
+```cfm
+// Use force=true to drop and recreate if table exists from failed migration
+t = createTable(name="likes", force=true);  // Drops existing table first
+```
+
+**When to use:**
+- After a failed migration leaves partial tables
+- During development when iterating on schema
+- NOT recommended for production (use proper migration versioning)
+
+### Model Best Practices
+
+#### 1. Correct Parameter Names
+
+**Validation Functions Use "properties" (plural):**
+```cfm
+// ✅ CORRECT
+validatesPresenceOf(properties="username,email,passwordHash");
+validatesUniquenessOf(properties="username", message="Username already taken");
+
+// ❌ WRONG
+validatesPresenceOf(property="username");  // "property" doesn't exist
+```
+
+#### 2. Custom Validation Use "methods" (plural)
+
+```cfm
+// ✅ CORRECT
+validate(methods="preventSelfFollow");
+
+// ❌ WRONG
+validate(method="preventSelfFollow");  // "method" doesn't exist
+```
+
+### View Best Practices
+
+#### 1. Association Access in Query Loops
+
+**Problem:** Cannot call association methods directly on query columns:
+```cfm
+<cfloop query="tweets">
+    #tweets.user()#  ❌ Fails - tweets is a query, not an object
+</cfloop>
+```
+
+**Solution:** Load object first, then access associations:
+```cfm
+<cfloop query="tweets">
+    <cfset tweetObj = model("Tweet").findByKey(tweets.id)>
+    <cfset tweetUser = tweetObj.user()>  ✅ Works!
+    <p>By: #tweetUser.username#</p>
+</cfloop>
+```
+
+**Optimization:** Preload associations to avoid N+1 queries:
+```cfm
+// In controller - much better performance!
+tweets = model("Tweet").findAll(include="user", order="createdAt DESC");
+
+<cfloop query="tweets">
+    #tweets.username#  ✅ User data already joined
+</cfloop>
+```
+
+### Controller Best Practices
+
+#### 1. RedirectTo with Back Parameter
+
+**Correct Syntax for Default Route:**
+```cfm
+// ✅ CORRECT - struct as string
+redirectTo(back=true, default="{controller='tweets',action='index'}");
+
+// ❌ WRONG - doesn't parse correctly
+redirectTo(back=true, default="tweets##index");
+```
+
+#### 2. Counter Updates with Like/Follow
+
+When implementing like/follow features, update counters atomically:
+
+```cfm
+function create() {
+    like = model("Like").new(userId=session.userId, tweetId=params.tweetId);
+
+    if (like.save()) {
+        // Increment counter on parent
+        tweet = model("Tweet").findByKey(key=params.tweetId);
+        tweet.update(likesCount=tweet.likesCount + 1);
+    }
+}
+
+function delete() {
+    like = model("Like").findOne(where="userId = #session.userId# AND tweetId = #params.tweetId#");
+
+    if (isObject(like) && like.delete()) {
+        // Decrement counter, protect against negative
+        tweet = model("Tweet").findByKey(key=params.tweetId);
+        if (tweet.likesCount > 0) {
+            tweet.update(likesCount=tweet.likesCount - 1);
+        }
+    }
+}
+```
+
+### Alpine.js Integration Best Practices
+
+#### 1. Character Counter with Visual Feedback
+
+```html
+<div x-data="{ content: '', charCount: 0, maxChars: 280 }">
+    <textarea
+        x-model="content"
+        @input="charCount = content.length"
+        maxlength="280"></textarea>
+
+    <!-- Color-coded counter -->
+    <span x-bind:class="{
+        'text-gray-500': charCount < 260,
+        'text-yellow-600': charCount >= 260 && charCount < 280,
+        'text-red-600': charCount >= 280
+    }">
+        <span x-text="charCount"></span> / 280
+    </span>
+
+    <!-- Disable submit when over limit -->
+    <button x-bind:disabled="charCount === 0 || charCount > maxChars">
+        Tweet
+    </button>
+</div>
+```
+
+#### 2. Auto-Dismissing Notifications
+
+```html
+<div x-data="{ show: true }"
+     x-show="show"
+     x-init="setTimeout(() => show = false, 5000)"
+     class="alert">
+    Success message
+</div>
+```
+
+#### 3. Dropdown Menus with Click-Away
+
+```html
+<div x-data="{ open: false }">
+    <button @click="open = !open">Menu</button>
+
+    <div x-show="open"
+         @click.away="open = false"
+         x-cloak>
+        <!-- Menu items -->
+    </div>
+</div>
+```
+
+**Important:** Add `x-cloak` CSS to prevent flash of unstyled content:
+```css
+[x-cloak] { display: none !important; }
+```
+
+### Database Seeding Best Practices
+
+For test data in migrations, use CFML date functions, NOT database functions:
+
+```cfm
+// ✅ CORRECT - database-agnostic
+var now = Now();
+var yesterday = DateAdd("d", -1, now);
+var formatted = "TIMESTAMP '#DateFormat(yesterday, "yyyy-mm-dd")# #TimeFormat(yesterday, "HH:mm:ss")#'";
+
+execute("INSERT INTO tweets (content, userId, createdAt, updatedAt)
+         VALUES ('Test tweet', 1, #formatted#, #formatted#)");
+
+// ❌ WRONG - MySQL specific, won't work on H2/PostgreSQL
+execute("INSERT INTO tweets (content, userId, createdAt)
+         VALUES ('Test tweet', 1, DATE_SUB(NOW(), INTERVAL 1 DAY))");
+```
+
 ## Common Issues and Troubleshooting
 
 ### Association Errors
