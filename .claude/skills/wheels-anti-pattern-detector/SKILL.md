@@ -19,9 +19,160 @@ Activate automatically during:
 - Code review and refactoring
 - Any Wheels code modification
 
+## 🚨 Production-Tested Critical Detections
+
+### 1. CLI Generator String Boolean Values (CRITICAL)
+
+**🔴 CRITICAL:** The CLI `wheels g migration` command generates migrations with string boolean values that silently fail.
+
+**Detection Pattern:**
+```regex
+createTable\s*\([^)]*force\s*=\s*['"][^'"]*['"]
+createTable\s*\([^)]*id\s*=\s*['"][^'"]*['"]
+```
+
+**Examples to Detect:**
+```cfm
+❌ t = createTable(name='users', force='false', id='true', primaryKey='id');
+❌ t = createTable(name='posts', force='false');
+❌ t = createTable(name='comments', id='true');
+```
+
+**Auto-Fix:**
+```cfm
+✅ t = createTable(name='users');
+✅ t = createTable(name='posts');
+✅ t = createTable(name='comments');
+```
+
+**Error Message:**
+```
+⚠️  CRITICAL: CLI-generated string boolean values detected
+Line: 5
+Found: createTable(name='users', force='false', id='true', primaryKey='id')
+Fix:   createTable(name='users')
+
+CLI generators create STRING booleans ('false', 'true') that don't work.
+Remove force/id/primaryKey parameters and use Wheels defaults instead.
+This will cause "NoPrimaryKey" errors if not fixed!
+```
+
+### 2. Missing setPrimaryKey() in Models (CRITICAL)
+
+**🔴 CRITICAL:** Models must explicitly call `setPrimaryKey("id")` in config(), even when migrations are correct.
+
+**Detection Pattern:**
+```regex
+component\s+extends\s*=\s*["']Model["'][\s\S]*?function\s+config\s*\(\s*\)\s*\{(?![\s\S]*?setPrimaryKey)
+```
+
+**Examples to Detect:**
+```cfm
+❌ component extends="Model" {
+    function config() {
+        table("users");
+        hasMany(name="posts");  // Missing setPrimaryKey!
+    }
+}
+```
+
+**Auto-Fix:**
+```cfm
+✅ component extends="Model" {
+    function config() {
+        table("users");
+        setPrimaryKey("id");  // Added!
+        hasMany(name="posts");
+    }
+}
+```
+
+**Error Message:**
+```
+⚠️  CRITICAL: Missing setPrimaryKey() in model config()
+Line: 3
+Found: config() without setPrimaryKey() declaration
+Fix:   Add setPrimaryKey("id") as first line after table() declaration
+
+Even with correct migrations, Wheels ORM requires explicit primary key declaration.
+This will cause "Wheels.NoPrimaryKey" errors if not added!
+```
+
+### 3. Property Access Without structKeyExists() Check (CRITICAL)
+
+**🔴 CRITICAL:** Accessing properties in beforeCreate/beforeValidation callbacks without existence check causes errors.
+
+**Detection Pattern:**
+```regex
+function\s+(beforeCreate|beforeValidation|setDefaults)[\s\S]*?if\s*\(\s*!len\s*\(\s*this\.\w+\s*\)\s*\)(?![\s\S]*?structKeyExists)
+```
+
+**Examples to Detect:**
+```cfm
+❌ function setDefaults() {
+    if (!len(this.followersCount)) {  // Error if property doesn't exist!
+        this.followersCount = 0;
+    }
+}
+```
+
+**Auto-Fix:**
+```cfm
+✅ function setDefaults() {
+    if (!structKeyExists(this, "followersCount") || !len(this.followersCount)) {
+        this.followersCount = 0;
+    }
+}
+```
+
+**Error Message:**
+```
+⚠️  CRITICAL: Property access without structKeyExists() check
+Line: 15
+Found: if (!len(this.followersCount)) in beforeCreate callback
+Fix:   if (!structKeyExists(this, "followersCount") || !len(this.followersCount))
+
+In beforeCreate/beforeValidation callbacks, properties may not exist yet.
+This will cause "no accessible Member" errors if not checked!
+```
+
+### 4. Wrong Validation Parameter Names (CRITICAL)
+
+**🔴 CRITICAL:** Validation functions use "properties" (plural) not "property" (singular).
+
+**Detection Pattern:**
+```regex
+validates\w+Of\s*\(\s*property\s*=
+```
+
+**Examples to Detect:**
+```cfm
+❌ validatesPresenceOf(property="username,email")
+❌ validatesUniquenessOf(property="email")
+❌ validatesFormatOf(property="email", regEx="...")
+```
+
+**Auto-Fix:**
+```cfm
+✅ validatesPresenceOf(properties="username,email")
+✅ validatesUniquenessOf(properties="email")
+✅ validatesFormatOf(properties="email", regEx="...")
+```
+
+**Error Message:**
+```
+⚠️  CRITICAL: Wrong validation parameter name
+Line: 8
+Found: validatesPresenceOf(property="username")
+Fix:   validatesPresenceOf(properties="username")
+
+Wheels validation functions use "properties" (PLURAL), not "property".
+This validation will be silently ignored if not fixed!
+```
+
 ## Critical Anti-Patterns
 
-### 1. Mixed Argument Styles
+### 5. Mixed Argument Styles
 
 **Detection Pattern:**
 ```regex

@@ -87,6 +87,175 @@ validate(methods="customValidation")  // ✅ "methods" (plural)
 validate(method="customValidation")   // ❌ "method" doesn't exist
 ```
 
+## 🚨 Production-Tested Critical Fixes
+
+### 1. setPrimaryKey() Requirement (CRITICAL)
+
+**🔴 CRITICAL DISCOVERY:** Even when migrations correctly create primary keys, models **MUST** explicitly declare them using `setPrimaryKey()` in the `config()` method.
+
+**Problem Symptom:**
+```
+Error: "Wheels.NoPrimaryKey: No primary key exists on the users table"
+```
+
+**Even when migration succeeded:**
+```cfm
+// Migration appeared successful
+t = createTable(name="users");  // Creates id column as primary key
+t.create();  // ✅ Reports success
+```
+
+**Required Fix in Model:**
+```cfm
+component extends="Model" {
+    function config() {
+        table("users");
+        setPrimaryKey("id");  // 🚨 MANDATORY - Always add this line!
+
+        // Rest of configuration...
+        hasMany(name="tweets", dependent="delete");
+        validatesPresenceOf(properties="username,email");
+    }
+}
+```
+
+**Why This Happens:**
+- CLI generators may not add `setPrimaryKey()` to generated models
+- Wheels ORM requires explicit primary key declaration in model
+- Missing this causes "NoPrimaryKey" error even with correct database schema
+- **ALWAYS add `setPrimaryKey("id")` to EVERY model's config() method**
+
+**Rule:**
+```
+✅ MANDATORY: Add setPrimaryKey("id") to EVERY model config() - no exceptions!
+```
+
+### 2. Property Access in beforeCreate() Callbacks (CRITICAL)
+
+**🔴 CRITICAL DISCOVERY:** Accessing properties in `beforeCreate()` callbacks without checking existence causes "no accessible Member" errors.
+
+**Problem Symptom:**
+```
+Error: "Component [app.models.User] has no accessible Member with name [FOLLOWERSCOUNT]"
+```
+
+**❌ WRONG - Causes Error:**
+```cfm
+component extends="Model" {
+    function config() {
+        beforeCreate("setDefaults");
+    }
+
+    function setDefaults() {
+        // ❌ Error if property doesn't exist yet!
+        if (!len(this.followersCount)) {
+            this.followersCount = 0;
+        }
+    }
+}
+```
+
+**✅ CORRECT - Always Check Existence First:**
+```cfm
+component extends="Model" {
+    function config() {
+        beforeCreate("setDefaults");
+    }
+
+    function setDefaults() {
+        // ✅ Check existence first!
+        if (!structKeyExists(this, "followersCount") || !len(this.followersCount)) {
+            this.followersCount = 0;
+        }
+
+        if (!structKeyExists(this, "followingCount") || !len(this.followingCount)) {
+            this.followingCount = 0;
+        }
+
+        if (!structKeyExists(this, "tweetsCount") || !len(this.tweetsCount)) {
+            this.tweetsCount = 0;
+        }
+    }
+}
+```
+
+**Why This Happens:**
+- In `beforeCreate()`, properties may not exist yet in the `this` scope
+- Direct access like `this.propertyName` throws error if property doesn't exist
+- Must use `structKeyExists(this, "propertyName")` before accessing
+- This applies to ANY property access in beforeCreate, beforeValidation callbacks
+
+**Rule:**
+```
+✅ MANDATORY: Use structKeyExists(this, "property") before accessing properties in beforeCreate()
+```
+
+### 3. Complete Production-Ready Model Template
+
+**Use this template for ALL model generation to avoid common issues:**
+
+```cfm
+component extends="Model" {
+
+    function config() {
+        // 🚨 MANDATORY: Always set primary key
+        table("users");
+        setPrimaryKey("id");  // CRITICAL - Never omit this!
+
+        // Associations - ALWAYS use named parameters
+        hasMany(name="tweets", dependent="delete");
+        hasMany(name="likes", dependent="delete");
+        hasMany(name="followings", foreignKey="followerId", dependent="delete");
+        hasMany(name="followers", foreignKey="followingId", dependent="delete");
+
+        // Validations - Use "properties" (plural)
+        validatesPresenceOf(properties="username,email,passwordHash");
+        validatesUniquenessOf(properties="username,email", message="[property] already taken");
+        validatesFormatOf(properties="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$", message="Invalid email format");
+        validatesLengthOf(properties="username", minimum=3, maximum=50);
+        validatesLengthOf(properties="bio", maximum=160, allowBlank=true);
+
+        // Callbacks
+        beforeCreate("setDefaults");
+    }
+
+    // 🚨 CRITICAL: Always use structKeyExists() in beforeCreate
+    function setDefaults() {
+        if (!structKeyExists(this, "followersCount") || !len(this.followersCount)) {
+            this.followersCount = 0;
+        }
+        if (!structKeyExists(this, "followingCount") || !len(this.followingCount)) {
+            this.followingCount = 0;
+        }
+        if (!structKeyExists(this, "tweetsCount") || !len(this.tweetsCount)) {
+            this.tweetsCount = 0;
+        }
+    }
+
+    // Custom methods
+    function fullName() {
+        return "@" & this.username;
+    }
+
+    function isFollowing(required numeric userId) {
+        var follow = model("Follow").findOne(where="followerId = #this.id# AND followingId = #arguments.userId#");
+        return isObject(follow);
+    }
+}
+```
+
+### 4. CLI Generator Post-Generation Checklist
+
+**After using CLI `wheels g model` command, ALWAYS review and fix:**
+
+- [ ] Add `setPrimaryKey("id")` to config() method
+- [ ] Change all validation parameters from `property=` to `properties=`
+- [ ] Change custom validation from `method=` to `methods=`
+- [ ] Add `structKeyExists()` checks in all beforeCreate/beforeValidation callbacks
+- [ ] Ensure all association parameters use named style (name=, dependent=)
+- [ ] Verify all callback methods are marked `private`
+- [ ] Test model instantiation: `model("ModelName").new()` should not error
+
 ## Model Generation Template
 
 ### Basic Model Structure

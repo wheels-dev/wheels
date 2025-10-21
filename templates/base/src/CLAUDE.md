@@ -1574,6 +1574,235 @@ execute("INSERT INTO tweets (content, userId, createdAt)
          VALUES ('Test tweet', 1, DATE_SUB(NOW(), INTERVAL 1 DAY))");
 ```
 
+## 🔴 Critical Learnings from Production Use
+
+**These patterns were discovered during actual Twitter clone development and must be followed:**
+
+### 1. Migration Parameter Types (CRITICAL)
+
+**Problem:** CLI-generated migrations use string values for boolean parameters, causing primary keys to fail.
+
+❌ **CLI Generates (WRONG):**
+```cfm
+t = createTable(name='users', force='false', id='true', primaryKey='id');
+```
+
+✅ **Manual Fix Required:**
+```cfm
+// Option 1: Use defaults (RECOMMENDED)
+t = createTable(name='users');  // Defaults: force=false, id=true
+
+// Option 2: Explicit booleans
+t = createTable(name='users', force=false, id=true, primaryKey='id');
+```
+
+**⚠️ MANDATORY:** Always review CLI-generated migrations and convert string booleans to proper boolean types.
+
+### 2. Model Primary Key Configuration (CRITICAL)
+
+**Problem:** "NoPrimaryKey" error even when migration creates `id` column correctly.
+
+✅ **ALWAYS Include in Every Model:**
+```cfm
+component extends="Model" {
+    function config() {
+        table("users");
+        setPrimaryKey("id");  // ⚠️ REQUIRED - Must be explicit
+
+        // Rest of configuration...
+    }
+}
+```
+
+**Rule:** Even though Wheels creates an `id` column by default, you MUST explicitly call `setPrimaryKey("id")` in every model's `config()` method.
+
+### 3. Accessing Properties in beforeCreate() Callbacks (CRITICAL)
+
+**Problem:** "no accessible Member with name [PROPERTY]" error in beforeCreate callbacks.
+
+❌ **WRONG - Causes Runtime Error:**
+```cfm
+function setDefaults() {
+    if (!len(this.followersCount)) {
+        this.followersCount = 0;
+    }
+}
+```
+
+✅ **CORRECT - Check Existence First:**
+```cfm
+function setDefaults() {
+    if (!structKeyExists(this, "followersCount") || !len(this.followersCount)) {
+        this.followersCount = 0;
+    }
+}
+```
+
+**Rule:** In `beforeCreate()` and `beforeSave()` callbacks, always use `structKeyExists(this, "propertyName")` before accessing properties, as they may not exist yet.
+
+### 4. Validation Function Parameters (CRITICAL)
+
+**Problem:** Using singular "property" or "method" parameter names causes errors.
+
+❌ **WRONG:**
+```cfm
+validatesPresenceOf(property="username");        // Error!
+validatesFormatOf(property="email", ...);        // Error!
+validate(method="customValidator");              // Error!
+```
+
+✅ **CORRECT - Always Use Plural:**
+```cfm
+validatesPresenceOf(properties="username,email,passwordHash");
+validatesUniquenessOf(properties="username,email");
+validatesFormatOf(properties="email", regEx="...");
+validatesLengthOf(properties="username", minimum=3, maximum=50);
+validate(methods="customValidator");
+```
+
+**Rule:** Wheels validation functions use "properties" (plural) and "methods" (plural) - never "property" or "method".
+
+### 5. CLI Generator Limitations
+
+**⚠️ CLI generators are helpful but have known issues:**
+
+1. **Migrations:** Generate with string booleans (must fix manually)
+2. **Models:** Don't include `setPrimaryKey("id")` (must add manually)
+3. **Callbacks:** Don't include `structKeyExists()` checks (must add manually)
+4. **Validations:** May use correct syntax but verify parameter names
+
+**Workflow After CLI Generation:**
+1. ✅ Run CLI generator
+2. ✅ Review generated code
+3. ✅ Fix boolean parameters in migrations
+4. ✅ Add `setPrimaryKey("id")` to models
+5. ✅ Add `structKeyExists()` to callbacks
+6. ✅ Verify validation parameter names
+
+### 6. Migration Development Workflow
+
+**When migrations fail during development:**
+
+```bash
+# 1. Fix the migration file
+# 2. Reset database
+wheels dbmigrate reset
+
+# 3. Re-run migrations
+wheels dbmigrate latest
+```
+
+**Important:**
+- ✅ Use `reset` during local development iteration
+- ❌ NEVER use `force=true` in production migrations
+- ✅ Always test migrations with fresh database reset
+
+### 7. H2 Database Considerations
+
+**The default Wheels development database (H2) has specific behaviors:**
+
+- **Case Sensitivity:** Column names may be case-insensitive in SQL but case-sensitive when accessing struct properties
+- **Property Access:** Always use `structKeyExists()` for dynamic properties
+- **Production Testing:** H2 is great for development but always test with your production database (MySQL/PostgreSQL) before deploying
+
+### 8. Model Configuration Template
+
+**Use this template for ALL new models to avoid common errors:**
+
+```cfm
+component extends="Model" {
+
+    function config() {
+        table("tablename");
+        setPrimaryKey("id");  // ⚠️ ALWAYS INCLUDE
+
+        // Associations
+        hasMany(name="children");
+        belongsTo(name="parent");
+
+        // Validations - ALWAYS use "properties" (plural)
+        validatesPresenceOf(properties="field1,field2");
+        validatesUniquenessOf(properties="field1");
+        validatesFormatOf(properties="email", regEx="...");
+        validatesLengthOf(properties="field1", minimum=1, maximum=50);
+
+        // Custom validations - ALWAYS use "methods" (plural)
+        validate(methods="customValidator");
+
+        // Callbacks
+        beforeCreate("setDefaults");
+    }
+
+    // Callback with structKeyExists checks
+    function setDefaults() {
+        if (!structKeyExists(this, "counter") || !len(this.counter)) {
+            this.counter = 0;
+        }
+    }
+
+    // Custom validation
+    function customValidator() {
+        if (structKeyExists(this, "field1") && /* condition */) {
+            addError(property="field1", message="Error message");
+        }
+    }
+}
+```
+
+### 9. Alpine.js Integration Pattern (Proven Working)
+
+**Character counter with dynamic button state (tested in production):**
+
+```html
+<div x-data="{ content: '', charCount: 0, maxChars: 280 }">
+    <textarea
+        x-model="content"
+        @input="charCount = content.length"
+        maxlength="280"
+        class="form-control"
+    ></textarea>
+
+    <!-- Color-coded counter -->
+    <div x-bind:class="{
+        'text-gray-500': charCount < 260,
+        'text-yellow-600': charCount >= 260 && charCount < 280,
+        'text-red-600': charCount >= 280
+    }">
+        <span x-text="charCount"></span> / <span x-text="maxChars"></span>
+    </div>
+
+    <!-- Dynamic button state -->
+    <button
+        type="submit"
+        x-bind:disabled="charCount === 0 || charCount > maxChars"
+        x-bind:class="{
+            'bg-blue-600 hover:bg-blue-700': charCount > 0 && charCount <= maxChars,
+            'bg-gray-300 cursor-not-allowed': charCount === 0 || charCount > maxChars
+        }"
+    >
+        Submit
+    </button>
+</div>
+```
+
+**Don't forget the CSS:**
+```css
+[x-cloak] { display: none !important; }
+```
+
+### 10. Testing Sequence Best Practice
+
+**Follow this sequence for all browser testing:**
+
+1. ✅ Navigate to page and verify no errors
+2. ✅ Take screenshot of initial state
+3. ✅ Fill forms and test interactions
+4. ✅ Verify Alpine.js features (counters, dropdowns, etc.)
+5. ✅ Take screenshot after each major action
+6. ✅ Verify success messages and redirects
+7. ✅ Test delete/destroy actions
+8. ✅ Check console for JavaScript errors
+
 ## Common Issues and Troubleshooting
 
 ### Association Errors
