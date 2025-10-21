@@ -57,19 +57,36 @@ mcp__wheels__wheels_migrate(action="latest")
 4. **Apply fixes** using skill patterns
 5. **Re-test** to verify
 
-**Browser Testing Steps:**
+**Browser Testing Options (in order of preference):**
+
+**Option A: Puppeteer MCP (Preferred)**
 ```javascript
 // 1. Verify server
 mcp__wheels__wheels_server(action="status")
 
 // 2. Navigate and test
-mcp__browsermcp__browser_navigate(url="http://localhost:PORT")
-mcp__browsermcp__browser_screenshot()
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:PORT")
+mcp__puppeteer__puppeteer_screenshot(name="test")
 
 // 3. Test user flows (navigation, forms, CRUD operations)
+```
 
-// 4. When error occurs - INVOKE SKILL FIRST
-Skill("wheels-debugging")  // Get guidance before fixing
+**Option B: Playwright MCP**
+```javascript
+mcp__playwright__playwright_navigate(url="http://localhost:PORT")
+mcp__playwright__playwright_screenshot()
+```
+
+**Option C: Browser MCP (if Puppeteer/Playwright unavailable)**
+```javascript
+mcp__browsermcp__browser_navigate(url="http://localhost:PORT")
+mcp__browsermcp__browser_screenshot()
+```
+
+**When error occurs during testing:**
+```javascript
+// 4. INVOKE SKILL FIRST - Get guidance before fixing
+Skill("wheels-debugging")
 ```
 
 ---
@@ -481,7 +498,16 @@ Skill("wheels-view-generator")
 Skill("wheels-migration-generator")
 mcp__wheels__wheels_migrate(action="latest")
 
-// 3. Browser test
+// 3. Browser test (use available MCP tool)
+// Puppeteer (preferred):
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080/posts")
+mcp__puppeteer__puppeteer_screenshot(name="posts-index")
+
+// OR Playwright:
+mcp__playwright__playwright_navigate(url="http://localhost:8080/posts")
+mcp__playwright__playwright_screenshot()
+
+// OR Browser MCP (fallback):
 mcp__browsermcp__browser_navigate(url="http://localhost:8080/posts")
 mcp__browsermcp__browser_screenshot()
 
@@ -489,9 +515,9 @@ mcp__browsermcp__browser_screenshot()
 Skill("wheels-debugging")
 // Follow guidance, apply fix, re-test
 
-// 5. Success
-mcp__browsermcp__browser_navigate(url="http://localhost:8080/posts/new")
-mcp__browsermcp__browser_screenshot()
+// 5. Success - test form submission
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080/posts/new")
+mcp__puppeteer__puppeteer_screenshot(name="posts-new")
 ```
 
 ---
