@@ -6,8 +6,6 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
     var progressIndicator: NSProgressIndicator?
     var progressLabel: NSTextField?
     var outputTextView: NSTextView?
-    var deleteDMGCheckbox: NSButton?
-    var dmgPath: String?
 
     // Configuration fields
     var installPathField: NSTextField!
@@ -24,51 +22,7 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
     var skipPathCheckbox: NSButton!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        detectDMGPath()
         createMainWindow()
-    }
-
-    func detectDMGPath() {
-        // Check if running from a DMG by looking at the bundle path
-        if let bundlePath = Bundle.main.bundlePath as String? {
-            // Check if path contains /Volumes/ which indicates a mounted DMG
-            if bundlePath.contains("/Volumes/") {
-                // Try to find the DMG file that corresponds to this volume
-                let volumeName = bundlePath.components(separatedBy: "/Volumes/")[1].components(separatedBy: "/")[0]
-
-                // Common locations for DMG files
-                let possibleDMGLocations = [
-                    NSHomeDirectory() + "/Downloads/\(volumeName).dmg",
-                    NSHomeDirectory() + "/Desktop/\(volumeName).dmg",
-                    "/tmp/\(volumeName).dmg"
-                ]
-
-                for location in possibleDMGLocations {
-                    if FileManager.default.fileExists(atPath: location) {
-                        dmgPath = location
-                        break
-                    }
-                }
-
-                // If not found in common locations, try to find any DMG with similar name
-                if dmgPath == nil {
-                    let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-                    if let downloadsPath = downloadsURL?.path {
-                        do {
-                            let files = try FileManager.default.contentsOfDirectory(atPath: downloadsPath)
-                            for file in files {
-                                if file.lowercased().contains("wheels") && file.hasSuffix(".dmg") {
-                                    dmgPath = downloadsPath + "/" + file
-                                    break
-                                }
-                            }
-                        } catch {
-                            // Silently fail - DMG deletion is optional
-                        }
-                    }
-                }
-            }
-        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -386,16 +340,8 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
         scrollView.documentView = outputTextView
         contentView.addSubview(scrollView)
 
-        // Delete DMG checkbox (initially hidden) - aligned with button
-        deleteDMGCheckbox = NSButton(checkboxWithTitle: "Delete installer DMG file", target: nil, action: nil)
-        deleteDMGCheckbox?.frame = NSRect(x: 20, y: 24, width: 300, height: 24)
-        deleteDMGCheckbox?.state = .on
-        deleteDMGCheckbox?.isHidden = true
-        deleteDMGCheckbox?.tag = 998
-        contentView.addSubview(deleteDMGCheckbox!)
-
-        // Close button (initially hidden) - aligned with checkbox
-        let closeButton = NSButton(frame: NSRect(x: 500, y: 20, width: 80, height: 32))
+        // Close button (initially hidden)
+        let closeButton = NSButton(frame: NSRect(x: 260, y: 20, width: 80, height: 32))
         closeButton.title = "Close"
         closeButton.bezelStyle = .rounded
         closeButton.isHidden = true
@@ -565,11 +511,6 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
             progressLabel?.stringValue = "✓ Installation completed successfully!"
             appendOutput("\n\n✓ Installation completed successfully!\n")
 
-            // Show delete DMG checkbox only if installation was successful and DMG was detected
-            if dmgPath != nil {
-                deleteDMGCheckbox?.isHidden = false
-            }
-
             // Open browser to Wheels docs
             if let url = URL(string: "https://wheels.dev/guides") {
                 NSWorkspace.shared.open(url)
@@ -586,53 +527,7 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
     }
 
     @objc func closeProgressWindow() {
-        // Check if user wants to delete DMG
-        if deleteDMGCheckbox?.state == .on, let dmgPath = dmgPath {
-            deleteDMGFile(at: dmgPath)
-        }
         NSApp.terminate(nil)
-    }
-
-    func deleteDMGFile(at path: String) {
-        do {
-            // First, try to unmount the DMG volume if it's still mounted
-            if let bundlePath = Bundle.main.bundlePath as String? {
-                if bundlePath.contains("/Volumes/") {
-                    let volumeName = bundlePath.components(separatedBy: "/Volumes/")[1].components(separatedBy: "/")[0]
-                    let volumePath = "/Volumes/\(volumeName)"
-
-                    // Schedule unmount and delete for after app quits
-                    let script = """
-                    #!/bin/bash
-                    sleep 1
-                    diskutil unmount "\(volumePath)" 2>/dev/null
-                    sleep 1
-                    rm -f "\(path)"
-                    rm -f "$0"
-                    """
-
-                    let scriptPath = NSTemporaryDirectory() + "cleanup-wheels-dmg.sh"
-                    try script.write(toFile: scriptPath, atomically: true, encoding: .utf8)
-
-                    // Make script executable
-                    let chmod = Process()
-                    chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
-                    chmod.arguments = ["+x", scriptPath]
-                    try chmod.run()
-                    chmod.waitUntilExit()
-
-                    // Execute cleanup script in background
-                    let task = Process()
-                    task.executableURL = URL(fileURLWithPath: "/bin/bash")
-                    task.arguments = [scriptPath]
-                    task.launch()
-
-                    appendOutput("\nScheduled deletion of installer DMG: \(path)\n")
-                }
-            }
-        } catch {
-            appendOutput("\nWarning: Could not delete DMG file: \(error.localizedDescription)\n")
-        }
     }
 
     func showAlert(_ message: String) {
