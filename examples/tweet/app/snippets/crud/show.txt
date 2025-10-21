@@ -1,0 +1,6 @@
+<!--- |ObjectNameSingularC| Show --->
+<cfparam name="|ObjectNameSingular|">
+<cfoutput>
+<h1>View |ObjectNameSingularC|</h1>
+<!--- CLI-Appends-Here --->
+</cfoutput>

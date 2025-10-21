@@ -1,0 +1,10 @@
+<!--- |ObjectNameSingularC| Edit Form --->
+<cfparam name="|ObjectNameSingular|">
+<cfoutput>
+<h1>Edit |ObjectNameSingularC|</h1>
+#errorMessagesFor("|ObjectNameSingular|")#
+#startFormTag(id="|ObjectNameSingular|EditForm", route="|ObjectNameSingularC|", method="patch", key=params.key)#
+	#includePartial("form")#
+	#submitTag(value="Update |ObjectNameSingularC|")#
+#endFormTag()#
+</cfoutput>
