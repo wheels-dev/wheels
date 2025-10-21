@@ -172,6 +172,67 @@ mcp__wheels__wheels_generate(type="migration", name="CreateUsersTable")
 
 **After ANY development work (models, views, controllers, routes), you MUST:**
 
+**🔧 Browser Automation Detection**
+This project supports both Playwright and Puppeteer MCP tools. You MUST:
+1. Check which browser automation tool is available
+2. Use the appropriate tool syntax for your testing
+
+**Detection Logic:**
+- If `mcp__playwright__*` tools are available → Use Playwright syntax
+- If `mcp__puppeteer__*` tools are available → Use Puppeteer syntax
+- Prefer Playwright if both are available (more modern, better features)
+
+---
+
+#### Using Playwright (Preferred)
+
+1. **📋 Verify Server Status**
+   ```javascript
+   mcp__wheels__wheels_server(action="status")
+   ```
+
+2. **🌐 Navigate to Application**
+   ```javascript
+   mcp__playwright__browser_navigate(url="http://localhost:[PORT]")
+   ```
+
+3. **📸 Take Screenshot**
+   ```javascript
+   mcp__playwright__browser_snapshot()  // Accessibility snapshot (better)
+   // OR
+   mcp__playwright__browser_take_screenshot(filename="homepage_test.png")
+   ```
+
+4. **🧪 Test Core User Flows**
+   ```javascript
+   // Click elements
+   mcp__playwright__browser_click(element="first post link", ref="[ref-from-snapshot]")
+
+   // Fill forms
+   mcp__playwright__browser_fill_form(fields=[
+     {name: "username", type: "textbox", ref: "[ref]", value: "testuser"},
+     {name: "email", type: "textbox", ref: "[ref]", value: "test@example.com"}
+   ])
+
+   // Take screenshots after actions
+   mcp__playwright__browser_take_screenshot(filename="after_action.png")
+   ```
+
+5. **🔍 Verify Interactive Elements**
+   ```javascript
+   // Test navigation
+   mcp__playwright__browser_click(element="navigation link", ref="[ref]")
+   mcp__playwright__browser_snapshot()
+
+   // Test forms
+   mcp__playwright__browser_type(element="comment field", ref="[ref]", text="Test comment")
+   mcp__playwright__browser_click(element="submit button", ref="[ref]")
+   ```
+
+---
+
+#### Using Puppeteer (Alternative)
+
 1. **📋 Verify Server Status**
    ```javascript
    mcp__wheels__wheels_server(action="status")
@@ -187,25 +248,32 @@ mcp__wheels__wheels_generate(type="migration", name="CreateUsersTable")
    mcp__puppeteer__puppeteer_screenshot(name="homepage_test", width=1200, height=800)
    ```
 
-4. **🧪 Test Core User Flows (MANDATORY)**
+4. **🧪 Test Core User Flows**
+   ```javascript
+   // Click elements
+   mcp__puppeteer__puppeteer_click(selector="article:first-child h2 a")
+   mcp__puppeteer__puppeteer_screenshot(name="post_detail", width=1200, height=800)
+
+   // Fill forms
+   mcp__puppeteer__puppeteer_fill(selector="input[name='username']", value="testuser")
+
+   // Test interactive elements
+   mcp__puppeteer__puppeteer_click(selector="button.btn-primary")
+   mcp__puppeteer__puppeteer_screenshot(name="interaction_test", width=1200, height=800)
+   ```
+
+---
+
+#### Common Testing Requirements (Both Tools)
+
+**4. 🧪 Test Core User Flows (MANDATORY)**
    - **Navigation Testing**: Click all main navigation links
    - **CRUD Operations**: Test create, read, update, delete flows
    - **Form Interactions**: Test all forms and validation
    - **Interactive Elements**: Test JavaScript/Alpine.js/HTMX functionality
    - **Responsive Design**: Test on different viewport sizes
 
-5. **🔍 Verify Key Features Work**
-   ```javascript
-   // Example: Test clicking first post
-   mcp__puppeteer__puppeteer_click(selector="article:first-child h2 a")
-   mcp__puppeteer__puppeteer_screenshot(name="post_detail", width=1200, height=800)
-
-   // Example: Test interactive elements
-   mcp__puppeteer__puppeteer_click(selector="button[contains-class='btn']")
-   mcp__puppeteer__puppeteer_screenshot(name="interaction_test", width=1200, height=800)
-   ```
-
-6. **📊 Document Test Results**
+**5. 📊 Document Test Results**
    - Confirm all screenshots show expected UI
    - Verify no JavaScript errors in console
    - Document any issues found
@@ -225,6 +293,56 @@ mcp__wheels__wheels_generate(type="migration", name="CreateUsersTable")
 - [ ] All CRUD operations work end-to-end
 
 ### 🚀 Browser Testing Templates
+
+#### Playwright Templates (Preferred)
+
+**For Blog Applications:**
+```javascript
+// Test homepage
+mcp__playwright__browser_navigate(url="http://localhost:PORT")
+mcp__playwright__browser_snapshot()  // Take accessibility snapshot
+mcp__playwright__browser_take_screenshot(filename="blog_homepage.png")
+
+// Test post detail - first get snapshot to find element refs
+mcp__playwright__browser_snapshot()
+mcp__playwright__browser_click(element="first post link", ref="[ref-from-snapshot]")
+mcp__playwright__browser_take_screenshot(filename="post_detail.png")
+
+// Test comment form interaction
+mcp__playwright__browser_click(element="Add Comment button", ref="[ref]")
+mcp__playwright__browser_type(element="comment field", ref="[ref]", text="Test comment")
+mcp__playwright__browser_take_screenshot(filename="comment_form.png")
+
+// Test create post
+mcp__playwright__browser_click(element="Write Post link", ref="[ref]")
+mcp__playwright__browser_fill_form(fields=[
+  {name: "title", type: "textbox", ref: "[ref]", value: "Test Post"},
+  {name: "content", type: "textbox", ref: "[ref]", value: "Test content"}
+])
+mcp__playwright__browser_take_screenshot(filename="create_post.png")
+```
+
+**For Admin Applications:**
+```javascript
+// Test admin dashboard
+mcp__playwright__browser_navigate(url="http://localhost:PORT/admin")
+mcp__playwright__browser_snapshot()
+mcp__playwright__browser_take_screenshot(filename="admin_dashboard.png")
+
+// Test admin CRUD operations
+// ... specific admin testing flows using snapshot + click pattern
+```
+
+**For API Applications:**
+```javascript
+// Test API endpoints
+mcp__playwright__browser_navigate(url="http://localhost:PORT/api/endpoint")
+mcp__playwright__browser_take_screenshot(filename="api_response.png")
+```
+
+---
+
+#### Puppeteer Templates (Alternative)
 
 **For Blog Applications:**
 ```javascript
@@ -272,7 +390,7 @@ mcp__puppeteer__puppeteer_screenshot(name="api_response")
 2. **Verify MCP server** (`mcp__wheels__wheels_server(action="status")`)
 3. **Invoke appropriate Claude Code skill** (e.g., `Skill("wheels-model-generator")`)
 4. **Generate code using MCP tools** (e.g., `mcp__wheels__wheels_generate(...)`)
-5. **Test in browser** (using Puppeteer MCP tools)
+5. **Test in browser** (using Playwright or Puppeteer MCP tools - see browser testing section)
 
 ### MCP-Enabled Wheels Development
 
@@ -394,7 +512,13 @@ Skill("wheels-test-generator")
 mcp__wheels__wheels_test()
 mcp__wheels__wheels_analyze(target="all")
 
-// 4. Browser testing (MANDATORY)
+// 4. Browser testing (MANDATORY) - Use Playwright OR Puppeteer
+// Playwright (preferred):
+mcp__playwright__browser_navigate(url="http://localhost:8080")
+mcp__playwright__browser_snapshot()
+mcp__playwright__browser_take_screenshot(filename="homepage.png")
+
+// OR Puppeteer (alternative):
 mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080")
 mcp__puppeteer__puppeteer_screenshot(name="homepage")
 
@@ -1620,7 +1744,13 @@ Skill("wheels-migration-generator")
 // Then migrate:
 mcp__wheels__wheels_migrate(action="latest")
 
-// 6. Browser test (MANDATORY)
+// 6. Browser test (MANDATORY) - Use Playwright OR Puppeteer
+// Playwright (preferred):
+mcp__playwright__browser_navigate(url="http://localhost:8080/posts")
+mcp__playwright__browser_snapshot()
+mcp__playwright__browser_take_screenshot(filename="posts_index.png")
+
+// OR Puppeteer (alternative):
 mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080/posts")
 mcp__puppeteer__puppeteer_screenshot(name="posts_index")
 ```
