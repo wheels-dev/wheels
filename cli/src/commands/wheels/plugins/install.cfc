@@ -1,9 +1,9 @@
 /**
  * Install Wheels CLI plugins
  * Examples:
- * wheels plugins install wheels-vue-cli
- * wheels plugins install wheels-docker --dev
- * wheels plugins install https://github.com/user/wheels-plugin --global
+ * wheels plugins install cfwheels-flashmessages-bootstrap
+ * wheels plugins install cfwheels-bcrypt --dev
+ * wheels plugins install cfwheels-bcrypt
  */
 component aliases="wheels plugin install" extends="../base" {
 
@@ -20,22 +20,57 @@ component aliases="wheels plugin install" extends="../base" {
         string version = ""
     ) {
         arguments = reconstructArgs(arguments);
-        print.yellowLine("Installing plugin: #arguments.name#...")
+
+        print.line()
+             .boldCyanLine("===========================================================")
+             .boldCyanLine("  Installing Plugin")
+             .boldCyanLine("===========================================================")
              .line();
-        
-        var result = pluginService.install(argumentCollection = arguments);
-        
-        if (result.success) {
-            print.greenLine("Plugin installed successfully");
-            
-            if (result.keyExists("plugin") && result.plugin.keyExists("description")) {
-                print.line("#result.plugin.description#");
-            }
-            
-            print.line()
-                 .yellowLine("Run 'wheels plugins list' to see installed plugins");
+
+        var packageSpec = arguments.name;
+        if (len(arguments.version)) {
+            packageSpec &= "@" & arguments.version;
+        }
+
+        print.line("Plugin:  #arguments.name#");
+        if (len(arguments.version)) {
+            print.line("Version: #arguments.version#");
         } else {
-            print.redLine("Failed to install plugin: #result.error#");
+            print.line("Version: latest");
+        }
+        print.line();
+
+        var result = pluginService.install(argumentCollection = arguments);
+
+        print.boldCyanLine("===========================================================")
+             .line();
+
+        if (result.success) {
+            print.boldGreenText("[OK] ")
+                 .greenLine("Plugin installed successfully!")
+                 .line();
+
+            if (result.keyExists("plugin") && result.plugin.keyExists("description")) {
+                print.line("#result.plugin.description#")
+                     .line();
+            }
+
+            print.boldLine("Commands:")
+                 .cyanLine("  wheels plugin list          View all installed plugins")
+                 .cyanLine("  wheels plugin info #arguments.name#   View plugin details");
+        } else {
+            print.boldRedText("[ERROR] ")
+                 .redLine("Failed to install plugin")
+                 .line()
+                 .yellowLine("Error: #result.error#")
+                 .line();
+
+            print.line("Possible solutions:")
+                 .line("  - Verify the plugin name is correct")
+                 .line("  - Check if the plugin exists on ForgeBox:")
+                 .cyanLine("    wheels plugin list --available")
+                 .line("  - Ensure the plugin type is 'cfwheels-plugins'");
+
             setExitCode(1);
         }
     }

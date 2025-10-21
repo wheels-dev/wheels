@@ -24,82 +24,20 @@ component aliases="wheels plugin info" extends="../base" {
                  .boldMagentaLine("===========================================================")
                  .line();
 
-            // Check local installation status
+            // Check local installation status in /plugins folder only
             var isInstalled = false;
             var installedVersion = "";
-            var foundKey = "";
             var pluginPath = "";
-            
-            // Helper function to find plugin in dependencies by name or slug
-            var findPluginKey = function(dependencies, searchTerm) {
-                // First try exact match (case sensitive)
-                if (dependencies.keyExists(searchTerm)) {
-                    return searchTerm;
-                }
-                
-                // Only try common variations for known patterns, not fuzzy matching
-                for (var key in dependencies) {
-                    // Check exact variations of known plugin naming patterns
-                    if (searchTerm.lcase() == ("cfwheels-" & key).lcase() || 
-                        searchTerm.lcase() == ("wheels-" & key).lcase()) {
-                        return key;
-                    }
-                    if (("cfwheels-" & key).lcase() == searchTerm.lcase() ||
-                        ("wheels-" & key).lcase() == searchTerm.lcase()) {
-                        return key;
-                    }
-                }
-                return "";
-            };
-            
-            // Check root box.json
-            var boxJsonPath = resolvePath("box.json");
-            if (fileExists(boxJsonPath)) {
-                var boxJson = deserializeJSON(fileRead(boxJsonPath));
-                var searchName = arguments.name;
-                
-                // Check dependencies
-                if (boxJson.keyExists("dependencies")) {
-                    foundKey = findPluginKey(boxJson.dependencies, searchName);
-                    if (len(foundKey)) {
-                        isInstalled = true;
-                        installedVersion = boxJson.dependencies[foundKey];
-                        
-                        // Check if there's an installPath for this plugin
-                        if (boxJson.keyExists("installPaths") && boxJson.installPaths.keyExists(foundKey)) {
-                            pluginPath = resolvePath(boxJson.installPaths[foundKey]);
-                        }
-                    }
-                }
-                
-                // Check devDependencies if not found in regular dependencies
-                if (!isInstalled && boxJson.keyExists("devDependencies")) {
-                    foundKey = findPluginKey(boxJson.devDependencies, searchName);
-                    if (len(foundKey)) {
-                        isInstalled = true;
-                        installedVersion = boxJson.devDependencies[foundKey];
-                        
-                        // Check if there's an installPath for this plugin
-                        if (boxJson.keyExists("installPaths") && boxJson.installPaths.keyExists(foundKey)) {
-                            pluginPath = resolvePath(boxJson.installPaths[foundKey]);
-                        }
-                    }
-                }
-            }
-            
-            // If we found a plugin path, try to get more info from its box.json
-            if (len(pluginPath) && directoryExists(pluginPath)) {
-                var pluginBoxJsonPath = pluginPath & "/box.json";
-                if (fileExists(pluginBoxJsonPath)) {
-                    try {
-                        var pluginBoxJson = deserializeJSON(fileRead(pluginBoxJsonPath));
-                        // Override with more accurate version from plugin's own box.json
-                        if (pluginBoxJson.keyExists("version") && len(pluginBoxJson.version)) {
-                            installedVersion = pluginBoxJson.version;
-                        }
-                    } catch (any e) {
-                        // Continue with version from root box.json
-                    }
+
+            // Find plugin by folder name, slug, or actual name
+            var pluginsDir = fileSystemUtil.resolvePath("plugins");
+            if (directoryExists(pluginsDir)) {
+                var foundPlugin = findPluginInFolder(pluginsDir, arguments.name);
+
+                if (foundPlugin.found) {
+                    isInstalled = true;
+                    pluginPath = foundPlugin.path;
+                    installedVersion = foundPlugin.version;
                 }
             }
             
@@ -435,5 +373,136 @@ component aliases="wheels plugin info" extends="../base" {
             return arguments.path;
         }
         return expandPath(".") & "/" & arguments.path;
+    }
+
+    /**
+     * Find plugin in /plugins folder by folder name, slug, or actual name
+     * Algorithm searches all plugin folders and matches against:
+     * 1. Folder name (exact match, case insensitive)
+     * 2. Plugin slug from box.json (exact match, case insensitive)
+     * 3. Plugin name from box.json (exact match, case insensitive)
+     * 4. Normalized variations (removes cfwheels-, wheels- prefixes)
+     */
+    private function findPluginInFolder(required string pluginsDir, required string searchTerm) {
+        var result = {
+            found: false,
+            path: "",
+            version: "unknown"
+        };
+
+        // Normalize search term for comparison
+        var normalizedSearch = normalizePluginName(arguments.searchTerm);
+
+        // Get all directories in plugins folder
+        var pluginDirs = directoryList(arguments.pluginsDir, false, "query", "*", "name", "directory");
+
+        for (var pluginDir in pluginDirs) {
+            var folderName = pluginDir.name;
+            var pluginPath = arguments.pluginsDir & "/" & folderName;
+
+            // Check 1: Direct folder name match (case insensitive)
+            if (compareNoCase(folderName, arguments.searchTerm) == 0) {
+                result.found = true;
+                result.path = pluginPath;
+                result.version = getVersionFromPluginFolder(pluginPath);
+                return result;
+            }
+
+            // Check 2 & 3: Check against slug and name in box.json
+            var boxJsonPath = pluginPath & "/box.json";
+            if (fileExists(boxJsonPath)) {
+                try {
+                    var boxJson = deserializeJSON(fileRead(boxJsonPath));
+
+                    // Check slug (case insensitive)
+                    if (structKeyExists(boxJson, "slug") && compareNoCase(boxJson.slug, arguments.searchTerm) == 0) {
+                        result.found = true;
+                        result.path = pluginPath;
+                        result.version = structKeyExists(boxJson, "version") ? boxJson.version : "unknown";
+                        return result;
+                    }
+
+                    // Check actual name (case insensitive)
+                    if (structKeyExists(boxJson, "name") && compareNoCase(boxJson.name, arguments.searchTerm) == 0) {
+                        result.found = true;
+                        result.path = pluginPath;
+                        result.version = structKeyExists(boxJson, "version") ? boxJson.version : "unknown";
+                        return result;
+                    }
+
+                    // Check 4: Normalized comparison (removes prefixes like cfwheels-, wheels-)
+                    var normalizedSlug = normalizePluginName(structKeyExists(boxJson, "slug") ? boxJson.slug : "");
+                    var normalizedName = normalizePluginName(structKeyExists(boxJson, "name") ? boxJson.name : "");
+                    var normalizedFolder = normalizePluginName(folderName);
+
+                    if ((len(normalizedSlug) && compareNoCase(normalizedSlug, normalizedSearch) == 0) ||
+                        (len(normalizedName) && compareNoCase(normalizedName, normalizedSearch) == 0) ||
+                        (len(normalizedFolder) && compareNoCase(normalizedFolder, normalizedSearch) == 0)) {
+                        result.found = true;
+                        result.path = pluginPath;
+                        result.version = structKeyExists(boxJson, "version") ? boxJson.version : "unknown";
+                        return result;
+                    }
+
+                } catch (any e) {
+                    // Continue checking other folders
+                }
+            } else {
+                // No box.json, check normalized folder name
+                var normalizedFolder = normalizePluginName(folderName);
+                if (compareNoCase(normalizedFolder, normalizedSearch) == 0) {
+                    result.found = true;
+                    result.path = pluginPath;
+                    result.version = "unknown";
+                    return result;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Normalize plugin name by removing common prefixes
+     * Examples:
+     * - "cfwheels-bcrypt" -> "bcrypt"
+     * - "CFWheels Bcrypt" -> "bcrypt"
+     * - "wheels-bcrypt" -> "bcrypt"
+     * - "bcrypt" -> "bcrypt"
+     */
+    private function normalizePluginName(required string pluginName) {
+        var normalized = trim(arguments.pluginName);
+
+        // Remove common prefixes (case insensitive)
+        normalized = reReplaceNoCase(normalized, "^cfwheels[\s-]+", "");
+        normalized = reReplaceNoCase(normalized, "^wheels[\s-]+", "");
+
+        // Remove trailing -plugin suffix
+        normalized = reReplaceNoCase(normalized, "[\s-]+plugin$", "");
+
+        // Convert to lowercase and remove extra spaces
+        normalized = lCase(trim(normalized));
+
+        return normalized;
+    }
+
+    /**
+     * Get version from plugin folder's box.json
+     */
+    private function getVersionFromPluginFolder(required string pluginPath) {
+        var boxJsonPath = arguments.pluginPath & "/box.json";
+
+        if (fileExists(boxJsonPath)) {
+            try {
+                var boxJson = deserializeJSON(fileRead(boxJsonPath));
+                if (structKeyExists(boxJson, "version")) {
+                    return boxJson.version;
+                }
+            } catch (any e) {
+                // Return unknown if error
+            }
+        }
+
+        return "unknown";
     }
 }

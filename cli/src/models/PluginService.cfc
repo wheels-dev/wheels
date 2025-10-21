@@ -7,7 +7,8 @@ component {
     
     
     /**
-     * Install a Wheels CLI plugin
+     * Install a Wheels plugin (cfwheels-plugins type only)
+     * Plugins are automatically installed to /plugins folder
      */
     function install(
         required string name,
@@ -15,62 +16,73 @@ component {
         string version = ""
     ) {
         try {
-            var boxJsonPath = expandPath("box.json");
-            var boxJson = {};
-            
-            // Read existing box.json
-            if (fileExists(boxJsonPath)) {
-                boxJson = deserializeJSON(fileRead(boxJsonPath));
+            // Ensure plugins directory exists
+            var pluginsDir = fileSystemUtil.resolvePath("plugins");
+            if (!directoryExists(pluginsDir)) {
+                directoryCreate(pluginsDir);
             }
-            
-            // Initialize dependencies if needed
-            if (!boxJson.keyExists("dependencies")) {
-                boxJson.dependencies = {};
-            }
-            if (!boxJson.keyExists("devDependencies")) {
-                boxJson.devDependencies = {};
-            }
-            
-            // Determine dependency type
-            var depType = arguments.dev ? "devDependencies" : "dependencies";
-            
-            // Check if it's a valid plugin
+
+            // Check if it's a valid cfwheels-plugins package
             var pluginInfo = getPluginInfo(arguments.name);
             if (!pluginInfo.isValid) {
                 return {
                     success: false,
-                    error: "Plugin '" & arguments.name & "' not found or is not a valid Wheels CLI plugin"
+                    error: "Plugin '" & arguments.name & "' not found or is not a valid Wheels plugin"
                 };
             }
-            
-            // Add version if specified
+
+            // Verify it's a cfwheels-plugins type
+            if (pluginInfo.type != "cfwheels-plugins") {
+                return {
+                    success: false,
+                    error: "Package '" & arguments.name & "' is not a cfwheels-plugins type. Only cfwheels-plugins can be installed."
+                };
+            }
+
+            // Build package spec with version
             var packageSpec = arguments.name;
             if (len(arguments.version)) {
                 packageSpec &= "@" & arguments.version;
             }
-            
-            // Add to box.json
-            boxJson[depType][pluginInfo.slug] = packageSpec;
-            
-            // Write updated box.json
-            fileWrite(boxJsonPath, serializeJSON(boxJson, true));
-            
-            // Install via CommandBox
-            packageService.installPackage(
+
+            // Get the slug for directory name
+            var pluginSlug = pluginInfo.slug;
+            var targetPath = pluginsDir & "/" & pluginSlug;
+
+            // Install via CommandBox with proper parameters
+            var result = packageService.installPackage(
                 ID = packageSpec,
-                save = true,
-                saveDev = arguments.dev
+                currentWorkingDirectory = fileSystemUtil.resolvePath(""),
+                save = false,
+                production = true,
+                verbose = false
             );
-            
-            // Register plugin commands
-            registerPluginCommands(pluginInfo);
-            
+
+            // If package didn't install to /plugins, move it there
+            if (directoryExists(targetPath)) {
+                // Already in correct location
+            } else {
+                // Check common installation locations and move if needed
+                var possiblePaths = [
+                    fileSystemUtil.resolvePath("modules/" & pluginSlug),
+                    fileSystemUtil.resolvePath(pluginSlug)
+                ];
+
+                for (var possiblePath in possiblePaths) {
+                    if (directoryExists(possiblePath)) {
+                        // Move to plugins directory
+                        directoryRename(possiblePath, targetPath);
+                        break;
+                    }
+                }
+            }
+
             return {
                 success: true,
                 plugin: pluginInfo,
-                installedVersion: pluginInfo.version
+                installedVersion: arguments.version ?: pluginInfo.version
             };
-            
+
         } catch (any e) {
             return {
                 success: false,
@@ -80,68 +92,36 @@ component {
     }
     
     /**
-     * Remove a Wheels CLI plugin
+     * Remove a Wheels plugin from /plugins folder
      */
     function remove(required string name) {
         try {
-            var boxJsonPath = resolvePath("box.json");
-            var pluginFound = false;
+            var pluginsDir = fileSystemUtil.resolvePath("plugins");
 
-            // Get current working directory
-            var currentDir = fileSystemUtil.resolvePath("");
-
-            // Check if plugin exists in box.json
-            if (fileExists(boxJsonPath)) {
-                var boxJson = deserializeJSON(fileRead(boxJsonPath));
-
-                // Check dependencies
-                if (boxJson.keyExists("dependencies") && boxJson.dependencies.keyExists(arguments.name)) {
-                    boxJson.dependencies.delete(arguments.name);
-                    pluginFound = true;
-                }
-
-                // Check devDependencies
-                if (boxJson.keyExists("devDependencies") && boxJson.devDependencies.keyExists(arguments.name)) {
-                    boxJson.devDependencies.delete(arguments.name);
-                    pluginFound = true;
-                }
-
-                if (!pluginFound) {
-                    // Check if plugin is in /plugins folder (Wheels application plugin)
-                    var pluginsDir = fileSystemUtil.resolvePath("plugins");
-                    if (directoryExists(pluginsDir)) {
-                        var pluginPath = pluginsDir & "/" & arguments.name;
-                        if (directoryExists(pluginPath)) {
-                            pluginFound = true;
-                        }
-                    }
-                }
-
-                if (!pluginFound) {
-                    return {
-                        success: false,
-                        error: "Plugin '#arguments.name#' is not installed"
-                    };
-                }
-
-                // Write updated box.json
-                fileWrite(boxJsonPath, serializeJSON(boxJson, true));
-
-                // Uninstall via CommandBox
-                packageService.uninstallPackage(
-                    ID = arguments.name,
-                    currentWorkingDirectory = currentDir
-                );
-            } else {
+            // Check if plugins directory exists
+            if (!directoryExists(pluginsDir)) {
                 return {
                     success: false,
-                    error: "No box.json found. Plugin '#arguments.name#' is not installed"
+                    error: "Plugins directory not found. Plugin '#arguments.name#' is not installed"
                 };
             }
 
+            // Find plugin by folder name, slug, or actual name
+            var foundPlugin = findPluginByName(pluginsDir, arguments.name);
+
+            if (!foundPlugin.found) {
+                return {
+                    success: false,
+                    error: "Plugin '#arguments.name#' is not installed in plugins folder"
+                };
+            }
+
+            // Delete the plugin directory
+            directoryDelete(foundPlugin.path, true);
+
             return {
                 success: true,
-                pluginName: arguments.name
+                pluginName: foundPlugin.folderName
             };
 
         } catch (any e) {
@@ -153,116 +133,129 @@ component {
     }
     
     /**
-     * List installed plugins
+     * List installed plugins from /plugins folder only
      */
     function list() {
         var plugins = [];
-        var pluginNames = [];
-        
-        // Check for Wheels application plugins in /plugins folder first (priority)
+
+        // Check for cfwheels-plugins in /plugins folder
         var pluginsDir = fileSystemUtil.resolvePath("plugins");
-        if (directoryExists(pluginsDir)) {
-            // Get all .zip files in plugins directory (Wheels application plugins)
-            var pluginZips = directoryList(pluginsDir, false, "query", "*.zip", "name");
-            for (var zipFile in pluginZips) {
-                var pluginInfo = parseWheelsPluginZip(pluginsDir & "/" & zipFile.name);
-                if (pluginInfo.isValid) {
-                    arrayAppend(plugins, pluginInfo);
-                    arrayAppend(pluginNames, pluginInfo.name);
-                }
+        if (!directoryExists(pluginsDir)) {
+            return plugins; // Return empty array if plugins folder doesn't exist
+        }
+
+        // Get all directories in plugins folder
+        var pluginDirs = directoryList(pluginsDir, false, "query", "*", "name", "directory");
+
+        for (var pluginDir in pluginDirs) {
+            var pluginPath = pluginsDir & "/" & pluginDir.name;
+            var pluginInfo = getPluginInfoFromFolder(pluginPath, pluginDir.name);
+
+            if (pluginInfo.isValid) {
+                arrayAppend(plugins, pluginInfo);
             }
         }
-        
-        // Also check box.json for CLI plugins installed locally (avoid duplicates)
-        var boxJsonPath = resolvePath("box.json");
-        if (fileExists(boxJsonPath)) {
-            var boxJson = deserializeJSON(fileRead(boxJsonPath));
-            
-            // Check dependencies
-            if (boxJson.keyExists("dependencies")) {
-                for (var dep in boxJson.dependencies) {
-                    if (isWheelsPlugin(dep) && !isDuplicatePlugin(dep, pluginNames)) {
-                        var pluginInfo = getInstalledPluginInfo(dep, false);
-                        arrayAppend(plugins, pluginInfo);
-                        arrayAppend(pluginNames, pluginInfo.name);
-                    }
-                }
-            }
-            
-            // Check devDependencies
-            if (boxJson.keyExists("devDependencies")) {
-                for (var dep in boxJson.devDependencies) {
-                    if (isWheelsPlugin(dep) && !isDuplicatePlugin(dep, pluginNames)) {
-                        var pluginInfo = getInstalledPluginInfo(dep, true);
-                        arrayAppend(plugins, pluginInfo);
-                        arrayAppend(pluginNames, pluginInfo.name);
-                    }
-                }
-            }
-        }
-        
+
         return plugins;
     }
-    
+
     /**
-     * Search for available plugins
-     */
-    function search(string query = "", string type = "cfwheels-plugins") {
-        try {
-            // Search ForgeBox for wheels plugins
-            var searchParams = {};
-            if (len(arguments.query)) {
-                searchParams.searchTerm = arguments.query;
-            }
-            searchParams.type = arguments.type;
-            searchParams.max = 50;
-            
-            var searchResults = packageService.search(argumentCollection=searchParams);
-            
-            var plugins = [];
-            for (var result in searchResults) {
-                arrayAppend(plugins, {
-                    name: result.name,
-                    slug: result.slug,
-                    version: result.version,
-                    description: result.summary,
-                    author: result.author,
-                    downloads: result.downloads
-                });
-            }
-            
-            return plugins;
-        } catch (any e) {
-            return [];
-        }
-    }
-    
-    /**
-     * Get plugin information
+     * Get plugin information from ForgeBox
+     * Validates that it's a cfwheels-plugins type
      */
     private function getPluginInfo(pluginName) {
-        // Check if it's a URL
-        if (findNoCase("http", arguments.pluginName) || findNoCase("github.com", arguments.pluginName)) {
+        try {
+            // Check if it's a URL
+            if (findNoCase("http", arguments.pluginName) || findNoCase("github.com", arguments.pluginName)) {
+                return {
+                    isValid: false,
+                    error: "URL installations are not supported for cfwheels-plugins. Use package name from ForgeBox."
+                };
+            }
+
+            // Try to get package info from ForgeBox using forgebox service
+            try {
+                var forgeboxData = forgebox.getEntry(arguments.pluginName);
+
+                // Check if it's a cfwheels-plugins type
+                if (structKeyExists(forgeboxData, "typeslug") && forgeboxData.typeslug == "cfwheels-plugins") {
+                    return {
+                        isValid: true,
+                        name: forgeboxData.title ?: arguments.pluginName,
+                        slug: arguments.pluginName,
+                        version: forgeboxData.version ?: "latest",
+                        type: forgeboxData.typeslug,
+                        description: forgeboxData.summary ?: ""
+                    };
+                } else {
+                    return {
+                        isValid: false,
+                        error: "Package '#arguments.pluginName#' is not a cfwheels-plugins type"
+                    };
+                }
+            } catch (any e) {
+                return {
+                    isValid: false,
+                    error: "Package '#arguments.pluginName#' not found on ForgeBox"
+                };
+            }
+
+        } catch (any e) {
             return {
-                isValid: true,
-                name: listLast(arguments.pluginName, "/"),
-                slug: listLast(arguments.pluginName, "/"),
-                version: "latest",
-                repository: arguments.pluginName
+                isValid: false,
+                error: e.message
             };
         }
-        
-        // Assume package names are valid and let PackageService/ForgeBox handle validation during install
-        // This approach is more permissive and mirrors how CommandBox handles package installation
-        var slug = lCase(arguments.pluginName);
-        
-        return {
-            isValid: true,
-            name: arguments.pluginName,
-            slug: slug,
-            version: "latest",
-            description: "ForgeBox package"
+    }
+
+    /**
+     * Get plugin information from installed folder
+     */
+    function getPluginInfoFromFolder(required string pluginPath, required string folderName) {
+        var pluginInfo = {
+            isValid: false,
+            name: arguments.folderName,
+            slug: arguments.folderName,
+            folderName: arguments.folderName,
+            version: "unknown",
+            description: "",
+            type: "cfwheels-plugins"
         };
+
+        try {
+            // Check for box.json in plugin folder
+            var boxJsonPath = arguments.pluginPath & "/box.json";
+            if (fileExists(boxJsonPath)) {
+                var boxJson = deserializeJSON(fileRead(boxJsonPath));
+
+                pluginInfo.isValid = true;
+                if (structKeyExists(boxJson, "name")) {
+                    pluginInfo.name = boxJson.name;
+                }
+                if (structKeyExists(boxJson, "slug")) {
+                    pluginInfo.slug = boxJson.slug;
+                }
+                if (structKeyExists(boxJson, "version")) {
+                    pluginInfo.version = boxJson.version;
+                }
+                if (structKeyExists(boxJson, "shortDescription")) {
+                    pluginInfo.description = boxJson.shortDescription;
+                } else if (structKeyExists(boxJson, "description")) {
+                    pluginInfo.description = boxJson.description;
+                }
+                if (structKeyExists(boxJson, "type")) {
+                    pluginInfo.type = boxJson.type;
+                }
+            } else {
+                // No box.json, but folder exists - mark as valid with folder name
+                pluginInfo.isValid = true;
+            }
+
+        } catch (any e) {
+            pluginInfo.isValid = false;
+        }
+
+        return pluginInfo;
     }
     
     /**
@@ -403,6 +396,117 @@ component {
     private function registerPluginCommands(pluginInfo) {
         // CommandBox will auto-discover commands in the module
         // This is a placeholder for any additional registration logic
+    }
+
+    /**
+     * Find plugin in /plugins folder by folder name, slug, or actual name
+     * Algorithm searches all plugin folders and matches against:
+     * 1. Folder name (exact match, case insensitive)
+     * 2. Plugin slug from box.json (exact match, case insensitive)
+     * 3. Plugin name from box.json (exact match, case insensitive)
+     * 4. Normalized variations (removes cfwheels-, wheels- prefixes)
+     */
+    function findPluginByName(required string pluginsDir, required string searchTerm) {
+        var result = {
+            found: false,
+            path: "",
+            folderName: ""
+        };
+
+        // Normalize search term for comparison
+        var normalizedSearch = normalizePluginName(arguments.searchTerm);
+
+        // Get all directories in plugins folder
+        var pluginDirs = directoryList(arguments.pluginsDir, false, "query", "*", "name", "directory");
+
+        for (var pluginDir in pluginDirs) {
+            var folderName = pluginDir.name;
+            var pluginPath = arguments.pluginsDir & "/" & folderName;
+
+            // Check 1: Direct folder name match (case insensitive)
+            if (compareNoCase(folderName, arguments.searchTerm) == 0) {
+                result.found = true;
+                result.path = pluginPath;
+                result.folderName = folderName;
+                return result;
+            }
+
+            // Check 2 & 3: Check against slug and name in box.json
+            var boxJsonPath = pluginPath & "/box.json";
+            if (fileExists(boxJsonPath)) {
+                try {
+                    var boxJson = deserializeJSON(fileRead(boxJsonPath));
+
+                    // Check slug (case insensitive)
+                    if (structKeyExists(boxJson, "slug") && compareNoCase(boxJson.slug, arguments.searchTerm) == 0) {
+                        result.found = true;
+                        result.path = pluginPath;
+                        result.folderName = folderName;
+                        return result;
+                    }
+
+                    // Check actual name (case insensitive)
+                    if (structKeyExists(boxJson, "name") && compareNoCase(boxJson.name, arguments.searchTerm) == 0) {
+                        result.found = true;
+                        result.path = pluginPath;
+                        result.folderName = folderName;
+                        return result;
+                    }
+
+                    // Check 4: Normalized comparison (removes prefixes like cfwheels-, wheels-)
+                    var normalizedSlug = normalizePluginName(structKeyExists(boxJson, "slug") ? boxJson.slug : "");
+                    var normalizedName = normalizePluginName(structKeyExists(boxJson, "name") ? boxJson.name : "");
+                    var normalizedFolder = normalizePluginName(folderName);
+
+                    if ((len(normalizedSlug) && compareNoCase(normalizedSlug, normalizedSearch) == 0) ||
+                        (len(normalizedName) && compareNoCase(normalizedName, normalizedSearch) == 0) ||
+                        (len(normalizedFolder) && compareNoCase(normalizedFolder, normalizedSearch) == 0)) {
+                        result.found = true;
+                        result.path = pluginPath;
+                        result.folderName = folderName;
+                        return result;
+                    }
+
+                } catch (any e) {
+                    // Continue checking other folders
+                }
+            } else {
+                // No box.json, check normalized folder name
+                var normalizedFolder = normalizePluginName(folderName);
+                if (compareNoCase(normalizedFolder, normalizedSearch) == 0) {
+                    result.found = true;
+                    result.path = pluginPath;
+                    result.folderName = folderName;
+                    return result;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Normalize plugin name by removing common prefixes
+     * Examples:
+     * - "cfwheels-bcrypt" -> "bcrypt"
+     * - "CFWheels Bcrypt" -> "bcrypt"
+     * - "wheels-bcrypt" -> "bcrypt"
+     * - "bcrypt" -> "bcrypt"
+     */
+    private function normalizePluginName(required string pluginName) {
+        var normalized = trim(arguments.pluginName);
+
+        // Remove common prefixes (case insensitive)
+        normalized = reReplaceNoCase(normalized, "^cfwheels[\s-]+", "");
+        normalized = reReplaceNoCase(normalized, "^wheels[\s-]+", "");
+
+        // Remove trailing -plugin suffix
+        normalized = reReplaceNoCase(normalized, "[\s-]+plugin$", "");
+
+        // Convert to lowercase and remove extra spaces
+        normalized = lCase(trim(normalized));
+
+        return normalized;
     }
     
     /**
