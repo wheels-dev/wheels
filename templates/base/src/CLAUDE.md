@@ -23,7 +23,123 @@ ls .mcp.json
 mcp__wheels__wheels_server(action="status")
 ```
 
-### 🛑 STEP 3: Load Documentation
+### 🛑 STEP 3: Use Claude Code Skills (MANDATORY)
+
+**🔴 CRITICAL: Before generating ANY Wheels code, you MUST invoke the appropriate Claude Code skill.**
+
+Claude Code provides specialized skills that contain deep expertise about Wheels framework patterns and prevent common errors. These skills MUST be used for code generation tasks.
+
+#### Available Claude Code Skills
+
+1. **wheels-model-generator** - Generate Wheels ORM models
+   - Use when: Creating or modifying models, adding validations, defining associations
+   - Prevents: Mixed argument styles, invalid associations, CFML syntax errors
+   - Invoke before: Any model creation or modification
+
+2. **wheels-controller-generator** - Generate Wheels MVC controllers
+   - Use when: Creating controllers, adding actions, implementing filters
+   - Prevents: Mixed parameter styles, incorrect rendering, invalid filters
+   - Invoke before: Any controller creation or modification
+
+3. **wheels-view-generator** - Generate Wheels view templates
+   - Use when: Creating views, forms, layouts, or partials
+   - Prevents: Query/array confusion, incorrect form helpers, association display errors
+   - Invoke before: Any view creation or modification
+
+4. **wheels-migration-generator** - Generate database migrations
+   - Use when: Creating tables, altering schemas, managing database changes
+   - Prevents: Database-specific SQL, cross-database incompatibility
+   - Invoke before: Any migration creation or modification
+
+5. **wheels-test-generator** - Generate TestBox BDD test specs
+   - Use when: Creating tests for models, controllers, or integration workflows
+   - Ensures: Comprehensive test coverage with proper Wheels testing conventions
+   - Invoke before: Any test creation
+
+6. **wheels-auth-generator** - Generate authentication system
+   - Use when: Implementing user authentication, login/logout, session management
+   - Provides: Secure authentication patterns with bcrypt support
+   - Invoke before: Any authentication implementation
+
+7. **wheels-api-generator** - Generate RESTful API controllers
+   - Use when: Creating API endpoints, JSON APIs, or web services
+   - Ensures: Proper REST conventions and error handling
+   - Invoke before: Any API controller creation
+
+8. **wheels-anti-pattern-detector** - Detect and prevent common errors
+   - Use when: Before generating ANY Wheels code (automatically activated)
+   - Prevents: Mixed arguments, query confusion, non-existent helpers, database-specific SQL
+   - ALWAYS active during code generation
+
+9. **wheels-debugging** - Troubleshoot Wheels errors
+   - Use when: Encountering errors, exceptions, or unexpected behavior
+   - Provides: Error analysis, common solutions, debugging strategies
+   - Invoke when: Debugging issues
+
+10. **wheels-refactoring** - Refactor Wheels code
+    - Use when: Optimizing code, fixing anti-patterns, improving performance
+    - Provides: Refactoring patterns and best practices
+    - Invoke when: Improving existing code
+
+11. **wheels-deployment** - Configure production deployment
+    - Use when: Preparing for production, configuring servers, hardening security
+    - Provides: Security hardening, performance optimization, environment setup
+    - Invoke when: Deploying to production
+
+12. **wheels-documentation-generator** - Generate documentation
+    - Use when: Documenting code, creating READMEs, generating API docs
+    - Provides: Documentation comments, README files, API documentation
+    - Invoke when: Documenting the application
+
+#### How to Use Skills
+
+**🚨 MANDATORY WORKFLOW:**
+
+1. **Identify the task type** (model, controller, view, migration, etc.)
+2. **Invoke the appropriate skill FIRST** before any code generation
+3. **Follow the skill's guidance** for proper Wheels patterns
+4. **Generate code** using MCP tools after skill validation
+
+**Example Workflows:**
+
+```javascript
+// Creating a model - MUST invoke skill first
+Skill("wheels-model-generator")
+// Wait for skill to load and provide guidance
+// Then use MCP tool:
+mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string")
+
+// Creating a controller - MUST invoke skill first
+Skill("wheels-controller-generator")
+// Wait for skill to load and provide guidance
+// Then use MCP tool:
+mcp__wheels__wheels_generate(type="controller", name="Users", actions="index,show,new,create")
+
+// Creating a migration - MUST invoke skill first
+Skill("wheels-migration-generator")
+// Wait for skill to load and provide guidance
+// Then use MCP tool:
+mcp__wheels__wheels_generate(type="migration", name="CreateUsersTable")
+```
+
+#### Skill Invocation Rules
+
+**✅ ALWAYS invoke skills:**
+- Before generating ANY Wheels component (model, controller, view, migration)
+- When encountering Wheels-specific errors
+- When refactoring Wheels code
+- When implementing authentication or APIs
+- Before deploying to production
+
+**❌ NEVER skip skills:**
+- Skills prevent common Wheels errors and anti-patterns
+- Skills ensure proper CFML syntax and Wheels conventions
+- Skills provide framework-specific expertise not available in general AI knowledge
+
+### 🛑 STEP 4: Load Documentation (If Needed)
+
+**After invoking the appropriate skill**, you may load additional documentation:
+
 1. **📖 Load Relevant .ai Documentation**
    - Check if `.ai/` folder exists in project root
    - Load appropriate documentation sections:
@@ -52,7 +168,7 @@ mcp__wheels__wheels_server(action="status")
 
 **🔴 CRITICAL: ALL development tasks MUST include comprehensive browser testing - NO EXCEPTIONS**
 
-### 🛑 STEP 4: MANDATORY BROWSER TESTING (ALWAYS REQUIRED)
+### 🛑 STEP 5: MANDATORY BROWSER TESTING (ALWAYS REQUIRED)
 
 **After ANY development work (models, views, controllers, routes), you MUST:**
 
@@ -148,19 +264,59 @@ mcp__puppeteer__puppeteer_screenshot(name="api_response")
 
 ## Quick Start
 
+### Complete Development Workflow
+
+**🚨 MANDATORY ORDER OF OPERATIONS:**
+
+1. **Check for MCP tools** (`ls .mcp.json`)
+2. **Verify MCP server** (`mcp__wheels__wheels_server(action="status")`)
+3. **Invoke appropriate Claude Code skill** (e.g., `Skill("wheels-model-generator")`)
+4. **Generate code using MCP tools** (e.g., `mcp__wheels__wheels_generate(...)`)
+5. **Test in browser** (using Puppeteer MCP tools)
+
 ### MCP-Enabled Wheels Development
 
 **🚨 CRITICAL: If `.mcp.json` exists, use MCP tools exclusively**
 
-### ✅ Common Development Tasks (MCP Tools)
-- **Create a model**: `mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string,active:boolean")`
-- **Create a controller**: `mcp__wheels__wheels_generate(type="controller", name="Users", actions="index,show,new,create,edit,update,delete")`
-- **Create full scaffold**: `mcp__wheels__wheels_generate(type="scaffold", name="Product", attributes="name:string,price:decimal,instock:boolean")`
-- **Run migrations**: `mcp__wheels__wheels_migrate(action="latest")` or `mcp__wheels__wheels_migrate(action="up")` or `mcp__wheels__wheels_migrate(action="down")`
+### ✅ Common Development Tasks (Skills + MCP Tools)
+
+**IMPORTANT: Always invoke the appropriate skill BEFORE using MCP tools**
+
+- **Create a model**:
+  1. `Skill("wheels-model-generator")` (FIRST)
+  2. `mcp__wheels__wheels_generate(type="model", name="User", attributes="name:string,email:string,active:boolean")`
+
+- **Create a controller**:
+  1. `Skill("wheels-controller-generator")` (FIRST)
+  2. `mcp__wheels__wheels_generate(type="controller", name="Users", actions="index,show,new,create,edit,update,delete")`
+
+- **Create a view**:
+  1. `Skill("wheels-view-generator")` (FIRST)
+  2. `mcp__wheels__wheels_generate(type="view", name="users/index")`
+
+- **Create a migration**:
+  1. `Skill("wheels-migration-generator")` (FIRST)
+  2. `mcp__wheels__wheels_generate(type="migration", name="CreateUsersTable")`
+
+- **Create tests**:
+  1. `Skill("wheels-test-generator")` (FIRST)
+  2. `mcp__wheels__wheels_generate(type="test", name="User")`
+
+- **Create authentication**:
+  1. `Skill("wheels-auth-generator")` (FIRST)
+  2. Follow skill guidance for auth implementation
+
+- **Create API**:
+  1. `Skill("wheels-api-generator")` (FIRST)
+  2. Follow skill guidance for API implementation
+
+- **Run migrations**: `mcp__wheels__wheels_migrate(action="latest")`
 - **Run tests**: `mcp__wheels__wheels_test()`
 - **Reload application**: `mcp__wheels__wheels_reload()`
 - **Check server status**: `mcp__wheels__wheels_server(action="status")`
 - **Analyze project**: `mcp__wheels__wheels_analyze(target="all")`
+- **Debug errors**: `Skill("wheels-debugging")`
+- **Refactor code**: `Skill("wheels-refactoring")`
 
 ### ❌ Legacy CLI Commands (DO NOT USE if .mcp.json exists)
 ~~- Create a model: `wheels g model User name:string,email:string,active:boolean`~~
@@ -215,16 +371,34 @@ mcp__wheels__wheels_analyze(target="all")
 // 1. Start every session by checking MCP availability
 mcp__wheels__wheels_server(action="status")
 
-// 2. Create a complete blog system
+// 2. Create a complete blog system - INVOKE SKILLS FIRST
+Skill("wheels-model-generator")
+// Wait for skill to load, then:
 mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text,published:boolean")
+
+Skill("wheels-controller-generator")
+// Wait for skill to load, then:
 mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create,edit,update,delete")
+
+Skill("wheels-view-generator")
+// Wait for skill to load, then:
+mcp__wheels__wheels_generate(type="view", name="posts/index")
+
+Skill("wheels-migration-generator")
+// Wait for skill to load, then:
 mcp__wheels__wheels_migrate(action="latest")
 
 // 3. Test and validate
+Skill("wheels-test-generator")
+// Wait for skill to load, then:
 mcp__wheels__wheels_test()
 mcp__wheels__wheels_analyze(target="all")
 
-// 4. Reload when making configuration changes
+// 4. Browser testing (MANDATORY)
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080")
+mcp__puppeteer__puppeteer_screenshot(name="homepage")
+
+// 5. Reload when making configuration changes
 mcp__wheels__wheels_reload()
 ```
 
@@ -1097,8 +1271,113 @@ execute("INSERT INTO posts (title, createdAt, updatedAt) VALUES ('My Post', NOW(
 ```
 
 ### Debugging Tips
-1. Check Wheels documentation - don't assume Rails conventions work
-2. Use simple patterns first, add complexity incrementally
-3. Test associations and routes in isolation
-4. Use `?reload=true` after configuration changes
-5. Check debug footer for route information
+1. **Invoke `Skill("wheels-debugging")` when encountering errors**
+2. Check Wheels documentation - don't assume Rails conventions work
+3. Use simple patterns first, add complexity incrementally
+4. Test associations and routes in isolation
+5. Use `?reload=true` after configuration changes
+6. Check debug footer for route information
+
+## Summary: Complete AI Assistant Workflow
+
+**🚨 MANDATORY: Follow this exact workflow for ALL Wheels development tasks**
+
+### The 5-Step Mandatory Process
+
+1. **🔧 Check MCP Tools** (STEP 1)
+   - Verify `.mcp.json` exists
+   - Test MCP server connection
+   - Confirm MCP tools are available
+
+2. **🎯 Invoke Claude Code Skill** (STEP 3)
+   - **ALWAYS FIRST** before code generation
+   - Select appropriate skill for task:
+     - Models → `Skill("wheels-model-generator")`
+     - Controllers → `Skill("wheels-controller-generator")`
+     - Views → `Skill("wheels-view-generator")`
+     - Migrations → `Skill("wheels-migration-generator")`
+     - Tests → `Skill("wheels-test-generator")`
+     - Auth → `Skill("wheels-auth-generator")`
+     - API → `Skill("wheels-api-generator")`
+     - Debugging → `Skill("wheels-debugging")`
+     - Refactoring → `Skill("wheels-refactoring")`
+     - Deployment → `Skill("wheels-deployment")`
+   - Wait for skill to load and provide guidance
+   - Follow skill's framework-specific patterns
+
+3. **📖 Load Documentation** (STEP 4, if needed)
+   - Read relevant `.ai/` documentation
+   - Or use MCP resources
+   - Validate against established patterns
+
+4. **💻 Generate Code with MCP Tools** (After skill validation)
+   - Use MCP tools exclusively (NO CLI commands)
+   - Follow skill guidance for proper patterns
+   - Examples:
+     - `mcp__wheels__wheels_generate(...)`
+     - `mcp__wheels__wheels_migrate(...)`
+     - `mcp__wheels__wheels_test()`
+
+5. **🌐 Test in Browser** (STEP 5 - MANDATORY)
+   - Check server status
+   - Navigate to application
+   - Screenshot homepage
+   - Test all user flows
+   - Verify interactive elements
+   - Document results
+
+### Critical Rules
+
+**✅ ALWAYS:**
+- Invoke appropriate Claude Code skill BEFORE code generation
+- Use MCP tools when `.mcp.json` exists
+- Test in browser after ANY development work
+- Follow Wheels-specific patterns from skills
+- Validate against framework conventions
+
+**❌ NEVER:**
+- Skip skill invocation for code generation
+- Use CLI commands when MCP tools are available
+- Skip browser testing
+- Mix positional and named parameters in Wheels functions
+- Assume Rails conventions work in Wheels
+- Skip the anti-pattern detector skill
+
+### Example: Creating a Blog Post Feature
+
+```javascript
+// ✅ CORRECT WORKFLOW
+// 1. Check MCP
+mcp__wheels__wheels_server(action="status")
+
+// 2. Model - Invoke skill FIRST
+Skill("wheels-model-generator")
+// Then generate:
+mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text")
+
+// 3. Controller - Invoke skill FIRST
+Skill("wheels-controller-generator")
+// Then generate:
+mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create")
+
+// 4. Views - Invoke skill FIRST
+Skill("wheels-view-generator")
+// Then generate:
+mcp__wheels__wheels_generate(type="view", name="posts/index")
+
+// 5. Migration - Invoke skill FIRST
+Skill("wheels-migration-generator")
+// Then migrate:
+mcp__wheels__wheels_migrate(action="latest")
+
+// 6. Browser test (MANDATORY)
+mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080/posts")
+mcp__puppeteer__puppeteer_screenshot(name="posts_index")
+```
+
+**Following this workflow ensures:**
+- ✅ Proper Wheels conventions and patterns
+- ✅ Prevention of common framework errors
+- ✅ CFML syntax correctness
+- ✅ Comprehensive browser validation
+- ✅ Production-ready code quality

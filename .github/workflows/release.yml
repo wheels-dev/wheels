@@ -175,7 +175,8 @@ jobs:
 
       - name: Publish All Packages to ForgeBox
         run: |
-          ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true"
+          # Publish stable release and mark as current/stable version
+          ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true" "true"
 
       #############################################
       # Build Artifacts for GitHub
@@ -186,7 +187,7 @@ jobs:
           ./tools/build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
           ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
-          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}"
+          ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
 
       - name: Upload Wheels Base Template Artifact
         uses: actions/upload-artifact@v4
