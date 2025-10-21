@@ -1125,6 +1125,50 @@ function config() {
 }
 ```
 
+### Password Hashing
+
+**🔴 CRITICAL: Lucee/Adobe ColdFusion BCrypt Limitations**
+
+Lucee CFML does **not** support BCrypt hashing via the native `hash()` function. Attempting to use BCrypt will result in a runtime error:
+```
+java.security.NoSuchAlgorithmException: bcrypt MessageDigest not available
+```
+
+**❌ DOES NOT WORK in Lucee:**
+```cfm
+passwordHash = hash(password, "BCrypt");  // Runtime error!
+```
+
+**✅ CORRECT APPROACH - Use SHA-256:**
+```cfm
+// For user registration
+params.user.passwordHash = hash(params.user.password, "SHA-256");
+
+user = model("User").create(params.user);
+```
+
+**✅ CORRECT APPROACH - Verify passwords:**
+```cfm
+private function verifyPassword(required string password, required string hash) {
+    return hash(arguments.password, "SHA-256") == arguments.hash;
+}
+```
+
+**Available Hash Algorithms in Lucee:**
+- ✅ `SHA-256` (recommended for passwords)
+- ✅ `SHA-512` (even stronger)
+- ✅ `MD5` (not recommended for passwords - too weak)
+- ❌ `BCrypt` (NOT supported natively)
+
+**For Production BCrypt Support:**
+If BCrypt is required, you must use a Java library:
+```cfm
+// Requires BCrypt Java library in classpath
+bcrypt = createObject("java", "org.mindrot.jbcrypt.BCrypt");
+passwordHash = bcrypt.hashpw(password, bcrypt.gensalt());
+isValid = bcrypt.checkpw(password, passwordHash);
+```
+
 ### SQL Injection Prevention
 ```cfm
 // Use model methods (automatically sanitized)
@@ -1327,6 +1371,44 @@ function onError(exception, eventname) {
 ## Production-Tested Best Practices
 
 **The following patterns were validated during real-world Twitter clone development:**
+
+### Authentication Best Practices
+
+#### 1. Password Hashing - Lucee BCrypt Limitation (CRITICAL)
+
+**Problem:** Lucee CFML does not support BCrypt hashing natively via `hash()` function.
+
+**Discovery:** During Twitter clone development, attempting BCrypt resulted in:
+```
+java.security.NoSuchAlgorithmException: bcrypt MessageDigest not available
+```
+
+**❌ WRONG - Causes Runtime Error:**
+```cfm
+function create() {
+    params.user.passwordHash = hash(params.user.password, "BCrypt");  // Runtime error!
+    user = model("User").create(params.user);
+}
+```
+
+**✅ CORRECT - Use SHA-256:**
+```cfm
+function create() {
+    params.user.passwordHash = hash(params.user.password, "SHA-256");
+    user = model("User").create(params.user);
+}
+
+function verifyPassword(required string password, required string hash) {
+    return hash(arguments.password, "SHA-256") == arguments.hash;
+}
+```
+
+**Alternative for Production:**
+Use Java BCrypt library if stronger hashing is required:
+```cfm
+bcrypt = createObject("java", "org.mindrot.jbcrypt.BCrypt");
+passwordHash = bcrypt.hashpw(password, bcrypt.gensalt());
+```
 
 ### Migration Best Practices
 
