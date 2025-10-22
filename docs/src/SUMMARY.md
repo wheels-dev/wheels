@@ -77,6 +77,7 @@
     * [wheels docs generate](command-line-tools/commands/docs/docs-generate.md)
     * [wheels docs serve](command-line-tools/commands/docs/docs-serve.md)
   * Plugins
+    * [wheels plugin init](command-line-tools/commands/plugins/plugins-init.md)
     * [wheels plugin install](command-line-tools/commands/plugins/plugins-install.md)
     * [wheels plugin list](command-line-tools/commands/plugins/plugins-list.md)
     * [wheels plugin search](command-line-tools/commands/plugins/plugins-search.md)

@@ -5,9 +5,7 @@
  * wheels plugin init wheels-awesome-feature --author="John Doe"
  */
 component aliases="wheels plugin init" extends="../base" {
-    
-    property name="fileService" inject="FileService@wheels-cli";
-    
+
     /**
      * @name.hint Name of the plugin (will be prefixed with 'wheels-' if not already)
      * @author.hint Plugin author name
@@ -24,162 +22,180 @@ component aliases="wheels plugin init" extends="../base" {
         string license = "MIT"
     ) {
         try {
+            // Reconstruct arguments to handle prefix (--)
+            arguments = reconstructArgs(arguments);
+
             // Ensure plugin name follows convention
             var pluginName = arguments.name;
             if (!reFindNoCase("^wheels-", pluginName)) {
                 pluginName = "wheels-" & pluginName;
             }
-            
-            print.greenBoldLine("🚀 Initializing new Wheels plugin: #pluginName#")
+
+            // Extract simple plugin name (without "wheels-" prefix)
+            var simplePluginName = replaceNoCase(pluginName, "wheels-", "", "one");
+
+            // Convert to camelCase for function names (remove hyphens and capitalize)
+            var functionPrefix = simplePluginName;
+            if (find("-", functionPrefix)) {
+                // Split by hyphen and capitalize each word after the first
+                var parts = listToArray(functionPrefix, "-");
+                functionPrefix = parts[1];
+                for (var i = 2; i <= arrayLen(parts); i++) {
+                    functionPrefix &= uCase(left(parts[i], 1)) & right(parts[i], len(parts[i]) - 1);
+                }
+            }
+
+            print.line()
+                 .boldCyanLine("===========================================================")
+                 .boldCyanLine("  Initializing Wheels Plugin: #pluginName#")
+                 .boldCyanLine("===========================================================")
                  .line();
-            
-            // Create plugin directory
-            var pluginDir = getCWD() & "/" & pluginName;
-            
+
+            // Create plugin in /plugins directory
+            var pluginsBaseDir = fileSystemUtil.resolvePath("plugins");
+            var pluginDir = pluginsBaseDir & "/" & simplePluginName;
+
+            // Ensure /plugins directory exists
+            if (!directoryExists(pluginsBaseDir)) {
+                directoryCreate(pluginsBaseDir);
+            }
+
             if (directoryExists(pluginDir)) {
-                error("Directory '#pluginName#' already exists!");
+                print.boldRedText("[ERROR] ")
+                     .redLine("Plugin already exists")
+                     .line()
+                     .yellowLine("Plugin '#simplePluginName#' already exists in /plugins folder")
+                     .line();
+                setExitCode(1);
                 return;
             }
-            
-            print.line("Creating plugin structure...");
-            
-            // Create directory structure
+
+            print.line("Creating plugin in /plugins/#simplePluginName#/...");
+
+            // Create plugin directory
             directoryCreate(pluginDir);
-            directoryCreate(pluginDir & "/commands");
-            directoryCreate(pluginDir & "/models");
             directoryCreate(pluginDir & "/tests");
-            directoryCreate(pluginDir & "/templates");
-            
+
             // Create box.json
             var boxJson = {
                 "name": pluginName,
                 "version": arguments.version,
                 "author": arguments.author,
-                "location": "ForgeBox",
                 "slug": pluginName,
-                "type": "commandbox-modules,cfwheels-plugins",
-                "keywords": "cfwheels,wheels,cli,plugin",
+                "type": "cfwheels-plugins",
+                "keywords": "cfwheels,wheels,plugin",
                 "homepage": "",
-                "documentation": "",
-                "repository": {
-                    "type": "git",
-                    "URL": ""
-                },
-                "bugs": "",
                 "shortDescription": arguments.description,
-                "description": arguments.description,
-                "license": [{
-                    "type": arguments.license,
-                    "URL": ""
-                }],
-                "contributors": [],
-                "dependencies": {},
-                "devDependencies": {},
-                "installPaths": {},
-                "scripts": {},
-                "ignore": [
-                    "**/.*",
-                    "tests/"
-                ]
+                "private": false
             };
-            
+
             fileWrite(pluginDir & "/box.json", serializeJSON(boxJson, true));
-            
-            // Create ModuleConfig.cfc
-            var moduleConfig = '/**
- * Module Configuration for #pluginName#
- */
-component {
-    
-    // Module Properties
-    this.title = "#pluginName#";
-    this.author = "#arguments.author#";
-    this.webURL = "";
-    this.description = "#arguments.description#";
-    this.version = "#arguments.version#";
-    this.viewParentLookup = true;
-    this.layoutParentLookup = true;
-    this.entryPoint = "/#lCase(pluginName)#";
-    this.inheritEntryPoint = false;
-    this.modelNamespace = "#lCase(pluginName)#";
-    this.cfmapping = "#lCase(pluginName)#";
-    this.autoMapModels = true;
-    this.dependencies = [];
-    
-    function configure() {
-        // Module settings
-        settings = {};
-        
-        // Module interceptors
-        interceptors = [];
-        
-        // Custom declared points
-        interceptorSettings = {
-            customInterceptionPoints = []
-        };
+
+            // Create main plugin CFC
+            var pluginCFC = 'component hint="#pluginName#" output="false" mixin="global" {
+
+    public function init() {
+        this.version = "#arguments.version#";
+        return this;
     }
-    
+
     /**
-     * Fired when the module is registered and activated
+     * Example function - Add your plugin methods here
+     *
+     * [section: Plugins]
+     * [category: #functionPrefix#]
+     *
+     * @param1 Description of parameter
      */
-    function onLoad() {
-        // Register any custom commands
+    public function #functionPrefix#Example(required string param1) {
+        // Your plugin logic here
+        return arguments.param1;
     }
-    
-    /**
-     * Fired when the module is unregistered and unloaded
-     */
-    function onUnload() {
-        // Cleanup code
-    }
+
 }';
-            
-            fileWrite(pluginDir & "/ModuleConfig.cfc", moduleConfig);
-            
+
+            fileWrite(pluginDir & "/#simplePluginName#.cfc", pluginCFC);
+
+            // Create index.cfm (plugin documentation page)
+            var indexCFM = '<h1>#pluginName#</h1>
+<p>#arguments.description#</p>
+
+<h3>Installation</h3>
+<pre>
+wheels plugin install #pluginName#
+</pre>
+
+<h3>Usage</h3>
+<h4>Example Function</h4>
+<pre>
+// Call the example function
+result = #functionPrefix#Example("test");
+</pre>
+
+<h3>Functions</h3>
+<ul>
+    <li><strong>#functionPrefix#Example()</strong> - Example function</li>
+</ul>
+
+<h3>Version</h3>
+<p>#arguments.version#</p>
+
+<h3>Author</h3>
+<p>#arguments.author#</p>
+';
+
+            fileWrite(pluginDir & "/index.cfm", indexCFM);
+
             // Create README.md
             var readme = "## #pluginName#
 
 #arguments.description#
 
-#### Installation
+## Installation
 
 Install via CommandBox:
 
-    wheels plugin install #pluginName#
+```bash
+wheels plugin install #pluginName#
+```
 
-#### Usage
+## Usage
 
-[Add usage instructions here]
+#### Example Function
 
-#### Commands
+```cfml
+// Call the example function
+result = #functionPrefix#Example(""test"");
+```
 
-This plugin provides the following commands:
+## Functions
 
-- `wheels [command]` - [Description]
+- **#functionPrefix#Example()** - Example function description
 
-#### Configuration
+## Development
 
-[Add configuration options here]
+## Running Tests
 
-#### Development
+```bash
+box testbox run
+```
 
-Running Tests:
+## Publishing
 
-    box testbox run
+```bash
+box login
+box publish
+```
 
-Building for Release:
-
-    box package publish
-
-#### License
+## License
 
 #arguments.license#
 
-#### Author
+## Author
 
 #arguments.author#
 ";
-            
+
             fileWrite(pluginDir & "/README.md", readme);
             
             // Create .gitignore
@@ -194,74 +210,58 @@ node_modules/
 *.log';
             
             fileWrite(pluginDir & "/.gitignore", gitignore);
-            
-            // Create example command
-            var exampleCommand = '/**
- * Example command for #pluginName#
- */
-component extends="commandbox.system.BaseCommand" {
-    
-    /**
-     * Run the example command
-     */
-    function run() {
-        print.greenLine("Hello from #pluginName#!");
-    }
-}';
-            
-            fileWrite(pluginDir & "/commands/hello.cfc", exampleCommand);
-            
+
             // Create test file
             var testFile = 'component extends="wheels.Testbox" {
-    
+
     function run() {
         describe("#pluginName# Tests", function() {
-            it("should have tests", function() {
-                expect(true).toBeTrue();
+
+            it("should initialize correctly", function() {
+                var plugin = createObject("component", "#simplePluginName#").init();
+                expect(plugin.version).toBe("#arguments.version#");
             });
+
+            it("should have example function", function() {
+                var plugin = createObject("component", "#simplePluginName#").init();
+                var result = plugin.#functionPrefix#Example("test");
+                expect(result).toBe("test");
+            });
+
         });
     }
+
 }';
-            
-            fileWrite(pluginDir & "/tests/MainTest.cfc", testFile);
-            
-            print.greenLine("✅ Plugin structure created successfully!")
+
+            fileWrite(pluginDir & "/tests/#simplePluginName#Test.cfc", testFile);
+
+            print.line()
+                 .boldCyanLine("===========================================================")
+                 .line()
+                 .boldGreenText("[OK] ")
+                 .greenLine("Plugin created successfully in /plugins/#simplePluginName#/")
                  .line();
-            
-            // Show next steps
+
+            print.boldLine("Files Created:")
+                 .line("  #simplePluginName#.cfc    Main plugin component")
+                 .line("  index.cfm         Documentation page")
+                 .line("  box.json          Package metadata")
+                 .line("  README.md         Project documentation")
+                 .line();
+
             print.boldLine("Next Steps:")
-                 .line()
-                 .line("1. Navigate to your plugin directory:")
-                 .yellowLine("   cd #pluginName#")
-                 .line()
-                 .line("2. Initialize git repository:")
-                 .yellowLine("   git init")
-                 .line()
-                 .line("3. Install dependencies:")
-                 .yellowLine("   box install")
-                 .line()
-                 .line("4. Add your plugin commands in the 'commands' directory")
-                 .line()
-                 .line("5. Test your plugin locally:")
-                 .yellowLine("   box package link")
-                 .yellowLine("   wheels hello  ## Test the example command")
-                 .line()
-                 .line("6. When ready to publish:")
-                 .yellowLine("   box login")
-                 .yellowLine("   box package publish")
-                 .line()
-                 .boldLine("Plugin Structure:")
-                 .line("  #pluginName#/")
-                 .line("  ├── box.json          ## Package configuration")
-                 .line("  ├── ModuleConfig.cfc  ## Module configuration")
-                 .line("  ├── README.md         ## Documentation")
-                 .line("  ├── commands/         ## CLI commands")
-                 .line("  ├── models/           ## Service components")
-                 .line("  ├── templates/        ## File templates")
-                 .line("  └── tests/            ## Test suite");
-            
+                 .cyanLine("  1. Edit #simplePluginName#.cfc to add your plugin functions")
+                 .cyanLine("  2. Update index.cfm and README.md with usage examples")
+                 .cyanLine("  3. Test: wheels reload (then call your functions)")
+                 .cyanLine("  4. Publish: box login && box publish");
+
         } catch (any e) {
-            error("Error initializing plugin: #e.message#");
+            print.line()
+                 .boldRedText("[ERROR] ")
+                 .redLine("Error initializing plugin")
+                 .line()
+                 .yellowLine("Error: #e.message#");
+            setExitCode(1);
         }
     }
 }
