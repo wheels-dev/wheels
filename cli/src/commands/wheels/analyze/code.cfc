@@ -29,6 +29,27 @@ component extends="wheels-cli.models.BaseCommand" {
     ) {
         //reconstructArgs() is defined in the same file, this file is not extented from base.cfc
         arguments = reconstructArgs(arguments);
+
+        // Validate severity parameter
+        var validSeverities = ["info", "warning", "error"];
+        if (!arrayFindNoCase(validSeverities, arguments.severity)) {
+            print.line()
+                 .boldRedText("[ERROR] ")
+                 .redLine("Invalid severity value")
+                 .line()
+                 .yellowLine("You provided: '#arguments.severity#'")
+                 .line()
+                 .line("Valid options:")
+                 .cyanLine("  - info     (Show all issues including informational)")
+                 .cyanLine("  - warning  (Show warnings and errors)")
+                 .cyanLine("  - error    (Show only critical errors)")
+                 .line()
+                 .line("Example:")
+                 .line("  wheels analyze code --severity=warning");
+            setExitCode(1);
+            return;
+        }
+
         // Set verbose mode if requested
         if (arguments.verbose) {
             print.setVerbose(true);
