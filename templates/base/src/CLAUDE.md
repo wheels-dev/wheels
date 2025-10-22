@@ -545,3 +545,121 @@ mcp__puppeteer__puppeteer_screenshot(name="posts-new")
 - Mix positional and named parameters
 - Assume Rails conventions work
 - Access properties without existence checks on new objects
+
+---
+
+## 📋 Spec-Driven Development Workflow
+
+This project uses a systematic spec-driven development approach for managing features and maintaining context across sessions.
+
+### Current Development
+
+#### Active Specifications
+*(Specifications currently in progress)*
+
+- None yet - use `/new-spec` to create your first feature specification
+
+#### Completed Specifications
+*(Successfully implemented features)*
+
+- None yet
+
+#### Recent Decisions
+*(Important architectural and implementation decisions)*
+
+1. **Spec-Driven Workflow Implemented**: Using comprehensive task breakdown and session persistence
+2. **Testing Strategy**: TestBox BDD specs + browser testing for all features
+3. **Context Persistence**: Multi-layer approach (CLAUDE.md, tasks.md, git commits, session notes)
+
+### Development Workflow Commands
+
+#### Starting a New Feature
+```bash
+/new-spec
+# Interactive prompts guide you through specification creation
+# Generates spec.md and technical-spec.md
+# Presents for review and approval
+```
+
+#### Breaking Down a Specification
+```bash
+/break-down-spec [spec-name]
+# Analyzes specification
+# Creates granular task breakdown (3-5 parent tasks, 3-8 subtasks each)
+# Generates tasks.md with YAML frontmatter
+# Creates feature branch
+```
+
+#### Implementing Tasks
+```bash
+/implement-task [task-number]
+# Loads task context
+# Invokes appropriate skills
+# Implements with testing
+# Marks complete upon success
+```
+
+#### Restoring Context
+```bash
+/restore-context
+# Loads project context from CLAUDE.md
+# Finds active specifications
+# Analyzes current state from tasks.md and git
+# Presents comprehensive status report
+# Offers to continue where you left off
+```
+
+#### Completing a Feature
+```bash
+/complete-spec [spec-name]
+# Runs comprehensive testing
+# Updates spec status to completed
+# Generates results report
+# Calculates implementation metrics
+```
+
+### Session Persistence Strategy
+
+This project uses **defense in depth** for context persistence:
+
+**Layer 1: Named Sessions**
+```bash
+claude --session-id [feature-name]
+claude --resume [feature-name]
+```
+
+**Layer 2: CLAUDE.md Updates**
+- Automatic session summaries via hooks
+- Active spec tracking
+- Recent decisions log
+
+**Layer 3: tasks.md Checkpoints**
+- Every task completion records timestamp, commit, session ID
+- Creates recoverable audit trail
+
+**Layer 4: Git Commit Messages**
+- Structured commits reference tasks and specs
+- Code becomes documentation
+
+**Layer 5: Automated Restoration**
+- `/restore-context` command rebuilds full context from documentation
+- Works even if session history is lost
+
+### Specification Storage
+
+All specifications are stored in `.claude/specs/`:
+```
+.claude/specs/
+├── YYYYMMDD-HHMMSS-feature-name/
+│   ├── spec.md              # Feature overview, user stories, acceptance criteria
+│   ├── technical-spec.md    # Architecture, database schema, API endpoints
+│   └── tasks.md             # Task breakdown with progress tracking
+```
+
+### Sub-Agents Available
+
+- **task-analyzer**: Analyzes specifications and creates optimal task breakdowns
+- **test-runner**: Runs tests and analyzes failures with suggested fixes
+- **spec-validator**: Validates specifications for completeness and consistency
+
+---

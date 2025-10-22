@@ -123,5 +123,9 @@
       "Bash(/dev/null)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "wheels",
+    "browsermcp"
+  ]
 }
