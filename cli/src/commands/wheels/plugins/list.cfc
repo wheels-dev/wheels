@@ -1,15 +1,14 @@
 /**
- * List installed Wheels CLI plugins
+ * List installed Wheels plugins
  * Examples:
  * wheels plugins list
- * wheels plugins list --global
  * wheels plugins list --format=json
  * wheels plugins list --available
  */
 component aliases="wheels plugin list" extends="../base" {
-    
+
     property name="pluginService" inject="PluginService@wheels-cli";
-    
+
     /**
      * @format.hint Output format: table (default) or json
      * @format.options table,json
@@ -20,75 +19,103 @@ component aliases="wheels plugin list" extends="../base" {
         boolean available = false
     ) {
         arguments = reconstructArgs(arguments);
+
         if (arguments.available) {
             // Show available plugins from ForgeBox
-            print.greenBoldLine("================ Available Wheels Plugins From ForgeBox ======================");
+            print.line()
+                 .boldCyanLine("===========================================================")
+                 .boldCyanLine("  Available Wheels Plugins on ForgeBox")
+                 .boldCyanLine("===========================================================")
+                 .line();
             command('forgebox show').params(type="cfwheels-plugins").run();
-            print.greenBoldLine("=============================================================================");
             return;
         }
-        
+
         // Show installed plugins
         var plugins = pluginService.list();
-        
+
         if (arrayLen(plugins) == 0) {
-            print.yellowLine("No plugins installed");
-            print.line("Install plugins with: wheels plugins install <plugin-name>");
-            print.line("See available plugins with: wheels plugins list --available");
+            print.line()
+                 .boldCyanLine("===========================================================")
+                 .boldCyanLine("  Installed Wheels Plugins")
+                 .boldCyanLine("===========================================================")
+                 .line();
+            print.yellowLine("No plugins installed in /plugins folder")
+                 .line();
+            print.line("Install plugins with:")
+                 .cyanLine("  wheels plugin install <plugin-name>")
+                 .line();
+            print.line("See available plugins:")
+                 .cyanLine("  wheels plugin list --available");
             return;
         }
-        
+
         if (arguments.format == "json") {
             // JSON format output
             var jsonOutput = {
-                "plugins": plugins
+                "plugins": plugins,
+                "count": arrayLen(plugins)
             };
-            print.line(jsonOutput);
+            print.line(serializeJSON(jsonOutput, true));
         } else {
-            // Table format output (matching the guide)
-            print.line("Installed Wheels CLI Plugins")
+            // Table format output
+            print.line()
+                 .boldCyanLine("===========================================================")
+                 .boldCyanLine("  Installed Wheels Plugins (#arrayLen(plugins)#)")
+                 .boldCyanLine("===========================================================")
                  .line();
-            
-            if (arrayLen(plugins) > 0) {
-                // Calculate column widths dynamically
-                var maxNameLength = 4; // minimum for "Name"
-                var maxVersionLength = 7; // minimum for "Version"
-                
-                for (var plugin in plugins) {
-                    if (len(plugin.name) > maxNameLength) {
-                        maxNameLength = len(plugin.name);
-                    }
-                    if (len(plugin.version) > maxVersionLength) {
-                        maxVersionLength = len(plugin.version);
-                    }
+
+            // Calculate column widths dynamically
+            var maxNameLength = 20; // minimum width
+            var maxVersionLength = 10; // minimum width
+
+            for (var plugin in plugins) {
+                if (len(plugin.name) > maxNameLength) {
+                    maxNameLength = len(plugin.name);
                 }
-                
-                // Add padding
-                maxNameLength += 2;
-                maxVersionLength += 2;
-                
-                // Print dynamic table header
-                var headerLine = padRight("Name", maxNameLength) & padRight("Version", maxVersionLength) & "Description";
-                var separatorLine = repeatString("-", len(headerLine));
-                
-                print.line(headerLine);
-                print.line(separatorLine);
-                
-                // Display plugins in table format with full information
-                for (var plugin in plugins) {
-                    var name = padRight(plugin.name, maxNameLength);
-                    var version = padRight(plugin.version, maxVersionLength);
-                    var description = plugin.keyExists("description") && len(plugin.description) ? plugin.description : "";
-                    
-                    print.line("#name##version##description#");
+                if (len(plugin.version) > maxVersionLength) {
+                    maxVersionLength = len(plugin.version);
                 }
-                
-                print.line();
-                print.yellowLine("Total: #arrayLen(plugins)# plugin" & (arrayLen(plugins) != 1 ? "s" : ""));
             }
+
+            // Add padding
+            maxNameLength += 2;
+            maxVersionLength += 2;
+
+            // Print table header
+            print.boldText(padRight("Plugin Name", maxNameLength))
+                 .boldText(padRight("Version", maxVersionLength))
+                 .boldLine("Description");
+
+            print.line(repeatString("-", maxNameLength + maxVersionLength + 40));
+
+            // Display plugins in table format
+            for (var plugin in plugins) {
+                var name = padRight(plugin.name, maxNameLength);
+                var version = padRight(plugin.version, maxVersionLength);
+                var description = plugin.keyExists("description") && len(plugin.description) ?
+                                left(plugin.description, 40) : "";
+
+                print.cyanText(name)
+                     .greenText(version)
+                     .line(description);
+            }
+
+            print.line()
+                 .boldLine("-----------------------------------------------------------")
+                 .line();
+
+            print.boldGreenText("[OK] ")
+                 .line("#arrayLen(plugins)# plugin#arrayLen(plugins) != 1 ? 's' : ''# installed")
+                 .line();
+
+            print.line("Commands:")
+                 .cyanLine("  wheels plugin info <name>      View plugin details")
+                 .cyanLine("  wheels plugin update:all       Update all plugins")
+                 .cyanLine("  wheels plugin outdated         Check for updates");
         }
     }
-    
+
     /**
      * Pad string to right with spaces
      */

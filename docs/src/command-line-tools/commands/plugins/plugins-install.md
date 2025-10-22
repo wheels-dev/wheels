@@ -1,6 +1,6 @@
-# plugins install
+# wheels plugins install
 
-Installs a Wheels CLI plugin from various sources including ForgeBox, GitHub, or local files.
+Install a Wheels plugin from ForgeBox into the `/plugins` folder.
 
 ## Usage
 
@@ -10,108 +10,234 @@ wheels plugins install <name> [--dev] [--version=<version>]
 
 ## Parameters
 
-- `name` - (Required) Plugin name or repository URL
-- `--dev` - (Optional) Install as development dependency
-- `--version` - (Optional) Specific version to install
+| Parameter | Required | Type    | Description                                    |
+|-----------|----------|---------|------------------------------------------------|
+| `name`    | Yes      | string  | Plugin name or slug from ForgeBox              |
+| `dev`     | No       | boolean | Install as development dependency (not used)   |
+| `version` | No       | string  | Specific version to install (default: latest)  |
 
 ## Description
 
-The `plugins install` command downloads and installs Wheels plugins into your application. It supports multiple installation sources:
+The `plugins install` command installs `cfwheels-plugins` type packages from ForgeBox into your application's `/plugins` folder. The command validates that the package is a valid cfwheels-plugin before installation.
 
-- **ForgeBox Registry**: Official and community plugins
-- **GitHub Repositories**: Direct installation from GitHub
-- **Local Files**: ZIP files or directories
-- **URL Downloads**: Direct ZIP file URLs
+### Features
 
-The command automatically:
-- Checks plugin compatibility
-- Resolves dependencies
-- Backs up existing plugins
-- Runs installation scripts
+- Installs only `cfwheels-plugins` type packages
+- Validates package type before installation
+- Automatically places plugins in `/plugins` folder
+- Supports specific version installation
+- Beautiful, color-coded output
+- Helpful error messages
+
+### Package Type Validation
+
+The command ensures that only packages with type `cfwheels-plugins` can be installed. This prevents accidental installation of non-plugin packages.
 
 ## Examples
 
-### Install from ForgeBox
+### Install latest version from ForgeBox
+
 ```bash
-wheels plugins install wheels-vue-cli
+wheels plugins install cfwheels-bcrypt
+```
+
+**Output:**
+```
+===========================================================
+  Installing Plugin
+===========================================================
+
+Plugin:  cfwheels-bcrypt
+Version: latest
+
+[CommandBox installation output...]
+
+===========================================================
+
+[OK] Plugin installed successfully!
+
+Bcrypt encryption support for Wheels
+
+Commands:
+  wheels plugin list          View all installed plugins
+  wheels plugin info cfwheels-bcrypt   View plugin details
 ```
 
 ### Install specific version
+
 ```bash
-wheels plugins install wheels-docker --version=2.0.0
+wheels plugins install cfwheels-shortcodes --version=0.0.3
 ```
 
-### Install from GitHub
-```bash
-wheels plugins install https://github.com/user/wheels-plugin
+**Output:**
+```
+===========================================================
+  Installing Plugin
+===========================================================
+
+Plugin:  cfwheels-shortcodes
+Version: 0.0.3
+
+[CommandBox installation output...]
+
+===========================================================
+
+[OK] Plugin installed successfully!
+
+Shortcode support for Wheels content
+
+Commands:
+  wheels plugin list          View all installed plugins
+  wheels plugin info cfwheels-shortcodes   View plugin details
 ```
 
-### Install as development dependency
+### Install using plugin name (matches slug)
+
 ```bash
-wheels plugins install wheels-docker --dev
+wheels plugins install bcrypt
 ```
 
-### Install with version
+The command will find and install `cfwheels-bcrypt` from ForgeBox.
+
+### Installation fails (wrong package type)
+
 ```bash
-wheels plugins install wheels-testing --dev --version=1.5.0
+wheels plugins install commandbox-migrations
+```
+
+**Output:**
+```
+===========================================================
+  Installing Plugin
+===========================================================
+
+Plugin:  commandbox-migrations
+Version: latest
+
+===========================================================
+
+[ERROR] Failed to install plugin
+
+Error: Only cfwheels-plugins can be installed via this command
+
+Possible solutions:
+  - Verify the plugin name is correct
+  - Check if the plugin exists on ForgeBox:
+    wheels plugin list --available
+  - Ensure the plugin type is 'cfwheels-plugins'
+```
+
+### Installation fails (plugin not found)
+
+```bash
+wheels plugins install nonexistent-plugin
+```
+
+**Output:**
+```
+===========================================================
+  Installing Plugin
+===========================================================
+
+Plugin:  nonexistent-plugin
+Version: latest
+
+===========================================================
+
+[ERROR] Failed to install plugin
+
+Error: Plugin not found on ForgeBox
+
+Possible solutions:
+  - Verify the plugin name is correct
+  - Check if the plugin exists on ForgeBox:
+    wheels plugin list --available
+  - Ensure the plugin type is 'cfwheels-plugins'
 ```
 
 ## Installation Process
 
-1. **Download**: Fetches plugin from specified source
-2. **Validation**: Checks compatibility and requirements
-3. **Backup**: Creates backup of existing plugin (if any)
-4. **Installation**: Extracts files to plugins directory
-5. **Dependencies**: Installs required dependencies
-6. **Initialization**: Runs plugin setup scripts
-7. **Verification**: Confirms successful installation
+1. **Display Header**: Shows plugin name and target version
+2. **Package Validation**: Verifies the package is type `cfwheels-plugins`
+3. **Download**: Uses CommandBox's PackageService to download from ForgeBox
+4. **Installation**: CommandBox installs the package
+5. **Directory Move**: If installed to wrong location, moves to `/plugins` folder
+6. **Verification**: Confirms installation success
+7. **Display Results**: Shows success message with helpful next steps
 
-## Output
+## How It Works
 
-```
-Installing plugin: wheels-vue-cli...
+The command uses PluginService which:
+1. Calls ForgeBox API to check package type
+2. Uses `packageService.installPackage()` to download and install
+3. Checks common installation paths (`/modules/`, root)
+4. Moves plugin to `/plugins/` folder if needed
+5. Returns success/failure status
 
-Plugin installed successfully
-```
+## Package Sources
 
-If installation fails:
-```
-Installing plugin: invalid-plugin...
+### ForgeBox (Only Supported Source)
 
-Plugin installation failed
-Error: Plugin not found in repository
-```
+The command only supports installing from ForgeBox:
 
-## Plugin Sources
-
-### ForgeBox
 ```bash
-# Install by name (searches ForgeBox)
-wheels plugins install plugin-name
+# By slug
+wheels plugins install cfwheels-bcrypt
 
+# By name (auto-finds slug)
+wheels plugins install bcrypt
+
+# Specific version
+wheels plugins install cfwheels-bcrypt --version=0.0.4
 ```
 
-### GitHub
-```bash
-# HTTPS URL
-wheels plugins install https://github.com/user/repo
+### Unsupported Sources
 
-# GitHub shorthand
-wheels plugins install github:user/repo
+The following sources are NOT supported:
+- ❌ GitHub repositories
+- ❌ Direct URLs
+- ❌ Local ZIP files
+- ❌ Local directories
 
-# Specific branch/tag
-wheels plugins install github:user/repo#v2.0.0
+To install plugins from these sources, use CommandBox's native `install` command and manually move to `/plugins` folder.
+
+## Error Messages
+
+### Package Type Validation Failed
 ```
-
-### Direct URL
-```bash
-wheels plugins install https://example.com/plugin.zip
+[ERROR] Failed to install plugin
+Error: Only cfwheels-plugins can be installed via this command
 ```
+**Solution**: Verify the package type on ForgeBox is `cfwheels-plugins`
+
+### Plugin Not Found
+```
+[ERROR] Failed to install plugin
+Error: Plugin not found on ForgeBox
+```
+**Solution**: Check available plugins with `wheels plugin list --available`
+
+### Network Error
+```
+[ERROR] Failed to install plugin
+Error: Could not connect to ForgeBox
+```
+**Solution**: Check internet connection and ForgeBox status
 
 ## Notes
 
-- Plugins must be compatible with your Wheels version
-- Always backup your application before installing plugins
-- Some plugins require manual configuration after installation
-- Use `wheels plugins list` to verify installation
-- Restart your application to activate new plugins
+- Only installs `cfwheels-plugins` type packages from ForgeBox
+- Plugins are installed to `/plugins` folder
+- The `--dev` parameter is accepted but not currently used
+- Package type validation prevents installation of incorrect packages
+- If a plugin is already installed, it will be overwritten
+- After installation, use `wheels plugin info <name>` to view details
+- Restart your application to activate the new plugin
+- The command automatically handles directory placement
+
+## See Also
+
+- [wheels plugin list](plugins-list.md) - List installed plugins
+- [wheels plugin info](plugins-info.md) - View plugin details
+- [wheels plugin update](plugins-update.md) - Update a plugin
+- [wheels plugin remove](plugins-remove.md) - Remove a plugin

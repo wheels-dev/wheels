@@ -133,8 +133,6 @@ wheels test:watch
 | `--format` | string | txt | Output format (txt, json, junit, html) |
 | `--verbose` | boolean | true | Display extra details including passing and skipped tests |
 | `--delay` | integer | 1000 | Delay in milliseconds before rerunning tests |
-| `--watchPaths` | string | - | Additional paths to watch (comma-separated) |
-| `--excludePaths` | string | - | Paths to exclude from watching (comma-separated) |
 | `--bundles` | string | - | The path or list of paths of the spec bundle CFCs to run and test ONLY |
 | `--labels` | string | - | The list of labels that a suite or spec must have in order to execute |
 | `--excludes` | string | - | The list of labels that a suite or spec must not have in order to execute |
@@ -151,12 +149,6 @@ wheels test:watch --directory=tests/specs/unit
 
 # Watch with custom delay and JSON format
 wheels test:watch --delay=500 --format=json
-
-# Watch additional paths
-wheels test:watch --watchPaths=models,controllers
-
-# Exclude paths from watching
-wheels test:watch --excludePaths=logs,temp
 ```
 
 ### test:coverage - Code Coverage
