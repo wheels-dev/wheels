@@ -257,12 +257,12 @@ class WheelsParameterTypoDetector {
                     // Reset for next parameter
                     currentParam = '';
                     paramStart = -1;
-                } else if (/[a-zA-Z_]/.test(char) && currentParam === '' && paramStart === -1) {
-                    // Start of a potential parameter name
+                } else if (/[a-zA-Z_$]/.test(char) && currentParam === '' && paramStart === -1) {
+                    // Start of a potential parameter name (including $ for Wheels internal params)
                     currentParam = char;
                     paramStart = i;
-                } else if (/\w/.test(char) && currentParam !== '') {
-                    // Continue building parameter name
+                } else if (/[\w$]/.test(char) && currentParam !== '') {
+                    // Continue building parameter name (including $ for Wheels internal params)
                     currentParam += char;
                 } else if (char === ' ' && currentParam !== '') {
                     // Space after word - check if it's a CFML type declaration
@@ -336,7 +336,23 @@ class WheelsParameterTypoDetector {
         const validParams = this.wheelsParameters[functionName];
         if (!validParams) return true; // Function not found, assume valid
 
-        return validParams.includes(parameterName.toLowerCase());
+        const lowerParam = parameterName.toLowerCase();
+
+        // Check exact match first
+        if (validParams.includes(lowerParam)) {
+            return true;
+        }
+
+        // Check singular/plural variations before declaring invalid
+        const pluralForm = this.pluralizeParameter(lowerParam);
+        const singularForm = this.singularizeParameter(lowerParam);
+
+        // If either plural or singular form exists, consider this valid (it's an alias)
+        if (validParams.includes(pluralForm) || validParams.includes(singularForm)) {
+            return true;
+        }
+
+        return false;
     }
 
     suggestParameter(functionName, parameterName) {
@@ -344,6 +360,18 @@ class WheelsParameterTypoDetector {
         if (!validParams) return null;
 
         const lowerParam = parameterName.toLowerCase();
+
+        // First check if plural/singular form exists - this is likely what user meant
+        const pluralForm = this.pluralizeParameter(lowerParam);
+        const singularForm = this.singularizeParameter(lowerParam);
+
+        if (validParams.includes(pluralForm)) {
+            return pluralForm;
+        }
+
+        if (validParams.includes(singularForm)) {
+            return singularForm;
+        }
 
         // Find best match using simple string similarity
         let bestMatch = null;
@@ -397,6 +425,82 @@ class WheelsParameterTypoDetector {
         }
 
         return matrix[str2.length][str1.length];
+    }
+
+    /**
+     * Pluralize a parameter name using simple English rules
+     * This helps detect parameter aliases like property/properties
+     */
+    pluralizeParameter(word) {
+        if (!word || word.length === 0) return word;
+
+        const lower = word.toLowerCase();
+
+        // Already plural or very short words
+        if (lower.endsWith('ies') || lower.endsWith('es') || lower.length < 3) {
+            return lower;
+        }
+
+        // Special case: "property" -> "properties"
+        if (lower === 'property') {
+            return 'properties';
+        }
+
+        // Words ending in 'y' preceded by consonant -> 'ies'
+        if (lower.match(/[^aeiou]y$/)) {
+            return lower.slice(0, -1) + 'ies';
+        }
+
+        // Words ending in 's', 'x', 'z', 'ch', 'sh' -> add 'es'
+        if (lower.match(/(s|ss|x|z|ch|sh)$/)) {
+            return lower + 'es';
+        }
+
+        // Default: just add 's'
+        return lower + 's';
+    }
+
+    /**
+     * Singularize a parameter name using simple English rules
+     * This helps detect parameter aliases like properties/property
+     */
+    singularizeParameter(word) {
+        if (!word || word.length === 0) return word;
+
+        const lower = word.toLowerCase();
+
+        // Too short to singularize
+        if (lower.length < 3) {
+            return lower;
+        }
+
+        // Special case: "properties" -> "property"
+        if (lower === 'properties') {
+            return 'property';
+        }
+
+        // Words ending in 'ies' -> 'y'
+        if (lower.endsWith('ies') && lower.length > 4) {
+            return lower.slice(0, -3) + 'y';
+        }
+
+        // Words ending in 'es' (but not 'ses', 'xes', 'zes', 'ches', 'shes')
+        if (lower.endsWith('es') && lower.length > 3) {
+            const beforeEs = lower.slice(-4, -2);
+            if (['ss', 'ch', 'sh'].includes(beforeEs) || ['x', 'z'].includes(lower.charAt(lower.length - 3))) {
+                return lower.slice(0, -2);
+            }
+            // Try removing just 's' for words like 'homes' -> 'home'
+            return lower.slice(0, -1);
+        }
+
+        // Words ending in 's' (but check it's not part of the root word)
+        if (lower.endsWith('s') && !lower.endsWith('ss')) {
+            return lower.slice(0, -1);
+        }
+
+        // Already singular or unrecognized pattern
+        return lower;
     }
 
     loadWheelsParameters() {
@@ -571,8 +675,8 @@ class WheelsParameterCompletionProvider {
         const paramText = lineText.substring(paramStart);
 
         // Find the current parameter being typed
-        // Look for the last word that could be a parameter name
-        const lastWordMatch = paramText.match(/(?:^|[,\s])([a-zA-Z]\w*)$/);
+        // Look for the last word that could be a parameter name (including $ for Wheels internal params)
+        const lastWordMatch = paramText.match(/(?:^|[,\s])([$a-zA-Z][\w$]*)$/);
 
         if (lastWordMatch) {
             return lastWordMatch[1];
@@ -1161,8 +1265,8 @@ class WheelsSignatureHelpProvider {
         }
 
         // Check if user is typing a partial parameter name
-        // Examples: "findAll(g" -> "g", "findAll(where='test', ord" -> "ord"
-        const paramNameMatch = callContent.match(/(?:^|\s*,\s*)([a-zA-Z]\w*)$/);
+        // Examples: "findAll(g" -> "g", "findAll(where='test', ord" -> "ord", "scope($c" -> "$c"
+        const paramNameMatch = callContent.match(/(?:^|\s*,\s*)([$a-zA-Z][\w$]*)$/);
         if (paramNameMatch) {
             const partialParamName = paramNameMatch[1];
             // Find parameter that starts with this partial name
