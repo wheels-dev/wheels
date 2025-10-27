@@ -1,5 +1,15 @@
 # Change Log
 
+## [1.0.8] - 2025-10-23
+
+### Fixed
+- **Smart Parameter Alias Detection**: Fixed false warnings for singular/plural parameter aliases
+  - Intelligently detects that `property` and `properties` are aliases before showing warnings
+  - Works for all parameter aliases like `name`/`names`, `property`/`properties`, etc.
+- **Dollar Sign Parameter Support**: Fixed parameter parsing to correctly handle Wheels internal parameters starting with `$`
+  - Now correctly recognizes parameters like `$call`, `$type`, `$args` without warnings
+  - Example: `scope(path = "test", $call = "new")` no longer shows "Did you mean '$call'?" warning
+
 ## [1.0.7] - 2025-10-16
 
 ### Changed
