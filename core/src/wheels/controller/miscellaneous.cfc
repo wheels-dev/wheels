@@ -17,10 +17,10 @@ component {
 	 * @writeToFile The file to which the email contents will be written
 	 */
 	public any function sendEmail(
-		string template = "",
-		string from = "",
-		string to = "",
-		string subject = "",
+		required string template,
+		required string from,
+		required string to,
+		required string subject,
 		any layout,
 		string file = "",
 		boolean detectMultipart,
