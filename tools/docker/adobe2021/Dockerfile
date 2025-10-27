@@ -2,11 +2,6 @@ FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
-#Add sqltie jdbc driver
-RUN mkdir -p /wheels-test-suite/.engine/adobe2021/WEB-INF/cfusion/lib \
- && wget -O /wheels-test-suite/.engine/adobe2021/WEB-INF/cfusion/lib/sqlite-jdbc.jar \
-    https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.50.3.0/sqlite-jdbc-3.50.3.0.jar
-
 #Add Sqlite
 RUN apt update -y && apt install -y sqlite3 libsqlite3-dev
 RUN pwd
