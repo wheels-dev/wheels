@@ -80,6 +80,51 @@ function config() {
 #startFormTag(action="create")#  // Wheels adds CSRF automatically
 ```
 
+**CRITICAL: Filter must run for ALL actions that use loaded data:**
+```cfm
+// ❌ WRONG - Filter doesn't run for show, but show expects 'user' to be loaded
+function config() {
+    filters(through="findUser", only="edit,update,delete");
+}
+function show() {
+    // ERROR: user variable not defined!
+    renderView();
+}
+
+// ✅ CORRECT - Filter runs for ALL actions that need the data
+function config() {
+    filters(through="findUser", only="show,edit,update,delete");
+}
+function show() {
+    // user variable loaded by filter
+    renderView();
+}
+```
+
+**CRITICAL: Centralize key parameter resolution in filters:**
+```cfm
+// ❌ WRONG - Duplicated logic in multiple actions
+function show() {
+    if (!structKeyExists(params, "key") && structKeyExists(session, "userId")) {
+        params.key = session.userId;
+    }
+    user = model("User").findByKey(key=params.key);
+}
+
+// ✅ CORRECT - Centralized in filter
+private function findUser() {
+    // Handle session userId fallback
+    if (!structKeyExists(params, "key") && structKeyExists(session, "userId")) {
+        params.key = session.userId;
+    }
+    user = model("User").findByKey(key=params.key);
+    if (!isObject(user)) {
+        flashInsert(error="User not found");
+        redirectTo(controller="home", action="index");
+    }
+}
+```
+
 ## CRUD Controller Template
 
 ### Complete CRUD Implementation
@@ -133,7 +178,7 @@ component extends="Controller" {
             redirectTo(action="show", key=resource.key());
         } else {
             flashInsert(error="Please correct the errors below.");
-            renderPage(action="new");
+            renderView(action="new");
         }
     }
 
@@ -155,7 +200,31 @@ component extends="Controller" {
             redirectTo(action="show", key=resource.key());
         } else {
             flashInsert(error="Please correct the errors below.");
-            renderPage(action="edit");
+            renderView(action="edit");
+        }
+    }
+
+    /**
+     * Update with optional password change (Task 4 pattern)
+     * Use this for user profile updates where password change is optional
+     */
+    function updateWithOptionalPassword() {
+        // User loaded by filter
+
+        // Handle optional password change - if blank, don't change it
+        if (structKeyExists(params.user, "password")) {
+            if (!len(trim(params.user.password))) {
+                structDelete(params.user, "password");
+                structDelete(params.user, "passwordConfirmation");
+            }
+        }
+
+        if (user.update(params.user)) {
+            flashInsert(success="Profile updated successfully!");
+            redirectTo(action="show", key=user.key());
+        } else {
+            flashInsert(error="Please correct the errors below.");
+            renderView(action="edit");
         }
     }
 
@@ -274,7 +343,7 @@ function create() {
 
     if (!resource.save()) {
         // Render the new action's view
-        renderPage(action="new");
+        renderView(action="new");
     }
 }
 ```
@@ -583,7 +652,7 @@ expect(controller.resources).toBeQuery();
 ## Quick Reference
 
 ### Common Controller Methods
-- `renderPage()` - Render specific view
+- `renderView()` - Render specific view
 - `renderPartial()` - Render partial
 - `renderWith()` - Render with format (JSON/XML)
 - `redirectTo()` - Redirect to action/URL

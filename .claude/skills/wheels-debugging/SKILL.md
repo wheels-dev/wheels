@@ -7,6 +7,16 @@ description: Troubleshoot common Wheels errors and provide debugging guidance. U
 
 ## Common Errors
 
+### "No matching function [RENDERPAGE] found"
+
+**Cause:** Using wrong function name - CFWheels uses `renderView()` not `renderPage()`
+
+**Solution:** Change to correct function name
+```cfm
+❌ renderPage(action="new")
+✅ renderView(action="new")
+```
+
 ### "Missing argument name" Error
 
 **Cause:** Mixed positional and named arguments
@@ -15,6 +25,19 @@ description: Troubleshoot common Wheels errors and provide debugging guidance. U
 ```cfm
 ❌ hasMany("comments", dependent="delete")
 ✅ hasMany(name="comments", dependent="delete")
+
+❌ .resources("sessions", only="new,create")
+✅ .resources(name="sessions", only="new,create")
+```
+
+### "key [onCreate,onUpdate] doesn't exist"
+
+**Cause:** Using comma-separated values in validation `when` parameter
+
+**Solution:** Remove the `when` parameter - validations run on both create and update by default
+```cfm
+❌ validatesConfirmationOf(properties="password", when="onCreate,onUpdate")
+✅ validatesConfirmationOf(properties="password")
 ```
 
 ### "Can't cast Object type [Query] to [Array]"

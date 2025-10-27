@@ -14,9 +14,48 @@ Activate automatically when:
 - User is changing database schema
 - User mentions: migration, database, table, column, index, schema
 
-## Critical Anti-Pattern to Prevent
+## 🚨 CRITICAL: Migration File Location
 
-### ❌ ANTI-PATTERN: Database-Specific Date Functions
+**Migrations MUST be in:** `app/migrator/migrations/`
+**NOT:** `db/migrate/` or any other location
+
+After creating migration files, reload Wheels: `curl -s "http://localhost:PORT/?reload=true&password="`
+
+## Critical Anti-Patterns to Prevent
+
+### ❌ ANTI-PATTERN 1: Wrong Migration Directory
+
+**WRONG:**
+```bash
+# Creating migration in wrong location
+db/migrate/20251022072809_CreateUsers.cfc  ❌ Won't be found!
+```
+
+**CORRECT:**
+```bash
+# Wheels looks for migrations here
+app/migrator/migrations/20251022072809_CreateUsers.cfc  ✅ Correct!
+```
+
+### ❌ ANTI-PATTERN 2: timestamps() Includes deletedAt
+
+**WRONG:**
+```cfm
+t.datetime(columnNames="deletedAt", allowNull=true);
+t.timestamps();  // ❌ Creates duplicate deletedAt!
+```
+
+**CORRECT:**
+```cfm
+t.timestamps();  // ✅ Includes createdAt, updatedAt, AND deletedAt
+```
+
+**Note:** Wheels `t.timestamps()` automatically adds:
+- `createdAt` (datetime, NOT NULL)
+- `updatedAt` (datetime, NOT NULL)
+- `deletedAt` (datetime, NULL) - for soft delete support
+
+### ❌ ANTI-PATTERN 3: Database-Specific Date Functions
 
 **NEVER use database-specific functions like DATE_SUB(), NOW(), CURDATE()!**
 

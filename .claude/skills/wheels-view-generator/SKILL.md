@@ -65,6 +65,89 @@ Activate automatically when:
 #textField(objectName="user", property="age", type="number")#  ✅
 ```
 
+### ❌ ANTI-PATTERN 4: HTML in linkTo() Text
+
+**linkTo() HTML-encodes the text parameter by default for security:**
+```cfm
+❌ WRONG - HTML will be escaped and displayed as text:
+#linkTo(text="<span class='logo'>Brand</span>", controller="home", action="index")#
+```
+
+**Use manual anchor tag with urlFor() for HTML content:**
+```cfm
+✅ CORRECT - HTML renders properly:
+<a href="#urlFor(controller='home', action='index')#">
+    <span class="logo">Brand</span>
+</a>
+```
+
+### ❌ ANTI-PATTERN 5: Assuming allErrors() Returns Array
+
+**allErrors(propertyName) can return string OR array:**
+```cfm
+❌ WRONG - Assumes always array:
+<cfloop array="#user.allErrors('email')#" index="error">
+    <li>#error#</li>
+</cfloop>
+```
+
+**✅ BEST PRACTICE - Inline Ternary (Task 4 Pattern):**
+```cfm
+<!--- For single error display (most common) --->
+<cfif user.hasErrors("email")>
+    <cfset emailErrors = user.allErrors("email")>
+    <p class="error">#isArray(emailErrors) ? emailErrors[1] : emailErrors#</p>
+</cfif>
+
+### ❌ ANTI-PATTERN 6: Wrong startFormTag() Pattern for Update Forms
+
+**CRITICAL: Using action="update" without route causes forms to submit as GET:**
+```cfm
+❌ WRONG - Submits as GET, doesn't reach update action:
+#startFormTag(action="update", method="patch")#
+
+❌ ALSO WRONG - Missing key parameter:
+#startFormTag(action="update", key=user.id, method="patch")#
+```
+
+**✅ CORRECT - Use route with key for RESTful updates:**
+```cfm
+<!--- For new records --->
+#startFormTag(action="create", method="post")#
+
+<!--- For updating existing records - use ROUTE not ACTION --->
+#startFormTag(route="user", key=user.id, method="patch")#
+
+<!--- Or dynamically --->
+<cfif user.isNew()>
+    #startFormTag(action="create", method="post")#
+<cfelse>
+    #startFormTag(route="user", key=user.id, method="patch")#
+</cfif>
+```
+
+**Why This Matters:**
+- `action="update"` tries to route to /controller/update (wrong)
+- `route="user"` with `key` routes to /users/[id] (correct RESTful pattern)
+- Without proper route+key, form submits as GET to wrong endpoint
+- PATCH method requires correct route to work properly
+```
+
+**✅ ALTERNATIVE - Explicit Type Check (for multiple errors):**
+```cfm
+<cfset propertyErrors = user.allErrors('email')>
+<cfif isArray(propertyErrors)>
+    <cfloop array="#propertyErrors#" index="error">
+        <li>#error#</li>
+    </cfloop>
+<cfelse>
+    <li>#propertyErrors#</li>
+</cfif>
+```
+
+**📝 Production Note (Task 4):**
+The inline ternary pattern is cleaner for form field errors where you only need to display the first error message.
+
 ## 🚨 Production-Tested Best Practices
 
 ### 1. Association Access in Query Loops (CRITICAL)
@@ -316,32 +399,40 @@ tweets = model("Tweet").findAll(select="id,content,likesCount");
         </div>
     </cfif>
 
-    #startFormTag(action=resource.isNew() ? "create" : "update", method=resource.isNew() ? "post" : "patch")#
+    <!--- CRITICAL: For update forms, use route with key, not just action --->
+    <cfif resource.isNew()>
+        #startFormTag(action="create", method="post")#
+    <cfelse>
+        #startFormTag(route="resource", key=resource.id, method="patch")#
+    </cfif>
 
-        <!--- Text input with error display --->
+        <!--- Text input with error display (Task 4 pattern) --->
         <div class="form-group #resource.hasErrors('title') ? 'has-error' : ''#">
             <label for="resource-title">Title *</label>
             #textField(objectName="resource", property="title", label=false, class="form-control")#
             <cfif resource.hasErrors("title")>
-                <span class="error-message">#resource.allErrors("title")[1]#</span>
+                <cfset titleErrors = resource.allErrors("title")>
+                <span class="error-message">#isArray(titleErrors) ? titleErrors[1] : titleErrors#</span>
             </cfif>
         </div>
 
-        <!--- Textarea with error display --->
+        <!--- Textarea with error display (Task 4 pattern) --->
         <div class="form-group #resource.hasErrors('description') ? 'has-error' : ''#">
             <label for="resource-description">Description</label>
             #textArea(objectName="resource", property="description", label=false, rows=6, class="form-control")#
             <cfif resource.hasErrors("description")>
-                <span class="error-message">#resource.allErrors("description")[1]#</span>
+                <cfset descErrors = resource.allErrors("description")>
+                <span class="error-message">#isArray(descErrors) ? descErrors[1] : descErrors#</span>
             </cfif>
         </div>
 
-        <!--- Email field (use textField with type) --->
+        <!--- Email field with error display (Task 4 pattern) --->
         <div class="form-group #resource.hasErrors('email') ? 'has-error' : ''#">
             <label for="resource-email">Email *</label>
             #textField(objectName="resource", property="email", type="email", label=false, class="form-control")#
             <cfif resource.hasErrors("email")>
-                <span class="error-message">#resource.allErrors("email")[1]#</span>
+                <cfset emailErrors = resource.allErrors("email")>
+                <span class="error-message">#isArray(emailErrors) ? emailErrors[1] : emailErrors#</span>
             </cfif>
         </div>
 
