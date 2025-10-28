@@ -112,6 +112,14 @@ component aliases='wheels g api-resource' extends="../base" {
         file action='write' file='#local.controllerFilePath#' mode='777' output='#trim(local.controllerContent)#';
         detailOutput.create(local.controllerFilePath);
 
+        // Add routes automatically
+        detailOutput.invoke("routes");
+        addRoutesToConfig(
+            resourceName = lCase(local.obj.objectNamePlural),
+            namespace = arguments.namespace,
+            version = arguments.version
+        );
+
         // Generate API documentation if requested
         if (arguments.docs) {
             detailOutput.invoke("documentation");
@@ -220,24 +228,28 @@ Status 204 No Content
 
         // Show next steps
         var nextSteps = [
-            "Review the generated controller at #local.controllerFilePath#"
+            "Review the generated controller at #local.controllerFilePath#",
+            "Routes have been automatically added to config/routes.cfm",
+            "Test your API endpoints"
         ];
 
-        // Add route configuration
-        local.routeConfig = "resources(name='#lCase(local.obj.objectNamePlural)#', except='new,edit')";
+        // Build endpoint URLs for display
+        local.baseUrl = "";
         if (len(arguments.namespace)) {
-            local.routeConfig = "namespace(name='#arguments.namespace#', function() {" & chr(10);
+            local.baseUrl = "/" & arguments.namespace;
             if (len(arguments.version)) {
-                local.routeConfig &= "    namespace(name='#arguments.version#', function() {" & chr(10);
-                local.routeConfig &= "        resources(name='#lCase(local.obj.objectNamePlural)#', except='new,edit');" & chr(10);
-                local.routeConfig &= "    });" & chr(10);
-            } else {
-                local.routeConfig &= "    resources(name='#lCase(local.obj.objectNamePlural)#', except='new,edit');" & chr(10);
+                local.baseUrl &= "/" & arguments.version;
             }
-            local.routeConfig &= "})";
         }
-        arrayAppend(nextSteps, "Add route to config/routes.cfm: #local.routeConfig#");
-        arrayAppend(nextSteps, "Test your API endpoints");
+        local.baseUrl &= "/" & lCase(local.obj.objectNamePlural);
+
+        arrayAppend(nextSteps, "");
+        arrayAppend(nextSteps, "Available endpoints:");
+        arrayAppend(nextSteps, "  GET    #local.baseUrl# (List all)");
+        arrayAppend(nextSteps, "  GET    #local.baseUrl#/:key (Show one)");
+        arrayAppend(nextSteps, "  POST   #local.baseUrl# (Create)");
+        arrayAppend(nextSteps, "  PUT    #local.baseUrl#/:key (Update)");
+        arrayAppend(nextSteps, "  DELETE #local.baseUrl#/:key (Delete)");
 
         if (arguments.docs) {
             arrayAppend(nextSteps, "Review API documentation at app/docs/api/#local.obj.objectNamePlural#.md");
@@ -263,7 +275,7 @@ Status 204 No Content
         local.content = 'component extends="wheels.Controller" {
 
     function config() {
-        provides("#arguments.format#");
+        provides("' & arguments.format & '");
         filters(through="setJsonResponse");';
 
         if (arguments.auth) {
@@ -274,8 +286,12 @@ Status 204 No Content
     }
 
     /**
-     * GET /#lCase(arguments.obj.objectNamePlural)#
-     * Returns a list of all #lCase(arguments.obj.objectNamePlural)#
+     * GET /';
+        local.content &= lCase(arguments.obj.objectNamePlural);
+        local.content &= '
+     * Returns a list of all ';
+        local.content &= lCase(arguments.obj.objectNamePlural);
+        local.content &= '
      */
     function index() {';
 
@@ -312,7 +328,11 @@ Status 204 No Content
 
         local.content &= '
 
-        local.#arguments.obj.objectNamePlural# = model("#arguments.obj.objectNameSingularC#").findAll(';
+        local.';
+        local.content &= arguments.obj.objectNamePlural;
+        local.content &= ' = model("';
+        local.content &= arguments.obj.objectNameSingularC;
+        local.content &= '").findAll(';
 
         if (arguments.filtering || arguments.sorting || arguments.pagination) {
             local.content &= 'argumentCollection=local.options';
@@ -323,14 +343,17 @@ Status 204 No Content
         if (arguments.pagination) {
             local.content &= '
 
+        local.paginationInfo = pagination();
         local.response = {
-            data = local.#arguments.obj.objectNamePlural#,
+            data = local.';
+            local.content &= arguments.obj.objectNamePlural;
+            local.content &= ',
             meta = {
                 pagination = {
-                    page = local.#arguments.obj.objectNamePlural#.currentPage ?: local.page,
+                    page = local.paginationInfo.currentPage,
                     perPage = local.perPage,
-                    total = local.#arguments.obj.objectNamePlural#.totalRecords ?: 0,
-                    pages = local.#arguments.obj.objectNamePlural#.totalPages ?: 1
+                    total = local.paginationInfo.totalRecords,
+                    pages = local.paginationInfo.totalPages
                 }
             }
         };
@@ -338,54 +361,120 @@ Status 204 No Content
         renderWith(data=local.response);';
         } else {
             local.content &= '
-        renderWith(data={ #arguments.obj.objectNamePlural#=local.#arguments.obj.objectNamePlural# });';
+        local.response = {};
+        local.response["';
+            local.content &= arguments.obj.objectNamePlural;
+            local.content &= '"] = local.';
+            local.content &= arguments.obj.objectNamePlural;
+            local.content &= ';
+        renderWith(data=local.response);';
         }
 
         local.content &= '
     }
 
     /**
-     * GET /#lCase(arguments.obj.objectNamePlural)#/:key
-     * Returns a specific #lCase(arguments.obj.objectNameSingular)# by ID
+     * GET /';
+        local.content &= lCase(arguments.obj.objectNamePlural);
+        local.content &= '/:key
+     * Returns a specific ';
+        local.content &= lCase(arguments.obj.objectNameSingular);
+        local.content &= ' by ID
      */
     function show() {
-        local.#arguments.obj.objectNameSingular# = model("#arguments.obj.objectNameSingularC#").findByKey(params.key);
+        local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ' = model("';
+        local.content &= arguments.obj.objectNameSingularC;
+        local.content &= '").findByKey(params.key);
 
-        if (IsObject(local.#arguments.obj.objectNameSingular#)) {
-            renderWith(data={ #arguments.obj.objectNameSingular#=local.#arguments.obj.objectNameSingular# });
+        if (IsObject(local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ')) {
+            local.response = {};
+            local.response["';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '"] = local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ';
+            renderWith(data=local.response);
         } else {
             renderWith(data={ error="Record not found" }, status=404);
         }
     }
 
     /**
-     * POST /#lCase(arguments.obj.objectNamePlural)#
-     * Creates a new #lCase(arguments.obj.objectNameSingular)#
+     * POST /';
+        local.content &= lCase(arguments.obj.objectNamePlural);
+        local.content &= '
+     * Creates a new ';
+        local.content &= lCase(arguments.obj.objectNameSingular);
+        local.content &= '
      */
     function create() {
-        local.#arguments.obj.objectNameSingular# = model("#arguments.obj.objectNameSingularC#").new(params.#arguments.obj.objectNameSingular#);
+        local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ' = model("';
+        local.content &= arguments.obj.objectNameSingularC;
+        local.content &= '").new(params.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ');
 
-        if (local.#arguments.obj.objectNameSingular#.save()) {
-            renderWith(data={ #arguments.obj.objectNameSingular#=local.#arguments.obj.objectNameSingular# }, status=201);
+        if (local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '.save()) {
+            local.response = {};
+            local.response["';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '"] = local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ';
+            renderWith(data=local.response, status=201);
         } else {
-            renderWith(data={ error="Validation failed", errors=local.#arguments.obj.objectNameSingular#.allErrors() }, status=422);
+            renderWith(data={ error="Validation failed", errors=local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '.allErrors() }, status=422);
         }
     }
 
     /**
-     * PUT /#lCase(arguments.obj.objectNamePlural)#/:key
-     * Updates an existing #lCase(arguments.obj.objectNameSingular)#
+     * PUT /';
+        local.content &= lCase(arguments.obj.objectNamePlural);
+        local.content &= '/:key
+     * Updates an existing ';
+        local.content &= lCase(arguments.obj.objectNameSingular);
+        local.content &= '
      */
     function update() {
-        local.#arguments.obj.objectNameSingular# = model("#arguments.obj.objectNameSingularC#").findByKey(params.key);
+        local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ' = model("';
+        local.content &= arguments.obj.objectNameSingularC;
+        local.content &= '").findByKey(params.key);
 
-        if (IsObject(local.#arguments.obj.objectNameSingular#)) {
-            local.#arguments.obj.objectNameSingular#.update(params.#arguments.obj.objectNameSingular#);
+        if (IsObject(local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ')) {
+            local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '.update(params.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ');
 
-            if (local.#arguments.obj.objectNameSingular#.hasErrors()) {
-                renderWith(data={ error="Validation failed", errors=local.#arguments.obj.objectNameSingular#.allErrors() }, status=422);
+            if (local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '.hasErrors()) {
+                renderWith(data={ error="Validation failed", errors=local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '.allErrors() }, status=422);
             } else {
-                renderWith(data={ #arguments.obj.objectNameSingular#=local.#arguments.obj.objectNameSingular# });
+                local.response = {};
+                local.response["';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '"] = local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ';
+                renderWith(data=local.response);
             }
         } else {
             renderWith(data={ error="Record not found" }, status=404);
@@ -393,26 +482,32 @@ Status 204 No Content
     }
 
     /**
-     * DELETE /#lCase(arguments.obj.objectNamePlural)#/:key
-     * Deletes a #lCase(arguments.obj.objectNameSingular)#
+     * DELETE /';
+        local.content &= lCase(arguments.obj.objectNamePlural);
+        local.content &= '/:key
+     * Deletes a ';
+        local.content &= lCase(arguments.obj.objectNameSingular);
+        local.content &= '
      */
     function delete() {
-        local.#arguments.obj.objectNameSingular# = model("#arguments.obj.objectNameSingularC#").findByKey(params.key);
+        local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ' = model("';
+        local.content &= arguments.obj.objectNameSingularC;
+        local.content &= '").findByKey(params.key);
 
-        if (IsObject(local.#arguments.obj.objectNameSingular#)) {
-            local.#arguments.obj.objectNameSingular#.delete();
+        if (IsObject(local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= ')) {
+            local.';
+        local.content &= arguments.obj.objectNameSingular;
+        local.content &= '.delete();
             renderWith(data={}, status=204);
         } else {
             renderWith(data={ error="Record not found" }, status=404);
         }
     }
-
-    /**
-     * Set Response to JSON
-     */
-    private function setJsonResponse() {
-        params.format = "#arguments.format#";
-    }';
+';
 
         // Add authentication if requested
         if (arguments.auth) {
@@ -491,8 +586,116 @@ Status 204 No Content
 
         local.content &= '
 
+    /**
+     * Set Response to JSON
+     */
+    private function setJsonResponse() {
+        params.format = "json";
+    }
+
 }';
 
         return local.content;
+    }
+
+    /**
+     * Add routes to config/routes.cfm automatically
+     */
+    private function addRoutesToConfig(
+        required string resourceName,
+        required string namespace,
+        required string version
+    ) {
+        local.routesPath = fileSystemUtil.resolvePath("config/routes.cfm");
+
+        if (!fileExists(local.routesPath)) {
+            detailOutput.error("Routes file not found: #local.routesPath#");
+            return;
+        }
+
+        // Read existing routes
+        local.routesContent = fileRead(local.routesPath);
+
+        // Build the route definition
+        local.routeDefinition = buildRouteDefinition(
+            resourceName = arguments.resourceName,
+            namespace = arguments.namespace,
+            version = arguments.version
+        );
+
+        // Check if route already exists
+        if (find(arguments.resourceName, local.routesContent)) {
+            detailOutput.line("Route for '#arguments.resourceName#' may already exist. Skipping...");
+            return;
+        }
+
+        // Find the position to insert (before wildcard or final .end())
+        local.insertPosition = 0;
+
+        // Try to find .wildcard() first (preferred insertion point)
+        if (find(".wildcard()", local.routesContent)) {
+            local.insertPosition = find(".wildcard()", local.routesContent);
+        } else if (find(".end()", local.routesContent)) {
+            // Insert before the final .end() if no wildcard found
+            // Find the LAST occurrence of .end()
+            local.lastEndPos = 0;
+            local.searchPos = 1;
+            while (find(".end()", local.routesContent, local.searchPos)) {
+                local.lastEndPos = find(".end()", local.routesContent, local.searchPos);
+                local.searchPos = local.lastEndPos + 1;
+            }
+            local.insertPosition = local.lastEndPos;
+        }
+
+        if (local.insertPosition > 0) {
+            // Insert route before .end() or .wildcard()
+            local.beforeEnd = left(local.routesContent, local.insertPosition - 1);
+            local.afterEnd = mid(local.routesContent, local.insertPosition, len(local.routesContent));
+
+            // Add proper indentation and newlines
+            local.newRoutesContent = local.beforeEnd & chr(10) & chr(10) & local.routeDefinition & chr(10) & local.afterEnd;
+
+            // Write updated routes
+            fileWrite(local.routesPath, local.newRoutesContent);
+            detailOutput.create("config/routes.cfm (updated)", true);
+        } else {
+            detailOutput.error("Could not find insertion point in routes.cfm. Please add routes manually.");
+        }
+    }
+
+    /**
+     * Build the route definition string
+     */
+    private function buildRouteDefinition(
+        required string resourceName,
+        required string namespace,
+        required string version
+    ) {
+        local.indent = "    ";
+        local.routeDef = "";
+
+        if (len(arguments.namespace)) {
+            local.routeDef &= chr(10) & local.indent & "// #uCase(arguments.namespace)# Routes" & chr(10);
+
+            if (len(arguments.version)) {
+                // Nested namespace with version
+                local.routeDef &= local.indent & '.namespace("#arguments.namespace#")' & chr(10);
+                local.routeDef &= local.indent & local.indent & '.namespace("#arguments.version#")' & chr(10);
+                local.routeDef &= local.indent & local.indent & local.indent & '.resources("#arguments.resourceName#")' & chr(10);
+                local.routeDef &= local.indent & local.indent & '.end()' & chr(10);
+                local.routeDef &= local.indent & '.end()';
+            } else {
+                // Just namespace, no version
+                local.routeDef &= local.indent & '.namespace("#arguments.namespace#")' & chr(10);
+                local.routeDef &= local.indent & local.indent & '.resources("#arguments.resourceName#")' & chr(10);
+                local.routeDef &= local.indent & '.end()';
+            }
+        } else {
+            // No namespace - direct resources
+            local.routeDef &= chr(10) & local.indent & "// #arguments.resourceName# Routes" & chr(10);
+            local.routeDef &= local.indent & '.resources("#arguments.resourceName#")';
+        }
+
+        return local.routeDef;
     }
 }
