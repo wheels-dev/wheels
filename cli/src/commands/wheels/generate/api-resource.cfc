@@ -272,11 +272,11 @@ Status 204 No Content
         required boolean sorting,
         required string namespace
     ) {
-        local.content = 'component extends="wheels.Controller" {
+        local.content = 'component extends="wheels.Controller" output="false" {
 
     function config() {
         provides("' & arguments.format & '");
-        filters(through="setJsonResponse");';
+        filters(through="clearOutputBuffer,setResponseFormat");';
 
         if (arguments.auth) {
             local.content &= chr(10) & '        filters(through="authenticate", except="index,show");';
@@ -522,16 +522,37 @@ Status 204 No Content
 
         if (!len(local.token) || !isValidToken(local.token)) {
             renderWith(data={error="Unauthorized"}, status=401);
+            abort;
         }
     }
 
     /**
      * Validate authentication token
+     *
+     * IMPORTANT: This is a placeholder that returns true for testing.
+     * You MUST implement proper token validation before deploying to production!
+     *
+     * Examples:
+     * - Check token against database
+     * - Verify JWT signature and expiration
+     * - Validate API key
      */
     private function isValidToken(required string token) {
         // TODO: Implement your token validation logic
-        // Example: Check against database, verify JWT, etc.
-        return false;
+        // For now, return true to allow testing - CHANGE THIS IN PRODUCTION!
+        return true;
+
+        // Example JWT validation (requires jwt-cfml library):
+        // try {
+        //     local.decoded = jwt.verify(arguments.token, application.jwtSecret);
+        //     return structKeyExists(local.decoded, "sub");
+        // } catch (any e) {
+        //     return false;
+        // }
+
+        // Example database token validation:
+        // local.user = model("User").findOne(where="apiToken = ''##arguments.token##''");
+        // return isObject(local.user);
     }';
         }
 
@@ -587,10 +608,21 @@ Status 204 No Content
         local.content &= '
 
     /**
-     * Set Response to JSON
+     * Clear any output buffer to prevent whitespace before XML/JSON
      */
-    private function setJsonResponse() {
-        params.format = "json";
+    private function clearOutputBuffer() {
+        // Clear any whitespace that may have been output
+        // Use cfcontent reset to clear everything including whitespace
+        content reset="true";
+    }
+
+    /**
+     * Set Response Format
+     */
+    private function setResponseFormat() {
+        params.format = "';
+        local.content &= arguments.format;
+        local.content &= '";
     }
 
 }';
