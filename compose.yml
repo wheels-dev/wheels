@@ -171,6 +171,7 @@ services:
       - ./templates/base/src:/wheels-test-suite
       - ./core/src/wheels:/wheels-test-suite/vendor/wheels
       - ./tests:/wheels-test-suite/tests
+      - ./tools/docker/adobe2021:/wheels-test-suite/tools/docker/adobe2021
       - type: bind
         source: ./tools/docker/adobe2021/server.json
         target: /wheels-test-suite/server.json
@@ -202,6 +203,7 @@ services:
       - ./templates/base/src:/wheels-test-suite
       - ./core/src/wheels:/wheels-test-suite/vendor/wheels
       - ./tests:/wheels-test-suite/tests
+      - ./tools/docker/adobe2023:/wheels-test-suite/tools/docker/adobe2023
       - type: bind
         source: ./tools/docker/adobe2023/server.json
         target: /wheels-test-suite/server.json
@@ -233,6 +235,7 @@ services:
       - ./templates/base/src:/wheels-test-suite
       - ./core/src/wheels:/wheels-test-suite/vendor/wheels
       - ./tests:/wheels-test-suite/tests
+      - ./tools/docker/adobe2025:/wheels-test-suite/tools/docker/adobe2025
       - type: bind
         source: ./tools/docker/adobe2025/server.json
         target: /wheels-test-suite/server.json
