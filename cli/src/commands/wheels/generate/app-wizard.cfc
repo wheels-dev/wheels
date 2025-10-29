@@ -209,11 +209,12 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
       .options( [
         {value: 'lucee', display: 'Lucee (Latest)', selected: true},
         {value: 'adobe', display: 'Adobe ColdFusion (Latest)'},
-        {value: 'lucee6', display: 'Lucee 6.x'},
-        {value: 'lucee5', display: 'Lucee 5.x'},
-        {value: 'adobe2023', display: 'Adobe ColdFusion 2023'},
-        {value: 'adobe2021', display: 'Adobe ColdFusion 2021'},
-        {value: 'adobe2018', display: 'Adobe ColdFusion 2018'},
+        {value: 'boxlang', display: 'BoxLang (Latest)'},
+        {value: 'lucee@6', display: 'Lucee 6.x'},
+        {value: 'lucee@5', display: 'Lucee 5.x'},
+        {value: 'adobe@2023', display: 'Adobe ColdFusion 2023'},
+        {value: 'adobe@2021', display: 'Adobe ColdFusion 2021'},
+        {value: 'adobe@2018', display: 'Adobe ColdFusion 2018'},
         {value: 'custom', display: 'Enter a custom engine endpoint'}
       ] )
       .required()

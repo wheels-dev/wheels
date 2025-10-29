@@ -18,6 +18,7 @@ component extends="../base" {
         numeric port = 35729,
         boolean open = true
     ) {
+        arguments = reconstructArgs(arguments);
         var docRoot = fileSystemUtil.resolvePath(arguments.root);
         
         if (!directoryExists(docRoot)) {
