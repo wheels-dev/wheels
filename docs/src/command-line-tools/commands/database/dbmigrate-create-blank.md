@@ -9,6 +9,26 @@ Create an empty database migration file with up and down methods.
 wheels dbmigrate create blank <name>
 ```
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels dbmigrate create blank addIndexes` (name as positional)
+- **Named parameters**: `name=value` (e.g., `name=addIndexes`, `description="Add indexes"`)
+- **Flag parameters**: `--flag=value` (e.g., `--name=addIndexes`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- Positional: `wheels dbmigrate create blank addIndexes`
+- All named: `name=addIndexes description="Custom migration"`
+- Positional + named: `wheels dbmigrate create blank addIndexes description="Add indexes"`
+
+❌ **NOT ALLOWED:**
+- Mixing positional + named for same parameter: `wheels dbmigrate create blank addIndexes name=other`
+
+**Recommendation:** Use positional for name, named for optional parameters: `wheels dbmigrate create blank addIndexes description="My migration"`
+
 ## Description
 
 The `dbmigrate create blank` command generates a new empty migration file with the basic structure including `up()` and `down()` methods. This provides a starting point for custom migrations where you need full control over the migration logic.
@@ -30,12 +50,26 @@ The `dbmigrate create blank` command generates a new empty migration file with t
 
 ### Create a basic empty migration
 ```bash
+# Positional (recommended)
+wheels dbmigrate create blank add_custom_indexes
+
+# OR flag syntax
 wheels dbmigrate create blank --name=add_custom_indexes
+
+# OR named
+wheels dbmigrate create blank name=add_custom_indexes
 ```
 
 ### Create migration with description
 ```bash
+# Positional + named (recommended)
+wheels dbmigrate create blank update_user_permissions description="Add role-based permissions to users"
+
+# OR all flags
 wheels dbmigrate create blank --name=update_user_permissions --description="Add role-based permissions to users"
+
+# OR all named
+wheels dbmigrate create blank name=update_user_permissions description="Add role-based permissions to users"
 ```
 
 

@@ -11,6 +11,25 @@ wheels dbmigrate create column name=<table_name> dataType=<type> columnName=<col
 
 Alias: `wheels db create column`
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Named parameters**: `name=value` (e.g., `name=users`, `dataType=string`, `columnName=email`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--allowNull=false`)
+- **Flag with value**: `--flag=value` (same as named parameters)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All named: `name=users dataType=string columnName=email`
+- Named parameters only (no positional support)
+
+❌ **NOT ALLOWED:**
+- Positional parameters: This command does not support positional parameters
+
+**Recommendation:** Use named parameters for all values: `name=users dataType=string columnName=email allowNull=false`
+
 ## Description
 
 The `dbmigrate create column` command generates a migration file that adds a column to an existing database table. It supports standard column types and various options for column configuration.

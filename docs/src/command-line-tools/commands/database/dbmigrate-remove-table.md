@@ -10,6 +10,24 @@ wheels dbmigrate remove table name=<table_name>
 
 Alias: `wheels db remove table`
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Named parameters**: `name=value` (e.g., `name=users`)
+- **Flag parameters**: `--flag=value` (e.g., `--name=users`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- Named: `wheels dbmigrate remove table name=users`
+- Flag: `wheels dbmigrate remove table --name=users`
+
+❌ **NOT ALLOWED:**
+- Positional parameters: This command does not support positional parameters
+
+**Recommendation:** Use named parameters: `wheels dbmigrate remove table name=users`
+
 ## Description
 
 The `dbmigrate remove table` command generates a migration file that drops an existing database table. The generated migration includes a dropTable() call in the up() method.

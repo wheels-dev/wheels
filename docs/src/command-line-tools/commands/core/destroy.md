@@ -9,6 +9,26 @@ wheels destroy <name>
 wheels d <name>
 ```
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels destroy user` (resource name as positional)
+- **Named parameters**: `name=value` (e.g., `name=user`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- Positional: `wheels destroy user`
+- Named: `wheels destroy name=user`
+
+❌ **NOT ALLOWED:**
+- Positional + named for same parameter: `wheels destroy user name=other`
+
+**Recommendation:** Use positional parameter for simplicity: `wheels destroy user`
+
+**Note:** This command always prompts for confirmation before proceeding. There is no `--force` flag to skip confirmation.
+
 ## Description
 
 The `wheels destroy` command removes all files and code associated with a resource that was previously generated. It's useful for cleaning up mistakes or removing features completely. This command will also drop the associated database table and remove resource routes.
@@ -39,7 +59,14 @@ When you destroy a resource, the following items are deleted:
 
 ### Basic destroy
 ```bash
+# Positional (recommended)
 wheels destroy user
+
+# OR named
+wheels destroy name=user
+
+# OR alias (positional)
+wheels d user
 ```
 
 This will prompt:
@@ -62,9 +89,13 @@ the following files and directories:
 Are you sure? [y/n]
 ```
 
-### Using the alias
+### Using the short alias
 ```bash
+# Positional with alias (recommended)
 wheels d product
+
+# OR named with alias
+wheels d name=product
 ```
 
 ## Confirmation
@@ -133,7 +164,7 @@ wheels generate resource product # Create correct one
 ### Clean up after experimentation
 ```bash
 # Try out a feature
-wheels generate scaffold blog_post title:string content:text
+wheels generate scaffold blog_post title:string,content:text
 # Decide you don't want it
 wheels destroy blog_post
 ```

@@ -4,11 +4,30 @@
 
 The `wheels env set` command allows you to set or update environment variables in `.env` files. This command provides a quick and safe way to modify environment configuration files directly from the command line, supporting both creation of new variables and updating of existing ones.
 
-## Command Syntax
+## Synopsis
 
 ```bash
 wheels env set KEY=VALUE [KEY2=VALUE2 ...] [--file=filename]
 ```
+
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Named parameters**: `KEY=VALUE` (e.g., `DB_HOST=localhost`, `API_KEY=secret`)
+- **Flag parameters**: `--flag=value` (e.g., `--file=.env.production`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- Named KEY=VALUE pairs: `wheels env set DB_HOST=localhost DB_PORT=3306`
+- Named + file flag: `wheels env set DB_HOST=localhost --file=.env.production`
+- Multiple variables: `wheels env set KEY1=value1 KEY2=value2 KEY3=value3`
+
+❌ **NOT ALLOWED:**
+- Positional parameters: This command does not support positional parameters
+
+**Recommendation:** Use KEY=VALUE format with optional --file flag: `wheels env set DB_HOST=localhost --file=.env.production`
 
 ## Parameters
 

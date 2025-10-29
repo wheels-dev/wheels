@@ -9,6 +9,26 @@ wheels generate test [type] [target] [options]
 wheels g test [type] [target] [options]
 ```
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels generate test model User` (most common)
+- **Named parameters**: `type=value target=value` (e.g., `type=model target=User`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--crud` equals `crud=true`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All positional: `wheels generate test model User`
+- All positional + flags: `wheels generate test model User --crud --factory`
+- All named: `type=model target=User crud=true`
+
+❌ **NOT ALLOWED:**
+- Positional + named: `wheels generate test model target=User` (causes error)
+
+**Recommendation:** Use positional for type/target, flags for options: `wheels generate test model User --crud --factory`
+
 ## Description
 
 The `wheels generate test` command creates test files for various components of your Wheels application using TestBox 5 BDD syntax. All generated tests use standard CFML `cfhttp()` for HTTP testing and proper Wheels `model()` syntax, ensuring compatibility and reliability.
@@ -51,7 +71,11 @@ The command generates different test structures based on the type:
 Generate a basic model test with validation and association tests:
 
 ```bash
+# Positional (recommended)
 wheels generate test model User
+
+# OR all named
+wheels g test type=model target=User
 ```
 
 **Output:** `tests/specs/models/UserSpec.cfc`
@@ -91,7 +115,11 @@ component extends="wheels.Testbox" {
 Generate a model test with create, read, update, delete operations:
 
 ```bash
+# Positional + flag (recommended)
 wheels generate test model Product --crud
+
+# OR all named
+wheels g test type=model target=Product crud=true
 ```
 
 **Output:** `tests/specs/models/ProductSpec.cfc`

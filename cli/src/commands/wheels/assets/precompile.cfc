@@ -53,11 +53,10 @@ component extends="../base" {
 		// Define asset directories		
 		var publicDir = fileSystemUtil.resolvePath("public");
 
-		print.line(publicDir);
-		var assetsDir = publicDir & "/assets";
-		var jsDir = publicDir & "/javascripts";
-		var cssDir = publicDir & "/stylesheets";
-		var imagesDir = publicDir & "/images";
+		var assetsDir = publicDir & "assets";
+		var jsDir = publicDir & "javascripts";
+		var cssDir = publicDir & "stylesheets";
+		var imagesDir = publicDir & "images";
 		
 		// Create compiled assets directory
 		var compiledDir = assetsDir & "/compiled";

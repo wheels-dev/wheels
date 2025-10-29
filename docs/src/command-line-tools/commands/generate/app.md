@@ -12,6 +12,26 @@ wheels g app [name] [template] [directory] [options]
 wheels new [name] [template] [directory] [options]
 ```
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels generate app blog` (most common)
+- **Named parameters**: `name=value` (e.g., `name=blog`, `template=HelloWorld`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--useBootstrap` equals `useBootstrap=true`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All positional: `wheels generate app blog`
+- All positional + flags: `wheels generate app blog --useBootstrap --init`
+- All named: `name=blog template=HelloWorld --useBootstrap`
+
+❌ **NOT ALLOWED:**
+- Positional + named: `wheels generate app blog name=myapp` (causes error)
+
+**Recommendation:** Use positional for name/template, flags for options: `wheels generate app blog --useBootstrap --init`
+
 ## Description
 
 The `wheels generate app` command creates a new Wheels application with a complete directory structure, configuration files, and optionally sample code. It supports multiple templates for different starting points.
@@ -75,37 +95,66 @@ wheels generate app myapp HelloPages
 
 ### Create basic application
 ```bash
+# Positional (recommended)
 wheels generate app blog
+
+# OR all named
+wheels g app name=blog
 ```
 
 ### Create with custom template
 ```bash
-wheels generate app api Base@BE
+# Positional (recommended)
+wheels generate app api HelloDynamic
+
+# OR all named
+wheels g app name=api template=HelloDynamic
 ```
 
 ### Create in specific directory
 ```bash
-wheels generate app name=myapp directory=./projects/
+# Positional + named (recommended)
+wheels generate app myapp --directory=./projects/
+
+# OR all named
+wheels g app name=myapp directory=./projects/
 ```
 
 ### Create with Bootstrap
 ```bash
+# Positional + flag (recommended)
 wheels generate app portfolio --useBootstrap
+
+# OR all named
+wheels g app name=portfolio useBootstrap=true
 ```
 
 ### Create with H2 database (default is true)
 ```bash
+# Positional + flag (recommended)
 wheels generate app demo --setupH2
+
+# OR all named
+wheels g app name=demo setupH2=true
 ```
 
 ### Create with all options
 ```bash
-wheels generate app name=enterprise template=HelloDynamic directory=./apps/ \
+# Positional + flags (recommended)
+wheels generate app enterprise --template=HelloDynamic --directory=./apps/ \
+  --reloadPassword=secret \
+  --datasourceName=enterprise_db \
+  --cfmlEngine=adobe \
+  --useBootstrap \
+  --setupH2
+
+# OR all named
+wheels g app name=enterprise template=HelloDynamic directory=./apps/ \
   reloadPassword=secret \
   datasourceName=enterprise_db \
   cfmlEngine=adobe \
-  --useBootstrap \
-  --setupH2
+  useBootstrap=true \
+  setupH2=true
 ```
 
 ## Generated Structure

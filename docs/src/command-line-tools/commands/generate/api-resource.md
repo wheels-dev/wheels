@@ -38,6 +38,28 @@ The generated controllers use `provides("json")` and `renderWith()` to return JS
 | `--docs` | Generate API documentation template | `false` |
 | `--force` | Overwrite existing files | `false` |
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Named parameters**: `name=value` (e.g., `name=products`, `version="v2"`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--auth` equals `auth=true`)
+- **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--version=v2`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All positional: `wheels generate api-resource products`
+- All named: `name=products version="v2" auth=true`
+- Positional + flags: `wheels generate api-resource products --auth --skipModel`
+
+❌ **NOT ALLOWED:**
+- Positional + named: `wheels generate api-resource products version="v2"` (causes error)
+
+**Recommendation:** Use positional for name + flags for options: `wheels generate api-resource products --auth --version=v2`
+
+---
+
 ## Examples
 
 ### Basic API Controller
@@ -45,6 +67,7 @@ The generated controllers use `provides("json")` and `renderWith()` to return JS
 Generate a simple API controller:
 
 ```bash
+# Positional name only
 wheels generate api-resource products
 ```
 
@@ -54,10 +77,14 @@ Creates:
 
 ### Without Advanced Features
 
-Generate a minimal API controller:
+Generate a minimal API controller without optional features:
 
 ```bash
-wheels generate api-resource products --pagination=false --filtering=false --sorting=false
+# Using named parameters (all named)
+wheels g api-resource name=products pagination=false filtering=false sorting=false
+
+# OR using flags (positional + flags) - RECOMMENDED
+wheels g api-resource products --pagination=false --filtering=false --sorting=false
 ```
 
 Creates a simple controller with only basic CRUD operations.
@@ -67,6 +94,7 @@ Creates a simple controller with only basic CRUD operations.
 Generate API controller with authentication:
 
 ```bash
+# Using flag
 wheels generate api-resource products --auth
 ```
 
@@ -77,16 +105,18 @@ Includes Bearer token authentication that requires Authorization header for crea
 Generate API controller with custom versioning:
 
 ```bash
-wheels generate api-resource products --version=v2 --namespace=api
+# Using flags with values
+wheels generate api-resource products --version=v2 --namespace=public
 ```
 
-Creates `/controllers/api/v2/Products.cfc`
+Creates `/controllers/public/v2/Products.cfc`
 
 ### Skip Model Generation
 
 Generate only the controller (model already exists):
 
 ```bash
+# Using flag
 wheels generate api-resource products --skipModel
 ```
 
@@ -95,6 +125,7 @@ wheels generate api-resource products --skipModel
 Generate everything with API documentation:
 
 ```bash
+# Multiple flags
 wheels generate api-resource products --auth --docs
 ```
 

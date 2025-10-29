@@ -10,6 +10,25 @@ wheels dbmigrate create table name=<table_name> [--force] [--id] primaryKey=<key
 
 Alias: `wheels db create table`
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Named parameters**: `name=value` (e.g., `name=users`, `primaryKey=userId`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--force` equals `force=true`)
+- **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--id=false`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All named: `name=users primaryKey=userId`
+- Named + flags: `name=users --force --id=false`
+
+❌ **NOT ALLOWED:**
+- Positional parameters: This command does not support positional parameters
+
+**Recommendation:** Use named for required parameters, flags for booleans: `name=users --force`
+
 ## Description
 
 The `dbmigrate create table` command generates a migration file that creates a new database table. The generated migration includes the table structure following Wheels conventions.
@@ -31,22 +50,32 @@ The generated migration file will contain a basic table structure. You'll need t
 
 ### Create a basic table
 ```bash
-wheels dbmigrate create table name=user
+# Named parameter (required)
+wheels dbmigrate create table name=users
 ```
 
 ### Create table without ID column
 ```bash
+# Named + flag (recommended)
 wheels dbmigrate create table name=user_roles --id=false
+
+# OR all named
+wheels db create table name=user_roles id=false
 ```
 
 ### Create table with custom primary key
 ```bash
+# Named parameters (recommended)
 wheels dbmigrate create table name=products primaryKey=productCode
 ```
 
 ### Force creation (overwrite existing)
 ```bash
+# Named + flag (recommended)
 wheels dbmigrate create table name=users --force
+
+# OR all named
+wheels db create table name=users force=true
 ```
 
 ## Generated Migration Example

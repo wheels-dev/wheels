@@ -9,6 +9,26 @@ wheels generate view [objectName] [name] [template]
 wheels g view [objectName] [name] [template]
 ```
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels generate view user show` (most common for this command)
+- **Named parameters**: `objectName=value name=value` (e.g., `objectName=user name=show`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--force` equals `force=true`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All positional: `wheels generate view user show`
+- All positional + flags: `wheels generate view user show --force`
+- All named: `objectName=user name=show template=crud/show`
+
+❌ **NOT ALLOWED:**
+- Positional + named: `wheels generate view user name=show` (causes error)
+
+**Recommendation:** Use positional parameters for objectName and name, flags for options: `wheels generate view user show --force`
+
 ## Description
 
 The `wheels generate view` command creates view files for controllers. It can generate individual views using templates or create blank view files.
@@ -20,7 +40,12 @@ The `wheels generate view` command creates view files for controllers. It can ge
 | `objectName` | View path folder (e.g., user) | Required |
 | `name` | Name of the file to create (e.g., edit) | Required |
 | `template` | Optional template to use | |
-| `--force` | Overwrite existing code | false |
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--force` | Overwrite existing code | `false` |
 
 ## Template Options
 
@@ -35,33 +60,54 @@ Available templates:
 
 ### Basic view (no template)
 ```bash
+# Positional (recommended)
 wheels generate view user show
+
+# OR all named
+wheels g view objectName=user name=show
 ```
 Creates: `/views/users/show.cfm` with empty content
 
 ### View with CRUD template
 ```bash
+# Positional with template (recommended)
 wheels generate view user show crud/show
+
+# OR all named
+wheels g view objectName=user name=show template=crud/show
 ```
 Creates: `/views/users/show.cfm` using the show template
 
 ### Edit form with template
 ```bash
+# Positional (recommended)
 wheels generate view user edit crud/edit
 ```
 Creates: `/views/users/edit.cfm` using the edit template
 
 ### Form partial
 ```bash
+# Positional (recommended)
 wheels generate view user _form crud/_form
 ```
 Creates: `/views/users/_form.cfm` using the form partial template
 
 ### Index view
 ```bash
+# Positional (recommended)
 wheels generate view product index crud/index
 ```
 Creates: `/views/products/index.cfm` using the index template
+
+### Force overwrite existing file
+```bash
+# Positional + flag (recommended)
+wheels generate view user show --force
+
+# OR all named
+wheels g view objectName=user name=show force=true
+```
+Overwrites existing `/views/users/show.cfm`
 
 ## Generated Code Examples
 
