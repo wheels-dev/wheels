@@ -34,6 +34,7 @@
     * [wheels generate test](command-line-tools/commands/generate/test.md)
     * [wheels generate snippets](command-line-tools/commands/generate/snippets.md)
     * [wheels generate scaffold](command-line-tools/commands/generate/scaffold.md)
+    * [wheels generate api-resource](command-line-tools/commands/generate/api-resource.md)
   * Database Commands
     * Database Operations
       * [wheels db create](command-line-tools/commands/database/db-create.md)
