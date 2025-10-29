@@ -17,7 +17,7 @@ component {
 	 * @writeToFile The file to which the email contents will be written
 	 */
 	public any function sendEmail(
-		required string template,
+		string template = "",
 		required string from,
 		required string to,
 		required string subject,
