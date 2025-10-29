@@ -55,6 +55,8 @@ this.smtpServersettings = {
 
 An email template is required for [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html) to work and forms the basis for the mail message content. Think of an email template as the content of your email.
 
+**Note:** The `template`, `from`, `to`, and `subject` parameters are all required when calling `sendEmail()`. You cannot send an email without specifying these values.
+
 Templates may be stored anywhere within the `/app/views/` folder, but we recommend a structured, logical approach. If different controllers utilize [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html)\
 and each require a unique template, place each email template within the `/app/views/controllername` folder structure.
 
@@ -88,7 +90,7 @@ Here's an example for `myemailtemplate.cfm`, which will contain HTML content.
 
 ### Sending the Email
 
-As we've said before, [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html) accepts all attribute of CFML's `cfmail` tag as arguments. But it also accepts any variables that you need to pass to the email template itself.
+The [sendEmail()](https://wheels.dev/api/v3.0.0/controller.sendemail.html) function requires 4 parameters: `template`, `from`, `to`, and `subject`. Additionally, it accepts all attributes of CFML's `cfmail` tag as arguments, plus any variables that you need to pass to the email template itself.
 
 Consider the following example:
 
