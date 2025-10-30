@@ -8,7 +8,7 @@ description: >-
 
 This chapter will introduce you to frameworks in general and later specifically to Wheels. We'll help you decide if you even need a framework at all and what common problems a framework tries to solve. If we're able to convince you that using a framework is the right thing for you, then we'll present our goals with creating Wheels and show you some key Wheels concepts.
 
-So let's get started.&#x20;
+So let's get started.
 
 ### Do I Really Need to Use a Framework?
 

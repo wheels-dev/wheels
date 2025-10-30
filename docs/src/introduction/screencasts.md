@@ -51,7 +51,7 @@ Learn how simple it is to delete records in a basic CRUD application using Wheel
 #### "Building a Social Network"
 
 [Episode 1: Setting up ColdFusion on Wheels](https://vimeo.com/channels/wheels/6961812)\
-Chris Peters starts the webcast series by demonstrating how to set up ColdFusion on Wheels&#x20;
+Chris Peters starts the webcast series by demonstrating how to set up ColdFusion on Wheels;
 
 [Episode 2: Form Helpers](https://vimeo.com/channels/wheels/7023829)\
 Chris Peters demonstrates how to bind a Wheels model object to a form through the use of form helpers
@@ -96,7 +96,7 @@ Learn how to use the provides() and renderWith() functions to automatically seri
 #### Other
 
 [Hello World](https://vimeo.com/channels/wheels/7785365)\
-Peter Amiri walks you through setting up a "Hello World" application using the ColdFusion on Wheels framework&#x20;
+Peter Amiri walks you through setting up a "Hello World" application using the ColdFusion on Wheels framework;
 
 [CFUnited 2010: Simplifying Database Code with the ColdFusion on Wheels ORM](https://vimeo.com/channels/wheels/13848065)\
 Chris Peters gives a high level overview of the ORM included with ColdFusion on Wheels
