@@ -53,7 +53,7 @@ component extends="wheels.Testbox" {
 
 			it("works with floats", () => {
 				result = g.model("post").$whereClause(where = "averagerating IN(3.6,3.2)")
-				datatypes = {"float": true, "float8": true, "double": true, "number": true}
+				datatypes = {"float": true, "float8": true, "double": true, "number": true, "real": true}
 
 				expect(arraylen(result)).toBeGTE(4)
 				expect(result[4]).toBeStruct()
@@ -74,7 +74,7 @@ component extends="wheels.Testbox" {
 
 			it("works with is null", () => {
 				result = g.model("post").$whereClause(where = "averagerating IS NULL")
-				datatypes = {"float": true, "float8": true, "double": true, "number": true}
+				datatypes = {"float": true, "float8": true, "double": true, "number": true, "real": true}
 
 				expect(arraylen(result)).toBeGTE(4)
 				expect(result[4]).toBeStruct()
