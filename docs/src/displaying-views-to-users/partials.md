@@ -132,7 +132,7 @@ If you need to display some HTML in between each iteration (maybe each iteration
 
 ```javascript
 <ul>
-    <li>#includePartial(partial=customers, query=customers, spacer="</li><li>")#</li>
+    <li>#includePartial(partial="customer", query=customers, spacer="</li><li>")#</li>
 </ul>
 ```
 

@@ -113,7 +113,7 @@ mapper()
     text="A fine variation (PDF)",
     route="widgetVariation",
     widgetKey=5,
-    key=20
+    key=20,
     format="pdf"
 )#
 </cfoutput>
@@ -213,7 +213,7 @@ mapper()
 To link to the `roles` resource, you would prefix it with the namespace name:
 
 ```html
-#linkTo(name="List Roles", route="adminRoles")#
+#linkTo(text="List Roles", route="adminRoles")#
 
 #linkTo(text=role.title, route="adminRole", key=role.key())#
 ```

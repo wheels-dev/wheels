@@ -16,7 +16,7 @@ The association methods should always be called in the `config()` method of a mo
 
 ### The belongsTo Association
 
-If your database table contains a field that is a foreign key to another table, then this is where to use the [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html)function.
+If your database table contains a field that is a foreign key to another table, then this is where to use the [belongsTo()](https://wheels.dev/api/v3.0.0/model.belongsto.html) function.
 
 If we had a comments table that contains a foreign key to the posts table called `postid`, then we would have this `config()` method within our comment model:
 
@@ -104,7 +104,7 @@ A dependency is when an associated model relies on the existence of its parent. 
 
 Wheels makes this easy for you. When setting up your association, simply add the argument `dependent` with one of the following values, and Wheels will automatically deal with the dependency.
 
-In your `model.cfc` file's `config()` function::
+In your `model.cfc` file's `config()` function:
 
 ```javascript
 // Instantiates the `profile` model and calls its `delete()` method.
@@ -151,7 +151,7 @@ Here's an example of how to select both the name of the employee and their manag
 component extends="Controller" {
  function index() {
 
-   employees= model("employee").findAll(include="manager", select="employees.name, managers.name AS managerName");
+   employees = model("employee").findAll(include="manager", select="employees.name, managers.name AS managerName");
 
  }
 }
@@ -437,7 +437,7 @@ We can include the related tables from the `subscription` bridge entity to get t
 component extends="Controller" {
  function index() {
 
-   subscriptions= model("subscription").findAll(include="customer,publication");
+   subscriptions = model("subscription").findAll(include="customer,publication");
 
  }
 }
@@ -468,8 +468,8 @@ Now you can get a customer's publications directly by using code like this:
 component extends="Controller" {
  function edit() {
 
-   customer= model("customer").findByKey(params.key);
-   publications= customer.publications();
+   customer = model("customer").findByKey(params.key);
+   publications = customer.publications();
 
  }
 }
