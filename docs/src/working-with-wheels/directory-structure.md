@@ -1,3 +1,7 @@
+---
+description: A comprehensive guide to the Wheels directory structure...
+---
+
 # Wheels Directory Structure Guide
 
 Understanding the Wheels directory structure is essential whether you're building applications or [contributing](https://github.com/wheels-dev/wheels) to the framework itself.
@@ -59,12 +63,6 @@ vendor
 **app/global/** - Holds globally accessible functions available throughout your application.
 
 **plugins/** - Contains downloaded Wheels plugins that extend your application's functionality.
-
-**Database Management** - Use the migration system (`wheels db migrate`) rather than manual SQL scripts for database schema changes.
-
-**Package Management** - Use CommandBox and the `box.json` file to manage dependencies. The `vendor/` directory contains installed packages and should be excluded from version control.
-
-**Local Development** - Configure your development environment using `server.json` for server settings and `.env` for environment variables. Never commit sensitive data in `.env` files to version control.
 
 ### Configuration and Assets
 

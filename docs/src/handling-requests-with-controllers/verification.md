@@ -37,7 +37,8 @@ function config(){
     verifies(
         only="create,update",
         post=true,
-        handler="incorrectRequestType";
+        handler="incorrectRequestType"
+    );
 }  
     
 function incorrectRequestType(){
@@ -112,7 +113,7 @@ verifies(
     post=true,
     params="userId,address",
     paramsTypes="integer,struct"
-)>
+);
 ```
 
 However, [verifies()](https://wheels.dev/api/v3.0.0/controller.verifies.html) should not be used to make sure that values within the address struct themselves are valid (such as making sure that `address.zipCode` is correct). Because the `address` struct will be passed in to the model, the validation will be performed there.

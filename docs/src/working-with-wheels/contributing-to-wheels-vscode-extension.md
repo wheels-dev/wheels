@@ -35,7 +35,7 @@ tools/vscode-ext/
 │   ├── wheels-api.json       # Contains wheels all API functions
 │   ├── wheels.code-snippets  # Model-specific snippets
 ├── assets/                   # Extension assets (icons, etc.)
-│   ├── wheels_logo.png       # Extension code snippets
+│   ├── wheels_logo.jpg       # Wheels Logo for extension
 ├── package.json              # Extension manifest and configuration
 ├── README.md                 # Extension documentation
 ├── CHANGELOG.md              # Version history
@@ -133,7 +133,7 @@ Follow the standard Wheels contribution process:
 3. **Fork and Branch**: Create a feature branch from `develop`
 4. **Make Changes**: Implement your changes following the guidelines above
 5. **Test Thoroughly**: Test your changes locally and with packaged VSIX
-6. **Submit Pull Request**: Create a pull request to the `develop` branch, before creating a PR, please also review [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md) and [Submitting Pull Requests](submitting-pull-requests.md) guide
+6. **Submit Pull Request**: Create a pull request to the `develop` branch, before creating a PR, please also review [Contributing to Wheels](contributing-to-wheels.md) and [Submitting Pull Requests](submitting-pull-requests.md) guide
 7. **Code Review**: Address any feedback from the core team
 
 ### Pull Request Guidelines

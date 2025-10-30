@@ -1,10 +1,14 @@
+---
+description: A comprehensive guide to testing your Wheels application using TestBox 6...
+---
+
 # Testing Your Application
 
 This guide provides comprehensive instructions for testing your Wheels 3.0 application using TestBox 6. Wheels 3.0 now includes TestBox integration as an enabled option, moving beyond the legacy RocketUnit framework. TestBox is already included in your installation through box.json dependency management.
 
 ## Overview
 
-TestBox 65 is a next-generation testing framework for ColdFusion (CFML) based on BDD (Behavior Driven Development) and TDD (Test Driven Development), providing a clean, obvious syntax for writing tests. It serves as a comprehensive testing engine with multi-format output capabilities and database testing support.
+TestBox 6 is a next-generation testing framework for ColdFusion (CFML) based on BDD (Behavior Driven Development) and TDD (Test Driven Development), providing a clean, obvious syntax for writing tests. It serves as a comprehensive testing engine with multi-format output capabilities and database testing support.
 
 For comprehensive TestBox documentation, refer to the [official TestBox documentation](https://testbox.ortusbooks.com/).
 

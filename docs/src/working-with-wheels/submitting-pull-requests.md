@@ -39,15 +39,6 @@ Add the main Wheels repository as an "upstream" remote to keep your fork in sync
 git remote add upstream https://github.com/wheels-dev/wheels.git
 ```
 
-### 4. Set Up Docker Test Environment
-
-Set up the Docker-based test environment to ensure your changes work across all supported platforms:
-
-```bash
-# Start the minimal test environment
-docker compose up quick-test -d
-```
-
 See [Using the Test Environment](using-the-test-environment.md) for more detailed instructions.
 
 ## Contribution Workflow

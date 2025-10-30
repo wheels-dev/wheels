@@ -595,7 +595,7 @@ mapper(mapFormat=false)
 
 // or just for this resource
 mapper()
-.resources(mapFormat=false, name="users)
+.resources(mapFormat=false, name="users")
 .end()
 ```
 

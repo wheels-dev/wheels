@@ -50,8 +50,7 @@ function sendTutorial() {
 
 Much better! :)
 
-By default, the [sendFile()](https://wheels.dev/api/v3.0.0/controller.sendfile.html) function will try and force a download dialog box to be shown to the user. The purpose of this is to make it easy for the user\
-to save the file to their computer. If you want the file to be shown inside the browser instead (when possible as decided by the browser in question), you can set the `disposition` argument to `inline`.
+By default, the [sendFile()](https://wheels.dev/api/v3.0.0/controller.sendfile.html) function will try and force a download dialog box to be shown to the user. The purpose of this is to make it easy for the user to save the file to their computer. If you want the file to be shown inside the browser instead (when possible as decided by the browser in question), you can set the `disposition` argument to `inline`.
 
 Here's an example:
 
@@ -63,8 +62,7 @@ function sendTutorial() {
 }
 ```
 
-You can also specify what HTTP content type to use when delivering the file by using the `type` argument. Please refer to the API for the [sendFile()](https://wheels.dev/api/v3.0.0/controller.sendfile.html)\
-function for complete details.
+You can also specify what HTTP content type to use when delivering the file by using the `type` argument. Please refer to the API for the [sendFile()](https://wheels.dev/api/v3.0.0/controller.sendfile.html) function for complete details.
 
 ### Sending Files via ram://
 
@@ -91,8 +89,7 @@ Perhaps the main reason to use the [sendFile()](https://wheels.dev/api/v3.0.0/co
 
 However, there is a security flaw here. Can you figure out what it is?
 
-You may have guessed that the files folder is placed in your web root, so anyone can download files from it by typing `http://www.domain.com/files/wheels_tutorial_20081028_J657D6HX.pdf` in their\
-browser. Although users would need to guess the file names to be able to access the files, we would still need something more robust as far as security goes.
+You may have guessed that the files folder is placed in your web root, so anyone can download files from it by typing `http://www.domain.com/files/wheels_tutorial_20081028_J657D6HX.pdf` in their browser. Although users would need to guess the file names to be able to access the files, we would still need something more robust as far as security goes.
 
 There are two solutions to this.
 
@@ -108,8 +105,7 @@ function sendTutorial() {
 ```
 {% endcode %}
 
-This assumes you've moved the folder two levels up in your file system and into\
-a folder named "tutorials".
+This assumes you've moved the folder two levels up in your file system and into a folder named "tutorials".
 
 ### Don't Open Any Holes with URL Parameters
 

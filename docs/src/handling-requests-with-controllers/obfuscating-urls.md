@@ -34,7 +34,7 @@ To turn on URL obfuscation, all you have to do is call `set(obfuscateURLs=true)`
 
 Once you do that, Wheels will handle everything else. Obviously, the main things Wheels does is obfuscate the primary key value when using the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function and deobfuscate it on the receiving end. Wheels will also obfuscate all other params sent in to [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) as well as any value in a form sent using a get request.
 
-In some circumstances, you will need to obfuscate and deobfuscate values yourself if you link to pages without using the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function, for example. In these cases, you can use the `obfuscateParam()` and `deObfuscateParam()`functions to do the job for you.
+In some circumstances, you will need to obfuscate and deobfuscate values yourself if you link to pages without using the [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function, for example. In these cases, you can use the `obfuscateParam()` and `deObfuscateParam()` functions to do the job for you.
 
 ### Is This Really Secure?
 

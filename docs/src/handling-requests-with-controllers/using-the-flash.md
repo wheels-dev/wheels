@@ -253,9 +253,9 @@ if( thingTwoHappened ){
 Which, when output via `flashMessages()` would render:
 
 ```html
-<div class=""flash-messages"">
-  <p class=""info-message"">Thing One Happened</p>
-  <p class=""info-message"">Thing Two Happened</p>
+<div class="flash-messages">
+  <p class="info-message">Thing One Happened</p>
+  <p class="info-message">Thing Two Happened</p>
 </div>
 ```
 
