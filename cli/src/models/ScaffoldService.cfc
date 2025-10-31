@@ -98,7 +98,7 @@ component {
             // 3. Generate Controller
             var controllerResult = codeGenerationService.generateController(
                 name = variables.helpers.pluralize(arguments.name),
-                rest = true,
+                crud = true,
                 api = arguments.api,
                 force = arguments.force,
                 baseDirectory = arguments.baseDirectory,

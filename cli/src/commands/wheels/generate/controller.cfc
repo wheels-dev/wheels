@@ -1,30 +1,34 @@
 /**
  * Generate a controller in /controllers/NAME.cfc
- * 
+ *
  * Examples:
  * wheels generate controller Users
- * wheels generate controller Users rest=true
- * wheels generate controller Users actions=index,show,custom
- * wheels generate controller Api/V1/Users api=true
+ * wheels generate controller Users --crud
+ * wheels generate controller Users --actions=index,show,custom
+ * wheels generate controller Users --api
+ * wheels generate controller Users --crud --actions=dashboard
+ * wheels generate controller Users --actions=dashboard --noViews
  */
 component aliases="wheels g controller" extends="../base" {
-    
+
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
     property name="detailOutput" inject="DetailOutputService@wheels-cli";
-    
+
     /**
      * @name.hint Name of the controller to create (usually plural)
-     * @actions.hint Actions to generate (comma-delimited, default: CRUD for REST)
-     * @rest.hint Generate RESTful controller with CRUD actions
-     * @api.hint Generate API controller (no view-related actions)
+     * @actions.hint Actions to generate (comma-delimited) - HIGHEST PRIORITY, overrides --crud
+     * @crud.hint Generate CRUD controller with actions (index, show, new, create, edit, update, delete) and views (like scaffold)
+     * @api.hint Generate API controller (no views generated, only JSON/XML endpoints)
+     * @noViews.hint Skip view generation (only generate controller)
      * @description.hint Controller description
      * @force.hint Overwrite existing files
      */
     function run(
         required string name,
         string actions = "",
-        boolean rest = false,
+        boolean crud = false,
         boolean api = false,
+        boolean noViews = false,
         string description = "",
         boolean force = false
     ) {
@@ -32,9 +36,10 @@ component aliases="wheels g controller" extends="../base" {
         // Reconstruct arguments for handling --prefixed options
 		arguments = reconstructArgs(arguments);
 
-        // Handle API flag implies REST
+        // Handle API flag implies CRUD and no views
         if (arguments.api) {
-            arguments.rest = true;
+            arguments.crud = true;
+            arguments.noViews = true;
         }
         
         // Validate controller name
@@ -46,52 +51,72 @@ component aliases="wheels g controller" extends="../base" {
         
         detailOutput.header("", "Generating controller: #arguments.name#");
         
-        // Parse actions
+        // Parse actions - PRIORITY: --actions > --crud > --api > default
         var actionList = [];
         if (len(arguments.actions)) {
+            // HIGHEST PRIORITY: Custom actions specified
             actionList = listToArray(arguments.actions);
-        } else if (arguments.rest) {
+        } else if (arguments.crud) {
             if (arguments.api) {
+                // API: No form actions (new, edit)
                 actionList = ["index", "show", "create", "update", "delete"];
             } else {
+                // CRUD: All CRUD actions with forms
                 actionList = ["index", "show", "new", "create", "edit", "update", "delete"];
             }
         } else {
+            // Default: Only index
             actionList = ["index"];
         }
-        
+
         // Generate controller
         var result = codeGenerationService.generateController(
             name = arguments.name,
             description = arguments.description,
-            rest = arguments.rest,
+            crud = arguments.crud,
             api = arguments.api,
             force = arguments.force,
             actions = actionList,
             baseDirectory = getCWD()
         );
-        
+
         if (result.success) {
             detailOutput.create(result.path);
-            
+
             // Initialize viewsCreated outside the conditional block
             var viewsCreated = 0;
-            
-            // Generate views for non-API controllers
-            if (!arguments.api && arguments.rest) {
+
+            // Generate views (unless --api or --noViews is specified)
+            if (!arguments.api && !arguments.noViews) {
                 detailOutput.invoke("views");
-                
-                var viewActions = ["index", "show", "new", "edit"];
-                
-                for (var action in viewActions) {
-                    if (arrayFindNoCase(actionList, action)) {
+
+                // For CRUD controllers, generate scaffold-style views (index, show, new, edit, _form)
+                if (arguments.crud && !len(arguments.actions)) {
+                    var viewActions = ["index", "show", "new", "edit", "_form"];
+
+                    for (var action in viewActions) {
                         var viewResult = codeGenerationService.generateView(
                             name = arguments.name,
                             action = action,
                             force = arguments.force,
                             baseDirectory = getCWD()
                         );
-                        
+
+                        if (viewResult.success) {
+                            detailOutput.create(viewResult.path, true);
+                            viewsCreated++;
+                        }
+                    }
+                } else {
+                    // For custom actions or default, generate views for all actions in the action list
+                    for (var action in actionList) {
+                        var viewResult = codeGenerationService.generateView(
+                            name = arguments.name,
+                            action = action,
+                            force = arguments.force,
+                            baseDirectory = getCWD()
+                        );
+
                         if (viewResult.success) {
                             detailOutput.create(viewResult.path, true);
                             viewsCreated++;
@@ -105,15 +130,15 @@ component aliases="wheels g controller" extends="../base" {
                 "Review the generated controller at #result.path#",
                 "Implement action logic for #arrayToList(actionList, ', ')#"
             ];
-            
-            if (arguments.rest) {
-                arrayAppend(nextSteps, "Add route to config/routes.cfm: resources('" & lCase(arguments.name) & "');");
+
+            if (arguments.crud) {
+                arrayAppend(nextSteps, "Add route to config/routes.cfm: .resources('" & lCase(arguments.name) & "')");
             } else {
-                arrayAppend(nextSteps, "Add routes to config/routes.cfm");
+                arrayAppend(nextSteps, "Add routes to config/routes.cfm for each action");
             }
-            
-            if (!arguments.api && viewsCreated > 0) {
-                arrayAppend(nextSteps, "Customize the views as needed");
+
+            if (viewsCreated > 0) {
+                arrayAppend(nextSteps, "Customize the #viewsCreated# generated view" & (viewsCreated > 1 ? "s" : "") & " as needed");
             }
             
             detailOutput.success("Controller generation complete!");

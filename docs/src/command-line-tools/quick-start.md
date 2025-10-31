@@ -57,7 +57,7 @@ Or use H2 embedded database:
 wheels new blog --setupH2
 ```
 
-Create the database: (Coming Soon)
+Create the database:
 
 ```bash
 # If using external database (MySQL, PostgreSQL, etc.)
