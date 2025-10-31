@@ -126,16 +126,6 @@ You now have a fully functional blog post management system!
 
 ## Development Workflow
 
-### File Watching
-
-In a new terminal:
-
-```bash
-wheels watch
-```
-
-Now changes to `.cfc` and `.cfm` files trigger automatic reloads.
-
 ### Running Tests
 
 ```bash
@@ -365,7 +355,6 @@ wheels db setup --seed-count=10
 
 # Start development
 wheels server start
-wheels watch
 
 # Visit http://localhost:3000/posts
 ```

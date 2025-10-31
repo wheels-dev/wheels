@@ -18,7 +18,7 @@ Wheels CLI is a CommandBox module that provides a comprehensive set of tools for
 
 ### [Command Reference](commands/README.md)
 Complete reference for all CLI commands organized by category:
-- [Core Commands](commands/core/init.md) - Essential commands like init, reload, watch
+- [Core Commands](commands/core/init.md) - Essential commands like init, reload.
 - [Code Generation](commands/generate/app.md) - Generate applications, models, controllers, views
 - [Database Commands](commands/database/db-create.md) - Complete database management and migrations
 - [Testing Commands](commands/test/test-run.md) - Run tests and generate coverage
@@ -111,8 +111,6 @@ wheels test:coverage         # Generate coverage reports
 Enhance your development workflow:
 
 ```bash
-# Watch for file changes
-wheels watch
 
 # Reload application
 wheels reload development
