@@ -16,23 +16,23 @@ Wheels CLI is a CommandBox module that provides a comprehensive set of tools for
 
 ## Documentation Structure
 
-### 📚 [Command Reference](commands/README.md)
+### [Command Reference](commands/README.md)
 Complete reference for all CLI commands organized by category:
 - [Core Commands](commands/core/init.md) - Essential commands like init, reload, watch
 - [Code Generation](commands/generate/app.md) - Generate applications, models, controllers, views
-- [Database Commands](commands/database/database-management.md) - Complete database management and migrations
-- [Testing Commands](commands/testing/test.md) - Run tests and generate coverage
-- [Configuration](commands/config/config-list.md) - Manage application settings
+- [Database Commands](commands/database/db-create.md) - Complete database management and migrations
+- [Testing Commands](commands/test/test-run.md) - Run tests and generate coverage
+- [Configuration](commands/config/config-dump.md) - Manage application settings
 - [And more...](commands/README.md)
 
-### 🚀 [Quick Start Guide](guides/quick-start.md)
+### [Quick Start Guide](guides/quick-start.md)
 Get up and running with Wheels CLI in minutes. Learn how to:
 - Install Wheels CLI
 - Create your first application
 - Generate CRUD scaffolding
 - Run tests and migrations
 
-### 📖 Guides
+### Guides
 
 #### Development Guides
 - [Service Architecture](guides/service-architecture.md) - Understand the CLI's architecture
@@ -45,7 +45,7 @@ Get up and running with Wheels CLI in minutes. Learn how to:
 - [Security Guide](guides/security.md) - Security scanning and hardening
 - [Performance Guide](guides/performance.md) - Optimization techniques
 
-### 📋 Reference
+### Reference
 - [Configuration Options](reference/configuration.md) - All available configuration settings
 - [Template Variables](reference/templates.md) - Variables available in templates
 - [Exit Codes](reference/exit-codes.md) - Understanding command exit codes
@@ -53,7 +53,7 @@ Get up and running with Wheels CLI in minutes. Learn how to:
 
 ## Key Features
 
-### 🛠️ Code Generation
+### Code Generation
 
 Generate complete applications or individual components:
 
@@ -70,7 +70,7 @@ wheels generate controller users --rest
 wheels generate view users index
 ```
 
-### 🗄️ Database Management
+### Database Management
 
 Complete database lifecycle management:
 
@@ -90,7 +90,7 @@ wheels db status            # Check migration status
 wheels db rollback          # Rollback migrations
 ```
 
-### 🧪 Testing
+### Testing
 
 Comprehensive testing support:
 
@@ -106,7 +106,7 @@ wheels test:watch            # Watch mode
 wheels test:coverage         # Generate coverage reports
 ```
 
-### 👀 Development Tools
+### Development Tools
 
 Enhance your development workflow:
 
@@ -129,7 +129,7 @@ wheels security scan
    # macOS/Linux
    curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo apt-key add -
    or
-	 brew install commandbox
+	brew install commandbox
 
    # Windows
    choco install commandbox
@@ -179,13 +179,13 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 ## Recent Updates
 
 ### Version 3.0.0
-- 🆕 Modernized service architecture
-- 🆕 Enhanced testing capabilities with watch mode
-- 🆕 Security scanning and performance optimization
-- 🆕 Plugin and environment management
-- 🆕 Improved code generation with more options
-- 🔧 Better error handling and user feedback
-- 📚 Comprehensive documentation
+- Modernized service architecture
+- Enhanced testing capabilities with watch mode
+- Security scanning and performance optimization
+- Plugin and environment management
+- Improved code generation with more options
+- Better error handling and user feedback
+- Comprehensive documentation
 
 ## Quick Links
 

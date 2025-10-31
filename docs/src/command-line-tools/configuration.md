@@ -1,3 +1,9 @@
+---
+description: >-
+  Learn how to manage configuration in Wheels using environment variables,
+  settings files, and CLI tools for configuration management.
+---
+
 # Configuration Management Guide
 
 This guide covers configuration management in Wheels, including working with environment variables, settings files, and the CLI tools for managing configuration.

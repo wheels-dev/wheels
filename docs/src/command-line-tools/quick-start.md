@@ -1,3 +1,9 @@
+---
+description: >-
+  Get up and running with Wheels CLI in minutes. Learn installation, creating
+  your first application, and common development tasks.
+---
+
 # Quick Start Guide
 
 Get up and running with Wheels CLI in minutes.
@@ -150,7 +156,7 @@ Let's add comments to posts:
 ```bash
 # Generate comment model
 wheels generate model comment --properties="author:string,content:text,postId:integer" \
-  --belongs-to="post"
+  --belongsTo="post"
 
 # Update post model
 wheels generate property post comments --has-many
@@ -343,10 +349,10 @@ cd myblog
 wheels scaffold post title:string,slug:string,content:text,publishedAt:datetime
 wheels scaffold author name:string,email:string,bio:text
 wheels generate model comment author:string,email:string,content:text,postId:integer \
-  --belongs-to=post
+  --belongsTo=post
 
 # Update associations
-wheels generate property post authorId:integer --belongs-to=author
+wheels generate property post authorId:integer --belongsTo=author
 wheels generate property post comments --has-many
 wheels generate property author posts --has-many
 
