@@ -395,18 +395,18 @@ function run(required string name) {
     if (!isValidName(arguments.name)) {
         error("Invalid name. Names must be alphanumeric.");
     }
-    
+
     // Warnings
     if (hasSpecialChars(arguments.name)) {
-        print.yellowLine("⚠ Warning: Special characters detected");
+        print.yellowLine("Warning: Special characters detected");
     }
-    
+
     // Success
-    print.greenLine("✓ Name is valid");
+    print.greenLine("Name is valid");
 }
 
 private function error(required string message) {
-    print.redLine("✗ #arguments.message#");
+    print.redLine("#arguments.message#");
     exit(1);
 }
 ```
