@@ -38,7 +38,12 @@ component extends="../base" {
 		string environment = "production"
 	) {
 		// Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
+		arguments = reconstructArgs(
+			argStruct = arguments,
+            allowedValues = {
+                environment: ["production", "staging", "development", "test", "maintenance", "prod", "dev", "stage"]
+            }
+		);
 
 		// Normalize environment aliases
 		arguments.environment = normalizeEnvironment(arguments.environment);

@@ -29,14 +29,17 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		boolean env = false,
 		boolean settings = false
 	) {
-		arguments = reconstructArgs(arguments);
 		if(!isWheelsApp()){
-			
+			error("This command must be run from a Wheels application root directory.");
 		}
-		// Validate format
-		if (!ListFindNoCase("table,json", arguments.format)) {
-			error("Invalid format: #arguments.format#. Valid formats are: table, json");
-		}
+		// Reconstruct and validate arguments
+		arguments = reconstructArgs(
+			argStruct = arguments,
+			allowedValues = {
+				format: ["table", "json"]
+			}
+		);
+
 
 		// Validate environments are different
 		if (arguments.env1 == arguments.env2) {

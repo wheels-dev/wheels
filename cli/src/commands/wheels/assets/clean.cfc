@@ -10,16 +10,9 @@
  * wheels assets:clean --dryRun
  * {code}
  **/
-component extends="../base" {
+component aliases="clean" extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
-	
-	// CommandBox metadata
-	this.aliases = [ "clean" ];
-	this.parameters = [
-		{ name="keep", type="numeric", required=false, default=3, hint="Number of versions to keep for each asset" },
-		{ name="dryRun", type="boolean", required=false, default=false, hint="Show what would be deleted without actually deleting" }
-	];
 	
 	/**
 	 * Remove old compiled assets while keeping the most recent versions
@@ -34,6 +27,7 @@ component extends="../base" {
 		numeric keep = 3,
 		boolean dryRun = false
 	) {
+		arguments = reconstructArgs(arguments);
 		if (!isWheelsApp()) {
 			error("This command must be run from a Wheels application root directory.");
 		}
