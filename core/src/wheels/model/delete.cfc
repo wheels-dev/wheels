@@ -210,7 +210,10 @@ component {
 		if ($callback("beforeDelete", arguments.callbacks)) {
 			// Delete dependent record(s).
 			// Done before the main record is deleted to make sure eventual foreign key constraints does not prevent deletion.
-			$deleteDependents();
+			$deleteDependents(
+				softDelete = arguments.softDelete,
+				includeSoftDeletes = arguments.includeSoftDeletes
+			);
 
 			local.deleted = variables.wheels.class.adapter.$querySetup(
 				sql = arguments.sql,
