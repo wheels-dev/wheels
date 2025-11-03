@@ -14,7 +14,7 @@ Let's look at a possible scenario for what happens when a visitor to your imagin
 
 * You create a new `order` object using the [new()](https://wheels.dev/api/v3.0.0/model.new.html) method based on the incoming form parameters.
 * You call the [save()](https://wheels.dev/api/v3.0.0/model.save.html) method on the order object, which will cause Wheels to first validate the object and then store it in the database if it passes validation.
-* The next day, you call the [update(](https://wheels.dev/api/v3.0.0/model.update.html) method on the object because the user decided to change the shipping method for the order.
+* The next day, you call the [update()](https://wheels.dev/api/v3.0.0/model.update.html) method on the object because the user decided to change the shipping method for the order.
 * Another day passes, and you call the [delete()](https://wheels.dev/api/v3.0.0/model.delete.html) method on the object because the visitor called in to cancel the order.
 
 Let's say you want to have the following things executed somewhere in the code:
@@ -84,7 +84,7 @@ The following 16 functions can be used to register callbacks.
 
 As you can see above, there are a few places (5, to be exact) where one callback or the other will be executed, but not both.
 
-The very first possible callback that can take place in an object's life cycle is either [afterNew()](https://wheels.dev/api/v3.0.0/model.afternew.html) or [afterFind](https://wheels.dev/api/v3.0.0/model.afterfind.html). The [afterNew()](https://wheels.dev/api/v3.0.0/model.afternew.html) callback methods are triggered when you create the object yourself for the very first time, for example, when using the [new()](https://wheels.dev/api/v3.0.0/model.new.html) method. [afterFind()](https://wheels.dev/api/v3.0.0/model.afterFind.html) is triggered when the object is created as a result of fetching a record from the database, for example, when using [findByKey()](https://wheels.dev/api/v3.0.0/model.findByKey.html). (There is some special behavior for this callback type that we'll explain in detail later on in this chapter).
+The very first possible callback that can take place in an object's life cycle is either [afterNew()](https://wheels.dev/api/v3.0.0/model.afternew.html) or [afterFind](https://wheels.dev/api/v3.0.0/model.afterfind.html). The [afterNew()](https://wheels.dev/api/v3.0.0/model.afternew.html) callback methods are triggered when you create the object yourself for the very first time, for example, when using the [new()](https://wheels.dev/api/v3.0.0/model.new.html) method. [afterFind()](https://wheels.dev/api/v3.0.0/model.afterfind.html) is triggered when the object is created as a result of fetching a record from the database, for example, when using [findByKey()](https://wheels.dev/api/v3.0.0/model.findByKey.html). (There is some special behavior for this callback type that we'll explain in detail later on in this chapter).
 
 The remaining callbacks get executed depending on whether or not we're running a "create," "update," or "delete" operation.
 

@@ -26,8 +26,7 @@ using the following methods:
 3. Request Header
 
 Which formats you can request is determined by what you configure in the\
-controller. See the section below on _Responding to Different Formats in the_\
-&#xNAN;_&#x43;ontroller_ for more details.
+controller. See the section below on _Responding to Different Formats in the _Controller_ for more details.
 
 #### URL Variable
 
@@ -147,7 +146,7 @@ authors = model("author").findAll(returnAs="structs");
 
 The reason for doing it this way is that it will preserve the case for the struct / JSON keys.
 
-Secondly, make use of Wheels ability to return the JSON values in a specified type. This is done in the [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html)function, like this:
+Secondly, make use of Wheels ability to return the JSON values in a specified type. This is done in the [renderWith()](https://wheels.dev/api/v3.0.0/controller.renderwith.html) function, like this:
 
 ```javascript
 renderWith(data=authors, firstName="string", booksForSale="integer");

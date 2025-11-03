@@ -1,3 +1,7 @@
+---
+description: Bootstrap an existing Wheels application for CLI usage by creating necessary configuration files.
+---
+
 # wheels init
 
 Bootstrap an existing Wheels application for CLI usage.

@@ -1,3 +1,9 @@
+---
+description: >-
+  Enhance your development workflow with Wheels CLI commands for framework
+  upgrades, performance testing, and documentation generation.
+---
+
 # Development Workflow Commands
 
 This guide covers the Wheels CLI commands designed to enhance your development workflow, including framework upgrades, performance testing, and documentation generation.

@@ -8,7 +8,7 @@ Wheels allows you to set up different _environments_ that match stages in your d
 
 The **Development** environment is the most convenient one to use as you start building your application because it does not cache any data. Therefore, if you make any changes to your controllers and actions, for example, it will immediately be picked up by Wheels.
 
-Other environment modes cache this information in order to speed up your application as much as possible. Making changes to the database in these most modes will cause Wheels to throw an error. (Although that can be avoided with a `reload` call. More on that later.)
+Other environment modes cache this information in order to speed up your application as much as possible. Making changes to the database in most of these modes will cause Wheels to throw an error. (Although that can be avoided with a `reload` call. More on that later.)
 
 The fastest environment mode in terms of page load time is the **Production** mode. This is what you should set your application to run in before you launch your website.
 
@@ -53,7 +53,7 @@ Wheels provides multiple ways to switch between environments. Choose the method 
 
 The easiest and most reliable way to switch environments is using the Wheels CLI command:
 
-```bash
+```cfml
 wheels env switch production
 ```
 
@@ -63,7 +63,7 @@ This command will:
 3. Validate that the target environment exists before switching
 
 **Examples:**
-```bash
+```cfml
 # Switch to production environment
 wheels env switch production
 
@@ -78,7 +78,7 @@ wheels env switch development
 
 If you prefer not to use the CLI command, you can manually change the environment by editing the `/config/environment.cfm` file:
 
-```bash
+```cfml
 // /config/environment.cfm
 <cfscript>
     // Change this value to your desired environment

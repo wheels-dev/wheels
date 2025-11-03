@@ -16,7 +16,7 @@ Wheels uses a very flexible routing system to match your application's URLs to c
 
 Within this routing system is a _default route_ that handles many scenarios that you'll run across as a developer. The default route is mapped using the pattern `[controller]/[action]/[key]`.
 
-Consider this example URL:http://localhost:8080/users/edit/12
+Consider this example URL: http://localhost:8080/users/edit/12
 
 {% tabs %}
 {% tab title="HTTP" %}

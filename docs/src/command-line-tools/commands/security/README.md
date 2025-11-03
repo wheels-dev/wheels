@@ -74,14 +74,14 @@ The security commands understand and check for proper usage of Wheels security f
 // Checked: CSRF protection enabled
 component extends="Controller" {
     function config() {
-        protectsFromForgery(); ✅
+        protectsFromForgery();
     }
 }
 
 // Flagged: Missing CSRF protection
 component extends="Controller" {
     function create() {
-        // State-changing action without protection ❌
+        // State-changing action without protection
     }
 }
 ```
@@ -89,20 +89,20 @@ component extends="Controller" {
 #### Model Security
 ```cfm
 // Checked: Proper parameter usage
-users = model("User").findAll(where="name = :name", name=params.name); ✅
+users = model("User").findAll(where="name = :name", name=params.name);
 
 // Flagged: SQL injection risk
-users = model("User").findAll(where="name = '#params.name#'"); ❌
+users = model("User").findAll(where="name = '#params.name#'");
 ```
 
 #### Configuration Security
 ```cfm
 // Checked: Production-safe settings
-set(showErrorInformation=false); ✅
-set(sendEmailOnError=true); ✅
+set(showErrorInformation=false);
+set(sendEmailOnError=true);
 
 // Flagged: Debug mode in production
-set(showErrorInformation=true); ❌
+set(showErrorInformation=true);
 ```
 
 ## Integration Workflows

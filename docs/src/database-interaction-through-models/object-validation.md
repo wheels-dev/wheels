@@ -145,7 +145,7 @@ We then should create a method called `validateEmailFormat`, which in this case 
 ```javascript
 private function validateEmailFormat() {
     if ( !IsValid("email", this.email) ) {
-        addError(property="email", message="Email address != in a valid format.");
+        addError(property="email", message="Email address is not in a valid format.");
     }
 }
 ```
@@ -201,7 +201,7 @@ The first line of the action creates a `newUser` based on the `user` model and t
 
 Now, to persist the object to the database, the model's [save()](https://wheels.dev/api/v3.0.0/model.save.html) call can be placed within a `<cfif>` test. If the save succeeds, the [save()](https://wheels.dev/api/v3.0.0/model.save.html) method will return `true`, and the contents of the `<cfif>` will be executed. But if any of the validations set up in the model fail, the [save()](https://wheels.dev/api/v3.0.0/model.save.html) method returns `false`, and the `<cfelse>` will execute.
 
-The important step here is to recognize that the `<cfelse>` renders the original form input page using the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderWith.html) function. When this happens, the view will use the `newUser` object defined in our [save()](https://wheels.dev/api/v3.0.0/model.save.html) method. If a [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) were used instead, the validation information loaded in our [save()](https://wheels.dev/api/v3.0.0/model.save.html) method would be lost.
+The important step here is to recognize that the `<cfelse>` renders the original form input page using the [renderView()](https://wheels.dev/api/v3.0.0/controller.renderView.html) function. When this happens, the view will use the `newUser` object defined in our [save()](https://wheels.dev/api/v3.0.0/model.save.html) method. If a [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) were used instead, the validation information loaded in our [save()](https://wheels.dev/api/v3.0.0/model.save.html) method would be lost.
 
 ### The View
 
@@ -270,7 +270,7 @@ Another way of adding a custom error message is by going into an individual prop
 Here's a change that we may apply in the `config()` method of our model:
 
 ```javascript
-validatesNumericalityOf(
+validatesUniquenessOf(
     property="email",
     message="Email address is already in use in another account"
 );

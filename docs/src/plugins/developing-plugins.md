@@ -87,7 +87,7 @@ This is convenient when you're deploying plugins but can be annoying when you're
 
 ### Disabling Plugin Overwriting
 
-To force Wheels to skip the unzipping process, set the `overwritePlugins` setting to `false` in the development\` environment.
+To force Wheels to skip the unzipping process, set the `overwritePlugins` setting to `false` in the development environment.
 
 {% code title="/config/development/settings.cfm" %}
 ```javascript

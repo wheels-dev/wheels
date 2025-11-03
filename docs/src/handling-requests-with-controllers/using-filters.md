@@ -39,17 +39,17 @@ component extends="Controller" {
 
     function secretStuff() {
         if ( !find("212.55", cgi.remote_addr) ) {
-            flashInsert(alert="Sorry, we're !open in that area.");
+            flashInsert(msg="Sorry, we're not open in that area.");
             redirectTo(action="sorry");
         } else if ( !StructKeyExists(session, "userId") ) {
-            flashInsert(alert="Please login first.");
+            flashInsert(msg="Please login first.");
             redirectTo(action="login");
         }
     }
 
     function evenMoreSecretStuff() {
         if ( !find("212.55", cgi.remote_addr) ) {
-            flashInsert(msg="Sorry, we're !open in that area.");
+            flashInsert(msg="Sorry, we're not open in that area.");
             redirectTo(action="sorry");
         } else if ( !StructKeyExists(session, "userId") ) {
             flashInsert(msg="Please login first.");

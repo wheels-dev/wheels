@@ -168,7 +168,7 @@ $ run-script patch-release
 ```
 {% endcode %}
 
-ForgeBox does not store your actual package files like npm, but points to your download location.&#x20;
+ForgeBox does not store your actual package files like npm, but points to your download location.
 
 The following should happen (again, assuming you have git publish rights from that plugin directory)
 

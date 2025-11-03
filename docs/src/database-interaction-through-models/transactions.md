@@ -26,9 +26,10 @@ component extends="Model" {
 
   function createFirstPost(){
     var post = model("post").new(
-        authorId=this.id,
-        text="This is my first post!";
-        post.save();
+      authorId=this.id,
+      text="This is my first post!"
+    );
+    post.save();
   }
 }
 ```

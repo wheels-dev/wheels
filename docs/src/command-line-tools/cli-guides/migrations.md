@@ -652,7 +652,7 @@ function up() {
 #!/bin/bash
 # Check for pending migrations
 if wheels dbmigrate info | grep -q "pending"; then
-    echo "⚠️  Pending migrations detected!"
+    echo "Pending migrations detected!"
     wheels dbmigrate info
     exit 1
 fi

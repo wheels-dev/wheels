@@ -34,7 +34,7 @@ property(
     );
 ```
 
-As you can probably deduce, we're creating a SQL statement that will be run in the `SELECT` clause to generate the \`fullName.
+As you can probably deduce, we're creating a SQL statement that will be run in the `SELECT` clause to generate the fullName.
 
 With this line in place, `fullName` will become available in both full model objects and query objects returned by the various finder methods like [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) and [findOne()](https://wheels.dev/api/v3.0.0/model.findone.html).
 
