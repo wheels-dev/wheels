@@ -190,7 +190,7 @@ component {
 	 * Called when a model object is deleted (e.g. post.delete()).
 	 * Deletes all associated records (or sets their foreign key values to NULL).
 	 */
-	public void function $deleteDependents() {
+	public void function $deleteDependents(boolean softDelete = true, boolean includeSoftDeletes = false) {
 		for (local.key in variables.wheels.class.associations) {
 			local.association = variables.wheels.class.associations[local.key];
 			if (ListFindNoCase("hasMany,hasOne", local.association.type) && local.association.dependent != false) {
@@ -202,6 +202,8 @@ component {
 					case "delete":
 						local.invokeArgs = {};
 						local.invokeArgs.instantiate = true;
+						local.invokeArgs.softDelete = arguments.softDelete;
+						local.invokeArgs.includeSoftDeletes = arguments.includeSoftDeletes;
 						$invoke(componentReference = this, method = "delete#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "remove":
@@ -210,7 +212,10 @@ component {
 						$invoke(componentReference = this, method = "remove#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "deleteAll":
-						$invoke(componentReference = this, method = "delete#local.all##local.key#");
+						local.invokeArgs = {};
+						local.invokeArgs.softDelete = arguments.softDelete;
+						local.invokeArgs.includeSoftDeletes = arguments.includeSoftDeletes;
+						$invoke(componentReference = this, method = "delete#local.all##local.key#", invokeArgs = local.invokeArgs);
 						break;
 					case "removeAll":
 						$invoke(componentReference = this, method = "remove#local.all##local.key#");
