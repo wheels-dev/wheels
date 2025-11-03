@@ -115,37 +115,77 @@ component extends="wheels-cli.models.BaseCommand" {
      * @componentObject The component instance (use 'this' when calling)
      * @validate Whether to validate required arguments (default: true)
      * @allowedValues Struct of argument names with allowed values
+     * @numericRanges Struct of argument names with min/max numeric ranges
+     *                Example: {port: {min: 1, max: 65535}, timeout: {min: 0, max: 3600}}
      */
     function reconstructArgs(
         required struct argStruct,
         string functionName = "run",
         any componentObject = this,
         boolean validate = true,
-        struct allowedValues = {}
+        struct allowedValues = {},
+        struct numericRanges = {}
     ) {
         local.result = {};
 
         // Step 1: Reconstruct arguments from flags
         for (local.key in arguments.argStruct) {
             if (find("=", local.key)) {
-                local.parts = listToArray(local.key, "=");
-                if (arrayLen(local.parts) == 2 && arguments.argStruct[local.key] == true) {
-                    local.result[local.parts[1]] = local.parts[2];
+                // Split only on the first = to handle values with = signs
+                local.equalPos = find("=", local.key);
+                local.paramName = left(local.key, local.equalPos - 1);
+                local.paramValue = mid(local.key, local.equalPos + 1, len(local.key));
+
+                // Remove surrounding quotes if present
+                if (len(local.paramValue) >= 2 && left(local.paramValue, 1) == '"' && right(local.paramValue, 1) == '"') {
+                    local.paramValue = mid(local.paramValue, 2, len(local.paramValue) - 2);
+                }
+
+                // Convert ONLY explicit string boolean values to actual booleans
+                if (lCase(trim(local.paramValue)) == "true") {
+                    local.result[local.paramName] = true;
+                } else if (lCase(trim(local.paramValue)) == "false") {
+                    local.result[local.paramName] = false;
                 } else {
-                    local.result[local.parts[1]] = local.parts[2] ?: true;
+                    local.result[local.paramName] = local.paramValue;
                 }
             } else {
                 local.result[local.key] = arguments.argStruct[local.key];
             }
         }
 
-        // Step 2: Validation
+        // Step 2: Fix CommandBox boolean pre-conversion
+        // CommandBox converts --flag=0 to flag=false and --flag=1 to flag=true
+        // We need to convert these back to numeric when the parameter type expects numeric
+        try {
+            local.funcMetadata = getMetadata(arguments.componentObject[arguments.functionName]);
+            if (structKeyExists(local.funcMetadata, "parameters")) {
+                for (local.param in local.funcMetadata.parameters) {
+                    local.paramName = local.param.name;
+                    local.paramType = structKeyExists(local.param, "type") ? local.param.type : "any";
+
+                    // If parameter expects numeric but received boolean, convert back
+                    if ((local.paramType == "numeric" || local.paramType == "integer")
+                        && structKeyExists(local.result, local.paramName)
+                        && isBoolean(local.result[local.paramName])) {
+
+                        // Convert boolean back to numeric: false->0, true->1
+                        local.result[local.paramName] = local.result[local.paramName] ? 1 : 0;
+                    }
+                }
+            }
+        } catch (any e) {
+            // If metadata extraction fails, continue without boolean conversion
+        }
+
+        // Step 3: Validation
         if (arguments.validate) {
             local.result = validateArguments(
                 args = local.result,
                 functionName = arguments.functionName,
                 componentObject = arguments.componentObject,
-                allowedValues = arguments.allowedValues
+                allowedValues = arguments.allowedValues,
+                numericRanges = arguments.numericRanges
             );
         }
 
@@ -159,7 +199,8 @@ component extends="wheels-cli.models.BaseCommand" {
         required struct args,
         required string functionName,
         required any componentObject,
-        struct allowedValues = {}
+        struct allowedValues = {},
+        struct numericRanges = {}
     ) {
         local.errors = [];
         local.warnings = [];
@@ -177,6 +218,7 @@ component extends="wheels-cli.models.BaseCommand" {
                 local.paramName = local.param.name;
                 local.paramType = structKeyExists(local.param, "type") ? local.param.type : "any";
                 local.isRequired = structKeyExists(local.param, "required") && local.param.required;
+                local.hasDefault = structKeyExists(local.param, "default");
                 local.hasHint = structKeyExists(local.param, "hint");
                 local.displayName = local.hasHint ? local.param.hint : humanizeArgName(local.paramName);
 
@@ -192,7 +234,19 @@ component extends="wheels-cli.models.BaseCommand" {
                     }
                 }
 
-                // VALIDATION 2: Allowed values (enum-like validation)
+                // VALIDATION 2: Arguments with default values cannot be explicitly set to empty
+                // This catches cases where user does: --format="" or format=""
+                if (!local.isRequired && local.hasDefault) {
+                    // Check if the argument was explicitly provided in the args struct
+                    if (structKeyExists(arguments.args, local.paramName)) {
+                        // If it was provided but is empty, that's an error
+                        if (!len(trim(local.argValue))) {
+                            arrayAppend(local.errors, "#local.displayName# cannot be empty. Either omit it to use the default value or provide a valid value");
+                        }
+                    }
+                }
+
+                // VALIDATION 3: Allowed values (enum-like validation)
                 if (structKeyExists(arguments.allowedValues, local.paramName)) {
                     local.allowed = arguments.allowedValues[local.paramName];
 
@@ -205,7 +259,7 @@ component extends="wheels-cli.models.BaseCommand" {
                     }
                 }
 
-                // VALIDATION 3: Data type validation
+                // VALIDATION 4: Data type validation
                 if (len(trim(local.argValue))) {
                     switch (local.paramType) {
                         case "numeric":
@@ -220,6 +274,34 @@ component extends="wheels-cli.models.BaseCommand" {
                                 arrayAppend(local.errors, "#local.displayName# must be true or false");
                             }
                             break;
+                    }
+                }
+
+                // VALIDATION 5: Numeric range validation
+                if (structKeyExists(arguments.numericRanges, local.paramName)) {
+                    if (local.paramType == "numeric" || local.paramType == "integer") {
+                        // Check if value exists and is numeric (handle both explicit and default values)
+                        local.numericValue = "";
+                        if (structKeyExists(arguments.args, local.paramName) && isNumeric(arguments.args[local.paramName])) {
+                            local.numericValue = arguments.args[local.paramName];
+                        } else if (local.hasDefault && isNumeric(local.param.default)) {
+                            // Use default value if not explicitly provided
+                            local.numericValue = local.param.default;
+                        }
+
+                        if (isNumeric(local.numericValue)) {
+                            local.range = arguments.numericRanges[local.paramName];
+                            if (structKeyExists(local.range, "min") && local.numericValue < local.range.min) {
+                                arrayAppend(local.errors,
+                                    "#local.displayName# must be at least #local.range.min#. You provided: #local.numericValue#"
+                                );
+                            }
+                            if (structKeyExists(local.range, "max") && local.numericValue > local.range.max) {
+                                arrayAppend(local.errors,
+                                    "#local.displayName# must be at most #local.range.max#. You provided: #local.numericValue#"
+                                );
+                            }
+                        }
                     }
                 }
             }
