@@ -10,7 +10,7 @@ When a user submits a form, you do not want to show any content on the page that
 
 To avoid the above problem, it is recommended to always redirect the user after submitting a form. In Wheels this is done with the [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) function. It is basically a wrapper around the `cflocation` tag in CFML.
 
-Being that [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) is a Wheels function, it can accept the `route, controller, action`, and `key` arguments so that you can easily redirect\
+Being that [redirectTo()](https://wheels.dev/api/v3.0.0/controller.redirectto.html) is a Wheels function, it can accept the `route, controller, action`, and `key` arguments so that you can easily redirect
 to other actions in your application.
 
 ### Three Ways to Redirect

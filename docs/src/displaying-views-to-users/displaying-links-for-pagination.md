@@ -74,7 +74,7 @@ In the view...
 
 <cfoutput>#paginationLinks(handle="userQuery")#</cfoutput>
 
-<cfoutput query="blog">
+<cfoutput query="blogs">
     #address#<br />
 </cfoutput>
 

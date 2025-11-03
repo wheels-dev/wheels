@@ -7,7 +7,7 @@ The `wheels config diff` command compares configuration settings and environment
 ## Command Syntax
 
 ```bash
-wheels config diff <env1> <env2> [changesOnly] [--format=<format>] [--env] [--settings]
+wheels config diff <env1> <env2> [--changesOnly] [--format=<format>] [--env] [--settings]
 ```
 
 ## Parameters
@@ -16,7 +16,7 @@ wheels config diff <env1> <env2> [changesOnly] [--format=<format>] [--env] [--se
 |-----------|------|----------|-------------|
 | env1 | string | Yes | First environment to compare (e.g., development, testing, production) |
 | env2 | string | Yes | Second environment to compare |
-| changesOnly | flag | No | Only show differences, hide identical values |
+| --changesOnly | flag | No | Only show differences, hide identical values |
 | --format | string | No | Output format: `table` (default) or `json` |
 | --env | flag | No | Compare only environment variables |
 | --settings | flag | No | Compare only Wheels settings |
@@ -40,7 +40,7 @@ wheels config diff development production
 ### Compare Only Differences
 ```bash
 # Show only the differences, hide identical values
-wheels config diff development production changesOnly
+wheels config diff development production --changesOnly
 ```
 
 ### Compare Environment Variables Only
@@ -248,7 +248,7 @@ Masked values appear as `***MASKED***` in the output.
 ### Pre-Deployment Verification
 ```bash
 # Verify configuration differences before deploying to production
-wheels config diff testing production changesOnly
+wheels config diff testing production --changesOnly
 ```
 
 ### Environment Synchronization Check
@@ -273,7 +273,7 @@ wheels config diff staging production --format=json > config-diff.json
 ### Environment Variable Validation
 ```bash
 # Ensure all required environment variables exist in production
-wheels config diff development production --env changesOnly
+wheels config diff development production --env --changesOnly
 ```
 
 ### Quick Similarity Check
@@ -292,13 +292,13 @@ Shows all differences and similarities between development and production config
 
 ### Example 2: Changes Only
 ```bash
-wheels config diff testing production changesOnly
+wheels config diff testing production --changesOnly
 ```
 Shows only the differences, useful for quick reviews.
 
 ### Example 3: Environment Variables Focus
 ```bash
-wheels config diff development staging --env changesOnly
+wheels config diff development staging --env --changesOnly
 ```
 Shows only environment variable differences between development and staging.
 
@@ -310,7 +310,7 @@ Outputs similarity percentage for automated checks.
 
 ### Example 5: Settings Validation
 ```bash
-wheels config diff development production --settings changesOnly
+wheels config diff development production --settings --changesOnly
 ```
 Validates only Wheels settings differences.
 
@@ -356,7 +356,7 @@ Only `table` and `json` formats are supported.
 
 ## Tips
 
-- Use `changesOnly` to quickly identify configuration drift
+- Use `--changesOnly` to quickly identify configuration drift
 - Pipe JSON output to `jq` for advanced filtering and processing
 - Create aliases for common comparisons (e.g., `alias cfgdiff='wheels config diff'`)
 - Review the similarity percentage as a quick health check
@@ -418,7 +418,7 @@ SECRET_KEY=prod_secret_key
 
 ### Performance Issues
 - Large configuration files may take time to parse
-- Consider using `changesOnly` to reduce output
+- Consider using `--changesOnly` to reduce output
 - Use JSON format for faster processing in scripts
 
 ## Related Commands

@@ -20,7 +20,7 @@ If you look closely in the `events` folder, you will also notice that there are 
 
 **On Maintenance**
 
-The `onmaintenance.cfm` file is included when Wheels is set to maintenance mode. After the file is included, `cfabort`is called by Wheels so no other code runs in this mode.
+The `onmaintenance.cfm` file is included when Wheels is set to maintenance mode. After the file is included, `cfabort` is called by Wheels so no other code runs in this mode.
 
 **On Error**
 

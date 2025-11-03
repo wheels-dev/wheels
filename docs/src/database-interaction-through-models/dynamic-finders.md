@@ -4,7 +4,7 @@ description: Make your model calls more readable by using dynamic finders.
 
 # Dynamic Finders
 
-Since the introduction of `onMissingMethod()` in CFML, we have been able to port over the concept of _dynamic finders_from Rails to Wheels.
+Since the introduction of `onMissingMethod()` in CFML, we have been able to port over the concept of _dynamic finders_ from Rails to Wheels.
 
 The concept is simple. Instead of using arguments to tell Wheels what you want to do, you can use a dynamically-named method.
 

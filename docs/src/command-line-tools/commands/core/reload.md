@@ -109,6 +109,5 @@ set(reloadPassword="mySecretPassword");
 
 ## See Also
 
-- [wheels init](init.md) - Initialize application configuration
-- [wheels watch](watch.md) - Auto-reload on file changes
+- [wheels init](init.md) - Initialize application configuration=
 - [wheels info](info.md) - Display application information

@@ -168,8 +168,7 @@ Much like the layouts outlined in the [Layouts](https://wheels.dev/3.0.0/guides/
 A layout should be used just as the name implies: for layout and stylistic aspects of the email body. Based on the example given above, let's assume that the same email content needs to be sent twice.
 
 * Message is sent to a new member with a stylized header and footer.
-* A copy of message is sent to an admin at your company with a generic header\
-  and footer.
+* A copy of message is sent to an admin at your company with a generic header and footer.
 
 Best practice is that variables (such as `recipientName` and `startDate`, in the example above) be placed as outputs in the template file.
 

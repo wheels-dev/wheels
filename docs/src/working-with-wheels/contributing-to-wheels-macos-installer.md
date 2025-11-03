@@ -53,7 +53,7 @@ tools/installer/macos/
 ├── build-swift.sh              # Build script (creates .app)
 ├── create-dmg.sh               # DMG creation script
 ├── assets/                     # App icons and resources
-│   └── wheels_logo.icns        # Built application
+│   └── wheels_logo.icns        # Wheels Logo
 ├── installer/                  # Build output directory
 │   ├── wheels-installer.app    # Built application
 │   └── wheels-installer.dmg    # Distributable DMG
@@ -293,7 +293,7 @@ Follow the standard Wheels contribution process:
 3. **Fork and Branch**: Create a feature branch from `develop`
 4. **Make Changes**: Implement your changes following the guidelines above
 5. **Test Thoroughly**: Test on multiple macOS versions and architectures
-6. **Submit Pull Request**: Create a pull request to the `develop` branch, before creating a PR, please also review [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md) and [Submitting Pull Requests](submitting-pull-requests.md) guide
+6. **Submit Pull Request**: Create a pull request to the `develop` branch, before creating a PR, please also review [Contributing to Wheels](contributing-to-wheels.md) and [Submitting Pull Requests](submitting-pull-requests.md) guide
 7. **Code Review**: Address any feedback from the core team
 
 ### Pull Request Guidelines

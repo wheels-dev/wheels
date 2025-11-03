@@ -49,7 +49,7 @@ booksAndAuthors = model("Book").findAll(
 
 Here, we call the `findAll()` function on the Book class instead, and thereby we ensure that the pagination is based on the books and not the authors. In this case, we will always get 25 records back.
 
-If you need to know more about the returned query, you can use the `pagination()` function which returns a struct with keys `pagination().currentPage`, `pagination().totalPages` and `pagination().totalRecords`.&#x20;
+If you need to know more about the returned query, you can use the `pagination()` function which returns a struct with keys `pagination().currentPage`, `pagination().totalPages` and `pagination().totalRecords`.
 
 That's all there is to it, really. The best way to learn pagination is to play around with it with debugging turned on.
 

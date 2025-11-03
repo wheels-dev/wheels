@@ -205,7 +205,7 @@ You would link up the form like so:
 #startFormTag(
     route="productVariation",
     language="es",
-    productKey=product,key(),
+    productKey=product.key(),
     key=variation.key(),
     method="patch"
 )#
@@ -420,7 +420,7 @@ Let's add some error message handlers for the `firstName`, `lastName`, and `depa
     #textField(objectName="profile", property="lastName")#
     #errorMessageOn(objectName="profile", property="lastName")#
 
-    #selectTag(
+    #select(
         objectName="profile",
         property="departmentId",
         options=departments

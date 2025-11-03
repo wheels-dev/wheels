@@ -1,6 +1,6 @@
 ---
 description: >-
-  An overview of Wheels configuration and how is it used in your applications.
+  An overview of Wheels configuration and how it is used in your applications.
   Learn how to override a Wheels convention to make it your own.
 ---
 
@@ -267,7 +267,7 @@ Wheels includes a powerful routing system. Parts of it are configurable with the
 
 See the chapters about [Using Routes](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) and [Obfuscating URLs](../handling-requests-with-controllers/obfuscating-urls.md) for more information about how this all works together.
 
-**Full Listing of Miscellaneous Settings**
+**Full Listing of Routing Settings**
 
 | Name              | Type    | Default | Description                                                                               |
 | ----------------- | ------- | ------- | ----------------------------------------------------------------------------------------- |
@@ -288,9 +288,9 @@ Wheels includes built-in Cross-Site Request Forgery (CSRF) protection for form p
 
 | Name                          | Type    | Default                | Description                                                                                                                                                                                                                                                                                                                                             |
 | ----------------------------- | ------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| csrfStore                     | string  | session                | <p>Which storage strategy to use for storing the CSRF authenticity token. Valid values are <code>session</code> or <code>cookie</code>.<br><br>Choosing <code>session</code> requires no additional configuration.<br><br>Choosing <code>cookie</code> for this requires additional configuration listed below.</p>                                     |
-| csrfCookieEncryptionAlgorithm | string  | AES                    | Encryption algorithm to use for encrypting the authenticity token cookie contents. This setting is ignored if you're using `session` storage. See your CF engine's documentation for the `Encrypt()`function for more information.                                                                                                                      |
-| csrfCookieEncryptionSecretKey | string  |                        | Secret key used to encrypt the authenticity token cookie contents. This value must be configured to a string compatible with the `csrfCookieEncryptionAlgorithm`setting if you're using `cookie` storage. This value is ignored if you're using `session` storage. See your CF engine's documentation for the `Encrypt()`function for more information. |
+| csrfStore                     | string  | session                | Which storage strategy to use for storing the CSRF authenticity token. Valid values are `session` or `cookie`. Choosing `session` requires no additional configuration. Choosing `cookie` for this requires additional configuration listed below.                                     |
+| csrfCookieEncryptionAlgorithm | string  | AES                    | Encryption algorithm to use for encrypting the authenticity token cookie contents. This setting is ignored if you're using `session` storage. See your CF engine's documentation for the `Encrypt()` function for more information.                                                                                                                      |
+| csrfCookieEncryptionSecretKey | string  |                        | Secret key used to encrypt the authenticity token cookie contents. This value must be configured to a string compatible with the `csrfCookieEncryptionAlgorithm`setting if you're using `cookie` storage. This value is ignored if you're using `session` storage. See your CF engine's documentation for the `Encrypt()` function for more information. |
 | csrfCookieEncryptionEncoding  | string  | Base64                 | Encoding to use to write the encrypted value to the cookie. This value is ignored if you're using `session` storage. See your CF engine's documentation for the `Encrypt()` function for more information.                                                                                                                                              |
 | csrfCookieName                | string  | \_wheels\_authenticity | The name of the cookie to be set to store CSRF token data. This value is ignored if you're using `session` storage.                                                                                                                                                                                                                                     |
 | csrfCookieDomain              | string  |                        | Domain to set the cookie on. See your CF engine's documentation for `cfcookie` for more information.                                                                                                                                                                                                                                                    |
@@ -314,7 +314,7 @@ In this first version, the user can enable this feature, which will allow reques
 
 | Name                    | Type    | Default | Description                                                                                                                              |
 | ----------------------- | ------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| disableEngineCheck      | boolean | false   | Set to `true` if you don't want Wheels to block you from using older CFML engines (such as ColdFusion 9, Railo etc).                     |
+| disableEngineCheck      | boolean | false   | Set to `true` if you don't want Wheels to block you from using older CFML engines (such as `ColdFusion 9`, `Railo` etc).                     |
 | enableMigratorComponent | boolean | true    | Set to `false` to completely disable the migrator component which will prevent any Database migrations                                   |
 | enablePluginsComponent  | boolean | true    | Set to `false` to completely disable the plugins component which will prevent any plugin loading, and not load the entire plugins system |
 | enablePublicComponent   | boolean | true    | Set to `false` to completely disable the public component which will disable the GUI even in development mode                            |
