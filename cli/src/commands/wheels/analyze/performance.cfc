@@ -32,7 +32,11 @@ component extends="../base" {
             argStruct = arguments,
             allowedValues = {
                 target: ["all", "controller", "view", "query", "memory"]
-            }
+            },
+            numericRanges={
+				duration:{min:1, max:1000},
+                threshold:{min:1, max:5000}
+			}
         );
 
         print.yellowLine("Analyzing application performance...")

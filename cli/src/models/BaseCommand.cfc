@@ -154,6 +154,7 @@ component extends="commandbox.system.BaseCommand" {
         // Step 2: Fix CommandBox boolean pre-conversion
         // CommandBox converts --flag=0 to flag=false and --flag=1 to flag=true
         // We need to convert these back to numeric when the parameter type expects numeric
+        // BUT: If we parsed a numeric value from a flag (like "keep=4"), use that instead
         try {
             local.funcMetadata = getMetadata(arguments.componentObject[arguments.functionName]);
             if (structKeyExists(local.funcMetadata, "parameters")) {
@@ -162,12 +163,23 @@ component extends="commandbox.system.BaseCommand" {
                     local.paramType = structKeyExists(local.param, "type") ? local.param.type : "any";
 
                     // If parameter expects numeric but received boolean, convert back
+                    // ONLY if we didn't already parse a string/numeric value
                     if ((local.paramType == "numeric" || local.paramType == "integer")
                         && structKeyExists(local.result, local.paramName)
-                        && isBoolean(local.result[local.paramName])) {
+                        && isBoolean(local.result[local.paramName])
+                        && !isNumeric(local.result[local.paramName])) {
 
                         // Convert boolean back to numeric: false->0, true->1
                         local.result[local.paramName] = local.result[local.paramName] ? 1 : 0;
+                    }
+
+                    // If we have a string that's numeric, convert it to actual numeric
+                    if ((local.paramType == "numeric" || local.paramType == "integer")
+                        && structKeyExists(local.result, local.paramName)
+                        && isSimpleValue(local.result[local.paramName])
+                        && isNumeric(local.result[local.paramName])) {
+
+                        local.result[local.paramName] = val(local.result[local.paramName]);
                     }
                 }
             }

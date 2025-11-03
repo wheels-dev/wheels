@@ -25,7 +25,7 @@ component aliases="clobber" extends="../base" {
 		if (!isWheelsApp()) {
 			error("This command must be run from a Wheels application root directory.");
 		}
-		arguments = reconstructArg(arguments);
+		arguments = reconstructArgs(argStruct=arguments);
 		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 		
 		if (!directoryExists(compiledDir)) {
