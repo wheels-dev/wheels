@@ -78,15 +78,15 @@
     * [wheels docs generate](command-line-tools/commands/docs/docs-generate.md)
     * [wheels docs serve](command-line-tools/commands/docs/docs-serve.md)
   * Plugins
-    * [wheels plugin init](command-line-tools/commands/plugins/plugins-init.md)
     * [wheels plugin install](command-line-tools/commands/plugins/plugins-install.md)
     * [wheels plugin list](command-line-tools/commands/plugins/plugins-list.md)
     * [wheels plugin search](command-line-tools/commands/plugins/plugins-search.md)
     * [wheels plugin info](command-line-tools/commands/plugins/plugins-info.md)
+    * [wheels plugin outdated](command-line-tools/commands/plugins/plugins-outdated.md)
     * [wheels plugin update](command-line-tools/commands/plugins/plugins-update.md)
     * [wheels plugin update:all](command-line-tools/commands/plugins/plugins-update-all.md)
-    * [wheels plugin outdated](command-line-tools/commands/plugins/plugins-outdated.md)
     * [wheels plugin remove](command-line-tools/commands/plugins/plugins-remove.md)
+    * [wheels plugin init](command-line-tools/commands/plugins/plugins-init.md)
   * Asset Management
     * [asset management commands](command-line-tools/commands/assets-cache-management.md)
 * CLI Development Guides

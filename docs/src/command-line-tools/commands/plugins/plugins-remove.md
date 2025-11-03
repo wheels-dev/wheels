@@ -2,11 +2,31 @@
 
 Removes an installed Wheels CLI plugin.
 
-## Usage
+## Synopsis
 
 ```bash
 wheels plugins remove <name> [--force]
 ```
+
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels plugins remove cfwheels-bcrypt` (plugin name)
+- **Named parameters**: `name=value` (e.g., `name=cfwheels-bcrypt`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--force` equals `force=true`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- Positional: `wheels plugins remove cfwheels-bcrypt`
+- Positional + flags: `wheels plugins remove cfwheels-bcrypt --force`
+- All named: `name=cfwheels-bcrypt force=true`
+
+❌ **NOT ALLOWED:**
+- Positional + named for same param: `wheels plugins remove cfwheels-bcrypt name=other`
+
+**Recommendation:** Use positional for plugin name, flags for options: `wheels plugins remove cfwheels-bcrypt --force`
 
 ## Parameters
 

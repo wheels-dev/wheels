@@ -27,38 +27,24 @@ component extends="wheels-cli.models.BaseCommand" {
         boolean report = false,
         boolean verbose = false
     ) {
-        //reconstructArgs() is defined in the same file, this file is not extented from base.cfc
-        arguments = reconstructArgs(arguments);
-
-        // Validate severity parameter
-        var validSeverities = ["info", "warning", "error"];
-        if (!arrayFindNoCase(validSeverities, arguments.severity)) {
-            print.line()
-                 .boldRedText("[ERROR] ")
-                 .redLine("Invalid severity value")
-                 .line()
-                 .yellowLine("You provided: '#arguments.severity#'")
-                 .line()
-                 .line("Valid options:")
-                 .cyanLine("  - info     (Show all issues including informational)")
-                 .cyanLine("  - warning  (Show warnings and errors)")
-                 .cyanLine("  - error    (Show only critical errors)")
-                 .line()
-                 .line("Example:")
-                 .line("  wheels analyze code --severity=warning");
-            setExitCode(1);
-            return;
+        //isWheelsApp() is defined in the same file, this file is not extented from base.cfc
+        if(!isWheelsApp(resolvePath("."))){
+           error("This command must be run from a Wheels application root directory.");
         }
+        // Reconstruct and validate arguments with allowed values
+        arguments = reconstructArgs(
+            argStruct = arguments,
+            allowedValues = {
+                format: ["console", "json", "junit"],
+                severity: ["info", "warning", "error"]
+            }
+        );
 
         // Set verbose mode if requested
         if (arguments.verbose) {
             print.setVerbose(true);
         }
 
-        //isWheelsApp() is defined in the same file, this file is not extented from base.cfc
-        if(!isWheelsApp(resolvePath("."))){
-           error("This command must be run from a Wheels application root directory.");
-        }
         if (arguments.verbose) {
             print.yellowLine("Analyzing code quality with verbose output...")
                  .line()
@@ -121,9 +107,25 @@ component extends="wheels-cli.models.BaseCommand" {
         }
     }
     
-    function reconstructArgs(required struct argStruct) {
+    /**
+     * Reconstruct arguments from CommandBox flag format with validation
+     *
+     * @argStruct The arguments struct passed to run() method
+     * @functionName Name of the calling function (default: "run")
+     * @componentObject The component instance (use 'this' when calling)
+     * @validate Whether to validate required arguments (default: true)
+     * @allowedValues Struct of argument names with allowed values
+     */
+    function reconstructArgs(
+        required struct argStruct,
+        string functionName = "run",
+        any componentObject = this,
+        boolean validate = true,
+        struct allowedValues = {}
+    ) {
         local.result = {};
 
+        // Step 1: Reconstruct arguments from flags
         for (local.key in arguments.argStruct) {
             if (find("=", local.key)) {
                 local.parts = listToArray(local.key, "=");
@@ -137,7 +139,128 @@ component extends="wheels-cli.models.BaseCommand" {
             }
         }
 
+        // Step 2: Validation
+        if (arguments.validate) {
+            local.result = validateArguments(
+                args = local.result,
+                functionName = arguments.functionName,
+                componentObject = arguments.componentObject,
+                allowedValues = arguments.allowedValues
+            );
+        }
+
         return local.result;
+    }
+
+    /**
+     * Validate arguments based on function metadata
+     */
+    private function validateArguments(
+        required struct args,
+        required string functionName,
+        required any componentObject,
+        struct allowedValues = {}
+    ) {
+        local.errors = [];
+        local.warnings = [];
+
+        try {
+            // Get function metadata
+            local.funcMetadata = getMetadata(arguments.componentObject[arguments.functionName]);
+
+            if (!structKeyExists(local.funcMetadata, "parameters")) {
+                return arguments.args;
+            }
+
+            // Loop through each parameter in function signature
+            for (local.param in local.funcMetadata.parameters) {
+                local.paramName = local.param.name;
+                local.paramType = structKeyExists(local.param, "type") ? local.param.type : "any";
+                local.isRequired = structKeyExists(local.param, "required") && local.param.required;
+                local.hasHint = structKeyExists(local.param, "hint");
+                local.displayName = local.hasHint ? local.param.hint : humanizeArgName(local.paramName);
+
+                // Get actual argument value
+                local.argValue = structKeyExists(arguments.args, local.paramName)
+                    ? arguments.args[local.paramName]
+                    : "";
+
+                // VALIDATION 1: Required string arguments cannot be empty
+                if (local.isRequired && local.paramType == "string") {
+                    if (!len(trim(local.argValue))) {
+                        arrayAppend(local.errors, "#local.displayName# is required and cannot be empty");
+                    }
+                }
+
+                // VALIDATION 2: Allowed values (enum-like validation)
+                if (structKeyExists(arguments.allowedValues, local.paramName)) {
+                    local.allowed = arguments.allowedValues[local.paramName];
+
+                    if (isArray(local.allowed)) {
+                        if (!arrayFindNoCase(local.allowed, local.argValue)) {
+                            arrayAppend(local.errors,
+                                "#local.displayName# must be one of: #arrayToList(local.allowed, ', ')#. You provided: '#local.argValue#'"
+                            );
+                        }
+                    }
+                }
+
+                // VALIDATION 3: Data type validation
+                if (len(trim(local.argValue))) {
+                    switch (local.paramType) {
+                        case "numeric":
+                        case "integer":
+                            if (!isNumeric(local.argValue)) {
+                                arrayAppend(local.errors, "#local.displayName# must be a number. You provided: '#local.argValue#'");
+                            }
+                            break;
+
+                        case "boolean":
+                            if (!isBoolean(local.argValue)) {
+                                arrayAppend(local.errors, "#local.displayName# must be true or false");
+                            }
+                            break;
+                    }
+                }
+            }
+
+            // Throw error if validation failed
+            if (arrayLen(local.errors)) {
+                // Format error message with proper line breaks and bullets
+                local.errorMessage = chr(10) & chr(10);
+                local.errorMessage &= repeatString("-", 60) & chr(10);
+
+                for (local.i = 1; local.i <= arrayLen(local.errors); local.i++) {
+                    local.errorMessage &= "  " & local.i & ". " & local.errors[local.i] & chr(10);
+                }
+
+                local.errorMessage &= repeatString("-", 60) & chr(10);
+
+                print.redLine(local.errorMessage);
+                error("validation Error");
+            }
+
+        } catch (any e) {
+            // If metadata parsing fails, just return args without validation
+            if (findNoCase("validation error", e.message)) {
+                rethrow;
+            }
+        }
+
+        return arguments.args;
+    }
+
+    /**
+     * Convert camelCase or PascalCase to human-readable format
+     */
+    private function humanizeArgName(required string argName) {
+        // Add space before capital letters
+        local.result = reReplace(arguments.argName, "([A-Z])", " \1", "all");
+
+        // Capitalize first letter
+        local.result = uCase(left(local.result, 1)) & right(local.result, len(local.result) - 1);
+
+        return trim(local.result);
     }
 
     //Use this function for commands that should work Only if the application is running
@@ -592,34 +715,23 @@ component extends="wheels-cli.models.BaseCommand" {
     private function generateReport(results) {
         var reportPath = fileSystemUtil.resolvePath("reports/code-analysis-#dateFormat(now(), 'yyyymmdd')##timeFormat(now(), 'HHmmss')#.html");
         var reportDir = getDirectoryFromPath(reportPath);
-        
+
         if (!directoryExists(reportDir)) {
             directoryCreate(reportDir, true);
         }
-        
-        // Start progress indication
-        print.yellow("Generating HTML report... ").toConsole();
-        
-        // Calculate total items to process for progress tracking
-        var totalItems = structCount(results.files) + 
-                        arrayLen(results.complexFunctions) + 
-                        arrayLen(results.duplicates);
-        
-        var html = generateReportHTML(results, totalItems);
+
+        // Generate HTML without progress tracking (simpler and faster)
+        print.yellowLine("Generating HTML report...");
+
+        var html = generateReportHTML(results);
         fileWrite(reportPath, html);
-        
-        print.line().greenLine("HTML report generated: #reportPath#");
+
+        print.greenLine("HTML report generated: #reportPath#");
     }
     
-    private function generateReportHTML(results, totalItems = 0) {
+    private function generateReportHTML(results) {
         var gradeColor = getGradeColorHex(results.metrics.grade);
-        var processedItems = 0;
-        
-        // Show initial progress
-        if (totalItems > 0) {
-            print.text("[0%]").toConsole();
-        }
-        
+
         var html = '<!DOCTYPE html>
 <html>
 <head>
@@ -724,16 +836,16 @@ component extends="wheels-cli.models.BaseCommand" {
             </div>
         </div>
         ';
-        
-        // Generate complex functions HTML with progress
-        html &= generateComplexFunctionsHTML(results, processedItems, totalItems);
-        
-        // Generate duplicate code HTML with progress  
-        html &= generateDuplicateCodeHTML(results, processedItems, totalItems);
-        
-        // Generate file issues HTML with progress
-        html &= generateFileIssuesHTML(results, processedItems, totalItems);
-        
+
+        // Generate complex functions HTML
+        html &= generateComplexFunctionsHTML(results);
+
+        // Generate duplicate code HTML
+        html &= generateDuplicateCodeHTML(results);
+
+        // Generate file issues HTML
+        html &= generateFileIssuesHTML(results);
+
         html &= '
         <div class="footer">
             <p>Wheels Code Analyzer v1.0 • <a href="https://wheels.dev/3.0.0/guides/command-line-tools/commands/analysis/analyze-code" target="blank">View Documentation</a></p>
@@ -745,47 +857,41 @@ component extends="wheels-cli.models.BaseCommand" {
         return html;
     }
     
-    private function generateComplexFunctionsHTML(results, processedItems = 0, totalItems = 0) {
+    private function generateComplexFunctionsHTML(results) {
         if (arrayLen(results.complexFunctions) == 0) {
             return "";
         }
-        
+
         var html = '<div class="section">';
         html &= '<h2>Complex Functions</h2>';
-        
+
         // Sort by complexity
         var sorted = duplicate(results.complexFunctions);
         arraySort(sorted, function(a, b) {
             return b.complexity - a.complexity;
         });
-        
+
         for (var func in sorted) {
             var relativePath = replace(func.file, getCWD(), "");
             html &= '<div class="complex-func">';
             html &= '<strong>' & func.function & '()</strong> in ' & relativePath;
             html &= ' - Complexity: <strong>' & func.complexity & '</strong>';
             html &= '</div>';
-            
-            // Update progress
-            if (totalItems > 0) {
-                processedItems++;
-                updateProgress(processedItems, totalItems);
-            }
         }
-        
+
         html &= '</div>';
         return html;
     }
     
-    private function generateDuplicateCodeHTML(results, processedItems = 0, totalItems = 0) {
+    private function generateDuplicateCodeHTML(results) {
         if (results.metrics.duplicateBlocks == 0) {
             return "";
         }
-        
+
         var html = '<div class="section">';
         html &= '<h2>Duplicate Code Blocks</h2>';
         html &= '<p>Found ' & results.metrics.duplicateBlocks & ' duplicate code blocks across your codebase.</p>';
-        
+
         var count = min(10, arrayLen(results.duplicates));
         for (var i = 1; i <= count; i++) {
             var dup = results.duplicates[i];
@@ -798,14 +904,8 @@ component extends="wheels-cli.models.BaseCommand" {
             }
             html &= '</ul>';
             html &= '</div>';
-            
-            // Update progress
-            if (totalItems > 0) {
-                processedItems++;
-                updateProgress(processedItems, totalItems);
-            }
         }
-        
+
         html &= '</div>';
         return html;
     }
@@ -821,19 +921,16 @@ component extends="wheels-cli.models.BaseCommand" {
         }
     }
     
-    private function generateFileIssuesHTML(results, processedItems = 0, totalItems = 0) {
+    private function generateFileIssuesHTML(results) {
         var html = "";
-        var fileCount = 0;
-        var totalFiles = structCount(results.files);
-        
+
         for (var filePath in results.files) {
-            fileCount++;
             var fileIssues = results.files[filePath];
             var relativePath = replace(filePath, getCWD(), "");
-            
+
             html &= '<div class="file-section">';
             html &= '<div class="file-header">' & relativePath & ' (' & arrayLen(fileIssues) & ' issues)</div>';
-            
+
             for (var issue in fileIssues) {
                 html &= '<div class="issue ' & issue.severity & '">';
                 html &= '<div class="issue-header">';
@@ -846,26 +943,13 @@ component extends="wheels-cli.models.BaseCommand" {
                 }
                 html &= '</div>';
             }
-            
+
             html &= '</div>';
-            
-            // Update progress every 10 files or on last file
-            if (totalItems > 0 && (fileCount % 10 == 0 || fileCount == totalFiles)) {
-                processedItems = processedItems + min(10, totalFiles - fileCount + 10);
-                updateProgress(processedItems, totalItems);
-            }
         }
-        
+
         return html;
     }
-    
-    private function updateProgress(current, total) {
-        var percentage = round((current / total) * 100);
-        // Clear previous progress text and show new one
-        print.text(repeatString(chr(8), 5)).toConsole(); // Backspace to clear previous percentage
-        print.text("[#percentage#%]").toConsole();
-    }
-    
+
     private function getSeverityIcon(severity) {
         switch (arguments.severity) {
             case "error": return "[ERROR]";

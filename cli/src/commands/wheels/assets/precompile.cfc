@@ -38,7 +38,12 @@ component extends="../base" {
 		string environment = "production"
 	) {
 		// Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
+		arguments = reconstructArgs(
+			argStruct = arguments,
+            allowedValues = {
+                environment: ["production", "staging", "development", "test", "maintenance", "prod", "dev", "stage"]
+            }
+		);
 
 		// Normalize environment aliases
 		arguments.environment = normalizeEnvironment(arguments.environment);
@@ -53,11 +58,10 @@ component extends="../base" {
 		// Define asset directories		
 		var publicDir = fileSystemUtil.resolvePath("public");
 
-		print.line(publicDir);
-		var assetsDir = publicDir & "/assets";
-		var jsDir = publicDir & "/javascripts";
-		var cssDir = publicDir & "/stylesheets";
-		var imagesDir = publicDir & "/images";
+		var assetsDir = publicDir & "assets";
+		var jsDir = publicDir & "javascripts";
+		var cssDir = publicDir & "stylesheets";
+		var imagesDir = publicDir & "images";
 		
 		// Create compiled assets directory
 		var compiledDir = assetsDir & "/compiled";

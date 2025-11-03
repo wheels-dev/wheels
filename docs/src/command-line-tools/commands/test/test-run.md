@@ -18,6 +18,26 @@ box install testbox-cli --global
 wheels test run [spec] [options]
 ```
 
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Named parameters**: `name=value` (e.g., `format=json`, `filter="User"`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--coverage` equals `coverage=true`)
+- **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--format=json`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All named: `wheels test run format=json verbose=true`
+- All flags: `wheels test run --verbose --coverage`
+- Named + flags: `wheels test run format=json --coverage`
+
+❌ **NOT ALLOWED:**
+- Positional + named: Not applicable for this command (no positional parameters)
+
+**Recommendation:** Use named parameters for specific values, flags for boolean options: `wheels test run format=json --coverage`
+
 ## Description
 
 The `wheels test run` command executes your application's TestBox test suite with support, filtering, and various output formats. This is the primary command for running your application tests (as opposed to framework tests).
@@ -46,46 +66,63 @@ wheels test run
 
 ### Filter tests by pattern
 ```bash
+# Named parameter (recommended for string values)
 wheels test run filter="User"
 wheels test run filter="test_user_validation"
 ```
 
 ### Run specific bundles
 ```bash
+# Named parameter (recommended)
 wheels test run bundles="tests.models"
 wheels test run bundles="tests.models,tests.controllers"
 ```
 
 ### Run tests with specific labels
 ```bash
+# Named parameter (recommended)
 wheels test run labels="unit"
 wheels test run labels="critical,auth"
 ```
 
 ### Generate coverage report
 ```bash
+# Flag (recommended for boolean)
 wheels test run --coverage
+
+# OR named
+wheels test run coverage=true
 ```
 
 ### Use different output format
 ```bash
+# Named (recommended)
 wheels test run format=json
 wheels test run format=junit
+
+# OR flag with value
+wheels test run --format=json
 ```
 
 ### Run tests from specific directory
 ```bash
+# Named parameters (recommended)
 wheels test run directory="tests/specs"
 wheels test run directory="tests/specs/unit" recurse=false
 ```
 
 ### Verbose output with coverage
 ```bash
+# Flags + named (recommended)
 wheels test run --verbose --coverage format=txt
+
+# OR all named
+wheels test run verbose=true coverage=true format=txt
 ```
 
 ### Run tests for different type
 ```bash
+# Named (recommended)
 wheels test run type=core
 wheels test run type=app
 ```

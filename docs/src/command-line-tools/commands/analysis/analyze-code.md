@@ -2,11 +2,33 @@
 
 Analyzes code quality in your Wheels application, checking for best practices, potential issues, and code standards compliance.
 
-## Usage
+## Synopsis
 
 ```bash
 wheels analyze code [--path=<path>] [--fix] [--format=<format>] [--severity=<severity>] [--report] [--verbose]
 ```
+
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Named parameters**: `name=value` (e.g., `path=app/controllers`, `format=json`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--fix` equals `fix=true`)
+- **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--path=app/models`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- All flags: `wheels analyze code --fix --report --verbose`
+- Flags with values: `wheels analyze code --path=app/models --format=json`
+- Named + flags: `path=app/controllers format=json --fix`
+
+❌ **NOT ALLOWED:**
+- Positional parameters: This command does not support positional parameters
+
+**Recommendation:** Use flag syntax for consistency: `wheels analyze code --path=app/models --fix --format=json`
+
+## Parameters
 
 | Parameter   | Description                                                                 | Default     |
 |-------------|-----------------------------------------------------------------------------|-------------|
@@ -52,12 +74,20 @@ wheels analyze code
 
 ### Analyze specific directory
 ```bash
+# Flag syntax (recommended)
 wheels analyze code --path=app/controllers
+
+# OR named
+wheels analyze code path=app/controllers
 ```
 
 ### Analyze specific file
 ```bash
+# Flag syntax (recommended)
 wheels analyze code --path=app/models/User.cfc
+
+# OR named
+wheels analyze code path=app/models/User.cfc
 ```
 
 ### Auto-fix issues

@@ -9,15 +9,9 @@
  * wheels assets:clobber --force
  * {code}
  **/
-component extends="../base" {
+component aliases="clobber" extends="../base" {
 	
 	property name="FileSystemUtil" inject="FileSystem";
-	
-	// CommandBox metadata
-	this.aliases = [ "clobber" ];
-	this.parameters = [
-		{ name="force", type="boolean", required=false, default=false, hint="Skip confirmation prompt" }
-	];
 	
 	/**
 	 * Remove all compiled assets and reset the asset pipeline
@@ -31,7 +25,7 @@ component extends="../base" {
 		if (!isWheelsApp()) {
 			error("This command must be run from a Wheels application root directory.");
 		}
-		
+		arguments = reconstructArg(arguments);
 		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 		
 		if (!directoryExists(compiledDir)) {

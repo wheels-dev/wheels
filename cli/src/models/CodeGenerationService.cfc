@@ -121,7 +121,7 @@ component {
         required string name,
         string extends = "",
         string description = "",
-        boolean rest = false,
+        boolean crud = false,
         boolean api = false,
         boolean force = false,
         array actions = [],
@@ -132,7 +132,7 @@ component {
         var controllerName = capitalize(arguments.name);
         var fileName = controllerName & ".cfc";
         var filePath = resolvePath("controllers/#fileName#", arguments.baseDirectory);
-        
+
         // Check if file exists
         if (fileExists(filePath) && !arguments.force) {
             return {
@@ -141,16 +141,16 @@ component {
                 path: filePath
             };
         }
-        
+
         // Default actions based on type
         if (arrayLen(arguments.actions) == 0) {
-            if (arguments.rest) {
+            if (arguments.crud) {
                 arguments.actions = ["index", "show", "new", "create", "edit", "update", "delete"];
             } else {
                 arguments.actions = ["index"];
             }
         }
-        
+
         // Prepare template context
         var context = {
             controllerName: controllerName,
@@ -158,19 +158,19 @@ component {
             extends: len(arguments.extends) ? arguments.extends : "Controller",
             description: arguments.description,
             actions: arguments.actions,
-            rest: arguments.rest,
+            crud: arguments.crud,
             api: arguments.api,
             belongsTo: arguments.belongsTo,
             hasMany: arguments.hasMany,
             timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
         };
-        
+
         // Generate from template
         try {
             var template = "ControllerContent.txt";
             if (arguments.api) {
                 template = "ApiControllerContent.txt";
-            } else if (arguments.rest) {
+            } else if (arguments.crud) {
                 template = "CRUDContent.txt";
             }
             

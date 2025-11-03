@@ -18,27 +18,28 @@ wheels generate scaffold Comment --belongsTo=Product --api=true
 
 The `wheels scaffold` command generates a complete CRUD (Create, Read, Update, Delete) implementation including model, controller, views, tests, and database migration. It's the fastest way to create a fully functional resource.
 
-## Parameter Syntax
+## CommandBox Parameter Syntax
 
-CommandBox supports multiple parameter formats:
+This command supports multiple parameter formats:
 
+- **Positional parameters**: `wheels generate scaffold Product` (resource name)
 - **Named parameters**: `name=value` (e.g., `name=Product`, `properties="name:string,price:decimal"`)
 - **Flag parameters**: `--flag` equals `flag=true` (e.g., `--api` equals `api=true`)
 - **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--properties="name:string"`)
 
-**Note**: Flag syntax (`--flag`) avoids positional/named parameter conflicts and is recommended for boolean options.
-
-### Parameter Mixing Rules
-
-CommandBox parameter processing has specific rules about mixing parameter types:
+**Parameter Mixing Rules:**
 
 ✅ **ALLOWED:**
-- **All positional**: `wheels generate scaffold Product`
-- **All named**: `name=Product properties="name:string"`
-- **Positional + flags**: `wheels generate scaffold Product --api --migrate`
+- All positional: `wheels generate scaffold Product`
+- All named: `name=Product properties="name:string"`
+- Positional + flags: `wheels generate scaffold Product --api --migrate`
 
 ❌ **NOT ALLOWED:**
-- **Positional + named**: `wheels generate scaffold Product properties="name:string"` (causes "positional and named parameters" error)
+- Positional + named: `wheels generate scaffold Product properties="name:string"` (causes error)
+
+**Recommendation:** Use positional for resource name, flags for options: `wheels generate scaffold Product --properties="name:string" --api --migrate`
+
+**Note:** Flag syntax (`--flag`) avoids positional/named parameter conflicts and is recommended for boolean options.
 
 ## Arguments
 

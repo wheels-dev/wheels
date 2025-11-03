@@ -2,11 +2,32 @@
 
 Install a Wheels plugin from ForgeBox into the `/plugins` folder.
 
-## Usage
+## Synopsis
 
 ```bash
 wheels plugins install <name> [--dev] [--version=<version>]
 ```
+
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels plugins install cfwheels-bcrypt` (plugin name)
+- **Named parameters**: `name=value` (e.g., `name=cfwheels-bcrypt`, `version=1.0.0`)
+- **Flag parameters**: `--flag` equals `flag=true` (e.g., `--dev` equals `dev=true`)
+- **Flag with value**: `--flag=value` (e.g., `--version=1.0.0`)
+
+**Parameter Mixing Rules:**
+
+✅ **ALLOWED:**
+- Positional: `wheels plugins install cfwheels-bcrypt`
+- Positional + flags: `wheels plugins install cfwheels-bcrypt --version=1.0.0`
+- All named: `name=cfwheels-bcrypt version=1.0.0`
+
+❌ **NOT ALLOWED:**
+- Positional + named for same param: `wheels plugins install cfwheels-bcrypt name=other`
+
+**Recommendation:** Use positional for plugin name, flags for options: `wheels plugins install cfwheels-bcrypt --version=1.0.0`
 
 ## Parameters
 
