@@ -19,6 +19,7 @@ component extends="../base" {
         string source="",
         string target=""
     ) {
+        arguments = reconstructArgs(arguments);
         // Welcome message
         print.line();
         print.boldMagentaLine("Wheels Environment Manager");

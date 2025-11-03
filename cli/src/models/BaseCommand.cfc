@@ -250,12 +250,20 @@ component extends="commandbox.system.BaseCommand" {
 
                 // VALIDATION 2: Arguments with default values cannot be explicitly set to empty
                 // This catches cases where user does: --format="" or format=""
+                // UNLESS the default value itself is empty (in which case empty is valid)
                 if (!local.isRequired && local.hasDefault) {
-                    // Check if the argument was explicitly provided in the args struct
-                    if (structKeyExists(arguments.args, local.paramName)) {
-                        // If it was provided but is empty, that's an error
-                        if (!len(trim(local.argValue))) {
-                            arrayAppend(local.errors, "#local.displayName# cannot be empty. Either omit it to use the default value or provide a valid value");
+                    // Get the default value
+                    local.defaultValue = local.param.default;
+
+                    // Only validate if the default value is NOT empty
+                    // If default is "", then "" is a valid value
+                    if (len(trim(local.defaultValue))) {
+                        // Check if the argument was explicitly provided in the args struct
+                        if (structKeyExists(arguments.args, local.paramName)) {
+                            // If it was provided but is empty, that's an error
+                            if (!len(trim(local.argValue))) {
+                                arrayAppend(local.errors, "#local.displayName# cannot be empty. Either omit it to use the default value or provide a valid value");
+                            }
                         }
                     }
                 }

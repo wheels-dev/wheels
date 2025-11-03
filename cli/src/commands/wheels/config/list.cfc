@@ -19,6 +19,7 @@ component extends="../base" {
         string filter="",
         boolean showSensitive=false
     ) {
+        arguments = reconstructArgs(arguments);
         // Welcome message
         print.line();
         print.boldMagentaLine("Wheels Configuration Settings");
