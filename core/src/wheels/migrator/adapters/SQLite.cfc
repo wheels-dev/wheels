@@ -5,18 +5,17 @@ component extends="Abstract" {
 	variables.sqlTypes['biginteger'] = { name = 'INTEGER' };
 	variables.sqlTypes['binary'] = { name = 'BLOB' };
 	variables.sqlTypes['boolean'] = { name = 'INTEGER' }; // SQLite has no real BOOLEAN type
-	variables.sqlTypes['date'] = { name = 'DATE' };
-	variables.sqlTypes['datetime'] = { name = 'DATETIME' };
-	variables.sqlTypes['decimal'] = { name = 'NUMERIC' };
+	variables.sqlTypes['date'] = { name = 'TEXT' };
+	variables.sqlTypes['datetime'] = { name = 'TEXT' };
+	variables.sqlTypes['decimal'] = { name = 'REAL' };
 	variables.sqlTypes['float'] = { name = 'REAL' };
 	variables.sqlTypes['integer'] = { name = 'INTEGER' };
-	variables.sqlTypes['integer'] = { name = 'INT' };
 	variables.sqlTypes['string'] = { name = 'TEXT', limit = 255 };
 	variables.sqlTypes['text'] = { name = 'TEXT' };
 	variables.sqlTypes['mediumtext'] = { name = 'TEXT' };
 	variables.sqlTypes['longtext'] = { name = 'TEXT' };
-	variables.sqlTypes['time'] = { name = 'TIME' };
-	variables.sqlTypes['timestamp'] = { name = 'DATETIME' };
+	variables.sqlTypes['time'] = { name = 'TEXT' };
+	variables.sqlTypes['timestamp'] = { name = 'TEXT' };
 	variables.sqlTypes['uuid'] = { name = 'TEXT', limit = 36 };
 
 	/**
