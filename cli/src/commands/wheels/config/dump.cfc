@@ -26,11 +26,12 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		boolean noMask = false
 	) {
 
-		arguments = reconstructArgs(arguments);
-		// Validate format
-		if (!ListFindNoCase("table,json,env,cfml", arguments.format)) {
-			error("Invalid format: #arguments.format#. Valid formats are: table, json, env, cfml");
-		}
+		arguments = reconstructArgs(
+			argStruct = arguments,
+			allowedValues = {
+				format: ["table", "json", "env", "cfml"]
+			}
+		);
 
 		// Determine environment
 		local.env = Len(arguments.environment) ? arguments.environment : getEnvironment();

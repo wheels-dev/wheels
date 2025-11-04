@@ -5,7 +5,7 @@
  * wheels analyze performance --duration=60 --target=query
  * wheels analyze performance --profile --report
  */
-component extends="wheels-cli.models.BaseCommand" {
+component extends="../base" {
     
     /**
      * @target.hint Analysis target (all, controller, view, query, memory)
@@ -32,7 +32,11 @@ component extends="wheels-cli.models.BaseCommand" {
             argStruct = arguments,
             allowedValues = {
                 target: ["all", "controller", "view", "query", "memory"]
-            }
+            },
+            numericRanges={
+				duration:{min:1, max:1000},
+                threshold:{min:1, max:5000}
+			}
         );
 
         print.yellowLine("Analyzing application performance...")
@@ -136,179 +140,6 @@ component extends="wheels-cli.models.BaseCommand" {
             setExitCode(1);
         }
     }
-
-    /**
-     * Reconstruct arguments from CommandBox flag format with validation
-     *
-     * @argStruct The arguments struct passed to run() method
-     * @functionName Name of the calling function (default: "run")
-     * @componentObject The component instance (use 'this' when calling)
-     * @validate Whether to validate required arguments (default: true)
-     * @allowedValues Struct of argument names with allowed values
-     */
-    function reconstructArgs(
-        required struct argStruct,
-        string functionName = "run",
-        any componentObject = this,
-        boolean validate = true,
-        struct allowedValues = {}
-    ) {
-        local.result = {};
-
-        // Step 1: Reconstruct arguments from flags
-        for (local.key in arguments.argStruct) {
-            if (find("=", local.key)) {
-                local.parts = listToArray(local.key, "=");
-                if (arrayLen(local.parts) == 2 && arguments.argStruct[local.key] == true) {
-                    local.result[local.parts[1]] = local.parts[2];
-                } else {
-                    local.result[local.parts[1]] = local.parts[2] ?: true;
-                }
-            } else {
-                local.result[local.key] = arguments.argStruct[local.key];
-            }
-        }
-
-        // Step 2: Validation
-        if (arguments.validate) {
-            local.result = validateArguments(
-                args = local.result,
-                functionName = arguments.functionName,
-                componentObject = arguments.componentObject,
-                allowedValues = arguments.allowedValues
-            );
-        }
-
-        return local.result;
-    }
-
-    /**
-     * Validate arguments based on function metadata
-     */
-    private function validateArguments(
-        required struct args,
-        required string functionName,
-        required any componentObject,
-        struct allowedValues = {}
-    ) {
-        local.errors = [];
-        local.warnings = [];
-
-        try {
-            // Get function metadata
-            local.funcMetadata = getMetadata(arguments.componentObject[arguments.functionName]);
-
-            if (!structKeyExists(local.funcMetadata, "parameters")) {
-                return arguments.args;
-            }
-
-            // Loop through each parameter in function signature
-            for (local.param in local.funcMetadata.parameters) {
-                local.paramName = local.param.name;
-                local.paramType = structKeyExists(local.param, "type") ? local.param.type : "any";
-                local.isRequired = structKeyExists(local.param, "required") && local.param.required;
-                local.hasHint = structKeyExists(local.param, "hint");
-                local.displayName = local.hasHint ? local.param.hint : humanizeArgName(local.paramName);
-
-                // Get actual argument value
-                local.argValue = structKeyExists(arguments.args, local.paramName)
-                    ? arguments.args[local.paramName]
-                    : "";
-
-                // VALIDATION 1: Required string arguments cannot be empty
-                if (local.isRequired && local.paramType == "string") {
-                    if (!len(trim(local.argValue))) {
-                        arrayAppend(local.errors, "#local.displayName# is required and cannot be empty");
-                    }
-                }
-
-                // VALIDATION 2: Allowed values (enum-like validation)
-                if (structKeyExists(arguments.allowedValues, local.paramName)) {
-                    local.allowed = arguments.allowedValues[local.paramName];
-
-                    if (isArray(local.allowed)) {
-                        if (!arrayFindNoCase(local.allowed, local.argValue)) {
-                            arrayAppend(local.errors,
-                                "#local.displayName# must be one of: #arrayToList(local.allowed, ', ')#. You provided: '#local.argValue#'"
-                            );
-                        }
-                    }
-                }
-
-                // VALIDATION 3: Data type validation
-                if (len(trim(local.argValue))) {
-                    switch (local.paramType) {
-                        case "numeric":
-                        case "integer":
-                            if (!isNumeric(local.argValue)) {
-                                arrayAppend(local.errors, "#local.displayName# must be a number. You provided: '#local.argValue#'");
-                            }
-                            break;
-
-                        case "boolean":
-                            if (!isBoolean(local.argValue)) {
-                                arrayAppend(local.errors, "#local.displayName# must be true or false");
-                            }
-                            break;
-                    }
-                }
-            }
-
-            // Throw error if validation failed
-            if (arrayLen(local.errors)) {
-                // Format error message with proper line breaks and bullets
-                local.errorMessage = chr(10) & chr(10);
-                local.errorMessage &= repeatString("-", 60) & chr(10);
-
-                for (local.i = 1; local.i <= arrayLen(local.errors); local.i++) {
-                    local.errorMessage &= "  " & local.i & ". " & local.errors[local.i] & chr(10);
-                }
-
-                local.errorMessage &= repeatString("-", 60) & chr(10);
-
-                print.redLine(local.errorMessage);
-                error("validation Error");
-            }
-
-        } catch (any e) {
-            // If metadata parsing fails, just return args without validation
-            if (findNoCase("validation error", e.message)) {
-                rethrow;
-            }
-        }
-
-        return arguments.args;
-    }
-
-    /**
-     * Convert camelCase or PascalCase to human-readable format
-     */
-    private function humanizeArgName(required string argName) {
-        // Add space before capital letters
-        local.result = reReplace(arguments.argName, "([A-Z])", " \1", "all");
-
-        // Capitalize first letter
-        local.result = uCase(left(local.result, 1)) & right(local.result, len(local.result) - 1);
-
-        return trim(local.result);
-    }
-
-    //Use this function for commands that should work Only if the application is running
-	boolean function isWheelsApp(string path = getCWD()) {
-		// Check for vendor/wheels folder
-		if (!directoryExists(arguments.path & "/vendor/wheels")) {
-			return false;
-		}
-		// Check for config folder
-		if (!directoryExists(arguments.path & "/config")) {
-			return false;
-		}
-		// Check for app folder
-		if (!directoryExists(arguments.path & "/app")) {
-			return false;
-		}
-		return true;
-	}
     
     private function enableProfiling() {
         try {

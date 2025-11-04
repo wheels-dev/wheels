@@ -18,6 +18,7 @@ component extends="../base" {
         string environment="development",
         boolean encrypt=false
     ) {
+        arguments = reconstructArgs(arguments);
         // Welcome message
         print.line();
         print.boldMagentaLine("Wheels Configuration Manager");

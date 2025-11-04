@@ -27,12 +27,21 @@ component aliases="clean" extends="../base" {
 		numeric keep = 3,
 		boolean dryRun = false
 	) {
-		arguments = reconstructArgs(arguments);
 		if (!isWheelsApp()) {
 			error("This command must be run from a Wheels application root directory.");
 		}
-		
-		print.boldGreenLine("==> Cleaning old compiled assets...");
+		arguments = reconstructArgs(
+			argStruct=arguments,
+			numericRanges={
+				keep:{min:1, max:100}
+			}
+		);
+		print.line();
+		if(!dryRun){
+			print.boldGreenLine("==> Cleaning old compiled assets...");
+		}else{
+			print.boldCyanLine("==> Dry Running old compiled assets...");
+		}
 		print.line();
 		
 		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
@@ -58,7 +67,7 @@ component aliases="clean" extends="../base" {
 		// Group files by base name
 		var fileGroups = {};
 		var files = directoryList(compiledDir, false, "query", "*.*");
-		
+
 		for (var file in files) {
 			if (file.type == "File" && file.name != "manifest.json") {
 				var baseName = extractBaseName(file.name);
@@ -72,10 +81,10 @@ component aliases="clean" extends="../base" {
 				});
 			}
 		}
-		
+
 		var deletedCount = 0;
 		var freedSpace = 0;
-		
+
 		// Process each group
 		for (var baseName in fileGroups) {
 			var group = fileGroups[baseName];
@@ -85,16 +94,24 @@ component aliases="clean" extends="../base" {
 				return dateCompare(b.dateLastModified, a.dateLastModified);
 			});
 			
-			// Keep the specified number of versions
+			// Keep the specified number of versions (array is sorted newest first)
+			// Delete from the end of the array (oldest files)
 			if (arrayLen(group) > arguments.keep) {
-				print.boldLine("Cleaning #baseName#...");
-				
-				for (var i = arguments.keep + 1; i <= arrayLen(group); i++) {
+				if (arguments.dryRun) {
+					print.boldLine("Analyzing #baseName#...");
+				} else {
+					print.boldLine("Cleaning #baseName#...");
+				}
+
+				// Delete from the end (oldest) since array is sorted newest first
+				for (var i = arrayLen(group); i > arguments.keep; i--) {
 					var fileInfo = group[i];
 					var fileSize = getFileInfo(fileInfo.path).size;
-					
+
 					if (arguments.dryRun) {
 						print.line("Would delete: #fileInfo.name# (#formatFileSize(fileSize)#)");
+						deletedCount++;
+						freedSpace += fileSize;
 					} else {
 						try {
 							fileDelete(fileInfo.path);
@@ -127,20 +144,19 @@ component aliases="clean" extends="../base" {
 	/**
 	 * Extract base name from a compiled asset filename
 	 * e.g., "app-a1b2c3d4.min.js" returns "app"
+	 * e.g., "style-ABC12345.min.css" returns "style"
+	 * e.g., "script-DEF67890.js" returns "script"
 	 */
 	private string function extractBaseName(required string fileName) {
-		// Remove hash and extension
 		var name = arguments.fileName;
-		
-		// Handle minified files
-		name = reReplace(name, "\.min\.(js|css)$", "", "one");
-		
-		// Remove hash pattern (8+ character hex string)
-		name = reReplace(name, "-[a-f0-9]{8,}\.", ".", "one");
-		
-		// Remove final extension
-		name = listDeleteAt(name, listLen(name, "."), ".");
-		
+
+		// Remove file extension (.js, .css, .min.js, .min.css)
+		name = reReplace(name, "\.(min\.)?(js|css)$", "", "one");
+
+		// Remove hash pattern (dash followed by 8+ character hex string, case-insensitive)
+		// Examples: "app-a1b2c3d4" → "app", "style-ABC12345" → "style"
+		name = reReplaceNoCase(name, "-[a-f0-9]{8,}$", "", "one");
+
 		return name;
 	}
 	

@@ -14,7 +14,7 @@ Create a new file in `/commands/wheels/`:
 
 ```cfc
 // commands/wheels/hello.cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     
     /**
      * Say hello
@@ -41,7 +41,7 @@ wheels hello John
 ### Component Structure
 
 ```cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     
     // Command metadata
     property name="name" default="mycommand";
@@ -97,21 +97,21 @@ Create nested command structure:
 
 ```cfc
 // commands/wheels/deploy.cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     function run() {
         print.line("Usage: wheels deploy [staging|production]");
     }
 }
 
 // commands/wheels/deploy/staging.cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     function run() {
         print.line("Deploying to staging...");
     }
 }
 
 // commands/wheels/deploy/production.cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     function run() {
         print.line("Deploying to production...");
     }
@@ -129,7 +129,7 @@ wheels deploy production
 Get user input:
 
 ```cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     
     function run() {
         // Simple input
@@ -163,7 +163,7 @@ component extends="wheels.cli.models.BaseCommand" {
 Show progress for long operations:
 
 ```cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     
     function run() {
         // Progress bar
@@ -201,7 +201,7 @@ component extends="wheels.cli.models.BaseCommand" {
 ### 1. Inject Existing Services
 
 ```cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
     property name="templateService" inject="TemplateService@wheels-cli";
@@ -569,7 +569,7 @@ box forgebox publish
 
 ```cfc
 // commands/wheels/db/backup.cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     
     property name="datasource" inject="coldbox:datasource";
     
@@ -604,7 +604,7 @@ component extends="wheels.cli.models.BaseCommand" {
 
 ```cfc
 // commands/wheels/quality.cfc
-component extends="wheels.cli.models.BaseCommand" {
+component extends="wheels-cli.models.BaseCommand" {
     
     property name="analysisService" inject="AnalysisService@wheels-cli";
     
