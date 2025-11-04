@@ -50,6 +50,88 @@ this.customTagPaths = ListAppend(
 ```
 {% endcode %}
 
+### Using Environment Variables in config/app.cfm
+
+**Important:** When your application starts, Wheels automatically loads `.env` files and makes their values available in `this.env` **before** `config/app.cfm` is executed. This means you can access environment variables directly in `config/app.cfm` using `this.env`.
+
+#### Accessing Environment Variables
+
+Use `this.env` to access values from your `.env` file:
+
+{% code title="config/app.cfm" %}
+```javascript
+// Access environment variables using this.env
+this.name = this.env["APP_NAME"] ?: "MyWheelsApp";
+
+// Database configuration using environment variables
+this.datasources["myapp"] = {
+    class: this.env["DB_CLASS"] ?: "org.h2.Driver",
+    connectionString: this.env["DB_CONNECTION_STRING"],
+    username: this.env["DB_USER"],
+    password: this.env["DB_PASSWORD"]
+};
+
+// Multiple datasources from environment variables
+this.datasources["primary"] = {
+    class: "com.mysql.cj.jdbc.Driver",
+    connectionString: "jdbc:mysql://" & this.env["DB_HOST"] & ":" & this.env["DB_PORT"] & "/" & this.env["DB_NAME"],
+    username: this.env["DB_USER"],
+    password: this.env["DB_PASSWORD"]
+};
+```
+{% endcode %}
+
+#### Example .env File
+
+{% code title=".env" %}
+```bash
+# Application Settings
+APP_NAME=MyWheelsApp
+WHEELS_ENV=development
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=myapp_dev
+DB_USER=dbuser
+DB_PASSWORD=secret123
+DB_CLASS=com.mysql.cj.jdbc.Driver
+DB_CONNECTION_STRING=jdbc:mysql://localhost:3306/myapp_dev?useSSL=false
+```
+{% endcode %}
+
+#### Environment-Specific Configuration
+
+You can create environment-specific `.env` files:
+
+- `.env` - Default values for all environments
+- `.env.development` - Development-specific values
+- `.env.production` - Production-specific values
+- `.env.testing` - Testing-specific values
+
+Wheels will automatically load the appropriate file `(.env.[environment])` based the variable `WHEELS_ENV` defined in your current .env file.
+
+#### Best Practices for Environment Variables
+
+1. **Never commit sensitive credentials** - Add `.env` to your `.gitignore` file
+2. **Use `.env.example` as a template** - Commit a template with placeholder values
+3. **Use the null coalescing operator** - Provide defaults: `this.env["KEY"] ?: "default"`
+4. **Document required variables** - List all required environment variables in your README
+
+{% code title=".env.example" %}
+```bash
+# Copy this file to .env and fill in your values
+# Never commit .env to version control!
+
+APP_NAME=YourAppName
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=your_database
+DB_USER=your_username
+DB_PASSWORD=your_password
+```
+{% endcode %}
+
 ### Types of Configurations Available
 
 There are several types of configurations that you can perform in Wheels to override all those default behaviors. In Wheels, you can find all these configuration options:
@@ -113,15 +195,37 @@ For more information, read the chapter about [URL Rewriting](https://wheels.dev/
 
 Probably the most important configuration of them all. What is an application without a database to store all of its precious data?
 
-The data source configuration is what tells Wheels which database to use for all of its models. (This can be overridden on a per-model basis, but that will be covered later.) To set this up in Wheels, it's just as easy as the previous example:
+The data source configuration is what tells Wheels which database to use for all of its models. (This can be overridden on a per-model basis, but that will be covered later.)
 
-{% code title="CFScript" %}
+#### Basic Data Source Configuration
+
+{% code title="config/settings.cfm" %}
 ```javascript
 set(dataSourceName="yourDataSourceName");
 set(dataSourceUserName="yourDataSourceUsername");
 set(dataSourcePassword="yourDataSourcePassword");
 ```
 {% endcode %}
+
+#### Using Environment Variables for Data Sources
+
+**Recommended:** Use environment variables for database credentials to keep sensitive information secure. You can access environment variables using this scope:
+
+**In `config/app.cfm`** (recommended for datasource configuration):
+
+{% code title="config/app.cfm" %}
+```javascript
+// Use this.env to access .env file variables
+this.datasources["myapp"] = {
+    class: this.env["DB_CLASS"],
+    connectionString: this.env["DB_CONNECTION_STRING"],
+    username: this.env["DB_USER"],
+    password: this.env["DB_PASSWORD"]
+};
+```
+{% endcode %}
+
+See [Using Environment Variables in config/app.cfm](#using-environment-variables-in-configappcfm) for more details on working with environment variables.
 
 ### Function Settings
 
