@@ -31,8 +31,13 @@ component aliases='wheels g view' extends="../base"  {
 		string layout="",
 		boolean force=false
 	){
-		//reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
+		requireWheelsApp(getCWD());
+		arguments = reconstructArgs(
+			argStruct=arguments,
+			allowedValues={
+				template: ["crud/_form", "crud/edit", "crud/index", "crud/new", "crud/show"]
+			}
+		);
 		var obj = helpers.getNameVariants(listLast( arguments.objectName, '/\' ));
 		var viewdirectory     = fileSystemUtil.resolvePath( "app/views" );
 		var directory 		  = fileSystemUtil.resolvePath( "app/views" & "/" & obj.objectNamePlural);

@@ -48,8 +48,8 @@ component aliases='wheels g model' extends="../base" {
         boolean migration = true,
         boolean force = false
     ) {
-        // Reconstruct arguments for handling --prefixed options
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(argStruct=arguments);
 
         // Support positional parameter for name
         if (structKeyExists(arguments, "1") && !structKeyExists(arguments, "name")) {

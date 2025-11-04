@@ -37,9 +37,9 @@ component  aliases='wheels g route' extends="../base"  {
 		boolean resources = false,
 		string root = ""
 	) {
-		// Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
-		
+		requireWheelsApp(getCWD());
+		arguments = reconstructArgs(argStruct=arguments);
+
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 

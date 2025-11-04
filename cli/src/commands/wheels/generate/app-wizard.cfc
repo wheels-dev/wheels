@@ -69,6 +69,9 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
     boolean expert = false,
     boolean skipInstall = false
    ) {
+    // Reconstruct arguments for handling --prefixed options
+    arguments = reconstructArgs(argStruct=arguments);
+
     // Initialize detail service
     var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 

@@ -33,8 +33,10 @@ component extends="../base" {
             argStruct=arguments,
             allowedValues={
                 format: ["html", "json", "markdown"],
-                template: ["default", "minimal", "detailed"]
-            }
+                template: ["default", "minimal", "detailed"],
+                include: ["models", "controllers", "views", "services"]
+            },
+            allowCommaSeparated=["include"]
         );
         
         print.line()

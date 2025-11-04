@@ -43,8 +43,13 @@ component aliases='wheels g api-resource' extends="../base" {
         boolean docs=false,
         boolean force=false
     ) {
-        // Reconstruct arguments for handling --prefixed options
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                format: ["json", "xml"]
+            }
+        );
 
         detailOutput.header("", "Generating API resource: #arguments.name# (#arguments.namespace#/#arguments.version#)");
 
