@@ -21,13 +21,10 @@ component extends="../base" {
 		string database = "",
 		boolean force = false
 	) {
-		arguments = reconstructArgs(arguments);
 		local.appPath = getCWD();
+		requireWheelsApp(local.appPath);
+		arguments = reconstructArgs(arguments);
 		
-		if (!isWheelsApp(local.appPath)) {
-			error("This command must be run from a Wheels application directory");
-			return;
-		}
 
 		try {
 			// Determine environment

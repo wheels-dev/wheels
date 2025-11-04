@@ -18,6 +18,7 @@ component aliases='wheels g test' extends="../base"  {
 	 * Initialize the command
 	 */
 	function init() {
+		super.init();
 		return this;
 	}
 

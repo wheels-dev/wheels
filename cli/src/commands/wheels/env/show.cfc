@@ -25,7 +25,12 @@ component extends="../base" {
         string format = "table",
         string file = ".env"
     ) {
-        arguments = reconstructArgs(arguments);
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                format: ["table", "json", "list"]
+            }
+        );
         try {
             // Check if we're in a Wheels project
             if (!directoryExists(resolvePath("app"))) {

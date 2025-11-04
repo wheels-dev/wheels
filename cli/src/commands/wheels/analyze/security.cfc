@@ -14,6 +14,7 @@ component extends="../base" {
         string severity = "medium",
         boolean deep = false
     ) {
+        requireWheelsApp(getCWD());
         arguments = reconstructArgs(arguments);
         print.yellowBoldLine("DEPRECATED: This command is deprecated")
              .yellowLine("Please use 'wheels security scan' instead")

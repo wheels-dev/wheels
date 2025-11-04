@@ -35,6 +35,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
    * Initialize the command
    */
   function init() {
+    super.init();
     return this;
   }
 

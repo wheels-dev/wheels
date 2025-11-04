@@ -14,6 +14,7 @@ component aliases='wheels g model' extends="../base" {
      * Constructor
      */
     function init() {
+        super.init();
         return this;
     }
 

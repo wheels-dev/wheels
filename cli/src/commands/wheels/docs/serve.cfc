@@ -18,7 +18,13 @@ component extends="../base" {
         numeric port = 35729,
         boolean open = true
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            numericRanges={
+                port: {min:1024, max:65535}
+            }
+        );
         var docRoot = fileSystemUtil.resolvePath(arguments.root);
         
         if (!directoryExists(docRoot)) {

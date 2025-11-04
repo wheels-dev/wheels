@@ -27,10 +27,7 @@ component extends="../base" {
         boolean report = false,
         boolean verbose = false
     ) {
-        //isWheelsApp() is defined in the same file, this file is not extented from base.cfc
-        if(!isWheelsApp(resolvePath("."))){
-           error("This command must be run from a Wheels application root directory.");
-        }
+        requireWheelsApp(getCWD());
         // Reconstruct and validate arguments with allowed values
         arguments = reconstructArgs(
             argStruct = arguments,

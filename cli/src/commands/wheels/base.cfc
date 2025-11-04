@@ -1599,4 +1599,20 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 		}
 	}
 
+	
+    /**
+     * Require that the current directory is a Wheels application
+     * Throws a consistent error message if not a Wheels app
+     *
+     * @path Optional path to check (defaults to current directory)
+     */
+    function requireWheelsApp(string path = "") {
+        var checkPath = len(trim(arguments.path)) ? arguments.path : resolvePath(".");
+
+        if (!isWheelsApp(checkPath)) {
+            error("This command must be run from a Wheels application root directory.");
+        }
+    }
+   
+
 }

@@ -27,9 +27,7 @@ component aliases="clean" extends="../base" {
 		numeric keep = 3,
 		boolean dryRun = false
 	) {
-		if (!isWheelsApp()) {
-			error("This command must be run from a Wheels application root directory.");
-		}
+		requireWheelsApp(getCWD());
 		arguments = reconstructArgs(
 			argStruct=arguments,
 			numericRanges={

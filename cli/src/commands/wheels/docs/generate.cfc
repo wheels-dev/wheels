@@ -28,7 +28,14 @@ component extends="../base" {
         boolean serve = false,
         boolean verbose = false
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                format: ["html", "json", "markdown"],
+                template: ["default", "minimal", "detailed"]
+            }
+        );
         
         print.line()
             .boldBlueLine("Documentation Generator")

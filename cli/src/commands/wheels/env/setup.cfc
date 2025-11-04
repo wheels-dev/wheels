@@ -38,8 +38,15 @@ component extends="../base" {
         boolean skipDatabase = false,
         boolean help = false
     ) {
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                template: ["local", "docker", "vagrant"],
+                dbtype: ["h2", "mysql", "postgres", "mssql", "oracle"]
+            }
+        );
         var projectRoot = resolvePath(".");
-        arguments = reconstructArgs(arguments);
 
         // Show help if requested
         if ( arguments.help == true) {
@@ -47,7 +54,7 @@ component extends="../base" {
         } else {
             while ( trim(arguments.environment) == "" ) {
                 arguments.environment = ask(
-                    "Enter environment (development, staging, production): "
+                    "Environment Can't be Empty! Enter environment (development, staging, production): "
                 );
             }
         }

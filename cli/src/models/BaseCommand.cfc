@@ -260,8 +260,16 @@ component extends="commandbox.system.BaseCommand" {
                     if (len(trim(local.defaultValue))) {
                         // Check if the argument was explicitly provided in the args struct
                         if (structKeyExists(arguments.args, local.paramName)) {
-                            // If it was provided but is empty, that's an error
-                            if (!len(trim(local.argValue))) {
+                            // Clean up the value - remove surrounding quotes if present
+                            local.cleanValue = trim(local.argValue);
+                            // Remove surrounding single or double quotes
+                            if ((left(local.cleanValue, 1) == "'" && right(local.cleanValue, 1) == "'") ||
+                                (left(local.cleanValue, 1) == '"' && right(local.cleanValue, 1) == '"')) {
+                                local.cleanValue = mid(local.cleanValue, 2, len(local.cleanValue) - 2);
+                            }
+
+                            // If it was provided but is empty (or just quotes), that's an error
+                            if (!len(trim(local.cleanValue))) {
                                 arrayAppend(local.errors, "#local.displayName# cannot be empty. Either omit it to use the default value or provide a valid value");
                             }
                         }

@@ -13,6 +13,7 @@ component  aliases='wheels g route' extends="../base"  {
 	 * Initialize the command
 	 */
 	function init() {
+		super.init();
 		return this;
 	}
 
