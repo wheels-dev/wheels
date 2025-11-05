@@ -16,6 +16,7 @@
 	 * Initialize the command
 	 */
 	function init() {
+		super.init();
 		return this;
 	}
 

@@ -18,6 +18,7 @@ component aliases='wheels g test' extends="../base"  {
 	 * Initialize the command
 	 */
 	function init() {
+		super.init();
 		return this;
 	}
 
@@ -42,8 +43,13 @@ component aliases='wheels g test' extends="../base"  {
 		boolean force=false,
 		boolean open=false
 	){
-        // Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+		arguments = reconstructArgs(
+			argStruct=arguments,
+			allowedValues={
+				type: ["model", "controller", "view", "unit", "integration", "api"]
+			}
+		);
 
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");

@@ -54,8 +54,13 @@ component aliases='wheels g property'  extends="../base"  {
 		number precision=0,
 		number scale=0
 	){
-		// Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
+		requireWheelsApp(getCWD());
+		arguments = reconstructArgs(
+			argStruct=arguments,
+			allowedValues={
+				dataType: ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "limit", "text", "time", "timestamp", "uuid"]
+			}
+		);
 
     	var obj = helpers.getNameVariants(arguments.name);
 

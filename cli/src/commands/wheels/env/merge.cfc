@@ -22,6 +22,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		string output = ".env.merge",
 		boolean dryRun = false
 	) {
+		requireWheelsApp(getCWD());
 		// Reconstruct arguments to handle -- prefixed options
 		arguments = reconstructArgs(arguments);
 		local.sourceFiles = [arguments.source1, arguments.source2];

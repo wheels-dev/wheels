@@ -27,8 +27,16 @@ component extends="../base" {
         string sort = "name",
         boolean help = false
     ) {
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                format: ["table", "json"],
+                filter: ["All", "Active", "Inactive"],
+                sort: ["name", "modified", "size"]
+            }
+        );
         var projectRoot = resolvePath(".");
-        arguments = reconstructArgs(arguments);
         arguments.rootPath = projectRoot;
         
         

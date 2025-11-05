@@ -23,10 +23,7 @@ component extends="../base" {
         boolean profile = false
     ) {
         // Validate we're in a Wheels project
-        if (!isWheelsApp(resolvePath("."))) { 
-            error("This command must be run from the root of a Wheels application.");
-        }
-
+        requireWheelsApp(getCWD());
         // Reconstruct and validate arguments with allowed values
         arguments = reconstructArgs(
             argStruct = arguments,

@@ -37,6 +37,7 @@ component extends="../base" {
 		boolean force = false,
 		string environment = "production"
 	) {
+		requireWheelsApp(getCWD());
 		// Reconstruct arguments for handling --prefixed options
 		arguments = reconstructArgs(
 			argStruct = arguments,
@@ -48,9 +49,6 @@ component extends="../base" {
 		// Normalize environment aliases
 		arguments.environment = normalizeEnvironment(arguments.environment);
 
-		if (!isWheelsApp()) {
-			error("This command must be run from a Wheels application root directory.");
-		}
 		
 		print.boldGreenLine("==> Precompiling assets for #arguments.environment#...");
 		print.line();

@@ -11,7 +11,7 @@ component aliases='wheels db exec' extends="../base" {
 	 * @version.hint Version to migrate to
 	 **/
 	function run( required string version	) {
-t		// Reconstruct arguments for handling --prefixed options
+		// Reconstruct arguments for handling --prefixed options
 		arguments = reconstructArgs(arguments);
 
 		var loc={

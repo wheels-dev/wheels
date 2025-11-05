@@ -31,8 +31,14 @@ component extends="../base" {
         boolean production=false,
         boolean nginx=false
     ) {
-
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                db: ["h2", "mysql", "postgres", "mssql", "oracle"],
+                cfengine: ["lucee", "adobe"]
+            }
+        );
         // Check for existing files if force is not set
         if (!arguments.force) {
             local.existingFiles = [];
@@ -65,18 +71,6 @@ component extends="../base" {
         print.line();
         print.boldMagentaLine("Wheels Docker Configuration");
         print.line();
-
-        // Validate database selection
-        local.supportedDatabases = ["h2", "mysql", "postgres", "mssql", "oracle"];
-        if (!arrayContains(local.supportedDatabases, lCase(arguments.db))) {
-            error("Unsupported database: #arguments.db#. Please choose from: #arrayToList(local.supportedDatabases)#");
-        }
-
-        // Validate CF engine
-        local.supportedEngines = ["lucee", "adobe"];
-        if (!arrayContains(local.supportedEngines, lCase(arguments.cfengine))) {
-            error("Unsupported CF engine: #arguments.cfengine#. Please choose from: #arrayToList(local.supportedEngines)#");
-        }
 
         // Get application port - priority: command argument > server.json > default
         if (len(arguments.port) && isNumeric(arguments.port)) {

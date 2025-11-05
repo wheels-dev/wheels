@@ -30,8 +30,13 @@ component aliases="wheels g snippets" extends="../base" {
         boolean create = false,
         boolean force = false
     ) {
-        // Reconstruct arguments for handling --prefixed options
-        arguments = reconstructArgs(arguments);
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                output: ["console", "file"],
+                category: ["authentication", "model", "controller", "view", "database"]
+            }
+        );
 
         if (arguments.list) {
             return listSnippets(arguments.category);

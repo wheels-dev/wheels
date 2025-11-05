@@ -16,7 +16,7 @@ ENV ENV_MODE                "remote"
 ENV BOX_SERVER_CFCONFIGFILE "/wheels-test-suite/CFConfig.json"
 ENV BOX_SERVER_PROFILE      "none"
 ENV BOX_INSTALL             TRUE
-ENV BOX_SERVER_APP_CFENGINE "lucee@7.0.0-SNAPSHOT+317"
+ENV BOX_SERVER_APP_CFENGINE "lucee@7"
 
 # Set working directory
 WORKDIR ${APP_DIR}

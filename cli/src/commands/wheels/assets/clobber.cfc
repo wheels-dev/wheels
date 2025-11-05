@@ -22,9 +22,7 @@ component aliases="clobber" extends="../base" {
 	 * @force Skip confirmation prompt
 	 **/
 	function run(boolean force = false) {
-		if (!isWheelsApp()) {
-			error("This command must be run from a Wheels application root directory.");
-		}
+		requireWheelsApp(getCWD());
 		arguments = reconstructArgs(argStruct=arguments);
 		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 		

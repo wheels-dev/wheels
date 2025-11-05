@@ -32,9 +32,8 @@ component aliases="wheels g controller" extends="../base" {
         string description = "",
         boolean force = false
     ) {
-
-        // Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(argStruct=arguments);
 
         // Handle API flag implies CRUD and no views
         if (arguments.api) {

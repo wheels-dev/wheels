@@ -33,15 +33,43 @@ component aliases="wheels g scaffold" extends="../base" {
         boolean migrate = false,
         boolean force = false
     ) {
-        // Reconstruct arguments for handling --prefixed options
-        arguments = reconstructArgs(arguments);
-        
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(argStruct=arguments);
+
+        // Custom validation for properties parameter format (name:type,name2:type2)
+        if (len(trim(arguments.properties))) {
+            var validTypes = ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "limit", "text", "time", "timestamp", "uuid"];
+            var properties = listToArray(arguments.properties, ",");
+            var invalidTypes = [];
+
+            for (var prop in properties) {
+                prop = trim(prop);
+                if (find(":", prop)) {
+                    var propType = trim(listLast(prop, ":"));
+                    if (!arrayFindNoCase(validTypes, propType)) {
+                        arrayAppend(invalidTypes, propType);
+                    }
+                } else {
+                    // Property without type specification is invalid
+                    detailOutput.error("Invalid property format: '#prop#'. Expected format: name:type");
+                    setExitCode(1);
+                    return;
+                }
+            }
+
+            if (arrayLen(invalidTypes) > 0) {
+                detailOutput.error("Invalid property type(s): #arrayToList(invalidTypes, ', ')#. Valid types are: #arrayToList(validTypes, ', ')#");
+                setExitCode(1);
+                return;
+            }
+        }
+
         // Validate scaffold
         var validation = scaffoldService.validateScaffold(arguments.name, getCWD(), arguments.force);
         if (!validation.valid) {
             detailOutput.error("Cannot scaffold '#arguments.name#':");
             for (var error in validation.errors) {
-                detailOutput.getPrint().redLine("   • #error#");
+                print.redLine("   - #error#");
             }
             setExitCode(1);
             return;
@@ -64,7 +92,7 @@ component aliases="wheels g scaffold" extends="../base" {
         if (!result.success) {
             detailOutput.error("Scaffolding failed!");
             for (var error in result.errors) {
-                detailOutput.getPrint().redLine("   • #error#");
+                print.redLine("   - #error#");
             }
             setExitCode(1);
             return;

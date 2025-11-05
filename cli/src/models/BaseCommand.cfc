@@ -112,6 +112,8 @@ component extends="commandbox.system.BaseCommand" {
      *                Example: {environment: ["development","production","testing"]}
      * @numericRanges Struct of argument names with min/max numeric ranges
      *                Example: {port: {min: 1, max: 65535}, timeout: {min: 0, max: 3600}}
+     * @allowCommaSeparated Array of argument names that accept comma-separated lists
+     *                Example: ["include", "exclude", "tags"]
      */
     function reconstructArgs(
         required struct argStruct,
@@ -119,7 +121,8 @@ component extends="commandbox.system.BaseCommand" {
         any componentObject = this,
         boolean validate = true,
         struct allowedValues = {},
-        struct numericRanges = {}
+        struct numericRanges = {},
+        array allowCommaSeparated = []
     ) {
         local.result = {};
 
@@ -194,7 +197,8 @@ component extends="commandbox.system.BaseCommand" {
                 functionName = arguments.functionName,
                 componentObject = arguments.componentObject,
                 allowedValues = arguments.allowedValues,
-                numericRanges = arguments.numericRanges
+                numericRanges = arguments.numericRanges,
+                allowCommaSeparated = arguments.allowCommaSeparated
             );
         }
 
@@ -209,13 +213,15 @@ component extends="commandbox.system.BaseCommand" {
      * @componentObject Component instance to get metadata from
      * @allowedValues Struct of allowed values per argument
      * @numericRanges Struct of argument names with min/max numeric ranges
+     * @allowCommaSeparated Array of argument names that accept comma-separated lists
      */
     private function validateArguments(
         required struct args,
         required string functionName,
         required any componentObject,
         struct allowedValues = {},
-        struct numericRanges = {}
+        struct numericRanges = {},
+        array allowCommaSeparated = []
     ) {
         local.errors = [];
         local.warnings = [];
@@ -260,8 +266,16 @@ component extends="commandbox.system.BaseCommand" {
                     if (len(trim(local.defaultValue))) {
                         // Check if the argument was explicitly provided in the args struct
                         if (structKeyExists(arguments.args, local.paramName)) {
-                            // If it was provided but is empty, that's an error
-                            if (!len(trim(local.argValue))) {
+                            // Clean up the value - remove surrounding quotes if present
+                            local.cleanValue = trim(local.argValue);
+                            // Remove surrounding single or double quotes
+                            if ((left(local.cleanValue, 1) == "'" && right(local.cleanValue, 1) == "'") ||
+                                (left(local.cleanValue, 1) == '"' && right(local.cleanValue, 1) == '"')) {
+                                local.cleanValue = mid(local.cleanValue, 2, len(local.cleanValue) - 2);
+                            }
+
+                            // If it was provided but is empty (or just quotes), that's an error
+                            if (!len(trim(local.cleanValue))) {
                                 arrayAppend(local.errors, "#local.displayName# cannot be empty. Either omit it to use the default value or provide a valid value");
                             }
                         }
@@ -269,14 +283,41 @@ component extends="commandbox.system.BaseCommand" {
                 }
 
                 // VALIDATION 3: Allowed values (enum-like validation)
-                if (structKeyExists(arguments.allowedValues, local.paramName)) {
+                // Only validate if a value was provided (skip if empty unless required)
+                if (structKeyExists(arguments.allowedValues, local.paramName) && len(trim(local.argValue))) {
                     local.allowed = arguments.allowedValues[local.paramName];
 
                     if (isArray(local.allowed)) {
-                        if (!arrayFindNoCase(local.allowed, local.argValue)) {
-                            arrayAppend(local.errors,
-                                "#local.displayName# must be one of: #arrayToList(local.allowed, ', ')#. You provided: '#local.argValue#'"
-                            );
+                        // Check if this parameter explicitly allows comma-separated lists
+                        local.allowsCommaSeparated = arrayFindNoCase(arguments.allowCommaSeparated, local.paramName) > 0;
+
+                        if (local.allowsCommaSeparated && find(",", local.argValue)) {
+                            // Split by comma and validate each item (only if explicitly allowed)
+                            local.items = listToArray(local.argValue, ",");
+                            local.invalidItems = [];
+
+                            for (local.item in local.items) {
+                                local.trimmedItem = trim(local.item);
+                                if (!arrayFindNoCase(local.allowed, local.trimmedItem)) {
+                                    arrayAppend(local.invalidItems, local.trimmedItem);
+                                }
+                            }
+
+                            if (arrayLen(local.invalidItems) > 0) {
+                                local.invalidList = arrayToList(local.invalidItems, "', '");
+                                arrayAppend(local.errors,
+                                    "#local.displayName# contains invalid value(s): '#local.invalidList#'. " &
+                                    "Valid options are: #arrayToList(local.allowed, ', ')#. " &
+                                    "You can provide a comma-separated list (e.g., 'models,controllers')."
+                                );
+                            }
+                        } else {
+                            // Single value validation (default behavior)
+                            if (!arrayFindNoCase(local.allowed, local.argValue)) {
+                                arrayAppend(local.errors,
+                                    "#local.displayName# must be one of: #arrayToList(local.allowed, ', ')#. You provided: '#local.argValue#'"
+                                );
+                            }
                         }
                     }
                 }
