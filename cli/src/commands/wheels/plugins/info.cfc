@@ -13,9 +13,8 @@ component aliases="wheels plugin info" extends="../base" {
      * @name.hint Name of the plugin to show info for
      */
     function run(required string name) {
-        
-        // Reconstruct arguments for consistency
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(argStruct=arguments);
         try {
             print.line()
                  .boldMagentaLine("===========================================================")

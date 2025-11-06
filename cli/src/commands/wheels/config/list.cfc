@@ -19,6 +19,7 @@ component extends="../base" {
         string filter="",
         boolean showSensitive=false
     ) {
+        requireWheelsApp(getCWD());
         arguments = reconstructArgs(arguments);
         // Welcome message
         print.line();

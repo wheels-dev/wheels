@@ -12,11 +12,7 @@ component aliases="wheels get env" extends="../base" {
 	 */
 	public void function run() {
 		local.appPath = getCWD();
-		
-		if (!isWheelsApp(local.appPath)) {
-			error("This command must be run from a Wheels application directory");
-			return;
-		}
+		requireWheelsApp(local.appPath);
 
 		try {
 			// Check for environment in multiple places

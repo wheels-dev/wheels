@@ -15,11 +15,8 @@ component extends="../base" {
 	 */
 	public void function run(string settingName = "") {
 		local.appPath = getCWD();
-		
-		if (!isWheelsApp(local.appPath)) {
-			error("This command must be run from a Wheels application directory");
-			return;
-		}
+		requireWheelsApp(local.appPath);
+		arguments=reconstructArgs(arguments);
 
 		try {
 			// Read settings from the appropriate environment file

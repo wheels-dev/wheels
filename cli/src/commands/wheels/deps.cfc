@@ -23,17 +23,18 @@ component extends="base" {
         string version="",
         boolean dev=false
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                action=["list", "install", "update", "remove", "report"]
+            }
+        );
+
         // Welcome message
         print.line();
         print.boldMagentaLine("Wheels Dependency Manager");
         print.line();
-        
-        // Validate action
-        local.validActions = ["list", "install", "update", "remove", "report"];
-        if (!arrayContains(local.validActions, lCase(arguments.action))) {
-            error("Invalid action: #arguments.action#. Please choose from: #arrayToList(local.validActions)#");
-        }
         
         // Handle different actions
         switch (lCase(arguments.action)) {

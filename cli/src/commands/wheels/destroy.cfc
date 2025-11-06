@@ -17,6 +17,8 @@ component aliases='wheels d'  extends="base"  {
 	 **/
 	function run(required string name, string type="resource") {
 
+		requireWheelsApp(getCWD());
+		arguments=reconstructArgs(arguments);
 		// Validate that name is not empty
 		arguments.name = trim(arguments.name);
 		if (len(arguments.name) == 0) {

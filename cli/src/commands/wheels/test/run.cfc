@@ -32,13 +32,16 @@ component extends="../base" {
         boolean coverage = false,
         string reporter = "",
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                type=["app", "core"],
+                format=["txt", "json", "junit", "html"],
+                reporter=["text", "json", "junit", "tap", "antjunit", "console", ""]
+            }
+        );
         arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
-        
-        // Validate we're in a Wheels project
-        if (!isWheelsApp()) {
-            error("This command must be run from the root of a Wheels application.");
-        }
         
         // Map reporter to format if reporter is specified
         if (structKeyExists(arguments, "reporter") && len(arguments.reporter)) {

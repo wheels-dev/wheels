@@ -16,8 +16,8 @@ component alias="wheels plugin remove" extends="../base" {
         required string name,
         boolean force = false
     ) {
-        // Reconstruct arguments to handle prefix (--)
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(argStruct=arguments);
 
         // Confirmation prompt unless forced
         if (!arguments.force) {

@@ -54,12 +54,15 @@ component extends="commandbox.system.BaseCommand" {
      * Open a file path in the default editor
      */
     function openPath(required string path) {
-        if (shell.isWindows()) {
-            runCommand("start #arguments.path#");
-        } else if (shell.isMac()) {
-            runCommand("open #arguments.path#");
+        var os = CreateObject("java", "java.lang.System").getProperty("os.name");
+
+        if (FindNoCase("windows", os) > 0) {
+            // Windows start command requires empty quotes for title when path has spaces
+            command('!start "" "#arguments.path#"').run();
+        } else if (FindNoCase("mac", os) > 0) {
+            command('!open "#arguments.path#"').run();
         } else {
-            runCommand("xdg-open #arguments.path#");
+            command('!xdg-open "#arguments.path#"').run();
         }
     }
     

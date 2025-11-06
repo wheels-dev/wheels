@@ -44,13 +44,16 @@ component aliases='wheels test:all' extends="../base" {
         string filter = "",
         string servername = ""
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                type=["app", "core", "plugin"],
+                format=["txt", "json", "junit", "html"],
+                coverageReporter=["html", "json", "xml"]
+            }
+        );
         arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
-        
-        // Validate we're in a Wheels project
-        if (!isWheelsApp()) {
-            error("This command must be run from the root of a Wheels application.");
-        }
         
         // Build the test URL
         var testUrl = buildTestUrl(

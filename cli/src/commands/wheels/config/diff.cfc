@@ -29,9 +29,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		boolean env = false,
 		boolean settings = false
 	) {
-		if(!isWheelsApp()){
-			error("This command must be run from a Wheels application root directory.");
-		}
+		requireWheelsApp(getCWD());
 		// Reconstruct and validate arguments
 		arguments = reconstructArgs(
 			argStruct = arguments,

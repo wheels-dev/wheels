@@ -26,6 +26,7 @@ component extends="../base" {
         boolean force = false,
         boolean quiet = false
     ) {
+        requireWheelsApp(getCWD());
         var projectRoot = resolvePath(".");
         arguments = reconstructArgs(arguments);
 

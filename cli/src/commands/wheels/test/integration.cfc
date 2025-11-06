@@ -33,13 +33,15 @@ component aliases='wheels test:integration' extends="../base" {
         string directory = "integration",
         string servername = ""
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                type=["app", "core", "plugin"],
+                format=["txt", "json", "junit", "html"]
+            }
+        );
         arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
-        
-        // Validate we're in a Wheels project
-        if (!isWheelsApp()) {
-            error("This command must be run from the root of a Wheels application.");
-        }
         
         // Check if integration test directory exists, create if not
         var integrationTestPath = fileSystemUtil.resolvePath(arguments.directory);

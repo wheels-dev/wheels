@@ -18,7 +18,7 @@ The `wheels reload` command reloads your Wheels application, clearing caches and
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `mode` | Reload mode: `development`, `testing`, `maintenance`, `production` | `development` |
-| `password` | **Required** - The reload password configured in your application | None |
+| `password` |The reload password configured in your application | Empty |
 
 
 ## Reload Modes

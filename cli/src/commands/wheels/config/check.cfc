@@ -21,6 +21,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		boolean verbose = false,
 		boolean fix = false
 	) {
+		requireWheelsApp(getCWD());
 		arguments = reconstructArgs(argStruct=arguments);
 		// Determine environment
 		local.env = Len(arguments.environment) ? arguments.environment : getEnvironment();

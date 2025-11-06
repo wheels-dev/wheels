@@ -19,6 +19,7 @@ component extends="../base" {
         string source="",
         string target=""
     ) {
+        requireWheelsApp(getCWD());
         arguments = reconstructArgs(arguments);
         // Welcome message
         print.line();

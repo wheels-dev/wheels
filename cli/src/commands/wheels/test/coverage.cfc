@@ -43,7 +43,17 @@ component aliases='wheels test:coverage' extends="../base" {
         string servername = "",
         string outputFile = "test-results-coverage"
     ) {
-		arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                type=["app", "core", "plugin"],
+                format=["txt", "json", "junit", "html"]
+            },
+            numericRanges={
+                threshold={min=0, max=1000}
+            }
+        );
         // Use relative path for outputDir to avoid issues with TestBox
         var outputPath = arguments.outputDir;
         

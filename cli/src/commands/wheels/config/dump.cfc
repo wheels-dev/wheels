@@ -25,7 +25,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		string output = "",
 		boolean noMask = false
 	) {
-
+		requireWheelsApp(getCWD());
 		arguments = reconstructArgs(
 			argStruct = arguments,
 			allowedValues = {

@@ -25,6 +25,7 @@ component extends="../base" {
         string format = "table",
         string file = ".env"
     ) {
+        requireWheelsApp(getCWD());
         arguments = reconstructArgs(
             argStruct=arguments,
             allowedValues={
