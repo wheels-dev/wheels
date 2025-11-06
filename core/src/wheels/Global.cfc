@@ -198,122 +198,168 @@ component output="false" {
     cfhtmlhead(attributeCollection="#arguments#");
 	}
 
-	public any function $dbinfo(){
-    arguments.name = "local.rv";
-    if(StructKeyExists(arguments, "username") && !Len(arguments.username)){
-      StructDelete(arguments, "username");
-    }
-    if(StructKeyExists(arguments, "password") && !Len(arguments.password)){
-      StructDelete(arguments, "password");
-    }
+	public any function $dbinfo() {
+		arguments.name = "local.rv";
+		if (StructKeyExists(arguments, "username") && !Len(arguments.username)) {
+			StructDelete(arguments, "username");
+		}
+		if (StructKeyExists(arguments, "password") && !Len(arguments.password)) {
+			StructDelete(arguments, "password");
+		}
 
-	// BoxLang + SQL Server specific fix for index queries to avoid casting error
-    if (StructKeyExists(server, "boxlang") && 
-        StructKeyExists(arguments, "type") && arguments.type == "index" &&
-        StructKeyExists(arguments, "table")) {
-      
-		// Get database adapter to check if it's SQL Server
-		local.adapter = $get("adapterName");
-		if (local.adapter == "SQLServer") {
-			// Use direct SQL query instead of cfdbinfo for BoxLang + SQL Server index queries
+		// BoxLang + SQL Server specific fix for index queries
+		if (
+			StructKeyExists(server, "boxlang") &&
+			StructKeyExists(arguments, "type") && arguments.type == "index" &&
+			StructKeyExists(arguments, "table")
+		) {
+			local.adapter = $get("adapterName");
+
+			if (local.adapter == "SQLServer") {
+				local.sql = "
+					SELECT 
+						DB_NAME() AS TABLE_CAT,
+						SCHEMA_NAME(t.schema_id) AS TABLE_SCHEM,
+						t.name AS TABLE_NAME,
+						CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS NON_UNIQUE,
+						t.name AS INDEX_QUALIFIER,
+						i.name AS INDEX_NAME,
+						CASE 
+							WHEN i.type = 1 THEN 'Clustered Index'
+							WHEN i.type = 2 THEN 'Other Index'
+							ELSE 'Other Index'
+						END AS TYPE,
+						CAST(ic.key_ordinal AS INT) AS ORDINAL_POSITION,
+						c.name AS COLUMN_NAME,
+						CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS ASC_OR_DESC,
+						CAST(0 AS INT) AS CARDINALITY,
+						CAST(0 AS INT) AS PAGES,
+						'' AS FILTER_CONDITION
+					FROM sys.indexes i
+					INNER JOIN sys.objects t ON i.object_id = t.object_id
+					INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+					INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+					WHERE t.name = '#arguments.table#' 
+						AND t.type = 'U'
+						AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
+					ORDER BY i.name, ic.key_ordinal
+				";
+				local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+				return local.rv;
+			}
+
+			if (local.adapter == "Oracle") {
+				local.sql = "
+					SELECT 
+						NULL AS TABLE_CAT,
+						ai.OWNER AS TABLE_SCHEM,
+						ai.TABLE_NAME,
+						CASE WHEN ai.UNIQUENESS = 'NONUNIQUE' THEN 1 ELSE 0 END AS NON_UNIQUE,
+						ai.OWNER AS INDEX_QUALIFIER,
+						ai.INDEX_NAME,
+						'Other Index' AS TYPE,
+						ac.COLUMN_POSITION AS ORDINAL_POSITION,
+						ac.COLUMN_NAME,
+						CASE WHEN ac.DESCEND = 'DESC' THEN 'D' ELSE 'A' END AS ASC_OR_DESC,
+						0 AS CARDINALITY,
+						0 AS PAGES,
+						'' AS FILTER_CONDITION
+					FROM ALL_INDEXES ai
+					JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
+					WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
+						AND ai.INDEX_TYPE != 'LOB'
+					ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
+				";
+				local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+				return local.rv;
+			}
+		}
+
+		if (
+			structKeyExists(arguments, "type") &&
+			arguments.type eq "index" &&
+			$get("adapterName") eq "SQLite"
+		) {
 			local.sql = "
-			SELECT 
-				DB_NAME() AS TABLE_CAT,
-				SCHEMA_NAME(t.schema_id) AS TABLE_SCHEM,
-				t.name AS TABLE_NAME,
-				CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS NON_UNIQUE,
-				t.name AS INDEX_QUALIFIER,
-				i.name AS INDEX_NAME,
-				CASE 
-					WHEN i.type = 1 THEN 'Clustered Index'
-					WHEN i.type = 2 THEN 'Other Index'
-					ELSE 'Other Index'
-				END AS TYPE,
-				CAST(ic.key_ordinal AS INT) AS ORDINAL_POSITION,
-				c.name AS COLUMN_NAME,
-				CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS ASC_OR_DESC,
-				CAST(0 AS INT) AS CARDINALITY,
-				CAST(0 AS INT) AS PAGES,
-				'' AS FILTER_CONDITION
-			FROM sys.indexes i
-			INNER JOIN sys.objects t ON i.object_id = t.object_id
-			INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
-			INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
-			WHERE t.name = '#arguments.table#' 
-				AND t.type = 'U'
-				AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
-			ORDER BY i.name, ic.key_ordinal
+				SELECT
+					NULL AS TABLE_CAT,
+					NULL AS TABLE_SCHEM,
+					'#arguments.table#' AS TABLE_NAME,
+					CASE WHEN il.""unique"" = 0 THEN 1 ELSE 0 END AS NON_UNIQUE,
+					NULL AS INDEX_QUALIFIER,
+					il.name AS INDEX_NAME,
+					'Other Index' AS TYPE,
+					ii.seqno + 1 AS ORDINAL_POSITION,
+					ii.name AS COLUMN_NAME,
+					'A' AS ASC_OR_DESC,
+					0 AS CARDINALITY,
+					0 AS PAGES,
+					'' AS FILTER_CONDITION
+				FROM pragma_index_list('#arguments.table#') il
+				JOIN pragma_index_info(il.name) ii
+
+				UNION ALL
+
+				SELECT
+					NULL AS TABLE_CAT,
+					NULL AS TABLE_SCHEM,
+					'#arguments.table#' AS TABLE_NAME,
+					0 AS NON_UNIQUE,
+					NULL AS INDEX_QUALIFIER,
+					'PRIMARY' AS INDEX_NAME,
+					'Primary Key' AS TYPE,
+					pk AS ORDINAL_POSITION,
+					name AS COLUMN_NAME,
+					'A' AS ASC_OR_DESC,
+					0 AS CARDINALITY,
+					0 AS PAGES,
+					'' AS FILTER_CONDITION
+				FROM pragma_table_info('#arguments.table#')
+				WHERE pk > 0
+
+				ORDER BY INDEX_NAME, ORDINAL_POSITION;
 			";
-			
-			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+			local.rv = $query(sql = local.sql, datasource = arguments.datasource);
 			return local.rv;
 		}
-		
-		// Get database adapter to check if it's Oracle
-		if (local.adapter == "Oracle") {
-			// Use direct SQL query instead of cfdbinfo for BoxLang + Oracle index queries
-			local.sql = "
-			SELECT 
-				NULL AS TABLE_CAT,
-				ai.OWNER AS TABLE_SCHEM,
-				ai.TABLE_NAME,
-				CASE WHEN ai.UNIQUENESS = 'NONUNIQUE' THEN 1 ELSE 0 END AS NON_UNIQUE,
-				ai.OWNER AS INDEX_QUALIFIER,
-				ai.INDEX_NAME,
-				'Other Index' AS TYPE,
-				ac.COLUMN_POSITION AS ORDINAL_POSITION,
-				ac.COLUMN_NAME,
-				CASE WHEN ac.DESCEND = 'DESC' THEN 'D' ELSE 'A' END AS ASC_OR_DESC,
-				0 AS CARDINALITY,
-				0 AS PAGES,
-				'' AS FILTER_CONDITION
-			FROM ALL_INDEXES ai
-			JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
-			WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
-				AND ai.INDEX_TYPE != 'LOB'
-			ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
-			";
-			
-			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
-			return local.rv;
-		}
-    }
 
-    // If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
+		// If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
 		// Sometimes the call fails when using a custom database connection string.
 		// In that case the database name is not known by the CF server and it will just use any of the databases that the data source has access to.
 		// That can incorrectly be "information_schema" for example.
-    try{
-      cfdbinfo(attributeCollection="#arguments#");
-    }catch(any e){
-      cfdbinfo(attributeCollection="#arguments#");
-      local.type = arguments.type;
+		try {
+			cfdbinfo(attributeCollection = arguments);
+		} catch (any e) {
+			cfdbinfo(attributeCollection = arguments);
+			local.type = arguments.type;
 			arguments.type = "dbnames";
-      cfdbinfo(attributeCollection="#arguments#");
-      if(local.rv.recordCount GT 1){
-        for(local.i in local.rv){
-          if(local.i.database_name IS NOT "information_schema"){
-            arguments.dbname = local.i.database_name;
-          }
-        }
-      }
-      arguments.type = local.type;
-      cfdbinfo(attributeCollection="#arguments#");
-    }
+			cfdbinfo(attributeCollection = arguments);
+			if (local.rv.recordCount GT 1) {
+				for (local.i in local.rv) {
+					if (local.i.database_name IS NOT "information_schema") {
+						arguments.dbname = local.i.database_name;
+					}
+				}
+			}
+			arguments.type = local.type;
+			cfdbinfo(attributeCollection = arguments);
+		}
 
-    // Override name of database adapter when running internal tests
-    if(arguments.type IS "version"
-       AND StructKeyExists(url, "controller")
-       AND StructKeyExists(url, "action")
-       AND StructKeyExists(url, "view")
-       AND StructKeyExists(url, "type")
-       AND StructKeyExists(url, "adapter")){
-      if(url.controller IS "wheels" AND url.action IS "wheels" AND url.view IS "tests" AND url.type IS "core"){
-        QuerySetCell(local.rv, "driver_name", url.adapter);
-      }
-    }
+		// Override name for test mode
+		if (
+			arguments.type IS "version" AND
+			structKeyExists(url, "controller") AND
+			structKeyExists(url, "action") AND
+			structKeyExists(url, "view") AND
+			structKeyExists(url, "type") AND
+			structKeyExists(url, "adapter")
+		) {
+			if (url.controller IS "wheels" AND url.action IS "wheels" AND url.view IS "tests" AND url.type IS "core") {
+				QuerySetCell(local.rv, "driver_name", url.adapter);
+			}
+		}
 
-    return local.rv;
+		return local.rv;
 	}
 
 	public any function $wddx(required any input, string action = "cfml2wddx", boolean useTimeZoneInfo = true){
@@ -337,17 +383,16 @@ component output="false" {
 	}
 
 	public any function $query(required string sql){
-    StructDelete(arguments, "name");
-    // allow the use of query of queries, caveat: Query must be called query. Eg: SELECT * from query
+		StructDelete(arguments, "name");
+		// allow the use of query of queries, caveat: Query must be called query. Eg: SELECT * from query
 		if(StructKeyExists(arguments, "query") && IsQuery(arguments.query)){
 			var query = Duplicate(arguments.query);
-    }
-
-    local.rv = queryExecute(PreserveSingleQuotes(arguments.sql), [],  arguments);
+		}
+		local.rv = queryExecute(PreserveSingleQuotes(arguments.sql), [],  arguments);
 		// some sql statements may not return a value
 		if(StructKeyExists(local, "rv")){
 			return local.rv;
-    }
+		}
 	}
 
 
