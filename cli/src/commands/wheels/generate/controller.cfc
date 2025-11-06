@@ -25,7 +25,7 @@ component aliases="wheels g controller" extends="../base" {
      */
     function run(
         required string name,
-        string actions = "",
+        string actions = "index",
         boolean crud = false,
         boolean api = false,
         boolean noViews = false,
@@ -52,7 +52,9 @@ component aliases="wheels g controller" extends="../base" {
         
         // Parse actions - PRIORITY: --actions > --crud > --api > default
         var actionList = [];
-        if (len(arguments.actions)) {
+        var hasCustomActions = (arguments.actions != "index"); // Check if user provided custom actions
+
+        if (hasCustomActions) {
             // HIGHEST PRIORITY: Custom actions specified
             actionList = listToArray(arguments.actions);
         } else if (arguments.crud) {
@@ -89,41 +91,36 @@ component aliases="wheels g controller" extends="../base" {
             if (!arguments.api && !arguments.noViews) {
                 detailOutput.invoke("views");
 
-                // For CRUD controllers, generate scaffold-style views (index, show, new, edit, _form)
-                if (arguments.crud && !len(arguments.actions)) {
-                    var viewActions = ["index", "show", "new", "edit", "_form"];
+                // Determine which views to generate based on priority
+                var viewActions = [];
 
-                    for (var action in viewActions) {
-                        var viewResult = codeGenerationService.generateView(
-                            name = arguments.name,
-                            action = action,
-                            force = arguments.force,
-                            baseDirectory = getCWD()
-                        );
-
-                        if (viewResult.success) {
-                            detailOutput.create(viewResult.path, true);
-                            viewsCreated++;
-                        }
-                    }
+                if (hasCustomActions) {
+                    // HIGHEST PRIORITY: Custom actions specified - generate views for those actions only
+                    viewActions = actionList;
+                } else if (arguments.crud) {
+                    // CRUD: Generate scaffold-style views (index, show, new, edit, _form)
+                    viewActions = ["index", "show", "new", "edit", "_form"];
                 } else {
-                    // For custom actions or default, generate views for all actions in the action list
-                    for (var action in actionList) {
-                        var viewResult = codeGenerationService.generateView(
-                            name = arguments.name,
-                            action = action,
-                            force = arguments.force,
-                            baseDirectory = getCWD()
-                        );
+                    // Default: Generate views for actions in the action list
+                    viewActions = actionList;
+                }
 
-                        if (viewResult.success) {
-                            detailOutput.create(viewResult.path, true);
-                            viewsCreated++;
-                        }
+                // Generate views for determined actions
+                for (var action in viewActions) {
+                    var viewResult = codeGenerationService.generateView(
+                        name = arguments.name,
+                        action = action,
+                        force = arguments.force,
+                        baseDirectory = getCWD()
+                    );
+
+                    if (viewResult.success) {
+                        detailOutput.create(viewResult.path, true);
+                        viewsCreated++;
                     }
                 }
             }
-            
+
             // Show next steps
             var nextSteps = [
                 "Review the generated controller at #result.path#",
