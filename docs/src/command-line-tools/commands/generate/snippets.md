@@ -467,7 +467,7 @@ wheels generate snippets api-controller --output=file --path=app/controllers/Api
 
 ### Customization Options
 ```bash
-wheels generate snippets --customize
+wheels generate snippets [pattern] --customize
 ```
 
 Shows available customization options for snippets.

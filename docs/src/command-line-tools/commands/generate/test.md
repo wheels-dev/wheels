@@ -19,12 +19,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - All positional: `wheels generate test model User`
 - All positional + flags: `wheels generate test model User --crud --factory`
 - All named: `type=model target=User crud=true`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional + named: `wheels generate test model target=User` (causes error)
 
 **Recommendation:** Use positional for type/target, flags for options: `wheels generate test model User --crud --factory`
@@ -452,6 +452,7 @@ component extends="wheels.Testbox" {
 }
 ```
 
+**Key Features:**
 - JSON request/response handling with `serializeJSON()` and `deserializeJSON()`
 - Content-Type and Accept headers
 - Authentication testing placeholders

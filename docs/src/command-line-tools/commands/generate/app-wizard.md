@@ -164,20 +164,20 @@ Sound good? [y/n]
 The `skipInstall` parameter significantly changes the wizard experience:
 
 ### When skipInstall=false (default)
-- ✅ Asks about H2 database setup (if using Lucee)
-- ✅ Asks about Bootstrap dependencies
-- ✅ Shows "Dependencies" section
-- ✅ Includes dependency settings in summary table
-- ✅ Installs dependencies after app creation
+- Asks about H2 database setup (if using Lucee)
+- Asks about Bootstrap dependencies
+- Shows "Dependencies" section
+- Includes dependency settings in summary table
+- Installs dependencies after app creation
 
 ### When skipInstall=true
-- ❌ **Skips** H2 database question (even with Lucee)
-- ❌ **Skips** Bootstrap dependency question
-- ✅ Shows "Dependencies Skipped" message with explanation
-- ✅ Excludes dependency settings from summary table
-- ✅ Still asks about package initialization (`box.json` creation)
-- ✅ Still asks about core configuration (name, template, passwords, etc.)
-- ❌ **Skips** dependency installation after app creation
+- **Skips** H2 database question (even with Lucee)
+- **Skips** Bootstrap dependency question
+- Shows "Dependencies Skipped" message with explanation
+- Excludes dependency settings from summary table
+- Still asks about package initialization (`box.json` creation)
+- Still asks about core configuration (name, template, passwords, etc.)
+- **Skips** dependency installation after app creation
 
 ### Dependencies Skipped Message
 ```

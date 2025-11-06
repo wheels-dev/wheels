@@ -48,12 +48,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - All positional: `wheels generate api-resource products`
 - All named: `name=products version="v2" auth=true`
 - Positional + flags: `wheels generate api-resource products --auth --skipModel`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional + named: `wheels generate api-resource products version="v2"` (causes error)
 
 **Recommendation:** Use positional for name + flags for options: `wheels generate api-resource products --auth --version=v2`
