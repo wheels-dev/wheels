@@ -31,7 +31,7 @@ This command supports multiple parameter formats:
 
 ## Description
 
-The `wheels generate test` command creates test files for various components of your Wheels application using TestBox 5 BDD syntax. All generated tests use standard CFML `cfhttp()` for HTTP testing and proper Wheels `model()` syntax, ensuring compatibility and reliability.
+The `wheels generate test` command creates test files for various components of your Wheels application using TestBox 6 BDD syntax. All generated tests use standard CFML `cfhttp()` for HTTP testing and proper Wheels `model()` syntax, ensuring compatibility and reliability.
 
 ## Arguments
 
@@ -66,16 +66,11 @@ The command generates different test structures based on the type:
 
 ## Examples
 
-### Basic Model Test
-
-Generate a basic model test with validation and association tests:
+### Model Tests
 
 ```bash
-# Positional (recommended)
+# Basic model test
 wheels generate test model User
-
-# OR all named
-wheels g test type=model target=User
 ```
 
 **Output:** `tests/specs/models/UserSpec.cfc`
@@ -115,11 +110,8 @@ component extends="wheels.Testbox" {
 Generate a model test with create, read, update, delete operations:
 
 ```bash
-# Positional + flag (recommended)
+# With CRUD operations
 wheels generate test model Product --crud
-
-# OR all named
-wheels g test type=model target=Product crud=true
 ```
 
 **Output:** `tests/specs/models/ProductSpec.cfc`
@@ -141,15 +133,12 @@ it("should create a new product", function() {
 });
 ```
 
-### Model Test with Factory Pattern
-
-Generate tests using `model().create()` for test data:
-
+# With factory pattern for test data
 ```bash
 wheels generate test model Order --crud --factory
 ```
 
-**Output:** `tests/specs/models/OrderSpec.cfc`
+**Output:** `tests/specs/models/UserSpec.cfc`
 
 **Generated Code:**
 ```cfc
@@ -168,11 +157,16 @@ it("should create a new order", function() {
 });
 ```
 
-### Basic Controller Test
+**Key Features:**
+- Validation testing with `model().new()` and `valid()`
+- Association testing
+- CRUD operations: `model().create()`, `findByKey()`, `save()`, `delete()` (with `--crud`)
+- Factory pattern for reusable test data (with `--factory`)
 
-Generate HTTP-based controller tests:
+### Controller Tests
 
 ```bash
+# Basic controller test
 wheels generate test controller Users
 ```
 
@@ -200,15 +194,12 @@ component extends="wheels.Testbox" {
 }
 ```
 
-### Controller Test with CRUD Actions
-
-Generate full CRUD controller tests via HTTP:
-
+# With CRUD actions
 ```bash
 wheels generate test controller Products --crud
 ```
 
-**Output:** `tests/specs/controllers/ProductsControllerSpec.cfc`
+**Output:** `tests/specs/controllers/UsersControllerSpec.cfc`
 
 **Contains:**
 - `it("should list all products (index action)")` - Tests GET `/products`
@@ -234,11 +225,16 @@ it("should create a new product (create action)", function() {
 });
 ```
 
-### View Test
+**Key Features:**
+- HTTP-based testing using `cfhttp()`
+- Tests for index, show, create, update, delete actions (with `--crud`)
+- Response status code assertions
+- Content verification
 
-Generate view rendering tests:
+### View Tests
 
 ```bash
+# View rendering test
 wheels generate test view users edit
 ```
 
@@ -274,11 +270,15 @@ component extends="wheels.Testbox" {
 }
 ```
 
-### Unit Test
+**Key Features:**
+- HTTP-based rendering tests
+- Status code verification
+- HTML content assertions
 
-Generate unit tests for custom services/libraries:
+### Unit Tests
 
 ```bash
+# Basic unit test
 wheels generate test unit OrderProcessor
 ```
 
@@ -315,15 +315,12 @@ component extends="wheels.Testbox" {
 }
 ```
 
-### Unit Test with Mock Examples
-
-Generate unit tests with MockBox mocking examples:
-
+# With mocking examples
 ```bash
 wheels generate test unit PaymentService --mock
 ```
 
-**Output:** `tests/specs/unit/PaymentServiceSpec.cfc`
+**Output:** `tests/specs/unit/OrderProcessorSpec.cfc`
 
 **Additional Mock Test:**
 ```cfc
@@ -335,11 +332,16 @@ it("should work with mocked dependencies", function() {
 });
 ```
 
-### Integration Test
+**Key Features:**
+- Direct component instantiation
+- Edge case testing
+- Error handling tests
+- MockBox examples (with `--mock`)
 
-Generate end-to-end workflow tests:
+### Integration Tests
 
 ```bash
+# End-to-end workflow test
 wheels generate test integration CheckoutFlow --crud
 ```
 
@@ -348,7 +350,6 @@ wheels generate test integration CheckoutFlow --crud
 **Generated Code:**
 ```cfc
 component extends="wheels.Testbox" {
-
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
     }
@@ -389,11 +390,15 @@ component extends="wheels.Testbox" {
 }
 ```
 
-### API Test
+**Key Features:**
+- Multi-step workflow testing
+- Complete user journey via HTTP
+- Performance timing assertions
 
-Generate API endpoint tests with JSON handling:
+### API Tests
 
 ```bash
+# API endpoint tests with JSON
 wheels generate test api Users --crud
 ```
 
@@ -447,83 +452,34 @@ component extends="wheels.Testbox" {
 }
 ```
 
-### Force Overwrite
+- JSON request/response handling with `serializeJSON()` and `deserializeJSON()`
+- Content-Type and Accept headers
+- Authentication testing placeholders
+- RESTful status code assertions (200, 201, 401, etc.)
 
-Overwrite existing test files without confirmation:
+### Additional Options
 
 ```bash
+# Force overwrite existing files
 wheels generate test model User --force
-```
 
-**Effect:** Overwrites `tests/specs/models/UserSpec.cfc` without prompting.
-
-### Generate and Open
-
-Create test and open in default editor:
-
-```bash
+# Generate and open in editor
 wheels generate test controller Products --crud --open
 ```
 
-**Effect:** Creates test file and opens it in your system's default `.cfc` file editor.
-
-## Generated Test Features
+## Generated Test Structure
 
 All generated tests include:
 
-- **TestBox 5 BDD Syntax**: Modern `describe()` and `it()` syntax
-- **Proper Lifecycle Methods**: `beforeAll()`, `beforeEach()`, `afterEach()` hooks
-- **HTTP-Based Testing**: Uses `cfhttp()` for controller, view, integration, and API tests
-- **Model Testing**: Uses `model().new()`, `model().create()`, and `model().findByKey()`
-- **CRUD Operations**: Complete create, read, update, delete test cases (with `--crud`)
-- **Factory Pattern**: Test data creation using `model().create()` (with `--factory`)
-- **Mock Examples**: MockBox stub examples (with `--mock`)
-- **JSON Handling**: `serializeJSON()` and `deserializeJSON()` for API tests
-- **Placeholder Comments**: Helpful comments guiding test implementation
-
-## Common Test Patterns
-
-### Model Validation Testing
-```cfc
-it("should validate required fields", function() {
-    expect(user.valid()).toBe(false);
-    expect(user.errors).toHaveKey("email");
-});
-```
-
-### Model CRUD Testing
-```cfc
-it("should create a new user", function() {
-    var user = model("User").create({
-        email = "test@example.com",
-        firstName = "Test"
-    });
-    expect(user.id).toBeGT(0);
-});
-```
-
-### HTTP Controller Testing
-```cfc
-it("should return 200 status", function() {
-    cfhttp(url = "#baseUrl#/users", method = "GET", result = "response");
-    expect(response.status_code).toBe(200);
-});
-```
-
-### API JSON Testing
-```cfc
-it("should return valid JSON", function() {
-    cfhttp(url = "#apiUrl#/users", method = "GET", result = "response") {
-        cfhttpparam(type = "header", name = "Accept", value = "application/json");
-    }
-    var data = deserializeJSON(response.filecontent);
-    expect(data).toHaveKey("data");
-});
-```
+- **TestBox 6 BDD Syntax**: Modern `describe()` and `it()` syntax
+- **Lifecycle Methods**: `beforeAll()`, `beforeEach()`, `afterEach()` hooks
+- **Proper Testing Patterns**:
+  - Models: `model().new()`, `model().create()`, `findByKey()`
+  - Controllers/Views/Integration: `cfhttp()` with status code assertions
+  - APIs: JSON serialization with proper headers
+- **Helpful Placeholders**: Comments guiding implementation
 
 ## Running Tests
-
-Run the generated tests using the Wheels test command:
 
 ```bash
 # Run all tests
@@ -538,7 +494,7 @@ wheels test run --coverage
 
 ## Best Practices
 
-1. **Fill in Test Attributes**: Generated tests include `// Add test attributes` comments - replace with actual model attributes
+1. **Fill in Test Attributes**: Replace `// Add test attributes` comments with actual model attributes
 2. **Customize Assertions**: Add specific assertions for your application's business logic
 3. **Use Factory Pattern**: Use `--factory` flag for tests requiring multiple similar objects
 4. **Test Edge Cases**: Add tests for empty values, null inputs, boundary conditions
