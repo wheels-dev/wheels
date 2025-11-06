@@ -1,3 +1,0 @@
-<cfoutput>
-<!--- CLI-Appends-Here --->
-</cfoutput>

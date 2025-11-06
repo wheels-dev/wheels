@@ -95,8 +95,6 @@ Creates a required string property with maximum 50 characters.
 
 ## What the Command Does
 
-The `wheels generate property` command performs these actions:
-
 1. **Creates Database Migration**: Generates a migration file to add the column to the database
 2. **Updates Form View**: Adds the property to `_form.cfm` if it exists
 3. **Updates Index View**: Adds the property to `index.cfm` table if it exists
@@ -106,7 +104,7 @@ The `wheels generate property` command performs these actions:
 ## Generated Files
 
 ### Database Migration
-**File**: `app/migrator/migrations/[timestamp]_add_[columnName]_to_[tableName].cfc`
+**File**: `app/migrator/migrations/[timestamp]_create_column__[tableName]_[columnName].cfc`
 
 ```cfc
 component extends="wheels.migrator.Migration" {
@@ -132,84 +130,31 @@ component extends="wheels.migrator.Migration" {
 ```
 
 ### View Updates
+When views exist, the command adds the new property:
 
-When views exist, the command adds the new property to them:
-
-**Form View** (`_form.cfm`): Adds appropriate input field
+**Form View**: Adds appropriate input field
 ```cfm
-<!-- Added to _form.cfm -->
 #textField(objectName="user", property="firstName")#
 ```
 
-**Index View** (`index.cfm`): Adds column to table
+**Index View**: Adds column to table
 ```cfm
-<!-- Added to table header -->
 <th>First Name</th>
-
-<!-- Added to table body -->
 <td>#user.firstName#</td>
 ```
 
-**Show View** (`show.cfm`): Adds property display
+**Show View**: Adds property display
 ```cfm
-<!-- Added to show.cfm -->
 <p><strong>First Name:</strong> #user.firstName#</p>
 ```
 
-## Special Behaviors
-
-### Boolean Default Values
-When adding boolean properties without a default value, the command automatically sets `default=0`:
-```bash
-wheels generate property name=User columnName=isActive --dataType=boolean
-# Automatically gets default=0
-```
-
-### Model File Check
-The command checks if the corresponding model file exists and asks for confirmation if it doesn't:
-```
-Hold On! We couldn't find a corresponding Model at /app/models/User.cfc:
-are you sure you wish to add the property 'email' to users? [y/n]
-```
-
-### Lowercase Column Names
-Column names are automatically converted to lowercase in migrations (following Wheels conventions):
-```bash
-# Input: columnName=firstName
-# Migration: columnName=firstname
-```
-
-## Command Workflow
-
-1. **Validation**: Checks if model file exists (optional)
-2. **Migration**: Creates database migration using `wheels dbmigrate create column`
-3. **Form Update**: Adds form field to `_form.cfm` (if exists)
-4. **Index Update**: Adds column to `index.cfm` table (if exists)
-5. **Show Update**: Adds property display to `show.cfm` (if exists)
-6. **Migration Prompt**: Asks if you want to run migration immediately
-
-## Troubleshooting
-
-### Property Not Added to Views
-- Check that view files exist (`_form.cfm`, `index.cfm`, `show.cfm`)
-- View files must be in `/app/views/[modelPlural]/` directory
-
-### Migration Fails
-- Ensure model name matches existing table
-- Check that column doesn't already exist
-- Verify database permissions
-
-### Boolean Values
-- Boolean properties automatically get `default=0` if no default specified
-- Use `--default=1` for true default values
-
 ## Best Practices
 
-1. **Run migrations immediately** when prompted to keep database in sync
-2. **Use semantic names** for properties (firstName, not fname)
-3. **Set appropriate defaults** for boolean and numeric fields
-4. **Consider null constraints** based on business logic
-5. **Add one property at a time** for better change tracking
+1. Run migrations immediately when prompted
+2. Use semantic property names (firstName, not fname)
+3. Set appropriate defaults for boolean and numeric fields
+4. Consider null constraints based on business logic
+5. Add one property at a time for better change tracking
 
 ## See Also
 
