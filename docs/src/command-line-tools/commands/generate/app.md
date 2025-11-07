@@ -9,7 +9,6 @@ Create a new Wheels application from templates.
 ```bash
 wheels generate app [name] [template] [directory] [options]
 wheels g app [name] [template] [directory] [options]
-wheels new [name] [template] [directory] [options]
 ```
 
 ## CommandBox Parameter Syntax
@@ -48,7 +47,7 @@ The `wheels generate app` command creates a new Wheels application with a comple
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `reloadPassword` | Set reload password | `''` (empty) |
+| `reloadPassword` | Set reload password | (empty) |
 | `datasourceName` | Database datasource name | App name |
 | `cfmlEngine` | CFML engine (lucee/adobe/boxlang) | `lucee` |
 | `--useBootstrap` | Include Bootstrap CSS | `false` |
@@ -102,86 +101,77 @@ wheels generate app blog
 wheels g app name=blog
 ```
 
-### Create with custom template
-```bash
-# Positional (recommended)
-wheels generate app api HelloDynamic
-
-# OR all named
-wheels g app name=api template=HelloDynamic
-```
-
 ### Create in specific directory
 ```bash
 # Positional + named (recommended)
 wheels generate app myapp --directory=./projects/
-
-# OR all named
-wheels g app name=myapp directory=./projects/
 ```
 
 ### Create with Bootstrap
 ```bash
 # Positional + flag (recommended)
 wheels generate app portfolio --useBootstrap
-
-# OR all named
-wheels g app name=portfolio useBootstrap=true
 ```
 
 ### Create with H2 database (default is true)
 ```bash
 # Positional + flag (recommended)
 wheels generate app demo --setupH2
-
-# OR all named
-wheels g app name=demo setupH2=true
 ```
 
 ### Create with all options
 ```bash
 # Positional + flags (recommended)
-wheels generate app enterprise --template=HelloDynamic --directory=./apps/ \
-  --reloadPassword=secret \
-  --datasourceName=enterprise_db \
-  --cfmlEngine=adobe \
-  --useBootstrap \
-  --setupH2
-
-# OR all named
-wheels g app name=enterprise template=HelloDynamic directory=./apps/ \
-  reloadPassword=secret \
-  datasourceName=enterprise_db \
-  cfmlEngine=adobe \
-  useBootstrap=true \
-  setupH2=true
+wheels generate app enterprise --template=HelloDynamic --directory=./apps/ --reloadPassword=secret --datasourceName=enterprise_db --cfmlEngine=adobe --useBootstrap --setupH2
 ```
 
 ## Generated Structure
 
 ```
 myapp/
-├── .wheels-cli.json      # CLI configuration
-├── box.json              # Dependencies
-├── server.json           # Server configuration
-├── Application.cfc       # Application settings
+├── .gitignore              # Github gitignore file
+├── box.json                # Dependencies
+├── server.json             # Server configuration
+├── README.md               # Description about application
 ├── config/
-│   ├── app.cfm          # App configuration
-│   ├── routes.cfm       # URL routes
-│   └── settings.cfm     # Framework settings
-├── controllers/
-│   └── Main.cfc         # Default controller
-├── models/
-├── views/
-│   ├── layout.cfm       # Default layout
-│   └── main/
-│       └── index.cfm    # Home page
+│   ├── development/
+│   │   └── settings.cfm    # Environment specific settings
+│   ├── maintenance/
+│   │   └── settings.cfm    # Environment specific settings
+│   ├── production/
+│   │   └── settings.cfm    # Environment specific settings
+│   ├── testing/
+│   │   └── settings.cfm    # Environment specific settings
+│   ├── app.cfm             # App configuration
+│   ├── routes.cfm          # URL routes
+│   ├── environment.cfm     # Environment
+│   └── settings.cfm        # Framework settings
+├── app/
+│   ├── controllers/
+│   │   └── Controller.cfc  # Default controller
+│   ├── events/             # Default event handlers
+│   ├── migrator/           # Contains migrations
+│   ├── models/
+│   │   └── Model.cfc       # Default model
+│   ├── snippets/
+│   ├── views/
+│   │   ├── helpers.cfm     # Default helpers
+│   │   └── layout.cfm       # Default layout
 ├── public/
+│   ├── files/
 │   ├── stylesheets/
 │   ├── javascripts/
-│   └── images/
+│   ├── images/
+│   ├── miscellaneous/
+│   ├── Application.cfc     # Application settings
+│   ├── index.cfm           # Home page
+│   └── urlrewrite.xml       
+├── plugins/
 ├── tests/
-└── wheels/              # Framework files
+└── vendor/                 # Framework files
+    ├── testbox/
+    ├── wheels/
+    └── wirebox/
 ```
 
 ## Configuration Files
@@ -191,8 +181,16 @@ myapp/
 {
   "name": "myapp",
   "version": "1.0.0",
+  "author": "Wheels Core Team and Community",
+  "installPaths": {
+    "wheels-core": "vendor/wheels/",
+    "wirebox": "vendor/wirebox/",
+    "testbox": "vendor/testbox/"
+  },
   "dependencies": {
-    "wheels": "^2.5.0"
+    "wheels-core": "3.0.0",
+    "wirebox": "^7",
+    "testbox": "^6",
   }
 }
 ```
@@ -200,83 +198,32 @@ myapp/
 ### server.json
 ```json
 {
-  "web": {
-    "http": {
-      "port": 3000
+    "name":"myapp",
+    "web":{
+        "host":"localhost",
+        "webroot":"public",
+        "rewrites":{
+            "enable":true,
+            "config":"public/urlrewrite.xml"
+        }
+    },
+    "app":{
+        "cfengine":"lucee",
+        "libDirs":"app/lib"
     }
-  },
-  "app": {
-    "cfengine": "lucee5"
-  }
 }
 ```
 
-### .wheels-cli.json
+### Configure Custom Port in server.json
 ```json
 {
-  "name": "myapp",
-  "version": "1.0.0",
-  "framework": "wheels",
-  "reload": "wheels"
+  "web": {
+    "http": {
+      "enable":true,
+      "port":"3000"
+    }
+  }
 }
-```
-
-## Database Setup
-
-### With H2 (Embedded)
-```bash
-wheels generate app myapp
-```
-- H2 is setup by default (--setupH2=true)
-- No external database needed
-- Perfect for development
-- Auto-configured datasource
-- To disable: `--setupH2=false`
-
-### With External Database
-1. Create application:
-   ```bash
-   wheels generate app myapp datasourceName=myapp_db --setupH2=false
-   ```
-
-2. Configure in CommandBox:
-   ```bash
-   server set app.datasources.myapp_db={...}
-   ```
-
-## Post-Generation Steps
-
-1. **Navigate to directory**
-   ```bash
-   cd myapp
-   ```
-
-2. **Install dependencies**
-   ```bash
-   box install
-   ```
-
-3. **Start server**
-   ```bash
-   box server start
-   ```
-
-4. **Open browser**
-   ```
-   http://localhost:3000
-   ```
-
-## Template Development
-
-Create custom templates in `~/.commandbox/cfml/modules/wheels-cli/templates/apps/`:
-
-```
-mytemplate/
-├── config/
-├── controllers/
-├── models/
-├── views/
-└── template.json
 ```
 
 ## Best Practices
