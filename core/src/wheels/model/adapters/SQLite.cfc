@@ -122,7 +122,7 @@ component extends="Base" output=false {
 	 * Default VALUES syntax (same as MySQL).
 	 */
 	public string function $defaultValues() {
-		return "() VALUES()";
+		return " DEFAULT VALUES";
 	}
 
 }
