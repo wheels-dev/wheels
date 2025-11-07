@@ -214,18 +214,18 @@ mailer.#methodList[1]#(to="user@example.com", subject="Welcome!");', "cfscript")
      * Create test file for mailer
      */
     private void function createMailerTest(required string mailerName, required array methods) {
-        var testsDir = helpers.getTestPath() & "/mailers";
-        
+        var testsDir = helpers.getTestPath() & "/specs/mailers";
+
         if (!directoryExists(testsDir)) {
-            directoryCreate(testsDir);
+            directoryCreate(testsDir, true);
         }
-        
-        var testPath = testsDir & "/" & mailerName & "Test.cfc";
-        
+
+        var testPath = testsDir & "/" & mailerName & "Spec.cfc";
+
         if (!fileExists(testPath)) {
             var testContent = generateMailerTest(mailerName, methods);
             fileWrite(testPath, testContent);
-            detailOutput.output("Created test: /tests/mailers/#mailerName#Test.cfc");
+            detailOutput.output("Created test: /tests/specs/mailers/#mailerName#Spec.cfc");
         }
     }
     

@@ -34,14 +34,19 @@ component aliases="wheels plugin search" extends="../base" {
              .boldCyanLine("===========================================================")
              .boldCyanLine("  Searching ForgeBox for Wheels Plugins")
              .boldCyanLine("===========================================================")
-             .line();
+             .line()
+             .console();
 
         if (len(arguments.query)) {
             print.line("Search term: #arguments.query#")
-                 .line();
+                 .line().console();
         }
 
-        // try {
+        try {
+            print.line("Searching, Please wait ...")
+                 .line()
+                 .toConsole();
+
             // Use forgebox show command to get all cfwheels-plugins
             var forgeboxResult = command('forgebox show')
                 .params(type='cfwheels-plugins')
@@ -109,12 +114,15 @@ component aliases="wheels plugin search" extends="../base" {
                 }
             }
 
+            print.line()
+                 .toConsole();
+
             if (!arrayLen(results)) {
                 print.yellowLine("No plugins found" & (len(arguments.query) ? " matching '#arguments.query#'" : ""))
                      .line()
                      .line("Try:")
                      .cyanLine("  wheels plugin search <different-keyword>")
-                     .cyanLine("  wheels plugin list --available");
+                     .cyanLine("  wheels plugin list --available").console();
                 return;
             }
 
@@ -146,13 +154,17 @@ component aliases="wheels plugin search" extends="../base" {
 
                 // Calculate column widths
                 var maxNameLength = 20;
+                var maxSlugLength = 20;
                 var maxVersionLength = 10;
                 var maxDownloadsLength = 10;
-                var maxDescLength = 40;
+                var maxDescLength = 30;
 
                 for (var plugin in results) {
-                    if (len(plugin.slug) > maxNameLength) {
-                        maxNameLength = len(plugin.slug);
+                    if (len(plugin.name) > maxNameLength) {
+                        maxNameLength = len(plugin.name);
+                    }
+                    if (len(plugin.slug) > maxSlugLength) {
+                        maxSlugLength = len(plugin.slug);
                     }
                     if (len(plugin.version) > maxVersionLength) {
                         maxVersionLength = len(plugin.version);
@@ -164,16 +176,18 @@ component aliases="wheels plugin search" extends="../base" {
                 }
 
                 maxNameLength += 2;
+                maxSlugLength += 2;
                 maxVersionLength += 2;
                 maxDownloadsLength += 2;
 
                 // Print table header
                 print.boldText(padRight("Name", maxNameLength))
+                     .boldText(padRight("Slug", maxSlugLength))
                      .boldText(padRight("Version", maxVersionLength))
                      .boldText(padRight("Downloads", maxDownloadsLength))
                      .boldLine("Description");
 
-                print.line(repeatString("-", maxNameLength + maxVersionLength + maxDownloadsLength + maxDescLength));
+                print.line(repeatString("-", maxNameLength + maxSlugLength + maxVersionLength + maxDownloadsLength + maxDescLength));
 
                 // Display results
                 for (var plugin in results) {
@@ -182,7 +196,8 @@ component aliases="wheels plugin search" extends="../base" {
                         desc = left(desc, maxDescLength - 3) & "...";
                     }
 
-                    print.cyanText(padRight(plugin.slug, maxNameLength))
+                    print.boldText(padRight(plugin.name, maxNameLength))
+                         .cyanText(padRight(plugin.slug, maxSlugLength))
                          .greenText(padRight(plugin.version, maxVersionLength))
                          .yellowText(padRight(numberFormat(plugin.downloads ?: 0), maxDownloadsLength))
                          .line(desc);
@@ -196,14 +211,14 @@ component aliases="wheels plugin search" extends="../base" {
                      .cyanLine("  wheels plugin info <name>       View plugin details");
             }
 
-        // } catch (any e) {
-        //     print.line()
-        //          .boldRedText("[ERROR] ")
-        //          .redLine("Error searching for plugins")
-        //          .line()
-        //          .yellowLine("Error: #e.message#");
-        //     setExitCode(1);
-        // }
+        } catch (any e) {
+            print.line()
+                 .boldRedText("[ERROR] ")
+                 .redLine("Error searching for plugins")
+                 .line()
+                 .yellowLine("Error: #e.message#");
+            setExitCode(1);
+        }
     }
 
     /**

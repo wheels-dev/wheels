@@ -296,18 +296,18 @@ set(functionName = "includeHelpers", helper = "#arguments.name#");', "cfscript")
      * Create test file for helper
      */
     private void function createHelperTest(required string helperName, required array functions, required string type) {
-        var testsDir = helpers.getTestPath() & "/helpers";
-        
+        var testsDir = helpers.getTestPath() & "/specs/helpers";
+
         if (!directoryExists(testsDir)) {
-            directoryCreate(testsDir);
+            directoryCreate(testsDir, true);
         }
-        
-        var testPath = testsDir & "/" & helperName & "Test.cfc";
-        
+
+        var testPath = testsDir & "/" & helperName & "Spec.cfc";
+
         if (!fileExists(testPath)) {
             var testContent = generateHelperTest(helperName, functions, type);
             fileWrite(testPath, testContent);
-            detailOutput.output("Created test: /tests/helpers/#helperName#Test.cfc");
+            detailOutput.output("Created test: /tests/specs/helpers/#helperName#Spec.cfc");
         }
     }
     

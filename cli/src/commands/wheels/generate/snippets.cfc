@@ -21,7 +21,7 @@ component aliases="wheels g snippets" extends="../base" {
      * @force.hint Overwrite existing files
      */
     function run(
-        string pattern = "",
+        required string pattern,
         boolean list = false,
         string category = "",
         string output = "console",
@@ -30,6 +30,7 @@ component aliases="wheels g snippets" extends="../base" {
         boolean create = false,
         boolean force = false
     ) {
+        requireWheelsApp(getCWD());
         arguments = reconstructArgs(
             argStruct=arguments,
             allowedValues={
@@ -134,8 +135,11 @@ component aliases="wheels g snippets" extends="../base" {
      * Write snippet to file
      */
     private function writeSnippetToFile(required struct snippet, required string path, boolean force = false) {
-        if (fileExists(arguments.path) && !arguments.force) {
-            detailOutput.error("File already exists: #arguments.path#");
+        // Resolve path relative to application directory
+        var resolvedPath = fileSystemUtil.resolvePath(arguments.path);
+
+        if (fileExists(resolvedPath) && !arguments.force) {
+            detailOutput.error("File already exists: #resolvedPath#");
             detailOutput.getPrint().line("Use --force to overwrite");
             setExitCode(1);
             return;
@@ -144,13 +148,13 @@ component aliases="wheels g snippets" extends="../base" {
         var content = getSnippetContent(arguments.snippet);
 
         // Create directory if needed
-        var dir = getDirectoryFromPath(arguments.path);
+        var dir = getDirectoryFromPath(resolvedPath);
         if (!directoryExists(dir)) {
             directoryCreate(dir, true);
         }
 
-        fileWrite(arguments.path, content);
-        detailOutput.create("Created: #arguments.path#");
+        fileWrite(resolvedPath, content);
+        detailOutput.create("Created: #resolvedPath#");
     }
 
     /**

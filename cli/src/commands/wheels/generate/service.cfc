@@ -255,18 +255,18 @@ property name="#lCase(left(arguments.name, len(arguments.name)-7))#Service" inje
      * Create test file for service
      */
     private void function createServiceTest(required string serviceName, required array methods) {
-        var testsDir = helpers.getTestPath() & "/services";
-        
+        var testsDir = helpers.getTestPath() & "/specs/services";
+
         if (!directoryExists(testsDir)) {
-            directoryCreate(testsDir);
+            directoryCreate(testsDir, true);
         }
-        
-        var testPath = testsDir & "/" & serviceName & "Test.cfc";
-        
+
+        var testPath = testsDir & "/" & serviceName & "Spec.cfc";
+
         if (!fileExists(testPath)) {
             var testContent = generateServiceTest(serviceName, methods);
             fileWrite(testPath, testContent);
-            detailOutput.output("Created test: /tests/services/#serviceName#Test.cfc");
+            detailOutput.output("Created test: /tests/specs/services/#serviceName#Spec.cfc");
         }
     }
     

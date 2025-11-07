@@ -274,18 +274,18 @@ job.enqueueAt(datetime: dateAdd("h", 1, now()), data: data);', "cfscript");
      * Create test file for job
      */
     private void function createJobTest(required string jobName) {
-        var testsDir = helpers.getTestPath() & "/jobs";
-        
+        var testsDir = helpers.getTestPath() & "/specs/jobs";
+
         if (!directoryExists(testsDir)) {
-            directoryCreate(testsDir);
+            directoryCreate(testsDir, true);
         }
-        
-        var testPath = testsDir & "/" & jobName & "Test.cfc";
-        
+
+        var testPath = testsDir & "/" & jobName & "Spec.cfc";
+
         if (!fileExists(testPath)) {
             var testContent = generateJobTest(jobName);
             fileWrite(testPath, testContent);
-            detailOutput.output("Created test: /tests/jobs/#jobName#Test.cfc");
+            detailOutput.output("Created test: /tests/specs/jobs/#jobName#Spec.cfc");
         }
     }
     
