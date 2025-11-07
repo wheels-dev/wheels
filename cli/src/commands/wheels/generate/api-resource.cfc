@@ -47,9 +47,22 @@ component aliases='wheels g api-resource' extends="../base" {
         arguments = reconstructArgs(
             argStruct=arguments,
             allowedValues={
-                format: ["json", "xml"]
+                format=["json", "xml"]
             }
         );
+
+        // Validate resource name using centralized validation
+        var validation = codeGenerationService.validateName(listLast(arguments.name, "/"), "controller");
+        if (!validation.valid) {
+            detailOutput.error("Invalid resource name");
+            for (var err in validation.errors) {
+                detailOutput.getPrint().line("  - #err#");
+            }
+            detailOutput.getPrint().line("");
+            detailOutput.getPrint().line("Usage: wheels g api-resource <name>");
+            setExitCode(1);
+            return;
+        }
 
         detailOutput.header("", "Generating API resource: #arguments.name# (#arguments.namespace#/#arguments.version#)");
 
@@ -69,9 +82,16 @@ component aliases='wheels g api-resource' extends="../base" {
         // Create model if requested
         if (!arguments.skipModel) {
             detailOutput.invoke("model");
-            command("wheels generate model")
-                .params(name=local.obj.objectNameSingular, force=arguments.force)
-                .run();
+            try {
+                command("wheels generate model")
+                    .params(name=local.obj.objectNameSingular, force=arguments.force)
+                    .run();
+            } catch (any e) {
+                detailOutput.error("Failed to generate model: #e.message#");
+                detailOutput.getPrint().line("You can continue without a model using --skipModel");
+                setExitCode(1);
+                return;
+            }
         }
 
         // Generate API controller with advanced features

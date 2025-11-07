@@ -392,43 +392,57 @@ component {
         array methods = [],
         string baseDirectory = ""
     ) {
+        // Follow the standard pattern from 'wheels generate test'
         var testName = arguments.name;
-        if (!reFindNoCase("Test$", testName)) {
-            testName &= "Test";
-        }
-        
-        var testDir = "tests/";
+
+        // Determine test directory and naming convention based on type
+        var testDir = "tests/specs/";
+        var suffix = "";
+
         switch (arguments.type) {
             case "model":
                 testDir &= "models/";
+                suffix = "Spec";
                 break;
             case "controller":
                 testDir &= "controllers/";
+                suffix = "ControllerSpec";
                 break;
             case "view":
                 testDir &= "views/";
+                suffix = "ViewSpec";
                 break;
             default:
                 if (arguments.unit) {
                     testDir &= "unit/";
+                    suffix = "Spec";
                 } else if (arguments.integration) {
                     testDir &= "integration/";
+                    suffix = "IntegrationSpec";
+                } else {
+                    testDir &= "unit/";
+                    suffix = "Spec";
                 }
         }
-        
+
+        // Remove existing Test/Spec/ControllerSpec suffix if present
+        testName = reReplaceNoCase(testName, "(Test|Spec|ControllerSpec|ViewSpec|IntegrationSpec)$", "");
+        // Add the correct suffix
+        testName &= suffix;
+
         var fileName = testName & ".cfc";
         var filePath = resolvePath(testDir & fileName, arguments.baseDirectory);
-        
+
         // Create directory if needed
         var dir = resolvePath(testDir, arguments.baseDirectory);
         if (!directoryExists(dir)) {
             directoryCreate(dir, true);
         }
-        
+
         // Prepare template context
         var context = {
             testName: testName,
-            targetName: replaceNoCase(testName, "Test", ""),
+            targetName: reReplaceNoCase(testName, "(Spec|Test|ControllerSpec|ViewSpec|IntegrationSpec)$", ""),
             type: arguments.type,
             methods: arguments.methods,
             timestamp: dateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")
