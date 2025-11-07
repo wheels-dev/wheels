@@ -20,6 +20,7 @@ component extends="../base" {
 		string required = "",
 		boolean verbose = false
 	) {
+		requireWheelsApp(getCWD());
 		arguments = reconstructArgs(arguments);
 		
 		local.envFile = resolvePath(arguments.file);

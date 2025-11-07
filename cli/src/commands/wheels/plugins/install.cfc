@@ -19,7 +19,8 @@ component aliases="wheels plugin install" extends="../base" {
         boolean dev = false,
         string version = ""
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(argStruct=arguments);
 
         print.line()
              .boldCyanLine("===========================================================")

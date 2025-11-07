@@ -606,17 +606,4 @@ component aliases='wheels g test' extends="../base"  {
 		
 		return content;
 	}
-	
-	/**
-	 * Open a file path in the default editor
-	 */
-	private function openPath(required string path) {
-		if (shell.isWindows()) {
-			runCommand("start #arguments.path#");
-		} else if (shell.isMac()) {
-			runCommand("open #arguments.path#");
-		} else {
-			runCommand("xdg-open #arguments.path#");
-		}
-	}
 }

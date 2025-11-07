@@ -16,9 +16,13 @@ component aliases="wheels plugin outdated,wheels plugins outdated" extends="../b
     function run(
         string format = "table"
     ) {
-
-        // Reconstruct arguments to handle prefix (--)
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                format=["table", "json"]
+            }
+        );
         try {
             print.line()
                  .boldCyanLine("===========================================================")

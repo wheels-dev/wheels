@@ -21,7 +21,14 @@ component aliases="wheels plugin search" extends="../base" {
         string format = "table",
         string orderBy = "downloads"
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                format=["table", "json"],
+                orderBy=["name", "downloads", "updated"]
+            }
+        );
 
         print.line()
              .boldCyanLine("===========================================================")

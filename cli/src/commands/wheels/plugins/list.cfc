@@ -18,7 +18,13 @@ component aliases="wheels plugin list" extends="../base" {
         string format = "table",
         boolean available = false
     ) {
-        arguments = reconstructArgs(arguments);
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                format=["table", "json"]
+            }
+        );
 
         if (arguments.available) {
             // Show available plugins from ForgeBox

@@ -21,9 +21,15 @@ component aliases="wheels plugin init" extends="../base" {
         string version = "1.0.0",
         string license = "MIT"
     ) {
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(
+            argStruct=arguments,
+            allowedValues={
+                license=["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", "ISC", "Proprietary"]
+            }
+        );
+
         try {
-            // Reconstruct arguments to handle prefix (--)
-            arguments = reconstructArgs(arguments);
 
             // Ensure plugin name follows convention
             var pluginName = arguments.name;

@@ -19,6 +19,8 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
         boolean dryRun = false,
         boolean force = false
     ) {
+        requireWheelsApp(getCWD());
+        arguments = reconstructArgs(argStruct=arguments);
         try {
             print.line()
                  .boldCyanLine("===========================================================")

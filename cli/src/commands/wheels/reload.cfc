@@ -17,8 +17,8 @@ component aliases='wheels r'  extends="base"  {
 	 * @mode.options development,testing,maintenance,production
 	 * @password The reload password
 	 **/
-	function run(string mode="development", required string password) {
-
+	function run(string mode="development", string password="") {
+		arguments=reconstructArgs(arguments);
   		var serverDetails = $getServerInfo();
 
   		getURL = serverDetails.serverURL &
