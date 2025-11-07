@@ -721,6 +721,15 @@ component output="false" {
 			default:
 				Throw(type = "Wheels.InvalidTimeStampMode", message = "Timestamp mode #arguments.timeStampMode# is invalid");
 		}
+
+		// Handle SQLite (TEXT storage)
+		if (get("adapterName") == "SQLite") {
+			// Store as quoted ISO 8601 string (standard for SQLite)
+			if (IsDate(local.rv)) {
+				local.rv = "'#DateFormat(local.rv, 'yyyy-mm-dd')# #TimeFormat(local.rv, 'HH:mm:ss')#'";
+			}
+		}
+
 		return local.rv;
 	}
 

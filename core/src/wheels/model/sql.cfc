@@ -18,7 +18,13 @@ component {
 			} else {
 				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
 			}
-			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = "cf_sql_timestamp"};
+			// Use cf_sql_varchar in SQLite for TEXT timestamps
+			if(get("adapterName") eq "SQLite") {
+				local.type = "cf_sql_varchar";
+			} else {
+				local.type = "cf_sql_timestamp";
+			}
+			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = local.type};
 			ArrayAppend(arguments.sql, local.param);
 		} else {
 			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
