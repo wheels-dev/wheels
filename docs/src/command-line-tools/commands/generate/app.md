@@ -22,12 +22,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - All positional: `wheels generate app blog`
 - All positional + flags: `wheels generate app blog --useBootstrap --init`
 - All named: `name=blog template=HelloWorld --useBootstrap`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional + named: `wheels generate app blog name=myapp` (causes error)
 
 **Recommendation:** Use positional for name/template, flags for options: `wheels generate app blog --useBootstrap --init`
