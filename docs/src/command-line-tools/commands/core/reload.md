@@ -20,6 +20,13 @@ The `wheels reload` command reloads your Wheels application, clearing caches and
 | `mode` | Reload mode: `development`, `testing`, `maintenance`, `production` | `development` |
 | `password` |The reload password configured in your application | Empty |
 
+## Configuration
+
+Set the reload password in your Wheels `settings.cfm`:
+
+```cfml
+set(reloadPassword="mySecretPassword");
+```
 
 ## Reload Modes
 
@@ -56,41 +63,11 @@ wheels reload mode=production password=mypassword
 - Minimal error information
 - Optimized performance
 
-## Examples
-
-### Basic reload (development mode)
-```bash
-wheels reload password=wheels
-```
-
-### Reload in production mode
-```bash
-wheels reload mode=production password=mySecretPassword
-```
-
-### Using the alias
-```bash
-wheels r password=wheels
-```
-
-### Reload for testing
-```bash
-wheels reload mode=testing password=wheels
-```
-
 ## Security
 
 - The reload password must match the one configured in your Wheels application
 - Password is sent via URL parameter to the running application
 - Always use a strong password in production environments
-
-## Configuration
-
-Set the reload password in your Wheels `settings.cfm`:
-
-```cfml
-set(reloadPassword="mySecretPassword");
-```
 
 ## Notes
 

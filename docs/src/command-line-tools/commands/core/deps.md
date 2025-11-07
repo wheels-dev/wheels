@@ -16,7 +16,7 @@ The `wheels deps` command provides a streamlined interface for managing your Whe
 
 | Argument | Description | Default |
 |----------|-------------|---------|
-| `action` | **Required** - Action to perform: `list`, `install`, `update`, `remove`, `report` | None |
+| `action` | **Required** - Action to perform: `list`, `install`, `update`, `remove`, `report` | Required |
 | `name` | Package name (required for install/update/remove actions) | None |
 | `version` | Specific version to install (optional, for install action only) | Latest version |
 
@@ -44,12 +44,12 @@ Output shows:
 Example output:
 ```
 Dependencies:
-  cbvalidation @ ^4.6.0+28 (Production) - Not Installed
-  wirebox @ ^7.4.2+24 (Production) - Not Installed
-  shortcodes @ ^0.0.4 (Production) - Not Installed
+  wirebox @ ^7.0.0 (Production) - Installed
+  testbox @ ^6.0.0 (Production) - Installed
+  wheels-core @ ^3.0.0-SNAPSHOT.rc.1 (Production) - Installed
 
 Dev Dependencies:
-  testbox @ ^6.4.0+17 (Development) - Installed
+  shortcodes @ ^0.0.4 (Production) - Not Installed
 ```
 
 ### Install

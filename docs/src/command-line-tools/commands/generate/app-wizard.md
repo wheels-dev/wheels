@@ -18,7 +18,7 @@ CommandBox supports multiple parameter formats:
 
 - **Named parameters**: `name=value` (e.g., `name=MyApp`, `template=wheels-base-template@BE`)
 - **Flag parameters**: `--flag` equals `flag=true` (e.g., `--expert` equals `expert=true`)
-- **Flag with value**: `--flag=value` equals `flag=value` (e.g., `--skipInstall=true`)
+- **Param with value**: `--param=value` equals `param=value` (e.g., `--skipInstall=true`)
 
 **Note**: Flag syntax (`--flag`) avoids positional/named parameter conflicts and is recommended for boolean options.
 
@@ -26,17 +26,10 @@ CommandBox supports multiple parameter formats:
 
 The `wheels generate app-wizard` command provides an interactive, step-by-step wizard for creating a new Wheels application. It guides you through configuration options with helpful prompts, making it ideal for beginners or when you want to explore available options.
 
-## Arguments
-
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `name` | Application name (optional - will prompt if not provided) | Prompted |
-
 ## Options
 
 | Option | Description | Valid Values | Default |
 |--------|-------------|--------------|---------|
-| `template` | App template to use | ForgeBox endpoint or slug | `wheels-base-template@BE` |
 | `directory` | Directory to create app in | Valid directory path | `{current directory}/{name}` |
 | `reloadPassword` | Reload password for the app | Any string | `changeMe` |
 | `datasourceName` | Database datasource name | Valid datasource name | `{app name}` |
@@ -89,8 +82,11 @@ Please enter a datasource name if different from MyWheelsApp: MyWheelsApp
 Please select your preferred CFML engine?
 ❯ Lucee (Latest)
   Adobe ColdFusion (Latest)
+  BoxLang (Latest)
+  Lucee 7.x
   Lucee 6.x
   Lucee 5.x
+  Adobe ColdFusion 2025
   Adobe ColdFusion 2023
   Adobe ColdFusion 2021
   Adobe ColdFusion 2018
@@ -175,9 +171,6 @@ The `skipInstall` parameter significantly changes the wizard experience:
 - **Skips** Bootstrap dependency question
 - Shows "Dependencies Skipped" message with explanation
 - Excludes dependency settings from summary table
-- Still asks about package initialization (`box.json` creation)
-- Still asks about core configuration (name, template, passwords, etc.)
-- **Skips** dependency installation after app creation
 
 ### Dependencies Skipped Message
 ```
@@ -193,12 +186,6 @@ Dependencies like Bootstrap and H2 database will not be configured or installed.
 wheels generate app-wizard
 ```
 Runs full interactive wizard with all prompts.
-
-### Pre-configured App Name
-```bash
-wheels generate app-wizard name=MyApp
-```
-Skips name prompt, asks for other configuration.
 
 ### Skip All Dependencies
 ```bash
@@ -218,12 +205,6 @@ wheels generate app-wizard --nonInteractive
 ```
 Uses all defaults, no prompts. Creates app immediately.
 
-### Fully Configured
-```bash
-wheels generate app-wizard name=MyApp template=wheels-base-template@BE --skipInstall --expert --force
-```
-Pre-configured with expert mode and skipped dependencies.
-
 ## Expert Mode Options
 
 When `--expert` is enabled, additional configuration options are available:
@@ -238,7 +219,6 @@ When `--expert` is enabled, additional configuration options are available:
 
 ### Development Tools
 - **Custom plugin repositories**: Additional ForgeBox endpoints
-- **Build tool integration**: Ant, Gradle, Maven, or NPM integration
 
 ## Non-Interactive Mode
 
@@ -265,11 +245,10 @@ After successful creation:
 Model generation complete!
 
 Next steps:
-   1. cd MyWheelsApp
-   2. Review generated configuration files
-   3. Configure your datasource in CFML server admin
-   4. box server start (to start development server)
-   5. Visit http://localhost:8080
+   1. Review generated configuration files
+   2. Configure your datasource in CFML server admin
+   3. box server start (to start development server)
+   4. Visit http://localhost:8080
 
 Additional commands:
    - wheels generate model User name:string,email:string
@@ -321,28 +300,6 @@ Run 'box install' in your application directory to install them manually.
 4. **Expert mode for production**: Use `--expert` for production-ready configurations
 5. **Save time with non-interactive**: Use `--nonInteractive` in automated scripts
 6. **Template selection**: Choose templates that match your project requirements
-
-## Common Patterns
-
-### API-Only Application
-```bash
-wheels generate app-wizard name=MyAPI template=wheels-base-template@BE --skipInstall --expert
-```
-
-### Full-Stack Web Application
-```bash
-wheels generate app-wizard name=MyWebApp --useBootstrap --setupH2
-```
-
-### Team Development Setup
-```bash
-wheels generate app-wizard --nonInteractive name=TeamProject template=wheels-starter-app --cfmlEngine=lucee --force
-```
-
-### CI/CD Pipeline
-```bash
-wheels generate app-wizard --nonInteractive --skipInstall name=BuildApp template=wheels-base-template@BE
-```
 
 ## Troubleshooting
 
