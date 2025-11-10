@@ -497,6 +497,50 @@ component output="false" {
 	 * Internal function.
 	 */
 	public string function $convertToString(required any value, string type = "") {
+		// Normalize inputs
+		local.val = arguments.value;
+		local.detectedType = arguments.type;
+
+		// If no explicit type passed, try to detect a sensible one
+		if (!Len(detectedType)) {
+			if (IsArray(val)) {
+				detectedType = "array";
+			} else if (IsStruct(val)) {
+				detectedType = "struct";
+			} else if (IsBinary(val)) {
+				detectedType = "binary";
+			} else if (IsNumeric(val)) {
+				detectedType = "integer";
+			} else if (IsDate(val)) {
+				detectedType = "datetime";
+			} else {
+				detectedType = "string";
+			}
+		}
+
+		// --- EARLY DATE/TIME PROMOTION ---
+		// If the caller provided a non-datetime type (eg "string") but the value looks like a date/time,
+		// promote it to datetime so the switch branch will canonicalize properly.
+		if (
+			detectedType NEQ "datetime"
+			AND IsSimpleValue(val)
+			AND Len(Trim(val))
+		) {
+			local.s = Trim(val);
+
+			// Match patterns loosely so they work for plain dates too
+			local.patternAMPM  = '^\d{1,2}/\d{1,2}/\d{4}(\s+\d{1,2}:\d{2}(\s*(AM|PM))?)?$';
+			local.patternISO   = '^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$';
+			local.patternSlash = '^\s*\d{1,2}/\d{1,2}/\d{4}\s*$';
+
+
+			// Day name or other verbose formats are ignored to avoid false positives
+			if (ReFindNoCase(local.patternAMPM, local.s) OR ReFindNoCase(local.patternISO, local.s) OR ReFindNoCase(local.patternSlash, local.s)) {
+				// Promote to datetime so the datetime branch will run below
+				detectedType = "datetime";
+			}
+		}
+
 		// BoxLang compatibility: Pre-process problematic date strings before type detection
 		if (StructKeyExists(server, "boxlang") && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
 			// Manually parse DD/MM/YYYY format to avoid BoxLang's MM/DD/YYYY interpretation
@@ -507,7 +551,7 @@ component output="false" {
 			
 			local.dateComponents = ListToArray(local.datePart, "/");
 			local.timeComponents = ListToArray(local.timePart, ":");
-			
+
 			local.day = Val(local.dateComponents[1]);    // First = day (DD/MM/YYYY)
 			local.month = Val(local.dateComponents[2]);  // Second = month
 			local.year = Val(local.dateComponents[3]);
@@ -519,73 +563,124 @@ component output="false" {
 			} else if (local.amPm == "AM" && local.hour == 12) {
 				local.hour = 0;
 			}
-			arguments.value = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+			// convert to a real datetime object and continue (so switch will format it)
+			val = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+			// ensure detectedType is datetime so switch will format
+			detectedType = "datetime";
 		}
 
-		if (!Len(arguments.type)) {
-			if (IsArray(arguments.value)) {
-				arguments.type = "array";
-			} else if (IsStruct(arguments.value)) {
-				arguments.type = "struct";
-			} else if (IsBinary(arguments.value)) {
-				arguments.type = "binary";
-			} else if (IsNumeric(arguments.value)) {
-				arguments.type = "integer";
-			} else if (IsDate(arguments.value)) {
-				arguments.type = "datetime";
-			}
-		}
-		switch (arguments.type) {
+		// --- SWITCH ON (possibly promoted) TYPE ---
+		switch (detectedType) {
 			case "array":
-				arguments.value = ArrayToList(arguments.value);
-				break;
+				return ArrayToList(val);
+
 			case "struct":
-				local.str = "";
-				local.keyList = ListSort(StructKeyList(arguments.value), "textnocase", "asc");
-				local.keyArray = ListToArray(local.keyList);
-				local.iEnd = ArrayLen(local.keyArray);
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.key = local.keyArray[local.i];
-					local.str = ListAppend(local.str, local.key & "=" & arguments.value[local.key]);
+				local.kList = ListSort(StructKeyList(val), "textnocase", "asc");
+				local.out = "";
+				for (local.k in ListToArray(local.kList)) {
+					local.out = ListAppend(local.out, local.k & "=" & val[local.k]);
 				}
-				arguments.value = local.str;
-				break;
+				return local.out;
+
 			case "binary":
-				arguments.value = ToString(arguments.value);
-				break;
+				return ToString(val);
+
 			case "float":
 			case "integer":
-				if (!Len(arguments.value)) {
+				if (!Len(val)) {
 					return "";
 				}
-				if (arguments.value == "true") {
-					return 1;
+				if (val == "true") {
+					return "1";
 				}
-				arguments.value = Val(arguments.value);
-				break;
+				return Val(val);
+
 			case "boolean":
-				if (Len(arguments.value)) {
-					arguments.value = (arguments.value IS true);
+				if (Len(val)) {
+					return (val IS true) ? "true" : "false";
 				}
-				break;
+				return "";
+
 			case "datetime":
-				if(isInstanceOf(arguments.value, "oracle.sql.TIMESTAMP")){
-					arguments.value = arguments.value.timestampValue();
+				// If it's already a date object, canonicalize
+				if (IsDate(val)) {
+					return DateFormat(val, "yyyy-mm-dd") & " " & TimeFormat(val, "HH:mm:ss");
 				}
-				// createdatetime will throw an error
-				if (IsDate(arguments.value)) {
-					arguments.value = CreateDateTime(
-						Year(arguments.value),
-						Month(arguments.value),
-						Day(arguments.value),
-						Hour(arguments.value),
-						Minute(arguments.value),
-						Second(arguments.value)
-					);
+
+				// If it is a string that looks like a date, try parsing
+				if (IsSimpleValue(val)) {
+					local.s2 = Trim(val);
+					// Try ParseDateTime (which handles many formats)
+					try {
+						local.dt = ParseDateTime(local.s2);
+						if (IsDate(local.dt)) {
+							return DateFormat(local.dt, "yyyy-mm-dd") & " " & TimeFormat(local.dt, "HH:mm:ss");
+						}
+					} catch (any e) {
+						// fallback parsing attempts for common formats
+
+						// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
+						if (ReFind("^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$", local.s2, "i")) {
+							local.parts = REReplace(local.s2, "^(\\d{4})-(\\d{2})-(\\d{2}).*$", "\\1-\\2-\\3", "all");
+							local.timePart = REReplace(local.s2, ".*[ T](\\d{1,2}:\\d{2}(?::\\d{2})?).*$", "\\1", "all");
+							if (Len(local.timePart) AND local.timePart NEQ local.s2) {
+								// has time
+								local.dt = ParseDateTime(local.parts & " " & local.timePart);
+								if (IsDate(local.dt)) {
+									return DateFormat(local.dt, "yyyy-mm-dd") & " " & TimeFormat(local.dt, "HH:mm:ss");
+								}
+							} else {
+								// date only
+								local.dt = CreateDate(Val(ListGetAt(local.parts,1,"-")), Val(ListGetAt(local.parts,2,"-")), Val(ListGetAt(local.parts,3,"-")));
+								return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+							}
+						}
+
+						// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — prefer DD/MM/YYYY if BoxLang or if day>12
+						if (ReFind("^\\d{1,2}/\\d{1,2}/\\d{4}", local.s2)) {
+							local.comps = ListToArray(local.s2, "/");
+							local.d1 = Val(local.comps[1]);
+							local.d2 = Val(local.comps[2]);
+							local.y  = Val(local.comps[3]);
+
+							// Heuristic: if day part > 12 then it's DD/MM/YYYY
+							if (d1 > 12) {
+								local.day = d1; local.month = d2;
+							} else if (d2 > 12) {
+								// likely MM/DD/YYYY
+								local.month = d1; local.day = d2;
+							} else {
+								// ambiguous -> prefer DD/MM/YYYY if server.boxlang exists, else MM/DD/YYYY
+								if (StructKeyExists(server, "boxlang")) {
+									local.day = d1; local.month = d2;
+								} else {
+									local.month = d1; local.day = d2;
+								}
+							}
+							local.dt = CreateDate(y, local.month, local.day);
+							// if time exists in same string, try to parse it using ParseDateTime
+							if (ReFind("\\d{1,2}:\\d{2}", local.s2)) {
+								try {
+									local.dt2 = ParseDateTime(local.s2);
+									if (IsDate(local.dt2)) {
+										return DateFormat(local.dt2, "yyyy-mm-dd") & " " & TimeFormat(local.dt2, "HH:mm:ss");
+									}
+								} catch (any e2) {
+									// fallback to midnight
+									return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+								}
+							}
+							return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+						}
+					}
 				}
-				break;
+				// If we reach here, parsing failed — return original string to allow comparison
+				return val;
+
+			default:
+				// Default: return raw value as string (no conversion)
+				return val;
 		}
-		return arguments.value;
 	}
 
 	/**
