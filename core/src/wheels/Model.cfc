@@ -182,10 +182,21 @@ component output="false" displayName="Model" extends="wheels.Global"{
 					} else {
 						variables.wheels.class.properties[local.property].label = humanize(local.property);
 					}
+					// Detect datetime-like columns for SQLite, without changing the DB type
+					if (
+						variables.wheels.class.properties[local.property].datatype eq "TEXT"
+						&& variables.wheels.class.properties[local.property].type eq "cf_sql_varchar"
+						&& ReFindNoCase("\b(date|time|dob|birthday|birthTime|created|updated)\b", variables.wheels.class.properties[local.property].column)
+					) {
+						// Override only validation type
+						variables.wheels.class.properties[local.property].validationtype = "datetime";
+					} else {
+						// Default logic
+						variables.wheels.class.properties[local.property].validationtype = variables.wheels.class.adapter.$getValidationType(
+							variables.wheels.class.properties[local.property].type
+						);
+					}
 
-					variables.wheels.class.properties[local.property].validationtype = variables.wheels.class.adapter.$getValidationType(
-						variables.wheels.class.properties[local.property].type
-					);
 					if (StructKeyExists(variables.wheels.class.mapping, local.property)) {
 						if (StructKeyExists(variables.wheels.class.mapping[local.property], "label")) {
 							variables.wheels.class.properties[local.property].label = variables.wheels.class.mapping[local.property].label;
