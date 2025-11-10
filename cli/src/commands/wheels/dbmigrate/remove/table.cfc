@@ -13,7 +13,7 @@ component aliases='wheels db remove table' extends="../../base"  {
 	 **/
 	function run(
 		required string name ) {
-
+		arguments = reconstructArgs(arguments);
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/remove-table.txt"));
 
