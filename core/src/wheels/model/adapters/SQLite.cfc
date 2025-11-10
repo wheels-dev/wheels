@@ -73,8 +73,8 @@ component extends="Base" output=false {
 		required boolean parameterize,
 		string $primaryKey = ""
 	) {
-		
-
+		$removeColumnAliasesInOrderClause(args = arguments);
+		$moveAggregateToHaving(args = arguments);
 		return $performQuery(argumentCollection = arguments);
 	}
 
