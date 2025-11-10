@@ -8,8 +8,6 @@ Reset all database migrations by migrating to version 0.
 wheels dbmigrate reset
 ```
 
-Alias: `wheels db reset`
-
 ## Description
 
 The `dbmigrate reset` command resets your database by migrating to version 0, effectively rolling back all executed migrations. This is useful during development when you need to start fresh.

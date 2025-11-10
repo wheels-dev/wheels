@@ -8,8 +8,6 @@ Generate a migration file for creating a new database table.
 wheels dbmigrate create table name=<table_name> [--force] [--id] primaryKey=<key_name>
 ```
 
-Alias: `wheels db create table`
-
 ## CommandBox Parameter Syntax
 
 This command supports multiple parameter formats:
@@ -20,11 +18,11 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - All named: `name=users primaryKey=userId`
 - Named + flags: `name=users --force --id=false`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional parameters: This command does not support positional parameters
 
 **Recommendation:** Use named for required parameters, flags for booleans: `name=users --force`

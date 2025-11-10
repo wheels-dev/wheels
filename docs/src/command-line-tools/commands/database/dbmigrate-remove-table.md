@@ -19,11 +19,11 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - Named: `wheels dbmigrate remove table name=users`
 - Flag: `wheels dbmigrate remove table --name=users`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional parameters: This command does not support positional parameters
 
 **Recommendation:** Use named parameters: `wheels dbmigrate remove table name=users`
