@@ -3,7 +3,7 @@
  *
  * | Parameter   | Required | Default | Description                                         |
  * | ----------- | -------- | ------- | --------------------------------------------------- |
- * | name        | false    |         | The column name to add                              |
+ * | name        | true     |         | The column name to add                              |
  * | tableName   | true     |         | The name of the database table to modify            |
  * | dataType    | true     |         | The column type to add                              |
  * | default     | false    |         | The default value to set for the column             |
