@@ -73,6 +73,7 @@ component extends="Base" output=false {
 		required boolean parameterize,
 		string $primaryKey = ""
 	) {
+		$convertMaxRowsToLimit(args = arguments);
 		$removeColumnAliasesInOrderClause(args = arguments);
 		$moveAggregateToHaving(args = arguments);
 		return $performQuery(argumentCollection = arguments);
