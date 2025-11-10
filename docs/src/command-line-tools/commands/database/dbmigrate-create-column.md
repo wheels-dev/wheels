@@ -9,8 +9,6 @@ Generate a migration file for adding columns to an existing database table.
 wheels dbmigrate create column name=<table_name> dataType=<type> columnName=<column> [options]
 ```
 
-Alias: `wheels db create column`
-
 ## CommandBox Parameter Syntax
 
 This command supports multiple parameter formats:
@@ -21,11 +19,11 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - All named: `name=users dataType=string columnName=email`
 - Named parameters only (no positional support)
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional parameters: This command does not support positional parameters
 
 **Recommendation:** Use named parameters for all values: `name=users dataType=string columnName=email allowNull=false`

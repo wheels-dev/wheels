@@ -1,7 +1,5 @@
 # wheels db create
 
-
-
 Create a new database based on your datasource configuration.
 
 ## Synopsis

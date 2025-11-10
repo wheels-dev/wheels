@@ -19,12 +19,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - Positional: `wheels dbmigrate create blank addIndexes`
 - All named: `name=addIndexes description="Custom migration"`
 - Positional + named: `wheels dbmigrate create blank addIndexes description="Add indexes"`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Mixing positional + named for same parameter: `wheels dbmigrate create blank addIndexes name=other`
 
 **Recommendation:** Use positional for name, named for optional parameters: `wheels dbmigrate create blank addIndexes description="My migration"`
