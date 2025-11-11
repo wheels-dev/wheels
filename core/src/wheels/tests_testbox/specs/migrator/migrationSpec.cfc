@@ -695,7 +695,9 @@ component extends="wheels.Testbox" {
 
 			beforeEach(() => {
 				isACF2016 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2016
+				isACF = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor >= 2018
 				isPostgres = migration.adapter.adapterName() == "PostgreSQL"
+				isSQLite = migration.adapter.adapterName() == "SQLite"
 				isLucee = application.wheels.serverName == "Lucee"
 				isBoxLang = application.wheels.serverName == "BoxLang"
 			})
@@ -746,7 +748,7 @@ component extends="wheels.Testbox" {
 
 				// Added the ListLen check here for CF2018 because its cfdbinfo behaves a little differently.
 				// It returns the index for multiple columns in one record where as Lucee or Boxlang returns multiple.
-				if(isLucee || isBoxLang) {
+				if((isLucee || isBoxLang) || (isSQLite && isACF)) {
 					expect(actual.recordCount).toBe(2)
 				} else {
 					expect(ListLen(actual['column_name'][1])).toBe(2)
