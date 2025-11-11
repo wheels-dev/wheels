@@ -187,6 +187,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 						variables.wheels.class.properties[local.property].datatype eq "TEXT"
 						&& variables.wheels.class.properties[local.property].type eq "cf_sql_varchar"
 						&& ReFindNoCase("\b(date|time|dob|birthday|birthTime|created|updated)\b", variables.wheels.class.properties[local.property].column)
+						&& get("adapterName") eq "SQLite"
 					) {
 						// Override only validation type
 						variables.wheels.class.properties[local.property].validationtype = "datetime";
