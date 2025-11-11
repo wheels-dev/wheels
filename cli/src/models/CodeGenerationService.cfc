@@ -169,34 +169,29 @@ component {
         try {
             var template = "ControllerContent.txt";
 
-            // Template selection priority: custom actions > api > crud > default
-            // If actions were explicitly provided and differ from standard CRUD, use basic template
-            var hasCustomActions = false;
-            var standardCrudActions = ["index", "show", "new", "create", "edit", "update", "delete"];
-            var apiCrudActions = ["index", "show", "create", "update", "delete"];
-
-            if (arguments.crud && arguments.api) {
-                // Check if actions match API CRUD
-                hasCustomActions = (arrayLen(arguments.actions) != arrayLen(apiCrudActions)) ||
-                                   !arrayEvery(arguments.actions, function(action) {
-                                       return arrayFindNoCase(apiCrudActions, action) > 0;
-                                   });
-            } else if (arguments.crud) {
-                // Check if actions match standard CRUD
-                hasCustomActions = (arrayLen(arguments.actions) != arrayLen(standardCrudActions)) ||
-                                   !arrayEvery(arguments.actions, function(action) {
-                                       return arrayFindNoCase(standardCrudActions, action) > 0;
-                                   });
-            }
-
-            // Select template based on priority
-            if (hasCustomActions) {
-                // Custom actions specified - use basic controller template
-                template = "ControllerContent.txt";
-            } else if (arguments.api) {
+            // Template selection priority: api > crud > custom actions > default
+            // API flag takes highest priority when combined with CRUD
+            if (arguments.api && arguments.crud) {
+                // API CRUD controller - use API template
                 template = "ApiControllerContent.txt";
             } else if (arguments.crud) {
-                template = "CRUDContent.txt";
+                // Check if actions match standard CRUD
+                var standardCrudActions = ["index", "show", "new", "create", "edit", "update", "delete"];
+                var hasCustomActions = (arrayLen(arguments.actions) != arrayLen(standardCrudActions)) ||
+                                       !arrayEvery(arguments.actions, function(action) {
+                                           return arrayFindNoCase(standardCrudActions, action) > 0;
+                                       });
+
+                if (hasCustomActions) {
+                    // Custom actions specified - use basic controller template
+                    template = "ControllerContent.txt";
+                } else {
+                    // Standard CRUD - use CRUD template
+                    template = "CRUDContent.txt";
+                }
+            } else {
+                // No CRUD flag - use basic template
+                template = "ControllerContent.txt";
             }
             
             var generatedPath = templateService.generateFromTemplate(

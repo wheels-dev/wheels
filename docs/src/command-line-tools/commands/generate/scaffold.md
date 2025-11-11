@@ -7,11 +7,12 @@ Generate complete CRUD scaffolding for a resource including model, controller, v
 ```bash
 wheels generate scaffold name [options]
 wheels g scaffold name [options]
+wheels g resource name [options]    # Alias for scaffold
 ```
 
 ## Description
 
-The `wheels scaffold` command generates a complete CRUD (Create, Read, Update, Delete) implementation including model, controller, views, tests, and database migration. It's the fastest way to create a fully functional resource.
+The `wheels scaffold` command (alias: `wheels g resource`) generates a complete CRUD (Create, Read, Update, Delete) implementation including model, controller, views, tests, and database migration. It's the fastest way to create a fully functional resource.
 
 ## CommandBox Parameter Syntax
 
@@ -54,23 +55,26 @@ This command supports multiple parameter formats:
 
 ## Examples
 
-### Basic Scaffold Examples
+### Basic Examples
 
 ```bash
 # Basic scaffold
-wheels generate scaffold Product
+wheels g scaffold Product
+wheels g resource Product                    # Same as scaffold
 
 # With properties
-wheels generate scaffold Product --properties="name:string,price:decimal,stock:integer"
+wheels g scaffold Product --properties="name:string,price:decimal,stock:integer"
+wheels g resource Product --properties="name:string,price:decimal,stock:integer"
 
 # With associations
-wheels generate scaffold Order --properties="total:decimal,status:string" --belongsTo=User --hasMany=orderItems
+wheels g scaffold Order --properties="total:decimal,status:string" --belongsTo=User --hasMany=orderItems
 
 # API-only scaffold (no views)
-wheels generate scaffold Product --api --properties="name:string,price:decimal"
+wheels g scaffold Product --api --properties="name:string,price:decimal"
+wheels g resource Product --api --properties="name:string,price:decimal"
 
 # With auto-migration
-wheels generate scaffold Category --properties="name:string" --migrate
+wheels g scaffold Category --properties="name:string" --migrate
 ```
 
 ### Advanced Examples
@@ -264,7 +268,7 @@ mapper()
 
 ## See Also
 
-- [wheels generate model](model.md) - Generate models
-- [wheels generate controller](controller.md) - Generate controllers
-- [wheels generate resource](resource.md) - Generate REST resources
+- [wheels generate model](model.md) - Generate models only
+- [wheels generate controller](controller.md) - Generate controllers only
+- [wheels generate view](view.md) - Generate views only
 - [wheels dbmigrate latest](../database/dbmigrate-latest.md) - Run migrations
