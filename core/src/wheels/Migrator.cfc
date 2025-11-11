@@ -381,11 +381,23 @@ component output="false" extends="wheels.Global"{
 			}
 		} catch (any e) {
 			if (application[local.appKey].createMigratorTable) {
-				try {
-					local.dbType = local.info.database_productname;
-					local.tableName = application[local.appKey].migratorTableName;
+				local.dbType = local.info.database_productname;
+				local.tableName = application[local.appKey].migratorTableName;
 
-					// DB-specific SQLs
+				// SQLite: skip rename / ALTER, create table with constraint in one query
+				if (FindNoCase("SQLite", local.dbType)) {
+					local.createSQL = "
+						CREATE TABLE #local.tableName# (
+							version VARCHAR(25),
+							core_level INT NOT NULL DEFAULT 1,
+							CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)
+						)
+					";
+					$query(
+						datasource = application[local.appKey].dataSourceName,
+						sql = local.createSQL
+					);
+				} else {
 					if (FindNoCase("SQLServer", local.dbType) || FindNoCase("SQL Server", local.dbType)) {
 						local.renameSQL = "EXEC sp_rename 'migratorversions', '#local.tableName#'";
 						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
@@ -400,32 +412,35 @@ component output="false" extends="wheels.Global"{
 						local.createSQL = "CREATE TABLE #local.tableName# (version VARCHAR(25), core_level INT NOT NULL DEFAULT 1)";
 						local.addColumnSQL = "ALTER TABLE #local.tableName# ADD core_level INT NOT NULL DEFAULT 1";
 					}
-					$query(
-						datasource = application[local.appKey].dataSourceName,
-						sql = "SELECT version FROM migratorversions"
-					);
-					$query(
-						datasource = application[local.appKey].dataSourceName,
-						sql = local.renameSQL
-					);
-					$query(
-						datasource = application[local.appKey].dataSourceName,
-						sql = local.addColumnSQL
-					);
-					$query(
-						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
-					);
-				} catch (any e) {
-					// If rename fails, create table instead
-					$query(
-						datasource = application[local.appKey].dataSourceName,
-						sql = local.createSQL
-					);
-					$query(
-						datasource = application[local.appKey].dataSourceName,
-						sql = "ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
-					);
+
+					try {
+						$query(
+							datasource=application[local.appKey].dataSourceName,
+							sql="SELECT version FROM migratorversions"
+						);
+						$query(
+							datasource=application[local.appKey].dataSourceName, 
+							sql=local.renameSQL
+						);
+						$query(
+							datasource=application[local.appKey].dataSourceName, 
+							sql=local.addColumnSQL
+						);
+						$query(
+							datasource=application[local.appKey].dataSourceName, 
+							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
+						);
+					} catch (any e) {
+						// If rename fails, create table instead
+						$query(
+							datasource=application[local.appKey].dataSourceName, 
+							sql=local.createSQL
+						);
+						$query(
+							datasource=application[local.appKey].dataSourceName, 
+							sql="ALTER TABLE #local.tableName# ADD CONSTRAINT fk_core_level FOREIGN KEY (core_level) REFERENCES c_o_r_e_levels(id)"
+						);
+					}
 				}
 			}
 			return 0;
