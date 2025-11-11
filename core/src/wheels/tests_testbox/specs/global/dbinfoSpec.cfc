@@ -26,7 +26,7 @@ component extends="wheels.Testbox" {
                 );
 
                 expect( local.result.recordCount ).toBe( 3 );
-                expect( queryColumnData( local.result, "column_name" ) ).toInclude( "role_id" );
+                expect( valueList(local.result.COLUMN_NAME) ).toInclude( "role_id" );
                 expect( listToArray( local.result.columnList ) ).toInclude( "REFERENCED_PRIMARYKEY" );
             });
 
@@ -48,8 +48,8 @@ component extends="wheels.Testbox" {
                 );
 
                 expect( local.result.recordCount ).toBe( 2 );
-                expect( queryColumnData( local.result, "column_name" ) ).toInclude( "role_id" );
-                expect( queryColumnData( local.result, "column_name" ) ).toInclude( "role_name" );
+                expect( valueList(local.result.COLUMN_NAME) ).toInclude( "role_id" );
+                expect( valueList(local.result.COLUMN_NAME) ).toInclude( "role_name" );
             });
 
             it( "should return correct index information", () => {
@@ -73,7 +73,7 @@ component extends="wheels.Testbox" {
                         expect( local.result.recordCount ).toBe( 1 );
                 }
 
-                expect( queryColumnData( local.result, "column_name" ) ).toInclude( "role_id" );
+                expect( valueList(local.result.COLUMN_NAME) ).toInclude( "role_id" );
             });
 
             it( "should return correct database version info", () => {
@@ -193,8 +193,8 @@ component extends="wheels.Testbox" {
     
     private void function createTestTables() {
         // Create roles table
-        query datasource=variables.datasource {
-            echo("
+        cfquery(datasource=variables.datasource) {
+            writeOutput("
                 CREATE TABLE #variables.prefix#roles (
                     role_id #variables.identityColumnType#,
                     role_name #variables.varcharType#(100) DEFAULT NULL,
@@ -204,8 +204,8 @@ component extends="wheels.Testbox" {
         }
 
         if(get('adapterName') eq 'SQLite') {
-            query datasource=variables.datasource {
-                echo("
+            cfquery(datasource=variables.datasource) {
+                writeOutput("
                     CREATE TABLE #variables.prefix#users (
                         user_id #variables.varcharType#(50) NOT NULL,
                         user_name #variables.varcharType#(50) NOT NULL,
@@ -217,8 +217,8 @@ component extends="wheels.Testbox" {
             }
         } else {
             // Create users table  
-            query datasource=variables.datasource {
-                echo("
+            cfquery(datasource=variables.datasource) {
+                writeOutput("
                     CREATE TABLE #variables.prefix#users (
                         user_id #variables.varcharType#(50) NOT NULL,
                         user_name #variables.varcharType#(50) NOT NULL,
@@ -229,8 +229,8 @@ component extends="wheels.Testbox" {
             }
 
             // Add foreign key
-            query datasource=variables.datasource {
-                echo("
+            cfquery(datasource=variables.datasource) {
+                writeOutput("
                     ALTER TABLE #variables.prefix#users
                     ADD CONSTRAINT fk_#variables.prefix#_user_role_id
                     FOREIGN KEY (role_id)
@@ -240,13 +240,13 @@ component extends="wheels.Testbox" {
         }
 
         // Add index
-        query datasource=variables.datasource {
-            echo("CREATE INDEX idx_#variables.prefix#_users_role_id ON #variables.prefix#users(role_id)");
+        cfquery(datasource=variables.datasource) {
+            writeOutput("CREATE INDEX idx_#variables.prefix#_users_role_id ON #variables.prefix#users(role_id)");
         }
 
         // Create a view
-        query datasource=variables.datasource {
-            echo("
+        cfquery(datasource=variables.datasource) {
+            writeOutput("
                 CREATE VIEW #variables.prefix#v_users AS
                 SELECT u.user_id, u.user_name, r.role_id, r.role_name
                 FROM #variables.prefix#users u
@@ -263,8 +263,8 @@ component extends="wheels.Testbox" {
         // Drop view first
         if (ListFindNoCase(local.tableList, variables.prefix & "v_users", Chr(7))) {
             try {
-                query datasource=variables.datasource {
-                    echo("DROP VIEW #variables.prefix#v_users");
+                cfquery(datasource=variables.datasource) {
+                    writeOutput("DROP VIEW #variables.prefix#v_users");
                 }
             } catch (any e) {}
         }
@@ -274,8 +274,8 @@ component extends="wheels.Testbox" {
         for (local.table in ListToArray(local.testTables)) {
             if (ListFindNoCase(local.tableList, local.table, Chr(7))) {
                 try {
-                    query datasource=variables.datasource {
-                        echo("DROP TABLE #local.table#");
+                    cfquery(datasource=variables.datasource) {
+                        writeOutput("DROP TABLE #local.table#");
                     }
                 } catch (any e) {}
             }
