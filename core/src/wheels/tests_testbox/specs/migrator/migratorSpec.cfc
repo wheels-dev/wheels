@@ -24,6 +24,9 @@ component extends="wheels.Testbox" {
 		describe("Tests that getAvailableMigrations", () => {
 
 			it("is returning expected value", () => {
+				if(get("adapterName") eq 'SQLite') {
+					skip("SQLite does not allow altering Columns.")
+				}
 				available = migrator.getAvailableMigrations();
 				actual = ""
 				for (local.i in available) {
