@@ -620,7 +620,7 @@ component output="false" {
 						// fallback parsing attempts for common formats
 
 						// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
-						if (ReFind("^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$", local.s2, "i")) {
+						if (ReFind("(?i)^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$", local.s2)) {
 							local.parts = REReplace(local.s2, "^(\\d{4})-(\\d{2})-(\\d{2}).*$", "\\1-\\2-\\3", "all");
 							local.timePart = REReplace(local.s2, ".*[ T](\\d{1,2}:\\d{2}(?::\\d{2})?).*$", "\\1", "all");
 							if (Len(local.timePart) AND local.timePart NEQ local.s2) {
