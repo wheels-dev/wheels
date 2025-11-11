@@ -115,7 +115,7 @@ component extends="Base" {
 	 */
 	public void function dropTable(required string name) {
 		local.appKey = $appKey();
-		if (application[local.appKey].serverName != "lucee") {
+		if (application[local.appKey].serverName != "lucee" && application[local.appKey].adapterName != "SQLite") {
 			local.foreignKeys = $getForeignKeys(arguments.name);
 			local.foreignKeysArray = ListToArray(local.foreignKeys);
 			local.iEnd = ArrayLen(local.foreignKeysArray);
