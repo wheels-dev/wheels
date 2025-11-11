@@ -1,18 +1,17 @@
 /**
- * wheels dbmigrate create column [tablename] [data-type] [column-name]
- * 
- * wheels dbmigrate create column [name] [data-type] [column-name]
+ * wheels dbmigrate create column [tableName] [dataType] [name]
+ *
  * | Parameter   | Required | Default | Description                                         |
  * | ----------- | -------- | ------- | --------------------------------------------------- |
- * | name        | true     |         | The name of the database table to modify            |
- * | data-type   | true     |         | The column type to add                              |
- * | column-name | false    |         | The column name to add                              |
+ * | name        | true     |         | The column name to add                              |
+ * | tableName   | true     |         | The name of the database table to modify            |
+ * | dataType    | true     |         | The column type to add                              |
  * | default     | false    |         | The default value to set for the column             |
  * | allowNull   | false    | true    | Should the column allow nulls                       |
  * | limit       | false    |         | The character limit of the column                   |
  * | precision   | false    |         | The precision of the numeric column                 |
  * | scale       | false    |         | The scale of the numeric column                     |
- * 
+ *
  **/
  component aliases='wheels db create column' extends="../../base"  {
 
@@ -25,10 +24,10 @@
 	}
 
 	/**
-	 * Usage: wheels dbmigrate create column [tablename] [force] [id] [primaryKey]
-	 * @name.hint The Object Name
+	 * Usage: wheels dbmigrate create column [name] [dataType] [dataType]
+	 * @name.hint The column name to add
+	 * @tableName.hint The name of the database table to modify
 	 * @dataType.hint The column type to add
-	 * @columnName.hint The column name to add
 	 * @default.hint The default value to set for the column
 	 * @allowNull.hint Should the column allow nulls
 	 * @limit.hint The character limit of the column
@@ -37,8 +36,8 @@
 	 **/
 	function run(
 		required string name,
+		required string tableName,
 		required string dataType,
-		required string columnName,
 		any default,
 		boolean allowNull=true,
 		number limit,
@@ -46,7 +45,12 @@
 		number scale) {
 	
 		// Reconstruct arguments for handling -- prefixed options
-		arguments = reconstructArgs(arguments);
+		arguments = reconstructArgs(
+			argStruct = arguments,
+            allowedValues = {
+                dataType= ["string", "text", "integer", "biginteger", "float", "boolean", "date", "time", "datetime", "timestamp", "binary"]
+            }
+		);
 
 		// Initialize detail service
 		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
@@ -57,9 +61,9 @@
 		var argumentString="";
 
 		// Changes here
-		content=replaceNoCase(content, "|tableName|", "#name#", "all");
+		content=replaceNoCase(content, "|tableName|", "#arguments.tableName#", "all");
 		content=replaceNoCase(content, "|columnType|", "#arguments.dataType#", "all");
-		content=replaceNoCase(content, "|columnName|", "#arguments.columnName#", "all");
+		content=replaceNoCase(content, "|columnName|", "#arguments.name#", "all");
 		//content=replaceNoCase(content, "|referenceName|", "#referenceName#", "all");
 
 		// Construct additional arguments(only add/replace if passed through)
@@ -98,7 +102,7 @@
 		details.header("", "Migration Generation");
 		
 		// Make File
-		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)) & '_' & lcase(trim(arguments.columnName)),	action="create_column",	content=content);
+		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.tableName)) & '_' & lcase(trim(arguments.name)),	action="create_column",	content=content);
 		
 		details.create(migrationPath);
 		details.success("Column migration created successfully!");

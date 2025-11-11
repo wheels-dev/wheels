@@ -6,11 +6,36 @@ Learn how to extend Wheels CLI with your own custom commands.
 
 Wheels CLI is built on CommandBox, making it easy to add custom commands. Commands can be simple scripts or complex operations using the service architecture.
 
+## Setup for Contributors
+
+### Step 1. Create a box.json if not exist in Directory "cli/src"
+
+Make sure these properties exist: "name", "version", "slug" and "type"
+
+```json
+{
+    "name": "wheels-cli",
+    "version": "3.0.0-SNAPSHOT",
+    "slug": "wheels-cli",
+    "type": "modules"
+}
+```
+
+### Step 2. Link the CLI Module
+
+Open CommandBox in the directory "cli/src" and link this directory as a module:
+
+```bash
+box package link --force
+```
+
+This allows you to develop and test CLI commands locally.
+
 ## Basic Command Structure
 
-### 1. Create Command File
+### Step 3. Create Command File
 
-Create a new file in `/commands/wheels/`:
+Create a new file in `cli/src/commands/wheels/`:
 
 ```cfc
 // commands/wheels/hello.cfc
@@ -26,7 +51,7 @@ component extends="wheels-cli.models.BaseCommand" {
 }
 ```
 
-### 2. Run Your Command
+### Step 4. Run Your Command
 
 ```bash
 wheels hello
@@ -62,6 +87,9 @@ component extends="wheels-cli.models.BaseCommand" {
         required string name,
         boolean force = false
     ) {
+        // Reconstruct arguments for handling -- prefixed options
+        arguments = reconstructArgs(argStruct=arguments);
+
         // Command logic here
     }
     
@@ -574,6 +602,8 @@ component extends="wheels-cli.models.BaseCommand" {
     property name="datasource" inject="coldbox:datasource";
     
     function run(string file = "backup-#dateFormat(now(), 'yyyy-mm-dd')#.sql") {
+        arguments = reconstructArgs(argStruct=arguments);
+
         print.line("Creating database backup...").toConsole();
         
         var spinner = progressSpinner.create();
@@ -609,6 +639,9 @@ component extends="wheels-cli.models.BaseCommand" {
     property name="analysisService" inject="AnalysisService@wheels-cli";
     
     function run(string path = ".", boolean fix = false) {
+        arguments = reconstructArgs(argStruct=arguments);
+
+        var analysisService = application.wirebox.getInstance("AnalysisService@wheels-cli");
         var issues = analysisService.analyze(arguments.path);
         
         if (arrayLen(issues)) {
