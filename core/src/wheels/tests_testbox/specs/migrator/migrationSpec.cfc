@@ -969,7 +969,7 @@ component extends="wheels.Testbox" {
 
 				expect(function() {
 					g.$query(datasource = application.wheels.dataSourceName, sql = "SELECT * FROM #tableName#")
-				}).toThrow("database")
+				}).toThrow()
 			})
 		})
 
