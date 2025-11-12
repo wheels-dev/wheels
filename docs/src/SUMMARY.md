@@ -159,6 +159,7 @@
 * [Database Migrations](database-interaction-through-models/database-migrations/README.md)
   * [Migrations in Production](database-interaction-through-models/database-migrations/migrations-in-production.md)
 * [Using Multiple Data Sources](database-interaction-through-models/using-multiple-data-sources.md)
+* [Using SQLite](database-interaction-through-models/using-sqlite.md)
 
 
 ## Project Documentation
