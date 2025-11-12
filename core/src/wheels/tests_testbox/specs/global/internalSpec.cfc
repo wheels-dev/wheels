@@ -261,6 +261,9 @@ component extends="wheels.Testbox" {
 
 			it("tests same output", () => {
 				binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.png'));
+				if( application.wheels.adapterName eq 'SQLite' ){
+					binaryData = toBase64(binaryData)
+				}
 				transaction action="begin" {
 					photo = g.model("photo").findOne();
 					photo.update(filename = "somefilename", fileData = binaryData);

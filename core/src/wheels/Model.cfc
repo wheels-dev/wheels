@@ -182,10 +182,22 @@ component output="false" displayName="Model" extends="wheels.Global"{
 					} else {
 						variables.wheels.class.properties[local.property].label = humanize(local.property);
 					}
+					// Detect datetime-like columns for SQLite, without changing the DB type
+					if (
+						variables.wheels.class.properties[local.property].datatype eq "TEXT"
+						&& variables.wheels.class.properties[local.property].type eq "cf_sql_varchar"
+						&& ReFindNoCase("\b(date|time|dob|birthday|birthTime|created|updated)\b", variables.wheels.class.properties[local.property].column)
+						&& get("adapterName") eq "SQLite"
+					) {
+						// Override only validation type
+						variables.wheels.class.properties[local.property].validationtype = "datetime";
+					} else {
+						// Default logic
+						variables.wheels.class.properties[local.property].validationtype = variables.wheels.class.adapter.$getValidationType(
+							variables.wheels.class.properties[local.property].type
+						);
+					}
 
-					variables.wheels.class.properties[local.property].validationtype = variables.wheels.class.adapter.$getValidationType(
-						variables.wheels.class.properties[local.property].type
-					);
 					if (StructKeyExists(variables.wheels.class.mapping, local.property)) {
 						if (StructKeyExists(variables.wheels.class.mapping[local.property], "label")) {
 							variables.wheels.class.properties[local.property].label = variables.wheels.class.mapping[local.property].label;
@@ -382,11 +394,13 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			local.adapterName = "H2";
 		} else if (FindNoCase("Oracle", local.info.driver_name)) {
 			local.adapterName = "Oracle";
+		} else if (FindNoCase("SQLite", local.info.driver_name)) {
+			local.adapterName = "SQLite";
 		} else {
 			Throw(
 				type = "Wheels.DatabaseNotSupported",
 				message = "#local.info.database_productname# is not supported by Wheels.",
-				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL or H2."
+				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, Oracle, SQLite or H2."
 			);
 		}
 		$set(adapterName = local.adapterName);

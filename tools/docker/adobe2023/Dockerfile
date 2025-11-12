@@ -2,6 +2,11 @@ FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
+#Add Sqlite
+RUN apt update -y && apt install -y sqlite3 libsqlite3-dev
+RUN pwd
+RUN sqlite3 wheelstestdb.db
+
 ENV PORT 62023
 ENV APP_DIR                 "/wheels-test-suite"
 ENV HEALTHCHECK_URI         "http://127.0.0.1:62023/"

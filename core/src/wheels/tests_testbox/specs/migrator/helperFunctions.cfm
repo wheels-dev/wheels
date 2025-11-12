@@ -46,6 +46,7 @@
 			case "MicrosoftSQLServer":
 			case "MySQL":
 			case "PostgreSQL":
+			case "SQLite":
 				return true;
 			default:
 				return false;
@@ -73,6 +74,8 @@
 				return ["IMAGE"];
 			case "PostgreSQL":
 				return ["BYTEA"];
+			case "SQLite":
+				return ["BLOB"];
 			default:
 				return "`addbinary()` not supported for " & migration.adapter.adapterName();
 		}
@@ -88,6 +91,8 @@
 				return "BIT,TINYINT";
 			case "PostgreSQL":
 				return "BOOLEAN";
+			case "SQLite":
+				return "INTEGER";
 			default:
 				return "`addboolean()` not supported for " & migration.adapter.adapterName();
 		}
@@ -110,6 +115,8 @@
 				return "DATE";
 			case "MicrosoftSQLServer":
 				return "date";
+			case "SQLite":
+				return "TEXT";
 			default:
 				return "`adddate()` not supported for " & migration.adapter.adapterName();
 		}
@@ -124,6 +131,8 @@
 				return "DATETIME";
 			case "PostgreSQL":
 				return "TIMESTAMP";
+			case "SQLite":
+				return "TEXT";
 			default:
 				return "`adddatetime()` not supported for " & migration.adapter.adapterName();
 		}
@@ -137,6 +146,8 @@
 				return "DECIMAL";
 			case "PostgreSQL":
 				return "NUMERIC";
+			case "SQLite":
+				return "REAL";
 			default:
 				return "`adddecimal()` not supported for " & migration.adapter.adapterName();
 		}
@@ -150,6 +161,8 @@
 			case "MySQL":
 			case "PostgreSQL":
 				return "FLOAT,float8"; // depends on db engine/drivers
+			case "SQLite":
+				return "REAL";
 			default:
 				return "`addfloat()` not supported for " & migration.adapter.adapterName();
 		}
@@ -158,6 +171,7 @@
 	private string function getIntegerType() {
 		switch (migration.adapter.adapterName()) {
 			case "H2":
+			case "SQLite":
 				return "INTEGER";
 			case "MicrosoftSQLServer":
 			case "MySQL":
@@ -176,6 +190,8 @@
 			case "MySQL":
 			case "PostgreSQL":
 				return ["VARCHAR", "CHARACTER VARYING"];
+			case "SQLite":
+				return ["TEXT"];
 			default:
 				return "`addstring()` not supported for " & migration.adapter.adapterName();
 		}
@@ -190,6 +206,8 @@
 				return ["TEXT"];
 			case "MicrosoftSQLServer":
 				return ["NVARCHAR", "NVARCHAR(MAX)"];
+			case "SQLite":
+				return ["TEXT"];
 			default:
 				return "`addtext()` not supported for " & migration.adapter.adapterName();
 		}
@@ -203,6 +221,8 @@
 			case "H2":
 			case "PostgreSQL":
 				return "TIME";
+			case "SQLite":
+				return "TEXT";
 			default:
 				return "`addtime()` not supported for " & migration.adapter.adapterName();
 		}
@@ -218,6 +238,8 @@
 				return "DATETIME";
 			case "PostgreSQL":
 				return "TIMESTAMP";
+			case "SQLite":
+				return "TEXT";
 			default:
 				return "`addtimestamp()` not supported for " & migration.adapter.adapterName();
 		}

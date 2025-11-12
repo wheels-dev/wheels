@@ -198,122 +198,168 @@ component output="false" {
     cfhtmlhead(attributeCollection="#arguments#");
 	}
 
-	public any function $dbinfo(){
-    arguments.name = "local.rv";
-    if(StructKeyExists(arguments, "username") && !Len(arguments.username)){
-      StructDelete(arguments, "username");
-    }
-    if(StructKeyExists(arguments, "password") && !Len(arguments.password)){
-      StructDelete(arguments, "password");
-    }
+	public any function $dbinfo() {
+		arguments.name = "local.rv";
+		if (StructKeyExists(arguments, "username") && !Len(arguments.username)) {
+			StructDelete(arguments, "username");
+		}
+		if (StructKeyExists(arguments, "password") && !Len(arguments.password)) {
+			StructDelete(arguments, "password");
+		}
 
-	// BoxLang + SQL Server specific fix for index queries to avoid casting error
-    if (StructKeyExists(server, "boxlang") && 
-        StructKeyExists(arguments, "type") && arguments.type == "index" &&
-        StructKeyExists(arguments, "table")) {
-      
-		// Get database adapter to check if it's SQL Server
-		local.adapter = $get("adapterName");
-		if (local.adapter == "SQLServer") {
-			// Use direct SQL query instead of cfdbinfo for BoxLang + SQL Server index queries
+		// BoxLang + SQL Server specific fix for index queries
+		if (
+			StructKeyExists(server, "boxlang") &&
+			StructKeyExists(arguments, "type") && arguments.type == "index" &&
+			StructKeyExists(arguments, "table")
+		) {
+			local.adapter = $get("adapterName");
+
+			if (local.adapter == "SQLServer") {
+				local.sql = "
+					SELECT 
+						DB_NAME() AS TABLE_CAT,
+						SCHEMA_NAME(t.schema_id) AS TABLE_SCHEM,
+						t.name AS TABLE_NAME,
+						CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS NON_UNIQUE,
+						t.name AS INDEX_QUALIFIER,
+						i.name AS INDEX_NAME,
+						CASE 
+							WHEN i.type = 1 THEN 'Clustered Index'
+							WHEN i.type = 2 THEN 'Other Index'
+							ELSE 'Other Index'
+						END AS TYPE,
+						CAST(ic.key_ordinal AS INT) AS ORDINAL_POSITION,
+						c.name AS COLUMN_NAME,
+						CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS ASC_OR_DESC,
+						CAST(0 AS INT) AS CARDINALITY,
+						CAST(0 AS INT) AS PAGES,
+						'' AS FILTER_CONDITION
+					FROM sys.indexes i
+					INNER JOIN sys.objects t ON i.object_id = t.object_id
+					INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+					INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+					WHERE t.name = '#arguments.table#' 
+						AND t.type = 'U'
+						AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
+					ORDER BY i.name, ic.key_ordinal
+				";
+				local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+				return local.rv;
+			}
+
+			if (local.adapter == "Oracle") {
+				local.sql = "
+					SELECT 
+						NULL AS TABLE_CAT,
+						ai.OWNER AS TABLE_SCHEM,
+						ai.TABLE_NAME,
+						CASE WHEN ai.UNIQUENESS = 'NONUNIQUE' THEN 1 ELSE 0 END AS NON_UNIQUE,
+						ai.OWNER AS INDEX_QUALIFIER,
+						ai.INDEX_NAME,
+						'Other Index' AS TYPE,
+						ac.COLUMN_POSITION AS ORDINAL_POSITION,
+						ac.COLUMN_NAME,
+						CASE WHEN ac.DESCEND = 'DESC' THEN 'D' ELSE 'A' END AS ASC_OR_DESC,
+						0 AS CARDINALITY,
+						0 AS PAGES,
+						'' AS FILTER_CONDITION
+					FROM ALL_INDEXES ai
+					JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
+					WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
+						AND ai.INDEX_TYPE != 'LOB'
+					ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
+				";
+				local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+				return local.rv;
+			}
+		}
+
+		if (
+			structKeyExists(arguments, "type") &&
+			arguments.type eq "index" &&
+			$get("adapterName") eq "SQLite"
+		) {
 			local.sql = "
-			SELECT 
-				DB_NAME() AS TABLE_CAT,
-				SCHEMA_NAME(t.schema_id) AS TABLE_SCHEM,
-				t.name AS TABLE_NAME,
-				CAST(CASE WHEN i.is_unique = 0 THEN 1 ELSE 0 END AS INT) AS NON_UNIQUE,
-				t.name AS INDEX_QUALIFIER,
-				i.name AS INDEX_NAME,
-				CASE 
-					WHEN i.type = 1 THEN 'Clustered Index'
-					WHEN i.type = 2 THEN 'Other Index'
-					ELSE 'Other Index'
-				END AS TYPE,
-				CAST(ic.key_ordinal AS INT) AS ORDINAL_POSITION,
-				c.name AS COLUMN_NAME,
-				CASE WHEN ic.is_descending_key = 0 THEN 'A' ELSE 'D' END AS ASC_OR_DESC,
-				CAST(0 AS INT) AS CARDINALITY,
-				CAST(0 AS INT) AS PAGES,
-				'' AS FILTER_CONDITION
-			FROM sys.indexes i
-			INNER JOIN sys.objects t ON i.object_id = t.object_id
-			INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
-			INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
-			WHERE t.name = '#arguments.table#' 
-				AND t.type = 'U'
-				AND i.type_desc IN ('CLUSTERED', 'NONCLUSTERED')
-			ORDER BY i.name, ic.key_ordinal
+				SELECT
+					NULL AS TABLE_CAT,
+					NULL AS TABLE_SCHEM,
+					'#arguments.table#' AS TABLE_NAME,
+					CASE WHEN il.""unique"" = 0 THEN 1 ELSE 0 END AS NON_UNIQUE,
+					NULL AS INDEX_QUALIFIER,
+					il.name AS INDEX_NAME,
+					'Other Index' AS TYPE,
+					ii.seqno + 1 AS ORDINAL_POSITION,
+					ii.name AS COLUMN_NAME,
+					'A' AS ASC_OR_DESC,
+					0 AS CARDINALITY,
+					0 AS PAGES,
+					'' AS FILTER_CONDITION
+				FROM pragma_index_list('#arguments.table#') il
+				JOIN pragma_index_info(il.name) ii
+
+				UNION ALL
+
+				SELECT
+					NULL AS TABLE_CAT,
+					NULL AS TABLE_SCHEM,
+					'#arguments.table#' AS TABLE_NAME,
+					0 AS NON_UNIQUE,
+					NULL AS INDEX_QUALIFIER,
+					'PRIMARY' AS INDEX_NAME,
+					'Primary Key' AS TYPE,
+					pk AS ORDINAL_POSITION,
+					name AS COLUMN_NAME,
+					'A' AS ASC_OR_DESC,
+					0 AS CARDINALITY,
+					0 AS PAGES,
+					'' AS FILTER_CONDITION
+				FROM pragma_table_info('#arguments.table#')
+				WHERE pk > 0
+
+				ORDER BY INDEX_NAME, ORDINAL_POSITION;
 			";
-			
-			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
+			local.rv = $query(sql = local.sql, datasource = arguments.datasource);
 			return local.rv;
 		}
-		
-		// Get database adapter to check if it's Oracle
-		if (local.adapter == "Oracle") {
-			// Use direct SQL query instead of cfdbinfo for BoxLang + Oracle index queries
-			local.sql = "
-			SELECT 
-				NULL AS TABLE_CAT,
-				ai.OWNER AS TABLE_SCHEM,
-				ai.TABLE_NAME,
-				CASE WHEN ai.UNIQUENESS = 'NONUNIQUE' THEN 1 ELSE 0 END AS NON_UNIQUE,
-				ai.OWNER AS INDEX_QUALIFIER,
-				ai.INDEX_NAME,
-				'Other Index' AS TYPE,
-				ac.COLUMN_POSITION AS ORDINAL_POSITION,
-				ac.COLUMN_NAME,
-				CASE WHEN ac.DESCEND = 'DESC' THEN 'D' ELSE 'A' END AS ASC_OR_DESC,
-				0 AS CARDINALITY,
-				0 AS PAGES,
-				'' AS FILTER_CONDITION
-			FROM ALL_INDEXES ai
-			JOIN ALL_IND_COLUMNS ac ON ai.INDEX_NAME = ac.INDEX_NAME AND ai.OWNER = ac.INDEX_OWNER
-			WHERE ai.TABLE_NAME = UPPER('#arguments.table#')
-				AND ai.INDEX_TYPE != 'LOB'
-			ORDER BY ai.INDEX_NAME, ac.COLUMN_POSITION
-			";
-			
-			local.rv = $query(sql=local.sql, datasource=arguments.datasource);
-			return local.rv;
-		}
-    }
 
-    // If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
+		// If the cfdbinfo call fails we try it again, this time setting "dbname" explicitly.
 		// Sometimes the call fails when using a custom database connection string.
 		// In that case the database name is not known by the CF server and it will just use any of the databases that the data source has access to.
 		// That can incorrectly be "information_schema" for example.
-    try{
-      cfdbinfo(attributeCollection="#arguments#");
-    }catch(any e){
-      cfdbinfo(attributeCollection="#arguments#");
-      local.type = arguments.type;
+		try {
+			cfdbinfo(attributeCollection = arguments);
+		} catch (any e) {
+			cfdbinfo(attributeCollection = arguments);
+			local.type = arguments.type;
 			arguments.type = "dbnames";
-      cfdbinfo(attributeCollection="#arguments#");
-      if(local.rv.recordCount GT 1){
-        for(local.i in local.rv){
-          if(local.i.database_name IS NOT "information_schema"){
-            arguments.dbname = local.i.database_name;
-          }
-        }
-      }
-      arguments.type = local.type;
-      cfdbinfo(attributeCollection="#arguments#");
-    }
+			cfdbinfo(attributeCollection = arguments);
+			if (local.rv.recordCount GT 1) {
+				for (local.i in local.rv) {
+					if (local.i.database_name IS NOT "information_schema") {
+						arguments.dbname = local.i.database_name;
+					}
+				}
+			}
+			arguments.type = local.type;
+			cfdbinfo(attributeCollection = arguments);
+		}
 
-    // Override name of database adapter when running internal tests
-    if(arguments.type IS "version"
-       AND StructKeyExists(url, "controller")
-       AND StructKeyExists(url, "action")
-       AND StructKeyExists(url, "view")
-       AND StructKeyExists(url, "type")
-       AND StructKeyExists(url, "adapter")){
-      if(url.controller IS "wheels" AND url.action IS "wheels" AND url.view IS "tests" AND url.type IS "core"){
-        QuerySetCell(local.rv, "driver_name", url.adapter);
-      }
-    }
+		// Override name for test mode
+		if (
+			arguments.type IS "version" AND
+			structKeyExists(url, "controller") AND
+			structKeyExists(url, "action") AND
+			structKeyExists(url, "view") AND
+			structKeyExists(url, "type") AND
+			structKeyExists(url, "adapter")
+		) {
+			if (url.controller IS "wheels" AND url.action IS "wheels" AND url.view IS "tests" AND url.type IS "core") {
+				QuerySetCell(local.rv, "driver_name", url.adapter);
+			}
+		}
 
-    return local.rv;
+		return local.rv;
 	}
 
 	public any function $wddx(required any input, string action = "cfml2wddx", boolean useTimeZoneInfo = true){
@@ -337,17 +383,16 @@ component output="false" {
 	}
 
 	public any function $query(required string sql){
-    StructDelete(arguments, "name");
-    // allow the use of query of queries, caveat: Query must be called query. Eg: SELECT * from query
+		StructDelete(arguments, "name");
+		// allow the use of query of queries, caveat: Query must be called query. Eg: SELECT * from query
 		if(StructKeyExists(arguments, "query") && IsQuery(arguments.query)){
 			var query = Duplicate(arguments.query);
-    }
-
-    local.rv = queryExecute(PreserveSingleQuotes(arguments.sql), [],  arguments);
+		}
+		local.rv = queryExecute(PreserveSingleQuotes(arguments.sql), [],  arguments);
 		// some sql statements may not return a value
 		if(StructKeyExists(local, "rv")){
 			return local.rv;
-    }
+		}
 	}
 
 
@@ -452,6 +497,67 @@ component output="false" {
 	 * Internal function.
 	 */
 	public string function $convertToString(required any value, string type = "") {
+		// Normalize inputs
+		local.val = arguments.value;
+		local.detectedType = arguments.type;
+
+		// BoxLang sometimes returns oracle.sql.TIMESTAMP objects that aren't recognized as CFML date objects.
+		if (
+			(StructKeyExists(server, "boxlang") || StructKeyExists(server, "coldfusion")) &&
+			IsObject(local.val) &&
+			FindNoCase("oracle.sql.TIMESTAMP", GetMetadata(local.val).name)
+		) {
+			try {
+				// Safely convert it to a CFML date using its toString() method, which returns an ISO-like string
+				local.val = ParseDateTime(local.val.toString());
+				local.detectedType = "datetime";
+			} catch (any e) {
+				// Fallback: just get the string representation
+				local.val = local.val.toString();
+				local.detectedType = "string";
+			}
+		}
+
+		// If no explicit type passed, try to detect a sensible one
+		if (!Len(detectedType)) {
+			if (IsArray(val)) {
+				detectedType = "array";
+			} else if (IsStruct(val)) {
+				detectedType = "struct";
+			} else if (IsBinary(val)) {
+				detectedType = "binary";
+			} else if (IsNumeric(val)) {
+				detectedType = "integer";
+			} else if (IsDate(val)) {
+				detectedType = "datetime";
+			} else {
+				detectedType = "string";
+			}
+		}
+
+		// --- EARLY DATE/TIME PROMOTION ---
+		// If the caller provided a non-datetime type (eg "string") but the value looks like a date/time,
+		// promote it to datetime so the switch branch will canonicalize properly.
+		if (
+			detectedType NEQ "datetime"
+			AND IsSimpleValue(val)
+			AND Len(Trim(val))
+		) {
+			local.s = Trim(val);
+
+			// Match patterns loosely so they work for plain dates too
+			local.patternAMPM  = '^\d{1,2}/\d{1,2}/\d{4}(\s+\d{1,2}:\d{2}(\s*(AM|PM))?)?$';
+			local.patternISO   = '^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$';
+			local.patternSlash = '^\s*\d{1,2}/\d{1,2}/\d{4}\s*$';
+
+
+			// Day name or other verbose formats are ignored to avoid false positives
+			if (ReFindNoCase(local.patternAMPM, local.s) OR ReFindNoCase(local.patternISO, local.s) OR ReFindNoCase(local.patternSlash, local.s)) {
+				// Promote to datetime so the datetime branch will run below
+				detectedType = "datetime";
+			}
+		}
+
 		// BoxLang compatibility: Pre-process problematic date strings before type detection
 		if (StructKeyExists(server, "boxlang") && IsSimpleValue(arguments.value) && ReFindNoCase("^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2} (AM|PM)$", arguments.value)) {
 			// Manually parse DD/MM/YYYY format to avoid BoxLang's MM/DD/YYYY interpretation
@@ -462,7 +568,7 @@ component output="false" {
 			
 			local.dateComponents = ListToArray(local.datePart, "/");
 			local.timeComponents = ListToArray(local.timePart, ":");
-			
+
 			local.day = Val(local.dateComponents[1]);    // First = day (DD/MM/YYYY)
 			local.month = Val(local.dateComponents[2]);  // Second = month
 			local.year = Val(local.dateComponents[3]);
@@ -474,73 +580,124 @@ component output="false" {
 			} else if (local.amPm == "AM" && local.hour == 12) {
 				local.hour = 0;
 			}
-			arguments.value = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+			// convert to a real datetime object and continue (so switch will format it)
+			val = CreateDateTime(local.year, local.month, local.day, local.hour, local.minute, 0);
+			// ensure detectedType is datetime so switch will format
+			detectedType = "datetime";
 		}
 
-		if (!Len(arguments.type)) {
-			if (IsArray(arguments.value)) {
-				arguments.type = "array";
-			} else if (IsStruct(arguments.value)) {
-				arguments.type = "struct";
-			} else if (IsBinary(arguments.value)) {
-				arguments.type = "binary";
-			} else if (IsNumeric(arguments.value)) {
-				arguments.type = "integer";
-			} else if (IsDate(arguments.value)) {
-				arguments.type = "datetime";
-			}
-		}
-		switch (arguments.type) {
+		// --- SWITCH ON (possibly promoted) TYPE ---
+		switch (detectedType) {
 			case "array":
-				arguments.value = ArrayToList(arguments.value);
-				break;
+				return ArrayToList(val);
+
 			case "struct":
-				local.str = "";
-				local.keyList = ListSort(StructKeyList(arguments.value), "textnocase", "asc");
-				local.keyArray = ListToArray(local.keyList);
-				local.iEnd = ArrayLen(local.keyArray);
-				for (local.i = 1; local.i <= local.iEnd; local.i++) {
-					local.key = local.keyArray[local.i];
-					local.str = ListAppend(local.str, local.key & "=" & arguments.value[local.key]);
+				local.kList = ListSort(StructKeyList(val), "textnocase", "asc");
+				local.out = "";
+				for (local.k in ListToArray(local.kList)) {
+					local.out = ListAppend(local.out, local.k & "=" & val[local.k]);
 				}
-				arguments.value = local.str;
-				break;
+				return local.out;
+
 			case "binary":
-				arguments.value = ToString(arguments.value);
-				break;
+				return ToString(val);
+
 			case "float":
 			case "integer":
-				if (!Len(arguments.value)) {
+				if (!Len(val)) {
 					return "";
 				}
-				if (arguments.value == "true") {
-					return 1;
+				if (val == "true") {
+					return "1";
 				}
-				arguments.value = Val(arguments.value);
-				break;
+				return Val(val);
+
 			case "boolean":
-				if (Len(arguments.value)) {
-					arguments.value = (arguments.value IS true);
+				if (Len(val)) {
+					return (val IS true) ? "true" : "false";
 				}
-				break;
+				return "";
+
 			case "datetime":
-				if(isInstanceOf(arguments.value, "oracle.sql.TIMESTAMP")){
-					arguments.value = arguments.value.timestampValue();
+				// If it's already a date object, canonicalize
+				if (IsDate(val)) {
+					return DateFormat(val, "yyyy-mm-dd") & " " & TimeFormat(val, "HH:mm:ss");
 				}
-				// createdatetime will throw an error
-				if (IsDate(arguments.value)) {
-					arguments.value = CreateDateTime(
-						Year(arguments.value),
-						Month(arguments.value),
-						Day(arguments.value),
-						Hour(arguments.value),
-						Minute(arguments.value),
-						Second(arguments.value)
-					);
+
+				// If it is a string that looks like a date, try parsing
+				if (IsSimpleValue(val)) {
+					local.s2 = Trim(val);
+					// Try ParseDateTime (which handles many formats)
+					try {
+						local.dt = ParseDateTime(local.s2);
+						if (IsDate(local.dt)) {
+							return DateFormat(local.dt, "yyyy-mm-dd") & " " & TimeFormat(local.dt, "HH:mm:ss");
+						}
+					} catch (any e) {
+						// fallback parsing attempts for common formats
+
+						// 1) ISO YYYY-MM-DD[ hh[:mm[:ss]]]
+						if (ReFind("(?i)^(\\d{4})-(\\d{2})-(\\d{2})(?:[ T](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$", local.s2)) {
+							local.parts = REReplace(local.s2, "^(\\d{4})-(\\d{2})-(\\d{2}).*$", "\\1-\\2-\\3", "all");
+							local.timePart = REReplace(local.s2, ".*[ T](\\d{1,2}:\\d{2}(?::\\d{2})?).*$", "\\1", "all");
+							if (Len(local.timePart) AND local.timePart NEQ local.s2) {
+								// has time
+								local.dt = ParseDateTime(local.parts & " " & local.timePart);
+								if (IsDate(local.dt)) {
+									return DateFormat(local.dt, "yyyy-mm-dd") & " " & TimeFormat(local.dt, "HH:mm:ss");
+								}
+							} else {
+								// date only
+								local.dt = CreateDate(Val(ListGetAt(local.parts,1,"-")), Val(ListGetAt(local.parts,2,"-")), Val(ListGetAt(local.parts,3,"-")));
+								return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+							}
+						}
+
+						// 2) Slash format DD/MM/YYYY or MM/DD/YYYY — prefer DD/MM/YYYY if BoxLang or if day>12
+						if (ReFind("^\\d{1,2}/\\d{1,2}/\\d{4}", local.s2)) {
+							local.comps = ListToArray(local.s2, "/");
+							local.d1 = Val(local.comps[1]);
+							local.d2 = Val(local.comps[2]);
+							local.y  = Val(local.comps[3]);
+
+							// Heuristic: if day part > 12 then it's DD/MM/YYYY
+							if (d1 > 12) {
+								local.day = d1; local.month = d2;
+							} else if (d2 > 12) {
+								// likely MM/DD/YYYY
+								local.month = d1; local.day = d2;
+							} else {
+								// ambiguous -> prefer DD/MM/YYYY if server.boxlang exists, else MM/DD/YYYY
+								if (StructKeyExists(server, "boxlang")) {
+									local.day = d1; local.month = d2;
+								} else {
+									local.month = d1; local.day = d2;
+								}
+							}
+							local.dt = CreateDate(y, local.month, local.day);
+							// if time exists in same string, try to parse it using ParseDateTime
+							if (ReFind("\\d{1,2}:\\d{2}", local.s2)) {
+								try {
+									local.dt2 = ParseDateTime(local.s2);
+									if (IsDate(local.dt2)) {
+										return DateFormat(local.dt2, "yyyy-mm-dd") & " " & TimeFormat(local.dt2, "HH:mm:ss");
+									}
+								} catch (any e2) {
+									// fallback to midnight
+									return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+								}
+							}
+							return DateFormat(local.dt, "yyyy-mm-dd") & " 00:00:00";
+						}
+					}
 				}
-				break;
+				// If we reach here, parsing failed — return original string to allow comparison
+				return val;
+
+			default:
+				// Default: return raw value as string (no conversion)
+				return val;
 		}
-		return arguments.value;
 	}
 
 	/**
@@ -676,6 +833,15 @@ component output="false" {
 			default:
 				Throw(type = "Wheels.InvalidTimeStampMode", message = "Timestamp mode #arguments.timeStampMode# is invalid");
 		}
+
+		// Handle SQLite (TEXT storage)
+		if (get("adapterName") == "SQLite") {
+			// Store as quoted ISO 8601 string (standard for SQLite)
+			if (IsDate(local.rv)) {
+				local.rv = "'#DateFormat(local.rv, 'yyyy-mm-dd')# #TimeFormat(local.rv, 'HH:mm:ss')#'";
+			}
+		}
+
 		return local.rv;
 	}
 

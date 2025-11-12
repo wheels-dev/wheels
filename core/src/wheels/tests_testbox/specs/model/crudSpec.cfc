@@ -8,6 +8,9 @@ component extends="wheels.Testbox" {
 
 			beforeEach(() => {
 				binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.png'))
+				if( application.wheels.adapterName eq 'SQLite' ){
+					binaryData = toBase64(binaryData)
+				}
 			})
 
 			it("is updating", () => {
@@ -284,6 +287,9 @@ component extends="wheels.Testbox" {
 					expect(photo.hasChanged('fileData')).toBeFalse()
 
 					binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.png'))
+					if( application.wheels.adapterName eq 'SQLite' ){
+						binaryData = toBase64(binaryData)
+					}
 					photo.fileData = binaryData
 
 					expect(photo.hasChanged('fileData')).toBeTrue()
@@ -298,6 +304,9 @@ component extends="wheels.Testbox" {
 					expect(photo.hasChanged('fileData')).toBeFalse()
 
 					binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.txt'))
+					if( application.wheels.adapterName eq 'SQLite' ){
+						binaryData = toBase64(binaryData)
+					}
 					photo.fileData = binaryData
 
 					expect(photo.hasChanged('fileData')).toBeTrue()

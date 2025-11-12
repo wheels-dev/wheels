@@ -6,7 +6,7 @@ component extends="Base" {
 			Throw(
 				type = "wheels.model.migrate.DatabaseNotSupported",
 				message = "#dbType# is not supported by Wheels.",
-				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL or H2."
+				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, Oracle, SQLite or H2."
 			);
 		} else {
 			this.adapter = CreateObject("component", "adapters.#dbType#");
@@ -115,7 +115,8 @@ component extends="Base" {
 	 */
 	public void function dropTable(required string name) {
 		local.appKey = $appKey();
-		if (application[local.appKey].serverName != "lucee") {
+		local.adapterName = $getDBType();
+		if (application[local.appKey].serverName != "lucee" && local.adapterName != "SQLite") {
 			local.foreignKeys = $getForeignKeys(arguments.name);
 			local.foreignKeysArray = ListToArray(local.foreignKeys);
 			local.iEnd = ArrayLen(local.foreignKeysArray);

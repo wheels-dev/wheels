@@ -18,7 +18,13 @@ component {
 			} else {
 				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
 			}
-			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = "cf_sql_timestamp"};
+			// Use cf_sql_varchar in SQLite for TEXT timestamps
+			if(get("adapterName") eq "SQLite") {
+				local.type = "cf_sql_varchar";
+			} else {
+				local.type = "cf_sql_timestamp";
+			}
+			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = local.type};
 			ArrayAppend(arguments.sql, local.param);
 		} else {
 			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
@@ -623,7 +629,7 @@ component {
 		// Issue#1273: Added this section to allow included tables to be referenced in the query
 		local.migration = CreateObject("component", "wheels.migrator.Migration").init();
 		local.tempSql = "";
-		if(arguments.include != "" && ListFind('PostgreSQL,H2,MicrosoftSQLServer,Oracle', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		if(arguments.include != "" && ListFind('PostgreSQL,H2,MicrosoftSQLServer,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			local.tempSql = arguments.sql;
 		}
 		local.whereClause = $whereClause(
@@ -644,7 +650,7 @@ component {
 				ArrayAppend(arguments.sql, "FROM #tablename()#");
 			}
 		}
-		else if(arguments.include != "" && ListFind('H2,Oracle', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		else if(arguments.include != "" && ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			if(left(arguments.sql[1], 6) == 'UPDATE'){
 				ArrayAppend(arguments.sql, "WHERE EXISTS (SELECT 1 FROM #arguments.include#");
 			}
@@ -687,7 +693,7 @@ component {
 				}
 				ArrayAppend(local.rv, "#local.joinclause# WHERE ");
 			}
-			else if(arguments.include != "" && ListFind('Oracle', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+			else if(arguments.include != "" && ListFind('Oracle,SQLite', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
 				ArrayAppend(local.rv, "WHERE");
 				ArrayAppend(local.rv, local.classes[2].JOIN.Split("ON")[2] & " AND");
 			}
@@ -817,7 +823,7 @@ component {
 			local.addToWhere = Replace(local.addToWhere, ",", " AND ", "all");
 			if (Len(local.addToWhere)) {
 				if (Len(arguments.where)) {
-					if(!(ListFind('Oracle', local.migration.adapter.adapterName()) && (isArray(arguments.sql) && left(arguments.sql[1], 6) == 'UPDATE'))){
+					if(!(ListFind('Oracle,SQLite', local.migration.adapter.adapterName()) && (isArray(arguments.sql) && left(arguments.sql[1], 6) == 'UPDATE'))){
 						ArrayInsertAt(local.rv, local.wherePos, " (");
 					}
 					ArrayAppend(local.rv, ") AND (");

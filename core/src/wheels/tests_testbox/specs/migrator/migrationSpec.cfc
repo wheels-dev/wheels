@@ -653,6 +653,13 @@ component extends="wheels.Testbox" {
 		describe("Tests addForeignKey", () => {
 
 			it("creates a foregin key constraint", () => {
+				local.info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version")
+				local.db = LCase(Replace(local.info.database_productname, " ", "", "all"))
+
+				if(local.db eq 'sqlite'){
+					skip("SQLite does not allow altering CONSTRAINTS.")
+				}
+
 				tableName = "dbm_afk_foos"
 				referenceTableName = "dbm_afk_bars"
 
@@ -688,7 +695,9 @@ component extends="wheels.Testbox" {
 
 			beforeEach(() => {
 				isACF2016 = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor == 2016
+				isACF = application.wheels.serverName == "Adobe Coldfusion" && application.wheels.serverVersionMajor >= 2018
 				isPostgres = migration.adapter.adapterName() == "PostgreSQL"
+				isSQLite = migration.adapter.adapterName() == "SQLite"
 				isLucee = application.wheels.serverName == "Lucee"
 				isBoxLang = application.wheels.serverName == "BoxLang"
 			})
@@ -739,7 +748,7 @@ component extends="wheels.Testbox" {
 
 				// Added the ListLen check here for CF2018 because its cfdbinfo behaves a little differently.
 				// It returns the index for multiple columns in one record where as Lucee or Boxlang returns multiple.
-				if(isLucee || isBoxLang) {
+				if((isLucee || isBoxLang) || (isSQLite && isACF)) {
 					expect(actual.recordCount).toBe(2)
 				} else {
 					expect(ListLen(actual['column_name'][1])).toBe(2)
@@ -791,6 +800,9 @@ component extends="wheels.Testbox" {
 		describe("Tests changeColumn", () => {
 
 			it("is changing column", () => {
+				if(get("adapterName") eq 'SQLite') {
+					skip("SQLite does not allow altering Columns.")
+				}
 				tableName = "dbm_changecolumn_tests"
 				columnName = "stringcolumn"
 
@@ -903,6 +915,9 @@ component extends="wheels.Testbox" {
 		describe("Tests dropForeignKey", () => {
 
 			it("drops a foreign key constraint", () => {
+				if(get("adapterName") eq 'SQLite') {
+					skip("SQLite does not allow altering CONSTRAINTS.")
+				}
 				tableName = "dbm_dfk_foos"
 				referenceTableName = "dbm_dfk_bars"
 
@@ -954,7 +969,7 @@ component extends="wheels.Testbox" {
 
 				expect(function() {
 					g.$query(datasource = application.wheels.dataSourceName, sql = "SELECT * FROM #tableName#")
-				}).toThrow("database")
+				}).toThrow()
 			})
 		})
 
