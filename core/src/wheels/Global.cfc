@@ -503,7 +503,7 @@ component output="false" {
 
 		// BoxLang sometimes returns oracle.sql.TIMESTAMP objects that aren't recognized as CFML date objects.
 		if (
-			StructKeyExists(server, "boxlang") &&
+			(StructKeyExists(server, "boxlang") || StructKeyExists(server, "coldfusion")) &&
 			IsObject(local.val) &&
 			FindNoCase("oracle.sql.TIMESTAMP", GetMetadata(local.val).name)
 		) {
