@@ -1,13 +1,13 @@
 ---
 description: >-
-  Learn how to use SQLite with CFWheels for lightweight, file-based database
+  Learn how to use SQLite with Wheels for lightweight, file-based database
   development and testing. Understand SQLite's capabilities, limitations, and
   best practices.
 ---
 
-# Using SQLite with CFWheels
+# Using SQLite with Wheels
 
-SQLite is a self-contained, serverless, zero-configuration, file-based SQL database engine. It's perfect for development, testing, and lightweight applications. CFWheels provides full support for SQLite with some important considerations to keep in mind.
+SQLite is a self-contained, serverless, zero-configuration, file-based SQL database engine. It's perfect for development, testing, and lightweight applications. Wheels provides full support for SQLite with some important considerations to keep in mind.
 
 ## What is SQLite?
 
@@ -21,7 +21,7 @@ SQLite is different from traditional client-server databases like MySQL, Postgre
 
 ## When to Use SQLite
 
-### ✅ Ideal Use Cases
+### Ideal Use Cases
 
 - **Local Development**: Fast setup without running a database server
 - **Automated Testing**: Clean, isolated test databases for each test run
@@ -29,7 +29,7 @@ SQLite is different from traditional client-server databases like MySQL, Postgre
 - **Small Applications**: Desktop apps, mobile apps, or embedded systems
 - **Read-Heavy Workloads**: Applications with more reads than writes
 
-### ❌ Not Recommended For
+### Not Recommended For
 
 - **High-Concurrency Writes**: SQLite locks the entire database file during writes
 - **Large-Scale Production**: Better options exist for high-traffic applications
@@ -56,6 +56,26 @@ cp sqlite-jdbc-3.50.3.0.jar /path/to/coldfusion/lib/
 ```
 
 Restart ColdFusion after adding the driver.
+
+#### Boxlang
+
+Download the SQLite module for Boxlang from [ForgeBox](https://forgebox.io/view/bx-sqlite) or simply list it as a dependency in your `box.json` file and then run `install` command to install all dependencies. Your box.json may look something like this:
+
+```bash
+{
+  "dependencies" : {
+    "wheels-core":"3.0.0-SNAPSHOT",
+    "wirebox":"^7",
+    "testbox":"^6",
+    "bx-compat-cfml":"^1.27.0+35",
+    "bx-csrf":"^1.2.0+3",
+    "bx-esapi":"^1.6.0+9",
+    "bx-image":"^1.0.1",
+    "bx-wddx":"^1.5.0+8",
+    "bx-sqlite":"^1.1.0+2"
+  }
+}
+```
 
 ### Creating a Data Source
 
@@ -273,16 +293,20 @@ function enableForeignKeys() {
 
 ### Concurrent Writes
 
-SQLite locks the entire database during write operations. For applications with high write concurrency:
+SQLite uses database-level locking during write operations, which can limit performance when multiple writes occur simultaneously. This behavior makes it less suitable for applications with high write concurrency.
 
-- Use a dedicated database server (MySQL, PostgreSQL)
-- Keep SQLite for development/testing only
-- Use Write-Ahead Logging (WAL) mode for better concurrency:
+If your application performs frequent concurrent writes, consider the following options:
+
+- Use a dedicated database server such as MySQL or PostgreSQL for production environments.
+- Reserve SQLite for development or testing, where simplicity and portability matter more than concurrency.
+- Enable Write-Ahead Logging (WAL) mode to improve concurrency and allow simultaneous reads and writes:
 
 ```javascript
-// Enable WAL mode
-queryExecute("PRAGMA journal_mode=WAL", [], {datasource: "myapp"});
+// Enable WAL mode for better concurrent access
+queryExecute("PRAGMA journal_mode = WAL", [], { datasource: "myapp" });
 ```
+
+WAL mode allows readers and writers to operate concurrently by logging changes to a separate file before committing them to the main database, significantly reducing contention.
 
 ### Case Sensitivity
 
@@ -416,11 +440,11 @@ queryExecute("PRAGMA busy_timeout = 10000", [], {datasource: "myapp"});
 **Solution**: Wheels automatically handles datetime conversion. Ensure you're using Wheels' datetime functions:
 
 ```javascript
-// ✅ Correct
+// Correct
 user.createdAt = Now();
 user.save();
 
-// ❌ Incorrect (manual string formatting)
+// Incorrect (manual string formatting)
 user.createdAt = DateFormat(Now(), "yyyy-mm-dd");
 ```
 
@@ -432,7 +456,7 @@ user.createdAt = DateFormat(Now(), "yyyy-mm-dd");
 
 ## Best Practices
 
-### ✅ Do
+### Do
 
 - Use SQLite for development and testing
 - Enable foreign keys per connection if using constraints
@@ -441,7 +465,7 @@ user.createdAt = DateFormat(Now(), "yyyy-mm-dd");
 - Add `*.db` to `.gitignore` to avoid committing database files
 - Use WAL mode for better concurrency: `PRAGMA journal_mode=WAL`
 
-### ❌ Don't
+### Don't
 
 - Use SQLite for high-traffic production applications
 - Store databases on network file systems (NFS/SMB)
@@ -530,12 +554,12 @@ Ensure all queries work correctly with the new database adapter. Watch for:
 
 - [SQLite Official Documentation](https://www.sqlite.org/docs.html)
 - [SQLite JDBC Driver](https://github.com/xerial/sqlite-jdbc)
-- [CFWheels Database Interaction Guide](../database-interaction-through-models/)
-- [CFWheels Migrations Guide](./database-migrations.md)
+- [Wheels Database Interaction Guide](../database-interaction-through-models/)
+- [Wheels Migrations Guide](./database-migrations.md)
 
 ## Summary
 
-SQLite is an excellent choice for CFWheels development and testing:
+SQLite is an excellent choice for Wheels development and testing:
 
 - **Zero configuration** makes it perfect for getting started quickly
 - **File-based** nature simplifies deployment and backup
