@@ -501,6 +501,23 @@ component output="false" {
 		local.val = arguments.value;
 		local.detectedType = arguments.type;
 
+		// BoxLang sometimes returns oracle.sql.TIMESTAMP objects that aren't recognized as CFML date objects.
+		if (
+			StructKeyExists(server, "boxlang") &&
+			IsObject(local.val) &&
+			FindNoCase("oracle.sql.TIMESTAMP", GetMetadata(local.val).name)
+		) {
+			try {
+				// Safely convert it to a CFML date using its toString() method, which returns an ISO-like string
+				local.val = ParseDateTime(local.val.toString());
+				local.detectedType = "datetime";
+			} catch (any e) {
+				// Fallback: just get the string representation
+				local.val = local.val.toString();
+				local.detectedType = "string";
+			}
+		}
+
 		// If no explicit type passed, try to detect a sensible one
 		if (!Len(detectedType)) {
 			if (IsArray(val)) {
