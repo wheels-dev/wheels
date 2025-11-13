@@ -47,6 +47,7 @@
                 thisResult = {
                     packageName = bundleName,
                     testName = structKeyExists(spec, "name") ? spec.name : "Unknown Test",
+                    testId = structKeyExists(spec, "id") ? spec.id : "",
                     time = structKeyExists(spec, "totalDuration") ? spec.totalDuration : 0,
                     status = "",
                     message = "",
@@ -193,7 +194,7 @@
                 <cfloop array="#failures#" index="result">
                     <tr class="error">
                         <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?method=runRemote&testSpecs=#ReplaceNoCase(result.testName," ","%20","all")#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td class="failed">#result.status#</td>
                     </tr>
@@ -232,7 +233,7 @@
                     <cfloop array="#errors#" index="result">
                         <tr class="error">
                             <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                            <td><a href="?method=runRemote&testSpecs=#ReplaceNoCase(result.testName," ","%20","all")#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
+                            <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                             <td class="n">#result.time#</td>
                             <td class="failed">#result.status#</td>
                         </tr>
@@ -272,7 +273,7 @@
                 <cfloop array="#passes#" index="result">
                     <tr class="positive">
                         <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?method=runRemote&testSpecs=#ReplaceNoCase(result.testName," ","%20","all")#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td class="success">#result.status#</td>
                     </tr>
@@ -280,8 +281,8 @@
 
                 <cfloop array="#skipped#" index="result">
                     <tr>
-                        <td><a href="?directory=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?directory=#result.packageName#&testSpecs=#result.testName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                        <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td>#result.status#</td>
                     </tr>
