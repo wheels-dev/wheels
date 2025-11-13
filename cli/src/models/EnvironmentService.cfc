@@ -462,6 +462,23 @@ component {
                     sid: dbSid
                 };
                 break;
+            case "sqlite":
+                // SQLite requires absolute path - calculate it now
+                var dbFileName = len(trim(arguments.database)) ?
+                    "#arguments.database#.db" :
+                    "wheels_#arguments.environment#.db";
+                // Get absolute path to db directory
+                var absoluteDbPath = arguments.rootPath & "/db/" & dbFileName;
+                config.datasourceInfo = {
+                    driver: "SQLite",
+                    host: "",
+                    port: "",
+                    database: absoluteDbPath,
+                    datasource: datasourceName,
+                    username: "",
+                    password: ""
+                };
+                break;
             default: // h2
                 config.datasourceInfo = {
                     driver: "H2",
@@ -497,6 +514,8 @@ component {
                 return "wheels";
             case "h2":
                 return "sa";
+            case "sqlite":
+                return "";
             default:
                 return "wheels";
         }
@@ -516,6 +535,8 @@ component {
             case "oracle":
                 return "wheels_password";
             case "h2":
+                return "";
+            case "sqlite":
                 return "";
             default:
                 return "wheels_password";
@@ -842,6 +863,14 @@ component {
                     connectionString: "jdbc:oracle:thin:@##this.env.DB_HOST##:##this.env.DB_PORT##:##this.env.DB_SID##"
                 };
                 break;
+            case "sqlite":
+                config = {
+                    class: "org.sqlite.JDBC",
+                    bundleName: "org.xerial.sqlite-jdbc",
+                    bundleVersion: "3.47.1.0",
+                    connectionString: "jdbc:sqlite:##this.env.DB_DATABASE##"
+                };
+                break;
             case "h2":
                 config = {
                     class: "org.h2.Driver",
@@ -1071,6 +1100,7 @@ box server start port=8080 host=0.0.0.0";
             case "postgres": return "PostgreSQL";
             case "mssql": return "MSSQL";
             case "oracle": return "Oracle";
+            case "sqlite": return "SQLite";
             default: return "H2";
         }
     }
@@ -1082,6 +1112,7 @@ box server start port=8080 host=0.0.0.0";
             case "mssql": return 1433;
             case "oracle": return 1521;
             case "h2": return ""; // H2 is embedded, no port
+            case "sqlite": return ""; // SQLite is file-based, no port
             default: return "";
         }
     }
@@ -1618,7 +1649,7 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         
         // Check database type
         if (structKeyExists(arguments.config, "DB_TYPE")) {
-            var validTypes = ["mysql", "postgres", "mssql", "h2"];
+            var validTypes = ["mysql", "postgres", "mssql", "h2", "sqlite", "oracle"];
             var dbTypeFound = false;
             for (var validType in validTypes) {
                 if (lCase(arguments.config.DB_TYPE) == validType) {
