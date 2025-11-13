@@ -229,7 +229,7 @@ For detailed information on TestBox runners and configuration options, refer to 
             application.wheels.csrfCookieEncryptionAlgorithm,
             application.wheels.csrfCookieEncryptionEncoding
         )
-        if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2", url.db)){
+        if(structKeyExists(url, "db") && listFind("mysql,sqlserver,postgres,h2,oracle,sqlite", url.db)){
             application.wheels.dataSourceName = "wheelstestdb_" & url.db;
         } else if (application.wheels.coreTestDataSourceName eq "|datasourceName|") {
             application.wheels.dataSourceName = "wheelstestdb"; 

@@ -85,6 +85,7 @@ Finally, to build any kind of meaningful website application, you will likely in
 * PostgreSQL 8.4+
 * H2 1.4+
 * Oracle 19c+
+* SQLite 3.50+
 
 {% hint style="info" %}
 **MySQL**

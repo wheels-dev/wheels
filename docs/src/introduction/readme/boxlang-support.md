@@ -73,6 +73,7 @@ For other databases supported by Wheels, install the corresponding BoxLang modul
 - **Microsoft SQL Server**: `box install bx-mssql`
 - **PostGreSQL Server**: `box install bx-postgresql`
 - **Oracle Server**: `box install bx-oracle`
+- **SQLite Server**: `box install bx-sqlite`
 
 #### Finding Additional Modules
 

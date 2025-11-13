@@ -203,6 +203,7 @@ Please help test these areas:
 ### Model Enhancements
 - PR-1326-ignoreColumns model config method [#1326](https://github.com/cfwheels/cfwheels/pull/1326) - [Adam Chapman](https://github.com/chapmandu)
 - PR-1568-issue #432 improved model initialization to handle race conditions with better error handling and automatic recovery [#1568](https://github.com/wheels-dev/wheels/pull/1568) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- **SQLite Support**: Added full support for SQLite database adapter with automatic datetime conversion to ISO 8601 text format, proper type mapping, and comprehensive test coverage across Lucee, Adobe ColdFusion, and BoxLang
 
 ### View Enhancements
 
@@ -226,12 +227,15 @@ Please help test these areas:
 - PR-1692-Update cfwheels to wheels branding [#1692](https://github.com/wheels-dev/wheels/pull/1692) - [Zain Ul Abideen](https://github.com/zainforbjs)
 - PR-1682-Update tag format to script format [#1682](https://github.com/wheels-dev/wheels/pull/1682) - [Zain Ul Abideen](https://github.com/zainforbjs)
 - PR-1681-Fix missing mail part in email content [#1681](https://github.com/wheels-dev/wheels/pull/1681) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1766-**SQLite Datetime Compatibility**: Fixed issue where SQLite would reject JDBC timestamp literals by implementing automatic conversion to ISO 8601 text format in the SQLite adapter
+- PR-1766-**SQLite Locking on Adobe ColdFusion**: Addressed intermittent SQLITE_LOCKED errors during migrations by skipping foreign key enumeration that triggered metadata queries with lingering file locks
 
 ### Miscellaneous
 - PR-1316-Feature/fix testui container [#1316](https://github.com/cfwheels/cfwheels/pull/1316) - [Peter Amiri](https://github.com/bpamiri)
 - PR-1328-Backport datasource changes to develop branch [#1328](https://github.com/cfwheels/cfwheels/pull/1328) - [Peter Amiri](https://github.com/bpamiri)
 - PR-1329-use github build vars to remove the hardcoded version number [#1329](https://github.com/cfwheels/cfwheels/pull/1329) - [Peter Amiri](https://github.com/bpamiri)
 - PR-1317-Rewrite the Vue based TestUI app [#1317](https://github.com/cfwheels/cfwheels/pull/1317) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- **SQLite Test Suite**: Added SQLite to the continuous integration test matrix for Lucee, Adobe ColdFusion, and BoxLang with comprehensive migrator and model tests
 
 ### Guides
 - PR-1304-Update beginner-tutorial-hello-database.md [#1304](https://github.com/cfwheels/cfwheels/pull/1304) - [MvdO79](https://github.com/MvdO79)
@@ -247,6 +251,7 @@ Please help test these areas:
 - PR-1686-Documentation updates for datasources [#1686](https://github.com/wheels-dev/wheels/pull/1686) - [Zain Ul Abideen](https://github.com/zainforbjs)
 - PR-1685-Testing application documentation [#1685](https://github.com/wheels-dev/wheels/pull/1685) - [Zain Ul Abideen](https://github.com/zainforbjs)
 - PR-1661-Update CONTRIBUTING.md [#1661](https://github.com/wheels-dev/wheels/pull/1661) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1766-**SQLite Documentation**: Added comprehensive guide for using SQLite with Wheels, covering setup, configuration, data types, datetime handling, migrations, associations, testing strategies, performance optimization, and troubleshooting
 
 ### Potentially Breaking Changes
 - PR-1240-Feature/move wheels outside the app root and make changes to mappings [#1240](https://github.com/cfwheels/cfwheels/pull/1240) - [Zain Ul Abideen](https://github.com/zainforbjs)
