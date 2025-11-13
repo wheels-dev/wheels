@@ -11,7 +11,7 @@ Wheels includes a comprehensive test environment specifically designed for testi
 The Wheels test environment uses Docker containers to provide a standardized setup for testing core framework functionality across:
 
 - Multiple CFML engines (Lucee 5/6/7, Adobe ColdFusion 2018/2021/2023/2025, BoxLang 1.x)
-- Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2, Oracle)
+- Multiple database platforms (MySQL, SQL Server, PostgreSQL, H2, Oracle, SQLite)
 - A modern test user interface (TestUI)
 - Automated test execution capabilities
 
@@ -231,6 +231,7 @@ box wheels test app --testBundles=controllers
 | SQL Server | sqlserver_cicd | 1434 (1433 internal) |
 | Oracle | oracle | 1522 (1521 internal) |
 | H2 | (embedded) | n/a |
+| SQLite | (embedded) | n/a |
 
 ## Pre-flight Checks and Container Management
 

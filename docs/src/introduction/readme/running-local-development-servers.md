@@ -37,6 +37,8 @@ wheels docker init cfengine=adobe cfversion=2018 db=mysql
 - `postgres` - PostgreSQL database  
 - `mssql` - Microsoft SQL Server
 - `h2` - H2 embedded database
+- `oracle` - Oracle database
+- `sqlite` - SQLite embedded database
 
 #### Generated Files
 

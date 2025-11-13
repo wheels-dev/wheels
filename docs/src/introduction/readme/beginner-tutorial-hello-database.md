@@ -112,7 +112,7 @@ Regardless of which method you choose, ensure that the datasource name and confi
 
 ### Our Sample Data Structure
 
-Wheels supports MySQL, SQL Server, PostgreSQL, Oracle and H2. It doesn't matter which DBMS you use for this tutorial; we will all be writing the same CFML code to interact with the database. Wheels does everything behind the scenes that needs to be done to work with each DBMS.
+Wheels supports MySQL, SQL Server, PostgreSQL, Oracle, SQLite and H2. It doesn't matter which DBMS you use for this tutorial; we will all be writing the same CFML code to interact with the database. Wheels does everything behind the scenes that needs to be done to work with each DBMS.
 
 That said, here's a quick look at a table that you'll need in your database, named `users`:
 
