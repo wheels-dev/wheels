@@ -11,7 +11,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that DummyTest", function() {
 
 			it("is Returning True", function() {
-				assert("true")
+				expect("true").toBeTrue()
 			})
 			
 		})

@@ -13,7 +13,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("is Returning True", () => {
-				assert("true")
+				expect("true").toBeTrue()
 			})
 			
 		})
