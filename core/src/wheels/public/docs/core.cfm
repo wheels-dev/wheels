@@ -43,7 +43,7 @@ if (StructKeyExists(application.wheels, "docs")) {
 		To fix the issue below:
 		https://github.com/wheels-dev/wheels/issues/1132
 		
-		To add the test framework functions in the documentation. Added the Test componenet in the documentscope.
+		To add the test framework functions in the documentation. Added the Test component in the documentScope.
 
 		As app/test/functions/Example.cfc can be deleted, so check if that component exists then create that component's object.
 		As Example.cfc extends tests.Test so we are checking the Example.cfc first as that will include both component's functions.
