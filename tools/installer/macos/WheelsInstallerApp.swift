@@ -134,8 +134,11 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
         enginePopup.addItems(withTitles: [
             "Lucee (Latest)",
             "Adobe ColdFusion (Latest)",
+            "BoxLang (Latest)",
+            "Lucee 7.x",
             "Lucee 6.x",
             "Lucee 5.x",
+            "Adobe ColdFusion 2025",
             "Adobe ColdFusion 2023",
             "Adobe ColdFusion 2021",
             "Adobe ColdFusion 2018"
@@ -466,8 +469,11 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
         let title = enginePopup.titleOfSelectedItem ?? ""
         if title == "Lucee (Latest)" { return "lucee" }
         if title == "Adobe ColdFusion (Latest)" { return "adobe" }
+        if title == "BoxLang (Latest)" { return "boxlang" }
+        if title == "Lucee 7.x" { return "lucee@7" }
         if title == "Lucee 6.x" { return "lucee@6" }
         if title == "Lucee 5.x" { return "lucee@5" }
+        if title == "Adobe ColdFusion 2025" { return "adobe@2025" }
         if title == "Adobe ColdFusion 2023" { return "adobe@2023" }
         if title == "Adobe ColdFusion 2021" { return "adobe@2021" }
         if title == "Adobe ColdFusion 2018" { return "adobe@2018" }
