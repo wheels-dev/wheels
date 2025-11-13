@@ -55,7 +55,7 @@ var
 
   // Radio buttons
   TemplateRadio1, TemplateRadio2, TemplateRadio3, TemplateRadio4, TemplateRadio5: TRadioButton;
-  EngineRadio1, EngineRadio2, EngineRadio3, EngineRadio4, EngineRadio5, EngineRadio6, EngineRadio7: TRadioButton;
+  EngineRadio1, EngineRadio2, EngineRadio3, EngineRadio4, EngineRadio5, EngineRadio6, EngineRadio7, EngineRadio8, EngineRadio9, EngineRadio10: TRadioButton;
 
   // Installation result tracking
   InstallationResult: Integer;
@@ -169,15 +169,21 @@ begin
   EngineRadio2 := TRadioButton.Create(WizardForm); EngineRadio2.Parent := EnginePage.Surface;
   EngineRadio2.Left := 8; EngineRadio2.Top := topPos+28; EngineRadio2.Width := EnginePage.SurfaceWidth-16; EngineRadio2.Caption := 'Adobe ColdFusion (Latest)';
   EngineRadio3 := TRadioButton.Create(WizardForm); EngineRadio3.Parent := EnginePage.Surface;
-  EngineRadio3.Left := 8; EngineRadio3.Top := topPos+56; EngineRadio3.Width := EnginePage.SurfaceWidth-16; EngineRadio3.Caption := 'Lucee 6.x';
+  EngineRadio3.Left := 8; EngineRadio3.Top := topPos+56; EngineRadio3.Width := EnginePage.SurfaceWidth-16; EngineRadio3.Caption := 'BoxLang (Latest)';
   EngineRadio4 := TRadioButton.Create(WizardForm); EngineRadio4.Parent := EnginePage.Surface;
-  EngineRadio4.Left := 8; EngineRadio4.Top := topPos+84; EngineRadio4.Width := EnginePage.SurfaceWidth-16; EngineRadio4.Caption := 'Lucee 5.x';
+  EngineRadio4.Left := 8; EngineRadio4.Top := topPos+84; EngineRadio4.Width := EnginePage.SurfaceWidth-16; EngineRadio4.Caption := 'Lucee 7.x';
   EngineRadio5 := TRadioButton.Create(WizardForm); EngineRadio5.Parent := EnginePage.Surface;
-  EngineRadio5.Left := 8; EngineRadio5.Top := topPos+112; EngineRadio5.Width := EnginePage.SurfaceWidth-16; EngineRadio5.Caption := 'Adobe ColdFusion 2023';
+  EngineRadio5.Left := 8; EngineRadio5.Top := topPos+112; EngineRadio5.Width := EnginePage.SurfaceWidth-16; EngineRadio5.Caption := 'Lucee 6.x';
   EngineRadio6 := TRadioButton.Create(WizardForm); EngineRadio6.Parent := EnginePage.Surface;
-  EngineRadio6.Left := 8; EngineRadio6.Top := topPos+140; EngineRadio6.Width := EnginePage.SurfaceWidth-16; EngineRadio6.Caption := 'Adobe ColdFusion 2021';
+  EngineRadio6.Left := 8; EngineRadio6.Top := topPos+140; EngineRadio6.Width := EnginePage.SurfaceWidth-16; EngineRadio6.Caption := 'Lucee 5.x';
   EngineRadio7 := TRadioButton.Create(WizardForm); EngineRadio7.Parent := EnginePage.Surface;
-  EngineRadio7.Left := 8; EngineRadio7.Top := topPos+168; EngineRadio7.Width := EnginePage.SurfaceWidth-16; EngineRadio7.Caption := 'Adobe ColdFusion 2018';
+  EngineRadio7.Left := 8; EngineRadio7.Top := topPos+168; EngineRadio7.Width := EnginePage.SurfaceWidth-16; EngineRadio7.Caption := 'Adobe ColdFusion 2025';
+  EngineRadio8 := TRadioButton.Create(WizardForm); EngineRadio8.Parent := EnginePage.Surface;
+  EngineRadio8.Left := 8; EngineRadio8.Top := topPos+196; EngineRadio8.Width := EnginePage.SurfaceWidth-16; EngineRadio8.Caption := 'Adobe ColdFusion 2023';
+  EngineRadio9 := TRadioButton.Create(WizardForm); EngineRadio9.Parent := EnginePage.Surface;
+  EngineRadio9.Left := 8; EngineRadio9.Top := topPos+224; EngineRadio9.Width := EnginePage.SurfaceWidth-16; EngineRadio9.Caption := 'Adobe ColdFusion 2021';
+  EngineRadio10 := TRadioButton.Create(WizardForm); EngineRadio10.Parent := EnginePage.Surface;
+  EngineRadio10.Left := 8; EngineRadio10.Top := topPos+252; EngineRadio10.Width := EnginePage.SurfaceWidth-16; EngineRadio10.Caption := 'Adobe ColdFusion 2018';
 
   { === Page 5: Options (H2 + Bootstrap + InitPkg) === }
   OptionsPage := CreateCustomPage(EnginePage.ID, 'Options', 'Select optional settings for your application.');
@@ -244,10 +250,13 @@ function GetEngine(Param: String): String;
 begin
   if EngineRadio1.Checked then Result := 'lucee'
   else if EngineRadio2.Checked then Result := 'adobe'
-  else if EngineRadio3.Checked then Result := 'lucee@6'
-  else if EngineRadio4.Checked then Result := 'lucee@5'
-  else if EngineRadio5.Checked then Result := 'adobe@2023'
-  else if EngineRadio6.Checked then Result := 'adobe@2021'
+  else if EngineRadio3.Checked then Result := 'boxlang'
+  else if EngineRadio4.Checked then Result := 'lucee@7'
+  else if EngineRadio5.Checked then Result := 'lucee@6'
+  else if EngineRadio6.Checked then Result := 'lucee@5'
+  else if EngineRadio7.Checked then Result := 'adobe@2025'
+  else if EngineRadio8.Checked then Result := 'adobe@2023'
+  else if EngineRadio9.Checked then Result := 'adobe@2021'
   else Result := 'adobe@2018';
 end;
 
