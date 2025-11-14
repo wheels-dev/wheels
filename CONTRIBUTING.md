@@ -44,7 +44,7 @@ We welcome contributions via **Issues** and **Pull Requests (PRs)**. Before you 
 **System Requirements:**
 
 * Adobe ColdFusion 2018/2021/2023/2025 OR Lucee 5/6/7
-* Supported database: H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle
+* Supported database: H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle, SQLite
 * Git for version control
 
 **Initial Setup:**
@@ -132,7 +132,7 @@ If you're making a **breaking change** or working on **core functionality**, it'
 
 **Test Database Requirements:**
 
-* Supported engines: H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle
+* Supported engines: H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle, SQLite
 
 **Writing Tests:**
 
@@ -183,6 +183,7 @@ Wheels 3.0 includes these core dependencies (automatically managed):
 
 **Database Support:**
 
+* SQLite (new in 3.0)
 * Oracle (new in 3.0)
 * Microsoft SQL Server
 * PostgreSQL  

@@ -156,7 +156,7 @@ component {
 - `global` - Global functions
 - `application` - Application scope
 - `none` - No injection
-- `microsoftsqlserver`, `mysql`, `oracle`, `postgresql` - Database adapters
+- `microsoftsqlserver`, `mysql`, `oracle`, `postgresql`, `SQLite` - Database adapters
 
 #### Environment Targeting
 Restrict plugin loading to specific environments:
