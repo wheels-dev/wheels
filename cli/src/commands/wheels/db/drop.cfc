@@ -1,9 +1,21 @@
 /**
  * Drop an existing database
  *
+ * Supports MySQL, PostgreSQL, SQL Server, Oracle, H2, and SQLite databases.
+ * For SQLite and H2, this will delete the database files from disk.
+ * For server-based databases, this will drop the database from the server.
+ *
  * {code:bash}
+ * # Drop database using current environment's datasource
  * wheels db drop
+ *
+ * # Drop specific datasource
  * wheels db drop --datasource=myapp_dev
+ *
+ * # Drop with specific environment
+ * wheels db drop --datasource=myapp_dev --environment=production
+ *
+ * # Skip confirmation prompt
  * wheels db drop --force
  * {code}
  */
@@ -99,6 +111,9 @@ component extends="../base" {
 					break;
 				case "H2":
 					dropH2Database(local.dsInfo, local.dbName);
+					break;
+				case "SQLite":
+					dropSQLiteDatabase(local.dsInfo, local.dbName);
 					break;
 				default:
 					error("Database drop not supported for driver: " & local.dbType);
@@ -217,42 +232,158 @@ component extends="../base" {
 	private void function dropH2Database(required struct dsInfo, required string dbName) {
 		try {
 			printStep("Dropping H2 database files...");
-			
+
 			// For H2, we need to delete the database files
 			local.dbPath = arguments.dsInfo.database;
-			
+
 			// H2 database files typically have .mv.db extension
 			local.dbFile = local.dbPath & ".mv.db";
 			local.lockFile = local.dbPath & ".lock.db";
 			local.traceFile = local.dbPath & ".trace.db";
-			
+
 			local.filesDeleted = false;
-			
+
 			if (FileExists(local.dbFile)) {
 				FileDelete(local.dbFile);
 				local.filesDeleted = true;
 				printSuccess("Deleted database file: " & local.dbFile);
 			}
-			
+
 			if (FileExists(local.lockFile)) {
 				FileDelete(local.lockFile);
 				printSuccess("Deleted lock file: " & local.lockFile);
 			}
-			
+
 			if (FileExists(local.traceFile)) {
 				FileDelete(local.traceFile);
 				printSuccess("Deleted trace file: " & local.traceFile);
 			}
-			
+
 			if (local.filesDeleted) {
 				printDivider();
 				printSuccess("H2 database dropped successfully!", true);
 			} else {
 				printWarning("No H2 database files found for: " & arguments.dbName);
 			}
-			
+
 		} catch (any e) {
 			printError("Error dropping H2 database: " & e.message);
+			throw(message=e.message);
+		}
+	}
+
+	/**
+	 * Drop SQLite database (file-based)
+	 */
+	private void function dropSQLiteDatabase(required struct dsInfo, required string dbName) {
+		try {
+			// For SQLite, the database path is stored directly in dsInfo.database
+			local.dbPath = arguments.dsInfo.database;
+			local.filesDeleted = false;
+
+			// SQLite may have additional files like -wal, -shm, -journal
+			// Delete these first to release locks
+			local.walFile = local.dbPath & "-wal";
+			local.shmFile = local.dbPath & "-shm";
+			local.journalFile = local.dbPath & "-journal";
+
+			if (FileExists(local.walFile)) {
+				try {
+					FileDelete(local.walFile);
+				} catch (any e) {
+					// Ignore auxiliary file deletion errors
+				}
+			}
+
+			if (FileExists(local.shmFile)) {
+				try {
+					FileDelete(local.shmFile);
+				} catch (any e) {
+					// Ignore auxiliary file deletion errors
+				}
+			}
+
+			if (FileExists(local.journalFile)) {
+				try {
+					FileDelete(local.journalFile);
+				} catch (any e) {
+					// Ignore auxiliary file deletion errors
+				}
+			}
+
+			// Try to delete the main database file
+			if (FileExists(local.dbPath)) {
+				try {
+					FileDelete(local.dbPath);
+					local.filesDeleted = true;
+				} catch (any deleteError) {
+					// File is locked - check if server is running and try to stop it
+					local.serverWasRunning = false;
+					try {
+						local.serverStatus = command("server status")
+							.inWorkingDirectory(getCWD())
+							.run(returnOutput=true);
+
+						if (findNoCase("running", local.serverStatus)) {
+							local.serverWasRunning = true;
+							printWarning("Server is running - stopping it to release database lock...");
+
+							// Stop the server
+							try {
+								command("server stop")
+									.inWorkingDirectory(getCWD())
+									.run();
+
+								// Wait and retry for file handles to be released
+								local.maxRetries = 5;
+								local.retryDelay = 1000; // 1 second
+								local.deleted = false;
+
+								for (local.retry = 1; local.retry <= local.maxRetries; local.retry++) {
+									sleep(local.retryDelay);
+
+									try {
+										FileDelete(local.dbPath);
+										local.filesDeleted = true;
+										local.deleted = true;
+										break;
+									} catch (any retryError) {
+										// Continue retrying
+									}
+								}
+
+								if (local.deleted) {
+									printSuccess("SQLite database dropped successfully!");
+									return;
+								} else {
+									throw(message="File still locked after stopping server. Wait a moment and try again.", detail=deleteError.message);
+								}
+							} catch (any stopError) {
+								throw(message="Failed to stop server: " & stopError.message, detail=deleteError.message);
+							}
+						}
+					} catch (any e) {
+						// Server status check failed
+					}
+
+					// If we get here, we couldn't delete the file
+					local.errorMsg = "Database file is locked";
+					if (local.serverWasRunning) {
+						local.errorMsg &= " - server was stopped but file is still locked";
+					} else {
+						local.errorMsg &= " - stop the application server or close any database tools";
+					}
+					throw(message=local.errorMsg, detail=deleteError.message);
+				}
+			}
+
+			if (local.filesDeleted) {
+				printSuccess("SQLite database dropped successfully!");
+			} else {
+				printWarning("No SQLite database files found");
+			}
+
+		} catch (any e) {
 			throw(message=e.message);
 		}
 	}

@@ -21,7 +21,7 @@ The command supports copying configurations from existing environments and allow
 
 ### Interactive Database Credentials
 
-When setting up environments with non-H2 databases (MySQL, PostgreSQL, MSSQL, Oracle), if database credentials are not provided as command arguments, the command will **interactively prompt** you to enter:
+When setting up environments with server-based databases (MySQL, PostgreSQL, MSSQL, Oracle), if database credentials are not provided as command arguments, the command will **interactively prompt** you to enter:
 - Database host (default: localhost)
 - Database port (database-specific defaults)
 - Database username (default: varies by database type)
@@ -43,7 +43,7 @@ This ensures you never use incorrect default credentials that could cause authen
 | Option | Description | Default | Valid Values |
 |--------|-------------|---------|--------------|
 | `--template` | Deployment template type | `local` | `local`, `docker`, `vagrant` |
-| `--dbtype` | Database type | `h2` | `h2`, `mysql`, `postgres`, `mssql`, `oracle` |
+| `--dbtype` | Database type | `h2` | `h2`, `sqlite`, `mysql`, `postgres`, `mssql`, `oracle` |
 | `--database` | Custom database name | `wheels_[environment]` | Any valid database name |
 | `--datasource` | ColdFusion datasource name | `wheels_[environment]` | Any valid datasource name |
 | `--host` | Database host | `localhost` (or prompted) | Any valid hostname/IP |
@@ -65,6 +65,9 @@ This ensures you never use incorrect default credentials that could cause authen
 ```bash
 # Create development environment with H2 database (default)
 wheels env setup environment=development
+
+# Create development environment with SQLite database (file-based, no server required)
+wheels env setup environment=development --dbtype=sqlite --database=myapp_dev
 
 # Create staging environment with MySQL (will prompt for credentials)
 wheels env setup environment=staging --dbtype=mysql
@@ -154,6 +157,29 @@ DB_HOST=
 DB_PORT=
 DB_DATABASE=./db/wheels_development
 DB_USER=sa
+DB_PASSWORD=
+DB_DATASOURCE=wheels_development
+
+## Server Settings
+SERVER_PORT=8080
+SERVER_CFENGINE=lucee5
+```
+
+For SQLite database:
+```bash
+## Wheels Environment: development
+## Generated on: 2025-01-18 12:30:00
+
+## Application Settings
+WHEELS_ENV=development
+WHEELS_RELOAD_PASSWORD=wheelsdevelopment
+
+## Database Settings
+DB_TYPE=sqlite
+DB_HOST=
+DB_PORT=
+DB_DATABASE=./db/myapp_dev.db
+DB_USER=
 DB_PASSWORD=
 DB_DATASOURCE=wheels_development
 
@@ -269,9 +295,41 @@ Creates:
 - **Connection**: No network port required (embedded)
 - **Database Path**: `./db/[database_name]`
 - **Default Credentials**: username=`sa`, password=*(empty)*
+- **Creation**: Database file created on first connection (lazy creation)
 
 ```bash
 wheels env setup environment=dev --dbtype=h2 --database=my_dev_db
+```
+
+### SQLite (File-Based)
+- **Use Case**: Development, testing, prototyping, portable applications, embedded systems
+- **Connection**: No network port required (file-based, serverless)
+- **Database Path**: `./db/[database_name].db`
+- **Default Credentials**: No username/password required (file-based authentication)
+- **Creation**: Database file created immediately (eager creation)
+- **JDBC Driver**: `org.sqlite.JDBC` (org.xerial.sqlite-jdbc v3.47.1.0) - included with Lucee/CommandBox
+- **Auxiliary Files**: Creates `.db-wal`, `.db-shm`, `.db-journal` during operation
+- **Configuration**: Uses absolute paths in datasource configuration
+- **Advantages**:
+  - Zero configuration - no server setup required
+  - Portable - single file database, easy to backup/move
+  - Fast - ideal for local development and testing
+  - Self-contained - all data in one file
+  - Cross-platform - works on Windows, macOS, Linux
+- **Limitations**:
+  - Single writer - not suitable for high-concurrency scenarios
+  - File locking - can cause issues on network drives
+  - Not recommended for production with multiple concurrent users
+
+```bash
+# Basic SQLite environment setup
+wheels env setup environment=dev --dbtype=sqlite --database=myapp_dev
+
+# SQLite with custom database name
+wheels env setup environment=test --dbtype=sqlite --database=integration_tests
+
+# SQLite for prototyping
+wheels env setup environment=prototype --dbtype=sqlite --database=prototype_v1
 ```
 
 ### MySQL

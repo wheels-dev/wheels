@@ -80,6 +80,31 @@ Drop existing database and recreate:
 wheels db create --force
 ```
 
+### SQLite Database
+
+Create SQLite database (file-based, no server required):
+```bash
+# Using existing datasource
+wheels db create --datasource=myapp_dev
+
+# With specific database type
+wheels db create --dbtype=sqlite --database=myapp_dev
+
+# Force recreate SQLite database
+wheels db create --dbtype=sqlite --force
+```
+
+Output:
+```
+[OK] SQLite JDBC driver loaded
+[OK] Database connection established
+[OK] Database schema initialized
+[OK] Database file created: D:\MyApp\db\myapp_dev.db
+[OK] File size: 16384 bytes
+
+SQLite database created successfully!
+```
+
 ## Interactive Datasource Creation
 
 If the specified datasource doesn't exist, the command will prompt you to create it interactively:
@@ -94,11 +119,12 @@ Would you like to create this datasource now? [y/n]: y
 Select database type:
   1. MySQL
   2. PostgreSQL
-  3. MSSQL
+  3. SQL Server (MSSQL)
   4. Oracle
   5. H2
+  6. SQLite
 
-Select database type [1-5]: 1
+Select database type [1-6]: 1
 Selected: MySQL
 
 Enter connection details:
@@ -161,6 +187,23 @@ The datasource will be saved to both `/config/app.cfm` and `CFConfig.json`.
 - No host/port configuration needed
 - Ideal for development and testing
 
+### SQLite
+- Lightweight file-based database - serverless and zero-configuration
+- **Database file created immediately** (unlike H2's lazy creation)
+- Creates database file with metadata table: `wheels_metadata`
+- Database stored at: `./db/database_name.db`
+- Automatically creates `db` directory if it doesn't exist
+- No username/password required (file-based authentication)
+- No host/port configuration needed
+- JDBC driver: `org.sqlite.JDBC` (org.xerial.sqlite-jdbc bundle v3.47.1.0)
+- Creates auxiliary files during operation:
+  - `database.db-wal` (Write-Ahead Log)
+  - `database.db-shm` (Shared Memory)
+  - `database.db-journal` (Rollback Journal)
+- **Use absolute paths** - paths are stored absolutely in configuration
+- Ideal for development, testing, prototyping, and portable applications
+- **Limitations:** Single writer, not recommended for high-concurrency production
+
 ## Output Format
 
 The command provides real-time, formatted output showing each step:
@@ -194,9 +237,10 @@ The command provides real-time, formatted output showing each step:
 > **⚠️ Note:** This command depends on configuration values. Please verify your database configuration before executing it.
 
 1. **Datasource Configuration**: The datasource can be configured in `/config/app.cfm` or created interactively
-2. **Database Privileges**: The database user must have CREATE DATABASE privileges (CREATE USER for Oracle)
-3. **Network Access**: The database server must be accessible
+2. **Database Privileges**: The database user must have CREATE DATABASE privileges (CREATE USER for Oracle, not applicable for H2/SQLite)
+3. **Network Access**: The database server must be accessible (not applicable for H2/SQLite file-based databases)
 4. **JDBC Drivers**: Appropriate JDBC drivers must be available in the classpath
+5. **File Permissions** (SQLite/H2 only): Write permissions required in application root directory
 
 ### Oracle JDBC Driver Installation
 
@@ -229,7 +273,7 @@ If you see "Driver not found" error for Oracle, you need to manually install the
 
    You should see: `[OK] Driver found: oracle.jdbc.OracleDriver`
 
-**Note:** Other database drivers (MySQL, PostgreSQL, MSSQL, H2) are typically included with CommandBox/Lucee by default.
+**Note:** Other database drivers (MySQL, PostgreSQL, MSSQL, H2, SQLite) are typically included with CommandBox/Lucee by default.
 
 ## Error Messages
 
@@ -295,6 +339,44 @@ Attempting to drop an Oracle system user (SYS, SYSTEM, etc.). Choose a different
 ```bash
 wheels db create --database=myapp_dev --force
 ```
+
+### "SQLite JDBC driver not found" (SQLite-specific)
+The SQLite JDBC driver is not available in the classpath.
+
+**Fix:** The SQLite driver (`org.xerial.sqlite-jdbc`) should be bundled with CommandBox/Lucee by default. If you see this error:
+1. Verify CommandBox version is up-to-date
+2. Check if the bundle is available in Lucee Admin
+3. Restart CommandBox completely (close all instances)
+
+### "Could not delete existing database file" (SQLite-specific)
+The existing SQLite database file is locked and cannot be deleted when using `--force`.
+
+**Fix:**
+1. Stop the application server: `box server stop`
+2. Close any database tools (DB Browser for SQLite, etc.)
+3. Try the command again:
+```bash
+wheels db create --force
+```
+
+The command will automatically attempt to stop the server and retry deletion.
+
+### "File permission error" (SQLite-specific)
+Insufficient permissions to create database file or `db` directory.
+
+**Fix:**
+1. Check file permissions on the application root directory
+2. Ensure the user running CommandBox has write permissions
+3. On Unix/Linux: `chmod 755 ./db` or create the directory manually
+
+### "Database file was not created" (SQLite-specific)
+The SQLite database file was not successfully created after connection.
+
+**Fix:**
+1. Verify disk space is available
+2. Check parent directory permissions
+3. Ensure the path doesn't contain invalid characters
+4. Try with a simpler database name
 
 ## Configuration Detection
 
