@@ -112,6 +112,27 @@ this.datasources['myapp'] = {
 };
 ```
 
+### Oracle Database
+
+```cfm
+this.datasources['myapp'] = {
+    class: 'oracle.jdbc.OracleDriver',
+    connectionString: 'jdbc:oracle:thin:@//localhost:1521/wheelstestdb',
+    username: 'dbuser',
+    password: 'dbpass'
+};
+```
+
+### SQLiet Database
+```cfm
+this.datasources['myapp'] = {
+    class: 'org.sqlite.JDBC',
+    connectionString: 'jdbc:sqlite:/app/wheelstestdb.db',
+    username: '',
+    password: ''
+};
+```
+
 ## Multiple Datasources
 
 ```cfm

@@ -33,6 +33,7 @@ In this [Beginner Tutorial: Hello World][2], we'll be writing a simple applicati
 
 **Supported Databases:**
 
+- SQLite (new in 3.0!)
 - Oracle (new in 3.0!)
 - Microsoft SQL Server
 - PostgreSQL
@@ -116,7 +117,7 @@ Please check out our [Contributing Guide][3] for detailed guidelines on how to g
 ### Test Database Setup
 
 1. Create a database on a supported database server named `wheelstestdb`
-   - Supported servers: Oracle, Microsoft SQL Server, PostgreSQL, MySQL, H2
+   - Supported servers: SQLite, Oracle, Microsoft SQL Server, PostgreSQL, MySQL, H2
 2. Create a datasource in your CFML engine's administrator named `wheelstestdb` pointing to the `wheelstestdb` database
 3. **Important:** Make sure to give it CLOB and BLOB support
 4. Open your browser to the Wheels Welcome Page
@@ -125,7 +126,7 @@ Please check out our [Contributing Guide][3] for detailed guidelines on how to g
 ### Docker Testing
 
  1. Create a database on a supported database server named `wheelstestdb`. At this time the supported
-    database servers are H2, Microsoft SQL Server, PostgreSQL, MySQL, and Oracle.
+    database servers are H2, Microsoft SQL Server, PostgreSQL, MySQL, Oracle and SQLite.
  2. Create a datasource in your CFML engine's administrator named `wheelstestdb` pointing to the
     `wheelstestdb` database and make sure to give it CLOB and BLOB support.
  3. Open your browser to the Wheels Welcome Page.

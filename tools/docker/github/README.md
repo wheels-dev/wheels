@@ -49,6 +49,7 @@ Your code is tested against every combination of:
 - SQL Server
 - H2 (embedded)
 - Oracle
+- SQLite
 
 **Total**: ~35 different environment combinations
 
@@ -59,7 +60,7 @@ strategy:
   fail-fast: false
   matrix:
     cfengine: ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023", "boxlang"]
-    dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle"]
+    dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle", "SQLite"]
 ```
 
 **Exclusions**:
@@ -89,6 +90,7 @@ strategy:
 | SQL Server | `wheels-sqlserver-1` | 1434→1433 | `wheels-sqlserver:v1.0.2` |
 | Oracle | `wheels-oracle-1` | 1522→1521 | `gvenzl/oracle-free:23-slim` |
 | H2 | (embedded) | n/a | Built into CFML engines |
+| SQLite | (embedded) | n/a | Built into CFML engines |
 
 ## Test Execution Process
 
@@ -140,7 +142,7 @@ http://localhost:{PORT}/wheels/core/tests?db={DATABASE}&format=json&only=failure
 ```
 
 **Parameters**:
-- `db`: Database type (mysql, postgres, sqlserver, h2, oracle)
+- `db`: Database type (mysql, postgres, sqlserver, h2, oracle, sqlite)
 - `format`: Response format (json)
 - `only`: Show only failures and errors
 
