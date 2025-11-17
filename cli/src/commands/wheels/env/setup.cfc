@@ -14,8 +14,8 @@ component extends="../base" {
      * @environment.options development,staging,production
      * @template.hint Environment template (local, docker, vagrant)
      * @template.options local,docker,vagrant
-     * @dbtype.hint Database type (h2, mysql, postgres, mssql, oracle)
-     * @dbtype.options h2,mysql,postgres,mssql,oracle
+     * @dbtype.hint Database type (h2, mysql, postgres, mssql, oracle, sqlite)
+     * @dbtype.options h2,mysql,postgres,mssql,oracle,sqlite
      * @force.hint Overwrite existing configuration
      * @skipDatabase.hint Skip database creation (only create .env file)
      */
@@ -43,7 +43,7 @@ component extends="../base" {
             argStruct=arguments,
             allowedValues={
                 template: ["local", "docker", "vagrant"],
-                dbtype: ["h2", "mysql", "postgres", "mssql", "oracle"]
+                dbtype: ["h2", "mysql", "postgres", "mssql", "oracle", "sqlite"]
             }
         );
         var projectRoot = resolvePath(".");
@@ -71,9 +71,10 @@ component extends="../base" {
         }
 
         // Check if we need interactive datasource configuration
-        // Only prompt if: not H2, no credentials provided, and not skipping database
+        // Only prompt if: not H2/SQLite, no credentials provided, and not skipping database
         var needsInteractiveDatasource = !arguments.skipDatabase &&
                                           lCase(arguments.dbtype) != "h2" &&
+                                          lCase(arguments.dbtype) != "sqlite" &&
                                           (!len(trim(arguments.host)) ||
                                            !len(trim(arguments.username)) ||
                                            !len(trim(arguments.password)));
@@ -233,7 +234,7 @@ component extends="../base" {
 
         " & bold & yellow & "OPTIONS:" & reset & "
             " & cyan & "--template" & reset & "       Template type: " & magenta & "local" & reset & ", " & magenta & "docker" & reset & ", " & magenta & "vagrant" & reset & " " & dim & "(default: local)" & reset & "
-            " & cyan & "--dbtype" & reset & "         Database type: " & magenta & "h2" & reset & ", " & magenta & "mysql" & reset & ", " & magenta & "postgres" & reset & ", " & magenta & "mssql" & reset & " " & dim & "(default: h2)" & reset & "
+            " & cyan & "--dbtype" & reset & "         Database type: " & magenta & "h2" & reset & ", " & magenta & "mysql" & reset & ", " & magenta & "postgres" & reset & ", " & magenta & "mssql" & reset & ", " & magenta & "sqlite" & reset & " " & dim & "(default: h2)" & reset & "
             " & cyan & "--database" & reset & "       Custom database name " & dim & "(default: wheels_[environment])" & reset & "
             " & cyan & "--datasource" & reset & "     ColdFusion datasource name " & dim & "(default: wheels_[environment])" & reset & "
             " & cyan & "--base" & reset & "           Base environment to copy settings from " & dim & "(copies config)" & reset & "
@@ -266,6 +267,7 @@ component extends="../base" {
 
         " & bold & yellow & "DATABASE TYPES:" & reset & "
             " & magenta & "h2" & reset & "        - Embedded database, no network port " & dim & "(default, great for dev/test)" & reset & "
+            " & magenta & "sqlite" & reset & "    - Lightweight file-based database " & dim & "(no network port, great for dev/test)" & reset & "
             " & magenta & "mysql" & reset & "     - MySQL database server " & dim & "(port 3306)" & reset & "
             " & magenta & "postgres" & reset & "  - PostgreSQL database server " & dim & "(port 5432)" & reset & "
             " & magenta & "mssql" & reset & "     - Microsoft SQL Server " & dim & "(port 1433)" & reset & "

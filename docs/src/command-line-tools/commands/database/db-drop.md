@@ -61,6 +61,31 @@ wheels db drop --force
 wheels db drop --datasource=myapp_test --environment=testing --force
 ```
 
+### Drop SQLite Database
+
+Drop file-based SQLite database:
+```bash
+# Using existing datasource
+wheels db drop --datasource=myapp_dev
+
+# With confirmation prompt
+wheels db drop --datasource=sqlite_app
+```
+
+Output:
+```
+[WARN] WARNING: This will permanently drop the database!
+Are you sure you want to drop the database 'D:\MyApp\db\myapp_dev.db'? Type 'yes' to confirm: yes
+
+[OK] SQLite database dropped successfully!
+```
+
+If server is running, it will automatically stop and retry:
+```
+[WARN] Server is running - stopping it to release database lock...
+[OK] SQLite database dropped successfully!
+```
+
 ## Safety Features
 
 1. **Confirmation Required**: By default, you must type "yes" to confirm
@@ -96,6 +121,22 @@ wheels db drop --datasource=myapp_test --environment=testing --force
 - Deletes database files (.mv.db, .lock.db, .trace.db)
 - Shows which files were deleted
 - No server connection required
+
+### SQLite
+- File-based deletion - removes database and auxiliary files
+- Deletes main database file (.db extension)
+- Automatically deletes auxiliary files:
+  - `.db-wal` (Write-Ahead Log)
+  - `.db-shm` (Shared Memory)
+  - `.db-journal` (Rollback Journal)
+- **Handles file locking automatically:**
+  - Detects if application server is running
+  - Stops server automatically if file is locked
+  - Retries deletion up to 5 times with 1-second delays
+  - Provides clear error messages if deletion fails
+- **Recommendation:** Stop server before dropping: `box server stop`
+- No network connection required (file-based)
+- Clean output with minimal messages
 
 ## Warning
 
@@ -143,6 +184,49 @@ The Oracle user/schema doesn't exist. No action needed.
 Attempting to drop an Oracle system user. System users like SYS, SYSTEM, ADMIN, XDB cannot be dropped.
 
 **Fix:** Verify you're targeting the correct database. System users are protected and cannot be removed.
+
+### "Database file is locked" (SQLite-specific)
+The SQLite database file cannot be deleted because it's currently in use.
+
+**Fix:**
+```bash
+# Stop the server first
+box server stop
+
+# Wait a moment for file handles to release
+# Then try again
+wheels db drop
+```
+
+The command will automatically attempt to:
+1. Detect if the server is running
+2. Stop the server
+3. Retry deletion up to 5 times
+4. Wait 1 second between retries
+
+If the error persists:
+- Close any database tools (DB Browser for SQLite, etc.)
+- Check if another process has the file open
+- Wait a few seconds and try again
+
+### "No SQLite database files found" (SQLite-specific)
+The SQLite database file doesn't exist at the expected location.
+
+This is normal if:
+- The database was already dropped
+- The database was never created
+- A different database path is configured
+
+No action needed.
+
+### "File still locked after stopping server" (SQLite-specific)
+The database file remains locked even after stopping the server.
+
+**Fix:**
+1. Wait 10-30 seconds for Windows to release the file handle
+2. Close any open database management tools
+3. Check Task Manager for lingering processes
+4. Try the command again
 
 ## Related Commands
 

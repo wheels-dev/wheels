@@ -61,9 +61,19 @@ component {
             }
 
             if (result.success) {
+                // Determine environment-specific settings based on environment type
+                var envSettings = getEnvironmentSpecificSettings(arguments.environment, arguments.debug, arguments.cache);
+
                 // Create environment file
                 createEnvironmentFile(arguments.environment, result.config, projectRoot);
-                createEnvironmentSettings(argumentCollection = arguments, config = result.config, rootPath = projectRoot);
+                createEnvironmentSettings(
+                    environment = arguments.environment,
+                    config = result.config,
+                    rootPath = projectRoot,
+                    debug = envSettings.debug,
+                    cache = envSettings.cache,
+                    reloadPassword = arguments.reloadPassword
+                );
 
                 // Write datasource to app.cfm with environment variables
                 // Skip if skipDatabase=true (called from wheels db create) to avoid loading unresolved placeholders
@@ -388,6 +398,63 @@ component {
     }
 
     /**
+     * Get environment-specific settings based on environment type
+     * Determines debug, cache, and other settings appropriate for each environment
+     */
+    private function getEnvironmentSpecificSettings(
+        required string environment,
+        boolean debug = false,
+        boolean cache = false
+    ) {
+        var envType = lCase(trim(arguments.environment));
+        var settings = {
+            debug: arguments.debug,
+            cache: arguments.cache
+        };
+
+        // If user explicitly set debug or cache flags, respect them
+        // Otherwise, apply environment-specific defaults
+        var userSetDebug = structKeyExists(arguments, "debug") && arguments.debug != false;
+        var userSetCache = structKeyExists(arguments, "cache") && arguments.cache != false;
+
+        // Environment-specific defaults (only applied if user didn't explicitly set values)
+        switch (envType) {
+            case "development":
+                if (!userSetDebug) settings.debug = true;
+                if (!userSetCache) settings.cache = false;
+                break;
+
+            case "testing":
+                if (!userSetDebug) settings.debug = true;
+                if (!userSetCache) settings.cache = false;
+                break;
+
+            case "staging":
+                if (!userSetDebug) settings.debug = false;
+                if (!userSetCache) settings.cache = true;
+                break;
+
+            case "maintenance":
+                if (!userSetDebug) settings.debug = false;
+                if (!userSetCache) settings.cache = true;
+                break;
+
+            case "production":
+                if (!userSetDebug) settings.debug = false;
+                if (!userSetCache) settings.cache = true;
+                break;
+
+            default:
+                // Custom environment names default to production-like settings
+                if (!userSetDebug) settings.debug = false;
+                if (!userSetCache) settings.cache = true;
+                break;
+        }
+
+        return settings;
+    }
+
+    /**
      * Setup local development environment
      */
     private function setupLocalEnvironment(argumentCollection) {
@@ -462,6 +529,36 @@ component {
                     sid: dbSid
                 };
                 break;
+            case "sqlite":
+                // SQLite requires absolute path - calculate it now
+                var dbFileName = (len(trim(arguments.database)) && trim(arguments.database) != "") ?
+                    "#trim(arguments.database)#.db" :
+                    "wheels_#arguments.environment#.db";
+                // Get absolute path to db directory - normalize path separators
+                // Remove trailing separator from rootPath if it exists
+                var cleanRootPath = arguments.rootPath;
+                if (right(cleanRootPath, 1) == "\" || right(cleanRootPath, 1) == "/") {
+                    cleanRootPath = left(cleanRootPath, len(cleanRootPath) - 1);
+                }
+                var pathSep = server.separator.file;
+                var absoluteDbPath = cleanRootPath & pathSep & "db" & pathSep & dbFileName;
+
+                // Ensure db directory exists for SQLite
+                var dbDir = cleanRootPath & pathSep & "db";
+                if (!directoryExists(dbDir)) {
+                    directoryCreate(dbDir);
+                }
+
+                config.datasourceInfo = {
+                    driver: "SQLite",
+                    host: "",
+                    port: "",
+                    database: absoluteDbPath,
+                    datasource: datasourceName,
+                    username: "",
+                    password: ""
+                };
+                break;
             default: // h2
                 config.datasourceInfo = {
                     driver: "H2",
@@ -497,6 +594,8 @@ component {
                 return "wheels";
             case "h2":
                 return "sa";
+            case "sqlite":
+                return "";
             default:
                 return "wheels";
         }
@@ -516,6 +615,8 @@ component {
             case "oracle":
                 return "wheels_password";
             case "h2":
+                return "";
+            case "sqlite":
                 return "";
             default:
                 return "wheels_password";
@@ -690,14 +791,26 @@ component {
             "wheels_" & arguments.environment;
         
         // Determine reload password
-        var reloadPass = len(trim(arguments.reloadPassword)) ? 
-            arguments.reloadPassword : 
+        var reloadPass = len(trim(arguments.reloadPassword)) ?
+            arguments.reloadPassword :
             "wheels" & arguments.environment;
 
-        // Define content with dynamic debug/cache settings
+        // Get environment-specific settings
+        var envType = lCase(trim(arguments.environment));
+        var isDevelopment = (envType == "development");
+        var isTesting = (envType == "testing");
+        var isStaging = (envType == "staging");
+        var isMaintenance = (envType == "maintenance");
+        var isProduction = (envType == "production" || !listFindNoCase("development,testing,staging,maintenance", envType));
+
+        // Determine if production-like (staging, maintenance, production, or custom)
+        var isProductionLike = (isProduction || isStaging || isMaintenance);
+
+        // Define content with environment-specific settings
         var content = '<cfscript>
     // Environment: #arguments.environment#
     // Generated: #now#
+    // Environment Type: #isProduction ? "Production/Custom" : (isDevelopment ? "Development" : (isTesting ? "Testing" : (isStaging ? "Staging" : "Maintenance")))#
     // Debug Mode: #arguments.debug ? "Enabled" : "Disabled"#
     // Cache Mode: #arguments.cache ? "Enabled" : "Disabled"#
 
@@ -706,12 +819,12 @@ component {
 
     // Environment settings
     set(environment="#arguments.environment#");
-    
-    // Debug settings - controlled by debug argument
+
+    // Debug settings - #arguments.debug ? "enabled for debugging" : "disabled for performance"#
     set(showDebugInformation=#arguments.debug#);
     set(showErrorInformation=#arguments.debug#);
 
-    // Caching settings - controlled by cache argument
+    // Caching settings - #arguments.cache ? "enabled for performance" : "disabled for development"#
     set(cacheFileChecking=#arguments.cache#);
     set(cacheImages=#arguments.cache#);
     set(cacheModelInitialization=#arguments.cache#);
@@ -726,11 +839,19 @@ component {
     set(reloadPassword="#reloadPass#");
 
     // URLs
-    set(urlRewriting="partial");
+    set(urlRewriting="On");
 
-    // Environment-specific settings
-    set(sendEmailOnError=#arguments.debug ? "false" : "true"#);
+    // Error handling - #isProductionLike ? "production mode" : "development mode"#
+    set(sendEmailOnError=#isProductionLike ? "true" : "false"#);
     set(errorEmailAddress="dev-team@example.com");
+
+    // Performance - #isProductionLike ? "optimized for production" : "optimized for development"#
+    set(softDeleteProperty="deletedAt");
+    set(setUpdatedAtOnCreate=true);
+
+    // Request handling
+    set(obfuscateUrls=#isProductionLike#);
+    set(clearQueryCacheOnReload=true);
 </cfscript>';
 
         // Write to settings.cfm
@@ -770,7 +891,13 @@ component {
 
             // Build datasource definition using generic DB_* environment variables
             var dsDefinition = chr(10) & chr(9) & "// #arguments.config.datasourceInfo.driver# Datasource - Uses generic DB_* environment variables" & chr(10);
-            dsDefinition &= chr(9) & "if (structKeyExists(this.env, ""DB_HOST"") && len(trim(this.env.DB_HOST))) {" & chr(10);
+
+            // For H2/SQLite (file-based), check DB_DATABASE; for others check DB_HOST
+            var dbType = lCase(arguments.config.dbtype);
+            var isFileBased = (dbType == "h2" || dbType == "sqlite");
+            var conditionKey = isFileBased ? "DB_DATABASE" : "DB_HOST";
+
+            dsDefinition &= chr(9) & "if (structKeyExists(this.env, ""#conditionKey#"") && len(trim(this.env.#conditionKey#))) {" & chr(10);
             dsDefinition &= chr(9) & chr(9) & 'this.datasources["#datasourceName#"] = {' & chr(10);
             dsDefinition &= chr(9) & chr(9) & chr(9) & 'class: "#dsConfig.class#",' & chr(10);
             dsDefinition &= chr(9) & chr(9) & chr(9) & 'bundleName: "#dsConfig.bundleName#",' & chr(10);
@@ -840,6 +967,14 @@ component {
                     bundleName: "org.lucee.oracle",
                     bundleVersion: "21.8.0.0-ojdbc11",
                     connectionString: "jdbc:oracle:thin:@##this.env.DB_HOST##:##this.env.DB_PORT##:##this.env.DB_SID##"
+                };
+                break;
+            case "sqlite":
+                config = {
+                    class: "org.sqlite.JDBC",
+                    bundleName: "org.xerial.sqlite-jdbc",
+                    bundleVersion: "3.47.1.0",
+                    connectionString: "jdbc:sqlite:##this.env.DB_DATABASE##"
                 };
                 break;
             case "h2":
@@ -1071,6 +1206,7 @@ box server start port=8080 host=0.0.0.0";
             case "postgres": return "PostgreSQL";
             case "mssql": return "MSSQL";
             case "oracle": return "Oracle";
+            case "sqlite": return "SQLite";
             default: return "H2";
         }
     }
@@ -1082,6 +1218,7 @@ box server start port=8080 host=0.0.0.0";
             case "mssql": return 1433;
             case "oracle": return 1521;
             case "h2": return ""; // H2 is embedded, no port
+            case "sqlite": return ""; // SQLite is file-based, no port
             default: return "";
         }
     }
@@ -1618,7 +1755,7 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         
         // Check database type
         if (structKeyExists(arguments.config, "DB_TYPE")) {
-            var validTypes = ["mysql", "postgres", "mssql", "h2"];
+            var validTypes = ["mysql", "postgres", "mssql", "h2", "sqlite", "oracle"];
             var dbTypeFound = false;
             for (var validType in validTypes) {
                 if (lCase(arguments.config.DB_TYPE) == validType) {

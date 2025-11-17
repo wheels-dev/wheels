@@ -689,6 +689,9 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 							case "org.h2.Driver":
 								local.dsInfo.driver = "H2";
 								break;
+							case "org.sqlite.JDBC":
+								local.dsInfo.driver = "SQLite";
+								break;
 							case "com.mysql.cj.jdbc.Driver":
 							case "com.mysql.jdbc.Driver":
 								local.dsInfo.driver = "MySQL";
@@ -773,7 +776,18 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 								local.dsInfo.database = local.dbPath;
 							}
 						}
-						
+
+						// Parse SQLite database path
+						if (local.dsInfo.driver == "SQLite") {
+							// jdbc:sqlite:/path/to/database.db
+							if (find("jdbc:sqlite:", local.connString)) {
+								local.dbPath = replaceNoCase(local.connString, "jdbc:sqlite:", "");
+								// Remove any parameters after ?
+								local.dbPath = listFirst(local.dbPath, "?");
+								local.dsInfo.database = local.dbPath;
+							}
+						}
+
 						// Parse database name from connection string for other drivers
 						if (local.dsInfo.driver == "MySQL") {
 							// jdbc:mysql://host:port/database?parameters

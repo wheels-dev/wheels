@@ -1,9 +1,27 @@
 /**
  * Create a new database
  *
+ * Supports MySQL, PostgreSQL, SQL Server, Oracle, H2, and SQLite databases.
+ * For SQLite, this will create the database file immediately with a metadata table.
+ * For H2, the database is created automatically on first connection.
+ * For server-based databases, this will create the database on the server.
+ *
  * {code:bash}
+ * # Create database using current environment's datasource
  * wheels db create
- * wheels db create datasource=myapp_dev
+ *
+ * # Create specific datasource
+ * wheels db create --datasource=myapp_dev
+ *
+ * # Create with specific environment
+ * wheels db create --datasource=myapp_dev --environment=production
+ *
+ * # Overwrite existing database
+ * wheels db create --force
+ *
+ * # Create with specific database type
+ * wheels db create --dbtype=sqlite
+ * wheels db create --dbtype=mysql
  * {code}
  */
 component extends="../base" {
@@ -13,7 +31,7 @@ component extends="../base" {
 	/**
 	 * @datasource Optional datasource name (defaults to current datasource setting)
 	 * @environment Optional environment (defaults to current environment)
-	 * @dbtype Optional database type (h2, mysql, postgres, mssql, oracle)
+	 * @dbtype Optional database type (h2, sqlite, mysql, postgres, mssql, oracle)
 	 * @help Create a new database
 	 */
 	public void function run(
@@ -28,7 +46,7 @@ component extends="../base" {
 		arguments = reconstructArgs(
 			argStruct=arguments,
 			allowedValues={
-				dbtype: ["h2", "mysql", "postgres", "mssql", "oracle"]
+				dbtype: ["h2", "sqlite", "mysql", "postgres", "mssql", "oracle"]
 			}
 		);
 
@@ -127,6 +145,9 @@ component extends="../base" {
 				case "H2":
 					printWarning("H2 databases are created automatically on first connection");
 					printSuccess("No action needed - database will be created when application starts");
+					break;
+				case "SQLite":
+					createSQLiteDatabase(local.dsInfo, local.dbName, arguments.force);
 					break;
 				default:
 					systemOutput("Please create the database manually using your database management tools.", true, true);
@@ -536,6 +557,9 @@ component extends="../base" {
 				case "H2":
 					local.templateKey = "h2";
 					break;
+				case "SQLite":
+					local.templateKey = "sqlite";
+					break;
 				default:
 					printError("Invalid dbtype: " & local.dbType);
 					return {};
@@ -551,9 +575,10 @@ component extends="../base" {
 			print.line("  3. SQL Server (MSSQL)");
 			print.line("  4. Oracle");
 			print.line("  5. H2");
+			print.line("  6. SQLite");
 			print.line();
 
-			local.dbTypeChoice = ask("Select database type [1-5]: ");
+			local.dbTypeChoice = ask("Select database type [1-6]: ");
 
 			switch (local.dbTypeChoice) {
 				case "1":
@@ -575,6 +600,10 @@ component extends="../base" {
 				case "5":
 					local.dbType = "H2";
 					local.templateKey = "h2";
+					break;
+				case "6":
+					local.dbType = "SQLite";
+					local.templateKey = "sqlite";
 					break;
 				default:
 					printError("Invalid choice!");
@@ -599,21 +628,27 @@ component extends="../base" {
 		print.cyanLine("Enter connection details:");
 		print.line();
 
-		// H2 is embedded - only needs database name and username (optional password)
-		if (local.dbType == "H2") {
+		// H2 and SQLite are file-based - only need database name
+		if (local.dbType == "H2" || local.dbType == "SQLite") {
 			local.database = ask("Database name [wheels_dev]: ");
 			if (!len(local.database)) {
 				local.database = "wheels_dev";
 			}
 
-			local.username = ask("Username [root]: ");
-			if (!len(local.username)) {
-				local.username = "root";
+			if (local.dbType == "H2") {
+				local.username = ask("Username [root]: ");
+				if (!len(local.username)) {
+					local.username = "root";
+				}
+
+				local.password = ask("Password (optional): ", "", true);
+			} else {
+				// SQLite doesn't use username/password
+				local.username = "";
+				local.password = "";
 			}
 
-			local.password = ask("Password (optional): ", "", true);
-
-			// H2 doesn't use host/port
+			// H2 and SQLite don't use host/port
 			local.host = "";
 			local.port = "";
 
@@ -659,13 +694,15 @@ component extends="../base" {
 		print.line("  Database Type: " & local.dbType);
 
 		// Only show host/port for server-based databases
-		if (local.dbType != "H2") {
+		if (local.dbType != "H2" && local.dbType != "SQLite") {
 			print.line("  Host: " & local.host);
 			print.line("  Port: " & local.port);
 		}
 
 		print.line("  Database: " & local.database);
-		print.line("  Username: " & local.username);
+		if (local.dbType != "SQLite") {
+			print.line("  Username: " & local.username);
+		}
 		print.line("  Connection String: " & local.connectionString);
 		print.line();
 
@@ -678,7 +715,6 @@ component extends="../base" {
 		local.dsConfig = {
 			class: local.template.class,
 			bundleName: local.template.bundleName,
-			bundleVersion: local.template.bundleVersion,
 			connectionString: local.connectionString,
 			username: local.username,
 			password: local.password,
@@ -738,7 +774,6 @@ component extends="../base" {
 			mysql: {
 				class: "com.mysql.cj.jdbc.Driver",
 				bundleName: "com.mysql.cj",
-				bundleVersion: "9.1.0",
 				host: "localhost",
 				port: "3306",
 				username: "root"
@@ -746,7 +781,6 @@ component extends="../base" {
 			postgre: {
 				class: "org.postgresql.Driver",
 				bundleName: "org.postgresql.jdbc",
-				bundleVersion: "42.7.4",
 				host: "localhost",
 				port: "5432",
 				username: "postgres"
@@ -754,7 +788,6 @@ component extends="../base" {
 			mssql: {
 				class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
 				bundleName: "org.lucee.mssql",
-				bundleVersion: "12.6.3.jre11",
 				host: "localhost",
 				port: "1433",
 				username: "admin"
@@ -762,7 +795,6 @@ component extends="../base" {
 			oracle: {
 				class: "oracle.jdbc.OracleDriver",
 				bundleName: "org.lucee.oracle",
-				bundleVersion: "21.8.0.0-ojdbc11",
 				host: "localhost",
 				port: "1521",
 				username: "system"
@@ -770,10 +802,16 @@ component extends="../base" {
 			h2: {
 				class: "org.h2.Driver",
 				bundleName: "org.h2",
-				bundleVersion: "1.3.172",
 				host: "",
 				port: "",
 				username: "root"
+			},
+			sqlite: {
+				class: "org.sqlite.JDBC",
+				bundleName: "org.xerial.sqlite-jdbc",
+				host: "",
+				port: "",
+				username: ""
 			}
 		};
 	}
@@ -819,6 +857,9 @@ component extends="../base" {
 			case "H2":
 				local.appPath = getCWD();
 				return "jdbc:h2:#local.appPath#db/h2/#arguments.database#;MODE=MySQL";
+			case "SQLite":
+				local.appPath = getCWD();
+				return "jdbc:sqlite:#local.appPath#/db/#arguments.database#.db";
 			default:
 				return "";
 		}
@@ -842,7 +883,6 @@ component extends="../base" {
 	this.datasources["#arguments.dsName#"] = {
 		class: "#arguments.dsConfig.class#",
 		bundleName: "#arguments.dsConfig.bundleName#",
-		bundleVersion: "#arguments.dsConfig.bundleVersion#",
 		connectionString: "#arguments.dsConfig.connectionString#",
 		username: "#arguments.dsConfig.username#",
 		password: "#arguments.dsConfig.password#",
@@ -913,6 +953,9 @@ component extends="../base" {
 					break;
 				case "H2":
 					local.cfconfigClass = "org.h2.Driver";
+					break;
+				case "SQLite":
+					local.cfconfigClass = "org.sqlite.JDBC";
 					break;
 			}
 
@@ -1012,6 +1055,143 @@ component extends="../base" {
 		} catch (any e) {
 			printWarning("Could not write datasource to app.cfm: " & e.message);
 			printWarning("You may need to manually add the datasource configuration");
+		}
+	}
+
+	/**
+	 * Create SQLite database (file-based)
+	 */
+	private void function createSQLiteDatabase(required struct dsInfo, required string dbName, boolean force = false) {
+		try {
+			printStep("Creating SQLite database...");
+
+			// Get the database path from dsInfo
+			local.dbPath = arguments.dsInfo.database;
+
+			// Check if database file already exists
+			if (FileExists(local.dbPath)) {
+				if (!arguments.force) {
+					throw(message="Database file '" & local.dbPath & "' already exists! Use force=true to overwrite.");
+				}
+
+				printWarning("Database file already exists: " & local.dbPath);
+				printStep("Removing existing database file...");
+
+				// Delete auxiliary files first
+				local.walFile = local.dbPath & "-wal";
+				local.shmFile = local.dbPath & "-shm";
+				local.journalFile = local.dbPath & "-journal";
+
+				if (FileExists(local.walFile)) {
+					try {
+						FileDelete(local.walFile);
+						printSuccess("Deleted WAL file");
+					} catch (any e) {
+						printWarning("Could not delete WAL file: " & e.message);
+					}
+				}
+
+				if (FileExists(local.shmFile)) {
+					try {
+						FileDelete(local.shmFile);
+						printSuccess("Deleted SHM file");
+					} catch (any e) {
+						printWarning("Could not delete SHM file: " & e.message);
+					}
+				}
+
+				if (FileExists(local.journalFile)) {
+					try {
+						FileDelete(local.journalFile);
+						printSuccess("Deleted journal file");
+					} catch (any e) {
+						printWarning("Could not delete journal file: " & e.message);
+					}
+				}
+
+				// Delete main database file
+				try {
+					FileDelete(local.dbPath);
+					printSuccess("Deleted existing database file");
+				} catch (any e) {
+					throw(message="Could not delete existing database file: " & e.message, detail="Try stopping the application server first.");
+				}
+			}
+
+			// Ensure parent directory exists
+			local.dbDir = getDirectoryFromPath(local.dbPath);
+			if (!directoryExists(local.dbDir)) {
+				directoryCreate(local.dbDir, true);
+				printSuccess("Created database directory: " & local.dbDir);
+			}
+
+			// Create the SQLite database by establishing a connection and creating a table
+			printStep("Initializing SQLite database file...");
+
+			// Load SQLite JDBC driver
+			local.driver = "";
+			try {
+				local.driver = createObject("java", "org.sqlite.JDBC");
+				printSuccess("SQLite JDBC driver loaded");
+			} catch (any e) {
+				throw(message="SQLite JDBC driver not found. Ensure org.xerial.sqlite-jdbc is in classpath.");
+			}
+
+			// Create connection string
+			local.connectionString = "jdbc:sqlite:" & local.dbPath;
+
+			// Create properties for connection
+			local.props = createObject("java", "java.util.Properties");
+
+			// Connect to SQLite (this creates the file)
+			local.conn = local.driver.connect(local.connectionString, local.props);
+
+			if (isNull(local.conn)) {
+				throw(message="Failed to create SQLite database connection");
+			}
+
+			printSuccess("Database connection established");
+
+			// Create a metadata table to initialize the database
+			printStep("Initializing database schema...");
+			local.stmt = local.conn.createStatement();
+			local.createTableSQL = "CREATE TABLE IF NOT EXISTS wheels_metadata (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				key TEXT NOT NULL UNIQUE,
+				value TEXT,
+				createdat DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updatedat DATETIME DEFAULT CURRENT_TIMESTAMP
+			)";
+			local.stmt.execute(local.createTableSQL);
+
+			// Insert initial metadata
+			local.insertSQL = "INSERT INTO wheels_metadata (key, value) VALUES ('database_created', datetime('now'))";
+			local.stmt.execute(local.insertSQL);
+
+			printSuccess("Database schema initialized");
+
+			// Close statement and connection
+			local.stmt.close();
+			local.conn.close();
+
+			// Verify file was created
+			if (FileExists(local.dbPath)) {
+				local.fileInfo = getFileInfo(local.dbPath);
+				printSuccess("Database file created: " & local.dbPath);
+				printSuccess("File size: " & local.fileInfo.size & " bytes");
+
+				printDivider();
+				printSuccess("SQLite database created successfully!", true);
+			} else {
+				throw(message="Database file was not created at: " & local.dbPath);
+			}
+
+		} catch (any e) {
+			printError("Error creating SQLite database: " & e.message);
+			if (StructKeyExists(e, "detail") && Len(e.detail)) {
+				printError("Details: " & e.detail);
+			}
+			throw(message=e.message);
 		}
 	}
 
