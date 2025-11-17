@@ -715,7 +715,6 @@ component extends="../base" {
 		local.dsConfig = {
 			class: local.template.class,
 			bundleName: local.template.bundleName,
-			bundleVersion: local.template.bundleVersion,
 			connectionString: local.connectionString,
 			username: local.username,
 			password: local.password,
@@ -775,7 +774,6 @@ component extends="../base" {
 			mysql: {
 				class: "com.mysql.cj.jdbc.Driver",
 				bundleName: "com.mysql.cj",
-				bundleVersion: "9.1.0",
 				host: "localhost",
 				port: "3306",
 				username: "root"
@@ -783,7 +781,6 @@ component extends="../base" {
 			postgre: {
 				class: "org.postgresql.Driver",
 				bundleName: "org.postgresql.jdbc",
-				bundleVersion: "42.7.4",
 				host: "localhost",
 				port: "5432",
 				username: "postgres"
@@ -791,7 +788,6 @@ component extends="../base" {
 			mssql: {
 				class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
 				bundleName: "org.lucee.mssql",
-				bundleVersion: "12.6.3.jre11",
 				host: "localhost",
 				port: "1433",
 				username: "admin"
@@ -799,7 +795,6 @@ component extends="../base" {
 			oracle: {
 				class: "oracle.jdbc.OracleDriver",
 				bundleName: "org.lucee.oracle",
-				bundleVersion: "21.8.0.0-ojdbc11",
 				host: "localhost",
 				port: "1521",
 				username: "system"
@@ -807,7 +802,6 @@ component extends="../base" {
 			h2: {
 				class: "org.h2.Driver",
 				bundleName: "org.h2",
-				bundleVersion: "1.3.172",
 				host: "",
 				port: "",
 				username: "root"
@@ -815,7 +809,6 @@ component extends="../base" {
 			sqlite: {
 				class: "org.sqlite.JDBC",
 				bundleName: "org.xerial.sqlite-jdbc",
-				bundleVersion: "3.47.1.0",
 				host: "",
 				port: "",
 				username: ""
@@ -890,7 +883,6 @@ component extends="../base" {
 	this.datasources["#arguments.dsName#"] = {
 		class: "#arguments.dsConfig.class#",
 		bundleName: "#arguments.dsConfig.bundleName#",
-		bundleVersion: "#arguments.dsConfig.bundleVersion#",
 		connectionString: "#arguments.dsConfig.connectionString#",
 		username: "#arguments.dsConfig.username#",
 		password: "#arguments.dsConfig.password#",
