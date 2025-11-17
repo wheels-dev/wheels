@@ -67,6 +67,9 @@ Commands for generating application code and resources.
 - **`wheels generate scaffold`** - Complete CRUD
   [Documentation](generate/scaffold.md)
 
+- **`wheels generate api-resource`** - Generate RESTful API resource
+  [Documentation](generate/api-resource.md)
+
 ### Generator Options
 
 Common options across generators:
@@ -160,6 +163,12 @@ Commands for managing development environments and application context.
 - **`wheels env show`** - Show env variables
   [Documentation](environment/env-show.md)
 
+- **`wheels env switch`** - Switch between environments
+  [Documentation](environment/env-switch.md)
+
+- **`wheels env validate`** - Validate environment configuration
+  [Documentation](environment/env-validate.md)
+
 ## Code Analysis
 
 Commands for analyzing code quality and patterns.
@@ -173,6 +182,18 @@ Commands for analyzing code quality and patterns.
 - **`wheels analyze security`** - Security analysis
   [Documentation](analysis/analyze-security.md)
 
+## Config Commands
+
+Commands for managing application configuration.
+
+- **`wheels config check`** - Check configuration validity
+  [Documentation](config/config-check.md)
+
+- **`wheels config diff`** - Compare configuration differences
+  [Documentation](config/config-diff.md)
+
+- **`wheels config dump`** - Dump current configuration
+  [Documentation](config/config-dump.md)
 
 ## Docker Commands
 
@@ -181,8 +202,56 @@ Commands for Docker container management and deployment.
 - **`wheels docker init`** - Initialize Docker configuration
   [Documentation](docker/docker-init.md)
 
-- **`wheels docker deploy`** - Deploy using Docker
-  [Documentation](docker/docker-deploy.md)
+## Get Commands
+
+Commands for retrieving application information.
+
+- **`wheels get environment`** - Get current environment details
+  [Documentation](get/get-environment.md)
+
+- **`wheels get settings`** - Get application settings
+  [Documentation](get/get-settings.md)
+
+## Documentation Commands
+
+Commands for generating and serving project documentation.
+
+- **`wheels docs generate`** - Generate project documentation
+  [Documentation](docs/docs-generate.md)
+
+- **`wheels docs serve`** - Serve documentation locally
+  [Documentation](docs/docs-serve.md)
+
+## Plugin Commands
+
+Commands for managing Wheels plugins.
+
+- **`wheels plugin install`** - Install a plugin
+  [Documentation](plugins/plugins-install.md)
+
+- **`wheels plugin list`** - List installed plugins
+  [Documentation](plugins/plugins-list.md)
+
+- **`wheels plugin search`** - Search for plugins
+  [Documentation](plugins/plugins-search.md)
+
+- **`wheels plugin info`** - Show plugin information
+  [Documentation](plugins/plugins-info.md)
+
+- **`wheels plugin outdated`** - Check for outdated plugins
+  [Documentation](plugins/plugins-outdated.md)
+
+- **`wheels plugin update`** - Update a plugin
+  [Documentation](plugins/plugins-update.md)
+
+- **`wheels plugin update:all`** - Update all plugins
+  [Documentation](plugins/plugins-update-all.md)
+
+- **`wheels plugin remove`** - Remove a plugin
+  [Documentation](plugins/plugins-remove.md)
+
+- **`wheels plugin init`** - Initialize new plugin
+  [Documentation](plugins/plugins-init.md)
 
 ## Command Patterns
 

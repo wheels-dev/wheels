@@ -28,12 +28,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - All named: `wheels test run format=json verbose=true`
 - All flags: `wheels test run --verbose --coverage`
 - Named + flags: `wheels test run format=json --coverage`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional + named: Not applicable for this command (no positional parameters)
 
 **Recommendation:** Use named parameters for specific values, flags for boolean options: `wheels test run format=json --coverage`

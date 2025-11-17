@@ -18,13 +18,13 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - Positional: `wheels plugin search bcrypt`
 - Positional + flags: `wheels plugin search auth --format=json`
 - All named: `query=bcrypt format=json orderBy=downloads`
 - Named + flags: `query=auth --format=json`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional + named for same param: `wheels plugin search bcrypt query=other`
 
 **Recommendation:** Use positional for query, flags for options: `wheels plugin search auth --format=json --orderBy=downloads`
