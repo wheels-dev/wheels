@@ -5,6 +5,7 @@
  * wheels docker:init
  * wheels docker:init --db=mysql
  * wheels docker:init --db=postgres --dbVersion=13
+ * wheels docker:init --db=sqlite
  * wheels docker:init --db=oracle
  * wheels docker:init --db=oracle --dbVersion=23-slim
  * {code}
@@ -12,7 +13,7 @@
 component extends="../base" {
 
     /**
-     * @db Database to use (h2, mysql, postgres, mssql, oracle)
+     * @db Database to use (h2, sqlite, mysql, postgres, mssql, oracle)
      * @dbVersion Database version to use
      * @cfengine ColdFusion engine to use (lucee, adobe)
      * @cfVersion ColdFusion engine version
@@ -35,7 +36,7 @@ component extends="../base" {
         arguments = reconstructArgs(
             argStruct=arguments,
             allowedValues={
-                db: ["h2", "mysql", "postgres", "mssql", "oracle"],
+                db: ["h2", "sqlite", "mysql", "postgres", "mssql", "oracle"],
                 cfengine: ["lucee", "adobe"]
             }
         );
@@ -114,6 +115,7 @@ component extends="../base" {
 ADD https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex /usr/local/lib/serverHome/WEB-INF/lucee-server/deploy/org.lucee.h2-2.1.214.0001L.lex
             ';
         }
+        // Note: SQLite JDBC driver is included with Lucee/CommandBox by default - no extension needed
         if (arguments.production) {
             // Production Dockerfile with optimizations
             local.dockerContent = 'FROM ortussolutions/commandbox:latest
@@ -267,7 +269,15 @@ CMD ["box", "server", "start", "--console", "--force"]';
             case "h2":
                 // H2 runs embedded, no separate service needed
                 local.dbService = '';
-                local.dbEnvironment = '      DB_TYPE: h2';
+                local.dbEnvironment = '
+      DB_TYPE: h2';
+                break;
+
+            case "sqlite":
+                // SQLite runs embedded (file-based), no separate service needed
+                local.dbService = '';
+                local.dbEnvironment = '
+      DB_TYPE: sqlite';
                 break;
         }
 
@@ -503,10 +513,14 @@ http {
     private function configureDatasource(string db) {
         local.cfconfigPath = fileSystemUtil.resolvePath("CFConfig.json");
         local.datasourceConfig = {};
-        
-        // Skip H2 as it's embedded and doesn't need container connection
+
+        // Skip H2 and SQLite as they're file-based and don't need container connection
         if (arguments.db == "h2") {
             print.yellowLine("Skipping datasource configuration for H2 (embedded database)");
+            return;
+        }
+        if (arguments.db == "sqlite") {
+            print.yellowLine("Skipping datasource configuration for SQLite (file-based database)");
             return;
         }
         
