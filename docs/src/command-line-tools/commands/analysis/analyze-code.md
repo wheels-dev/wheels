@@ -18,12 +18,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+**ALLOWED:**
 - All flags: `wheels analyze code --fix --report --verbose`
 - Flags with values: `wheels analyze code --path=app/models --format=json`
 - Named + flags: `path=app/controllers format=json --fix`
 
-❌ **NOT ALLOWED:**
+**NOT ALLOWED:**
 - Positional parameters: This command does not support positional parameters
 
 **Recommendation:** Use flag syntax for consistency: `wheels analyze code --path=app/models --fix --format=json`

@@ -16,7 +16,7 @@ The `wheels docker init` command creates Docker configuration files for containe
 
 | Option | Description | Default | Valid Values |
 |--------|-------------|---------|--------------|
-| `--db` | Database system to use | `mysql` | `h2`, `mysql`, `postgres`, `mssql`, `oracle` |
+| `--db` | Database system to use | `mysql` | `h2`, `sqlite`, `mysql`, `postgres`, `mssql`, `oracle` |
 | `--dbVersion` | Database version to use | varies by db | Any valid version for the selected database |
 | `--cfengine` | CFML engine to use | `lucee` | `lucee`, `adobe` |
 | `--cfVersion` | CFML engine version | `6` | Any valid version for the selected engine |
@@ -31,6 +31,7 @@ The `wheels docker init` command creates Docker configuration files for containe
 - MSSQL: `2019-latest`
 - Oracle: `latest` (Oracle Database 23c Free)
 - H2: embedded (no version needed)
+- SQLite: embedded (no version needed)
 
 ## Examples
 
@@ -57,6 +58,11 @@ wheels docker init --cfengine=adobe --cfVersion=2023
 ### Initialize with H2 embedded database
 ```bash
 wheels docker init --db=h2
+```
+
+### Initialize with SQLite file-based database
+```bash
+wheels docker init --db=sqlite
 ```
 
 ### Initialize with Oracle
@@ -122,11 +128,13 @@ wheels docker init --db=postgres --dbVersion=15 --cfengine=lucee --cfVersion=6 -
      - Optimized image size
    - Based on `ortussolutions/commandbox:latest`
    - Installs H2 extension for Lucee if H2 database selected
+   - SQLite JDBC driver included by default (no extension needed)
    - Exposes application port (custom, from server.json, or defaults to 8080)
 
 3. **Generates docker-compose.yml** with:
    - Application service with port mapping or internal exposure
-   - Database service (mysql, postgres, or mssql) if selected
+   - Database service (mysql, postgres, mssql, or oracle) if selected
+   - File-based databases (H2, SQLite) run embedded within app container
    - Nginx reverse proxy service (if `--nginx`)
    - Environment variables for database connection
    - Volume mappings for data persistence
@@ -166,6 +174,7 @@ wheels docker init --db=postgres --dbVersion=15 --cfengine=lucee --cfVersion=6 -
      - Oracle: `oracle.jdbc.OracleDriver`
    - Uses Docker service name `db` for host resolution
    - Configures appropriate ports and credentials
+   - **Note**: Skipped for H2 and SQLite (file-based databases)
 
 7. **Updates server.json for Docker compatibility**:
    - Sets `web.host` to `0.0.0.0` (required for Docker containers to accept external connections)
@@ -436,8 +445,26 @@ http {
 ### H2
 - **Embedded**: No separate container needed
 - **Extension**: Automatically added to Lucee deployments via Dockerfile
-- **Connection**: Configured in CFConfig.json
-- **Storage**: Within application container filesystem
+- **Connection**: Configured in application settings
+- **Storage**: Within application container filesystem at `./db/`
+- **JDBC Driver**: `org.h2.Driver`
+
+### SQLite
+- **Embedded**: No separate container needed (file-based)
+- **JDBC Driver**: `org.sqlite.JDBC` (included with Lucee/CommandBox by default)
+- **Connection**: Configured in application settings
+- **Storage**: Within application container filesystem at `./db/`
+- **Database File**: `./db/database_name.db`
+- **Characteristics**:
+  - Serverless, zero-configuration
+  - Single file database (easy to backup)
+  - Ideal for development, testing, and prototyping
+  - No username/password required
+  - Creates auxiliary files during operation (.db-wal, .db-shm, .db-journal)
+- **Use Cases**: Development, testing, embedded systems, portable applications
+- **Limitations**:
+  - Single writer (not suitable for high-concurrency)
+  - Not recommended for production with multiple concurrent users
 
 ## Production vs Development Mode
 
@@ -595,7 +622,7 @@ The following environment variables are configured in docker-compose.yml:
 | `DB_USER` | Database username | `wheels` or `sa` |
 | `DB_PASSWORD` | Database password | `wheels` or `Wheels123!` |
 | `DB_SID` | Oracle SID (Oracle only) | `FREE` |
-| `DB_TYPE` | Database type (H2 only) | `h2` |
+| `DB_TYPE` | Database type (H2/SQLite only) | `h2` or `sqlite` |
 
 ## Starting Your Docker Environment
 
@@ -644,10 +671,10 @@ docker-compose up -d --build --force-recreate
 - **Production deployments MUST use secrets management and secure passwords**
 - Production mode creates security-hardened configurations with non-root users
 - Nginx adds reverse proxy capabilities for load balancing, caching, and security
-- H2 database runs embedded within the application container
+- H2 and SQLite databases run embedded within the application container
 - Volume mounts in development assume Wheels framework development structure
 - When using `--nginx`, the app is only exposed internally to nginx
-- CFConfig.json is updated with datasource configuration (skipped for H2)
+- CFConfig.json is updated with datasource configuration (skipped for H2 and SQLite)
 
 ## Troubleshooting
 
@@ -709,6 +736,18 @@ docker-compose up -d --build --force-recreate
 - Ensure CFConfig.json doesn't have conflicting datasource config
 - Check application logs for H2 initialization errors
 - H2 works with Lucee only (not Adobe ColdFusion)
+
+### SQLite database not working
+**Problem**: SQLite connection errors or database not found
+
+**Solutions**:
+- Verify `./db/` directory exists in the container
+- Check file permissions on database file (especially in production mode with UID 1001)
+- Ensure absolute paths are used in datasource configuration
+- SQLite JDBC driver is included by default (no extension installation needed)
+- Check application logs for SQLite initialization errors
+- Verify database file path in application settings
+- In production, ensure database file is accessible by `appuser` (UID 1001)
 
 ### Container not accessible from host
 **Problem**: Cannot access the application at http://localhost:8080

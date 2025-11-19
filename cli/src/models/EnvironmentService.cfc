@@ -901,7 +901,6 @@ component {
             dsDefinition &= chr(9) & chr(9) & 'this.datasources["#datasourceName#"] = {' & chr(10);
             dsDefinition &= chr(9) & chr(9) & chr(9) & 'class: "#dsConfig.class#",' & chr(10);
             dsDefinition &= chr(9) & chr(9) & chr(9) & 'bundleName: "#dsConfig.bundleName#",' & chr(10);
-            dsDefinition &= chr(9) & chr(9) & chr(9) & 'bundleVersion: "#dsConfig.bundleVersion#",' & chr(10);
             dsDefinition &= chr(9) & chr(9) & chr(9) & 'connectionString: "#dsConfig.connectionString#",' & chr(10);
             dsDefinition &= chr(9) & chr(9) & chr(9) & 'username: "##this.env.DB_USER##",' & chr(10);
             dsDefinition &= chr(9) & chr(9) & chr(9) & 'password: "##this.env.DB_PASSWORD##",' & chr(10);
@@ -939,7 +938,6 @@ component {
                 config = {
                     class: "com.mysql.cj.jdbc.Driver",
                     bundleName: "com.mysql.cj",
-                    bundleVersion: "9.1.0",
                     connectionString: "jdbc:mysql://##this.env.DB_HOST##:##this.env.DB_PORT##/##this.env.DB_DATABASE##?characterEncoding=UTF-8&serverTimezone=UTC&maxReconnects=3"
                 };
                 break;
@@ -948,7 +946,6 @@ component {
                 config = {
                     class: "org.postgresql.Driver",
                     bundleName: "org.postgresql.jdbc",
-                    bundleVersion: "42.7.4",
                     connectionString: "jdbc:postgresql://##this.env.DB_HOST##:##this.env.DB_PORT##/##this.env.DB_DATABASE##"
                 };
                 break;
@@ -957,7 +954,6 @@ component {
                 config = {
                     class: "com.microsoft.sqlserver.jdbc.SQLServerDriver",
                     bundleName: "org.lucee.mssql",
-                    bundleVersion: "12.6.3.jre11",
                     connectionString: "jdbc:sqlserver://##this.env.DB_HOST##:##this.env.DB_PORT##;DATABASENAME=##this.env.DB_DATABASE##;trustServerCertificate=true;SelectMethod=direct"
                 };
                 break;
@@ -965,7 +961,6 @@ component {
                 config = {
                     class: "oracle.jdbc.OracleDriver",
                     bundleName: "org.lucee.oracle",
-                    bundleVersion: "21.8.0.0-ojdbc11",
                     connectionString: "jdbc:oracle:thin:@##this.env.DB_HOST##:##this.env.DB_PORT##:##this.env.DB_SID##"
                 };
                 break;
@@ -973,7 +968,6 @@ component {
                 config = {
                     class: "org.sqlite.JDBC",
                     bundleName: "org.xerial.sqlite-jdbc",
-                    bundleVersion: "3.47.1.0",
                     connectionString: "jdbc:sqlite:##this.env.DB_DATABASE##"
                 };
                 break;
@@ -981,7 +975,6 @@ component {
                 config = {
                     class: "org.h2.Driver",
                     bundleName: "org.h2",
-                    bundleVersion: "1.3.172",
                     connectionString: "jdbc:h2:./db/##this.env.DB_DATABASE##;MODE=MySQL"
                 };
                 break;

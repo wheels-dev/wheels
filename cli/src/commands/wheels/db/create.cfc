@@ -116,6 +116,35 @@ component extends="../base" {
 			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels_dev";
 			local.dbType = local.dsInfo.driver;
 
+		// For file-based databases (SQLite, H2), extract just the database name if a full path/connection string was provided
+		if (local.dbType == "SQLite") {
+			if (findNoCase("jdbc:sqlite:", local.dbName) == 1) {
+				// Extract filename from JDBC connection string: jdbc:sqlite:/path/to/database.db -> database
+				local.fullPath = mid(local.dbName, 14, len(local.dbName)); // Remove "jdbc:sqlite:"
+				local.fileName = listLast(local.fullPath, "/\"); // Get filename
+				local.dbName = listFirst(local.fileName, "."); // Remove .db extension
+			} else if (find("\", local.dbName) || find("/", local.dbName)) {
+				// It's a full file path: D:\path\to\database.db or /path/to/database.db -> database
+				local.fileName = listLast(local.dbName, "/\"); // Get filename
+				local.dbName = listFirst(local.fileName, "."); // Remove .db extension
+			}
+			// Update dsInfo.database to use just the database name instead of full path
+			local.dsInfo.database = local.dbName;
+		} else if (local.dbType == "H2") {
+			if (findNoCase("jdbc:h2:", local.dbName) == 1) {
+				// Extract filename from H2 connection string
+				local.fullPath = mid(local.dbName, 9, len(local.dbName)); // Remove "jdbc:h2:"
+				local.fileName = listLast(local.fullPath, "/\");
+				local.dbName = listFirst(local.fileName, ";"); // Remove H2 options
+			} else if (find("\", local.dbName) || find("/", local.dbName)) {
+				// It's a full file path
+				local.fileName = listLast(local.dbName, "/\");
+				local.dbName = listFirst(local.fileName, ";"); // Remove H2 options if present
+			}
+			// Update dsInfo.database to use just the database name
+			local.dsInfo.database = local.dbName;
+		}
+
 			// Validate Oracle identifier (no hyphens or special characters allowed)
 			if (local.dbType == "Oracle" && reFind("[^a-zA-Z0-9_$##]", local.dbName)) {
 				error("Invalid Oracle identifier: '#local.dbName#' - Oracle usernames can only contain letters, numbers, and underscores. Use underscores instead of hyphens (e.g., 'wheels_dev' instead of 'wheels-dev')");
@@ -162,8 +191,15 @@ component extends="../base" {
 			writeDatasourceToAppCfmWithEnvVars(local.appPath, arguments.datasource, local.dbType, arguments.environment);
 
 		} catch (any e) {
-			// Errors are already handled and displayed by handleDatabaseError() function
-			// Just set exit code to indicate failure
+			// Display error if not already handled
+			if (!FindNoCase("Database already exists", e.message) &&
+			    !FindNoCase("Access denied", e.message) &&
+			    !FindNoCase("authentication failed", e.message)) {
+				printError("Database creation failed: " & e.message);
+				if (StructKeyExists(e, "detail") && Len(e.detail)) {
+					printError("Details: " & e.detail);
+				}
+			}
 			setExitCode(1);
 		}
 	}
@@ -859,7 +895,14 @@ component extends="../base" {
 				return "jdbc:h2:#local.appPath#db/h2/#arguments.database#;MODE=MySQL";
 			case "SQLite":
 				local.appPath = getCWD();
-				return "jdbc:sqlite:#local.appPath#/db/#arguments.database#.db";
+				// Ensure path uses forward slashes and is properly formatted
+				local.cleanPath = replace(local.appPath, "\", "/", "all");
+				// Remove trailing slash if present
+				if (right(local.cleanPath, 1) == "/") {
+					local.cleanPath = left(local.cleanPath, len(local.cleanPath) - 1);
+				}
+				local.dbFilePath = local.cleanPath & "/db/" & arguments.database & ".db";
+				return "jdbc:sqlite:" & local.dbFilePath;
 			default:
 				return "";
 		}
@@ -1066,7 +1109,28 @@ component extends="../base" {
 			printStep("Creating SQLite database...");
 
 			// Get the database path from dsInfo
-			local.dbPath = arguments.dsInfo.database;
+			// dsInfo.database might be:
+			// 1. Full JDBC connection string: "jdbc:sqlite:/path/to/db.db"
+			// 2. Just the database name: "wheels_dev"
+			local.databaseValue = arguments.dsInfo.database;
+			local.dbPath = "";
+
+			if (findNoCase("jdbc:sqlite:", local.databaseValue) == 1) {
+				// It's a full JDBC connection string - extract the file path
+				local.dbPath = mid(local.databaseValue, 14, len(local.databaseValue));
+			} else {
+				// It's just the database name - build the absolute path
+				local.appPath = getCWD();
+				local.cleanPath = replace(local.appPath, "\", "/", "all");
+				// Remove trailing slash if present
+				if (right(local.cleanPath, 1) == "/") {
+					local.cleanPath = left(local.cleanPath, len(local.cleanPath) - 1);
+				}
+				// Build absolute path to database file
+				local.dbPath = local.cleanPath & "/db/" & local.databaseValue & ".db";
+			}
+			// Normalize path separators to forward slashes
+			local.dbPath = replace(local.dbPath, "\", "/", "all");
 
 			// Check if database file already exists
 			if (FileExists(local.dbPath)) {
@@ -1187,12 +1251,61 @@ component extends="../base" {
 			}
 
 		} catch (any e) {
-			printError("Error creating SQLite database: " & e.message);
-			if (StructKeyExists(e, "detail") && Len(e.detail)) {
-				printError("Details: " & e.detail);
-			}
-			throw(message=e.message);
+			// Handle SQLite-specific errors
+			handleSQLiteError(e, arguments.dbName);
 		}
+	}
+
+	/**
+	 * Handle SQLite-specific errors
+	 */
+	private void function handleSQLiteError(required any e, required string dbName) {
+		local.errorHandled = false;
+		local.errorMessage = arguments.e.message;
+
+		// Check for common SQLite error patterns
+		if (FindNoCase("already exists", local.errorMessage)) {
+			printError("Database file already exists: " & arguments.dbName & ".db");
+			printWarning("Use force=true to overwrite the existing database");
+			local.errorHandled = true;
+		} else if (FindNoCase("Could not delete", local.errorMessage)) {
+			printError("Cannot delete existing database file");
+			printWarning("The database file may be locked by another process");
+			printWarning("Try stopping the application server and running the command again");
+			local.errorHandled = true;
+		} else if (FindNoCase("driver not found", local.errorMessage) ||
+		           FindNoCase("JDBC driver", local.errorMessage)) {
+			printError("SQLite JDBC driver not found");
+			printWarning("Ensure org.xerial.sqlite-jdbc is in the classpath");
+			printWarning("You may need to add the driver to your application server");
+			local.errorHandled = true;
+		} else if (FindNoCase("Failed to create", local.errorMessage)) {
+			printError("Failed to create SQLite database connection");
+			printWarning("Check that the db directory exists and is writable");
+			local.errorHandled = true;
+		} else if (FindNoCase("Permission denied", local.errorMessage) ||
+		           FindNoCase("Access is denied", local.errorMessage)) {
+			printError("Permission denied when creating database file");
+			printWarning("Ensure the application has write permissions to the db directory");
+			local.errorHandled = true;
+		} else if (FindNoCase("database is locked", local.errorMessage)) {
+			printError("Database is locked by another process");
+			printWarning("Close any applications that may be accessing the database file");
+			local.errorHandled = true;
+		}
+
+		// If error wasn't specifically handled, show generic error
+		if (!local.errorHandled) {
+			printError("SQLite Error: " & local.errorMessage);
+		}
+
+		// Show detail if available
+		if (StructKeyExists(arguments.e, "detail") && Len(arguments.e.detail)) {
+			printError("Details: " & arguments.e.detail);
+		}
+
+		// Always throw to propagate the error up
+		throw(message=arguments.e.message, detail=(StructKeyExists(arguments.e, "detail") ? arguments.e.detail : ""));
 	}
 
 }
