@@ -1,165 +1,230 @@
 /**
- * Generate helper functions for use in views and controllers
- * 
+ * Generate global helper functions for use throughout the application
+ *
  * Examples:
  * wheels generate helper Format
  * wheels generate helper StringUtils --functions="truncate,highlight,slugify"
- * wheels generate helper DateHelpers --global=true
- * wheels generate helper ViewHelpers --type=view
+ * wheels generate helper DateHelpers --description="Date formatting helpers"
  */
 component aliases='wheels g helper' extends="../base" {
-    
+
     property name="codeGenerationService" inject="CodeGenerationService@wheels-cli";
     property name="helpers" inject="helpers@wheels-cli";
     property name="detailOutput" inject="DetailOutputService@wheels-cli";
-    
+
     /**
      * @name.hint Name of the helper (e.g., FormatHelper, StringHelper)
      * @functions.hint Comma-separated list of functions to generate
-     * @type.hint Helper type: controller, view, or global (default: global)
-     * @global.hint Make helper functions available globally (default: false)
      * @description.hint Helper description
      * @force.hint Overwrite existing files
      */
     function run(
         required string name,
         string functions = "helperFunction",
-        string type = "global",
-        boolean global = false,
         string description = "",
         boolean force = false
     ) {
-        detailOutput.header("🛠️", "Generating helper: #arguments.name#");
-        
+        arguments=reconstructArgs(arguments);
+        detailOutput.header("", "Generating helper: #arguments.name#");
+
         // Ensure name ends with "Helper" or "Helpers"
         if (!reFindNoCase("Helper(s)?$", arguments.name)) {
             arguments.name &= "Helper";
         }
-        
+
         // Validate helper name
         var validation = codeGenerationService.validateName(arguments.name, "helper");
         if (!validation.valid) {
             error("Invalid helper name: " & arrayToList(validation.errors, ", "));
             return;
         }
-        
-        // Validate type
-        if (!listFindNoCase("controller,view,global", arguments.type)) {
-            error("Invalid helper type. Must be 'controller', 'view', or 'global'.");
-            return;
-        }
-        
-        // Set up paths based on type
-        var helperDir = "";
-        switch(arguments.type) {
-            case "controller":
-                helperDir = helpers.getAppPath() & "/controllers/helpers";
-                break;
-            case "view":
-                helperDir = helpers.getAppPath() & "/views/helpers";
-                break;
-            default:
-                helperDir = helpers.getAppPath() & "/helpers";
-        }
-        
+
+        // Set up helper directory
+        var helperDir = helpers.getAppPath() & "/helpers";
+
         if (!directoryExists(helperDir)) {
             directoryCreate(helperDir);
-            detailOutput.output("Created helpers directory: #replace(helperDir, helpers.getAppPath(), '')#");
+            detailOutput.output("Created helpers directory: /app/helpers");
         }
         
-        var helperPath = helperDir & "/" & arguments.name & ".cfc";
+        var helperPath = helperDir & "/" & arguments.name & ".cfm";
         
         // Check if file exists
         if (fileExists(helperPath) && !arguments.force) {
-            error("Helper already exists: #arguments.name#.cfc. Use force=true to overwrite.");
+            error("Helper already exists: #arguments.name#.cfm. Use force=true to overwrite.");
             return;
         }
         
         // Parse functions
         var functionList = listToArray(arguments.functions, ",");
-        
+
+        // Validate function names don't already exist (unless we're forcing an overwrite)
+        if (!arguments.force) {
+            var existingFunctions = checkForExistingFunctions(helperDir, functionList, arguments.name);
+            if (arrayLen(existingFunctions) > 0) {
+                error("The following function(s) already exist in helper files: #arrayToList(existingFunctions, ', ')#");
+                return;
+            }
+        }
+
         // Generate helper content
-        var helperContent = generateHelperContent(arguments, functionList);
-        
+        var helperContent = generateHelperContent(arguments.name, functionList, arguments.description);
+
         // Write helper file
         fileWrite(helperPath, helperContent);
         detailOutput.success("Created helper: #replace(helperPath, helpers.getAppPath(), '')#");
-        
+
+        // Ensure helper is included in app/global/functions.cfm
+        ensureHelperIncluded(arguments.name);
+
         // Create test file
-        createHelperTest(arguments.name, functionList, arguments.type);
-        
+        createHelperTest(arguments.name, functionList);
+
         // Show usage example
         detailOutput.separator();
         detailOutput.output("Usage example:");
-        
-        if (arguments.global || arguments.type == "global") {
-            detailOutput.code('// Helper functions are automatically available globally
+        detailOutput.code('// Helper functions are automatically available globally
 result = #functionList[1]#("some input");
 
 // In views
 <cfoutput>
     ##format#uCase(left(functionList[1], 1)) & mid(functionList[1], 2, len(functionList[1]))#(data)##
 </cfoutput>', "cfscript");
-        } else if (arguments.type == "controller") {
-            detailOutput.code('// In your controller
-component extends="Controller" {
-    function config() {
-        // Include the helper
-        includeHelpers("#arguments.name#");
     }
     
-    function index() {
-        // Use the helper function
-        result = #functionList[1]#("some input");
+    /**
+     * Check if any of the functions already exist in helper files
+     */
+    private array function checkForExistingFunctions(required string helperDir, required array functionList, required string currentHelperName) {
+        var conflicts = [];
+
+        // Get all helper files
+        if (!directoryExists(arguments.helperDir)) {
+            return conflicts;
+        }
+
+        var helperFiles = directoryList(arguments.helperDir, false, "path", "*.cfm");
+
+        // Check each helper file for function definitions
+        for (var helperFile in helperFiles) {
+            var fileContent = fileRead(helperFile);
+            var fileName = getFileFromPath(helperFile);
+
+            // Skip the current helper file being generated (in case of updates)
+            if (fileName == arguments.currentHelperName & ".cfm") {
+                continue;
+            }
+
+            // Check each function we want to create
+            for (var funcName in arguments.functionList) {
+                var cleanFuncName = trim(funcName);
+
+                // Search for function definitions with various patterns
+                // Matches: function name(, public function name(, private function name(, etc.
+                var pattern = "(public|private|package)?\s*function\s+#cleanFuncName#\s*\(";
+
+                if (reFindNoCase(pattern, fileContent) > 0) {
+                    arrayAppend(conflicts, "#cleanFuncName# (in #fileName#)");
+                }
+            }
+        }
+
+        return conflicts;
     }
-}', "cfscript");
+
+    /**
+     * Ensure helper is included in app/global/functions.cfm
+     */
+    private void function ensureHelperIncluded(required string helperName) {
+        var functionsPath = helpers.getAppPath() & "/global/functions.cfm";
+        var fileAlreadyExists = fileExists(functionsPath);
+
+        if (!fileAlreadyExists) {
+            createNewFunctionsFile(functionsPath, arguments.helperName);
+            return;
+        }
+
+        // File exists, check if helper is already included
+        var functionsContent = fileRead(functionsPath);
+        var helperFileName = arguments.helperName & ".cfm";
+
+        if (findNoCase(helperFileName, functionsContent) > 0) {
+            detailOutput.output("Helper already included in functions.cfm");
+            return;
+        }
+
+        // Add include to existing file
+        addIncludeToFunctionsFile(functionsContent, functionsPath, arguments.helperName);
+    }
+
+    /**
+     * Create new functions.cfm file
+     */
+    private void function createNewFunctionsFile(required string functionsPath, required string helperName) {
+        var content = "";
+        content &= "&lt;cfscript&gt;" & chr(10);
+        content &= "//=====================================================================" & chr(10);
+        content &= "//= " & chr(9) & "Global Functions" & chr(10);
+        content &= "//=====================================================================" & chr(10);
+        content &= 'include "../helpers/' & arguments.helperName & '.cfm";' & chr(10);
+        content &= "&lt;/cfscript&gt;" & chr(10);
+        fileWrite(arguments.functionsPath, content);
+        detailOutput.success("Created: /app/global/functions.cfm");
+    }
+
+
+    /**
+     * Add include statement to existing functions.cfm
+     */
+    private void function addIncludeToFunctionsFile(required string currentContent, required string functionsPath, required string helperName) {
+        var includeStatement = 'include "../helpers/' & arguments.helperName & '.cfm";' & chr(10);
+        var updatedContent = arguments.currentContent;
+
+        // Use variables to avoid CFML tag interpretation
+        var openingTag = chr(60) & "cfscript" & chr(62);
+        var closingTag = chr(60) & "/cfscript" & chr(62);
+
+        // Insert before closing cfscript tag
+        if (findNoCase(closingTag, updatedContent) > 0) {
+            updatedContent = reReplace(updatedContent, closingTag, includeStatement & closingTag, "one");
+        } else if (findNoCase(openingTag, updatedContent) > 0) {
+            // Has opening tag but no closing - add at end
+            updatedContent &= includeStatement;
         } else {
-            detailOutput.code('// In your view
-<cfoutput>
-    ##format#uCase(left(functionList[1], 1)) & mid(functionList[1], 2, len(functionList[1]))#(data)##
-</cfoutput>', "cfscript");
+            // No cfscript tags - wrap everything
+            updatedContent = openingTag & chr(10) & updatedContent & includeStatement & closingTag & chr(10);
         }
-        
-        // If global, show how to register
-        if (arguments.global && arguments.type != "global") {
-            detailOutput.separator();
-            detailOutput.output("To make this helper global, add to /config/settings.cfm:");
-            detailOutput.code('// Include helper globally
-set(functionName = "includeHelpers", helper = "#arguments.name#");', "cfscript");
-        }
+
+        fileWrite(arguments.functionsPath, updatedContent);
+        detailOutput.success("Added include to /app/global/functions.cfm");
     }
-    
+
     /**
      * Generate helper component content
      */
-    private string function generateHelperContent(required struct args, required array functions) {
-        var content = "/**" & chr(10);
-        content &= " * #args.name#" & chr(10);
-        if (len(args.description)) {
-            content &= " * #args.description#" & chr(10);
+    private string function generateHelperContent(required string helperName, required array functions, string description = "") {
+        var content = '';
+        content &= "/**" & chr(10);
+        content &= " * #arguments.helperName#" & chr(10);
+        if (len(trim(arguments.description))) {
+            content &= " * #trim(arguments.description)#" & chr(10);
         }
-        content &= " * Type: #args.type# helper" & chr(10);
         content &= " */" & chr(10);
-        content &= "component {" & chr(10) & chr(10);
-        
-        // Include Wheels helper functions
-        content &= chr(9) & "// Include Wheels framework helpers" & chr(10);
-        content &= chr(9) & "include ""/wheels/global/functions.cfm"";" & chr(10) & chr(10);
-        
+        content &= "<cfscript>" & chr(10) & chr(10);
+
         // Generate functions
         for (var func in functions) {
-            content &= generateHelperFunction(trim(func), args.type);
+            content &= generateHelperFunction(trim(func));
         }
-        
-        content &= "}";
-        
+
+        content &= "</cfscript>";
         return content;
     }
-    
+
     /**
      * Generate individual helper function
      */
-    private string function generateHelperFunction(required string functionName, required string type) {
+    private string function generateHelperFunction(required string functionName) {
         var content = chr(9) & "/**" & chr(10);
         content &= chr(9) & " * #humanize(functionName)# helper function" & chr(10);
         content &= chr(9) & " * @value.hint The value to process" & chr(10);
@@ -295,7 +360,7 @@ set(functionName = "includeHelpers", helper = "#arguments.name#");', "cfscript")
     /**
      * Create test file for helper
      */
-    private void function createHelperTest(required string helperName, required array functions, required string type) {
+    private void function createHelperTest(required string helperName, required array functions) {
         var testsDir = helpers.getTestPath() & "/specs/helpers";
 
         if (!directoryExists(testsDir)) {
@@ -305,7 +370,7 @@ set(functionName = "includeHelpers", helper = "#arguments.name#");', "cfscript")
         var testPath = testsDir & "/" & helperName & "Spec.cfc";
 
         if (!fileExists(testPath)) {
-            var testContent = generateHelperTest(helperName, functions, type);
+            var testContent = generateHelperTest(helperName, functions);
             fileWrite(testPath, testContent);
             detailOutput.output("Created test: /tests/specs/helpers/#helperName#Spec.cfc");
         }
@@ -314,12 +379,11 @@ set(functionName = "includeHelpers", helper = "#arguments.name#");', "cfscript")
     /**
      * Generate helper test content
      */
-    private string function generateHelperTest(required string helperName, required array functions, required string type) {
+    private string function generateHelperTest(required string helperName, required array functions) {
         var content = "component extends=""wheels.Test"" {" & chr(10) & chr(10);
-        
+
         content &= chr(9) & "function setup() {" & chr(10);
-        content &= chr(9) & chr(9) & "// Include the helper" & chr(10);
-        content &= chr(9) & chr(9) & "include ""/app/helpers/#helperName#.cfc"";" & chr(10);
+        content &= chr(9) & chr(9) & "// Global helpers are automatically included" & chr(10);
         content &= chr(9) & "}" & chr(10) & chr(10);
         
         for (var func in functions) {
