@@ -233,6 +233,9 @@ component output="false" {
 	}
 
 	public void function onRequestEnd( string targetPage ) {
+		if ( structKeyExists(request, "_onAbortTemplate") ) {
+			application.wo.$include( template = request._onAbortTemplate );
+		}
 		local.lockName = "reloadLock" & this.name;
 
 		arguments.componentReference = "wheels.events.EventMethods";
@@ -259,7 +262,7 @@ component output="false" {
 			&& StructKeyExists(application.wo, "$restoreTestRunnerApplicationScope")
 		) {
 			application.wo.$restoreTestRunnerApplicationScope();
-			application.wo.$include(template = "#application.wheels.eventPath#/onabort.cfm");
+			request._onAbortTemplate = application.wheels.eventPath & "/onabort.cfm";
 		}
 		return true;
 	}
