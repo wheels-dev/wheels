@@ -296,7 +296,7 @@ If you see "Driver not found" error, you need to manually install the Oracle JDB
    - Download `ojdbc11.jar` or `ojdbc8.jar`
 
 2. **Place the JAR file** in CommandBox's JRE library directory:
-   - **Windows**: `C:\Program Files\CommandBox\jre\lib\`
+   - **Windows**: `path\to\CommandBox\jre\lib\`
    - **Mac/Linux**: `/usr/local/lib/CommandBox/jre/lib/`
 
 3. **Restart CommandBox completely**:
