@@ -62,6 +62,9 @@ cp tools/build/base/server.json "${BUILD_DIR}/server.json"
 cp tools/build/base/config/app.cfm "${BUILD_DIR}/config/app.cfm"
 cp tools/build/base/config/settings.cfm "${BUILD_DIR}/config/settings.cfm"
 
+# Copy .env file
+cp .env "${BUILD_DIR}/.env"
+
 # Replace version placeholders
 echo "Replacing version placeholders..."
 find "${BUILD_DIR}" -type f \( -name "*.json" -o -name "*.md" -o -name "*.cfm" -o -name "*.cfc" \) | while read file; do
