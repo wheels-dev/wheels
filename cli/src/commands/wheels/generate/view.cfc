@@ -40,7 +40,8 @@ component aliases='wheels g view' extends="../base"  {
 		);
 		var obj = helpers.getNameVariants(listLast( arguments.objectName, '/\' ));
 		var viewdirectory     = fileSystemUtil.resolvePath( "app/views" );
-		var directory 		  = fileSystemUtil.resolvePath( "app/views" & "/" & obj.objectNamePlural);
+		// Build path from resolved viewdirectory to avoid conflicts with existing directories (e.g., tests/)
+	var directory 		  = viewdirectory & "/" & obj.objectNamePlural;
 		
 		// Handle multiple views if comma-separated list is provided
 		var viewNames = listToArray(arguments.name);

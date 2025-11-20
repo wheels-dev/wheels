@@ -24,7 +24,8 @@ component {
         boolean cache = false,
         string reloadPassword = "",
         boolean skipDatabase = false,
-        boolean help = false
+        boolean help = false,
+        string updateMode = "create"
     ) {
 
 
@@ -33,8 +34,25 @@ component {
 
             // Check if environment already exists
             var envFile = projectRoot & ".env." & arguments.environment;
-            
-            if (fileExists(envFile) && !arguments.force) {
+
+            // Handle update mode for existing environments
+            if (fileExists(envFile) && arguments.updateMode == "update") {
+                // Update only database variables
+                return updateDatabaseVariablesOnly(
+                    envFile = envFile,
+                    environment = arguments.environment,
+                    dbtype = arguments.dbtype,
+                    database = arguments.database,
+                    datasource = arguments.datasource,
+                    host = arguments.host,
+                    port = arguments.port,
+                    username = arguments.username,
+                    password = arguments.password,
+                    sid = arguments.sid
+                );
+            }
+
+            if (fileExists(envFile) && !arguments.force && arguments.updateMode != "overwrite") {
                 return {
                     success: false,
                     error: "Environment '" & arguments.environment & "' already exists. Use --force to overwrite."
@@ -1890,6 +1908,236 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         } catch (any e) {
             // Non-critical error - settings file update is optional
             // Don't throw, just continue
+        }
+    }
+
+    /**
+     * Update only database variables in an existing environment file
+     * Preserves all other settings like WHEELS_DEBUG, WHEELS_CACHE, SERVER_PORT, etc.
+     */
+    private struct function updateDatabaseVariablesOnly(
+        required string envFile,
+        required string environment,
+        required string dbtype,
+        required string database,
+        required string datasource,
+        required string host,
+        required string port,
+        required string username,
+        required string password,
+        required string sid
+    ) {
+        try {
+            // Read existing environment file
+            var envContent = fileRead(arguments.envFile);
+            var envLines = listToArray(envContent, chr(10));
+            var updatedLines = [];
+            var dbVarsFound = {
+                DB_TYPE: false,
+                DB_HOST: false,
+                DB_PORT: false,
+                DB_DATABASE: false,
+                DB_USER: false,
+                DB_PASSWORD: false,
+                DB_SID: false,
+                DB_DATASOURCE: false
+            };
+            var inDatabaseSection = false;
+            var databaseSectionEnd = 0;
+
+            // Process each line
+            for (var i = 1; i <= arrayLen(envLines); i++) {
+                var line = envLines[i];
+                var trimmedLine = trim(line);
+
+                // Track if we're in the database section
+                if (findNoCase("## Database Settings", trimmedLine)) {
+                    inDatabaseSection = true;
+                    arrayAppend(updatedLines, line);
+                    continue;
+                }
+
+                // Track when database section ends (next section starts)
+                if (inDatabaseSection && findNoCase("##", trimmedLine) && !findNoCase("## Database", trimmedLine)) {
+                    inDatabaseSection = false;
+                    databaseSectionEnd = arrayLen(updatedLines);
+                }
+
+                // Update DB_TYPE
+                if (findNoCase("DB_TYPE=", trimmedLine) == 1) {
+                    dbVarsFound.DB_TYPE = true;
+                    arrayAppend(updatedLines, "DB_TYPE=#arguments.dbtype#");
+                    continue;
+                }
+
+                // Update DB_HOST
+                if (findNoCase("DB_HOST=", trimmedLine) == 1) {
+                    dbVarsFound.DB_HOST = true;
+                    if (len(trim(arguments.host))) {
+                        arrayAppend(updatedLines, "DB_HOST=#arguments.host#");
+                    }
+                    continue;
+                }
+
+                // Update DB_PORT
+                if (findNoCase("DB_PORT=", trimmedLine) == 1) {
+                    dbVarsFound.DB_PORT = true;
+                    if (len(trim(arguments.port))) {
+                        arrayAppend(updatedLines, "DB_PORT=#arguments.port#");
+                    }
+                    continue;
+                }
+
+                // Update DB_DATABASE
+                if (findNoCase("DB_DATABASE=", trimmedLine) == 1) {
+                    dbVarsFound.DB_DATABASE = true;
+                    var dbName = len(trim(arguments.database)) ? arguments.database : "wheels_#arguments.environment#";
+                    arrayAppend(updatedLines, "DB_DATABASE=#dbName#");
+                    continue;
+                }
+
+                // Update DB_USER
+                if (findNoCase("DB_USER=", trimmedLine) == 1) {
+                    dbVarsFound.DB_USER = true;
+                    arrayAppend(updatedLines, "DB_USER=#arguments.username#");
+                    continue;
+                }
+
+                // Update DB_PASSWORD
+                if (findNoCase("DB_PASSWORD=", trimmedLine) == 1) {
+                    dbVarsFound.DB_PASSWORD = true;
+                    arrayAppend(updatedLines, "DB_PASSWORD=#arguments.password#");
+                    continue;
+                }
+
+                // Update DB_SID (Oracle only)
+                if (findNoCase("DB_SID=", trimmedLine) == 1) {
+                    dbVarsFound.DB_SID = true;
+                    if (lCase(arguments.dbtype) == "oracle" && len(trim(arguments.sid))) {
+                        arrayAppend(updatedLines, "DB_SID=#arguments.sid#");
+                    }
+                    continue;
+                }
+
+                // Update DB_DATASOURCE
+                if (findNoCase("DB_DATASOURCE=", trimmedLine) == 1) {
+                    dbVarsFound.DB_DATASOURCE = true;
+                    var dsName = len(trim(arguments.datasource)) ? arguments.datasource : "wheels_#arguments.environment#";
+                    arrayAppend(updatedLines, "DB_DATASOURCE=#dsName#");
+                    continue;
+                }
+
+                // Preserve all other lines (including comments, blank lines, and other variables)
+                arrayAppend(updatedLines, line);
+            }
+
+            // Add missing database variables after the database section
+            var missingVars = [];
+
+            if (!dbVarsFound.DB_TYPE) {
+                arrayAppend(missingVars, "DB_TYPE=#arguments.dbtype#");
+            }
+
+            if (!dbVarsFound.DB_HOST && len(trim(arguments.host))) {
+                arrayAppend(missingVars, "DB_HOST=#arguments.host#");
+            }
+
+            if (!dbVarsFound.DB_PORT && len(trim(arguments.port))) {
+                arrayAppend(missingVars, "DB_PORT=#arguments.port#");
+            }
+
+            if (!dbVarsFound.DB_DATABASE) {
+                var dbName = len(trim(arguments.database)) ? arguments.database : "wheels_#arguments.environment#";
+                arrayAppend(missingVars, "DB_DATABASE=#dbName#");
+            }
+
+            if (!dbVarsFound.DB_USER) {
+                arrayAppend(missingVars, "DB_USER=#arguments.username#");
+            }
+
+            if (!dbVarsFound.DB_PASSWORD) {
+                arrayAppend(missingVars, "DB_PASSWORD=#arguments.password#");
+            }
+
+            if (!dbVarsFound.DB_SID && lCase(arguments.dbtype) == "oracle" && len(trim(arguments.sid))) {
+                arrayAppend(missingVars, "DB_SID=#arguments.sid#");
+            }
+
+            if (!dbVarsFound.DB_DATASOURCE) {
+                var dsName = len(trim(arguments.datasource)) ? arguments.datasource : "wheels_#arguments.environment#";
+                arrayAppend(missingVars, "DB_DATASOURCE=#dsName#");
+            }
+
+            // Insert missing variables into the appropriate section
+            if (arrayLen(missingVars) > 0) {
+                // If we found a database section, add missing vars there
+                if (databaseSectionEnd > 0) {
+                    // Insert missing vars after database section header
+                    for (var i = arrayLen(missingVars); i >= 1; i--) {
+                        arrayInsertAt(updatedLines, databaseSectionEnd + 1, missingVars[i]);
+                    }
+                } else {
+                    // No database section exists, create one before server settings
+                    var insertPoint = 0;
+                    for (var i = 1; i <= arrayLen(updatedLines); i++) {
+                        if (findNoCase("## Server Settings", updatedLines[i])) {
+                            insertPoint = i;
+                            break;
+                        }
+                    }
+
+                    if (insertPoint > 0) {
+                        arrayInsertAt(updatedLines, insertPoint, "");
+                        arrayInsertAt(updatedLines, insertPoint + 1, "## Database Settings");
+                        var offset = 2;
+                        for (var varLine in missingVars) {
+                            arrayInsertAt(updatedLines, insertPoint + offset, varLine);
+                            offset++;
+                        }
+                        arrayInsertAt(updatedLines, insertPoint + offset, "");
+                    } else {
+                        // Just append to end if no server section found
+                        arrayAppend(updatedLines, "");
+                        arrayAppend(updatedLines, "## Database Settings");
+                        for (var varLine in missingVars) {
+                            arrayAppend(updatedLines, varLine);
+                        }
+                        arrayAppend(updatedLines, "");
+                    }
+                }
+            }
+
+            // Write updated content back to file
+            fileWrite(arguments.envFile, arrayToList(updatedLines, chr(10)));
+
+            // Build datasource info for response
+            var dbName = len(trim(arguments.database)) ? arguments.database : "wheels_#arguments.environment#";
+            var dsName = len(trim(arguments.datasource)) ? arguments.datasource : "wheels_#arguments.environment#";
+
+            return {
+                success: true,
+                message: "Database variables updated successfully in environment '#arguments.environment#'",
+                config: {
+                    datasourceInfo: {
+                        database: dbName,
+                        datasource: dsName,
+                        dbtype: arguments.dbtype,
+                        host: arguments.host,
+                        port: arguments.port,
+                        username: arguments.username
+                    }
+                },
+                nextSteps: [
+                    "Database credentials updated in .env.#arguments.environment#",
+                    "Restart your server to apply changes: server restart"
+                ]
+            };
+
+        } catch (any e) {
+            return {
+                success: false,
+                error: "Failed to update database variables: #e.message#"
+            };
         }
     }
 

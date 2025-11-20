@@ -38,7 +38,7 @@ component extends="../base" {
 		string datasource = "",
 		string environment = "",
 		string database = "",
-		string dbtype = "h2",
+		string dbtype = "",
 		boolean force = false
 	) {
 		local.appPath = getCWD();
@@ -768,7 +768,7 @@ component extends="../base" {
 			command("wheels env setup")
 				.params(
 					environment = arguments.environment,
-					dbtype = local.dbType,
+					dbtype = normalizeDbType(local.dbType),
 					datasource = arguments.datasourceName,
 					database = local.database,
 					host = local.host,
@@ -776,8 +776,7 @@ component extends="../base" {
 					username = local.username,
 					password = local.password,
 					sid = local.sid ?: "",
-					skipDatabase = true,
-					force = true
+					skipDatabase = true
 				)
 				.run();
 
@@ -1041,7 +1040,7 @@ component extends="../base" {
 				command("wheels env setup")
 					.params(
 						environment = arguments.environment,
-						dbtype = arguments.dbType,
+						dbtype = normalizeDbType(arguments.dbType),
 						datasource = arguments.datasource,
 						database = arguments.dsInfo.database,
 						host = arguments.dsInfo.host ?: "localhost",
@@ -1049,8 +1048,7 @@ component extends="../base" {
 						username = arguments.dsInfo.username ?: "root",
 						password = arguments.dsInfo.password ?: "",
 						sid = arguments.dsInfo.sid ?: "",
-						skipDatabase = true,
-						force = true
+						skipDatabase = true
 					)
 					.run();
 
@@ -1306,6 +1304,32 @@ component extends="../base" {
 
 		// Always throw to propagate the error up
 		throw(message=arguments.e.message, detail=(StructKeyExists(arguments.e, "detail") ? arguments.e.detail : ""));
+	}
+
+	/**
+	 * Normalize database type to CLI parameter format
+	 * Converts internal database type names to lowercase short form expected by env setup
+	 */
+	private string function normalizeDbType(required string dbType) {
+		switch (arguments.dbType) {
+			case "MySQL":
+			case "MySQL5":
+				return "mysql";
+			case "PostgreSQL":
+				return "postgres";
+			case "MSSQLServer":
+			case "MSSQL":
+				return "mssql";
+			case "Oracle":
+				return "oracle";
+			case "H2":
+				return "h2";
+			case "SQLite":
+				return "sqlite";
+			default:
+				// If already in lowercase format, return as-is
+				return lCase(arguments.dbType);
+		}
 	}
 
 }
