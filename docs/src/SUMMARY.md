@@ -29,6 +29,8 @@
     * [wheels generate controller](command-line-tools/commands/generate/controller.md)
     * [wheels generate model](command-line-tools/commands/generate/model.md)
     * [wheels generate view](command-line-tools/commands/generate/view.md)
+    * [wheels generate helper](command-line-tools/commands/generate/helper.md)
+    * [wheels generate migration](command-line-tools/commands/generate/migration.md)
     * [wheels generate property](command-line-tools/commands/generate/property.md)
     * [wheels generate route](command-line-tools/commands/generate/route.md)
     * [wheels generate test](command-line-tools/commands/generate/test.md)

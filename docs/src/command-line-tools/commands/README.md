@@ -52,6 +52,12 @@ Commands for generating application code and resources.
 - **`wheels generate view`** (alias: `wheels g view`) - Generate view
   [Documentation](generate/view.md)
 
+- **`wheels generate helper`** (alias: `wheels g helper`) - Generate global helper functions
+  [Documentation](generate/helper.md)
+
+- **`wheels generate migration`** (alias: `wheels g migration`) - Generate database migration
+  [Documentation](generate/migration.md)
+
 - **`wheels generate property`** - Add model property
   [Documentation](generate/property.md)
 
@@ -260,9 +266,11 @@ Commands for managing Wheels plugins.
 Many commands have shorter aliases:
 
 ```bash
-wheels g controller users  # Same as: wheels generate controller users
-wheels g model user       # Same as: wheels generate model user
-wheels new myapp         # Same as: wheels generate app myapp
+wheels g controller users      # Same as: wheels generate controller users
+wheels g model user           # Same as: wheels generate model user
+wheels g helper format        # Same as: wheels generate helper format
+wheels g migration CreateUsers # Same as: wheels generate migration CreateUsers
+wheels new myapp              # Same as: wheels generate app myapp
 ```
 
 ### Common Workflows

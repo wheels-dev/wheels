@@ -64,10 +64,39 @@ component extends="../base" {
 
         // CHECK ENVIRONMENT EXISTENCE FIRST - before prompting for credentials
         var envFile = projectRoot & "/.env." & arguments.environment;
-        if (fileExists(envFile) && !arguments.force) {
-            print.redLine("Setup failed: Environment '#arguments.environment#' already exists. Use --force to overwrite.");
-            setExitCode(1);
-            return;
+        var updateMode = "create"; // create, overwrite, or update
+
+        if (fileExists(envFile)) {
+            if (arguments.force) {
+                updateMode = "overwrite";
+            } else {
+                print.line();
+                print.yellowLine("Environment '#arguments.environment#' already exists.");
+                print.line();
+                print.yellowLine("What would you like to do?");
+                print.line("  1. Overwrite entire environment file");
+                print.line("  2. Update only database variables (preserve other settings)");
+                print.line("  3. Cancel");
+                print.line();
+
+                var choice = ask("Select option [1-3]: ");
+
+                switch(choice) {
+                    case "1":
+                        updateMode = "overwrite";
+                        print.greenLine("Will overwrite environment file...");
+                        break;
+                    case "2":
+                        updateMode = "update";
+                        print.greenLine("Will update only database variables...");
+                        break;
+                    case "3":
+                    default:
+                        print.yellowLine("Environment setup cancelled.");
+                        return;
+                }
+                print.line();
+            }
         }
 
         // Check if we need interactive datasource configuration
@@ -142,7 +171,7 @@ component extends="../base" {
             }
         }
 
-        var result = environmentService.setup(argumentCollection = arguments, rootPath=projectRoot );
+        var result = environmentService.setup(argumentCollection = arguments, rootPath=projectRoot, updateMode=updateMode );
 
         if (result.success) {
             print.greenLine("Environment setup complete!")
