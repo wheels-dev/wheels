@@ -186,7 +186,13 @@ component extends="wheels.Testbox" {
             variables.varcharType = "TEXT";
         } else {
             // Default (H2, etc.)
-            variables.identityColumnType = "INT NOT NULL IDENTITY";
+            local.dbVersion = listToArray(local.dbInfo["DATABASE_VERSION"], " ")[1];
+            if(local.dbVersion eq '2.1.214'){
+                variables.identityColumnType = "INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY";
+            }
+            else if(local.dbVersion eq '1.3.172'){
+                variables.identityColumnType = "int NOT NULL IDENTITY";
+            }
             variables.varcharType = "VARCHAR";
         }
     }
