@@ -111,7 +111,7 @@ component output=false extends="wheels.Global"{
 			result          = wheels.result
 		);
 
-		if (isStruct(wheels.id) && !structIsEmpty(wheels.id)) {
+		if (structKeyExists(wheels,"id") && isStruct(wheels.id) && !structIsEmpty(wheels.id)) {
 			structAppend(wheels.result, wheels.id);
 		}
 
