@@ -96,7 +96,7 @@ component extends="wheels.Testbox" {
                 local.ourTables = [];
                 for (local.row in local.result) {
                     if (findNoCase(variables.prefix, local.row.table_name) && 
-                        local.row.table_type == "TABLE") {
+                        listFindNoCase("TABLE,BASE TABLE", local.row.table_type)) {
                         arrayAppend(local.ourTables, local.row);
                     }
                 }
@@ -115,7 +115,7 @@ component extends="wheels.Testbox" {
                 local.ourTables = [];
                 for (local.row in local.result) {
                     if (findNoCase(variables.prefix, local.row.table_name) && 
-                        (local.row.table_type == "TABLE" || local.row.table_type == "VIEW")) {
+                        (listFindNoCase("TABLE,BASE TABLE", local.row.table_type) || local.row.table_type == "VIEW")) {
                         arrayAppend(local.ourTables, local.row);
                     }
                 }
@@ -134,7 +134,7 @@ component extends="wheels.Testbox" {
                 local.ourTableNames = [];
                 for (local.row in local.result) {
                     if (findNoCase(variables.prefix, local.row.table_name) && 
-                        (local.row.table_type == "TABLE" || local.row.table_type == "VIEW")) {
+                        (listFindNoCase("TABLE,BASE TABLE", local.row.table_type) || local.row.table_type == "VIEW")) {
                         arrayAppend(local.ourTableNames, local.row.table_name);
                     }
                 }
