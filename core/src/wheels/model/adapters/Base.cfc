@@ -2,7 +2,7 @@ component output=false extends="wheels.Global"{
 
 	public struct function $executeQuery(
 		required struct queryAttributes,
-		required array sql,
+		required array  sql,
 		required boolean parameterize,
 		required numeric limit,
 		required numeric offset,
@@ -10,90 +10,113 @@ component output=false extends="wheels.Global"{
 		required string debugName,
 		required string primaryKey
 	) {
-    // Since we allow the developer to pass in the name to use for the query variable we need to avoid name clashing.
-		// We do this by putting all our own variables inside a $wheels struct.
-		local.$wheels = {};
-		local.$wheels.rv = {};
+		// local variables
+		local.wheels   = { rv: {} };
+		local.newLine  = chr(13) & chr(10);
+		local.args     = arguments;
+		local.sqlArray = args.sql;
+		local.sqlLen   = arrayLen(sqlArray);
 
-		if(structKeyExists(arguments.queryAttributes, "DATASOURCE") && len(arguments.queryAttributes.DATASOURCE)){
-			local.info = $dbinfo(
-				type = "version",
-				datasource = arguments.queryAttributes.DATASOURCE);
-		} else {
-			local.info = $dbinfo(
-				type = "version",
+		// Detect datasource info once
+		local.ds = args.queryAttributes;
+		local.dsInfo = ( structKeyExists(ds, "DATASOURCE") && len(ds.DATASOURCE) )
+			? $dbinfo(type="version", datasource=ds.DATASOURCE)
+			: $dbinfo(
+				type     = "version",
 				datasource = application.wheels.dataSourceName,
-				username = application.wheels.dataSourceUserName,
-				password = application.wheels.dataSourcePassword
+				username   = application.wheels.dataSourceUserName,
+				password   = application.wheels.dataSourcePassword
 			);
-		}
-    cfquery(attributeCollection=arguments.queryAttributes){
-      local.$wheels.pos = 0;
 
-      for (local.$wheels.i in arguments.sql) {
-        local.$wheels.pos += 1;
-        if (isStruct(local.$wheels.i)) {
-          local.$wheels.queryParamAttributes = $queryParams(local.$wheels.i);
-          if (!isBinary(local.$wheels.i.value) && local.$wheels.i.value == "null" && local.$wheels.pos > 1 &&
-            (right(arguments.sql[local.$wheels.pos - 1], 2) == "IS" || right(arguments.sql[local.$wheels.pos - 1], 6) == "IS NOT")) {
-            writeOutput("NULL");
-          } else if (structKeyExists(local.$wheels.queryParamAttributes, "list")) {
-            if (arguments.parameterize) {
-							writeOutput("(");
-              cfqueryParam(attributeCollection=local.$wheels.queryParamAttributes);
-							writeOutput(")");
-            } else {
-              writeOutput("(" & preserveSingleQuotes(local.$wheels.i.value) & ")");
-            }
-          } else {
-            if (arguments.parameterize) {
-              cfqueryParam(attributeCollection=local.$wheels.queryParamAttributes);
-            } else {
-              writeOutput($quoteValue(str=local.$wheels.i.value, sqlType=local.$wheels.i.type));
-            }
-          }
-        } else {
-          local.$wheels.i = replace(preserveSingleQuotes(local.$wheels.i), "[[comma]]", ",", "all");
-          writeOutput(preserveSingleQuotes(local.$wheels.i));
-        }
-        writeOutput(chr(13) & chr(10));
-      }
+		// Build query
+		cfquery(attributeCollection = args.queryAttributes) {
+			local.pos = 1;
+			local.prev = "";
 
-      if(arguments.limit){
-		if(FindNoCase("Oracle", local.info.database_productname)){
-			if(arguments.offset){
-				writeOutput("OFFSET " & arguments.offset & " ROWS" & chr(13) & chr(10) &  "FETCH NEXT " & arguments.limit & " ROWS ONLY");
-			} else {
-				writeOutput("FETCH FIRST " & arguments.limit & " ROWS ONLY");
+			for (; pos <= sqlLen; pos++) {
+				local.part = sqlArray[pos];
+
+				if (isStruct(part)) {
+					local.qp = $queryParams(part);
+
+					// Handle NULL for "IS NULL" or "IS NOT NULL"
+					if (
+						!isBinary(part.value) &&
+						part.value == "null" &&
+						pos > 1 &&
+						( right(prev, 2) == "IS" || right(prev, 6) == "IS NOT" )
+					) {
+						writeOutput("NULL");
+					}
+					// Handle parameter lists "(?,?,?)"
+					else if (structKeyExists(qp, "list")) {
+						writeOutput("(");
+						if (args.parameterize) {
+							cfqueryParam(attributeCollection = qp);
+						} else {
+							writeOutput("(" & preserveSingleQuotes(part.value) & ")");
+						}
+						writeOutput(")");
+					}
+					// Normal parameter
+					else {
+						if (args.parameterize) {
+							cfqueryParam(attributeCollection = qp);
+						} else {
+							writeOutput($quoteValue(str = part.value, sqlType = part.type));
+						}
+					}
+				}
+				else {
+					// regular SQL string part
+					part = replace(preserveSingleQuotes(part), "[[comma]]", ",", "all");
+					writeOutput(preserveSingleQuotes(part));
+				}
+
+				writeOutput(newLine);
+				prev = part;
 			}
-		} else {
-			writeOutput("LIMIT " & arguments.limit);
-			if (arguments.offset) {
-				writeOutput(chr(13) & chr(10) & "OFFSET " & arguments.offset);
+
+			// LIMIT / OFFSET logic
+			if (args.limit) {
+				if (findNoCase("Oracle", dsInfo.database_productname)) {
+					if (args.offset) {
+						writeOutput("OFFSET " & args.offset & " ROWS" & newLine & "FETCH NEXT " & args.limit & " ROWS ONLY");
+					} else {
+						writeOutput("FETCH FIRST " & args.limit & " ROWS ONLY");
+					}
+				} else {
+					writeOutput("LIMIT " & args.limit);
+					if (args.offset) {
+						writeOutput(newLine & "OFFSET " & args.offset);
+					}
+				}
+			}
+
+			// Comment block
+			if (len(args.comment)) {
+				writeOutput(args.comment);
 			}
 		}
-	  }
 
-      if (len(arguments.comment)) {
-        writeOutput(arguments.comment);
-      }
-    }
+		// Retrieve debug query if needed
+		if (structKeyExists(local, args.debugName)) {
+			wheels.rv.query = local[args.debugName];
+		}
 
-    if(StructKeyExists(local, arguments.debugName)){
-      local.$wheels.rv.query = local[arguments.debugName];
-    }
-    // Get / set the primary key name / value when Lucee / ACF cannot retrieve it for us.
-		local.$wheels.id = $identitySelect(
-			primaryKey = arguments.primaryKey,
-			queryAttributes = arguments.queryAttributes,
-			result = local.$wheels.result
+		// Manual identity retrieval for Lucee / ACF
+		wheels.id = $identitySelect(
+			primaryKey      = args.primaryKey,
+			queryAttributes = args.queryAttributes,
+			result          = wheels.result
 		);
-		if (StructKeyExists(local.$wheels, "id") && IsStruct(local.$wheels.id) && !StructIsEmpty(local.$wheels.id)) {
-			StructAppend(local.$wheels.result, local.$wheels.id);
+
+		if (structKeyExists(wheels,"id") && isStruct(wheels.id) && !structIsEmpty(wheels.id)) {
+			structAppend(wheels.result, wheels.id);
 		}
 
-		local.$wheels.rv.result = local.$wheels.result;
-		return local.$wheels.rv;
+		wheels.rv.result = wheels.result;
+		return wheels.rv;
 	}
 
 	/**
@@ -126,7 +149,7 @@ component output=false extends="wheels.Global"{
 		required struct result,
 		required string primaryKey
 	) {
-		var query = {};
+		local.query = {};
 		local.sql = Trim(arguments.result.sql);
 		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
 			local.startPar = Find("(", local.sql) + 1;
@@ -507,7 +530,7 @@ component output=false extends="wheels.Global"{
 		local.queryAttributes.dataSource = arguments.dataSource;
 		local.queryAttributes.username = variables.username;
 		local.queryAttributes.password = variables.password;
-		local.queryAttributes.result = "local.$wheels.result";
+		local.queryAttributes.result = "local.wheels.result";
 		local.queryAttributes.name = "local." & arguments.$debugName;
 		if (StructKeyExists(local.queryAttributes, "username") && !Len(local.queryAttributes.username)) {
 			StructDelete(local.queryAttributes, "username");

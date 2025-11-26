@@ -96,7 +96,7 @@ component extends="wheels.Testbox" {
                 local.ourTables = [];
                 for (local.row in local.result) {
                     if (findNoCase(variables.prefix, local.row.table_name) && 
-                        local.row.table_type == "TABLE") {
+                        listFindNoCase("TABLE,BASE TABLE", local.row.table_type)) {
                         arrayAppend(local.ourTables, local.row);
                     }
                 }
@@ -115,7 +115,7 @@ component extends="wheels.Testbox" {
                 local.ourTables = [];
                 for (local.row in local.result) {
                     if (findNoCase(variables.prefix, local.row.table_name) && 
-                        (local.row.table_type == "TABLE" || local.row.table_type == "VIEW")) {
+                        (listFindNoCase("TABLE,BASE TABLE", local.row.table_type) || local.row.table_type == "VIEW")) {
                         arrayAppend(local.ourTables, local.row);
                     }
                 }
@@ -134,7 +134,7 @@ component extends="wheels.Testbox" {
                 local.ourTableNames = [];
                 for (local.row in local.result) {
                     if (findNoCase(variables.prefix, local.row.table_name) && 
-                        (local.row.table_type == "TABLE" || local.row.table_type == "VIEW")) {
+                        (listFindNoCase("TABLE,BASE TABLE", local.row.table_type) || local.row.table_type == "VIEW")) {
                         arrayAppend(local.ourTableNames, local.row.table_name);
                     }
                 }
@@ -186,7 +186,13 @@ component extends="wheels.Testbox" {
             variables.varcharType = "TEXT";
         } else {
             // Default (H2, etc.)
-            variables.identityColumnType = "INT NOT NULL IDENTITY";
+            local.dbVersion = listToArray(local.dbInfo["DATABASE_VERSION"], " ")[1];
+            if(local.dbVersion eq '2.1.214'){
+                variables.identityColumnType = "INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY";
+            }
+            else if(local.dbVersion eq '1.3.172'){
+                variables.identityColumnType = "int NOT NULL IDENTITY";
+            }
             variables.varcharType = "VARCHAR";
         }
     }
