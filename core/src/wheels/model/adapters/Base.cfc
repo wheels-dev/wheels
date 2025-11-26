@@ -70,7 +70,7 @@ component output=false extends="wheels.Global"{
 				else {
 					// regular SQL string part
 					part = replace(preserveSingleQuotes(part), "[[comma]]", ",", "all");
-					writeOutput(part);
+					writeOutput(preserveSingleQuotes(part));
 				}
 
 				writeOutput(newLine);
