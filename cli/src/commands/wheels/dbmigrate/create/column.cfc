@@ -99,7 +99,7 @@
 		//content=replaceNoCase(content, "|scale|", "#scale#", "all");
 
 		// Output detail header
-		details.header("", "Migration Generation");
+		details.header("Migration Generation");
 		
 		// Make File
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.tableName)) & '_' & lcase(trim(arguments.name)),	action="create_column",	content=content);

@@ -11,15 +11,16 @@
  * {code}
  **/
 component aliases="clean" extends="../base" {
-	
+
 	property name="FileSystemUtil" inject="FileSystem";
-	
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * Remove old compiled assets while keeping the most recent versions
-	 * 
+	 *
 	 * This command cleans up old asset files from previous compilations,
 	 * keeping only the most recent version of each asset based on the manifest.
-	 * 
+	 *
 	 * @keep Number of versions to keep for each asset (default: 3)
 	 * @dryRun Show what would be deleted without actually deleting
 	 **/
@@ -34,18 +35,18 @@ component aliases="clean" extends="../base" {
 				keep:{min:1, max:100}
 			}
 		);
-		print.line();
+		detailOutput.line();
 		if(!dryRun){
-			print.boldGreenLine("==> Cleaning old compiled assets...");
+			print.greenBoldLine("Cleaning old compiled assets...").toConsole();
 		}else{
-			print.boldCyanLine("==> Dry Running old compiled assets...");
+			print.cyanBoldLine("Dry Running old compiled assets...").toConsole();
 		}
-		print.line();
-		
+		detailOutput.line();
+
 		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
-		
+
 		if (!directoryExists(compiledDir)) {
-			print.yellowLine("No compiled assets directory found. Nothing to clean.");
+			print.yellowLine("No compiled assets directory found. Nothing to clean.").toConsole();
 			return;
 		}
 		
@@ -57,7 +58,7 @@ component aliases="clean" extends="../base" {
 			try {
 				currentManifest = deserializeJSON(fileRead(manifestPath));
 			} catch (any e) {
-				print.redLine("Error reading manifest file: #e.message#");
+				detailOutput.error("Error reading manifest file: #e.message#");
 				return;
 			}
 		}
@@ -96,9 +97,9 @@ component aliases="clean" extends="../base" {
 			// Delete from the end of the array (oldest files)
 			if (arrayLen(group) > arguments.keep) {
 				if (arguments.dryRun) {
-					print.boldLine("Analyzing #baseName#...");
+					print.boldLine("Analyzing #baseName#...").toConsole();
 				} else {
-					print.boldLine("Cleaning #baseName#...");
+					print.boldLine("Cleaning #baseName#...").toConsole();
 				}
 
 				// Delete from the end (oldest) since array is sorted newest first
@@ -107,35 +108,36 @@ component aliases="clean" extends="../base" {
 					var fileSize = getFileInfo(fileInfo.path).size;
 
 					if (arguments.dryRun) {
-						print.line("Would delete: #fileInfo.name# (#formatFileSize(fileSize)#)");
+						detailOutput.output("Would delete: #fileInfo.name# (#formatFileSize(fileSize)#)");
 						deletedCount++;
 						freedSpace += fileSize;
 					} else {
 						try {
 							fileDelete(fileInfo.path);
-							print.redLine("Deleted: #fileInfo.name# (#formatFileSize(fileSize)#)");
+							print.redLine("Deleted: #fileInfo.name# (#formatFileSize(fileSize)#)").toConsole();
 							deletedCount++;
 							freedSpace += fileSize;
 						} catch (any e) {
-							print.redLine("Error deleting #fileInfo.name#: #e.message#");
+							detailOutput.error("Error deleting #fileInfo.name#: #e.message#");
 						}
 					}
 				}
 			}
 		}
-		
-		print.line();
-		
+
+
+		detailOutput.line();
+
 		if (arguments.dryRun) {
-			print.yellowLine("==> Dry run complete. No files were deleted.");
-			print.line("Would delete #deletedCount# files");
-			print.line("Would free #formatFileSize(freedSpace)# of disk space");
+			print.yellowLine("Dry run complete. No files were deleted.").toConsole();
+			detailOutput.output("Would delete #deletedCount# files");
+			detailOutput.output("Would free #formatFileSize(freedSpace)# of disk space");
 		} else if (deletedCount > 0) {
-			print.boldGreenLine("==> Asset cleaning complete!");
-			print.greenLine("Deleted #deletedCount# old asset files");
-			print.greenLine("Freed #formatFileSize(freedSpace)# of disk space");
+			detailOutput.success("Asset cleaning complete!");
+			print.greenLine("Deleted #deletedCount# old asset files").toConsole();
+			print.greenLine("Freed #formatFileSize(freedSpace)# of disk space").toConsole();
 		} else {
-			print.yellowLine("No old assets found to clean.");
+		detailOutput.statusWarning("No old assets found to clean.");
 		}
 	}
 	

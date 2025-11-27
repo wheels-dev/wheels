@@ -3,7 +3,9 @@
  * This command is maintained for backward compatibility only
  */
 component extends="../base" {
-    
+
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @deprecated Use 'wheels security scan' instead
      */
@@ -16,12 +18,12 @@ component extends="../base" {
     ) {
         requireWheelsApp(getCWD());
         arguments = reconstructArgs(arguments);
-        print.yellowBoldLine("DEPRECATED: This command is deprecated")
-             .yellowLine("Please use 'wheels security scan' instead")
-             .line();
-        
+        print.yellowLine("DEPRECATED: This command is deprecated").toConsole();
+        print.yellowLine("Please use 'wheels security scan' instead").toConsole();
+        detailOutput.line();
+
         // Forward to new command
-        print.line("Wait Running Command 'wheels security scan'...")
+        detailOutput.output("Wait Running Command 'wheels security scan'...");
         command("wheels security scan")
             .params(argumentCollection = arguments)
             .run();

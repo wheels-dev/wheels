@@ -6,7 +6,9 @@
  * wheels analyze performance --profile --report
  */
 component extends="../base" {
-    
+
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @target.hint Analysis target (all, controller, view, query, memory)
      * @target.options all,controller,view,query,memory
@@ -36,10 +38,9 @@ component extends="../base" {
 			}
         );
 
-        print.yellowLine("Analyzing application performance...")
-             .line();
-        
-        
+        print.yellowLine("Analyzing application performance...").toConsole();
+        detailOutput.line();
+
         var results = {
             startTime = now(),
             endTime = dateAdd("s", arguments.duration, now()),
@@ -72,10 +73,10 @@ component extends="../base" {
         }
         
         // Start monitoring
-        print.line("Starting performance monitoring for #arguments.duration# seconds...");
-        print.line("Target: #arguments.target#");
-        print.line("Threshold: #arguments.threshold#ms");
-        print.line();
+        detailOutput.output("Starting performance monitoring for #arguments.duration# seconds...");
+        detailOutput.output("Target: #arguments.target#");
+        detailOutput.output("Threshold: #arguments.threshold#ms");
+        detailOutput.line();
 
         // Monitor performance
         var progress = 0;
@@ -116,7 +117,7 @@ component extends="../base" {
         }
 
         // Clear the progress line and show completion
-        print.line(chr(13) & "[" & repeatString("=", 20) & "] 100% Complete!     ");
+        print.line(chr(13) & "[" & repeatString("=", 20) & "] 100% Complete!     ").toConsole();
         
         if (arguments.profile) {
             disableProfiling();
@@ -159,13 +160,13 @@ component extends="../base" {
                 .getMetricsService()
                 .setEnabled(true);
             
-            print.greenLine("Profiling mode enabled - Collecting real metrics");
+            print.greenLine("Profiling mode enabled - Collecting real metrics").toConsole();
         } catch (any e) {
-            print.yellowLine("Limited profiling enabled: #e.message#");
+            print.yellowLine("Limited profiling enabled: #e.message#").toConsole();
             request.performanceProfiling.enabled = true;
         }
     }
-    
+
     private function disableProfiling() {
         try {
             if (structKeyExists(request, "performanceProfiling")) {
@@ -174,8 +175,8 @@ component extends="../base" {
                     application.wheels.showDebugInformation = request.performanceProfiling.originalDebugMode;
                     application.wheels.cacheQueries = request.performanceProfiling.originalCaching;
                 }
-                
-                print.greenLine("Profiling mode disabled");
+
+                print.greenLine("Profiling mode disabled").toConsole();
             }
         } catch (any e) {
             // Silent fail
@@ -392,12 +393,9 @@ component extends="../base" {
     }
     
     private function displayResults(results) {
-        print.line();
-        print.line(repeatString("=", 50));
-        print.boldLine("       PERFORMANCE ANALYSIS COMPLETE");
-        print.line(repeatString("=", 50));
-        print.line();
-        
+        detailOutput.line();
+        detailOutput.sectionHeader("PERFORMANCE ANALYSIS COMPLETE");
+
         // Check if we have real data
         var hasRealData = false;
         for (var req in arguments.results.metrics.requests) {
@@ -406,111 +404,106 @@ component extends="../base" {
                 break;
             }
         }
-        
+
         if (hasRealData) {
-            print.greenLine("Data Source: REAL APPLICATION METRICS");
+            print.greenLine("Data Source: REAL APPLICATION METRICS").toConsole();
         } else {
-            print.yellowLine("Data Source: SIMULATED (Enable --profile for real data)");
+            print.yellowLine("Data Source: SIMULATED (Enable --profile for real data)").toConsole();
         }
-        print.line();
+        detailOutput.line();
         
         // Request metrics
         if (arguments.results.summary.totalRequests > 0) {
-            print.boldLine("Request Performance");
-            print.line(repeatString("-", 50));
-            print.line("Requests Analyzed:     #padString(arguments.results.summary.totalRequests, 8)#");
-            print.line("Average Response Time: #padString(arguments.results.summary.avgResponseTime & 'ms', 8)#");
-            print.line("Slowest Request:       #padString(arguments.results.summary.maxResponseTime & 'ms', 8)#");
-            print.line("Fastest Request:       #padString(arguments.results.summary.minResponseTime & 'ms', 8)#");
+            detailOutput.subsectionHeader("Request Performance");
+            detailOutput.metric("Requests Analyzed", arguments.results.summary.totalRequests);
+            detailOutput.metric("Average Response Time", arguments.results.summary.avgResponseTime & "ms");
+            detailOutput.metric("Slowest Request", arguments.results.summary.maxResponseTime & "ms");
+            detailOutput.metric("Fastest Request", arguments.results.summary.minResponseTime & "ms");
 
             if (arguments.results.summary.slowRequests > 0) {
-                print.redLine("Slow Requests (>#arguments.results.threshold#ms): #padString(arguments.results.summary.slowRequests, 8)#");
+                print.redLine("Slow Requests (>#arguments.results.threshold#ms): #arguments.results.summary.slowRequests#").toConsole();
             } else {
-                print.greenLine("Slow Requests:         #padString('None', 8)#");
+                print.greenLine("Slow Requests: None").toConsole();
             }
-            print.line();
+            detailOutput.line();
         }
         
         // Query metrics
         if (arguments.results.summary.totalQueries > 0) {
-            print.boldLine("Database Performance");
-            print.line(repeatString("-", 50));
-            print.line("Queries Executed:      #padString(arguments.results.summary.totalQueries, 8)#");
-            print.line("Average Query Time:    #padString(arguments.results.summary.avgQueryTime & 'ms', 8)#");
+            detailOutput.subsectionHeader("Database Performance");
+            detailOutput.metric("Queries Executed", arguments.results.summary.totalQueries);
+            detailOutput.metric("Average Query Time", arguments.results.summary.avgQueryTime & "ms");
 
             if (arguments.results.summary.slowQueries > 0) {
-                print.redLine("Slow Queries (>50ms):  #padString(arguments.results.summary.slowQueries, 8)#");
+                print.redLine("Slow Queries (>50ms): #arguments.results.summary.slowQueries#").toConsole();
             } else {
-                print.greenLine("Slow Queries:          #padString('None', 8)#");
+                print.greenLine("Slow Queries: None").toConsole();
             }
-            print.line();
+            detailOutput.line();
         }
-        
+
         // Memory metrics
         if (structCount(arguments.results.summary.memoryUsage) > 0) {
-            print.boldLine("Memory Usage");
-            print.line(repeatString("-", 50));
-            print.line("Average Memory:        #padString(arguments.results.summary.memoryUsage.avg & 'MB', 8)#");
-            print.line("Peak Memory:           #padString(arguments.results.summary.memoryUsage.max & 'MB', 8)#");
-            print.line();
+            detailOutput.subsectionHeader("Memory Usage");
+            detailOutput.metric("Average Memory", arguments.results.summary.memoryUsage.avg & "MB");
+            detailOutput.metric("Peak Memory", arguments.results.summary.memoryUsage.max & "MB");
+            detailOutput.line();
         }
         
         // Show slow requests if any
         if (arrayLen(arguments.results.metrics.requests) && arguments.results.summary.slowRequests > 0) {
-            print.yellowBoldLine("Top Slow Requests:");
-            print.line(repeatString("-", 50));
-            
+            detailOutput.subsectionHeader("Top Slow Requests");
+
             var threshold = arguments.results.threshold;
             var slowRequests = arguments.results.metrics.requests.filter(function(req) {
                 return req.responseTime > threshold;
             });
-            
+
             // Sort by response time
             arraySort(slowRequests, function(a, b) {
                 return b.responseTime - a.responseTime;
             });
-            
+
             // Show top 5 slow requests
             var count = min(5, arrayLen(slowRequests));
             for (var i = 1; i <= count; i++) {
                 var req = slowRequests[i];
-                print.line("  #i#. #req.controller#.#req.action#() - #req.responseTime#ms");
+                detailOutput.output("  #i#. #req.controller#.#req.action#() - #req.responseTime#ms");
             }
-            print.line();
+            detailOutput.line();
         }
-        
+
         // Show slow queries if any
         if (arrayLen(arguments.results.metrics.queries) && arguments.results.summary.slowQueries > 0) {
-            print.yellowBoldLine("Top Slow Queries:");
-            print.line(repeatString("-", 50));
-            
+            detailOutput.subsectionHeader("Top Slow Queries");
+
             var slowQueries = arguments.results.metrics.queries.filter(function(qry) {
                 return qry.executionTime > 50;
             });
-            
+
             // Sort by execution time
             arraySort(slowQueries, function(a, b) {
                 return b.executionTime - a.executionTime;
             });
-            
+
             // Show top 5 slow queries
             var count = min(5, arrayLen(slowQueries));
             for (var i = 1; i <= count; i++) {
                 var qry = slowQueries[i];
                 var sqlPreview = len(qry.sql) > 50 ? left(qry.sql, 47) & "..." : qry.sql;
-                print.line("  #i#. #sqlPreview# - #qry.executionTime#ms");
+                detailOutput.output("  #i#. #sqlPreview# - #qry.executionTime#ms");
             }
-            print.line();
+            detailOutput.line();
         }
-        
+
         // Performance score
         var score = calculatePerformanceScore(arguments.results);
         var grade = getPerformanceGrade(score);
-        
-        print.line(repeatString("=", 50));
-        print.boldLine("Performance Grade: #grade# (#score#/100)");
-        print.line(repeatString("=", 50));
-        print.line();
+
+        detailOutput.divider("=", 50);
+        print.boldLine("Performance Grade: #grade# (#score#/100)").toConsole();
+        detailOutput.divider("=", 50);
+        detailOutput.line();
         
         // Recommendations
         displayRecommendations(arguments.results);
@@ -556,42 +549,41 @@ component extends="../base" {
     }
     
     private function displayRecommendations(results) {
-        print.yellowBoldLine("Performance Recommendations:");
-        print.line(repeatString("-", 50));
-        
+        detailOutput.subsectionHeader("Performance Recommendations");
+
         var recommendations = [];
-        
+
         if (arguments.results.summary.avgResponseTime > 200) {
             arrayAppend(recommendations, "Implement caching for frequently accessed data");
             arrayAppend(recommendations, "Consider using a CDN for static assets");
         }
-        
+
         if (arguments.results.summary.slowQueries > 0) {
             arrayAppend(recommendations, "Add database indexes to improve query performance");
             arrayAppend(recommendations, "Use query result caching for repetitive queries");
             arrayAppend(recommendations, "Review and optimize slow SQL queries");
         }
-        
+
         if (arguments.results.summary.memoryUsage.max > 500) {
             arrayAppend(recommendations, "Monitor memory usage and optimize object creation");
             arrayAppend(recommendations, "Review application for memory leaks");
         }
-        
+
         if (arguments.results.summary.slowRequests > 5) {
             arrayAppend(recommendations, "Implement lazy loading for heavy operations");
             arrayAppend(recommendations, "Consider async processing for long-running tasks");
         }
-        
+
         // Always add general recommendations
         arrayAppend(recommendations, "Enable query result caching in production");
         arrayAppend(recommendations, "Minimize database round trips");
         arrayAppend(recommendations, "Use connection pooling for database connections");
-        
+
         for (var i = 1; i <= min(5, arrayLen(recommendations)); i++) {
-            print.line("  * #recommendations[i]#");
+            detailOutput.output("  * #recommendations[i]#");
         }
-        
-        print.line();
+
+        detailOutput.line();
     }
 
     private function getSimulatedRequestData() {
@@ -798,8 +790,8 @@ component extends="../base" {
 </html>';
         
         fileWrite(reportPath, html);
-        print.line();
-        print.greenLine("Performance report generated: #reportPath#");
+        detailOutput.line();
+        print.greenLine("Performance report generated: #reportPath#").toConsole();
     }
     
     private function generateSlowRequestsTable(results) {

@@ -51,7 +51,7 @@
 		content=replaceNoCase(content, "|primaryKey|", "#arguments.primaryKey#", "all");
 
 		// Output detail header
-		details.header("", "Migration Generation");
+		details.header("Migration Generation");
 		
 		// Make File
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);

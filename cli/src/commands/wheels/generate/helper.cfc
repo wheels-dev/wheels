@@ -25,7 +25,7 @@ component aliases='wheels g helper' extends="../base" {
         boolean force = false
     ) {
         arguments=reconstructArgs(arguments);
-        detailOutput.header("", "Generating helper: #arguments.name#");
+        detailOutput.header("Generating helper: #arguments.name#");
 
         // Ensure name ends with "Helper" or "Helpers"
         if (!reFindNoCase("Helper(s)?$", arguments.name)) {

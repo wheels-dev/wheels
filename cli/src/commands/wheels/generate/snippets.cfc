@@ -96,7 +96,7 @@ component aliases="wheels g snippets" extends="../base" {
             arrayAppend(categories[snippet.category], snippet);
         }
 
-        detailOutput.header("", "Available Snippets");
+        detailOutput.header("Available Snippets");
 
         var categoryOrder = ["Authentication", "Model", "Controller", "View", "Database"];
         for (var cat in categoryOrder) {
@@ -121,7 +121,7 @@ component aliases="wheels g snippets" extends="../base" {
      * Print snippet to console
      */
     private function printSnippet(required struct snippet) {
-        detailOutput.header("", "Generating Snippet: #arguments.snippet.name#");
+        detailOutput.header("Generating Snippet: #arguments.snippet.name#");
         detailOutput.getPrint().line("");
 
         var content = getSnippetContent(arguments.snippet);
@@ -396,7 +396,7 @@ component aliases="wheels g snippets" extends="../base" {
      * Create custom snippet
      */
     private function createCustomSnippet(required string name) {
-        detailOutput.header("", "Creating Custom Snippet");
+        detailOutput.header("Creating Custom Snippet");
 
         var snippetDir = getCWD() & "/app/snippets/" & arguments.name;
 
@@ -428,7 +428,7 @@ component aliases="wheels g snippets" extends="../base" {
      * Show customization options
      */
     private function showCustomizationOptions() {
-        detailOutput.header("", "Customization Options");
+        detailOutput.header("Customization Options");
         detailOutput.getPrint().line("You can customize snippets by:");
         detailOutput.getPrint().line("  1. Creating custom snippets with --create");
         detailOutput.getPrint().line("  2. Saving snippets to files with --output=file");

@@ -100,7 +100,7 @@ component aliases='wheels g test' extends="../base"  {
 		);
 		
 		// Output detail header
-		details.header("", "Test Generation");
+		details.header("Test Generation");
 		
 		file action='write' file='#testPath#' mode ='777' output='#trim( testContent )#';
 		details.create(testPath);

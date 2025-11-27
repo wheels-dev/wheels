@@ -31,7 +31,7 @@ component aliases='wheels g migration' extends="../base" {
         // Reconstruct arguments for handling --prefixed options
         arguments = reconstructArgs(arguments);
 
-        detailOutput.header("", "Migration Generation: #arguments.name#");
+        detailOutput.header("Migration Generation: #arguments.name#");
 
         // Validate migration name
         if (!reFindNoCase("^[A-Za-z][A-Za-z0-9_]*$", arguments.name)) {
