@@ -140,7 +140,7 @@ component extends="../base" {
 
         // Display issue summary only if there are issues at the filtered severity level
         if (results.totalIssues > 0) {
-            detailOutput.subsectionHeader("Issue Summary");
+            detailOutput.subHeader("Issue Summary");
 
             if (results.summary.errors > 0) {
                 print.redLine("Errors:   #padString(results.summary.errors, 5)# (Critical issues requiring immediate attention)").toConsole();
@@ -174,7 +174,7 @@ component extends="../base" {
         
         // Display issues by file
         if (structCount(results.files) > 0) {
-            detailOutput.subsectionHeader("Issues by File");
+            detailOutput.subHeader("Issues by File");
             for (var filePath in results.files) {
                 var fileIssues = results.files[filePath];
                 var relativePath = replace(filePath, getCWD(), "");
@@ -226,7 +226,7 @@ component extends="../base" {
     }
 
     private function displayMetricsSummary(results) {
-        detailOutput.subsectionHeader("Code Metrics");
+        detailOutput.subHeader("Code Metrics");
         detailOutput.metric("Files Analyzed", results.metrics.totalFiles);
         detailOutput.metric("Total Lines", results.metrics.totalLines);
         detailOutput.metric("Functions", results.metrics.totalFunctions);
@@ -238,7 +238,7 @@ component extends="../base" {
     }
     
     private function displayComplexityAnalysis(results) {
-        detailOutput.subsectionHeader("High Complexity Functions");
+        detailOutput.subHeader("High Complexity Functions");
 
         // Sort by complexity
         var sorted = duplicate(results.complexFunctions);
@@ -266,7 +266,7 @@ component extends="../base" {
     }
 
     private function displayDuplicateCode(results) {
-        detailOutput.subsectionHeader("Duplicate Code Detection");
+        detailOutput.subHeader("Duplicate Code Detection");
         print.yellowLine("Found #results.metrics.duplicateBlocks# duplicate code blocks").toConsole();
 
         // Show first few duplicates
@@ -289,7 +289,7 @@ component extends="../base" {
     }
 
     private function displayRecommendations(results) {
-        detailOutput.subsectionHeader("Recommendations");
+        detailOutput.subHeader("Recommendations");
 
         var recommendations = [];
 

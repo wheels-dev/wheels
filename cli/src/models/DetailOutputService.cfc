@@ -129,24 +129,11 @@ component {
 	}
 
 	/**
-	 * Output a header with emoji
-	 * @emoji The emoji to display
-	 * @message The header message
-	 */
-	function header(required string title, numeric width = 50) {
-		print.line(repeatString("=", arguments.width)).toConsole();
-		print.boldLine(centerString(arguments.title, arguments.width)).toConsole();
-		print.line(repeatString("=", arguments.width)).toConsole();
-		print.line().toConsole();
-		return this;
-	}
-
-	/**
 	 * Output a section header with double lines (realtime)
 	 * @title The section title
 	 * @width The width of the header (default: 50)
 	 */
-	function sectionHeader(required string title, numeric width = 50) {
+	function header(required string title, numeric width = 50) {
 		print.line(repeatString("=", arguments.width)).toConsole();
 		print.boldLine(centerString(arguments.title, arguments.width)).toConsole();
 		print.line(repeatString("=", arguments.width)).toConsole();
@@ -159,7 +146,7 @@ component {
 	 * @title The subsection title
 	 * @width The width of the header (default: 50)
 	 */
-	function subsectionHeader(required string title, numeric width = 50) {
+	function subHeader(required string title, numeric width = 50) {
 		print.boldLine(arguments.title).toConsole();
 		print.line(repeatString("-", arguments.width)).toConsole();
 		return this;

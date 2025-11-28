@@ -394,7 +394,7 @@ component extends="../base" {
     
     private function displayResults(results) {
         detailOutput.line();
-        detailOutput.sectionHeader("PERFORMANCE ANALYSIS COMPLETE");
+        detailOutput.header("PERFORMANCE ANALYSIS COMPLETE");
 
         // Check if we have real data
         var hasRealData = false;
@@ -414,7 +414,7 @@ component extends="../base" {
         
         // Request metrics
         if (arguments.results.summary.totalRequests > 0) {
-            detailOutput.subsectionHeader("Request Performance");
+            detailOutput.subHeader("Request Performance");
             detailOutput.metric("Requests Analyzed", arguments.results.summary.totalRequests);
             detailOutput.metric("Average Response Time", arguments.results.summary.avgResponseTime & "ms");
             detailOutput.metric("Slowest Request", arguments.results.summary.maxResponseTime & "ms");
@@ -430,7 +430,7 @@ component extends="../base" {
         
         // Query metrics
         if (arguments.results.summary.totalQueries > 0) {
-            detailOutput.subsectionHeader("Database Performance");
+            detailOutput.subHeader("Database Performance");
             detailOutput.metric("Queries Executed", arguments.results.summary.totalQueries);
             detailOutput.metric("Average Query Time", arguments.results.summary.avgQueryTime & "ms");
 
@@ -444,7 +444,7 @@ component extends="../base" {
 
         // Memory metrics
         if (structCount(arguments.results.summary.memoryUsage) > 0) {
-            detailOutput.subsectionHeader("Memory Usage");
+            detailOutput.subHeader("Memory Usage");
             detailOutput.metric("Average Memory", arguments.results.summary.memoryUsage.avg & "MB");
             detailOutput.metric("Peak Memory", arguments.results.summary.memoryUsage.max & "MB");
             detailOutput.line();
@@ -452,7 +452,7 @@ component extends="../base" {
         
         // Show slow requests if any
         if (arrayLen(arguments.results.metrics.requests) && arguments.results.summary.slowRequests > 0) {
-            detailOutput.subsectionHeader("Top Slow Requests");
+            detailOutput.subHeader("Top Slow Requests");
 
             var threshold = arguments.results.threshold;
             var slowRequests = arguments.results.metrics.requests.filter(function(req) {
@@ -475,7 +475,7 @@ component extends="../base" {
 
         // Show slow queries if any
         if (arrayLen(arguments.results.metrics.queries) && arguments.results.summary.slowQueries > 0) {
-            detailOutput.subsectionHeader("Top Slow Queries");
+            detailOutput.subHeader("Top Slow Queries");
 
             var slowQueries = arguments.results.metrics.queries.filter(function(qry) {
                 return qry.executionTime > 50;
@@ -549,7 +549,7 @@ component extends="../base" {
     }
     
     private function displayRecommendations(results) {
-        detailOutput.subsectionHeader("Performance Recommendations");
+        detailOutput.subHeader("Performance Recommendations");
 
         var recommendations = [];
 
