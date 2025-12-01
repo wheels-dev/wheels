@@ -12,6 +12,8 @@
  */
 component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @environment.hint The environment to dump (development, testing, production)
 	 * @format.hint Output format: table, json, env, or cfml
@@ -42,7 +44,8 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		local.envSettingsFile = local.configPath & "/" & local.env & "/settings.cfm";
 
 		if (!FileExists(local.settingsFile)) {
-			error("No settings.cfm file found in config directory");
+			detailOutput.error("No settings.cfm file found in config directory");
+			return;
 		}
 
 		// Load configuration
@@ -67,7 +70,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 				break;
 			default:
 				// Table format is handled differently
-				formatAsTable(local.config, local.env);
+				formatAsTable(local.config, local.env, arguments.noMask);
 		}
 
 		// Save to file if specified
@@ -76,17 +79,19 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 				// For table format, we need to capture the output differently
 				local.tableOutput = captureTableOutput(local.config, local.env);
 				FileWrite(ResolvePath(arguments.output), local.tableOutput);
-				print.greenLine("Configuration saved to: #arguments.output#");
+				detailOutput.statusSuccess("Configuration saved to: #arguments.output#");
 			} else {
 				FileWrite(ResolvePath(arguments.output), local.outputContent);
-				print.greenLine("Configuration saved to: #arguments.output#");
+				detailOutput.statusSuccess("Configuration saved to: #arguments.output#");
 			}
 		} else if (arguments.format != "table") {
 			// Output to console if not table format
 			if(arguments.format == "json"){
-				print.line(deSerializeJSON(local.outputContent));
-			}else{
-				print.line(local.outputContent);
+				detailOutput.line();
+				detailOutput.output(deserializeJSON(local.outputContent));
+			} else {
+				detailOutput.line();
+				detailOutput.output(local.outputContent);
 			}
 		}
 	}
@@ -380,15 +385,12 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		return ArrayToList(local.lines, Chr(10));
 	}
 
-	private void function formatAsTable(required struct config, required string environment) {
-		print.line();
-		print.greenLine("Configuration for environment: #arguments.environment#");
-		print.line();
+	private void function formatAsTable(required struct config, required string environment, boolean noMask) {
+		detailOutput.header("Configuration Export: #arguments.environment#", 50);
 
 		// Group settings by category
 		local.categories = {
 			"database": [],
-			"environment": [],
 			"caching": [],
 			"security": [],
 			"other": []
@@ -421,33 +423,52 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
 		// Display environment variables if present
 		if (StructKeyExists(arguments.config, "_environment") && StructCount(arguments.config._environment)) {
-			print.boldLine("Environment Variables:");
-			print.table(
+			detailOutput.subHeader("Environment Variables", 50);
+			detailOutput.getPrint().table(
 				data = prepareTableData(arguments.config._environment),
 				headers = ["Variable", "Value"]
 			);
-			print.line();
+			detailOutput.line();
 		}
 
 		// Display categorized settings
 		local.categoryNames = {
-			"database": "DATABASE",
-			"caching": "CACHING", 
-			"security": "SECURITY",
-			"environment": "ENVIRONMENT",
-			"other": "OTHER"
+			"database": "DATABASE SETTINGS",
+			"caching": "CACHING SETTINGS", 
+			"security": "SECURITY SETTINGS",
+			"other": "OTHER SETTINGS"
 		};
 		
-		for (local.category in ["database", "caching", "security", "environment", "other"]) {
+		for (local.category in ["database", "caching", "security", "other"]) {
 			if (ArrayLen(local.categories[local.category])) {
-				print.boldLine("#local.categoryNames[local.category]# Settings:");
-				print.table(
+				detailOutput.subHeader(local.categoryNames[local.category], 50);
+				detailOutput.getPrint().table(
 					data = local.categories[local.category],
 					headers = ["Setting", "Value"]
 				);
-				print.line();
+				detailOutput.line();
 			}
 		}
+
+		// Display summary
+		local.totalSettings = 0;
+		local.totalEnvVars = 0;
+		
+		for (local.category in local.categories) {
+			local.totalSettings += ArrayLen(local.categories[local.category]);
+		}
+		
+		if (StructKeyExists(arguments.config, "_environment")) {
+			local.totalEnvVars = StructCount(arguments.config._environment);
+		}
+
+		detailOutput.header("SUMMARY", 50);
+		detailOutput.metric("Environment", arguments.environment);
+		detailOutput.metric("Total Settings", local.totalSettings);
+		detailOutput.metric("Environment Variables", local.totalEnvVars);
+		detailOutput.metric("Sensitive Values Masked", !arguments.noMask ? "Yes" : "No");
+		detailOutput.line();
+		detailOutput.statusSuccess("Configuration dump completed successfully!");
 	}
 
 	private string function captureTableOutput(required struct config, required string environment) {
@@ -460,7 +481,6 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Group settings by category
 		local.categories = {
 			"database": [],
-			"environment": [],
 			"caching": [],
 			"security": [],
 			"other": []
@@ -503,11 +523,10 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			"database": "DATABASE Settings",
 			"caching": "CACHING Settings", 
 			"security": "SECURITY Settings",
-			"environment": "ENVIRONMENT Settings",
 			"other": "OTHER Settings"
 		};
 		
-		for (local.category in ["database", "caching", "security", "environment", "other"]) {
+		for (local.category in ["database", "caching", "security", "other"]) {
 			if (ArrayLen(local.categories[local.category])) {
 				ArrayAppend(local.output, local.categoryNames[local.category] & ":");
 				ArrayAppend(local.output, RepeatString("-", Len(local.categoryNames[local.category]) + 1));
