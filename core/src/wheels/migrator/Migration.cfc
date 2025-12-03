@@ -424,12 +424,24 @@ component extends="Base" {
 				} else if (IsBoolean(arguments[local.key])) {
 					local.columnValues = ListAppend(local.columnValues, IIf(arguments[local.key], 1, 0));
 				} else if (IsDate(arguments[local.key])) {
-					local.columnValues = ListAppend(local.columnValues, "#arguments[local.key]#");
+					if(get("adapterName") == "SQLite" && $isTimestampLiteral(arguments[local.key])){
+						local.columnValues = '"#$convertToString(arguments[local.key])#"';
+					} else {
+						local.columnValues = ListAppend(local.columnValues, "#arguments[local.key]#");
+					}
 				} else {
-					local.columnValues = ListAppend(
-						local.columnValues,
-						"'#ReplaceNoCase(arguments[local.key], "'", "''", "all")#'"
-					);
+					if (REFind("^'.*'$", arguments[local.key])) {
+						// strip only first and last quote
+						local.cleaned = Mid(arguments[local.key], 2, Len(arguments[local.key]) - 2);
+						// wrap in double quotes
+						local.columnValues = ListAppend(local.columnValues, '"' & local.cleaned & '"');
+					} else {
+						// normal values
+						local.columnValues = ListAppend(
+							local.columnValues,
+							"'#Replace(arguments[local.key], "'", "''", "all")#'"
+						);
+					}
 				}
 			}
 		}
@@ -474,10 +486,21 @@ component extends="Base" {
 				} else if (IsBoolean(arguments[local.key])) {
 					local.update = local.update & "#IIf(arguments[local.key], 1, 0)#";
 				} else if (IsDate(arguments[local.key])) {
-					local.update = local.update & "#arguments[local.key]#";
+					if(get("adapterName") == "SQLite" && $isTimestampLiteral(arguments[local.key])){
+						local.update =  local.update &  '"#$convertToString(arguments[local.key])#"';
+					} else {
+						local.update = local.update & "#arguments[local.key]#";
+					}
 				} else {
-					arguments[local.key] = ReplaceNoCase(arguments[local.key], "'", "''", "all");
-					local.update = local.update & "'#arguments[local.key]#'";
+					if (REFind("^'.*'$", arguments[local.key])) {
+						// strip only first and last quote
+						local.cleaned = Mid(arguments[local.key], 2, Len(arguments[local.key]) - 2);
+						// wrap in double quotes
+						local.update = local.update & '"' & local.cleaned & '"';
+					} else {
+						arguments[local.key] = ReplaceNoCase(arguments[local.key], "'", "''", "all");
+						local.update = local.update & "'#arguments[local.key]#'";
+					}
 				}
 				local.columnUpdates = ListAppend(local.columnUpdates, local.update);
 			}
@@ -515,4 +538,16 @@ component extends="Base" {
 		announce(local.message);
 	}
 
+	/**
+	 * Determines whether the given value is a ColdFusion timestamp literal.
+	 *
+	 * A valid CFML timestamp literal follows the exact format:
+	 * {ts 'YYYY-MM-DD HH:MM:SS'}
+	 *
+	 * @value The value to evaluate.
+	 * @return True if the value matches the ColdFusion timestamp literal syntax, otherwise false.
+	 */
+	private boolean function $isTimestampLiteral(required string value) {
+		return REFind("^\{ts '(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})'\}$", value) == 1;
+	}
 }
