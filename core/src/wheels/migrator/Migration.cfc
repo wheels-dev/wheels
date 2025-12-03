@@ -430,10 +430,18 @@ component extends="Base" {
 						local.columnValues = ListAppend(local.columnValues, "#arguments[local.key]#");
 					}
 				} else {
-					local.columnValues = ListAppend(
-						local.columnValues,
-						"#ReplaceNoCase(arguments[local.key], "'", '"', "all")#"
-					);
+					if (REFind("^'.*'$", arguments[local.key])) {
+						// strip only first and last quote
+						local.cleaned = Mid(arguments[local.key], 2, Len(arguments[local.key]) - 2);
+						// wrap in double quotes
+						local.columnValues = ListAppend(local.columnValues, '"' & local.cleaned & '"');
+					} else {
+						// normal values
+						local.columnValues = ListAppend(
+							local.columnValues,
+							"'#Replace(arguments[local.key], "'", "''", "all")#'"
+						);
+					}
 				}
 			}
 		}
