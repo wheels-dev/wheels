@@ -486,10 +486,21 @@ component extends="Base" {
 				} else if (IsBoolean(arguments[local.key])) {
 					local.update = local.update & "#IIf(arguments[local.key], 1, 0)#";
 				} else if (IsDate(arguments[local.key])) {
-					local.update = local.update & "#arguments[local.key]#";
+					if(get("adapterName") == "SQLite" && $isTimestampLiteral(arguments[local.key])){
+						local.update =  local.update &  '"#$convertToString(arguments[local.key])#"';
+					} else {
+						local.update = local.update & "#arguments[local.key]#";
+					}
 				} else {
-					arguments[local.key] = ReplaceNoCase(arguments[local.key], "'", "''", "all");
-					local.update = local.update & "'#arguments[local.key]#'";
+					if (REFind("^'.*'$", arguments[local.key])) {
+						// strip only first and last quote
+						local.cleaned = Mid(arguments[local.key], 2, Len(arguments[local.key]) - 2);
+						// wrap in double quotes
+						local.update = local.update & '"' & local.cleaned & '"';
+					} else {
+						arguments[local.key] = ReplaceNoCase(arguments[local.key], "'", "''", "all");
+						local.update = local.update & "'#arguments[local.key]#'";
+					}
 				}
 				local.columnUpdates = ListAppend(local.columnUpdates, local.update);
 			}
