@@ -92,7 +92,9 @@ component aliases="wheels plugin init" extends="../base" {
                 "keywords": "cfwheels,wheels,plugin",
                 "homepage": "",
                 "shortDescription": arguments.description,
-                "private": false
+                "private": false,
+                "directory":"/plugins/",
+                "packageDirectory":simplePluginName
             };
 
             fileWrite(pluginDir & "/box.json", serializeJSON(boxJson, true));
