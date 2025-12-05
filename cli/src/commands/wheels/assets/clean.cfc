@@ -35,14 +35,6 @@ component aliases="clean" extends="../base" {
 				keep:{min:1, max:100}
 			}
 		);
-		detailOutput.line();
-		if(!dryRun){
-			print.greenBoldLine("Cleaning old compiled assets...").toConsole();
-		}else{
-			print.cyanBoldLine("Dry Running old compiled assets...").toConsole();
-		}
-		detailOutput.line();
-
 		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 
 		if (!directoryExists(compiledDir)) {
@@ -62,6 +54,14 @@ component aliases="clean" extends="../base" {
 				return;
 			}
 		}
+
+		detailOutput.line();
+		if(!dryRun){
+			print.greenBoldLine("Cleaning old compiled assets...").toConsole();
+		}else{
+			print.cyanBoldLine("Dry Running old compiled assets...").toConsole();
+		}
+		detailOutput.line();
 		
 		// Group files by base name
 		var fileGroups = {};
@@ -137,7 +137,7 @@ component aliases="clean" extends="../base" {
 			print.greenLine("Deleted #deletedCount# old asset files").toConsole();
 			print.greenLine("Freed #formatFileSize(freedSpace)# of disk space").toConsole();
 		} else {
-		detailOutput.statusWarning("No old assets found to clean.");
+			detailOutput.statusWarning("No old assets found to clean.");
 		}
 	}
 	
