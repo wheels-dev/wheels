@@ -6,6 +6,8 @@
  **/
 component aliases='wheels db exec' extends="../base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 *  Migrate to specific version
 	 * @version.hint Version to migrate to
@@ -18,7 +20,16 @@ component aliases='wheels db exec' extends="../base" {
 			version = arguments.version
 		}
 
-		print.line("DBMigrateBridge > MigrateTo > #loc.version#");
-		print.redline($sendToCliCommand("&command=migrateTo&version=#loc.version#").message);
+		detailOutput.header("Migration Execution", 50);
+		detailOutput.metric("Target Version", loc.version);
+		detailOutput.divider();
+		var result = $sendToCliCommand("&command=migrateTo&version=#loc.version#");
+		result.success = false;
+		
+		if (structKeyExists(result, "success") && result.success) {
+			detailOutput.statusSuccess(result.message ?: "Migration completed successfully!");
+		} else {
+			detailOutput.statusFailed(result.message ?: "Migration failed!");
+		}
 	}
 }

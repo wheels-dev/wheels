@@ -15,6 +15,8 @@
  **/
  component aliases='wheels db create column' extends="../../base"  {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * Initialize the command
 	 */
@@ -51,9 +53,6 @@
                 dataType= ["string", "text", "integer", "biginteger", "float", "boolean", "date", "time", "datetime", "timestamp", "binary"]
             }
 		);
-
-		// Initialize detail service
-		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 		
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-column.txt"));
@@ -99,19 +98,20 @@
 		//content=replaceNoCase(content, "|scale|", "#scale#", "all");
 
 		// Output detail header
-		details.header("Migration Generation");
+		detailOutput.header("Migration Generation");
 		
 		// Make File
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.tableName)) & '_' & lcase(trim(arguments.name)),	action="create_column",	content=content);
 		
-		details.create(migrationPath);
-		details.success("Column migration created successfully!");
+		detailOutput.create(migrationPath);
+		detailOutput.line();
+		detailOutput.statusSuccess("Column migration created successfully!");
 		
 		var nextSteps = [];
 		arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
 		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
 		arrayAppend(nextSteps, "Or run all pending migrations: wheels dbmigrate latest");
-		details.nextSteps(nextSteps);
+		detailOutput.nextSteps(nextSteps);
 	}
 
 	function $constructArguments(args, string operator=","){

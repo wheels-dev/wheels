@@ -4,6 +4,8 @@
  **/ 
 component aliases='wheels db create blank' extends="../../base"  {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * Initialize the command
 	 */
@@ -23,19 +25,14 @@ component aliases='wheels db create blank' extends="../../base"  {
 		required string name,
 		string description = ""
 	) {
-
-
 		// Reconstruct arguments for handling --prefixed options
 		arguments = reconstructArgs(arguments);
 		
-		// Initialize detail service
-		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
-		
 		// Output detail header
-		details.header("Migration Generation");
+		detailOutput.header("Migration Generation");
 
 		// Get Template
-		var content=fileRead(getTemplate("dbmigrate/blank.txt")); 
+		var content = fileRead(getTemplate("dbmigrate/blank.txt")); 
 
 		// Replace template variables
 		if (len(trim(arguments.description))) {
@@ -45,14 +42,15 @@ component aliases='wheels db create blank' extends="../../base"  {
 		// Make File  
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)), action="blank", content=content);
 		
-		details.create(migrationPath);
-		details.success("Blank migration created successfully!");
+		detailOutput.create(migrationPath);
+		detailOutput.line();
+		detailOutput.statusSuccess("Blank migration created successfully!");
 		
 		var nextSteps = [];
 		arrayAppend(nextSteps, "1. Edit the migration file: #migrationPath#");
 		arrayAppend(nextSteps, "2. Start your server: server start");
 		arrayAppend(nextSteps, "3. Check migration status: wheels dbmigrate info");
 		arrayAppend(nextSteps, "4. Run the migration: wheels dbmigrate latest");
-		details.nextSteps(nextSteps);
+		detailOutput.nextSteps(nextSteps);
 	}
 }

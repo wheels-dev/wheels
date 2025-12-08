@@ -165,7 +165,7 @@ component {
 	 * @message The error message
 	 */
 	function error(required string message) {
-		print.line().redBoldLine(arguments.message).toConsole();
+		print.line().redBoldLine("[ERROR]: " & arguments.message).line().toConsole();
 	}
 
 

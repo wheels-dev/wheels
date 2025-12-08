@@ -12,6 +12,8 @@
  **/
  component aliases='wheels db create table' extends="../../base"  {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * Initialize the command
 	 */
@@ -38,8 +40,6 @@
 		// Reconstruct arguments for handling --prefixed options
 		arguments = reconstructArgs(arguments);
 		
-		// Initialize detail service
-		var details = application.wirebox.getInstance("DetailOutputService@wheels-cli");
 
 		// Get Template
 		var content=fileRead(getTemplate("dbmigrate/create-table.txt"));
@@ -51,18 +51,19 @@
 		content=replaceNoCase(content, "|primaryKey|", "#arguments.primaryKey#", "all");
 
 		// Output detail header
-		details.header("Migration Generation");
+		detailOutput.header("Migration Generation");
 		
 		// Make File
 		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);
 		
-		details.create(migrationPath);
-		details.success("Table migration created successfully!");
+		detailOutput.create(migrationPath);
+		detailOutput.line();
+		detailOutput.statusSuccess("Table migration created successfully!");
 		
 		var nextSteps = [];
 		arrayAppend(nextSteps, "Edit the migration to add columns: #migrationPath#");
 		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
 		arrayAppend(nextSteps, "Generate a model for this table: wheels generate model #arguments.name#");
-		details.nextSteps(nextSteps);
+		detailOutput.nextSteps(nextSteps);
 	}
 }
