@@ -27,6 +27,7 @@
 component extends="../base" {
 
 	property name="environmentService" inject="EnvironmentService@wheels-cli";
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
 	/**
 	 * @datasource Optional datasource name (defaults to current datasource setting)
@@ -62,14 +63,18 @@ component extends="../base" {
 			}
 
 			if (!Len(arguments.datasource)) {
-				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
+				detailOutput.error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
+				detailOutput.nextSteps([
+					"Specify a datasource: wheels db create --datasource=myapp_dev",
+					"Or configure dataSourceName in your app.cfm file"
+				]);
 				return;
 			}
 
-			printHeader("Database Creation Process");
-			printInfo("Datasource", arguments.datasource);
-			printInfo("Environment", arguments.environment);
-			printDivider();
+			detailOutput.header("Database Creation", 50);
+			detailOutput.metric("Datasource", arguments.datasource);
+			detailOutput.metric("Environment", arguments.environment);
+			detailOutput.divider();
 
 			// Normalize dbtype parameter
 			if (Len(arguments.dbtype)) {
@@ -80,10 +85,8 @@ component extends="../base" {
 			local.dsInfo = getDatasourceInfo(arguments.datasource, arguments.environment);
 
 			if (StructIsEmpty(local.dsInfo)) {
-				print.line();
-				print.yellowLine("Datasource '" & arguments.datasource & "' not found in server configuration.");
-				print.line();
-
+				detailOutput.statusWarning("Datasource '#arguments.datasource#' not found in server configuration.");
+				
 				// Ask if user wants to create datasource
 				if (ask("Would you like to create this datasource now? [y/n]: ") == "y") {
 					local.dsInfo = createInteractiveDatasource(
@@ -93,22 +96,19 @@ component extends="../base" {
 						dbtype = arguments.dbtype
 					);
 					if (StructIsEmpty(local.dsInfo)) {
-						error("Datasource creation cancelled or failed");
+						detailOutput.error("Datasource creation cancelled or failed");
 						return;
 					}
 				} else {
-					systemOutput("Please create the datasource in your CFML server admin first.", true, true);
-					error("Datasource '" & arguments.datasource & "' not found in server configuration");
+					detailOutput.statusInfo("Please create the datasource in your config/app.cfm first.");
+					detailOutput.statusFailed("Datasource '#arguments.datasource#' not found!");
 					return;
 				}
 			} else {
 				// Datasource found - check if dbtype parameter matches datasource type
-				// Normalize both for comparison to avoid false mismatches (MSSQL vs MSSQLServer)
 				if (Len(arguments.dbtype) && normalizeDbType(arguments.dbtype) != normalizeDbType(local.dsInfo.driver)) {
-					print.line();
-					print.yellowLine("WARNING: dbtype parameter ('#arguments.dbtype#') does not match datasource type ('#local.dsInfo.driver#')");
-					print.yellowLine("Using datasource type: #local.dsInfo.driver#");
-					print.line();
+					detailOutput.statusWarning("dbtype parameter ('#arguments.dbtype#') does not match datasource type ('#local.dsInfo.driver#')");
+					detailOutput.statusInfo("Using datasource type: #local.dsInfo.driver#");
 				}
 			}
 
@@ -116,44 +116,43 @@ component extends="../base" {
 			local.dbName = arguments.database != '' ? arguments.database : local.dsInfo.database != '' ? local.dsInfo.database : "wheels_dev";
 			local.dbType = local.dsInfo.driver;
 
-		// For file-based databases (SQLite, H2), extract just the database name if a full path/connection string was provided
-		if (local.dbType == "SQLite") {
-			if (findNoCase("jdbc:sqlite:", local.dbName) == 1) {
-				// Extract filename from JDBC connection string: jdbc:sqlite:/path/to/database.db -> database
-				local.fullPath = mid(local.dbName, 14, len(local.dbName)); // Remove "jdbc:sqlite:"
-				local.fileName = listLast(local.fullPath, "/\"); // Get filename
-				local.dbName = listFirst(local.fileName, "."); // Remove .db extension
-			} else if (find("\", local.dbName) || find("/", local.dbName)) {
-				// It's a full file path: D:\path\to\database.db or /path/to/database.db -> database
-				local.fileName = listLast(local.dbName, "/\"); // Get filename
-				local.dbName = listFirst(local.fileName, "."); // Remove .db extension
+			// For file-based databases (SQLite, H2), extract just the database name if a full path/connection string was provided
+			if (local.dbType == "SQLite") {
+				if (findNoCase("jdbc:sqlite:", local.dbName) == 1) {
+					local.fullPath = mid(local.dbName, 14, len(local.dbName));
+					local.fileName = listLast(local.fullPath, "/\");
+					local.dbName = listFirst(local.fileName, ".");
+				} else if (find("\", local.dbName) || find("/", local.dbName)) {
+					local.fileName = listLast(local.dbName, "/\");
+					local.dbName = listFirst(local.fileName, ".");
+				}
+				local.dsInfo.database = local.dbName;
+			} else if (local.dbType == "H2") {
+				if (findNoCase("jdbc:h2:", local.dbName) == 1) {
+					local.fullPath = mid(local.dbName, 9, len(local.dbName));
+					local.fileName = listLast(local.fullPath, "/\");
+					local.dbName = listFirst(local.fileName, ";");
+				} else if (find("\", local.dbName) || find("/", local.dbName)) {
+					local.fileName = listLast(local.dbName, "/\");
+					local.dbName = listFirst(local.fileName, ";");
+				}
+				local.dsInfo.database = local.dbName;
 			}
-			// Update dsInfo.database to use just the database name instead of full path
-			local.dsInfo.database = local.dbName;
-		} else if (local.dbType == "H2") {
-			if (findNoCase("jdbc:h2:", local.dbName) == 1) {
-				// Extract filename from H2 connection string
-				local.fullPath = mid(local.dbName, 9, len(local.dbName)); // Remove "jdbc:h2:"
-				local.fileName = listLast(local.fullPath, "/\");
-				local.dbName = listFirst(local.fileName, ";"); // Remove H2 options
-			} else if (find("\", local.dbName) || find("/", local.dbName)) {
-				// It's a full file path
-				local.fileName = listLast(local.dbName, "/\");
-				local.dbName = listFirst(local.fileName, ";"); // Remove H2 options if present
-			}
-			// Update dsInfo.database to use just the database name
-			local.dsInfo.database = local.dbName;
-		}
 
 			// Validate Oracle identifier (no hyphens or special characters allowed)
 			if (local.dbType == "Oracle" && reFind("[^a-zA-Z0-9_$##]", local.dbName)) {
-				error("Invalid Oracle identifier: '#local.dbName#' - Oracle usernames can only contain letters, numbers, and underscores. Use underscores instead of hyphens (e.g., 'wheels_dev' instead of 'wheels-dev')");
+				detailOutput.error("Invalid Oracle identifier: '#local.dbName#'");
+				detailOutput.statusWarning("Oracle usernames can only contain letters, numbers, and underscores.");
+				detailOutput.nextSteps([
+					"Use underscores instead of hyphens",
+					"Example: 'wheels_dev' instead of 'wheels-dev'"
+				]);
 				return;
 			}
 
-			printInfo("Database Type", local.dbType);
-			printInfo("Database Name", local.dbName);
-			printDivider();
+			detailOutput.metric("Database Type", local.dbType);
+			detailOutput.metric("Database Name", local.dbName);
+			detailOutput.divider();
 			
 			// Create database based on type
 			switch (local.dbType) {
@@ -172,22 +171,22 @@ component extends="../base" {
 					createDatabase(local.dsInfo, local.dbName, arguments.force, "Oracle");
 					break;
 				case "H2":
-					printWarning("H2 databases are created automatically on first connection");
-					printSuccess("No action needed - database will be created when application starts");
+					detailOutput.statusInfo("H2 databases are created automatically on first connection");
+					detailOutput.statusSuccess("No action needed - database will be created when application starts");
 					break;
 				case "SQLite":
 					createSQLiteDatabase(local.dsInfo, local.dbName, arguments.force);
 					break;
 				default:
-					systemOutput("Please create the database manually using your database management tools.", true, true);
-					error("Database creation not supported for driver: " & local.dbType);
+					detailOutput.statusInfo("Database creation not supported for driver: #local.dbType#");
+					detailOutput.statusWarning("Please create the database manually using your database management tools.");
+					return;
 			}
 
 			// After database creation, ensure environment setup exists
 			ensureEnvironmentSetup(local.appPath, arguments.environment, arguments.datasource, local.dbType, local.dsInfo);
 
 			// Now write datasource to app.cfm using environment variables
-			// This is done AFTER database creation so the actual values from dsInfo were used for DB creation
 			writeDatasourceToAppCfmWithEnvVars(local.appPath, arguments.datasource, local.dbType, arguments.environment);
 
 		} catch (any e) {
@@ -195,9 +194,9 @@ component extends="../base" {
 			if (!FindNoCase("Database already exists", e.message) &&
 			    !FindNoCase("Access denied", e.message) &&
 			    !FindNoCase("authentication failed", e.message)) {
-				printError("Database creation failed: " & e.message);
+				detailOutput.statusFailed("Database creation failed: " & e.message);
 				if (StructKeyExists(e, "detail") && Len(e.detail)) {
-					printError("Details: " & e.detail);
+					detailOutput.output("Details: " & e.detail, true);
 				}
 			}
 			setExitCode(1);
@@ -209,16 +208,16 @@ component extends="../base" {
 	 */
 	private void function createDatabase(required struct dsInfo, required string dbName, boolean force = false, required string dbType) {
 		try {
-			printStep("Initializing " & arguments.dbType & " database creation...");
+			print.line("Initializing #arguments.dbType# database creation...").toConsole();
 			
-			// Get database-specific configuration (don't pass target dbName, use system DB)
+			// Get database-specific configuration
 			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo);
 			// Build connection URL to system database (not the target database)
 			local.url = buildSystemJDBCUrl(local.dbConfig.tempDS);
 			local.username = local.dbConfig.tempDS.username ?: "";
 			local.password = local.dbConfig.tempDS.password ?: "";
 			
-			printStep("Connecting to " & arguments.dbType & " server...");
+			print.line("Connecting to #arguments.dbType# server...").toConsole();
 			
 			// Create driver instance
 			local.driver = "";
@@ -227,16 +226,17 @@ component extends="../base" {
 			for (local.driverClass in local.dbConfig.driverClasses) {
 				try {
 					local.driver = createObject("java", local.driverClass);
-					printSuccess("Driver found: " & local.driverClass);
+					detailOutput.statusSuccess("Driver found: #local.driverClass#");
 					local.driverFound = true;
 					break;
 				} catch (any driverError) {
-					printWarning("Driver not available: " & local.driverClass);
+					detailOutput.statusWarning("Driver not available: #local.driverClass#");
 				}
 			}
 			
 			if (!local.driverFound) {
-				throw(message="No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.");
+				detailOutput.error("No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.");
+				return;
 			}
 			
 			// Create properties for connection
@@ -246,67 +246,72 @@ component extends="../base" {
 			
 			// Test if driver accepts the URL
 			if (!local.driver.acceptsURL(local.url)) {
-				throw(message=arguments.dbType & " driver does not accept the URL format");
+				detailOutput.error(arguments.dbType & " driver does not accept the URL format");
+				return;
 			}
 			
 			// Connect using driver directly
 			local.conn = local.driver.connect(local.url, local.props);
 			
 			if (isNull(local.conn)) {
-				systemOutput("Driver returned null connection. Common causes:");
-				systemOutput("1. " & arguments.dbType & " server is not running");
-				systemOutput("2. Wrong server/port configuration");
-				systemOutput("3. Invalid credentials");
-				systemOutput("4. Network/firewall issues");
+				detailOutput.statusFailed("Connection failed");
+				detailOutput.nextSteps([
+					"1. Check if #arguments.dbType# server is running",
+					"2. Verify server/port configuration",
+					"3. Check credentials",
+					"4. Check network/firewall settings"
+				]);
 				if (arguments.dbType == "PostgreSQL") {
-					systemOutput("5. pg_hba.conf authentication issues");
+					detailOutput.statusWarning("Check pg_hba.conf authentication settings");
 				}
-				throw(message="Connection failed");
+				detailOutput.error("Connection failed");
+				return;
 			}
 			
-			printSuccess("Connected successfully to " & arguments.dbType & " server!");
+			detailOutput.statusSuccess("Connected successfully to #arguments.dbType# server!");
 			
 			// Check if database already exists
-			printStep("Checking if database exists...");
+			print.line("Checking if database exists...").toConsole();
 			local.exists = checkDatabaseExists(local.conn, arguments.dbName, arguments.dbType);
 			
 			if (local.exists) {
 				if (!arguments.force) {
-					throw(message="Database '" & arguments.dbName & "' already exists! Use force=true to drop existing database.");
+					detailOutput.error("Database '#arguments.dbName#' already exists! Use force=true to drop existing database.");
+					return;
 				}
 				
-				printWarning("Database '" & arguments.dbName & "' already exists!");
+				detailOutput.statusWarning("Database '#arguments.dbName#' already exists!");
 				
 				// Handle active connections for PostgreSQL
 				if (arguments.dbType == "PostgreSQL") {
-					printStep("Terminating active connections...");
+					print.line("Terminating active connections...").toConsole();
 					terminatePostgreSQLConnections(local.conn, arguments.dbName);
 				}
 				
 				// Drop existing database
-				printStep("Dropping existing database...");
+				print.line("Dropping existing database...").toConsole();
 				dropDatabase(local.conn, arguments.dbName, arguments.dbType);
-				printSuccess("Existing database dropped.");
+				detailOutput.statusSuccess("Existing database dropped.");
 			}
 			
 			// Create the database
-			printStep("Creating " & arguments.dbType & " database '" & arguments.dbName & "'...");
+			print.line("Creating #arguments.dbType# database '#arguments.dbName#'...").toConsole();
 			executeCreateDatabase(local.conn, arguments.dbName, arguments.dbType);
-			printSuccess("Database '" & arguments.dbName & "' created successfully!");
+			detailOutput.statusSuccess("Database '#arguments.dbName#' created successfully!");
 			
 			// Verify database was created
-			printStep("Verifying database creation...");
+			print.line("Verifying database creation...").toConsole();
 			if (verifyDatabaseCreated(local.conn, arguments.dbName, arguments.dbType)) {
-				printSuccess("Database '" & arguments.dbName & "' verified successfully!");
+				detailOutput.statusSuccess("Database '#arguments.dbName#' verified successfully!");
 			} else {
-				printWarning("Database creation verification failed");
+				detailOutput.statusWarning("Database creation verification failed");
 			}
 			
 			// Clean up
 			local.conn.close();
 			
-			printDivider();
-			printSuccess(arguments.dbType & " database creation completed successfully!", true);
+			detailOutput.divider();
+			detailOutput.success("#arguments.dbType# database creation completed successfully!");
 			
 		} catch (any e) {
 			handleDatabaseError(e, arguments.dbType, arguments.dbName);
@@ -339,9 +344,8 @@ component extends="../base" {
 					// Ignore if this fails
 				}
 
-				// Drop user with CASCADE to remove all objects
 				local.dropSQL = "DROP USER " & UCASE(arguments.dbName) & " CASCADE";
-				systemOutput("DEBUG - Executing DROP SQL: " & local.dropSQL, true);
+				detailOutput.getPrint().line("DEBUG - Executing DROP SQL: #local.dropSQL#");
 				local.stmt.execute(local.dropSQL);
 				break;
 		}
@@ -358,14 +362,14 @@ component extends="../base" {
 		
 		switch (arguments.dbType) {
 			case "MySQL":
-				local.createSQL = "CREATE DATABASE `" & arguments.dbName & "` " &
+				local.createSQL = "CREATE DATABASE `#arguments.dbName#` " &
 								"CHARACTER SET utf8mb4 " &
 								"COLLATE utf8mb4_unicode_ci";
 				local.stmt.executeUpdate(local.createSQL);
 				break;
 
 			case "PostgreSQL":
-				local.createSQL = 'CREATE DATABASE "' & arguments.dbName & '" ' &
+				local.createSQL = 'CREATE DATABASE "#arguments.dbName#" ' &
 								'WITH ENCODING ''UTF8'' ' &
 								'LC_COLLATE ''en_US.UTF-8'' ' &
 								'LC_CTYPE ''en_US.UTF-8'' ' &
@@ -374,7 +378,7 @@ component extends="../base" {
 				break;
 
 			case "SQLServer":
-				local.createSQL = "CREATE DATABASE [" & arguments.dbName & "]";
+				local.createSQL = "CREATE DATABASE [#arguments.dbName#]";
 				local.stmt.execute(local.createSQL);
 				break;
 
@@ -385,20 +389,16 @@ component extends="../base" {
 					local.alterSession = "ALTER SESSION SET ""_ORACLE_SCRIPT""=true";
 					local.stmt.execute(local.alterSession);
 				} catch (any e) {
-					// Ignore if this fails (non-CDB Oracle or insufficient privileges)
-					systemOutput("Note: Could not set _ORACLE_SCRIPT (may not be needed)", true);
+					detailOutput.statusInfo("Note: Could not set _ORACLE_SCRIPT (may not be needed)");
 				}
 
-				// Create Oracle user (schema)
 				local.createSQL = "CREATE USER #arguments.dbName# IDENTIFIED BY #arguments.dbName#_pass";
-				systemOutput("DEBUG - Executing SQL: " & local.createSQL, true);
+				detailOutput.getPrint().line("DEBUG - Executing SQL: #local.createSQL#");
 				local.stmt.execute(local.createSQL);
 
-				// Grant privileges
 				local.grantSQL = "GRANT CONNECT, RESOURCE TO #arguments.dbName#";
 				local.stmt.execute(local.grantSQL);
 				break;
-
 		}
 		
 		local.stmt.close();
@@ -478,79 +478,79 @@ component extends="../base" {
 		switch (arguments.dbType) {
 			case "MySQL":
 				if (FindNoCase("database exists", arguments.e.message)) {
-					printError("Database already exists: " & arguments.dbName);
+					detailOutput.statusFailed("Database already exists: #arguments.dbName#");
 					local.errorHandled = true;
 				} else if (FindNoCase("Access denied", arguments.e.message)) {
-					printError("Access denied - check MySQL credentials and permissions");
+					detailOutput.statusFailed("Access denied - check MySQL credentials and permissions");
 					local.errorHandled = true;
 				} else if (FindNoCase("Communications link failure", arguments.e.message)) {
-					printError("Cannot connect to MySQL server - check if MySQL is running and accessible");
+					detailOutput.statusFailed("Cannot connect to MySQL server - check if MySQL is running and accessible");
 					local.errorHandled = true;
 				}
 				break;
 
 			case "PostgreSQL":
 				if (FindNoCase("already exists", arguments.e.message)) {
-					printError("Database already exists: " & arguments.dbName);
+					detailOutput.statusFailed("Database already exists: #arguments.dbName#");
 					local.errorHandled = true;
 				} else if (FindNoCase("authentication failed", arguments.e.message)) {
-					printError("Authentication failed - check PostgreSQL credentials");
+					detailOutput.statusFailed("Authentication failed - check PostgreSQL credentials");
 					local.errorHandled = true;
 				} else if (FindNoCase("Connection refused", arguments.e.message)) {
-					printError("Connection refused - check if PostgreSQL is running and accessible");
+					detailOutput.statusFailed("Connection refused - check if PostgreSQL is running and accessible");
 					local.errorHandled = true;
 				} else if (FindNoCase("database is being accessed by other users", arguments.e.message)) {
-					printError("Cannot drop database - other users are connected");
+					detailOutput.statusFailed("Cannot drop database - other users are connected");
 					local.errorHandled = true;
 				}
 				break;
 
 			case "SQLServer":
 				if (FindNoCase("database exists", arguments.e.message)) {
-					printError("Database already exists: " & arguments.dbName);
+					detailOutput.statusFailed("Database already exists: #arguments.dbName#");
 					local.errorHandled = true;
 				} else if (FindNoCase("Login failed", arguments.e.message)) {
-					printError("Login failed - check SQL Server credentials");
+					detailOutput.statusFailed("Login failed - check SQL Server credentials");
 					local.errorHandled = true;
 				}
 				break;
 
 			case "Oracle":
 				if (FindNoCase("ORA-01920", arguments.e.message) || FindNoCase("user name conflicts", arguments.e.message)) {
-					printError("User (schema) already exists: " & arguments.dbName);
-					printWarning("Use force=true to drop and recreate the user");
+					detailOutput.statusFailed("User (schema) already exists: #arguments.dbName#");
+					detailOutput.statusWarning("Use force=true to drop and recreate the user");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-28014", arguments.e.message) || FindNoCase("cannot drop administrative user", arguments.e.message)) {
-					printError("Cannot drop administrative/system user: " & arguments.dbName);
-					printWarning("Please choose a different database name (e.g., 'myapp_dev', 'wheels_dev')");
-					printWarning("Oracle system users like SYS, SYSTEM, ADMIN, XDB, ORACLE_OCM, etc. cannot be dropped");
+					detailOutput.statusFailed("Cannot drop administrative/system user: #arguments.dbName#");
+					detailOutput.statusWarning("Please choose a different database name (e.g., 'myapp_dev', 'wheels_dev')");
+					detailOutput.statusWarning("Oracle system users like SYS, SYSTEM, ADMIN, XDB, ORACLE_OCM, etc. cannot be dropped");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-65096", arguments.e.message) || FindNoCase("common user or role name", arguments.e.message)) {
-					printError("Oracle CDB requires C## prefix for common users");
-					printWarning("This may indicate insufficient privileges to set _ORACLE_SCRIPT session variable");
-					printWarning("Try using a database name starting with 'C##' (e.g., 'C##MYAPP')");
+					detailOutput.statusFailed("Oracle CDB requires C## prefix for common users");
+					detailOutput.statusWarning("This may indicate insufficient privileges to set _ORACLE_SCRIPT session variable");
+					detailOutput.statusWarning("Try using a database name starting with 'C##' (e.g., 'C##MYAPP')");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-01017", arguments.e.message) || FindNoCase("invalid username/password", arguments.e.message)) {
-					printError("Invalid username/password - check Oracle credentials");
+					detailOutput.statusFailed("Invalid username/password - check Oracle credentials");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-12505", arguments.e.message) || FindNoCase("TNS:listener", arguments.e.message)) {
-					printError("Cannot connect to Oracle server - check SID and connection settings");
+					detailOutput.statusFailed("Cannot connect to Oracle server - check SID and connection settings");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-01031", arguments.e.message) || FindNoCase("insufficient privileges", arguments.e.message)) {
-					printError("Insufficient privileges - user must have CREATE USER and GRANT privileges");
+					detailOutput.statusFailed("Insufficient privileges - user must have CREATE USER and GRANT privileges");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-28001", arguments.e.message) || FindNoCase("password has expired", arguments.e.message)) {
-					printError("Password has expired - please update the password in Oracle");
+					detailOutput.statusFailed("Password has expired - please update the password in Oracle");
 					local.errorHandled = true;
 				}
 				break;
 		}
 		
 		if (!local.errorHandled) {
-			printError(arguments.dbType & " Error: " & arguments.e.message);
+			detailOutput.statusFailed("#arguments.dbType# Error: #arguments.e.message#");
 		}
 
-		// Always throw to propagate the error up (prevents duplicate error messages)
+		// Always throw to propagate the error up
 		throw(message=arguments.e.message, detail=(isDefined("arguments.e.detail") ? arguments.e.detail : ""));
 	}
 
@@ -563,9 +563,7 @@ component extends="../base" {
 		required string environment,
 		string dbtype = ""
 	) {
-		print.line();
-		print.cyanBoldLine("=== Interactive Datasource Creation ===");
-		print.line();
+		detailOutput.header("Interactive Datasource Creation", 50);
 
 		local.dbType = "";
 		local.templateKey = "";
@@ -597,22 +595,21 @@ component extends="../base" {
 					local.templateKey = "sqlite";
 					break;
 				default:
-					printError("Invalid dbtype: " & local.dbType);
+					detailOutput.statusFailed("Invalid dbtype: #local.dbType#");
 					return {};
 			}
 
-			print.greenLine("Using database type from parameter: " & local.dbType);
-			print.line();
+			detailOutput.statusSuccess("Using database type from parameter: #local.dbType#");
 		} else {
 			// Ask for database type interactively
-			print.yellowLine("Supported database types:");
-			print.line("  1. MySQL");
-			print.line("  2. PostgreSQL");
-			print.line("  3. SQL Server (MSSQL)");
-			print.line("  4. Oracle");
-			print.line("  5. H2");
-			print.line("  6. SQLite");
-			print.line();
+			detailOutput.subHeader("Supported Database Types", 50);
+			detailOutput.output("1. MySQL");
+			detailOutput.output("2. PostgreSQL");
+			detailOutput.output("3. SQL Server (MSSQL)");
+			detailOutput.output("4. Oracle");
+			detailOutput.output("5. H2");
+			detailOutput.output("6. SQLite");
+			detailOutput.line();
 
 			local.dbTypeChoice = ask("Select database type [1-6]: ");
 
@@ -642,27 +639,24 @@ component extends="../base" {
 					local.templateKey = "sqlite";
 					break;
 				default:
-					printError("Invalid choice!");
+					detailOutput.statusFailed("Invalid choice!");
 					return {};
 			}
 
-			print.line();
-			print.greenLine("Selected: " & local.dbType);
-			print.line();
+			detailOutput.statusSuccess("Selected: #local.dbType#");
 		}
 
 		// Get datasource templates
 		local.templates = getDatasourceTemplates();
 		if (!structKeyExists(local.templates, local.templateKey)) {
-			printError("Template not found for " & local.dbType);
+			detailOutput.statusFailed("Template not found for #local.dbType#");
 			return {};
 		}
 
 		local.template = local.templates[local.templateKey];
 
 		// Prompt for connection details
-		print.cyanLine("Enter connection details:");
-		print.line();
+		detailOutput.subHeader("Connection Details", 50);
 
 		// H2 and SQLite are file-based - only need database name
 		if (local.dbType == "H2" || local.dbType == "SQLite") {
@@ -689,13 +683,13 @@ component extends="../base" {
 			local.port = "";
 
 		} else {
-			// For server-based databases (MySQL, PostgreSQL, MSSQL, Oracle)
-			local.host = ask("Host [" & getDefaultValue(local.template, "host", "localhost") & "]: ");
+			// For server-based databases
+			local.host = ask("Host [#getDefaultValue(local.template, "host", "localhost")#]: ");
 			if (!len(local.host)) {
 				local.host = getDefaultValue(local.template, "host", "localhost");
 			}
 
-			local.port = ask("Port [" & getDefaultValue(local.template, "port", getDefaultPort(local.dbType)) & "]: ");
+			local.port = ask("Port [#getDefaultValue(local.template, "port", getDefaultPort(local.dbType))#]: ");
 			if (!len(local.port)) {
 				local.port = getDefaultValue(local.template, "port", getDefaultPort(local.dbType));
 			}
@@ -705,7 +699,7 @@ component extends="../base" {
 				local.database = "wheels_dev";
 			}
 
-			local.username = ask("Username [" & getDefaultValue(local.template, "username", "root") & "]: ");
+			local.username = ask("Username [#getDefaultValue(local.template, "username", "root")#]: ");
 			if (!len(local.username)) {
 				local.username = getDefaultValue(local.template, "username", "root");
 			}
@@ -724,26 +718,26 @@ component extends="../base" {
 		// Build connection string
 		local.connectionString = buildConnectionString(local.dbType, local.host, local.port, local.database, local.sid ?: "");
 
-		print.line();
-		print.yellowLine("Review datasource configuration:");
-		print.line("  Datasource Name: " & arguments.datasourceName);
-		print.line("  Database Type: " & local.dbType);
-
-		// Only show host/port for server-based databases
+		detailOutput.subHeader("Configuration Review", 50);
+		detailOutput.metric("Datasource Name", arguments.datasourceName);
+		detailOutput.metric("Database Type", local.dbType);
+		
 		if (local.dbType != "H2" && local.dbType != "SQLite") {
-			print.line("  Host: " & local.host);
-			print.line("  Port: " & local.port);
+			detailOutput.metric("Host", local.host);
+			detailOutput.metric("Port", local.port);
 		}
-
-		print.line("  Database: " & local.database);
+		
+		detailOutput.metric("Database", local.database);
+		
 		if (local.dbType != "SQLite") {
-			print.line("  Username: " & local.username);
+			detailOutput.metric("Username", local.username);
 		}
-		print.line("  Connection String: " & local.connectionString);
-		print.line();
+		
+		detailOutput.metric("Connection String", local.connectionString);
+		detailOutput.line();
 
 		if (ask("Create this datasource? [y/n]: ") != "y") {
-			printWarning("Datasource creation cancelled");
+			detailOutput.statusWarning("Datasource creation cancelled");
 			return {};
 		}
 
@@ -760,9 +754,7 @@ component extends="../base" {
 		};
 
 		// Instead of saving hardcoded values, call wheels env setup to create proper environment-based configuration
-		print.line();
-		print.yellowLine("Setting up environment configuration with environment variables...");
-		print.line();
+		print.line("Setting up environment configuration with environment variables...").toConsole();
 
 		try {
 			command("wheels env setup")
@@ -780,13 +772,11 @@ component extends="../base" {
 				)
 				.run();
 
-			print.line();
-			printSuccess("Environment configuration created with environment variables!");
-			print.line();
+			detailOutput.statusSuccess("Environment configuration created with environment variables!");
 
 		} catch (any e) {
-			printError("Failed to create environment configuration: " & e.message);
-			printWarning("You may need to manually run: wheels env setup environment=#arguments.environment#");
+			detailOutput.statusFailed("Failed to create environment configuration: #e.message#");
+			detailOutput.statusWarning("You may need to manually run: wheels env setup environment=#arguments.environment#");
 		}
 
 		// Return datasource info in the format expected by the rest of the code
@@ -914,7 +904,7 @@ component extends="../base" {
 		try {
 			local.appCfmPath = arguments.appPath & "/config/app.cfm";
 			if (!fileExists(local.appCfmPath)) {
-				printError("app.cfm not found at: " & local.appCfmPath);
+				detailOutput.statusFailed("app.cfm not found at: #local.appCfmPath#");
 				return false;
 			}
 
@@ -938,7 +928,7 @@ component extends="../base" {
 
 			// Check if datasource already exists
 			if (find('this.datasources["#arguments.dsName#"]', local.content)) {
-				printWarning("Datasource already exists in app.cfm - skipping");
+				detailOutput.statusWarning("Datasource already exists in app.cfm - skipping");
 				return true;
 			}
 
@@ -952,72 +942,12 @@ component extends="../base" {
 			}
 
 			fileWrite(local.appCfmPath, local.content);
-			printSuccess("Datasource added to app.cfm");
+			detailOutput.statusSuccess("Datasource added to app.cfm");
 			return true;
 
 		} catch (any e) {
-			printError("Error saving to app.cfm: " & e.message);
+			detailOutput.statusFailed("Error saving to app.cfm: #e.message#");
 			return false;
-		}
-	}
-
-	/**
-	 * Save datasource to CFConfig.json
-	 */
-	private boolean function saveDatasourceToCFConfig(required string dsName, required struct dsConfig, required string dbType, required string host, required string port, required string database, required string appPath) {
-		try {
-			local.cfconfigPath = arguments.appPath & "/CFConfig.json";
-			if (!fileExists(local.cfconfigPath)) {
-				printWarning("CFConfig.json not found - skipping");
-				return true; // Not critical
-			}
-
-			local.cfconfig = deserializeJSON(fileRead(local.cfconfigPath));
-
-			if (!structKeyExists(local.cfconfig, "datasources")) {
-				local.cfconfig.datasources = {};
-			}
-
-			// Map driver to CFConfig class
-			local.cfconfigClass = "";
-			switch (arguments.dbType) {
-				case "MySQL":
-					local.cfconfigClass = "com.mysql.cj.jdbc.Driver";
-					break;
-				case "PostgreSQL":
-					local.cfconfigClass = "org.postgresql.Driver";
-					break;
-				case "MSSQLServer":
-					local.cfconfigClass = "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-					break;
-				case "Oracle":
-					local.cfconfigClass = "oracle.jdbc.OracleDriver";
-					break;
-				case "H2":
-					local.cfconfigClass = "org.h2.Driver";
-					break;
-				case "SQLite":
-					local.cfconfigClass = "org.sqlite.JDBC";
-					break;
-			}
-
-			local.cfconfig.datasources[arguments.dsName] = {
-				class: local.cfconfigClass,
-				connectionString: arguments.dsConfig.connectionString,
-				username: arguments.dsConfig.username,
-				password: arguments.dsConfig.password,
-				host: arguments.host,
-				port: val(arguments.port),
-				database: arguments.database
-			};
-
-			fileWrite(local.cfconfigPath, serializeJSON(local.cfconfig));
-			printSuccess("Datasource added to CFConfig.json");
-			return true;
-
-		} catch (any e) {
-			printWarning("Error saving to CFConfig.json: " & e.message);
-			return false; // Non-critical
 		}
 	}
 
@@ -1031,10 +961,8 @@ component extends="../base" {
 			local.envFile = arguments.appPath & "/.env." & arguments.environment;
 
 			if (!fileExists(local.envFile)) {
-				print.line();
-				print.yellowLine("Environment files not found for: " & arguments.environment);
-				print.yellowLine("Creating environment configuration...");
-				print.line();
+				detailOutput.statusWarning("Environment files not found for: #arguments.environment#");
+				print.line("Creating environment configuration...").toConsole();
 
 				// Call wheels env setup with skipDatabase to avoid infinite loop
 				command("wheels env setup")
@@ -1052,13 +980,12 @@ component extends="../base" {
 					)
 					.run();
 
-				print.line();
-				printSuccess("Environment configuration created!");
+				detailOutput.statusSuccess("Environment configuration created!");
 			}
 
 		} catch (any e) {
-			printWarning("Could not create environment setup: " & e.message);
-			printWarning("You may need to run: wheels env setup environment=#arguments.environment#");
+			detailOutput.statusWarning("Could not create environment setup: #e.message#");
+			detailOutput.statusWarning("You may need to run: wheels env setup environment=#arguments.environment#");
 		}
 	}
 
@@ -1068,8 +995,7 @@ component extends="../base" {
 	 */
 	private void function writeDatasourceToAppCfmWithEnvVars(required string appPath, required string datasourceName, required string dbType, required string environment) {
 		try {
-			print.line();
-			printStep("Writing datasource to app.cfm...");
+			print.line("Writing datasource to app.cfm...").toConsole();
 
 			// Build config structure expected by writeDatasourceToAppCfm
 			local.config = {
@@ -1088,14 +1014,14 @@ component extends="../base" {
 			);
 
 			if (local.result.success) {
-				printSuccess(local.result.message);
+				detailOutput.statusSuccess(local.result.message);
 			} else {
-				printWarning(local.result.message);
+				detailOutput.statusWarning(local.result.message);
 			}
 
 		} catch (any e) {
-			printWarning("Could not write datasource to app.cfm: " & e.message);
-			printWarning("You may need to manually add the datasource configuration");
+			detailOutput.statusWarning("Could not write datasource to app.cfm: #e.message#");
+			detailOutput.statusWarning("You may need to manually add the datasource configuration");
 		}
 	}
 
@@ -1104,7 +1030,7 @@ component extends="../base" {
 	 */
 	private void function createSQLiteDatabase(required struct dsInfo, required string dbName, boolean force = false) {
 		try {
-			printStep("Creating SQLite database...");
+			print.line("Creating SQLite database...").toConsole();
 
 			// Get the database path from dsInfo
 			// dsInfo.database might be:
@@ -1133,11 +1059,11 @@ component extends="../base" {
 			// Check if database file already exists
 			if (FileExists(local.dbPath)) {
 				if (!arguments.force) {
-					throw(message="Database file '" & local.dbPath & "' already exists! Use force=true to overwrite.");
+					throw(message="Database file '#local.dbPath#' already exists! Use force=true to overwrite.");
 				}
 
-				printWarning("Database file already exists: " & local.dbPath);
-				printStep("Removing existing database file...");
+				detailOutput.statusWarning("Database file already exists: #local.dbPath#");
+				print.line("Removing existing database file...").toConsole();
 
 				// Delete auxiliary files first
 				local.walFile = local.dbPath & "-wal";
@@ -1147,34 +1073,34 @@ component extends="../base" {
 				if (FileExists(local.walFile)) {
 					try {
 						FileDelete(local.walFile);
-						printSuccess("Deleted WAL file");
+						detailOutput.statusSuccess("Deleted WAL file");
 					} catch (any e) {
-						printWarning("Could not delete WAL file: " & e.message);
+						detailOutput.statusWarning("Could not delete WAL file: #e.message#");
 					}
 				}
 
 				if (FileExists(local.shmFile)) {
 					try {
 						FileDelete(local.shmFile);
-						printSuccess("Deleted SHM file");
+						detailOutput.statusSuccess("Deleted SHM file");
 					} catch (any e) {
-						printWarning("Could not delete SHM file: " & e.message);
+						detailOutput.statusWarning("Could not delete SHM file: #e.message#");
 					}
 				}
 
 				if (FileExists(local.journalFile)) {
 					try {
 						FileDelete(local.journalFile);
-						printSuccess("Deleted journal file");
+						detailOutput.statusSuccess("Deleted journal file");
 					} catch (any e) {
-						printWarning("Could not delete journal file: " & e.message);
+						detailOutput.statusWarning("Could not delete journal file: #e.message#");
 					}
 				}
 
 				// Delete main database file
 				try {
 					FileDelete(local.dbPath);
-					printSuccess("Deleted existing database file");
+					detailOutput.statusSuccess("Deleted existing database file");
 				} catch (any e) {
 					throw(message="Could not delete existing database file: " & e.message, detail="Try stopping the application server first.");
 				}
@@ -1184,17 +1110,17 @@ component extends="../base" {
 			local.dbDir = getDirectoryFromPath(local.dbPath);
 			if (!directoryExists(local.dbDir)) {
 				directoryCreate(local.dbDir, true);
-				printSuccess("Created database directory: " & local.dbDir);
+				detailOutput.statusSuccess("Created database directory: #local.dbDir#");
 			}
 
 			// Create the SQLite database by establishing a connection and creating a table
-			printStep("Initializing SQLite database file...");
+			print.line("Initializing SQLite database file...").toConsole();
 
 			// Load SQLite JDBC driver
 			local.driver = "";
 			try {
 				local.driver = createObject("java", "org.sqlite.JDBC");
-				printSuccess("SQLite JDBC driver loaded");
+				detailOutput.statusSuccess("SQLite JDBC driver loaded");
 			} catch (any e) {
 				throw(message="SQLite JDBC driver not found. Ensure org.xerial.sqlite-jdbc is in classpath.");
 			}
@@ -1212,10 +1138,10 @@ component extends="../base" {
 				throw(message="Failed to create SQLite database connection");
 			}
 
-			printSuccess("Database connection established");
+			detailOutput.statusSuccess("Database connection established");
 
 			// Create a metadata table to initialize the database
-			printStep("Initializing database schema...");
+			print.line("Initializing database schema...").toConsole();
 			local.stmt = local.conn.createStatement();
 			local.createTableSQL = "CREATE TABLE IF NOT EXISTS wheels_metadata (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1230,7 +1156,7 @@ component extends="../base" {
 			local.insertSQL = "INSERT INTO wheels_metadata (key, value) VALUES ('database_created', datetime('now'))";
 			local.stmt.execute(local.insertSQL);
 
-			printSuccess("Database schema initialized");
+			detailOutput.statusSuccess("Database schema initialized");
 
 			// Close statement and connection
 			local.stmt.close();
@@ -1239,13 +1165,13 @@ component extends="../base" {
 			// Verify file was created
 			if (FileExists(local.dbPath)) {
 				local.fileInfo = getFileInfo(local.dbPath);
-				printSuccess("Database file created: " & local.dbPath);
-				printSuccess("File size: " & local.fileInfo.size & " bytes");
+				detailOutput.statusSuccess("Database file created: #local.dbPath#");
+				detailOutput.metric("File size", "#local.fileInfo.size# bytes");
 
-				printDivider();
-				printSuccess("SQLite database created successfully!", true);
+				detailOutput.divider();
+				detailOutput.success("SQLite database created successfully!");
 			} else {
-				throw(message="Database file was not created at: " & local.dbPath);
+				throw(message="Database file was not created at: #local.dbPath#");
 			}
 
 		} catch (any e) {
@@ -1263,43 +1189,43 @@ component extends="../base" {
 
 		// Check for common SQLite error patterns
 		if (FindNoCase("already exists", local.errorMessage)) {
-			printError("Database file already exists: " & arguments.dbName & ".db");
-			printWarning("Use force=true to overwrite the existing database");
+			detailOutput.statusFailed("Database file already exists: #arguments.dbName#.db");
+			detailOutput.statusWarning("Use force=true to overwrite the existing database");
 			local.errorHandled = true;
 		} else if (FindNoCase("Could not delete", local.errorMessage)) {
-			printError("Cannot delete existing database file");
-			printWarning("The database file may be locked by another process");
-			printWarning("Try stopping the application server and running the command again");
+			detailOutput.statusFailed("Cannot delete existing database file");
+			detailOutput.statusWarning("The database file may be locked by another process");
+			detailOutput.statusWarning("Try stopping the application server and running the command again");
 			local.errorHandled = true;
 		} else if (FindNoCase("driver not found", local.errorMessage) ||
 		           FindNoCase("JDBC driver", local.errorMessage)) {
-			printError("SQLite JDBC driver not found");
-			printWarning("Ensure org.xerial.sqlite-jdbc is in the classpath");
-			printWarning("You may need to add the driver to your application server");
+			detailOutput.statusFailed("SQLite JDBC driver not found");
+			detailOutput.statusWarning("Ensure org.xerial.sqlite-jdbc is in the classpath");
+			detailOutput.statusWarning("You may need to add the driver to your application server");
 			local.errorHandled = true;
 		} else if (FindNoCase("Failed to create", local.errorMessage)) {
-			printError("Failed to create SQLite database connection");
-			printWarning("Check that the db directory exists and is writable");
+			detailOutput.statusFailed("Failed to create SQLite database connection");
+			detailOutput.statusWarning("Check that the db directory exists and is writable");
 			local.errorHandled = true;
 		} else if (FindNoCase("Permission denied", local.errorMessage) ||
 		           FindNoCase("Access is denied", local.errorMessage)) {
-			printError("Permission denied when creating database file");
-			printWarning("Ensure the application has write permissions to the db directory");
+			detailOutput.statusFailed("Permission denied when creating database file");
+			detailOutput.statusWarning("Ensure the application has write permissions to the db directory");
 			local.errorHandled = true;
 		} else if (FindNoCase("database is locked", local.errorMessage)) {
-			printError("Database is locked by another process");
-			printWarning("Close any applications that may be accessing the database file");
+			detailOutput.statusFailed("Database is locked by another process");
+			detailOutput.statusWarning("Close any applications that may be accessing the database file");
 			local.errorHandled = true;
 		}
 
 		// If error wasn't specifically handled, show generic error
 		if (!local.errorHandled) {
-			printError("SQLite Error: " & local.errorMessage);
+			detailOutput.statusFailed("SQLite Error: #local.errorMessage#");
 		}
 
 		// Show detail if available
 		if (StructKeyExists(arguments.e, "detail") && Len(arguments.e.detail)) {
-			printError("Details: " & arguments.e.detail);
+			detailOutput.output("Details: #arguments.e.detail#", true);
 		}
 
 		// Always throw to propagate the error up
