@@ -434,12 +434,10 @@ component output="false" {
 		}
 
 		if (structKeyExists(server, "boxlang")) {
-			local.headerMap = local.response.getResponseHeaderMap();
-			if (structKeyExists(local.headerMap, "Content-Type")) {
-				local.headerArray = local.headerMap["Content-Type"];
-				if (arrayLen(local.headerArray) > 0 && !isNull(local.headerArray[1])) {
-					local.rv = local.headerArray[1];
-				}
+			local.request = local.response.getRequest();
+			local.header = local.request.getHeader("Content-Type");
+			if(!isNull(local.header)) {
+				local.rv = local.header;
 			}
 		} else {
 			if (local.response.containsHeader("Content-Type")) {
