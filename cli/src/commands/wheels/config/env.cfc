@@ -59,6 +59,9 @@ component extends="../base" {
         
         // Send command to get environments
         local.result = $sendToCliCommand(urlstring="&command=environmentList");
+        if(!local.result.success){
+			return;
+		}
         
         // Display results
         if (structKeyExists(local.result, "environments") && isArray(local.result.environments)) {
@@ -85,7 +88,9 @@ component extends="../base" {
         
         // Send command to create environment
         local.result = $sendToCliCommand(urlstring="&command=environmentCreate&environment=#urlEncodedFormat(arguments.environment)#");
-        
+        if(!local.result.success){
+			return;
+		}
         // Display results
         if (structKeyExists(local.result, "success") && local.result.success) {
             print.boldGreenLine("Environment '#arguments.environment#' created successfully");
@@ -114,7 +119,9 @@ component extends="../base" {
         
         // Send command to copy environment
         local.result = $sendToCliCommand(urlstring="&command=environmentCopy&sourceEnvironment=#urlEncodedFormat(arguments.source)#&targetEnvironment=#urlEncodedFormat(arguments.target)#");
-        
+        if(!local.result.success){
+			return;
+		}
         // Display results
         if (structKeyExists(local.result, "success") && local.result.success) {
             print.boldGreenLine("Environment settings copied successfully");

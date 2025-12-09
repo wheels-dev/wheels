@@ -1,7 +1,9 @@
 /**
  * Migration to Latest
  **/
-component  aliases='wheels db latest,wheels db migrate'  extends="../base"  {
+component aliases='wheels db latest,wheels db migrate' extends="../base" {
+
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
 	/**
 	 * @version Optional version to migrate to (0 to initialize, or specific version number)
@@ -14,33 +16,41 @@ component  aliases='wheels db latest,wheels db migrate'  extends="../base"  {
 		// Support for wheels db migrate version=0 syntax
 		if (Len(arguments.version)) {
 			if (arguments.version == "0") {
-				print.line("Initializing migration tables...");
+				print.line("Initializing migration tables...").toConsole();
 				// Run reset to version 0 which initializes the migration table
 				command('wheels dbmigrate reset').run();
-				print.greenLine("Migration table initialized successfully");
+				detailOutput.statusSuccess("Migration table initialized successfully");
 			} else {
 				// Migrate to specific version
-				print.line("Migrating database to version #arguments.version#...");
+				print.line("Migrating database to version #arguments.version#...").toConsole();
 				command('wheels dbmigrate exec').params(version=arguments.version).run();
 			}
 		} else {
 			// Default behavior - migrate to latest
 			try {
 				var DBMigrateInfo = $sendToCliCommand("&command=info");
+				if(!local.DBMigrateInfo.success){
+					return;
+				}
 				
 				// Check if we got a valid response
 				if (!DBMigrateInfo.success  || !structKeyExists(DBMigrateInfo, "lastVersion")) {
-					error("Unable to retrieve migration information from the application. Please ensure your server is running and the application is properly configured.");
+					detailOutput.error("Unable to retrieve migration information from the application. Please ensure your server is running and the application is properly configured.");
+					return;
 				}
 				
-				print.line("Updating Database Schema to Latest Version")
-					.line("Latest Version is #DBMigrateInfo.lastVersion#");
+				detailOutput.header("Updating Database Schema to Latest Version");
+				detailOutput.metric("Latest Version", DBMigrateInfo.lastVersion);
+				
 				command('wheels dbmigrate exec').params(version=DBMigrateInfo.lastVersion).run();
 			} catch (any e) {
-				error("Failed to get migration information: #e.message#");
+				detailOutput.error("Failed to get migration information: #e.message#");
+				return;
 			}
 		}
 		
+		// Add a separator before the info command output
+		detailOutput.separator();
 		command('wheels dbmigrate info').run();
 	}
 

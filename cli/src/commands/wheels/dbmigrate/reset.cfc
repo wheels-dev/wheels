@@ -8,7 +8,10 @@ component  aliases='wheels db reset'  extends="../base"  {
 	 **/
 	function run() {
 		var DBMigrateInfo=$sendToCliCommand();
-		print.line("Resetting Database Schema");
+		if(!DBMigrateInfo.success){
+			return;
+		}
+		print.line("Resetting Database Schema").toConsole();
 		command('wheels dbmigrate exec').params(version=0).run();
 		command('wheels dbmigrate info').run();
 	}

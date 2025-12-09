@@ -147,6 +147,7 @@ component {
 	 * @width The width of the header (default: 50)
 	 */
 	function subHeader(required string title, numeric width = 50) {
+		print.line().toConsole();
 		print.boldLine(arguments.title).toConsole();
 		print.line(repeatString("-", arguments.width)).toConsole();
 		return this;
