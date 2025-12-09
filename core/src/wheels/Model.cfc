@@ -537,6 +537,10 @@ component output="false" displayName="Model" extends="wheels.Global"{
 				if (!local.methodExists) {
 					variables[local.functionName] = componentInstance[local.functionName];
 					this[local.functionName] = componentInstance[local.functionName];
+				} else {
+					local.superMethodName = "super" & local.functionName;
+					variables[local.superMethodName] = componentInstance[local.functionName];
+					this[local.superMethodName] = componentInstance[local.functionName];
 				}
 				
 				// Only add super prefix for functions that will be overridden by plugins/mixins
