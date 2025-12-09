@@ -491,7 +491,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 		if(isJson(loc.filecontent)){
   			loc.result=deserializeJSON(loc.filecontent);
   			if(structKeyexists(loc.result, "success") && loc.result.success){
-					print.line("Call to bridge was successful.");
+					print.line("Call to bridge was successful.").toConsole();
   				return loc.result;
   			}else{
 				error("Bridge response received but indicates failure.");
@@ -499,23 +499,23 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
   		} else {
   			// Check if this is likely an application error
   			if (find("<title>", loc.filecontent) && find("error", lCase(loc.filecontent))) {
-  				print.redLine("Your application appears to have an error that's preventing CLI access.");
-  				print.line("");
-  				print.yellowLine("Common causes:");
-  				print.line("  - Syntax errors in routes.cfm or other configuration files");
-  				print.line("  - Missing required files or directories");
-  				print.line("  - Database connection issues");
-  				print.line("");
-  				print.yellowLine("To debug:");
-  				print.line("  1. Visit your application in a browser: #replace(targetURL, '?controller=wheels&action=wheels&view=cli&command=info', '')#");
-  				print.line("  2. Fix any errors shown");
-  				print.line("  3. Try the CLI command again");
+  				print.redLine("Your application appears to have an error that's preventing CLI access.").toConsole();
+  				print.line("").toConsole();
+  				print.yellowLine("Common causes:").toConsole();
+  				print.line("  - Syntax errors in routes.cfm or other configuration files").toConsole();
+  				print.line("  - Missing required files or directories").toConsole();
+  				print.line("  - Database connection issues").toConsole();
+  				print.line("").toConsole();
+  				print.yellowLine("To debug:").toConsole();
+  				print.line("  1. Visit your application in a browser: #replace(targetURL, '?controller=wheels&action=wheels&view=cli&command=info', '')#").toConsole();
+  				print.line("  2. Fix any errors shown").toConsole();
+  				print.line("  3. Try the CLI command again").toConsole();
   			} else {
-  				print.line(helpers.stripTags(Formatter.unescapeHTML(loc.filecontent)));
+  				print.line(helpers.stripTags(Formatter.unescapeHTML(loc.filecontent))).toConsole();
   			}
-  			print.line("");
-  			print.line("Tried #targetURL#");
-  			error("Error returned from DBMigrate Bridge");
+  			print.line("").toConsole();
+  			print.line("Tried #targetURL#").toConsole();
+  			error("Error returned from DBMigrate Bridge").toConsole();
   		}
 	}
 

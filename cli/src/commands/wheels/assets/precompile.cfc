@@ -11,8 +11,9 @@
  * {code}
  **/
 component extends="../base" {
-	
+
 	property name="FileSystemUtil" inject="FileSystem";
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 	
 	// CommandBox metadata
 	this.aliases = [ "precompile" ];
@@ -49,9 +50,8 @@ component extends="../base" {
 		// Normalize environment aliases
 		arguments.environment = normalizeEnvironment(arguments.environment);
 
-		
-		print.boldGreenLine("==> Precompiling assets for #arguments.environment#...");
-		print.line();
+		print.greenBoldLine("==> Precompiling assets for #arguments.environment#...").toConsole();
+		detailOutput.line();
 		
 		// Define asset directories		
 		var publicDir = fileSystemUtil.resolvePath("public");
@@ -65,7 +65,7 @@ component extends="../base" {
 		var compiledDir = assetsDir & "/compiled";
 		if (!directoryExists(compiledDir)) {
 			directoryCreate(compiledDir);
-			print.line("Created compiled assets directory: #compiledDir#");
+			detailOutput.output("Created compiled assets directory: #compiledDir#");
 		}
 		
 		// Initialize manifest
@@ -74,7 +74,7 @@ component extends="../base" {
 		
 		// Process JavaScript files
 		if (directoryExists(jsDir)) {
-			print.boldLine("Processing JavaScript files...");
+			print.boldLine("Processing JavaScript files...").toConsole();
 			var jsFiles = directoryList(jsDir, true, "query", "*.js");
 			for (var file in jsFiles) {
 				if (file.type == "File" && !findNoCase(".min.js", file.name)) {
@@ -91,7 +91,7 @@ component extends="../base" {
 		
 		// Process CSS files
 		if (directoryExists(cssDir)) {
-			print.boldLine("Processing CSS files...");
+			print.boldLine("Processing CSS files...").toConsole();
 			var cssFiles = directoryList(cssDir, true, "query", "*.css");
 			for (var file in cssFiles) {
 				if (file.type == "File" && !findNoCase(".min.css", file.name)) {
@@ -108,7 +108,7 @@ component extends="../base" {
 		
 		// Process image files
 		if (directoryExists(imagesDir)) {
-			print.boldLine("Processing image files...");
+			print.boldLine("Processing image files...").toConsole();
 			var imageFiles = directoryList(imagesDir, true, "query");
 			for (var file in imageFiles) {
 				if (file.type == "File" && isImageFile(file.name)) {
@@ -125,19 +125,19 @@ component extends="../base" {
 		// Write manifest file
 		var manifestPath = compiledDir & "/manifest.json";
 		fileWrite(manifestPath, serializeJSON(manifest));
-		print.line("Asset manifest written to: #manifestPath#");
-		
-		print.line();
-		print.boldGreenLine("==> Asset precompilation complete!");
-		print.greenLine("    Processed #processedCount# files");
-		print.line("    Compiled assets location: #compiledDir#");
-		
+		detailOutput.output("Asset manifest written to: #manifestPath#");
+
+		detailOutput.line();
+		print.greenBoldLine("==> Asset precompilation complete!").toConsole();
+		print.greenLine("    Processed #processedCount# files").toConsole();
+		detailOutput.output("    Compiled assets location: #compiledDir#");
+
 		// Provide instructions for production
-		print.line();
-		print.yellowLine("To use precompiled assets in production:");
-		print.line("1. Configure your web server to serve static files from /public/assets/compiled");
-		print.line("2. Update your application to use the asset manifest for cache-busted URLs");
-		print.line("3. Set wheels.assetManifest = true in your production environment");
+		detailOutput.line();
+		print.yellowLine("To use precompiled assets in production:").toConsole();
+		detailOutput.output("1. Configure your web server to serve static files from /public/assets/compiled");
+		detailOutput.output("2. Update your application to use the asset manifest for cache-busted URLs");
+		detailOutput.output("3. Set wheels.assetManifest = true in your production environment");
 	}
 	
 	/**
@@ -158,7 +158,7 @@ component extends="../base" {
 
 		// Check if file already exists and hasn't changed
 		if (!arguments.force && fileExists(targetPath)) {
-			print.line("#fileName# (unchanged)");
+			detailOutput.output("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
@@ -171,7 +171,7 @@ component extends="../base" {
 		arguments.manifest[fileName] = targetFileName;
 
 		var processType = getProcessingDescription(arguments.environment);
-		print.greenLine("#fileName# -> #targetFileName# (#processType#)");
+		print.greenLine("#fileName# -> #targetFileName# (#processType#)").toConsole();
 		return 1;
 	}
 	
@@ -193,7 +193,7 @@ component extends="../base" {
 
 		// Check if file already exists and hasn't changed
 		if (!arguments.force && fileExists(targetPath)) {
-			print.line("#fileName# (unchanged)");
+			detailOutput.output("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
@@ -206,7 +206,7 @@ component extends="../base" {
 		arguments.manifest[fileName] = targetFileName;
 
 		var processType = getProcessingDescription(arguments.environment);
-		print.greenLine("#fileName# -> #targetFileName# (#processType#)");
+		print.greenLine("#fileName# -> #targetFileName# (#processType#)").toConsole();
 		return 1;
 	}
 	
@@ -229,16 +229,16 @@ component extends="../base" {
 		
 		// Check if file already exists
 		if (!arguments.force && fileExists(targetPath)) {
-			print.line("#fileName# (unchanged)");
+			detailOutput.output("#fileName# (unchanged)");
 			arguments.manifest[fileName] = targetFileName;
 			return 0;
 		}
-		
+
 		// Copy image with cache-busted filename
 		fileCopy(arguments.source, targetPath);
 		arguments.manifest[fileName] = targetFileName;
-		
-		print.greenLine("#fileName# -> #targetFileName#");
+
+		print.greenLine("#fileName# -> #targetFileName#").toConsole();
 		return 1;
 	}
 	

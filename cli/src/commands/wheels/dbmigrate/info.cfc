@@ -3,6 +3,8 @@
  **/
 component aliases='wheels db info' extends="../base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 *  Display DB Migrate info
 	 **/
@@ -18,36 +20,41 @@ component aliases='wheels db info' extends="../base" {
 			} 
 		}
 
-		print.yellowline( "+-----------------------------------------+-----------------------------------------+" );
-		print.yellow( "| Datasource: " & rJustify(results.datasource,27) & " | " );
-		print.yellowLine( "Total Migrations: " & rJustify(arrayLen(results.migrations),21) & " |" );
-		//print.yellowline( "+-----------------------------------------+-----------------------------------------+" );
-		print.yellow( "| Database Type: " & rJustify(results.databaseType,24) & " | " );
-		print.yellowLine( "Available Migrations: " & rJustify(available,17) & " |" );
-		print.yellow( "| " & rJustify("",39) & " | " );
-		print.yellowLine( "Current Version: " & rJustify(results.currentVersion,22) & " |" );
-		print.yellow( "| " & rJustify("",39) & " | " );
-		print.yellowLine( "Latest Version: " & rJustify(results.lastVersion,23) & " |" );
-		print.yellowline( "+-----------------------------------------+-----------------------------------------+" );
-
+		detailOutput.header("Database Migration Status", 50);
+		
+		detailOutput.subHeader("Database Information", 50);
+		detailOutput.metric("Datasource", results.datasource);
+		detailOutput.metric("Database Type", results.databaseType);
+		
+		detailOutput.subHeader("Migration Status", 50);
+		detailOutput.metric("Total Migrations", arrayLen(results.migrations));
+		detailOutput.metric("Available Migrations", available);
+		detailOutput.metric("Current Version", results.currentVersion);
+		detailOutput.metric("Latest Version", results.lastVersion);
+		
+		detailOutput.divider();
+		
 		if (arrayLen(migrations)) {
-			print.yellowline( "+----------+------------------------------------------------------------------------+" );
+			detailOutput.subHeader("Migration Files", 50);
+			
+			var migrationData = [];
 			for (migration in migrations) {
-				print.yellow("| ");
-				if (migration.status == "") {
-					available++;
-					print.yellow( lJustify("",8) );
-				} else {
-					print.yellow( lJustify(migration.status,8) );
-				}
-				print.yellowLine( ' | ' & lJustify(migration.CFCFILE,70) & ' |');
+				arrayAppend(migrationData, {
+					status: migration.status == "" ? "" : migration.status,
+					file: migration.CFCFILE
+				});
 			}
-			print.yellowline( "+----------+------------------------------------------------------------------------+" );
+			
+			detailOutput.getPrint().table(
+				data = migrationData,
+				headers = ["Status", "Migration File"]
+			).toConsole();
+			
+			detailOutput.line();
 		}
 		
 		if (results.message != "Returning what I know..") {
-			print.yellowline(results.message);
+			detailOutput.statusInfo(results.message);
 		}
-
 	}
 }

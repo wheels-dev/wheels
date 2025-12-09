@@ -6,9 +6,10 @@
  * wheels analyze code --path=app/models --severity=error
  */
 component extends="../base" {
-    
+
     property name="analysisService" inject="AnalysisService@wheels-cli";
-    
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @path.hint Path to analyze (default: current directory)
      * @fix.hint Attempt to fix issues automatically
@@ -43,18 +44,18 @@ component extends="../base" {
         }
 
         if (arguments.verbose) {
-            print.yellowLine("Analyzing code quality with verbose output...")
-                 .line()
-                 .line("Configuration:")
-                 .line("  Path: #resolvePath(arguments.path)#")
-                 .line("  Severity filter: #arguments.severity#")
-                 .line("  Fix mode: #(arguments.fix ? 'enabled' : 'disabled')#")
-                 .line("  Output format: #arguments.format#")
-                 .line("  Report generation: #(arguments.report ? 'enabled' : 'disabled')#")
-                 .line();
+            print.yellowLine("Analyzing code quality with verbose output...").toConsole();
+            detailOutput.line();
+            detailOutput.output("Configuration:");
+            detailOutput.output("  Path: #resolvePath(arguments.path)#");
+            detailOutput.output("  Severity filter: #arguments.severity#");
+            detailOutput.output("  Fix mode: #(arguments.fix ? 'enabled' : 'disabled')#");
+            detailOutput.output("  Output format: #arguments.format#");
+            detailOutput.output("  Report generation: #(arguments.report ? 'enabled' : 'disabled')#");
+            detailOutput.line();
         } else {
-            print.yellowLine("Analyzing code quality...")
-                 .line();
+            print.yellowLine("Analyzing code quality...").toConsole();
+            detailOutput.line();
         }
 
         // Pass the print object to the service
@@ -66,23 +67,24 @@ component extends="../base" {
         );
         
         if (arguments.fix) {
-            print.line().yellowLine("Applying automatic fixes...");
+            detailOutput.line();
+            print.yellowLine("Applying automatic fixes...").toConsole();
             var fixed = analysisService.autoFix(results, print); // Pass print here too
-            print.greenLine("Fixed #fixed.count# issues automatically");
+            print.greenLine("Fixed #fixed.count# issues automatically").toConsole();
 
             if (arguments.verbose && arrayLen(fixed.files) > 0) {
-                print.line("Files modified:");
+                detailOutput.output("Files modified:");
                 for (var file in fixed.files) {
-                    print.line("  * #file#");
+                    detailOutput.output("  * #file#");
                 }
             }
-            print.line();
+            detailOutput.line();
 
             // Re-analyze after fixes
             if (arguments.verbose) {
-                print.yellowLine("Re-analyzing after fixes with verbose output...");
+                print.yellowLine("Re-analyzing after fixes with verbose output...").toConsole();
             } else {
-                print.yellowLine("Re-analyzing after fixes...");
+                print.yellowLine("Re-analyzing after fixes...").toConsole();
             }
             results = analysisService.analyze(
                 path = resolvePath(arguments.path),
@@ -91,8 +93,8 @@ component extends="../base" {
                 verbose = arguments.verbose
             );
         }
-        
-        print.line();
+
+        detailOutput.line();
         displayResults(results, arguments.format, arguments.severity);
         
         if (arguments.report) {
@@ -107,10 +109,10 @@ component extends="../base" {
     private function displayResults(results, format, severity = "warning") {
         switch (format) {
             case "json":
-                print.line(generateBeautifiedJSON(results));
+                detailOutput.output(generateBeautifiedJSON(results));
                 break;
             case "junit":
-                print.line(generateBeautifiedJUnitXML(results));
+                detailOutput.output(generateBeautifiedJUnitXML(results));
                 break;
             default:
                 displayConsoleResults(results, severity);
@@ -119,7 +121,7 @@ component extends="../base" {
     
     private function displayConsoleResults(results, severity = "warning") {
         // Display header with grade
-        print.line();
+        detailOutput.line();
         displayCodeHealthHeader(results);
 
         // Display metrics summary first (always shown)
@@ -131,33 +133,32 @@ component extends="../base" {
             results.metrics.deprecatedCalls == 0 &&
             results.metrics.codeSmells == 0 &&
             results.metrics.grade == "A") {
-            print.line();
-            print.greenBoldLine("Excellent! No issues found. Your code is pristine!");
+            detailOutput.line();
+            print.greenBoldLine("Excellent! No issues found. Your code is pristine!").toConsole();
             return;
         }
-        
+
         // Display issue summary only if there are issues at the filtered severity level
         if (results.totalIssues > 0) {
-            print.boldLine("Issue Summary");
-            print.line(repeatString("-", 50));
+            detailOutput.subHeader("Issue Summary");
 
             if (results.summary.errors > 0) {
-                print.redLine("Errors:   #padString(results.summary.errors, 5)# (Critical issues requiring immediate attention)");
+                print.redLine("Errors:   #padString(results.summary.errors, 5)# (Critical issues requiring immediate attention)").toConsole();
             }
             if (results.summary.warnings > 0) {
-                print.yellowLine("Warnings: #padString(results.summary.warnings, 5)# (Issues that should be addressed)");
+                print.yellowLine("Warnings: #padString(results.summary.warnings, 5)# (Issues that should be addressed)").toConsole();
             }
             if (results.summary.info > 0) {
-                print.blueLine("Info:     #padString(results.summary.info, 5)# (Suggestions for improvement)");
+                print.blueLine("Info:     #padString(results.summary.info, 5)# (Suggestions for improvement)").toConsole();
             }
 
-            print.line();
+            detailOutput.line();
         } else {
             // No issues at filtered severity, but check for other problems
             if (results.metrics.deprecatedCalls > 0 || results.metrics.codeSmells > 0) {
-                print.line();
-                print.yellowLine("No issues found at '#severity#' severity level, but other code quality concerns exist:");
-                print.line();
+                detailOutput.line();
+                print.yellowLine("No issues found at '#severity#' severity level, but other code quality concerns exist:").toConsole();
+                detailOutput.line();
             }
         }
         
@@ -173,9 +174,7 @@ component extends="../base" {
         
         // Display issues by file
         if (structCount(results.files) > 0) {
-            print.boldLine("Issues by File");
-            print.line(repeatString("-", 50));
-            
+            detailOutput.subHeader("Issues by File");
             for (var filePath in results.files) {
                 var fileIssues = results.files[filePath];
                 var relativePath = replace(filePath, getCWD(), "");
@@ -184,151 +183,144 @@ component extends="../base" {
 
                 // Group issues by severity for better readability
                 var groupedIssues = groupIssuesBySeverity(fileIssues);
-                
+
                 for (var severity in ["error", "warning", "info"]) {
                     if (structKeyExists(groupedIssues, severity) && arrayLen(groupedIssues[severity]) > 0) {
                         for (var issue in groupedIssues[severity]) {
                             var icon = getSeverityIcon(issue.severity);
                             var color = getSeverityColor(issue.severity);
-                            
-                            print[color & "Line"]("  #icon# Line #issue.line#:#issue.column# - #issue.message#");
-                            print.grayLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : ""));
+
+                            detailOutput.colored("  #icon# Line #issue.line#:#issue.column# - #issue.message#", color);
+                            print.grayLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
                         }
                     }
                 }
-                
-                print.line();
+
+                detailOutput.line();
             }
         }
-        
+
         // Display recommendations
         displayRecommendations(results);
-        
+
         // Display execution time
-        print.line();
-        print.grayLine("Analysis completed in #numberFormat(results.executionTime, '0.00')# seconds");
+        detailOutput.line();
+        print.grayLine("Analysis completed in #numberFormat(results.executionTime, '0.00')# seconds").toConsole();
     }
     
     private function displayCodeHealthHeader(results) {
         var grade = results.metrics.grade;
         var score = results.metrics.healthScore;
         var gradeColor = getGradeColor(grade);
-        
-        print.line(repeatString("=", 50));
-        print.boldLine("           CODE QUALITY REPORT");
-        print.line(repeatString("=", 50));
-        print.line();
-        
+
+        detailOutput.header("CODE QUALITY REPORT");
+
         // Display grade with appropriate color
-        print[gradeColor & "BoldLine"]("           Grade: #grade# (#score#/100)");
-        
+        print.redBoldLine("           Grade: #grade# (#score#/100)");
+
         // Display grade description
         var gradeDesc = getGradeDescription(grade);
-        print.line("           #gradeDesc#");
-        print.line(repeatString("=", 50));
-        print.line();
+        detailOutput.output("           #gradeDesc#");
+        detailOutput.divider("=");
+        detailOutput.line();
     }
-    
+
     private function displayMetricsSummary(results) {
-        print.boldLine("Code Metrics");
-        print.line(repeatString("-", 50));
-        print.line("Files Analyzed:       #padString(results.metrics.totalFiles, 5)#");
-        print.line("Total Lines:          #padString(results.metrics.totalLines, 5)#");
-        print.line("Functions:            #padString(results.metrics.totalFunctions, 5)#");
-        print.line("Avg Complexity:       #padString(results.metrics.averageComplexity, 5)#");
-        print.line("Duplicate Blocks:     #padString(results.metrics.duplicateBlocks, 5)#");
-        print.line("Code Smells:          #padString(results.metrics.codeSmells, 5)#");
-        print.line("Deprecated Calls:     #padString(results.metrics.deprecatedCalls, 5)#");
-        print.line();
+        detailOutput.subHeader("Code Metrics");
+        detailOutput.metric("Files Analyzed", results.metrics.totalFiles);
+        detailOutput.metric("Total Lines", results.metrics.totalLines);
+        detailOutput.metric("Functions", results.metrics.totalFunctions);
+        detailOutput.metric("Avg Complexity", results.metrics.averageComplexity);
+        detailOutput.metric("Duplicate Blocks", results.metrics.duplicateBlocks);
+        detailOutput.metric("Code Smells", results.metrics.codeSmells);
+        detailOutput.metric("Deprecated Calls", results.metrics.deprecatedCalls);
+        detailOutput.line();
     }
     
     private function displayComplexityAnalysis(results) {
-        print.boldLine("High Complexity Functions");
-        print.line(repeatString("-", 50));
-        
+        detailOutput.subHeader("High Complexity Functions");
+
         // Sort by complexity
         var sorted = duplicate(results.complexFunctions);
         arraySort(sorted, function(a, b) {
             return b.complexity - a.complexity;
         });
-        
+
         // Show top 5
         var count = min(5, arrayLen(sorted));
         for (var i = 1; i <= count; i++) {
             var func = sorted[i];
             var relativePath = replace(func.file, getCWD(), "");
-            print.yellowLine("  * #func.function#() in #relativePath#");
+            print.yellowLine("  * #func.function#() in #relativePath#").toConsole();
             // Use a default threshold of 10 if not available in results
-            var threshold = structKeyExists(results, "config") && structKeyExists(results.config, "rules") 
-                ? results.config.rules["max-function-complexity"] 
+            var threshold = structKeyExists(results, "config") && structKeyExists(results.config, "rules")
+                ? results.config.rules["max-function-complexity"]
                 : 10;
-            print.line("    Complexity: #func.complexity# (threshold: #threshold#)");
+            detailOutput.output("    Complexity: #func.complexity# (threshold: #threshold#)");
         }
-        
+
         if (arrayLen(sorted) > 5) {
-            print.grayLine("  ... and #arrayLen(sorted) - 5# more");
+            print.grayLine("  ... and #arrayLen(sorted) - 5# more").toConsole();
         }
-        print.line();
+        detailOutput.line();
     }
-    
+
     private function displayDuplicateCode(results) {
-        print.boldLine("Duplicate Code Detection");
-        print.line(repeatString("-", 50));
-        print.yellowLine("Found #results.metrics.duplicateBlocks# duplicate code blocks");
-        
+        detailOutput.subHeader("Duplicate Code Detection");
+        print.yellowLine("Found #results.metrics.duplicateBlocks# duplicate code blocks").toConsole();
+
         // Show first few duplicates
         var count = min(3, arrayLen(results.duplicates));
         for (var i = 1; i <= count; i++) {
             var dup = results.duplicates[i];
-            print.line();
-            print.line("  Duplicate Block #i# (#dup.lineCount# lines, #arrayLen(dup.occurrences)# occurrences):");
+            detailOutput.line();
+            detailOutput.output("  Duplicate Block #i# (#dup.lineCount# lines, #arrayLen(dup.occurrences)# occurrences):");
             for (var j = 1; j <= min(3, arrayLen(dup.occurrences)); j++) {
                 var occ = dup.occurrences[j];
                 var relativePath = replace(occ.file, getCWD(), "");
-                print.grayLine("    - #relativePath# (lines #occ.startLine#-#occ.endLine#)");
+                print.grayLine("    - #relativePath# (lines #occ.startLine#-#occ.endLine#)").toConsole();
             }
         }
-        
+
         if (arrayLen(results.duplicates) > 3) {
-            print.grayLine("  ... and #arrayLen(results.duplicates) - 3# more duplicate blocks");
+            print.grayLine("  ... and #arrayLen(results.duplicates) - 3# more duplicate blocks").toConsole();
         }
-        print.line();
+        detailOutput.line();
     }
-    
+
     private function displayRecommendations(results) {
-        print.yellowBoldLine("Recommendations");
-        print.line(repeatString("-", 50));
-        
+        detailOutput.subHeader("Recommendations");
+
         var recommendations = [];
-        
+
         if (countFixableIssues(results) > 0) {
             arrayAppend(recommendations, "Run with --fix to automatically fix #countFixableIssues(results)# issues");
         }
-        
+
         if (results.metrics.averageComplexity > 10) {
             arrayAppend(recommendations, "Refactor complex functions to reduce cyclomatic complexity");
         }
-        
+
         if (results.metrics.duplicateBlocks > 5) {
             arrayAppend(recommendations, "Extract duplicate code into reusable functions or components");
         }
-        
+
         if (results.metrics.deprecatedCalls > 0) {
             arrayAppend(recommendations, "Update deprecated function calls to use modern alternatives");
         }
-        
+
         if (results.metrics.codeSmells > 10) {
             arrayAppend(recommendations, "Address code smells to improve maintainability");
         }
-        
+
         if (!fileExists(".wheelscheck")) {
             arrayAppend(recommendations, "Create a .wheelscheck config file for custom rules");
         }
-        
+
         arrayAppend(recommendations, "Integrate this check into your CI/CD pipeline");
-        
+
         for (var rec in recommendations) {
-            print.line("  * #rec#");
+            detailOutput.output("  * #rec#");
         }
     }
     
@@ -544,12 +536,12 @@ component extends="../base" {
         }
 
         // Generate HTML without progress tracking (simpler and faster)
-        print.yellowLine("Generating HTML report...");
+        print.yellowLine("Generating HTML report...").toConsole();
 
         var html = generateReportHTML(results);
         fileWrite(reportPath, html);
 
-        print.greenLine("HTML report generated: #reportPath#");
+        print.greenLine("HTML report generated: #reportPath#").toConsole();
     }
     
     private function generateReportHTML(results) {

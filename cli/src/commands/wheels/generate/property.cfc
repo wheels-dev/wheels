@@ -64,7 +64,7 @@ component aliases='wheels g property'  extends="../base"  {
 
     	var obj = helpers.getNameVariants(arguments.name);
 
-    	detailOutput.header("", "Generating property: #arguments.columnName# for #arguments.name#");
+    	detailOutput.header("Generating property: #arguments.columnName# for #arguments.name#");
 
     	// Quick Sanity Checks: are we actually adding a property to an existing model?
     	// Check for existence of model file: NB, DB columns can of course exist without a model file,

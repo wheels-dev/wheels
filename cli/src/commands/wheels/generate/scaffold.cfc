@@ -76,7 +76,7 @@ component aliases="wheels g scaffold, wheels g resource, wheels generate resourc
         }
         
         // Generate scaffold
-        detailOutput.header("", "Scaffolding resource: #arguments.name#");
+        detailOutput.header("Scaffolding resource: #arguments.name#");
         
         var result = scaffoldService.generateScaffold(
             name = arguments.name,

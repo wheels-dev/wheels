@@ -29,7 +29,7 @@ component aliases='wheels g service' extends="../base" {
         string description = "",
         boolean force = false
     ) {
-        detailOutput.header("⚙️", "Generating service: #arguments.name#");
+        detailOutput.header("Generating service: #arguments.name#");
         
         // Ensure name ends with "Service"
         if (!reFindNoCase("Service$", arguments.name)) {

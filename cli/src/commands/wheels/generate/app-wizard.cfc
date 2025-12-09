@@ -106,7 +106,7 @@ component aliases="wheels g app-wizard, wheels new" extends="../base" {
     }
 
     // ---------------- Welcome
-    details.header("", "Wheels Application Wizard");
+    details.header("Wheels Application Wizard");
     print.line()
       .cyanLine( "Welcome to the Wheels app wizard!" )
       .cyanLine( "I'll help you create a new Wheels application." )

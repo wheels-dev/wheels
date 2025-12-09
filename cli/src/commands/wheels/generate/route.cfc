@@ -126,7 +126,7 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 		file action='write' file='#target#' mode='777' output='#trim(content)#';
 
 		// Output detail message
-		details.header("", "Route Generation");
+		details.header("Route Generation");
 		details.route(inject);
 		details.update("config/routes.cfm");
 		details.success("Route added successfully!");

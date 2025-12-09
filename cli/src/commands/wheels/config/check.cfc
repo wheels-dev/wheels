@@ -10,6 +10,7 @@
  * {code}
  */
 component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
 	/**
 	 * @environment.hint The environment to check (development, testing, production)
@@ -26,32 +27,31 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Determine environment
 		local.env = Len(arguments.environment) ? arguments.environment : getEnvironment();
 		
-		print.line();
-		print.boldBlueLine("========================================");
-		print.boldLine("Configuration Validation");
-		print.boldLine("Environment: #local.env#");
-		print.boldBlueLine("========================================");
-		print.line();
+		detailOutput.line();
+		detailOutput.header("Configuration Validation - #local.env# Environment");
+		detailOutput.line();
 
 		local.issues = [];
 		local.warnings = [];
 		local.fixed = [];
 
 		// Check settings files exist
-		print.text("Checking configuration files... ");
+		if(arguments.verbose) {
+			print.line("Checking configuration files... ").toConsole();
+		}
 		local.configPath = ResolvePath("config");
 		local.settingsFile = local.configPath & "/settings.cfm";
 		local.envSettingsFile = local.configPath & "/" & local.env & "/settings.cfm";
 
 		if (!FileExists(local.settingsFile)) {
-			print.redLine("[FAILED]");
+			detailOutput.statusFailed("Files Configuration");
 			ArrayAppend(local.issues, {
 				type: "error",
 				message: "Missing config/settings.cfm file",
 				fix: "Create a settings.cfm file in the config directory"
 			});
 		} else {
-			print.greenLine("[OK]");
+			detailOutput.statusSuccess("Files Configuration");
 		}
 
 		// Load configuration
@@ -61,85 +61,97 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		}
 
 		// Check for required settings
-		print.text("Checking required settings... ");
+		if(arguments.verbose) {
+			print.line("Checking required settings... ").toConsole();
+		}
 		local.startCount = ArrayLen(local.issues);
 		checkRequiredSettings(local.config, local.issues, local.warnings);
 		if (ArrayLen(local.issues) > local.startCount) {
-			print.redLine("[FAILED]");
+			detailOutput.statusFailed("Required Settings");
 		} else {
-			print.greenLine("[OK]");
+			detailOutput.statusSuccess("Required Settings");
 		}
 
 		// Check for security issues
-		print.text("Checking security configuration... ");
+		if(arguments.verbose) {
+			print.line("Checking security configuration... ").toConsole();
+		}
 		local.startCount = ArrayLen(local.issues);
 		local.startWarnings = ArrayLen(local.warnings);
 		checkSecuritySettings(local.config, local.issues, local.warnings, local.env);
 		if (ArrayLen(local.issues) > local.startCount) {
-			print.redLine("[FAILED]");
+			detailOutput.statusFailed("Security Configuration");
 		} else if (ArrayLen(local.warnings) > local.startWarnings) {
-			print.yellowLine("[WARNING]");
+			detailOutput.statusWarning();
 		} else {
-			print.greenLine("[OK]");
+			detailOutput.statusSuccess("Security Configuration");
 		}
 
 		// Check database configuration
-		print.text("Checking database configuration... ");
+		if(arguments.verbose) {
+			print.line("Checking database configuration... ").toConsole();
+		}
 		local.startCount = ArrayLen(local.issues);
 		local.startWarnings = ArrayLen(local.warnings);
 		checkDatabaseSettings(local.config, local.issues, local.warnings);
 		if (ArrayLen(local.issues) > local.startCount) {
-			print.redLine("[FAILED]");
+			detailOutput.statusFailed("Database Configuration");
 		} else if (ArrayLen(local.warnings) > local.startWarnings) {
-			print.yellowLine("[WARNING]");
+			detailOutput.statusWarning();
 		} else {
-			print.greenLine("[OK]");
+			detailOutput.statusSuccess("Database Configuration");
 		}
 
 		// Check environment configuration
-		print.text("Checking environment-specific settings... ");
+		if(arguments.verbose) {
+			print.line("Checking environment-specific settings... ").toConsole();
+		}
 		local.startWarnings = ArrayLen(local.warnings);
 		checkEnvironmentSettings(local.config, local.issues, local.warnings, local.env);
 		if (ArrayLen(local.warnings) > local.startWarnings) {
-			print.yellowLine("[WARNING]");
+			detailOutput.statusWarning();
 		} else {
-			print.greenLine("[OK]");
+			detailOutput.statusSuccess("Environment-Specific Settings");
 		}
 
 		// Check .env file
-		print.text("Checking .env file configuration... ");
+		if(arguments.verbose) {
+			print.line("Checking .env file configuration... ").toConsole();
+		}
 		local.startCount = ArrayLen(local.issues);
 		local.startWarnings = ArrayLen(local.warnings);
 		local.startFixed = ArrayLen(local.fixed);
 		checkEnvFile(local.issues, local.warnings, arguments.fix, local.fixed);
 		if (ArrayLen(local.fixed) > local.startFixed) {
-			print.blueLine("[FIXED]");
+			detailOutput.statusFixed();
 		} else if (ArrayLen(local.issues) > local.startCount) {
-			print.redLine("[FAILED]");
+			detailOutput.statusFailed(".env File Configuration");
 		} else if (ArrayLen(local.warnings) > local.startWarnings) {
-			print.yellowLine("[WARNING]");
+			detailOutput.statusWarning();
 		} else {
-			print.greenLine("[OK]");
+			detailOutput.statusSuccess(".env File Configuration");
 		}
 
 		// Additional checks for production environment
 		if (local.env == "production") {
-			print.text("Checking production-specific requirements... ");
+			if(arguments.verbose) {
+				print.line("Checking production-specific requirements... ").toConsole();
+			}
 			local.startCount = ArrayLen(local.issues);
 			local.startWarnings = ArrayLen(local.warnings);
 			checkProductionSettings(local.config, local.issues, local.warnings);
 			if (ArrayLen(local.issues) > local.startCount) {
-				print.redLine("[FAILED]");
+				detailOutput.statusFailed("Production-Specific Requirements");
 			} else if (ArrayLen(local.warnings) > local.startWarnings) {
-				print.yellowLine("[WARNING]");
+				detailOutput.statusWarning();
 			} else {
-				print.greenLine("[OK]");
+				detailOutput.statusSuccess("Production-Specific Requirements");
 			}
 		}
 
-		print.line();
-		print.boldBlueLine("========================================");
-		
+		detailOutput.line();
+		detailOutput.divider();
+
 		// Display results
 		displayResults(local.issues, local.warnings, local.fixed, arguments.verbose);
 
@@ -414,49 +426,49 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		required array fixed,
 		required boolean verbose
 	) {
-		print.line();
-		
+		detailOutput.line();
+
 		// Display fixed items
 		if (ArrayLen(arguments.fixed)) {
-			print.boldGreenLine("[FIXED] Issues:");
+			print.greenBoldLine("[FIXED] Issues:").toConsole();
 			for (local.fix in arguments.fixed) {
-				print.greenLine("   - #local.fix#");
+				print.greenLine("   - #local.fix#").toConsole();
 			}
-			print.line();
+			detailOutput.line();
 		}
 
 		// Display errors
 		if (ArrayLen(arguments.issues)) {
-			print.boldRedLine("[ERRORS] (#ArrayLen(arguments.issues)#):");
+			print.redBoldLine("[ERRORS] (#ArrayLen(arguments.issues)#):").toConsole();
 			for (local.issue in arguments.issues) {
-				print.redLine("   - #local.issue.message#");
+				print.redLine("   - #local.issue.message#").toConsole();
 				if (arguments.verbose) {
-					print.yellowLine("     --> Fix: #local.issue.fix#");
+					print.yellowLine("     --> Fix: #local.issue.fix#").toConsole();
 				}
 			}
-			print.line();
+			detailOutput.line();
 		}
 
 		// Display warnings
 		if (ArrayLen(arguments.warnings)) {
-			print.boldYellowLine("[WARNINGS] (#ArrayLen(arguments.warnings)#):");
+			detailOutput.yellowBold("[WARNINGS] (#ArrayLen(arguments.warnings)#):");
 			for (local.warning in arguments.warnings) {
-				print.yellowLine("   - #local.warning.message#");
+				print.yellowLine("   - #local.warning.message#").toConsole();
 				if (arguments.verbose) {
-					print.line("     --> Fix: #local.warning.fix#");
+					detailOutput.output("     --> Fix: #local.warning.fix#");
 				}
 			}
-			print.line();
+			detailOutput.line();
 		}
 
 		// Summary
-		print.boldBlueLine("========================================");
+		detailOutput.divider();
 		local.errorCount = ArrayLen(arguments.issues);
 		local.warningCount = ArrayLen(arguments.warnings);
-		
+
 		if (local.errorCount == 0 && local.warningCount == 0) {
-			print.boldGreenLine("[PASSED] Configuration validation successful!");
-			print.greenLine("  All checks completed successfully.");
+			print.greenBoldLine("[PASSED] Configuration validation successful!").toConsole();
+			print.greenLine("  All checks completed successfully.").toConsole();
 		} else {
 			local.summary = [];
 			if (local.errorCount > 0) {
@@ -465,20 +477,19 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			if (local.warningCount > 0) {
 				ArrayAppend(local.summary, "#local.warningCount# warning#local.warningCount != 1 ? 's' : ''#");
 			}
-			
+
 			if (local.errorCount > 0) {
-				print.boldRedLine("[FAILED] Configuration check failed");
+				print.redBoldLine("[FAILED] Configuration check failed").toConsole();
 			} else {
-				print.boldYellowLine("[WARNING] Configuration check completed with warnings");
+				detailOutput.yellowBold("[WARNING] Configuration check completed with warnings");
 			}
-			print.line("  Found: #ArrayToList(local.summary, ', ')#");
-			
+			detailOutput.output("  Found: #ArrayToList(local.summary, ', ')#");
+
 			if (!arguments.verbose && (local.errorCount > 0 || local.warningCount > 0)) {
-				print.line();
-				print.line("  Tip: Run with --verbose flag for detailed fix suggestions");
+				detailOutput.line();
+				detailOutput.output("  Tip: Run with --verbose flag for detailed fix suggestions");
 			}
 		}
-		print.boldBlueLine("========================================");
 	}
 
 	private struct function loadConfiguration(required string settingsFile, string envSettingsFile = "") {

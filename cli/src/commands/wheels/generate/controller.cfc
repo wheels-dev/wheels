@@ -48,7 +48,7 @@ component aliases="wheels g controller" extends="../base" {
             return;
         }
         
-        detailOutput.header("", "Generating controller: #arguments.name#");
+        detailOutput.header("Generating controller: #arguments.name#");
         
         // Parse actions - PRIORITY: --actions > --crud > --api > default
         var actionList = [];

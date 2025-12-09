@@ -21,6 +21,8 @@
  */
 component extends="../base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @datasource Optional datasource name (defaults to current datasource setting)
 	 * @environment Optional environment (defaults to current environment)
@@ -50,23 +52,27 @@ component extends="../base" {
 			}
 			
 			if (!Len(arguments.datasource)) {
-				error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
+				detailOutput.error("No datasource configured. Use datasource= parameter or set dataSourceName in settings.");
+				detailOutput.nextSteps([
+					"Specify a datasource: wheels db drop --datasource=myapp_dev",
+					"Or configure dataSourceName in your settings.cfm file"
+				]);
 				return;
 			}
 			
-			printHeader("Database Drop Process");
-			printWarning("WARNING: This will permanently drop the database!");
+			detailOutput.header("Database Drop Process", 50);
+			detailOutput.statusWarning("This will permanently drop the database!");
 			systemOutput("", true, true);
-			printInfo("Datasource", arguments.datasource);
-			printInfo("Environment", arguments.environment);
-			printDivider();
+			detailOutput.metric("Datasource", arguments.datasource);
+			detailOutput.metric("Environment", arguments.environment);
+			detailOutput.divider();
 			
 			// Get datasource configuration
 			local.dsInfo = getDatasourceInfo(arguments.datasource, arguments.environment);
 			
 			if (StructIsEmpty(local.dsInfo)) {
-				error("Datasource '" & arguments.datasource & "' not found in server configuration");
-				systemOutput("Please check your datasource configuration.", true, true);
+				detailOutput.statusFailed("Datasource '#arguments.datasource#' not found in server configuration");
+				print.line("Please check your datasource configuration.").toConsole();
 				return;
 			}
 			
@@ -76,19 +82,24 @@ component extends="../base" {
 
 			// Validate Oracle identifier (no hyphens or special characters allowed)
 			if (local.dbType == "Oracle" && reFind("[^a-zA-Z0-9_$##]", local.dbName)) {
-				error("Invalid Oracle identifier: '#local.dbName#' - Oracle usernames can only contain letters, numbers, and underscores. Use underscores instead of hyphens (e.g., 'wheels_dev' instead of 'wheels-dev')");
+				detailOutput.statusFailed("Invalid Oracle identifier: '#local.dbName#'");
+				detailOutput.statusWarning("Oracle usernames can only contain letters, numbers, and underscores.");
+				detailOutput.nextSteps([
+					"Use underscores instead of hyphens",
+					"Example: 'wheels_dev' instead of 'wheels-dev'"
+				]);
 				return;
 			}
 
-			printInfo("Database Type", local.dbType);
-			printInfo("Database Name", local.dbName);
-			printDivider();
+			detailOutput.metric("Database Type", local.dbType);
+			detailOutput.metric("Database Name", local.dbName);
+			detailOutput.divider();
 			
 			// Confirm unless forced
 			if (!arguments.force) {
-				local.confirm = ask("Are you sure you want to drop the database '" & local.dbName & "'? Type 'yes' to confirm: ");
+				local.confirm = ask("Are you sure you want to drop the database '#local.dbName#'? Type 'yes' to confirm: ");
 				if (local.confirm != "yes") {
-					printWarning("Database drop cancelled.");
+					detailOutput.statusWarning("Database drop cancelled.");
 					return;
 				}
 			}
@@ -116,14 +127,14 @@ component extends="../base" {
 					dropSQLiteDatabase(local.dsInfo, local.dbName);
 					break;
 				default:
-					error("Database drop not supported for driver: " & local.dbType);
-					systemOutput("Please drop the database manually using your database management tools.", true, true);
+					detailOutput.statusFailed("Database drop not supported for driver: #local.dbType#");
+					print.line("Please drop the database manually using your database management tools.").toConsole();
 			}
 			
 		} catch (any e) {
-			printError("Error dropping database: " & e.message);
+			detailOutput.statusFailed("Error dropping database: #e.message#");
 			if (StructKeyExists(e, "detail") && Len(e.detail)) {
-				printError("Details: " & e.detail);
+				detailOutput.output("Details: #e.detail#", true);
 			}
 		}
 	}
@@ -133,7 +144,7 @@ component extends="../base" {
 	 */
 	private void function dropDatabase(required struct dsInfo, required string dbName, required string dbType) {
 		try {
-			printStep("Initializing " & arguments.dbType & " database drop...");
+			print.line("Initializing #arguments.dbType# database drop...").toConsole();
 			
 			// Get database-specific configuration
 			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo);
@@ -143,7 +154,7 @@ component extends="../base" {
 			local.username = local.dbConfig.tempDS.username ?: "";
 			local.password = local.dbConfig.tempDS.password ?: "";
 			
-			printStep("Connecting to " & arguments.dbType & " server...");
+			print.line("Connecting to #arguments.dbType# server...").toConsole();
 			
 			// Create driver instance
 			local.driver = "";
@@ -152,16 +163,17 @@ component extends="../base" {
 			for (local.driverClass in local.dbConfig.driverClasses) {
 				try {
 					local.driver = createObject("java", local.driverClass);
-					printSuccess("Driver found: " & local.driverClass);
+					detailOutput.statusSuccess("Driver found: #local.driverClass#");
 					local.driverFound = true;
 					break;
 				} catch (any driverError) {
-					printWarning("Driver not available: " & local.driverClass);
+					detailOutput.statusWarning("Driver not available: #local.driverClass#");
 				}
 			}
 			
 			if (!local.driverFound) {
-				throw(message="No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.");
+				detailOutput.error("No #arguments.dbType# driver found. Ensure JDBC driver is in classpath.");
+				return;
 			}
 			
 			// Create properties for connection
@@ -171,55 +183,59 @@ component extends="../base" {
 			
 			// Test if driver accepts the URL
 			if (!local.driver.acceptsURL(local.url)) {
-				throw(message=arguments.dbType & " driver does not accept the URL format");
+				detailOutput.error("#arguments.dbType# driver does not accept the URL format");
+				return;
 			}
 			
 			// Connect using driver directly
 			local.conn = local.driver.connect(local.url, local.props);
 			
 			if (isNull(local.conn)) {
-				printError("Driver returned null connection. Common causes:");
-				printError("1. " & arguments.dbType & " server is not running");
-				printError("2. Wrong server/port configuration");
-				printError("3. Invalid credentials");
-				printError("4. Network/firewall issues");
+				detailOutput.statusFailed("Connection failed");
+				detailOutput.nextSteps([
+					"1. #arguments.dbType# server is not running",
+					"2. Wrong server/port configuration",
+					"3. Invalid credentials",
+					"4. Network/firewall issues"
+				]);
 				if (arguments.dbType == "PostgreSQL") {
-					printError("5. pg_hba.conf authentication issues");
+					detailOutput.statusWarning("Check pg_hba.conf authentication settings");
 				}
-				throw(message="Connection failed");
+				detailOutput.error("Connection failed");
+				return;
 			}
 			
-			printSuccess("Connected successfully to " & arguments.dbType & " server!");
+			detailOutput.statusSuccess("Connected successfully to #arguments.dbType# server!");
 			
 			// Check if database exists before attempting to drop
-			printStep("Checking if database exists...");
+			print.line("Checking if database exists...").toConsole();
 			local.exists = checkDatabaseExists(local.conn, arguments.dbName, arguments.dbType);
 			
 			if (!local.exists) {
-				printWarning("Database '" & arguments.dbName & "' does not exist.");
+				detailOutput.statusWarning("Database '#arguments.dbName#' does not exist.");
 				local.conn.close();
 				return;
 			}
 			
 			// Handle database-specific pre-drop operations
 			if (arguments.dbType == "PostgreSQL") {
-				printStep("Terminating active connections...");
+				print.line("Terminating active connections...").toConsole();
 				terminatePostgreSQLConnections(local.conn, arguments.dbName);
 			} else if (arguments.dbType == "SQLServer") {
-				printStep("Setting database to single-user mode...");
+				print.line("Setting database to single-user mode...").toConsole();
 				setSQLServerSingleUserMode(local.conn, arguments.dbName);
 			}
 			
 			// Drop the database
-			printStep("Dropping " & arguments.dbType & " database '" & arguments.dbName & "'...");
+			print.line("Dropping #arguments.dbType# database '#arguments.dbName#'...").toConsole();
 			executeDropDatabase(local.conn, arguments.dbName, arguments.dbType);
-			printSuccess("Database '" & arguments.dbName & "' dropped successfully!");
+			detailOutput.statusSuccess("Database '#arguments.dbName#' dropped successfully!");
 			
 			// Clean up
 			local.conn.close();
 			
-			printDivider();
-			printSuccess(arguments.dbType & " database drop completed successfully!", true);
+			detailOutput.divider();
+			detailOutput.success("#arguments.dbType# database drop completed successfully!");
 			
 		} catch (any e) {
 			handleDatabaseError(e, arguments.dbType, arguments.dbName);
@@ -231,7 +247,7 @@ component extends="../base" {
 	 */
 	private void function dropH2Database(required struct dsInfo, required string dbName) {
 		try {
-			printStep("Dropping H2 database files...");
+			print.line("Dropping H2 database files...").toConsole();
 
 			// For H2, we need to delete the database files
 			local.dbPath = arguments.dsInfo.database;
@@ -246,29 +262,30 @@ component extends="../base" {
 			if (FileExists(local.dbFile)) {
 				FileDelete(local.dbFile);
 				local.filesDeleted = true;
-				printSuccess("Deleted database file: " & local.dbFile);
+				detailOutput.statusSuccess("Deleted database file: #local.dbFile#");
 			}
 
 			if (FileExists(local.lockFile)) {
 				FileDelete(local.lockFile);
-				printSuccess("Deleted lock file: " & local.lockFile);
+				detailOutput.statusSuccess("Deleted lock file: #local.lockFile#");
 			}
 
 			if (FileExists(local.traceFile)) {
 				FileDelete(local.traceFile);
-				printSuccess("Deleted trace file: " & local.traceFile);
+				detailOutput.statusSuccess("Deleted trace file: #local.traceFile#");
 			}
 
 			if (local.filesDeleted) {
-				printDivider();
-				printSuccess("H2 database dropped successfully!", true);
+				detailOutput.divider();
+				detailOutput.success("H2 database dropped successfully!");
 			} else {
-				printWarning("No H2 database files found for: " & arguments.dbName);
+				detailOutput.statusWarning("No H2 database files found for: #arguments.dbName#");
 			}
 
 		} catch (any e) {
-			printError("Error dropping H2 database: " & e.message);
-			throw(message=e.message);
+			detailOutput.statusFailed("Error dropping H2 database: #e.message#");
+			detailOutput.error(e.message);
+			return;
 		}
 	}
 
@@ -326,7 +343,7 @@ component extends="../base" {
 
 						if (findNoCase("running", local.serverStatus)) {
 							local.serverWasRunning = true;
-							printWarning("Server is running - stopping it to release database lock...");
+							detailOutput.statusWarning("Server is running - stopping it to release database lock...");
 
 							// Stop the server
 							try {
@@ -353,13 +370,15 @@ component extends="../base" {
 								}
 
 								if (local.deleted) {
-									printSuccess("SQLite database dropped successfully!");
+									detailOutput.statusSuccess("SQLite database dropped successfully!");
 									return;
 								} else {
-									throw(message="File still locked after stopping server. Wait a moment and try again.", detail=deleteError.message);
+									detailOutput.error("File still locked after stopping server. Wait a moment and try again. " & deleteError.message);
+									return;
 								}
 							} catch (any stopError) {
-								throw(message="Failed to stop server: " & stopError.message, detail=deleteError.message);
+								detailOutput.error("Failed to stop server: " & stopError.message);
+								return;
 							}
 						}
 					} catch (any e) {
@@ -373,18 +392,20 @@ component extends="../base" {
 					} else {
 						local.errorMsg &= " - stop the application server or close any database tools";
 					}
-					throw(message=local.errorMsg, detail=deleteError.message);
+					detailOutput.error(local.errorMsg & " - " & deleteError.message);
+					return;
 				}
 			}
 
 			if (local.filesDeleted) {
-				printSuccess("SQLite database dropped successfully!");
+				detailOutput.statusSuccess("SQLite database dropped successfully!");
 			} else {
-				printWarning("No SQLite database files found");
+				detailOutput.statusWarning("No SQLite database files found");
 			}
 
 		} catch (any e) {
-			throw(message=e.message);
+			detailOutput.error(e.message);
+			return;
 		}
 	}
 
@@ -490,8 +511,8 @@ component extends="../base" {
 	private void function setSQLServerSingleUserMode(required any conn, required string dbName) {
 		local.stmt = arguments.conn.createStatement();
 		local.stmt.executeUpdate(
-			"IF EXISTS (SELECT 1 FROM sys.databases WHERE name = '" & arguments.dbName & "') " &
-			"ALTER DATABASE [" & arguments.dbName & "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE"
+			"IF EXISTS (SELECT 1 FROM sys.databases WHERE name = '#arguments.dbName#') " &
+			"ALTER DATABASE [#arguments.dbName#] SET SINGLE_USER WITH ROLLBACK IMMEDIATE"
 		);
 		local.stmt.close();
 	}
@@ -505,69 +526,69 @@ component extends="../base" {
 		switch (arguments.dbType) {
 			case "MySQL":
 				if (FindNoCase("Access denied", arguments.e.message)) {
-					printError("Access denied - check MySQL credentials and DROP privileges");
+					detailOutput.statusFailed("Access denied - check MySQL credentials and DROP privileges");
 					local.errorHandled = true;
 				} else if (FindNoCase("Communications link failure", arguments.e.message)) {
-					printError("Cannot connect to MySQL server - check if MySQL is running and accessible");
+					detailOutput.statusFailed("Cannot connect to MySQL server - check if MySQL is running and accessible");
 					local.errorHandled = true;
 				}
 				break;
 
 			case "PostgreSQL":
 				if (FindNoCase("does not exist", arguments.e.message)) {
-					printError("Database does not exist: " & arguments.dbName);
+					detailOutput.statusFailed("Database does not exist: #arguments.dbName#");
 					local.errorHandled = true;
 				} else if (FindNoCase("authentication failed", arguments.e.message)) {
-					printError("Authentication failed - check PostgreSQL credentials");
+					detailOutput.statusFailed("Authentication failed - check PostgreSQL credentials");
 					local.errorHandled = true;
 				} else if (FindNoCase("Connection refused", arguments.e.message)) {
-					printError("Connection refused - check if PostgreSQL is running and accessible");
+					detailOutput.statusFailed("Connection refused - check if PostgreSQL is running and accessible");
 					local.errorHandled = true;
 				} else if (FindNoCase("database is being accessed by other users", arguments.e.message)) {
-					printError("Cannot drop database - other users are connected");
+					detailOutput.statusFailed("Cannot drop database - other users are connected");
 					local.errorHandled = true;
 				}
 				break;
 
 			case "SQLServer":
 				if (FindNoCase("Login failed", arguments.e.message)) {
-					printError("Login failed - check SQL Server credentials");
+					detailOutput.statusFailed("Login failed - check SQL Server credentials");
 					local.errorHandled = true;
 				}
 				break;
 
 			case "Oracle":
 				if (FindNoCase("ORA-01918", arguments.e.message) || FindNoCase("user does not exist", arguments.e.message)) {
-					printError("User (schema) does not exist: " & arguments.dbName);
+					detailOutput.statusFailed("User (schema) does not exist: #arguments.dbName#");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-28014", arguments.e.message) || FindNoCase("cannot drop administrative user", arguments.e.message)) {
-					printError("Cannot drop administrative/system user: " & arguments.dbName);
-					printWarning("Oracle system users like SYS, SYSTEM, ADMIN, XDB cannot be dropped");
+					detailOutput.statusFailed("Cannot drop administrative/system user: #arguments.dbName#");
+					detailOutput.statusWarning("Oracle system users like SYS, SYSTEM, ADMIN, XDB cannot be dropped");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-01017", arguments.e.message) || FindNoCase("invalid username/password", arguments.e.message)) {
-					printError("Invalid username/password - check Oracle credentials");
+					detailOutput.statusFailed("Invalid username/password - check Oracle credentials");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-12505", arguments.e.message) || FindNoCase("TNS:listener", arguments.e.message)) {
-					printError("Cannot connect to Oracle server - check SID and connection settings");
+					detailOutput.statusFailed("Cannot connect to Oracle server - check SID and connection settings");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-01031", arguments.e.message) || FindNoCase("insufficient privileges", arguments.e.message)) {
-					printError("Insufficient privileges - user must have DROP USER privilege");
+					detailOutput.statusFailed("Insufficient privileges - user must have DROP USER privilege");
 					local.errorHandled = true;
 				} else if (FindNoCase("ORA-65096", arguments.e.message) || FindNoCase("common user or role name", arguments.e.message)) {
-					printError("Oracle CDB requires C## prefix or _ORACLE_SCRIPT session variable");
-					printWarning("This may indicate insufficient privileges");
+					detailOutput.statusFailed("Oracle CDB requires C## prefix or _ORACLE_SCRIPT session variable");
+					detailOutput.statusWarning("This may indicate insufficient privileges");
 					local.errorHandled = true;
 				}
 				break;
 		}
 
 		if (!local.errorHandled) {
-			printError(arguments.dbType & " Error: " & arguments.e.message);
+			detailOutput.statusFailed("#arguments.dbType# Error: #arguments.e.message#");
 			if (isDefined("arguments.e.detail")) {
-				printError("Detail: " & arguments.e.detail);
+				detailOutput.output("Detail: #arguments.e.detail#", true);
 			}
-			throw(message=arguments.e.message, detail=(isDefined("arguments.e.detail") ? arguments.e.detail : ""));
+			detailOutput.error(arguments.e.message);
+			return;
 		}
 	}
-
 }

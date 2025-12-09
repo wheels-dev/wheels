@@ -4,6 +4,8 @@
  **/
 component aliases='wheels db remove table' extends="../../base"  {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * I create a migration file to remove a table
 	 *
@@ -20,7 +22,20 @@ component aliases='wheels db remove table' extends="../../base"  {
 		// Changes here
 		content=replaceNoCase(content, "|tableName|", "#name#", "all");
 
+		// Output detail header
+		detailOutput.header("Migration Generation");
+		
 		// Make File
-		 $createMigrationFile(name=lcase(trim(arguments.name)),	action="remove_table",	content=content);
+		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="remove_table",	content=content);
+		
+		detailOutput.remove(migrationPath);
+		detailOutput.line();
+		detailOutput.statusSuccess("Table removal migration created successfully!");
+		
+		var nextSteps = [];
+		arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
+		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
+		arrayAppend(nextSteps, "Run all pending migrations: wheels dbmigrate latest");
+		detailOutput.nextSteps(nextSteps);
 	}
 }

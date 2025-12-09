@@ -98,7 +98,7 @@ component aliases="wheels g app" extends="../base" {
     arguments.directory = resolvePath( arguments.directory );
 
     // Output detail header
-    details.header("", "Creating new Wheels application: #arguments.name#");
+    details.header("Creating new Wheels application: #arguments.name#");
 
     // Validate directory, if it doesn't exist, create it.
     if ( !directoryExists( arguments.directory ) ) {

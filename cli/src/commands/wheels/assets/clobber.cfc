@@ -10,8 +10,9 @@
  * {code}
  **/
 component aliases="clobber" extends="../base" {
-	
+
 	property name="FileSystemUtil" inject="FileSystem";
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 	
 	/**
 	 * Remove all compiled assets and reset the asset pipeline
@@ -27,7 +28,7 @@ component aliases="clobber" extends="../base" {
 		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 		
 		if (!directoryExists(compiledDir)) {
-			print.yellowLine("No compiled assets directory found. Nothing to clobber.");
+			print.yellowLine("No compiled assets directory found. Nothing to clobber.").toConsole();
 			return;
 		}
 		
@@ -44,31 +45,30 @@ component aliases="clobber" extends="../base" {
 		}
 		
 		if (fileCount == 0) {
-			print.yellowLine("No compiled assets found. Nothing to clobber.");
+			print.yellowLine("No compiled assets found. Nothing to clobber.").toConsole();
 			return;
 		}
 		
-		print.boldRedLine("==> WARNING: Asset Clobber");
-		print.line();
-		print.line("This will permanently delete:");
-		print.line("  - #fileCount# compiled asset files");
-		print.line("  - #formatFileSize(totalSize)# of disk space");
-		print.line("  - The asset manifest file");
-		print.line();
-		print.yellowLine("You will need to run 'wheels assets:precompile' to regenerate assets.");
-		print.line();
+		detailOutput.line();
+		detailOutput.statusWarning("This will permanently delete:");
+		detailOutput.output("  - #fileCount# compiled asset files");
+		detailOutput.output("  - #formatFileSize(totalSize)# of disk space");
+		detailOutput.output("  - The asset manifest file");
+		detailOutput.line();
+		print.yellowLine("You will need to run 'wheels assets:precompile' to regenerate assets.").toConsole();
+		detailOutput.line();
 		
 		// Confirm unless forced
 		if (!arguments.force) {
 			var confirmed = ask("Are you sure you want to delete all compiled assets? [y/N]: ");
 			if (lCase(trim(confirmed)) != "y") {
-				print.line("Operation cancelled.");
+				detailOutput.output("Operation cancelled.");
 				return;
 			}
 		}
 		
-		print.line();
-		print.boldLine("Removing compiled assets...");
+		detailOutput.line();
+		print.boldLine("Removing compiled assets...").toConsole();
 		
 		try {
 			// Delete all files and subdirectories
@@ -76,16 +76,16 @@ component aliases="clobber" extends="../base" {
 			
 			// Recreate empty directory
 			directoryCreate(compiledDir);
-			
-			print.line();
-			print.boldGreenLine("==> Asset clobber complete!");
-			print.greenLine("Deleted #fileCount# files");
-			print.greenLine("Freed #formatFileSize(totalSize)# of disk space");
-			print.line();
-			print.yellowLine("Remember to run 'wheels assets:precompile' before deploying to production.");
+			detailOutput.line();
+			detailOutput.statusSuccess("Asset clobber complete!");
+			print.greenLine("Deleted #fileCount# files").toConsole();
+			print.greenLine("Freed #formatFileSize(totalSize)# of disk space").toConsole();
+			detailOutput.line();
+			print.yellowLine("Remember to run 'wheels assets:precompile' before deploying to production.").toConsole();
 		} catch (any e) {
-			print.redLine("Error removing compiled assets: #e.message#");
-			error("Failed to clobber assets");
+			detailOutput.statusFailed("Failed to clobber assets");
+			detailOutput.error("Error removing compiled assets: #e.message#");
+			return;
 		}
 	}
 	

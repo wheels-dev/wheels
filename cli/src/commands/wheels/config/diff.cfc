@@ -11,6 +11,7 @@
  * {code}
  */
 component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
 	/**
 	 * @env1.hint First environment to compare
@@ -38,10 +39,10 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			}
 		);
 
-
 		// Validate environments are different
 		if (arguments.env1 == arguments.env2) {
-			error("Cannot compare an environment to itself");
+			detailOutput.error("Cannot compare an environment to itself");
+			return;
 		}
 
 		// Determine what to compare
@@ -78,10 +79,10 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		local.env1EnvExists = fileExists(local.env1File) || (arguments.env1 == "development" && fileExists(local.baseEnvFile));
 
 		if (!local.env1SettingsExists && !local.env1EnvExists) {
-			print.yellowLine("Warning: Environment '#arguments.env1#' not found!");
-			print.cyanLine("  Settings file: #local.env1SettingsFile# (not found)");
-			print.cyanLine("  Env file: #local.env1File# (not found)");
-			print.redLine("Environment '#arguments.env1#' does not exist. No settings file or .env file found.");
+			detailOutput.statusWarning("Environment '#arguments.env1#' not found!");
+			detailOutput.output("  Settings file: #local.env1SettingsFile# (not found)", true);
+			detailOutput.output("  Env file: #local.env1File# (not found)", true);
+			detailOutput.statusFailed("Environment '#arguments.env1#' does not exist. No settings file or .env file found.");
 			return;
 		}
 
@@ -90,17 +91,18 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		local.env2EnvExists = fileExists(local.env2File) || (arguments.env2 == "development" && fileExists(local.baseEnvFile));
 
 		if (!local.env2SettingsExists && !local.env2EnvExists) {
-			print.yellowLine("Warning: Environment '#arguments.env2#' not found!");
-			print.cyanLine("  Settings file: #local.env2SettingsFile# (not found)");
-			print.cyanLine("  Env file: #local.env2File# (not found)");
-			print.redLine("Environment '#arguments.env2#' does not exist. No settings file or .env file found.");
+			detailOutput.statusWarning("Environment '#arguments.env2#' not found!");
+			detailOutput.output("  Settings file: #local.env2SettingsFile# (not found)", true);
+			detailOutput.output("  Env file: #local.env2File# (not found)", true);
+			detailOutput.statusFailed("Environment '#arguments.env2#' does not exist. No settings file or .env file found.");
 			return;
 		}
 
 		// Compare settings if requested
 		if (local.compareSettings) {
 			if (!FileExists(local.settingsFile)) {
-				error("No settings.cfm file found in config directory");
+				detailOutput.error("No settings.cfm file found in config directory");
+				return;
 			}
 
 			// Load configurations for both environments (even if files don't exist, will be empty)
@@ -239,33 +241,25 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		required boolean compareSettings,
 		required boolean compareEnv
 	) {
-		print.line();
-		print.boldBlueLine("========================================");
-		print.boldLine("Configuration Comparison: #arguments.env1# vs #arguments.env2#");
-		print.boldBlueLine("========================================");
-		print.line();
+		detailOutput.header("Configuration Comparison: #arguments.env1# vs #arguments.env2#", 50);
 
 		// Display settings differences
 		if (arguments.compareSettings && StructKeyExists(arguments.differences, "settings")) {
-			print.boldCyanLine("[SETTINGS CONFIGURATION]");
-			print.line();
+			detailOutput.subHeader("SETTINGS CONFIGURATION", 50);
 			displayDifferenceSection(arguments.differences.settings, arguments.env1, arguments.env2, arguments.changesOnly, "settings");
 		}
 
 		// Display environment variable differences
 		if (arguments.compareEnv && StructKeyExists(arguments.differences, "env")) {
 			if (arguments.compareSettings && StructKeyExists(arguments.differences, "settings")) {
-				print.line();
+				detailOutput.separator();
 			}
-			print.boldCyanLine("[ENVIRONMENT VARIABLES]");
-			print.line();
+			detailOutput.subHeader("ENVIRONMENT VARIABLES", 50);
 			displayDifferenceSection(arguments.differences.env, arguments.env1, arguments.env2, arguments.changesOnly, "env");
 		}
 
 		// Display combined summary
-		print.boldBlueLine("========================================");
-		print.boldLine("SUMMARY");
-		print.boldBlueLine("========================================");
+		detailOutput.header("SUMMARY", 50);
 		
 		local.totalIdentical = 0;
 		local.totalDifferent = 0;
@@ -278,59 +272,59 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			local.totalDifferent += ArrayLen(s.different);
 			local.totalUnique += ArrayLen(s.onlyInFirst) + ArrayLen(s.onlyInSecond);
 			
-			print.line("Settings:");
-			print.line("  Total: #local.settingsTotal#");
-			print.greenLine("  Identical: #ArrayLen(s.identical)#");
+			detailOutput.output("Settings:");
+			detailOutput.metric("Total", local.settingsTotal);
+			detailOutput.metric("Identical", ArrayLen(s.identical));
 			if (ArrayLen(s.different) > 0) {
-				print.yellowLine("  Different: #ArrayLen(s.different)#");
+				detailOutput.metric("Different", ArrayLen(s.different));
 			}
 			if (ArrayLen(s.onlyInFirst) + ArrayLen(s.onlyInSecond) > 0) {
-				print.redLine("  Unique: #ArrayLen(s.onlyInFirst) + ArrayLen(s.onlyInSecond)#");
+				detailOutput.metric("Unique", ArrayLen(s.onlyInFirst) + ArrayLen(s.onlyInSecond));
 			}
 		}
 		
 		if (arguments.compareEnv && StructKeyExists(arguments.differences, "env")) {
 			if (arguments.compareSettings && StructKeyExists(arguments.differences, "settings")) {
-				print.line();
+				detailOutput.line();
 			}
 			local.e = arguments.differences.env;
 			local.envTotal = ArrayLen(e.identical) + ArrayLen(e.different) + ArrayLen(e.onlyInFirst) + ArrayLen(e.onlyInSecond);
 			local.totalIdentical += ArrayLen(e.identical);
 			local.totalDifferent += ArrayLen(e.different);
 			local.totalUnique += ArrayLen(e.onlyInFirst) + ArrayLen(e.onlyInSecond);
-			
-			print.line("Environment Variables:");
-			print.line("  Total: #local.envTotal#");
-			print.greenLine("  Identical: #ArrayLen(e.identical)#");
+
+			detailOutput.output("Environment Variables:");
+			detailOutput.metric("Total", local.envTotal);
+			detailOutput.metric("Identical", ArrayLen(e.identical));
 			if (ArrayLen(e.different) > 0) {
-				print.yellowLine("  Different: #ArrayLen(e.different)#");
+				detailOutput.metric("Different", ArrayLen(e.different));
 			}
 			if (ArrayLen(e.onlyInFirst) + ArrayLen(e.onlyInSecond) > 0) {
-				print.redLine("  Unique: #ArrayLen(e.onlyInFirst) + ArrayLen(e.onlyInSecond)#");
+				detailOutput.metric("Unique", ArrayLen(e.onlyInFirst) + ArrayLen(e.onlyInSecond));
 			}
 		}
 		
 		// Overall summary
 		local.grandTotal = local.totalIdentical + local.totalDifferent + local.totalUnique;
 		if (local.grandTotal > 0) {
-			print.line();
-			print.boldLine("Overall:");
-			print.line("  Total configurations: #local.grandTotal#");
-			print.greenLine("  Identical: #local.totalIdentical#");
+			detailOutput.separator();
+			detailOutput.output("Overall:");
+			detailOutput.metric("Total configurations", local.grandTotal);
+			detailOutput.metric("Identical", local.totalIdentical);
 			if (local.totalDifferent > 0) {
-				print.yellowLine("  Different: #local.totalDifferent#");
+				detailOutput.metric("Different", local.totalDifferent);
 			}
 			if (local.totalUnique > 0) {
-				print.redLine("  Unique: #local.totalUnique#");
+				detailOutput.metric("Unique", local.totalUnique);
 			}
-			
+
 			local.similarity = Round((local.totalIdentical / local.grandTotal) * 100);
-			print.line("  Similarity: #local.similarity#%");
+			detailOutput.metric("Similarity", "#local.similarity#%");
 		}
-		
+
 		if (local.totalDifferent == 0 && local.totalUnique == 0) {
-			print.line();
-			print.greenLine("Configurations are identical!");
+			detailOutput.line();
+			detailOutput.success("Configurations are identical!");
 		}
 	}
 
@@ -346,7 +340,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Show differences
 		if (ArrayLen(arguments.differences.different)) {
 			local.hasChanges = true;
-			print.boldYellowLine("Different Values:");
+			detailOutput.statusWarning("Different Values:");
 			local.data = [];
 			for (local.item in arguments.differences.different) {
 				ArrayAppend(local.data, {
@@ -355,17 +349,18 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					env2: maskSensitiveValue(local.item.key, local.item.value2)
 				});
 			}
-			print.table(
+			// Using print.table for tabular data since detailOutput doesn't have table functionality
+			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", arguments.env1, arguments.env2]
 			);
-			print.line();
+			detailOutput.line();
 		}
 
 		// Show only in first environment
 		if (ArrayLen(arguments.differences.onlyInFirst)) {
 			local.hasChanges = true;
-			print.boldRedLine("Only in #arguments.env1#:");
+			detailOutput.statusFailed("Only in #arguments.env1#:");
 			local.data = [];
 			for (local.item in arguments.differences.onlyInFirst) {
 				ArrayAppend(local.data, {
@@ -373,17 +368,17 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					value: maskSensitiveValue(local.item.key, local.item.value)
 				});
 			}
-			print.table(
+			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", "Value"]
 			);
-			print.line();
+			detailOutput.line();
 		}
 
 		// Show only in second environment
 		if (ArrayLen(arguments.differences.onlyInSecond)) {
 			local.hasChanges = true;
-			print.boldGreenLine("Only in #arguments.env2#:");
+			detailOutput.statusSuccess("Only in #arguments.env2#:");
 			local.data = [];
 			for (local.item in arguments.differences.onlyInSecond) {
 				ArrayAppend(local.data, {
@@ -391,16 +386,16 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					value: maskSensitiveValue(local.item.key, local.item.value)
 				});
 			}
-			print.table(
+			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", "Value"]
 			);
-			print.line();
+			detailOutput.line();
 		}
 
 		// Show identical values if not changes-only
 		if (!arguments.changesOnly && ArrayLen(arguments.differences.identical)) {
-			print.boldLine("Identical Values:");
+			detailOutput.statusInfo("Identical Values:");
 			local.data = [];
 			for (local.item in arguments.differences.identical) {
 				ArrayAppend(local.data, {
@@ -408,15 +403,15 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					value: maskSensitiveValue(local.item.key, local.item.value)
 				});
 			}
-			print.table(
+			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", "Value"]
 			);
-			print.line();
+			detailOutput.line();
 		}
 
 		if (!local.hasChanges && !arguments.changesOnly) {
-			print.greenLine("No differences found in #arguments.type#.");
+			detailOutput.statusSuccess("No differences found in #arguments.type#.");
 		}
 	}
 
@@ -529,8 +524,9 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			unique: local.totalUnique,
 			similarity: local.grandTotal > 0 ? Round((local.totalIdentical / local.grandTotal) * 100) : 0
 		};
+		
 		local.jsonData = SerializeJSON(local.output, false, false);
-		print.line(deserializeJSON(local.jsonData));
+		detailOutput.output(deserializeJSON(local.jsonData));
 	}
 
 	private string function maskSensitiveValue(required string key, required any value) {

@@ -89,7 +89,7 @@ component aliases='wheels g model' extends="../base" {
             return;
         }
 
-        detailOutput.header("", "Generating model: #arguments.name#");
+        detailOutput.header("Generating model: #arguments.name#");
 
         // Parse properties
         var parsedProperties = parseProperties(arguments.properties);

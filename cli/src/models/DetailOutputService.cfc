@@ -129,13 +129,27 @@ component {
 	}
 
 	/**
-	 * Output a header with emoji
-	 * @emoji The emoji to display
-	 * @message The header message
+	 * Output a section header with double lines (realtime)
+	 * @title The section title
+	 * @width The width of the header (default: 50)
 	 */
-	function header(required string emoji, required string message) {
-		var headerText = len(trim(arguments.emoji)) ? arguments.emoji & " " & arguments.message : arguments.message;
-		print.line().line(headerText).line().toConsole();
+	function header(required string title, numeric width = 50) {
+		print.line(repeatString("=", arguments.width)).toConsole();
+		print.boldLine(centerString(arguments.title, arguments.width)).toConsole();
+		print.line(repeatString("=", arguments.width)).toConsole();
+		print.line().toConsole();
+		return this;
+	}
+
+	/**
+	 * Output a subsection header with single line (realtime)
+	 * @title The subsection title
+	 * @width The width of the header (default: 50)
+	 */
+	function subHeader(required string title, numeric width = 50) {
+		print.boldLine(arguments.title).toConsole();
+		print.line(repeatString("-", arguments.width)).toConsole();
+		return this;
 	}
 
 	/**
@@ -151,7 +165,48 @@ component {
 	 * @message The error message
 	 */
 	function error(required string message) {
-		print.line().redBoldLine(arguments.message).toConsole();
+		print.line().redBoldLine("[ERROR]: " & arguments.message).line().toConsole();
+	}
+
+
+	/**
+	 * Output [SUCCESS] status indicator
+	 */
+	function statusSuccess(required string message) {
+		print.greenLine("[SUCCESS]: " & arguments.message).toConsole();
+		return this;
+	}
+
+	/**
+	 * Output [FAILED] status indicator
+	 */
+	function statusFailed(required string message) {
+		print.redLine("[FAILED]: " & arguments.message).toConsole();
+		return this;
+	}
+
+	/**
+	 * Output [WARNING] status indicator
+	 */
+	function statusWarning(required string message) {
+		print.yellowLine("[WARNING]: " & arguments.message).toConsole();
+		return this;
+	}
+
+	/**
+	 * Output [INFO] status indicator
+	 */
+	function statusInfo(required string message) {
+		print.cyanLine("[INFO]: " & arguments.message).toConsole();
+		return this;
+	}
+
+	/**
+	 * Output [FIXED] status indicator
+	 */
+	function statusFixed(required string message) {
+		print.blueLine("[FIXED]: " & arguments.message).toConsole();
+		return this;
 	}
 
 	/**
@@ -214,6 +269,40 @@ component {
 	function code(required string code, string language = "") {
 		print.line().line(arguments.code).line().toConsole();
 		return this;
+	}
+
+	/**
+	 * Output a divider line (realtime)
+	 * @char The character to repeat (default: -)
+	 * @length The length of the divider (default: 50)
+	 */
+	function divider(string char = "-", numeric length = 50) {
+		print.line(repeatString(arguments.char, arguments.length)).toConsole();
+		return this;
+	}
+
+	/**
+	 * Output a metric line with label and value (realtime)
+	 * @label The metric label
+	 * @value The metric value
+	 * @padding Total padding for alignment (default: 25)
+	 */
+	function metric(required string label, required any value, numeric padding = 25) {
+		var paddedLabel = lJustify(arguments.label & ":", arguments.padding);
+		print.line(paddedLabel & " " & arguments.value).toConsole();
+		return this;
+	}
+
+	/**
+	 * Center a string within a given width
+	 */
+	private function centerString(required string text, required numeric width) {
+		var textLen = len(arguments.text);
+		if (textLen >= arguments.width) {
+			return arguments.text;
+		}
+		var padding = int((arguments.width - textLen) / 2);
+		return repeatString(" ", padding) & arguments.text;
 	}
 
 }

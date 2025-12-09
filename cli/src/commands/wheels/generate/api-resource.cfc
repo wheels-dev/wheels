@@ -64,7 +64,7 @@ component aliases='wheels g api-resource' extends="../base" {
             return;
         }
 
-        detailOutput.header("", "Generating API resource: #arguments.name# (#arguments.namespace#/#arguments.version#)");
+        detailOutput.header("Generating API resource: #arguments.name# (#arguments.namespace#/#arguments.version#)");
 
         // Process resource name using getNameVariants
         local.obj = helpers.getNameVariants(arguments.name);
