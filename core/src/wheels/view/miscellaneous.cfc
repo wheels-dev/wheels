@@ -701,7 +701,7 @@ component {
 				local.currentObject = local.currentObject[key];
 			}
 			else {
-				return "Key not found: " & key;
+				return invoke(local.currentObject, key);
 			}
 		}
 
