@@ -30,6 +30,9 @@ component extends="base" {
 			
 			// Get routes via CLI bridge
 			local.result = $sendToCliCommand("&command=routes");
+			if(!local.result.success){
+				return;
+			}
 			
 			if (!structKeyExists(local.result, "routes") || !isArray(local.result.routes)) {
 				// Fall back to static parsing if bridge doesn't return routes

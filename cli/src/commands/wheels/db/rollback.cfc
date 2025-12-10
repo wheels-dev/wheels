@@ -63,6 +63,9 @@ component extends="../base" {
 		
 		// Send command to rollback migrations
 		local.result = $sendToCliCommand(urlstring=local.urlParams);
+		if(!local.result.success){
+			return;
+		}
 		
 		// Display results
 		if (StructKeyExists(local.result, "success") && local.result.success) {

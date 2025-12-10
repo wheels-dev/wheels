@@ -5,6 +5,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 	property name='serverService' inject='ServerService';
 	property name='Formatter'     inject='Formatter';
 	property name='Helpers'       inject='helpers@wheels-cli';
+	property name='detailOutput'       inject='detailOutputService@wheels-cli';
 	property name='packageService' inject='packageService';
 	property name="ConfigService" inject="ConfigService";
 	property name="JSONService" inject="JSONService";
@@ -486,16 +487,16 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 		$preConnectionCheck();
 
 		loc = new Http( url=targetURL ).send().getPrefix();
-		print.line("Sending: " & targetURL);
+		print.line("Sending: " & targetURL).toConsole();
 
 		if(isJson(loc.filecontent)){
   			loc.result=deserializeJSON(loc.filecontent);
   			if(structKeyexists(loc.result, "success") && loc.result.success){
-					print.line("Call to bridge was successful.").toConsole();
-  				return loc.result;
+				detailOutput.statusSuccess("Call to bridge was successful.");
   			}else{
-				error("Bridge response received but indicates failure.");
+				detailOutput.error("Bridge response received but indicates failure.");
 			}
+			return loc.result;
   		} else {
   			// Check if this is likely an application error
   			if (find("<title>", loc.filecontent) && find("error", lCase(loc.filecontent))) {
@@ -515,7 +516,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
   			}
   			print.line("").toConsole();
   			print.line("Tried #targetURL#").toConsole();
-  			error("Error returned from DBMigrate Bridge").toConsole();
+  			error("Error returned from DBMigrate Bridge");
   		}
 	}
 

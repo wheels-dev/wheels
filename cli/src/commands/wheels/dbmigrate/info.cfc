@@ -9,39 +9,41 @@ component aliases='wheels db info' extends="../base" {
 	 *  Display DB Migrate info
 	 **/
 	function run(  ) {
-		results = $sendToCliCommand();
-		migrations = results.migrations.reverse();
-
+		local.results = $sendToCliCommand();
+		if(!local.results.success){
+			return;
+		}
+		local.migrations = local.results.migrations.reverse();
 		// calculate the available migrations by stepping through the migration array
-		available = 0;
-		for (migration in migrations) {
-			if (migration.status == "") {
-				available++;
+		local.available = 0;
+		for (local.migration in local.migrations) {
+			if (local.migration.status == "") {
+				local.available++;
 			} 
 		}
 
 		detailOutput.header("Database Migration Status", 50);
 		
 		detailOutput.subHeader("Database Information", 50);
-		detailOutput.metric("Datasource", results.datasource);
-		detailOutput.metric("Database Type", results.databaseType);
+		detailOutput.metric("Datasource", local.results.datasource);
+		detailOutput.metric("Database Type", local.results.databaseType);
 		
 		detailOutput.subHeader("Migration Status", 50);
-		detailOutput.metric("Total Migrations", arrayLen(results.migrations));
-		detailOutput.metric("Available Migrations", available);
-		detailOutput.metric("Current Version", results.currentVersion);
-		detailOutput.metric("Latest Version", results.lastVersion);
+		detailOutput.metric("Total Migrations", arrayLen(local.results.migrations));
+		detailOutput.metric("Available Migrations", local.available);
+		detailOutput.metric("Current Version", local.results.currentVersion);
+		detailOutput.metric("Latest Version", local.results.lastVersion);
 		
 		detailOutput.divider();
 		
-		if (arrayLen(migrations)) {
+		if (arrayLen(local.migrations)) {
 			detailOutput.subHeader("Migration Files", 50);
 			
 			var migrationData = [];
-			for (migration in migrations) {
+			for (local.migration in local.migrations) {
 				arrayAppend(migrationData, {
-					status: migration.status == "" ? "" : migration.status,
-					file: migration.CFCFILE
+					status: local.migration.status == "" ? "" : local.migration.status,
+					file: local.migration.CFCFILE
 				});
 			}
 			
@@ -53,8 +55,8 @@ component aliases='wheels db info' extends="../base" {
 			detailOutput.line();
 		}
 		
-		if (results.message != "Returning what I know..") {
-			detailOutput.statusInfo(results.message);
+		if (local.results.message != "Returning what I know..") {
+			detailOutput.statusInfo(local.results.message);
 		}
 	}
 }

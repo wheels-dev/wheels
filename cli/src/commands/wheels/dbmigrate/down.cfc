@@ -10,6 +10,9 @@ component aliases='wheels db down' extends="../base"  {
 	 **/
 	function run(  ) {
 		var DBMigrateInfo=$sendToCliCommand();
+		if(!DBMigrateInfo.success){
+			return;
+		}
 		var migrations=DBMigrateInfo.migrations;
 
 		//print.line(Formatter.formatJson( $getDBMigrateInfo() ) );

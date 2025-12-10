@@ -31,6 +31,9 @@ component extends="../base" {
 		
 		// Get version information
 		local.result = $sendToCliCommand(urlstring=local.urlParams);
+		if(!local.result.success){
+			return;
+		}
 		
 		// Display results
 		if (StructKeyExists(local.result, "success") && local.result.success) {

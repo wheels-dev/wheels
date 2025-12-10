@@ -9,6 +9,7 @@ component extends="../base" {
     
     property name="fileSystemUtil" inject="FileSystem";
     property name="helpers" inject="Helpers@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @output.hint Output directory for docs
@@ -39,13 +40,9 @@ component extends="../base" {
             allowCommaSeparated=["include"]
         );
         
-        print.line()
-            .boldBlueLine("Documentation Generator")
-            .line("=".repeatString(50))
-            .line();
-        
-        print.yellowLine("Generating documentation...")
-            .line();
+        detailOutput.header("Documentation Generator");
+        print.line("Generating documentation...").toConsole();
+        detailOutput.line();
         
         var outputPath = resolvePath(arguments.output);
         var componentsToDocument = listToArray(arguments.include);
@@ -53,6 +50,7 @@ component extends="../base" {
         // Ensure output directory exists
         if (!directoryExists(outputPath)) {
             directoryCreate(outputPath, true);
+            detailOutput.create("directory #arguments.output#");
         }
         
         var documentedComponents = {
@@ -63,12 +61,12 @@ component extends="../base" {
             total = 0
         };
         
-        print.boldLine("Scanning source files...");
+        detailOutput.subHeader("Scanning Source Files");
         
         // Document each component type
         for (var componentType in componentsToDocument) {
             if (arguments.verbose) {
-                print.text("  Documenting #componentType#... ");
+                print.line("Documenting #componentType#...").toConsole();
             }
             
             var documented = documentComponents(
@@ -83,47 +81,52 @@ component extends="../base" {
             documentedComponents.total += arrayLen(documented);
             
             if (arrayLen(documented) > 0) {
-                print.greenLine("[OK] Found #arrayLen(documented)# #componentType#");
+                detailOutput.statusSuccess("Found #arrayLen(documented)# #componentType#");
             } else if (arguments.verbose) {
-                print.yellowLine("[SKIP] No #componentType# found");
+                detailOutput.statusWarning("No #componentType# found");
             }
         }
         
         // Generate index/navigation
-        print.line()
-            .text("Writing documentation... ");
+        detailOutput.line();
+        print.line("Writing documentation...").toConsole();
         
         if (arguments.format == "html") {
             generateHTMLIndex(outputPath, documentedComponents, arguments.template);
-            print.greenLine("[OK] HTML files generated");
+            detailOutput.statusSuccess("HTML files generated");
         } else if (arguments.format == "markdown") {
             generateMarkdownIndex(outputPath, documentedComponents);
-            print.greenLine("[OK] Markdown files generated");
+            detailOutput.statusSuccess("Markdown files generated");
         } else if (arguments.format == "json") {
             fileWrite(outputPath & "/documentation.json", serializeJSON(documentedComponents, true));
-            print.greenLine("[OK] JSON documentation generated");
+            detailOutput.statusSuccess("JSON documentation generated");
         }
         
         // Display summary
-        print.line()
-            .line("=".repeatString(50))
-            .greenBoldLine("[SUCCESS] Documentation generated successfully!")
-            .line();
+        detailOutput.separator();
+        detailOutput.statusSuccess("Documentation generated successfully!");
+        detailOutput.line();
         
-        print.boldLine("Summary:");
+        detailOutput.subHeader("Summary");
         for (var type in componentsToDocument) {
             if (arrayLen(documentedComponents[type])) {
-                print.line("  - #uCase(left(type, 1)) & right(type, len(type)-1)#: #arrayLen(documentedComponents[type])# files");
+                detailOutput.metric(
+                    label = "#uCase(left(type, 1)) & right(type, len(type)-1)#",
+                    value = "#arrayLen(documentedComponents[type])# files"
+                );
             }
         }
-        print.line("  - Total: #documentedComponents.total# components documented")
-            .line()
-            .greenLine("Output directory: #outputPath#");
+        detailOutput.metric(
+            label = "Total Components",
+            value = "#documentedComponents.total# documented"
+        );
+        detailOutput.line();
+        detailOutput.statusInfo("Output directory: #outputPath#");
         
         if (arguments.serve) {
-            print.line()
-                .yellowLine("Starting documentation server...")
-                .line();
+            detailOutput.line();
+            print.line("Starting documentation server...").toConsole();
+            detailOutput.line();
             
             // Start server using CommandBox
             command("wheels docs serve")
@@ -134,7 +137,7 @@ component extends="../base" {
                 )
                 .run();
             
-            print.greenLine("Documentation server started at http://localhost:8585");
+            detailOutput.statusSuccess("Documentation server started at http://localhost:8585");
         }
     }
     
@@ -155,7 +158,7 @@ component extends="../base" {
         
         if (!directoryExists(sourcePath)) {
             if (arguments.verbose) {
-                print.yellowLine("  Directory not found: app/#arguments.type#");
+                detailOutput.statusWarning("Directory not found: app/#arguments.type#");
             }
             return documented;
         }
@@ -192,12 +195,12 @@ component extends="../base" {
                     arrayAppend(documented, componentInfo);
                     
                     if (arguments.verbose) {
-                        print.greenLine("    [OK] #componentInfo.name#");
+                        detailOutput.create("#componentInfo.name#", true);
                     }
                 }
             } catch (any e) {
                 if (arguments.verbose) {
-                    print.redLine("    [ERROR] #getFileFromPath(file)#: #e.message#");
+                    detailOutput.statusFailed("#getFileFromPath(file)#: #e.message#", true);
                 }
             }
         }

@@ -1,41 +1,47 @@
 /**
  * Migration one version UP
  **/
-component aliases='wheels db up' extends="../base"  {
+component aliases='wheels db up' extends="../base" {
+
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
 	/**
 	 *
 	 **/
-	function run(  ) {
-		var DBMigrateInfo=$sendToCliCommand();
-		var migrations=DBMigrateInfo.migrations;
-
-		//print.line(Formatter.formatJson( $getDBMigrateInfo() ) );
+	function run() {
+		var DBMigrateInfo = $sendToCliCommand();
+		if(!DBMigrateInfo.success){
+			return;
+		}
+		var migrations = DBMigrateInfo.migrations;
 
 		// Check we're not already at the latest version
-		if(DBMigrateInfo.currentVersion == DBMigrateInfo.lastVersion){
-			print.greenBoldLine("We're all up to date already!");
+		if (DBMigrateInfo.currentVersion == DBMigrateInfo.lastVersion) {
+			detailOutput.statusSuccess("We're all up to date already!");
 			return;
 		}
 
 		// Get current version as an index of the migration array
 		var currentIndex = 0;
-		var newIndex     = 0;
-		migrations.each(function(migration,i,array){
-		    if(migration.version == DBMigrateInfo.currentVersion){
-		    	currentIndex = i;
-		    }
+		var newIndex = 0;
+		migrations.each(function(migration, i, array) {
+			if (migration.version == DBMigrateInfo.currentVersion) {
+				currentIndex = i;
+			}
 		});
 
-		if(currentIndex < arrayLen(migrations)){
+		if (currentIndex < arrayLen(migrations)) {
 			newIndex = ++currentIndex;
-			print.line("Migrating to #migrations[newIndex]['cfcfile']#");
+			detailOutput.statusInfo("Migrating to #migrations[newIndex]['cfcfile']#");
+			detailOutput.migrate(migrations[newIndex]['cfcfile']);
+			
 			command('wheels dbmigrate exec')
-				.params(version=migrations[newIndex]["version"])
+				.params(version = migrations[newIndex]["version"])
 				.run();
 		} else {
-			print.line("No more versions to go to?");
-		}
+			detailOutput.statusWarning("No more versions to go to?");
+		}		
+		detailOutput.separator();
 		command('wheels dbmigrate info').run();
 	}
 

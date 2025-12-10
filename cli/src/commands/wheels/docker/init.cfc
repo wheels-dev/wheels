@@ -12,6 +12,8 @@
  */
 component extends="../base" {
 
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @db Database to use (h2, sqlite, mysql, postgres, mssql, oracle)
      * @dbVersion Database version to use
@@ -54,29 +56,27 @@ component extends="../base" {
             }
 
             if (arrayLen(local.existingFiles)) {
-                print.line();
-                print.yellowLine("The following Docker files already exist:");
+                detailOutput.line();
+                detailOutput.statusWarning("The following Docker files already exist:");
                 for (local.file in local.existingFiles) {
-                    print.line("  - #local.file#");
+                    detailOutput.output("  - #local.file#", true);
                 }
-                print.line();
+                detailOutput.line();
 
                 if (!confirm("Do you want to overwrite these files? [y/n]")) {
-                    print.redLine("Operation cancelled.");
+                    detailOutput.statusFailed("Operation cancelled.");
                     return;
                 }
             }
         }
 
         // Welcome message
-        print.line();
-        print.boldMagentaLine("Wheels Docker Configuration");
-        print.line();
+        detailOutput.header("Wheels Docker Configuration");
 
         // Get application port - priority: command argument > server.json > default
         if (len(arguments.port) && isNumeric(arguments.port)) {
             local.appPort = val(arguments.port);
-            print.greenLine("Using port #local.appPort# from command argument");
+            detailOutput.statusSuccess("Using port #local.appPort# from command argument");
         } else {
             local.appPort = getAppPortFromServerJson();
         }
@@ -87,6 +87,7 @@ component extends="../base" {
         // Set CF engine
         setCFengine(arguments.cfengine, arguments.cfVersion);
         // Create Docker configuration files
+        detailOutput.subHeader("Creating Docker Configuration Files");        
         createDockerfile(arguments.cfengine, arguments.cfVersion, local.appPort, arguments.db, arguments.production);
         createDockerCompose(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion, local.appPort, arguments.production, arguments.nginx);
         createDockerIgnore(arguments.production);
@@ -97,12 +98,12 @@ component extends="../base" {
             createNginxConfig(local.appPort, arguments.production);
         }
 
-        print.line();
-        print.greenLine("Docker configuration created successfully!");
-        print.line();
-        print.yellowLine("To start your Docker environment:");
-        print.line("docker-compose up -d");
-        print.line();
+        detailOutput.line();
+        detailOutput.statusSuccess("Docker configuration created successfully!");
+        detailOutput.line();
+        detailOutput.statusInfo("To start your Docker environment:");
+        detailOutput.output("docker-compose up -d", true);
+        detailOutput.line();
     }
 
     private function createDockerfile(string cfengine, string cfVersion, numeric appPort, string db, boolean production=false) {
@@ -177,7 +178,7 @@ CMD ["box", "server", "start", "--console", "--force"]';
         }
 
         file action='write' file='#fileSystemUtil.resolvePath("Dockerfile")#' mode='777' output='#trim(local.dockerContent)#';
-        print.greenLine("Created Dockerfile");
+        detailOutput.create("Dockerfile");
     }
 
     private function createDockerCompose(string db, string dbVersion, string cfengine, string cfVersion, numeric appPort, boolean production=false, boolean nginx=false) {
@@ -365,7 +366,7 @@ volumes:
   db_data:';
 
         file action='write' file='#fileSystemUtil.resolvePath("docker-compose.yml")#' mode='777' output='#trim(local.composeContent)#';
-        print.greenLine("Created docker-compose.yml");
+        detailOutput.create("docker-compose.yml");
     }
 
     private function createDockerIgnore(boolean production=false) {
@@ -390,7 +391,7 @@ README.md
         }
 
         file action='write' file='#fileSystemUtil.resolvePath(".dockerignore")#' mode='777' output='#trim(local.ignoreContent)#';
-        print.greenLine("Created .dockerignore");
+        detailOutput.create(".dockerignore");
     }
 
     private function createNginxConfig(numeric appPort, boolean production=false) {
@@ -477,7 +478,7 @@ http {
 }';
 
         file action='write' file='#fileSystemUtil.resolvePath("nginx.conf")#' mode='777' output='#trim(local.nginxContent)#';
-        print.greenLine("Created nginx.conf");
+        detailOutput.create("nginx.conf");
     }
 
     private function getAppPortFromServerJson() {
@@ -495,16 +496,16 @@ http {
                     structKeyExists(local.serverData.web, "http") &&
                     structKeyExists(local.serverData.web.http, "port")) {
                     local.appPort = val(local.serverData.web.http.port);
-                    print.greenLine("Using port #local.appPort# from existing server.json");
+                    detailOutput.statusSuccess("Using port #local.appPort# from existing server.json");
                 } else {
-                    print.yellowLine("Port not found in server.json, using default port #local.appPort#");
+                    detailOutput.statusWarning("Port not found in server.json, using default port #local.appPort#");
                 }
             } catch (any e) {
-                print.redLine("Error reading server.json: #e.message#");
-                print.yellowLine("Using default port #local.appPort#");
+                detailOutput.statusFailed("Error reading server.json: #e.message#");
+                detailOutput.statusWarning("Using default port #local.appPort#");
             }
         } else {
-            print.yellowLine("server.json not found, using default port #local.appPort#");
+            detailOutput.statusWarning("server.json not found, using default port #local.appPort#");
         }
 
         return local.appPort;
@@ -516,11 +517,11 @@ http {
 
         // Skip H2 and SQLite as they're file-based and don't need container connection
         if (arguments.db == "h2") {
-            print.yellowLine("Skipping datasource configuration for H2 (embedded database)");
+            detailOutput.statusInfo("Skipping datasource configuration for H2 (embedded database)");
             return;
         }
         if (arguments.db == "sqlite") {
-            print.yellowLine("Skipping datasource configuration for SQLite (file-based database)");
+            detailOutput.statusInfo("Skipping datasource configuration for SQLite (file-based database)");
             return;
         }
         
@@ -534,7 +535,7 @@ http {
                     local.cfconfigData = {};
                 }
             } catch (any e) {
-                print.redLine("Error reading CFConfig.json: #e.message#");
+                detailOutput.statusFailed("Error reading CFConfig.json: #e.message#");
                 local.cfconfigData = { "datasources": {} };
             }
         } else {
@@ -610,22 +611,22 @@ http {
         // Write updated CFConfig.json
         local.updatedContent = serializeJSON(local.cfconfigData);
         file action='write' file='#local.cfconfigPath#' mode='777' output='#local.updatedContent#';
-        print.greenLine("Updated CFConfig.json with #arguments.db# datasource configuration");
+        detailOutput.create("CFConfig.json with #arguments.db# datasource configuration");
     }
 
     private function updateServerJsonForDocker(required numeric port) {
-        local.serverJsonPath = fileSystemUtil.resolvePath("server.json");
+        local.serverJsonPath = fileSystemUtil.resolvePath("dfdf/server.json");
 
         // Check if server.json exists
         if (!fileExists(local.serverJsonPath)) {
-            print.yellowLine("server.json not found, creating new one with Docker settings");
+            detailOutput.statusWarning("server.json not found, creating new one with Docker settings");
             local.serverContent = {};
         } else {
             try {
                 local.serverContent = deserializeJSON(fileRead(local.serverJsonPath));
             } catch (any e) {
-                print.redLine("Error reading server.json: #e.message#");
-                print.yellowLine("Creating new server.json with Docker settings");
+                detailOutput.statusFailed("Error reading server.json: #e.message#");
+                detailOutput.statusWarning("Creating new server.json with Docker settings");
                 local.serverContent = {};
             }
         }
@@ -658,9 +659,9 @@ http {
         try {
             local.updatedContent = serializeJSON(local.serverContent);
             file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
-            print.greenLine("Updated server.json for Docker (host: 0.0.0.0, port: #arguments.port#, openBrowser: false)");
+            detailOutput.update("server.json for Docker (host: 0.0.0.0, port: #arguments.port#, openBrowser: false)");
         } catch (any e) {
-            print.redLine("Error writing server.json: #e.message#");
+            detailOutput.statusFailed("Error writing server.json: #e.message#");
         }
     }
 
@@ -680,10 +681,12 @@ http {
                 local.updatedContent = serializeJSON(local.serverContent);
                 file action='write' file='#local.serverJsonPath#' mode='777' output='#local.updatedContent#';
             } catch ( any e ){
-                error("Not able to read server.json: #e.message#");
+                detailOutput.error("Not able to read server.json: #e.message#");
+                return;
             }
         } else {
-            error("server.json does not exist at #local.serverJsonPath#");
+            detailOutput.error("server.json does not exist at #local.serverJsonPath#");
+            return;
         }
     }
 }

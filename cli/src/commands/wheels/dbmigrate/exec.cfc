@@ -24,12 +24,14 @@ component aliases='wheels db exec' extends="../base" {
 		detailOutput.metric("Target Version", loc.version);
 		detailOutput.divider();
 		var result = $sendToCliCommand("&command=migrateTo&version=#loc.version#");
-		result.success = false;
+		if(!local.result.success){
+			return;
+		}
 		
 		if (structKeyExists(result, "success") && result.success) {
-			detailOutput.statusSuccess(result.message ?: "Migration completed successfully!");
+			detailOutput.statusSuccess("Migration completed successfully!");
 		} else {
-			detailOutput.statusFailed(result.message ?: "Migration failed!");
+			detailOutput.statusFailed("Migration failed!");
 		}
 	}
 }

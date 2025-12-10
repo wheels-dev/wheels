@@ -7,6 +7,7 @@
 component extends="../base" {
     
     property name="serverService" inject="ServerService";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @root.hint Root directory to serve (default: docs/api)
@@ -28,14 +29,15 @@ component extends="../base" {
         var docRoot = fileSystemUtil.resolvePath(arguments.root);
         
         if (!directoryExists(docRoot)) {
-            print.redLine("Documentation directory not found: #docRoot#");
-            print.line();
-            print.yellowLine("Tip: Run 'wheels docs generate' first to create documentation");
+            detailOutput.error("Documentation directory not found: #docRoot#");
+            detailOutput.line();
+            detailOutput.statusInfo("Tip: Run 'wheels docs generate' first to create documentation");
             return;
         }
         
-        print.yellowLine("Starting documentation server...")
-             .line();
+        detailOutput.header("Documentation Server");
+        print.line("Starting documentation server...").toConsole();
+        detailOutput.line();
         
         // Check if index file exists
         var hasIndex = fileExists(docRoot & "/index.html") || 
@@ -43,8 +45,9 @@ component extends="../base" {
                       fileExists(docRoot & "/index.json");
         
         if (!hasIndex) {
-            print.yellowLine("No index file found. Creating a simple directory listing...");
+            detailOutput.statusWarning("No index file found. Creating a simple directory listing...");
             createDirectoryListing(docRoot);
+            detailOutput.create("directory listing index.html");
         }
         
         // Start the server
@@ -59,16 +62,16 @@ component extends="../base" {
         try {
             serverService.start(serverArgs);
             
-            print.greenLine("Documentation server started!");
-            print.line();
-            print.line("Serving: #docRoot#");
-            print.line("URL: http://localhost:#arguments.port#");
+            detailOutput.statusSuccess("Documentation server started!");
+            detailOutput.line();
+            detailOutput.metric("Serving directory", docRoot);
+            detailOutput.metric("URL", "http://localhost:#arguments.port#");
             
             if (arguments.open) {
-                print.line("Opening browser...");
+                print.line("Opening browser...").toConsole();
             }
             
-            print.line();
+            detailOutput.line();
             
             // Keep the command running
             while (true) {
@@ -76,34 +79,33 @@ component extends="../base" {
 
                 // Check if server is still running or still starting
                 var serverInfo = serverService.getServerInfo(name=serverArgs.name, webroot=docRoot);
-                systemOutput("Status: " & serverInfo.status & chr(10));
-
+                
                 // If status is missing or server crashed, break
                 if (!structKeyExists(serverInfo, "status")) {
-                    systemOutput("Server info missing. Exiting..."& chr(10));
+                    detailOutput.statusFailed("Server info missing. Exiting...");
                     break;
                 }
 
                 // If server is fully running, continue
                 if (serverInfo.status == "running") {
-                    systemOutput("Server is up and running!"& chr(10));
+                    detailOutput.statusSuccess("Server is up and running!");
                     break;
                 }
 
                 // If still starting, just wait and continue
                 if (serverInfo.status == "starting") {
-                    systemOutput("Server is still starting... waiting..."& chr(10));
+                    print.line("Server is still starting... waiting...").toConsole();
                     continue;
                 }
 
                 // Any other status (like "stopped", "error", etc.)
-                print.redLine("Unexpected server status: " & serverInfo.status);
+                detailOutput.statusFailed("Unexpected server status: " & serverInfo.status);
                 break;
             }
 
             
         } catch (any e) {
-            print.redLine("Failed to start server: #e.message#");
+            detailOutput.error("Failed to start server: #e.message#");
             return;
         }
     }
