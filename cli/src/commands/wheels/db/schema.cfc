@@ -41,8 +41,8 @@ component extends="../base" {
         print.line("Retrieving database schema...");
         local.result = $sendToCliCommand(urlstring=local.urlParams);
         if(!local.result.success){
-			return;
-		}
+            return;
+        }
         
         // Process and display results
         if (structKeyExists(local.result, "success") && local.result.success && structKeyExists(local.result, "schema")) {

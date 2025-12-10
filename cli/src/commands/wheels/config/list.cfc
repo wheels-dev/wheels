@@ -45,8 +45,8 @@ component extends="../base" {
         print.line("Retrieving configuration settings...");
         local.result = $sendToCliCommand(urlstring=local.urlParams);
         if(!local.result.success){
-			return;
-		}
+            return;
+        }
         
         // Display results
         if (structKeyExists(local.result, "config") && isStruct(local.result.config)) {

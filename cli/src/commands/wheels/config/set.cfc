@@ -60,8 +60,8 @@ component extends="../base" {
         print.line("Setting configuration value...");
         local.result = $sendToCliCommand(urlstring=local.urlParams);
         if(!local.result.success){
-			return;
-		}
+            return;
+        }
         
         // Display results
         if (structKeyExists(local.result, "success") && local.result.success) {
