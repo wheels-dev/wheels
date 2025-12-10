@@ -2,6 +2,7 @@ component {
 
     property name="serverService" inject="ServerService";
     property name="templateService" inject="TemplateService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
      * Setup a Wheels development environment
@@ -173,7 +174,7 @@ component {
                     TYPE: determineEnvironmentType(envName),
                     TEMPLATE: structKeyExists(config, "WHEELS_TEMPLATE") ? config.WHEELS_TEMPLATE : "local",
                     DBTYPE: structKeyExists(config, "DB_TYPE") ? config.DB_TYPE : "unknown",
-                    DATABASE: structKeyExists(config, "DB_NAME") ? config.DB_NAME : "unknown",
+                    DATABASE: structKeyExists(config, "DB_DATABASE") ? config.DB_DATABASE : "unknown",
                     DATASOURCE: structKeyExists(config, "DB_DATASOURCE") ? config.DB_DATASOURCE : "wheels_#envName#",
                     CREATED: getFileInfo("#projectRoot#/#file#").lastModified,
                     SOURCE: "file",
@@ -225,7 +226,7 @@ component {
                             TYPE: determineEnvironmentType(envName),
                             TEMPLATE: "server.json",
                             DBTYPE: structKeyExists(envConfig, "DB_TYPE") ? envConfig.DB_TYPE : "configured",
-                            DATABASE: structKeyExists(envConfig, "DB_NAME") ? envConfig.DB_NAME : "configured",
+                            DATABASE: structKeyExists(envConfig, "DB_DATABASE") ? envConfig.DB_DATABASE : "configured",
                             DATASOURCE: structKeyExists(envConfig, "DB_DATASOURCE") ? envConfig.DB_DATASOURCE : "configured",
                             CREATED: getFileInfo(serverJsonPath).lastModified,
                             SOURCE: "server.json",
@@ -259,9 +260,7 @@ component {
 
         // Apply sorting
         environments = sortEnvironments(environments, arguments.sort);
-
-        // Format output based on requested format
-        return formatEnvironmentOutput(environments, arguments.format, arguments.verbose, currentEnv);
+        return environments;
     }
 
     /**
@@ -1033,7 +1032,7 @@ component {
             if (len(trim(ds.port))) {
                 serverJson.env[arguments.environment]["DB_PORT"] = ds.port;
             }
-            serverJson.env[arguments.environment]["DB_NAME"] = ds.database;
+            serverJson.env[arguments.environment]["DB_DATABASE"] = ds.database;
             serverJson.env[arguments.environment]["DB_USER"] = ds.username;
             serverJson.env[arguments.environment]["DB_PASSWORD"] = ds.password;
         }
@@ -1062,7 +1061,7 @@ services:
       - DB_TYPE=#arguments.dbtype#
       - DB_HOST=db
       - DB_PORT=#getDatabasePort(arguments.dbtype)#
-      - DB_NAME=#databaseName#
+      - DB_DATABASE=#databaseName#
       - DB_USER=wheels
       - DB_PASSWORD=wheels_password
     volumes:
@@ -1426,9 +1425,9 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         var databaseName = "";
         if (len(trim(arguments.database))) {
             databaseName = arguments.database;
-        } else if (structKeyExists(arguments.envConfig, "DB_NAME")) {
+        } else if (structKeyExists(arguments.envConfig, "DB_DATABASE")) {
             // Modify the base database name for the new environment
-            var baseName = arguments.envConfig["DB_NAME"];
+            var baseName = arguments.envConfig["DB_DATABASE"];
             // Replace any existing environment references with new environment
             if (find("_", baseName)) {
                 databaseName = "wheels_" & arguments.environment;
@@ -1589,164 +1588,10 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         return sorted;
     }
 
-    /**
-    * Format environment output
-    */
-    private function formatEnvironmentOutput(environments, format, verbose, currentEnv) {
-        switch(lCase(arguments.format)) {
-            case "json":
-                return formatAsJSON(arguments.environments, arguments.currentEnv);
-            
-            case "yaml":
-                return formatAsYAML(arguments.environments, arguments.currentEnv);
-            
-            case "table":
-            default:
-                return formatAsTable(arguments.environments, arguments.verbose, arguments.currentEnv);
-        }
-    }
 
-    /**
-    * Format as JSON
-    */
-    private function formatAsJSON(environments, currentEnv) {
-        var output = {
-            environments: [],
-            current: arguments.currentEnv,
-            total: arrayLen(arguments.environments)
-        };
-        
-        for (var env in arguments.environments) {
-            var envData = {
-                name: env.NAME,
-                type: env.TYPE,
-                active: env.ACTIVE,
-                database: env.DATABASE,
-                datasource: env.DATASOURCE,
-                template: env.TEMPLATE,
-                dbtype: env.DBTYPE,
-                lastModified: dateTimeFormat(env.CREATED, "yyyy-mm-dd'T'HH:nn:ss'Z'"),
-                status: env.STATUS,
-                source: env.SOURCE
-            };
-            
-            if (structKeyExists(env, "DEBUG")) {
-                envData.debug = env.DEBUG;
-            }
-            if (structKeyExists(env, "CACHE")) {
-                envData.cache = env.CACHE;
-            }
-            if (structKeyExists(env, "CONFIGPATH")) {
-                envData.configPath = env.CONFIGPATH;
-            }
-            if (structKeyExists(env, "VALIDATIONERRORS") && arrayLen(env.VALIDATIONERRORS)) {
-                envData.errors = env.VALIDATIONERRORS;
-            }
-            
-            arrayAppend(output.environments, envData);
-        }
-        
-        return serializeJSON(output);
-    }
 
-    /**
-    * Format as YAML
-    */
-    private function formatAsYAML(environments, currentEnv) {
-        var yaml = [];
-        arrayAppend(yaml, "environments:");
-        
-        for (var env in arguments.environments) {
-            arrayAppend(yaml, "  - name: #env.NAME#");
-            arrayAppend(yaml, "    type: #env.TYPE#");
-            arrayAppend(yaml, "    active: #env.ACTIVE#");
-            arrayAppend(yaml, "    template: #env.TEMPLATE#");
-            arrayAppend(yaml, "    database: #env.DATABASE#");
-            arrayAppend(yaml, "    dbtype: #env.DBTYPE#");
-            arrayAppend(yaml, "    created: #dateTimeFormat(env.CREATED, 'yyyy-mm-dd HH:nn:ss')#");
-            arrayAppend(yaml, "    source: #env.SOURCE#");
-            arrayAppend(yaml, "    status: #env.STATUS#");
-            
-            if (structKeyExists(env, "VALIDATIONERRORS") && arrayLen(env.VALIDATIONERRORS)) {
-                arrayAppend(yaml, "    errors:");
-                for (var error in env.VALIDATIONERRORS) {
-                    arrayAppend(yaml, "      - #error#");
-                }
-            }
-        }
-        
-        arrayAppend(yaml, "");
-        arrayAppend(yaml, "current: #arguments.currentEnv#");
-        arrayAppend(yaml, "total: #arrayLen(arguments.environments)#");
-        
-        return arrayToList(yaml, chr(10));
-    }
 
-    /**
-    * Format as table
-    */
-    private function formatAsTable(environments, verbose, currentEnv) {
-        var output = [];
-        
-        // Title
-        arrayAppend(output, "Available Environments");
-        arrayAppend(output, "=====================");
-        arrayAppend(output, "");
-        
-        if (arrayLen(arguments.environments) == 0) {
-            arrayAppend(output, "No environments configured");
-            arrayAppend(output, "Create an environment with: wheels env setup <environment>");
-            return arrayToList(output, chr(10));
-        }
-        
-        if (arguments.verbose) {
-            // Verbose format
-            for (var env in arguments.environments) {
-                var marker = env.ACTIVE ? " * " : "";
-                var status = env.ACTIVE ? "[Active]" : "";
-                
-                arrayAppend(output, "#env.NAME##marker##status#");
-                arrayAppend(output, "  Type:        #env.TYPE#");
-                arrayAppend(output, "  Database:    #env.DATABASE#");
-                arrayAppend(output, "  Datasource:  #env.DATASOURCE#");
-                if (structKeyExists(env, "DEBUG")) {
-                    arrayAppend(output, "  Debug:       #env.DEBUG == 'true' ? 'Enabled' : 'Disabled'#");
-                }
-                if (structKeyExists(env, "CACHE")) {
-                    arrayAppend(output, "  Cache:       #env.CACHE == 'true' ? 'Enabled' : 'Disabled'#");
-                }
-                if (structKeyExists(env, "CONFIGPATH")) {
-                    arrayAppend(output, "  Config:      #env.CONFIGPATH#");
-                }
-                arrayAppend(output, "  Modified:    #dateTimeFormat(env.CREATED, 'yyyy-mm-dd HH:nn:ss')#");
-                if (structKeyExists(env, "VALIDATIONERRORS") && arrayLen(env.VALIDATIONERRORS)) {
-                    arrayAppend(output, "  Issues:      #arrayToList(env.VALIDATIONERRORS, ', ')#");
-                }
-                arrayAppend(output, "");
-            }
-        } else {
-            // Table format
-            arrayAppend(output, "  NAME          TYPE         DATABASE           STATUS");
-            for (var env in arguments.environments) {
-                var name = env.NAME;
-                var marker = env.ACTIVE ? " *" : "";
-                var statusIcon = env.STATUS == "valid" ? "OK" : "WARN";
-                var statusText = env.ACTIVE ? "#statusIcon# Active" : "#statusIcon# #uCase(left(env.STATUS, 1))##right(env.STATUS, len(env.STATUS) - 1)#";
-                
-                // Pad columns for alignment
-                name = left(name & repeatString(" ", 14), 14);
-                var type = left(env.TYPE & repeatString(" ", 13), 13);
-                var database = left(env.DATABASE & repeatString(" ", 19), 19);
-                
-                arrayAppend(output, "  #name##type##database##statusText#");
-            }
-        }
-        
-        arrayAppend(output, "");
-        arrayAppend(output, "* = Current environment");
-        
-        return arrayToList(output, chr(10));
-    }
+
 
     /**
     * Validate environment configuration
@@ -1756,7 +1601,7 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         var isValid = true;
         
         // Check required fields
-        var requiredFields = ["DB_TYPE", "DB_NAME"];
+        var requiredFields = ["DB_TYPE", "DB_DATABASE"];
         for (var field in requiredFields) {
             if (!structKeyExists(arguments.config, field) || !len(trim(arguments.config[field]))) {
                 arrayAppend(errors, "Missing required field: #field#");
@@ -1855,7 +1700,7 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
     * @projectRoot The root directory of the CFWheels project
     * @return String The current environment name, or empty string if not found
     */
-    function getCurrentEnvironment(projectRoot) {
+    public function getCurrentEnvironment(projectRoot) {
         var currentEnv = "";
 
         // Use current directory if projectRoot not provided
@@ -1870,8 +1715,8 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
             var matches = reMatchNoCase("WHEELS_ENV\s*=\s*([^\r\n]+)", envContent);
             if (arrayLen(matches)) {
                 currentEnv = trim(matches[1]);
-                // Remove quotes if present
-                currentEnv = reReplace(currentEnv, "^[""']|[""']$", "", "all");
+                // Remove quotes if present and remove key name "wheels_env="
+                currentEnv = reReplace(currentEnv, "^([""']|wheels_env=)|([""'])$", "", "all");
             }
         }
 

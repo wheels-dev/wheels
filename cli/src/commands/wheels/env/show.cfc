@@ -14,6 +14,9 @@
  */
 component extends="../base" {
     
+    // Inject DetailOutputService
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     /**
      * @key.hint Specific environment variable key to show
      * @format.hint Output format: table (default) or json
@@ -35,28 +38,35 @@ component extends="../base" {
         try {
             // Check if we're in a Wheels project
             if (!directoryExists(resolvePath("app"))) {
-                error("This command must be run from a Wheels project root directory");
+                detailOutput.error("This command must be run from a Wheels project root directory");
             }
             
-            print.greenBoldLine("Environment Variables Viewer").line();
+            detailOutput.header("Environment Variables Viewer");
             
             // Read the .env file
             var envFile = resolvePath(arguments.file);
             if (!fileExists(envFile)) {
-                print.yellowLine("No #arguments.file# file found in project root");
-                print.line();
-                print.line("Create a .env file with key=value pairs, for example:");
-                print.line();
-                print.cyanLine("## Database Configuration");
-                print.cyanLine("DB_HOST=localhost");
-                print.cyanLine("DB_PORT=3306");
-                print.cyanLine("DB_NAME=myapp");
-                print.cyanLine("DB_USER=wheels");
-                print.cyanLine("DB_PASSWORD=secret");
-                print.line();
-                print.cyanLine("## Application Settings");
-                print.cyanLine("WHEELS_ENV=development");
-                print.cyanLine("WHEELS_RELOAD_PASSWORD=mypassword");
+                detailOutput.statusWarning("No #arguments.file# file found in project root");
+                detailOutput.line();
+                detailOutput.subHeader("Create a .env file with key=value pairs, for example:");
+                detailOutput.line();
+                
+                // Create example rows for table
+                var exampleRows = [
+                    { "Variable" = "## Database Configuration", "Value" = "", "Source" = "" },
+                    { "Variable" = "DB_HOST", "Value" = "localhost", "Source" = ".env.example" },
+                    { "Variable" = "DB_PORT", "Value" = "3306", "Source" = ".env.example" },
+                    { "Variable" = "DB_NAME", "Value" = "myapp", "Source" = ".env.example" },
+                    { "Variable" = "DB_USER", "Value" = "wheels", "Source" = ".env.example" },
+                    { "Variable" = "DB_PASSWORD", "Value" = "secret", "Source" = ".env.example" },
+                    { "Variable" = "## Application Settings", "Value" = "", "Source" = "" },
+                    { "Variable" = "WHEELS_ENV", "Value" = "development", "Source" = ".env.example" },
+                    { "Variable" = "WHEELS_RELOAD_PASSWORD", "Value" = "mypassword", "Source" = ".env.example" }
+                ];
+                
+                print.table(exampleRows);
+                detailOutput.line();
+                detailOutput.statusInfo("Use 'wheels env set KEY=VALUE' to create environment variables");
                 return;
             }
             
@@ -64,39 +74,57 @@ component extends="../base" {
             var envVars = parseEnvFile(envFile);
             
             if (structIsEmpty(envVars)) {
-                print.yellowLine("No environment variables found in #arguments.file#");
+                detailOutput.statusWarning("No environment variables found in #arguments.file#");
                 return;
             }
             
             // Handle specific key request
             if (len(arguments.key)) {
                 if (!structKeyExists(envVars, arguments.key)) {
-                    print.yellowLine("Environment variable '#arguments.key#' not found in #arguments.file#");
-                    print.line();
-                    print.line("Available keys:");
+                    detailOutput.statusWarning("Environment variable '#arguments.key#' not found in #arguments.file#");
+                    
+                    // Show available keys in a table
+                    var availableRows = [];
                     for (var availKey in structKeyArray(envVars).sort("text")) {
-                        print.line("  - #availKey#");
+                        arrayAppend(availableRows, {
+                            "Available Variables" = availKey,
+                            "Current Value" = maskSensitiveValue(availKey, envVars[availKey])
+                        });
+                    }
+                    
+                    if (arrayLen(availableRows)) {
+                        detailOutput.line();
+                        detailOutput.subHeader("Available Variables in #arguments.file#");
+                        print.table(availableRows);
                     }
                     return;
                 }
                 
                 // Found the key
-                var displayValue = envVars[arguments.key];
-                if (findNoCase("password", arguments.key) || findNoCase("secret", arguments.key) || findNoCase("key", arguments.key)) {
-                    displayValue = repeatString("*", min(len(displayValue), 8));
-                }
+                var displayValue = maskSensitiveValue(arguments.key, envVars[arguments.key]);
                 
                 if (arguments.format == "json") {
-                    local.jsonData = serializeJSON({Key: arguments.key,value: displayValue,source: arguments.file}, true);
-                    print.line(deserializeJSON(local.jsonData));
+                    local.jsonData = serializeJSON({
+                        Variable: arguments.key, 
+                        Value: displayValue, 
+                        Source: arguments.file
+                    }, true);
+                    detailOutput.code(deserializeJSON(local.jsonData), "json");
                 } else {
                     var rows = [
                         { "Variable" = arguments.key, "Value" = displayValue, "Source" = arguments.file }
                     ];
+                    detailOutput.subHeader("Environment Variable Details");
                     print.table(rows);
+                    
+                    // Add usage info
+                    detailOutput.line();
+                    detailOutput.statusInfo("Usage:");
+                    detailOutput.output("- Access in app: application.env['#arguments.key#']", true);
+                    detailOutput.output("- Use in config: set(value=application.env['#arguments.key#'])", true);
                 }
                 
-                return; // stop here, don’t print all vars
+                return; // stop here, don't print all vars
             }
             
             // Show all environment variables
@@ -104,38 +132,62 @@ component extends="../base" {
                 // Mask sensitive values in JSON output
                 var maskedVars = {};
                 for (var envKey in envVars) {
-                    maskedVars[envKey] = envVars[envKey];
-                    if (findNoCase("password", envKey) || findNoCase("secret", envKey) || findNoCase("key", envKey)) {
-                        maskedVars[envKey] = repeatString("*", min(len(envVars[envKey]), 8));
-                    }
+                    maskedVars[envKey] = maskSensitiveValue(envKey, envVars[envKey]);
                 }
-                print.line(maskedVars);
+                detailOutput.code(serializeJSON(maskedVars, true), "json");
             } else if (arguments.format == "table") {
                 // Build rows for table
                 var rows = [];
+
                 for (var envKey in envVars) {
-                    var displayValue = envVars[envKey];
-                    if (findNoCase("password", envKey) || findNoCase("secret", envKey) || findNoCase("key", envKey)) {
-                        displayValue = repeatString("*", min(len(displayValue), 8));
+                    var displayValue = maskSensitiveValue(envKey, envVars[envKey]);
+
+                    var row = structNew("ordered");
+                    row["Variable"] = envKey;
+                    row["Value"]    = displayValue;
+                    row["Source"]   = arguments.file;
+
+                    arrayAppend(rows, row);
+                }
+
+                // Sort rows by Variable name
+                rows.sort(function(a, b) {
+                    return compareNoCase(a.Variable, b.Variable);
+                });
+                
+                detailOutput.subHeader("Environment Variables from #arguments.file#");
+                detailOutput.getPrint().table(rows);
+                detailOutput.line();
+                
+                // Show summary and tips
+                var sensitiveCount = 0;
+                for (var envKey in envVars) {
+                    if (isSensitiveKey(envKey)) {
+                        sensitiveCount++;
                     }
-                    arrayAppend(rows, {
-                        "Variable" = envKey,
-                        "Value"    = displayValue,
-                        "Source"   = arguments.file
-                    });
                 }
                 
-                print.boldYellowLine("Environment Variables from #arguments.file#:");
-                print.line();
-                print.table(rows);
-                print.line();
-                print.greyLine("Tip: Access these in your app with application.env['KEY_NAME']");
-                print.greyLine("Or use them in config files: set(dataSourceName=application.env['DB_NAME'])");
-                print.greyLine("Wheels automatically loads .env on application start");
+                detailOutput.metric("Total variables", "#structCount(envVars)#");
+                if (sensitiveCount > 0) {
+                    detailOutput.metric("Sensitive variables", "#sensitiveCount# (masked)");
+                }
+                detailOutput.line();
+                detailOutput.statusInfo("Usage tips:");
+                detailOutput.output("- Access in app: application.env['VARIABLE_NAME']", true);
+                detailOutput.output("- Use in config: set(value=application.env['VARIABLE_NAME'])", true);
+                detailOutput.output("- Wheels loads .env automatically on app start", true);
+                detailOutput.output("- Update: wheels env set KEY=VALUE", true);
+                
+            } else if (arguments.format == "list") {
+                detailOutput.subHeader("Environment Variables from #arguments.file#");
+                for (var envKey in envVars) {
+                    var displayValue = maskSensitiveValue(envKey, envVars[envKey]);
+                    detailOutput.output("#envKey#=#displayValue#");
+                }
             }
             
         } catch (any e) {
-            error("Error showing environment variables: #e.message#");
+            detailOutput.error("Error showing environment variables: #e.message#");
         }
     }
     
@@ -181,5 +233,29 @@ component extends="../base" {
         }
         
         return envVars;
+    }
+    
+    /**
+     * Mask sensitive values
+     */
+    private function maskSensitiveValue(required string key, required string value) {
+        if (isSensitiveKey(arguments.key)) {
+            return repeatString("*", min(len(arguments.value), 8));
+        }
+        return arguments.value;
+    }
+    
+    /**
+     * Check if a key is sensitive
+     */
+    private function isSensitiveKey(required string key) {
+        return (
+            findNoCase("password", arguments.key) || 
+            findNoCase("secret", arguments.key)   || 
+            findNoCase("key", arguments.key)      || 
+            findNoCase("token", arguments.key)    ||
+            findNoCase("auth", arguments.key)     ||
+            findNoCase("credential", arguments.key)
+        );
     }
 }

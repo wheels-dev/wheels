@@ -10,6 +10,9 @@
  */
 component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
+	// Inject DetailOutputService
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @key=value.hint Environment variable(s) to set in KEY=VALUE format
 	 * @file.hint The .env file to update (defaults to .env)
@@ -30,7 +33,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		}
 
 		if (StructIsEmpty(local.updates)) {
-			error("No key=value pairs provided. Usage: wheels env set KEY=VALUE");
+			detailOutput.error("No key=value pairs provided. Usage: wheels env set KEY=VALUE");
 		}
 
 		// Update the .env file
@@ -122,9 +125,10 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		try {
 			FileWrite(arguments.envFile, local.envContent);
 			
-			print.line();
-			print.greenLine("Environment variables updated in #GetFileFromPath(arguments.envFile)#:");
+			detailOutput.line();
+			detailOutput.statusSuccess("Environment variables updated in #GetFileFromPath(arguments.envFile)#:");
 
+			// Display updated values
 			for (local.key in local.updatedKeys) {
 				local.displayValue = arguments.updates[local.key];
 				// Mask sensitive values
@@ -137,7 +141,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					local.displayValue = "***MASKED***";
 				}
 
-				print.line("  #local.key# = #ReReplace(local.displayValue, ',$', '', 'all')#");
+				detailOutput.metric(local.key, ReReplace(local.displayValue, ',$', '', 'all'));
 			}
 
 			// Warn if .env is not in .gitignore
@@ -146,14 +150,21 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 				if (FileExists(local.gitignore)) {
 					local.gitignoreContent = FileRead(local.gitignore);
 					if (!FindNoCase(GetFileFromPath(arguments.envFile), local.gitignoreContent)) {
-						print.line();
-						print.yellowLine("Warning: #GetFileFromPath(arguments.envFile)# is not in .gitignore!");
-						print.line("  Add it to .gitignore to prevent committing secrets.");
+						detailOutput.line();
+						detailOutput.statusWarning("#GetFileFromPath(arguments.envFile)# is not in .gitignore!");
+						detailOutput.output("Add it to .gitignore to prevent committing secrets.");
 					}
 				}
 			}
+			
+			// Show next steps
+			detailOutput.line();
+			detailOutput.statusInfo("Next steps:");
+			detailOutput.output("- Restart your application for changes to take effect", true);
+			detailOutput.output("- Use 'wheels env show' to view all environment variables", true);
+			
 		} catch (any e) {
-			error("Failed to update .env file: #e.message#");
+			detailOutput.error("Failed to update .env file: #e.message#");
 		}
 	}
 

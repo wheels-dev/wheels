@@ -8,6 +8,7 @@
 component extends="../base" {
     
     property name="environmentService" inject="EnvironmentService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @environment.hint Environment name (e.g. development, staging, production)
@@ -50,7 +51,8 @@ component extends="../base" {
 
         // Show help if requested
         if ( arguments.help == true) {
-            return showSetupHelp();
+            print.line(showSetupHelp()).toConsole();
+            return;
         } else {
             while ( trim(arguments.environment) == "" ) {
                 arguments.environment = ask(
@@ -59,8 +61,9 @@ component extends="../base" {
             }
         }
 
-        print.yellowLine("Setting up #arguments.environment# environment...")
-             .line();
+        print.line("Setting up #arguments.environment# environment...").toConsole();
+        detailOutput.header("Environment Setup");
+        detailOutput.statusInfo("Setting up #arguments.environment# environment");
 
         // CHECK ENVIRONMENT EXISTENCE FIRST - before prompting for credentials
         var envFile = projectRoot & "/.env." & arguments.environment;
@@ -70,32 +73,32 @@ component extends="../base" {
             if (arguments.force) {
                 updateMode = "overwrite";
             } else {
-                print.line();
-                print.yellowLine("Environment '#arguments.environment#' already exists.");
-                print.line();
-                print.yellowLine("What would you like to do?");
-                print.line("  1. Overwrite entire environment file");
-                print.line("  2. Update only database variables (preserve other settings)");
-                print.line("  3. Cancel");
-                print.line();
+                detailOutput.line();
+                detailOutput.statusWarning("Environment '#arguments.environment#' already exists.");
+                detailOutput.statusInfo("What would you like to do?");
+                detailOutput.line();
+                detailOutput.output("  1. Overwrite entire environment file", true);
+                detailOutput.output("  2. Update only database variables (preserve other settings)", true);
+                detailOutput.output("  3. Cancel", true);
+                detailOutput.line();
 
                 var choice = ask("Select option [1-3]: ");
 
                 switch(choice) {
                     case "1":
                         updateMode = "overwrite";
-                        print.greenLine("Will overwrite environment file...");
+                        detailOutput.statusSuccess("Will overwrite environment file...");
                         break;
                     case "2":
                         updateMode = "update";
-                        print.greenLine("Will update only database variables...");
+                        detailOutput.statusSuccess("Will update only database variables...");
                         break;
                     case "3":
                     default:
-                        print.yellowLine("Environment setup cancelled.");
+                        detailOutput.statusWarning("Environment setup cancelled.");
                         return;
                 }
-                print.line();
+                detailOutput.line();
             }
         }
 
@@ -109,13 +112,13 @@ component extends="../base" {
                                            !len(trim(arguments.password)));
 
         if (needsInteractiveDatasource) {
-            print.line();
-            print.yellowLine("Database credentials not provided for #arguments.dbtype# database");
+            detailOutput.line();
+            detailOutput.statusWarning("Database credentials not provided for #arguments.dbtype# database");
 
             if (confirm("Would you like to enter database credentials now? [y/n]")) {
-                print.line();
-                print.cyanLine("Please provide database connection details:");
-                print.line();
+                detailOutput.line();
+                detailOutput.subHeader("Database Configuration");
+                detailOutput.line();
 
                 // Prompt for host
                 if (!len(trim(arguments.host))) {
@@ -162,20 +165,21 @@ component extends="../base" {
                     }
                 }
 
-                print.line();
-                print.greenLine("Database credentials captured successfully!");
-                print.line();
+                detailOutput.line();
+                detailOutput.statusSuccess("Database credentials captured successfully!");
+                detailOutput.line();
             } else {
-                print.yellowLine("Using default credentials. You can update them in .env.#arguments.environment# later.");
-                print.line();
+                detailOutput.statusWarning("Using default credentials. You can update them in .env.#arguments.environment# later.");
+                detailOutput.line();
             }
         }
 
         var result = environmentService.setup(argumentCollection = arguments, rootPath=projectRoot, updateMode=updateMode );
 
         if (result.success) {
-            print.greenLine("Environment setup complete!")
-                 .line();
+            detailOutput.separator();
+            detailOutput.statusSuccess("Environment setup complete!");
+            detailOutput.line();
 
             // Create database if not skipped
             if (!arguments.skipDatabase && result.keyExists("config") && result.config.keyExists("datasourceInfo")) {
@@ -183,8 +187,8 @@ component extends="../base" {
                     result.config.datasourceInfo.datasource : "wheels_#arguments.environment#";
                 var databaseName = result.config.datasourceInfo.database;
 
-                print.yellowLine("Creating database '#databaseName#'...")
-                     .line();
+                print.line("Creating database '#databaseName#'...").toConsole();
+                detailOutput.line();
 
                 try {
                     command("wheels db create")
@@ -196,25 +200,40 @@ component extends="../base" {
                             force = true
                         )
                         .run();
+                    detailOutput.statusSuccess("Database created successfully!");
                 } catch (any e) {
-                    print.yellowLine("Warning: Database creation failed - #e.message#")
-                         .line()
-                         .yellowLine("You can create it manually with:")
-                         .line("  wheels db create datasource=#datasourceName# database=#databaseName# environment=#arguments.environment# dbtype=#arguments.dbtype#")
-                         .line();
+                    detailOutput.statusWarning("Database creation failed - #e.message#");
+                    detailOutput.line();
+                    detailOutput.statusInfo("You can create it manually with:");
+                    detailOutput.output("  wheels db create datasource=#datasourceName# database=#databaseName# environment=#arguments.environment# dbtype=#arguments.dbtype#", true);
+                    detailOutput.line();
                 }
             }
 
             if (result.keyExists("nextSteps") && arrayLen(result.nextSteps)) {
-                print.yellowBoldLine("Next Steps:")
-                     .line();
+                detailOutput.statusInfo("Next Steps:");
+                detailOutput.line();
 
                 for (var step in result.nextSteps) {
-                    print.line(step);
+                    detailOutput.output("  - #step#", true);
                 }
+                detailOutput.line();
             }
+            
+            // Show summary
+            detailOutput.subHeader("Summary");
+            detailOutput.metric("Environment", arguments.environment);
+            detailOutput.metric("Template", arguments.template);
+            detailOutput.metric("Database Type", arguments.dbtype);
+            if (result.keyExists("config") && result.config.keyExists("datasourceInfo")) {
+                detailOutput.metric("Datasource", result.config.datasourceInfo.datasource);
+                detailOutput.metric("Database", result.config.datasourceInfo.database);
+            }
+            detailOutput.metric("Debug Mode", arguments.debug ? "Enabled" : "Disabled");
+            detailOutput.metric("Cache Mode", arguments.cache ? "Enabled" : "Disabled");
+            
         } else {
-            print.redLine("Setup failed: #result.error#");
+            detailOutput.error("Setup failed: #result.error#");
             setExitCode(1);
         }
     }
