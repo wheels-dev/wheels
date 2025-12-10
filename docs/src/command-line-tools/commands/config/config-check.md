@@ -94,24 +94,34 @@ The command performs validation across multiple configuration areas:
 The command provides real-time status as it performs checks:
 
 ```
-========================================
-Configuration Validation
-Environment: development
-========================================
 
-Checking configuration files... [OK]
-Checking required settings... [OK]
-Checking security configuration... [WARNING]
-Checking database configuration... [OK]
-Checking environment-specific settings... [WARNING]
-Checking .env file configuration... [FAILED]
+==================================================
+Configuration Validation - development Environment
+==================================================
 
-========================================
+
+[SUCCESS]: Files Configuration
+[SUCCESS]: Required Settings
+[SUCCESS]: Security Configuration
+[SUCCESS]: Database Configuration
+[SUCCESS]: Environment-Specific Settings
+[FAILED]: .env File Configuration
+
+--------------------------------------------------
+
+[ERRORS] (1):
+   - .env file not in .gitignore
+
+--------------------------------------------------
+[FAILED] Configuration check failed
+  Found: 1 error
+
+  Tip: Run with --verbose flag for detailed fix suggestions
 ```
 
 ### Status Indicators
 
-- **[OK]** - Check passed successfully
+- **[SUCCESS]** - Check passed successfully
 - **[WARNING]** - Non-critical issues found
 - **[FAILED]** - Critical errors detected
 - **[FIXED]** - Issue was automatically fixed
@@ -142,7 +152,7 @@ Checking .env file configuration... [FAILED]
 
 ### Summary Output
 ```
-[PASSED] Configuration validation successful!
+[SUCCESS] Configuration validation successful!
   All checks completed successfully.
 ```
 
