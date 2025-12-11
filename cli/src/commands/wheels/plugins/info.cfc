@@ -8,6 +8,7 @@ component aliases="wheels plugin info" extends="../base" {
     
     property name="pluginService" inject="PluginService@wheels-cli";
     property name="packageService" inject="PackageService";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @name.hint Name of the plugin to show info for
@@ -16,12 +17,8 @@ component aliases="wheels plugin info" extends="../base" {
         requireWheelsApp(getCWD());
         arguments = reconstructArgs(argStruct=arguments);
         try {
-            print.line()
-                 .boldMagentaLine("===========================================================")
-                 .boldMagentaText("  Plugin Information: ")
-                 .boldWhiteLine(arguments.name)
-                 .boldMagentaLine("===========================================================")
-                 .line();
+            detailOutput.header("Plugin Information: #arguments.name#");
+            detailOutput.line();
 
             // Check local installation status in /plugins folder only
             var isInstalled = false;
@@ -45,10 +42,9 @@ component aliases="wheels plugin info" extends="../base" {
             var forgeboxInfo = {};
 
             if (isInstalled) {
-                print.boldLine("Status:")
-                     .text("  ")
-                     .boldGreenLine("Installed locally")
-                     .line();
+                detailOutput.subHeader("Status");
+                detailOutput.statusSuccess("Installed locally");
+                detailOutput.line();
 
                 // Try to get information from local plugin's box.json
                 var localPluginInfo = getLocalPluginInfo(pluginPath);
@@ -58,17 +54,14 @@ component aliases="wheels plugin info" extends="../base" {
                     displayLocalPluginInfo(localPluginInfo, installedVersion);
                 } else {
                     // Fallback if we can't read local plugin info
-                    print.boldLine("Details:")
-                         .text("  Version:     ")
-                         .cyanLine(installedVersion)
-                         .line();
+                    detailOutput.subHeader("Details");
+                    detailOutput.metric("Version", installedVersion);
+                    detailOutput.line();
                 }
             } else {
-                print.boldLine("Status:")
-                     .text("  ")
-                     .yellowBoldText("[X] ")
-                     .yellowLine("Not installed")
-                     .line();
+                detailOutput.subHeader("Status");
+                detailOutput.statusWarning("Not installed");
+                detailOutput.line();
 
                 // Try to get detailed ForgeBox information only if not installed
                 try {
@@ -85,31 +78,32 @@ component aliases="wheels plugin info" extends="../base" {
 
                 // Display ForgeBox information section
                 if (hasForgeboxData) {
-                    print.line(forgeboxResult);
+                    // Display the raw forgebox output
+                    detailOutput.code(forgeboxResult);
                 } else {
                     // Plugin not found anywhere - show helpful message instead of error
-                    print.redLine("Plugin Not Installed")
-                         .line()
-                         .line("The plugin '#arguments.name#' was not found in:")
-                         .line(" Local installation (box.json dependencies)")
-                         .line(" ForgeBox repository")
-                         .line()
-                         .line("Possible reasons:")
-                         .line(" Plugin name may be misspelled")
-                         .line(" Plugin may not exist on ForgeBox")
-                         .line(" Network connection issues")
-                         .line()
-                         .line("Suggestions:")
-                         .cyanLine(" Search for available plugins: wheels plugin list --available")
-                         .cyanLine(" Verify the correct plugin name")
-                         .line();
+                    detailOutput.statusFailed("Plugin Not Found");
+                    detailOutput.line();
+                    detailOutput.output("The plugin '#arguments.name#' was not found in:");
+                    detailOutput.output("- Local installation (box.json dependencies)", true);
+                    detailOutput.output("- ForgeBox repository", true);
+                    detailOutput.line();
+                    detailOutput.statusInfo("Possible reasons");
+                    detailOutput.output("- Plugin name may be misspelled", true);
+                    detailOutput.output("- Plugin may not exist on ForgeBox", true);
+                    detailOutput.output("- Network connection issues", true);
+                    detailOutput.line();
+                    detailOutput.statusInfo("Suggestions");
+                    detailOutput.output("- Search for available plugins: wheels plugin list --available", true);
+                    detailOutput.output("- Verify the correct plugin name", true);
+                    detailOutput.line();
                     return;
                 }
             }
 
             // Show installation/update commands only if plugin exists somewhere
             if (isInstalled || hasForgeboxData) {
-                print.boldLine("Commands:");
+                detailOutput.subHeader("Commands");
 
                 if (isInstalled) {
                     // Check if update available - handle version prefixes like "^0.0.4"
@@ -119,26 +113,21 @@ component aliases="wheels plugin info" extends="../base" {
                         var latestVersion = trim(forgeboxInfo.latestVersion);
 
                         if (cleanInstalledVersion != latestVersion) {
-                            print.text("  ")
-                                 .yellowBoldText("[!] ")
-                                 .yellowLine("Update Available: #cleanInstalledVersion# -> #latestVersion#")
-                                 .line();
+                            detailOutput.statusWarning("Update Available: #cleanInstalledVersion# -> #latestVersion#");
+                            detailOutput.line();
                         }
                     }
-                    print.text("  Update:  ")
-                         .cyanLine("wheels plugin update #arguments.name#");
+                    detailOutput.output("- Update:  wheels plugin update #arguments.name#", true);
                 } else {
-                    print.text("  Install: ")
-                         .cyanLine("wheels plugin install #arguments.name#");
+                    detailOutput.output("- Install: wheels plugin install #arguments.name#", true);
                 }
 
-                print.text("  Search:  ")
-                     .cyanLine("wheels plugin search")
-                     .line();
+                detailOutput.output("- Search:  wheels plugin search", true);
+                detailOutput.line();
             }
             
         } catch (any e) {
-            error("Error getting plugin info: #e.message#");
+            detailOutput.error("Error getting plugin info: #e.message#");
         }
     }
     
@@ -171,51 +160,54 @@ component aliases="wheels plugin info" extends="../base" {
      * Display local plugin information from box.json
      */
     private function displayLocalPluginInfo(required struct pluginInfo, required string installedVersion) {
-        print.line();
-
         // Display name prominently
         if (structKeyExists(pluginInfo, "name") && isSimpleValue(pluginInfo.name) && len(pluginInfo.name)) {
-            print.boldCyanLine(pluginInfo.name);
+            detailOutput.subHeader(pluginInfo.name);
         }
 
         // Display short description
         if (structKeyExists(pluginInfo, "shortDescription") && isSimpleValue(pluginInfo.shortDescription) && len(pluginInfo.shortDescription)) {
-            print.line(pluginInfo.shortDescription).line();
-        } else {
-            print.line();
+            detailOutput.output(pluginInfo.shortDescription);
         }
 
+        detailOutput.line();
+
         // Details section
-        print.boldLine("Details:");
+        detailOutput.subHeader("Details");
 
         // Display version
         if (structKeyExists(pluginInfo, "version") && isSimpleValue(pluginInfo.version) && len(pluginInfo.version)) {
-            print.text("  Version:     ").cyanLine(pluginInfo.version);
+            detailOutput.metric("Version", pluginInfo.version);
         } else {
-            print.text("  Version:     ").cyanLine(installedVersion);
+            detailOutput.metric("Version", installedVersion);
         }
 
         // Display slug
         if (structKeyExists(pluginInfo, "slug") && isSimpleValue(pluginInfo.slug) && len(pluginInfo.slug)) {
-            print.text("  Slug:        ").line(pluginInfo.slug);
+            detailOutput.metric("Slug", pluginInfo.slug);
         }
 
         // Display type
         if (structKeyExists(pluginInfo, "type") && isSimpleValue(pluginInfo.type) && len(pluginInfo.type)) {
-            print.text("  Type:        ").line(pluginInfo.type);
+            detailOutput.metric("Type", pluginInfo.type);
         }
 
         // Display author
         if (structKeyExists(pluginInfo, "author") && isSimpleValue(pluginInfo.author) && len(pluginInfo.author)) {
-            print.text("  Author:      ").line(pluginInfo.author);
+            detailOutput.metric("Author", pluginInfo.author);
         }
 
         // Display keywords - handle both string and array formats
         if (structKeyExists(pluginInfo, "keywords")) {
+            var keywordDisplay = "";
             if (isSimpleValue(pluginInfo.keywords) && len(pluginInfo.keywords)) {
-                print.text("  Keywords:    ").line(pluginInfo.keywords);
+                keywordDisplay = pluginInfo.keywords;
             } else if (isArray(pluginInfo.keywords) && arrayLen(pluginInfo.keywords) > 0) {
-                print.text("  Keywords:    ").line(arrayToList(pluginInfo.keywords, ', '));
+                keywordDisplay = arrayToList(pluginInfo.keywords, ', ');
+            }
+            
+            if (len(keywordDisplay)) {
+                detailOutput.metric("Keywords", keywordDisplay);
             }
         }
 
@@ -237,35 +229,41 @@ component aliases="wheels plugin info" extends="../base" {
         }
 
         if (hasLinks) {
-            print.line().boldLine("Links:");
+            detailOutput.line();
+            detailOutput.subHeader("Links");
 
             // Display homepage
             if (structKeyExists(pluginInfo, "homepage") && isSimpleValue(pluginInfo.homepage) && len(pluginInfo.homepage)) {
-                print.text("  Homepage:    ").blueLine(pluginInfo.homepage);
+                detailOutput.output("- Homepage: #pluginInfo.homepage#", true);
             }
 
             // Display repository - handle both string and struct formats
             if (structKeyExists(pluginInfo, "repository")) {
+                var repoUrl = "";
                 if (isSimpleValue(pluginInfo.repository) && len(pluginInfo.repository)) {
-                    print.text("  Repository:  ").blueLine(pluginInfo.repository);
+                    repoUrl = pluginInfo.repository;
                 } else if (isStruct(pluginInfo.repository) && structKeyExists(pluginInfo.repository, "URL") &&
                            isSimpleValue(pluginInfo.repository.URL) && len(pluginInfo.repository.URL)) {
-                    print.text("  Repository:  ").blueLine(pluginInfo.repository.URL);
+                    repoUrl = pluginInfo.repository.URL;
+                }
+                
+                if (len(repoUrl)) {
+                    detailOutput.output("- Repository: #repoUrl#", true);
                 }
             }
 
             // Display documentation URL
             if (structKeyExists(pluginInfo, "documentation") && isSimpleValue(pluginInfo.documentation) && len(pluginInfo.documentation)) {
-                print.text("  Docs:        ").blueLine(pluginInfo.documentation);
+                detailOutput.output("- Docs: #pluginInfo.documentation#", true);
             }
 
             // Display bugs URL
             if (structKeyExists(pluginInfo, "bugs") && isSimpleValue(pluginInfo.bugs) && len(pluginInfo.bugs)) {
-                print.text("  Issues:      ").blueLine(pluginInfo.bugs);
+                detailOutput.output("- Issues: #pluginInfo.bugs#", true);
             }
         }
 
-        print.line();
+        detailOutput.line();
     }
 
     /**

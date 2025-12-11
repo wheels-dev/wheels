@@ -14,6 +14,9 @@ component aliases="wheels plugin init" extends="../base" {
      * @license.hint License type
      * @license.options MIT,Apache-2.0,GPL-3.0,BSD-3-Clause,ISC,Proprietary
      */
+    
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     function run(
         required string name,
         string author = "",
@@ -51,11 +54,6 @@ component aliases="wheels plugin init" extends="../base" {
                 }
             }
 
-            print.line()
-                 .boldCyanLine("===========================================================")
-                 .boldCyanLine("  Initializing Wheels Plugin: #pluginName#")
-                 .boldCyanLine("===========================================================")
-                 .line();
 
             // Create plugin in /plugins directory
             var pluginsBaseDir = fileSystemUtil.resolvePath("plugins");
@@ -67,16 +65,13 @@ component aliases="wheels plugin init" extends="../base" {
             }
 
             if (directoryExists(pluginDir)) {
-                print.boldRedText("[ERROR] ")
-                     .redLine("Plugin already exists")
-                     .line()
-                     .yellowLine("Plugin '#simplePluginName#' already exists in /plugins folder")
-                     .line();
+                detailOutput.error("Plugin already exists");
                 setExitCode(1);
                 return;
             }
+            detailOutput.header("  Initializing Wheels Plugin: #pluginName#");
 
-            print.line("Creating plugin in /plugins/#simplePluginName#/...");
+            detailOutput.output("Creating plugin in /plugins/#simplePluginName#/...");
 
             // Create plugin directory
             directoryCreate(pluginDir);
@@ -243,32 +238,26 @@ node_modules/
 
             fileWrite(pluginDir & "/tests/#simplePluginName#Test.cfc", testFile);
 
-            print.line()
-                 .boldCyanLine("===========================================================")
-                 .line()
-                 .boldGreenText("[OK] ")
-                 .greenLine("Plugin created successfully in /plugins/#simplePluginName#/")
-                 .line();
+            detailOutput.line();
+            detailOutput.statusSuccess("Plugin created successfully in /plugins/#simplePluginName#/");
+            detailOutput.line();
 
-            print.boldLine("Files Created:")
-                 .line("  #simplePluginName#.cfc    Main plugin component")
-                 .line("  index.cfm         Documentation page")
-                 .line("  box.json          Package metadata")
-                 .line("  README.md         Project documentation")
-                 .line();
+            detailOutput.statusInfo("Files Created:");
+            detailOutput.output("- #simplePluginName#.cfc: Main plugin component",true);
+            detailOutput.output("- index.cfm: Documentation page",true);
+            detailOutput.output("- box.json: Package metadata",true);
+            detailOutput.output("- README.md: Project documentation",true);
+            detailOutput.line();
 
-            print.boldLine("Next Steps:")
-                 .cyanLine("  1. Edit #simplePluginName#.cfc to add your plugin functions")
-                 .cyanLine("  2. Update index.cfm and README.md with usage examples")
-                 .cyanLine("  3. Test: wheels reload (then call your functions)")
-                 .cyanLine("  4. Publish: box login && box publish");
+            detailOutput.statusInfo("Next Steps:");
+            detailOutput.output("1. Edit #simplePluginName#.cfc to add your plugin functions", true);
+            detailOutput.output("2. Update index.cfm and README.md with usage examples", true);
+            detailOutput.output("3. Test: wheels reload (then call your functions)", true);
+            detailOutput.output("4. Publish: box login && box publish", true);
 
         } catch (any e) {
-            print.line()
-                 .boldRedText("[ERROR] ")
-                 .redLine("Error initializing plugin")
-                 .line()
-                 .yellowLine("Error: #e.message#");
+            detailOutput.statusFailed("Error initializing plugin");
+            detailOutput.error("#e.message#");
             setExitCode(1);
         }
     }

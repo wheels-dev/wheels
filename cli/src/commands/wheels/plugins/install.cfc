@@ -8,6 +8,7 @@
 component aliases="wheels plugin install" extends="../base" {
 
     property name="pluginService" inject="PluginService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @name.hint Plugin name or repository URL
@@ -22,55 +23,59 @@ component aliases="wheels plugin install" extends="../base" {
         requireWheelsApp(getCWD());
         arguments = reconstructArgs(argStruct=arguments);
 
-        print.line()
-             .boldCyanLine("===========================================================")
-             .boldCyanLine("  Installing Plugin")
-             .boldCyanLine("===========================================================")
-             .line();
+        detailOutput.header("Installing Plugin");
+        detailOutput.line();
 
         var packageSpec = arguments.name;
         if (len(arguments.version)) {
             packageSpec &= "@" & arguments.version;
         }
 
-        print.line("Plugin:  #arguments.name#");
+        detailOutput.metric("Plugin", arguments.name);
         if (len(arguments.version)) {
-            print.line("Version: #arguments.version#");
+            detailOutput.metric("Version", arguments.version);
         } else {
-            print.line("Version: latest");
+            detailOutput.metric("Version", "latest");
         }
-        print.line();
+        if (arguments.dev) {
+            detailOutput.metric("Type", "Development dependency");
+        }
+        detailOutput.line();
 
         var result = pluginService.install(argumentCollection = arguments);
 
-        print.boldCyanLine("===========================================================")
-             .line();
+        detailOutput.divider("=", 60);
+        detailOutput.line();
 
         if (result.success) {
-            print.boldGreenText("[OK] ")
-                 .greenLine("Plugin installed successfully!")
-                 .line();
+            detailOutput.statusSuccess("Plugin installed successfully!");
+            detailOutput.line();
 
             if (result.keyExists("plugin") && result.plugin.keyExists("description")) {
-                print.line("#result.plugin.description#")
-                     .line();
+                detailOutput.output("#result.plugin.description#");
+                detailOutput.line();
             }
 
-            print.boldLine("Commands:")
-                 .cyanLine("  wheels plugin list          View all installed plugins")
-                 .cyanLine("  wheels plugin info #arguments.name#   View plugin details");
+            detailOutput.subHeader("Commands");
+            detailOutput.output("- wheels plugin list          View all installed plugins", true);
+            detailOutput.output("- wheels plugin info #arguments.name#   View plugin details", true);
+            
+            if (result.keyExists("plugin") && result.plugin.keyExists("homepage")) {
+                detailOutput.line();
+                detailOutput.subHeader("Documentation");
+                detailOutput.output("- #result.plugin.homepage#", true);
+            }
         } else {
-            print.boldRedText("[ERROR] ")
-                 .redLine("Failed to install plugin")
-                 .line()
-                 .yellowLine("Error: #result.error#")
-                 .line();
+            detailOutput.statusFailed("Failed to install plugin");
+            detailOutput.error("Error: #result.error#");
+            detailOutput.line();
 
-            print.line("Possible solutions:")
-                 .line("  - Verify the plugin name is correct")
-                 .line("  - Check if the plugin exists on ForgeBox:")
-                 .cyanLine("    wheels plugin list --available")
-                 .line("  - Ensure the plugin type is 'cfwheels-plugins'");
+            detailOutput.statusInfo("Possible solutions");
+            detailOutput.output("- Verify the plugin name is correct", true);
+            detailOutput.output("- Check if the plugin exists on ForgeBox:", true);
+            detailOutput.output("  wheels plugin list --available", true);
+            detailOutput.output("- Ensure the plugin type is 'cfwheels-plugins'", true);
+            detailOutput.output("- Try clearing package cache: box clean", true);
 
             setExitCode(1);
         }

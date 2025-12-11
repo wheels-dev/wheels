@@ -7,6 +7,8 @@
  */
 component aliases="wheels get env" extends="../base" {
 
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @help Show the current environment setting
 	 */
@@ -68,16 +70,22 @@ component aliases="wheels get env" extends="../base" {
 				local.configSource = "Using default";
 			}
 			
-			print.line();
-			print.boldLine("Current Environment:");
-			print.greenLine(local.environment);
-			print.line();
+			detailOutput.header("Current Environment: #local.environment#");
+			detailOutput.metric("Configured in", local.configSource);
 			
-			// Show where it's configured
-			print.line("Configured in: " & local.configSource);
+			
+			// Add usage information
+			detailOutput.line();
+			if (local.configSource == "Using default") {
+				detailOutput.output("To set an environment:");
+				detailOutput.output("- wheels env set environment_name", true);
+				detailOutput.output("- wheels env switch environment_name", true);
+				detailOutput.output("- Set WHEELS_ENV in .env file",true);
+			}
 			
 		} catch (any e) {
-			error("Error reading environment: " & e.message);
+			detailOutput.error("Error reading environment: #e.message#");
+			return;
 		}
 	}
 }
