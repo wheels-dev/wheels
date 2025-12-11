@@ -44,7 +44,7 @@ component aliases="wheels g controller" extends="../base" {
         // Validate controller name
         var validation = codeGenerationService.validateName(listLast(arguments.name, "/"), "controller");
         if (!validation.valid) {
-            error("Invalid controller name: " & arrayToList(validation.errors, ", "));
+            detailOutput.error("Invalid controller name: " & arrayToList(validation.errors, ", "));
             return;
         }
         

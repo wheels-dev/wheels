@@ -62,12 +62,14 @@ component aliases='wheels g test' extends="../base"  {
 			// Try legacy directory
 			testsdirectory = fileSystemUtil.resolvePath( "tests" );
 			if( !directoryExists( testsdirectory ) ) {
-				error( "Tests directory not found. Are you running this from your site root?" );
+				details.error( "Tests directory not found. Are you running this from your site root?" );
+				return;
 			}
 		}
 		
 		if( arguments.type == "view" && !len(arguments.name)){
-			error( "If creating a view test, we need to know the name of the view as well as the target");
+			details.error( "If creating a view test, we need to know the name of the view as well as the target");
+			return;
 		}
 
 		// Determine test directory and name based on type

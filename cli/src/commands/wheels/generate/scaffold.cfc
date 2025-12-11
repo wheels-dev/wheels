@@ -69,7 +69,7 @@ component aliases="wheels g scaffold, wheels g resource, wheels generate resourc
         if (!validation.valid) {
             detailOutput.error("Cannot scaffold '#arguments.name#':");
             for (var error in validation.errors) {
-                print.redLine("   - #error#");
+                detailOutput.error("#error#");
             }
             setExitCode(1);
             return;
@@ -92,7 +92,7 @@ component aliases="wheels g scaffold, wheels g resource, wheels generate resourc
         if (!result.success) {
             detailOutput.error("Scaffolding failed!");
             for (var error in result.errors) {
-                print.redLine("   - #error#");
+                detailOutput.error("#error#");
             }
             setExitCode(1);
             return;

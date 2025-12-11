@@ -35,7 +35,7 @@ component aliases='wheels g helper' extends="../base" {
         // Validate helper name
         var validation = codeGenerationService.validateName(arguments.name, "helper");
         if (!validation.valid) {
-            error("Invalid helper name: " & arrayToList(validation.errors, ", "));
+            detailOutput.error("Invalid helper name: " & arrayToList(validation.errors, ", "));
             return;
         }
 
@@ -51,7 +51,7 @@ component aliases='wheels g helper' extends="../base" {
         
         // Check if file exists
         if (fileExists(helperPath) && !arguments.force) {
-            error("Helper already exists: #arguments.name#.cfm. Use force=true to overwrite.");
+            detailOutput.error("Helper already exists: #arguments.name#.cfm. Use force=true to overwrite.");
             return;
         }
         
@@ -62,7 +62,7 @@ component aliases='wheels g helper' extends="../base" {
         if (!arguments.force) {
             var existingFunctions = checkForExistingFunctions(helperDir, functionList, arguments.name);
             if (arrayLen(existingFunctions) > 0) {
-                error("The following function(s) already exist in helper files: #arrayToList(existingFunctions, ', ')#");
+                detailOutput.error("The following function(s) already exist in helper files: #arrayToList(existingFunctions, ', ')#");
                 return;
             }
         }

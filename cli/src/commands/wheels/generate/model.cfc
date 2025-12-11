@@ -85,7 +85,7 @@ component aliases='wheels g model' extends="../base" {
         // Validate model name
         var validation = codeGenerationService.validateName(arguments.name, "model");
         if (!validation.valid) {
-            error("Invalid model name: " & arrayToList(validation.errors, ", "));
+            detailOutput.error("Invalid model name: " & arrayToList(validation.errors, ", "));
             return;
         }
 

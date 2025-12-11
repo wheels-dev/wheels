@@ -53,7 +53,8 @@ component aliases='wheels g view' extends="../base"  {
 
 		// Validate directory
 		if( !directoryExists( viewdirectory ) ) {
-			error( "[#viewdirectory#] can't be found. Are you running this from your site root?" );
+			detailOutput.error( "[#viewdirectory#] can't be found. Are you running this from your site root?" );
+			return;
  		}
 
  		// Validate views subdirectory, create if doesnt' exist

@@ -35,7 +35,7 @@ component aliases='wheels g migration' extends="../base" {
 
         // Validate migration name
         if (!reFindNoCase("^[A-Za-z][A-Za-z0-9_]*$", arguments.name)) {
-            error("Invalid migration name. Use only letters, numbers, and underscores, starting with a letter.");
+            detailOutput.error("Invalid migration name. Use only letters, numbers, and underscores, starting with a letter.");
             return;
         }
 
