@@ -143,12 +143,6 @@ jobs:
             -O ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
           
           ls -l ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/
-      
-      - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
-        if: ${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}
-        run: |
-
-          echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> "./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
 
       - name: Start cfengine (${{ matrix.cfengine }}) ...
         run: docker compose up -d ${{ matrix.cfengine }}
