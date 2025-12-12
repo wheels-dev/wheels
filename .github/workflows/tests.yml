@@ -214,6 +214,26 @@ jobs:
           # Try a basic curl to see if service responds
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
 
+      - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
+        if: (${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}) && ${{ matrix.dbengine == 'oracle' }}
+        run: |
+          echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> "./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
+
+      - name: Check file content
+        if: (${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}) && ${{ matrix.dbengine == 'oracle' }}
+        run : |
+          cat ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt
+
+      - name: Restart CF Engine
+        if: (${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}) && ${{ matrix.dbengine == 'oracle' }}
+        run: |
+          docker restart wheels-${{ matrix.cfengine }}-1
+      
+      - name: Check file content
+        if: (${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}) && ${{ matrix.dbengine == 'oracle' }}
+        run : |
+          cat ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt
+      
       - name: Wait for Oracle to be ready
         if: ${{ matrix.dbengine == 'oracle' }}
         run: sleep 120
