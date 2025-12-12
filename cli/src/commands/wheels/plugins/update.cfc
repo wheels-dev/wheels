@@ -10,6 +10,7 @@ component aliases="wheels plugin update" extends="../base" {
     property name="packageService" inject="PackageService";
     property name="forgebox" inject="ForgeBox";
     property name="fileSystemUtil" inject="FileSystem";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
      * @name.hint Name or slug of the plugin to update
@@ -24,20 +25,13 @@ component aliases="wheels plugin update" extends="../base" {
         requireWheelsApp(getCWD());
         arguments = reconstructArgs(argStruct=arguments);
         try {
-            print.line()
-                 .boldCyanLine("===========================================================")
-                 .boldCyanLine("  Updating Plugin: #arguments.name#")
-                 .boldCyanLine("===========================================================")
-                 .line();
+            detailOutput.header("Updating Plugin: #arguments.name#");
 
             // Find plugin in /plugins folder
             var pluginsDir = fileSystemUtil.resolvePath("plugins");
             if (!directoryExists(pluginsDir)) {
-                print.boldRedText("[ERROR] ")
-                     .redLine("Plugins directory not found")
-                     .line()
-                     .yellowLine("Plugin '#arguments.name#' is not installed")
-                     .line();
+                detailOutput.error("Plugins directory not found");
+                detailOutput.statusWarning("Plugin '#arguments.name#' is not installed");
                 setExitCode(1);
                 return;
             }
@@ -46,13 +40,11 @@ component aliases="wheels plugin update" extends="../base" {
             var foundPlugin = pluginService.findPluginByName(pluginsDir, arguments.name);
 
             if (!foundPlugin.found) {
-                print.boldRedText("[ERROR] ")
-                     .redLine("Plugin not found")
-                     .line()
-                     .yellowLine("Plugin '#arguments.name#' is not installed")
-                     .line()
-                     .line("Install this plugin:")
-                     .cyanLine("  wheels plugin install #arguments.name#");
+                detailOutput.error("Plugin not found");
+                detailOutput.statusWarning("Plugin '#arguments.name#' is not installed");
+                detailOutput.line();
+                detailOutput.subHeader("Install this plugin");
+                detailOutput.output("- wheels plugin install #arguments.name#", true);
                 setExitCode(1);
                 return;
             }
@@ -62,8 +54,9 @@ component aliases="wheels plugin update" extends="../base" {
             var pluginSlug = pluginInfo.slug;
             var currentVersion = pluginInfo.version;
 
-            print.line("Plugin:          #pluginInfo.name#");
-            print.line("Current version: #currentVersion#");
+            detailOutput.subHeader("Plugin Information");
+            detailOutput.metric("Plugin", pluginInfo.name);
+            detailOutput.metric("Current version", currentVersion);
 
             // Determine target version
             var targetVersion = len(arguments.version) ? arguments.version : "latest";
@@ -82,21 +75,18 @@ component aliases="wheels plugin update" extends="../base" {
                     latestVersion = mid(forgeboxResult, versionMatch.pos[2], versionMatch.len[2]);
                 }
                 if (len(latestVersion)) {
-                    print.line("Latest version:  #latestVersion#");
+                    detailOutput.metric("Latest version", latestVersion);
 
                     if (!arguments.force) {
                         // Check if already at target version
                         if (len(arguments.version)) {
                             // User specified a version
                             if (currentVersion == arguments.version) {
-                                print.line()
-                                     .boldCyanLine("===========================================================")
-                                     .line()
-                                     .boldGreenText("[OK] ")
-                                     .greenLine("Plugin is already at version #arguments.version#")
-                                     .line()
-                                     .line("Use --force to reinstall anyway:");
-                                print.cyanLine("  wheels plugin update #arguments.name# --force");
+                                detailOutput.line();
+                                detailOutput.statusSuccess("Plugin is already at version #arguments.version#");
+                                detailOutput.line();
+                                detailOutput.subHeader("Use --force to reinstall anyway");
+                                detailOutput.output("- wheels plugin update #arguments.name# --force", true);
                                 return;
                             }
                             targetVersion = arguments.version;
@@ -106,14 +96,11 @@ component aliases="wheels plugin update" extends="../base" {
                             var cleanLatest = trim(reReplace(latestVersion, "[^0-9\.]", "", "ALL"));
 
                             if (cleanCurrent == cleanLatest) {
-                                print.line()
-                                     .boldCyanLine("===========================================================")
-                                     .line()
-                                     .boldGreenText("[OK] ")
-                                     .greenLine("Plugin is already at the latest version (#latestVersion#)")
-                                     .line()
-                                     .line("Use --force to reinstall anyway:");
-                                print.cyanLine("  wheels plugin update #arguments.name# --force");
+                                detailOutput.line();
+                                detailOutput.statusSuccess("Plugin is already at the latest version (#latestVersion#)");
+                                detailOutput.line();
+                                detailOutput.statusInfo("Use --force to reinstall anyway");
+                                detailOutput.output("- wheels plugin update #arguments.name# --force", true);
                                 return;
                             }
                             targetVersion = latestVersion;
@@ -125,31 +112,29 @@ component aliases="wheels plugin update" extends="../base" {
                 } else {
                     // Couldn't get version from ForgeBox
                     if (!arguments.force && !len(arguments.version)) {
-                        print.line()
-                             .yellowLine("Unable to check latest version from ForgeBox")
-                             .line()
-                             .line("Options:")
-                             .line("  - Specify a version:")
-                             .cyanLine("    wheels plugin update #arguments.name# --version=x.x.x")
-                             .line("  - Force reinstall:")
-                             .cyanLine("    wheels plugin update #arguments.name# --force");
+                        detailOutput.statusWarning("Unable to check latest version from ForgeBox");
+                        detailOutput.line();
+                        detailOutput.subHeader("Options");
+                        detailOutput.output("- Specify a version:", true);
+                        detailOutput.output("  wheels plugin update #arguments.name# --version=x.x.x", true);
+                        detailOutput.output("- Force reinstall:", true);
+                        detailOutput.output("  wheels plugin update #arguments.name# --force", true);
                         return;
                     }
                 }
             } catch (any e) {
                 // Error querying ForgeBox
-                print.line()
-                     .yellowLine("Error checking ForgeBox: #e.message#")
-                     .line();
+                detailOutput.statusWarning("Error checking ForgeBox: #e.message#");
+                detailOutput.line();
 
                 if (!arguments.force && !len(arguments.version)) {
-                    print.yellowLine("Unable to verify if update is needed")
-                         .line()
-                         .line("Options:")
-                         .line("  - Specify a version:")
-                         .cyanLine("    wheels plugin update #arguments.name# --version=x.x.x")
-                         .line("  - Force reinstall:")
-                         .cyanLine("    wheels plugin update #arguments.name# --force");
+                    detailOutput.statusWarning("Unable to verify if update is needed");
+                    detailOutput.line();
+                    detailOutput.subHeader("Options");
+                    detailOutput.output("- Specify a version:", true);
+                    detailOutput.output("  wheels plugin update #arguments.name# --version=x.x.x", true);
+                    detailOutput.output("- Force reinstall:", true);
+                    detailOutput.output("  wheels plugin update #arguments.name# --force", true);
                     return;
                 }
 
@@ -159,17 +144,18 @@ component aliases="wheels plugin update" extends="../base" {
                 }
             }
 
-            print.line()
-                 .line("Target version: #targetVersion#")
-                 .boldCyanLine("===========================================================")
-                 .line();
+            detailOutput.line();
+            detailOutput.metric("Target version", targetVersion);
+            detailOutput.divider();
+            detailOutput.line();
 
-            // Remove old version
-            print.line("Removing old version...");
+            // Update process
+            detailOutput.output("Removing old version...");
             directoryDelete(foundPlugin.path, true);
+            detailOutput.remove(foundPlugin.folderName);
 
             // Install new version
-            print.line("Installing new version...");
+            detailOutput.output("Installing new version...");
 
             var packageSpec = pluginSlug;
             if (targetVersion != "latest") {
@@ -203,35 +189,28 @@ component aliases="wheels plugin update" extends="../base" {
                 }
             }
 
-            print.line()
-                 .boldCyanLine("===========================================================")
-                 .line()
-                 .boldGreenText("[OK] ")
-                 .greenLine("Plugin '#pluginInfo.name#' updated successfully!")
-                 .line();
+            detailOutput.line();
+            detailOutput.statusSuccess("Plugin '#pluginInfo.name#' updated successfully!");
+            detailOutput.line();
 
-            // Show post-update info
-            print.boldLine("Commands:")
-                 .cyanLine("  wheels plugin info #arguments.name#   View plugin details")
-                 .cyanLine("  wheels plugin list            View all installed plugins");
+            // Show version comparison
+            detailOutput.subHeader("Update Summary");
+            detailOutput.metric("Plugin", pluginInfo.name);
+            detailOutput.update("Version", "v#currentVersion# → v#targetVersion#");
+            detailOutput.metric("Location", "/plugins/#foundPlugin.folderName#");
+            detailOutput.line();
+
+            // Show post-update commands
+            detailOutput.subHeader("Commands");
+            detailOutput.output("- wheels plugin info #arguments.name#   View plugin details", true);
+            detailOutput.output("- wheels plugin list            View all installed plugins", true);
+            detailOutput.output("- wheels reload                Reload application", true);
+            detailOutput.line();
 
         } catch (any e) {
-            print.line()
-                 .boldRedText("[ERROR] ")
-                 .redLine("Error updating plugin")
-                 .line()
-                 .yellowLine("Error: #e.message#");
+            detailOutput.error("Error updating plugin: #e.message#");
             setExitCode(1);
+            return;
         }
-    }
-
-    /**
-     * Resolve a file path
-     */
-    private function resolvePath(path) {
-        if (left(arguments.path, 1) == "/" || mid(arguments.path, 2, 1) == ":") {
-            return arguments.path;
-        }
-        return expandPath(".") & "/" & arguments.path;
     }
 }

@@ -10,6 +10,8 @@
  */
 component aliases='wheels test:watch' extends="../base" {
     
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     /**
      * @type.hint Type of tests to run: (app, core, plugin)
      * @directory.hint Test directory to watch (default: tests/specs)
@@ -48,13 +50,12 @@ component aliases='wheels test:watch' extends="../base" {
         );
         arguments.directory = resolveTestDirectory(arguments.type, arguments.directory);
         
-        print.line("========================================");
-        print.boldLine("Starting Test Watcher");
-        print.line("========================================");
-        print.line();
-        print.yellowLine("Watching for file changes...");
-        print.line("Press Ctrl+C to stop watching");
-        print.line();
+        detailOutput.header("Starting Test Watcher");
+        detailOutput.divider("=", 40);
+        detailOutput.line();
+        detailOutput.statusInfo("Watching for file changes...");
+        detailOutput.output("Press Ctrl+C to stop watching");
+        detailOutput.line();
         
         // Build the test URL
         var testUrl = buildTestUrl(
@@ -94,23 +95,23 @@ component aliases='wheels test:watch' extends="../base" {
         }
         
         // Show watching configuration
-        print.line("Configuration:");
-        print.line("  Type: #arguments.type# tests");
-        print.line("  Directory: #arguments.directory#");
-        print.line("  Format: #arguments.format#");
-        print.line("  Delay: #arguments.delay#ms");
+        detailOutput.subHeader("Configuration");
+        detailOutput.metric("Type", "#arguments.type# tests");
+        detailOutput.metric("Directory", arguments.directory);
+        detailOutput.metric("Format", arguments.format);
+        detailOutput.metric("Delay", "#arguments.delay#ms");
         
         if (len(arguments.filter)) {
-            print.line("  Filter: #arguments.filter#");
+            detailOutput.metric("Filter", arguments.filter);
         }
         
         if (len(arguments.labels)) {
-            print.line("  Labels: #arguments.labels#");
+            detailOutput.metric("Labels", arguments.labels);
         }
         
-        print.line();
-        print.line("Executing: testbox watch");
-        print.line();
+        detailOutput.line();
+        detailOutput.output("Executing: testbox watch");
+        detailOutput.line();
         
         try {
             // Execute TestBox watch command
@@ -118,10 +119,10 @@ component aliases='wheels test:watch' extends="../base" {
         } catch (any e) {
             // Handle interruption gracefully
             if (findNoCase("interrupted", e.message) || findNoCase("ctrl", e.message)) {
-                print.line();
-                print.yellowLine("Watch mode stopped by user");
+                detailOutput.line();
+                detailOutput.statusInfo("Watch mode stopped by user");
             } else {
-                print.redLine("Error in watch mode: #e.message#");
+                detailOutput.error("Error in watch mode: #e.message#");
             }
         }
     }

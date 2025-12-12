@@ -9,6 +9,8 @@
  */
 component extends="../base" {
     
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     /**
      * @type.hint Type of tests to run: (app, core)
      * @recurse.hint Recurse into subdirectories
@@ -113,21 +115,23 @@ component extends="../base" {
         // Update the runner URL in params
         params.runner = testUrl;
         
-        // Display test type
-        print.greenBoldLine("================ #ucase(arguments.type)# Tests =======================").toConsole();
+        // Display test header
+        detailOutput.header("#ucase(arguments.type)# Tests");
         
         // Display additional info if verbose
         if (arguments.verbose) {
-            print.line("Test URL: #testUrl#").toConsole();
+            detailOutput.subHeader("Test Configuration");
+            detailOutput.metric("Test URL", testUrl);
             if (len(arguments.filter)) {
-                print.line("Filter: #arguments.filter#").toConsole();
+                detailOutput.metric("Filter", arguments.filter);
             }
             if (len(arguments.lables)) {
-                print.line("lables: #arguments.lables#").toConsole();
+                detailOutput.metric("Labels", arguments.lables);
             }
             if (arguments.coverage) {
-                print.line("Coverage: Enabled").toConsole();
+                detailOutput.metric("Coverage", "Enabled");
             }
+            detailOutput.line();
         }
         
         try {
@@ -141,7 +145,7 @@ component extends="../base" {
                 // If it's just an exit code error, ignore it and continue
                 // The actual test output should have been displayed already
                 if (findNoCase("failing exit code", commandError.message)) {
-                    print.yellowLine("TestBox completed (exit code indicates test results)").toConsole();
+                    detailOutput.statusWarning("TestBox completed (exit code indicates test results)");
                 } else {
                     // Re-throw if it's a genuine error
                     rethrow;
@@ -149,10 +153,12 @@ component extends="../base" {
             }
             
         } catch (any e) {
-            print.redLine("Error executing TestBox command: #e.message#").toConsole();
+            detailOutput.error("Error executing TestBox command: #e.message#");
+            return;
         }
         
-        print.greenBoldLine("============ #ucase(arguments.type)# Tests Completed ==================").toConsole();
+        detailOutput.line();
+        detailOutput.statusSuccess("#ucase(arguments.type)# Tests Completed");
     }
 
 }

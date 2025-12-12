@@ -10,6 +10,8 @@
  */
 component aliases='wheels test:coverage' extends="../base" {
     
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     /**
      * @type.hint Type of tests to run: (app, core, plugin)
      * @directory.hint Test directory to run (default: tests/specs)
@@ -62,9 +64,9 @@ component aliases='wheels test:coverage' extends="../base" {
         if (!directoryExists(fullOutputPath)) {
             try {
                 directoryCreate(fullOutputPath, true, true);
-                print.line("Created output directory: #fullOutputPath#");
+                detailOutput.create("output directory: #fullOutputPath#");
             } catch (any e) {
-                print.redLine("Failed to create output directory: #e.message#");
+                detailOutput.error("Failed to create output directory: #e.message#");
                 outputPath = "";  // Use current directory
             }
         }
@@ -137,12 +139,12 @@ component aliases='wheels test:coverage' extends="../base" {
             // Execute TestBox command
             command('testbox run').params(argumentCollection=params).run();
             
-            print.line();
-            print.greenLine("[SUCCESS] Tests completed successfully!");
+            detailOutput.line();
+            detailOutput.statusSuccess("Tests completed successfully!");
             
         } catch (any e) {
-			print.redLine("[ERROR] Test execution failed: #e.message#");
-			testsPassed = false;
+            detailOutput.statusFailed("Test execution failed: #e.message#");
+            testsPassed = false;
         }
         
     }

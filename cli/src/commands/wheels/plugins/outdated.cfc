@@ -8,6 +8,7 @@ component aliases="wheels plugin outdated,wheels plugins outdated" extends="../b
     
     property name="pluginService" inject="PluginService@wheels-cli";
     property name="forgebox" inject="ForgeBox";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @format.hint Output format: table (default) or json
@@ -24,34 +25,31 @@ component aliases="wheels plugin outdated,wheels plugins outdated" extends="../b
             }
         );
         try {
-            print.line()
-                 .boldCyanLine("===========================================================")
-                 .boldCyanLine("  Checking for Plugin Updates")
-                 .boldCyanLine("===========================================================")
-                 .line();
+            detailOutput.header("Checking for Plugin Updates");
+            detailOutput.line();
 
             // Get list of installed plugins from /plugins folder
             var plugins = pluginService.list();
 
             if (arrayLen(plugins) == 0) {
-                print.yellowLine("No plugins installed in /plugins folder")
-                     .line()
-                     .line("Install plugins with:")
-                     .cyanLine("  wheels plugin install <plugin-name>");
+                detailOutput.statusWarning("No plugins installed in /plugins folder");
+                detailOutput.line();
+                detailOutput.subHeader("Install plugins with");
+                detailOutput.output("- wheels plugin install <plugin-name>", true);
                 return;
             }
 
             var outdatedPlugins = [];
             var checkErrors = [];
 
+            detailOutput.output("Checking #arrayLen(plugins)# installed plugin(s)...");
+            detailOutput.line();
+
             // Check each plugin
             for (var plugin in plugins) {
                 try {
                     var pluginSlug = plugin.slug ?: plugin.name;
                     var displayName = plugin.name;
-                    var padding = repeatString(" ", max(40 - len(displayName), 1));
-
-                    print.text("  " & displayName & padding);
 
                     // Get latest version using forgebox show command for fresh data
                     var forgeboxResult = command('forgebox show')
@@ -72,44 +70,38 @@ component aliases="wheels plugin outdated,wheels plugins outdated" extends="../b
 
                     // Compare versions
                     if (cleanCurrent != cleanLatest && latestVersion != "unknown") {
-                        print.yellowBoldText("[OUTDATED] ")
-                             .yellowLine("#currentVersion# -> #latestVersion#");
-
                         arrayAppend(outdatedPlugins, {
                             name: plugin.name,
                             slug: pluginSlug,
                             currentVersion: currentVersion,
                             latestVersion: latestVersion
                         });
+                        detailOutput.update(displayName, true);
                     } else {
-                        print.greenBoldText("[OK] ")
-                             .greenLine("v#currentVersion#");
+                        detailOutput.identical("#displayName#:v#currentVersion# (up to date)", true);
                     }
 
                 } catch (any e) {
-                    print.redBoldText("[ERROR] ")
-                         .redLine("Could not check version");
+                    detailOutput.conflict(displayName, true);
                     arrayAppend(checkErrors, plugin.name);
                 }
             }
 
-            print.line()
-                 .boldCyanLine("===========================================================")
-                 .line();
+            detailOutput.line();
+            detailOutput.divider("=", 60);
+            detailOutput.line();
 
             // Handle no outdated plugins
             if (arrayLen(outdatedPlugins) == 0) {
-                print.boldGreenText("[OK] ")
-                     .greenLine("All plugins are up to date!")
-                     .line();
+                detailOutput.statusSuccess("All plugins are up to date!");
+                detailOutput.line();
 
                 if (arrayLen(checkErrors) > 0) {
-                    print.yellowLine("Could not check #arrayLen(checkErrors)# plugin#arrayLen(checkErrors) != 1 ? 's' : ''#:")
-                         .line();
+                    detailOutput.statusWarning("Could not check #arrayLen(checkErrors)# plugin(s)");
                     for (var errorPlugin in checkErrors) {
-                        print.yellowLine("  - #errorPlugin#");
+                        detailOutput.output("- #errorPlugin#: ", true);
                     }
-                    print.line();
+                    detailOutput.line();
                 }
 
                 return;
@@ -124,84 +116,64 @@ component aliases="wheels plugin outdated,wheels plugins outdated" extends="../b
                 };
                 print.line(serializeJSON(jsonOutput, true));
             } else {
-                print.boldYellowLine("Found #arrayLen(outdatedPlugins)# outdated plugin#arrayLen(outdatedPlugins) != 1 ? 's' : ''#:")
-                     .line();
+                detailOutput.subHeader("Found #arrayLen(outdatedPlugins)# outdated plugin(s)");
+                detailOutput.line();
 
-                // Calculate column widths
-                var maxNameLength = 20;
-                var maxCurrentLength = 10;
-                var maxLatestLength = 10;
-
+                // Create table for outdated plugins
+                var rows = [];
                 for (var plugin in outdatedPlugins) {
-                    if (len(plugin.name) > maxNameLength) {
-                        maxNameLength = len(plugin.name);
-                    }
-                    if (len(plugin.currentVersion) > maxCurrentLength) {
-                        maxCurrentLength = len(plugin.currentVersion);
-                    }
-                    if (len(plugin.latestVersion) > maxLatestLength) {
-                        maxLatestLength = len(plugin.latestVersion);
-                    }
+                    arrayAppend(rows, {
+                        "Plugin": plugin.name,
+                        "Current": plugin.currentVersion,
+                        "Latest": plugin.latestVersion
+                    });
                 }
 
-                maxNameLength += 2;
-                maxCurrentLength += 2;
-                maxLatestLength += 2;
-
-                // Print table header
-                print.boldText(padRight("Plugin", maxNameLength))
-                     .boldText(padRight("Current", maxCurrentLength))
-                     .boldLine(padRight("Latest", maxLatestLength));
-
-                print.line(repeatString("-", maxNameLength + maxCurrentLength + maxLatestLength));
-
-                // Display outdated plugins
-                for (var plugin in outdatedPlugins) {
-                    print.cyanText(padRight(plugin.name, maxNameLength))
-                         .yellowText(padRight(plugin.currentVersion, maxCurrentLength))
-                         .greenLine(padRight(plugin.latestVersion, maxLatestLength));
-                }
-
-                print.line()
-                     .boldLine("-----------------------------------------------------------")
-                     .line();
+                // Display the table
+                print.table(rows);
+                
+                detailOutput.line();
+                detailOutput.divider("-", 60);
+                detailOutput.line();
 
                 if (arrayLen(checkErrors) > 0) {
-                    print.yellowLine("Could not check #arrayLen(checkErrors)# plugin#arrayLen(checkErrors) != 1 ? 's' : ''#:")
-                         .line();
+                    detailOutput.statusWarning("Could not check #arrayLen(checkErrors)# plugin(s)");
                     for (var errorPlugin in checkErrors) {
-                        print.yellowLine("  - #errorPlugin#");
+                        detailOutput.output("- #errorPlugin#", true);
                     }
-                    print.line();
+                    detailOutput.line();
                 }
+
+                // Show summary
+                detailOutput.metric("Total plugins checked", "#arrayLen(plugins)#");
+                detailOutput.metric("Outdated plugins", "#arrayLen(outdatedPlugins)#");
+                detailOutput.metric("Up to date", "#arrayLen(plugins) - arrayLen(outdatedPlugins)#");
+                detailOutput.line();
 
                 // Show update commands
-                print.boldLine("Commands:")
-                     .line();
+                detailOutput.subHeader("Update Commands");
 
                 if (arrayLen(outdatedPlugins) == 1) {
-                    print.cyanLine("  wheels plugin update #outdatedPlugins[1].name#");
+                    detailOutput.output("- Update this plugin:", true);
+                    detailOutput.output("  wheels plugin update #outdatedPlugins[1].name#", true);
                 } else {
-                    print.line("Update all outdated plugins:")
-                         .cyanLine("  wheels plugin update:all")
-                         .line()
-                         .line("Update specific plugin:")
-                         .cyanLine("  wheels plugin update <plugin-name>");
+                    detailOutput.output("- Update all outdated plugins:", true);
+                    detailOutput.output("  wheels plugin update:all", true);
+                    detailOutput.output("- Update specific plugin:", true);
+                    detailOutput.output("  wheels plugin update <plugin-name>", true);
                 }
+                
+                detailOutput.line();
+                
+                // Add helpful tip
+                detailOutput.statusInfo("Tip");
+                detailOutput.output("Add --format=json for JSON output", true);
+                detailOutput.line();
             }
             
         } catch (any e) {
-            error("Error checking for outdated plugins: #e.message#");
+            detailOutput.error("Error checking for outdated plugins: #e.message#");
+            return;
         }
-    }
-
-    /**
-     * Pad string to right with spaces
-     */
-    private function padRight(required string text, required numeric length) {
-        if (len(arguments.text) >= arguments.length) {
-            return left(arguments.text, arguments.length);
-        }
-        return arguments.text & repeatString(" ", arguments.length - len(arguments.text));
     }
 }
