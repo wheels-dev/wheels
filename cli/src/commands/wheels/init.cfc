@@ -12,27 +12,32 @@
  **/
 component  extends="base"  {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 *
 	 **/
 	function run() {
+		
+		requireWheelsApp(getCWD());
+		detailOutput.header("Wheels init")
+				   .output("This function will attempt to add a few things")
+				   .output("to an EXISTING Wheels installation to help")
+				   .output("the CLI interact.")
+				   .line()
+				   .output("We're going to assume the following:")
+				   .output("- you've already setup a local datasource/database", true)
+				   .output("- you've already set a reload password", true)
+				   .line()
+				   .output("We're going to try and do the following:")
+				   .output("- create a box.json to help keep track of the wheels version", true)
+				   .output("- create a server.json", true)
+				   .divider()
+				   .line();
 
-		print.greenBoldLine( "==================================== Wheels init ===================================" )
-			   .greenBoldLine( " This function will attempt to add a few things " )
-				 .greenBoldLine( " to an EXISTING Wheels installation to help   " )
-				 .greenBoldLine( " the CLI interact." )
-				 .greenBoldLine( " " )
-				 .greenBoldLine( " We're going to assume the following:" )
-				 .greenBoldLine( "  - you've already setup a local datasource/database" )
-				 .greenBoldLine( "  - you've already set a reload password" )
-				 .greenBoldLine( " " )
-				 .greenBoldLine( " We're going to try and do the following:" )
-				 .greenBoldLine( "  - create a box.json to help keep track of the wheels version" )
-				 .greenBoldLine( "  - create a server.json" )
-				 .greenBoldLine( "====================================================================================" )
-			 .line().toConsole();
 		if(!confirm("Sound ok? [y/n] ")){
-			error("Ok, aborting...");
+			detailOutput.getPrint().redBoldLine("Ok, aborting...").toConsole();
+			return;
 		}
 
 		var serverJsonLocation=fileSystemUtil.resolvePath("server.json");
@@ -40,36 +45,40 @@ component  extends="base"  {
 		var boxJsonLocation=fileSystemUtil.resolvePath("box.json");
 
 		var wheelsVersion = $getWheelsVersion();
-		print.greenline(wheelsVersion);
+		detailOutput.statusInfo(wheelsVersion);
 
 		// Create a wheels/box.json if one doesn't exist
 		if(!fileExists(wheelsBoxJsonLocation)){
 			var wheelsBoxJSON = fileRead( getTemplate('/WheelsBoxJSON.txt' ) );
 			wheelsBoxJSON = replaceNoCase( wheelsBoxJSON, "|version|", trim(wheelsVersion), 'all' );
 
-				 // Make box.json
-	 		print.greenline( "========= Creating wheels/box.json" ).toConsole();
+			// Make box.json
+			detailOutput.statusInfo("Creating wheels/box.json");
 			file action='write' file=wheelsBoxJsonLocation mode ='777' output='#trim(wheelsBoxJSON)#';
+			detailOutput.create(wheelsBoxJsonLocation);
+			detailOutput.statusSuccess("Created wheels/box.json");
 
 		} else {
- 			print.greenline( "========= wheels/box.json exists, skipping" ).toConsole();
+			detailOutput.statusInfo("wheels/box.json exists, skipping");
 		}
 
 		// Create a server.json if one doesn't exist
 		if(!fileExists(serverJsonLocation)){
 			var appName       = ask( message = "Please enter an application name: we use this to make the server.json servername unique: ", defaultResponse = 'myapp');
 				appName 	  = helpers.stripSpecialChars(appName);
-			var setEngine     = ask( message = 'Please enter a default cfengine: ', defaultResponse = 'lucee5' );
+			var setEngine     = ask( message = 'Please enter a default cfengine: ', defaultResponse = 'lucee6' );
 
 			// Make server.json server name unique to this app: assumes lucee by default
-	 		print.greenline( "========= Creating default server.json" ).toConsole();
+			detailOutput.statusInfo("Creating default server.json");
 			var serverJSON = fileRead( getTemplate('/ServerJSON.txt' ) );
-		 		serverJSON = replaceNoCase( serverJSON, "|appName|", trim(appName), 'all' );
-		 		serverJSON = replaceNoCase( serverJSON, "|setEngine|", setEngine, 'all' );
-		 		file action='write' file=serverJsonLocation mode ='777' output='#trim(serverJSON)#';
+			serverJSON = replaceNoCase( serverJSON, "|appName|", trim(appName), 'all' );
+			serverJSON = replaceNoCase( serverJSON, "|setEngine|", setEngine, 'all' );
+			file action='write' file=serverJsonLocation mode ='777' output='#trim(serverJSON)#';
+			detailOutput.create(serverJsonLocation);
+			detailOutput.statusSuccess("Created server.json");
 
 		} else {
- 			print.greenline( "========= server.json exists, skipping" ).toConsole();
+			detailOutput.statusInfo("server.json exists, skipping");
 		}
 
 		// Create a box.json if one doesn't exist
@@ -82,12 +91,14 @@ component  extends="base"  {
 			boxJSON = replaceNoCase( boxJSON, "|version|", trim(wheelsVersion), 'all' );
 			boxJSON = replaceNoCase( boxJSON, "|appName|", trim(appName), 'all' );
 
-				 // Make box.json
-	 		print.greenline( "========= Creating box.json" ).toConsole();
+			// Make box.json
+			detailOutput.statusInfo("Creating box.json");
 			file action='write' file=boxJsonLocation mode ='777' output='#trim(boxJSON)#';
+			detailOutput.create(boxJsonLocation);
+			detailOutput.statusSuccess("Created box.json");
 
 		} else {
- 			print.greenline( "========= box.json exists, skipping" ).toConsole();
+			detailOutput.statusInfo("box.json exists, skipping");
 		}
 
 	}

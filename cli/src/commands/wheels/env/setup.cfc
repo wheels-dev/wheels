@@ -177,7 +177,7 @@ component extends="../base" {
         var result = environmentService.setup(argumentCollection = arguments, rootPath=projectRoot, updateMode=updateMode );
 
         if (result.success) {
-            detailOutput.separator();
+            detailOutput.line();
             detailOutput.statusSuccess("Environment setup complete!");
             detailOutput.line();
 

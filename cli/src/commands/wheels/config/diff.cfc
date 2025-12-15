@@ -252,7 +252,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Display environment variable differences
 		if (arguments.compareEnv && StructKeyExists(arguments.differences, "env")) {
 			if (arguments.compareSettings && StructKeyExists(arguments.differences, "settings")) {
-				detailOutput.separator();
+				detailOutput.line();
 			}
 			detailOutput.subHeader("ENVIRONMENT VARIABLES", 50);
 			displayDifferenceSection(arguments.differences.env, arguments.env1, arguments.env2, arguments.changesOnly, "env");
@@ -307,7 +307,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Overall summary
 		local.grandTotal = local.totalIdentical + local.totalDifferent + local.totalUnique;
 		if (local.grandTotal > 0) {
-			detailOutput.separator();
+			detailOutput.line();
 			detailOutput.output("Overall:");
 			detailOutput.metric("Total configurations", local.grandTotal);
 			detailOutput.metric("Identical", local.totalIdentical);

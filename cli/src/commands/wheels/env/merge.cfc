@@ -66,7 +66,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		} else {
 			// Write the merged file
 			writeMergedFile(arguments.output, local.merged);
-			detailOutput.separator();
+			detailOutput.line();
 			detailOutput.statusSuccess("Merged #ArrayLen(local.sourceFiles)# files into #arguments.output#");
 			detailOutput.metric("Total variables", "#StructCount(local.merged.vars)#");
 			

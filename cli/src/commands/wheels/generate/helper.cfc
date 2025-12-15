@@ -81,7 +81,7 @@ component aliases='wheels g helper' extends="../base" {
         createHelperTest(arguments.name, functionList);
 
         // Show usage example
-        detailOutput.separator();
+        detailOutput.line();
         detailOutput.output("Usage example:");
         detailOutput.code('// Helper functions are automatically available globally
 result = #functionList[1]#("some input");

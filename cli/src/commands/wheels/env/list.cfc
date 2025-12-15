@@ -235,7 +235,7 @@ component extends="../base" {
             ).toConsole();
             
             detailOutput.line();
-            detailOutput.separator();
+            detailOutput.line();
             detailOutput.metric("Total Environments", "#arrayLen(arguments.environments)#");
             detailOutput.metric("Current Environment", "#arguments.currentEnv#");
             detailOutput.statusInfo("* = Currently active environment");

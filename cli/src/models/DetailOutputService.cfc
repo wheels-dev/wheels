@@ -255,14 +255,6 @@ component {
 	}
 
 	/**
-	 * Output a separator line
-	 */
-	function separator() {
-		print.line().toConsole();
-		return this;
-	}
-
-	/**
 	 * Output a code block
 	 * @code The code to display
 	 * @language The language for syntax highlighting (optional)
