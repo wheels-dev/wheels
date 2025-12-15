@@ -21,91 +21,6 @@ jobs:
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
         experimental: [false]
-        include:
-          - cfengine: lucee7
-            dbengine: sqlite
-          - cfengine: lucee5
-            dbengine: sqlite
-          - cfengine: lucee6
-            dbengine: sqlite
-          - cfengine: adobe2021
-            dbengine: sqlite
-          - cfengine: adobe2023
-            dbengine: sqlite
-          - cfengine: adobe2025
-            dbengine: sqlite
-          - cfengine: boxlang
-            dbengine: sqlite
-          - cfengine: lucee7
-            dbengine: mysql
-          - cfengine: lucee7
-            dbengine: postgres
-          - cfengine: lucee7
-            dbengine: sqlserver
-          - cfengine: lucee7
-            dbengine: h2
-          - cfengine: lucee7
-            dbengine: oracle
-          - cfengine: lucee5
-            dbengine: mysql
-          - cfengine: lucee5
-            dbengine: postgres
-          - cfengine: lucee5
-            dbengine: sqlserver
-          - cfengine: lucee5
-            dbengine: h2
-          - cfengine: lucee5
-            dbengine: oracle
-          - cfengine: lucee6
-            dbengine: mysql
-          - cfengine: lucee6
-            dbengine: postgres
-          - cfengine: lucee6
-            dbengine: sqlserver
-          - cfengine: lucee6
-            dbengine: h2
-          - cfengine: lucee6
-            dbengine: oracle
-          - cfengine: adobe2018
-            dbengine: mysql
-          - cfengine: adobe2018
-            dbengine: postgres
-          - cfengine: adobe2018
-            dbengine: sqlserver
-          - cfengine: adobe2018
-            dbengine: oracle
-          - cfengine: adobe2021
-            dbengine: mysql
-          - cfengine: adobe2021
-            dbengine: postgres
-          - cfengine: adobe2021
-            dbengine: sqlserver
-          - cfengine: adobe2021
-            dbengine: oracle
-          - cfengine: adobe2023
-            dbengine: mysql
-          - cfengine: adobe2023
-            dbengine: postgres
-          - cfengine: adobe2023
-            dbengine: sqlserver
-          - cfengine: adobe2023
-            dbengine: oracle
-          - cfengine: adobe2025
-            dbengine: mysql
-          - cfengine: adobe2025
-            dbengine: postgres
-          - cfengine: adobe2025
-            dbengine: sqlserver
-          - cfengine: adobe2025
-            dbengine: oracle
-          - cfengine: boxlang
-            dbengine: mysql
-          - cfengine: boxlang
-            dbengine: sqlserver
-          - cfengine: boxlang
-            dbengine: postgres
-          - cfengine: boxlang
-            dbengine: oracle
         exclude:
           - cfengine: adobe2018
             dbengine: sqlite
@@ -119,6 +34,93 @@ jobs:
             dbengine: h2
           - cfengine: boxlang
             dbengine: h2
+          - cfengine: lucee7
+            dbengine: sqlite
+          - cfengine: lucee5
+            dbengine: sqlite
+          - cfengine: lucee6
+            dbengine: sqlite
+          - cfengine: adobe2021
+            dbengine: sqlite
+          - cfengine: adobe2023
+            dbengine: sqlite
+          - cfengine: adobe2025
+            dbengine: sqlite
+          - cfengine: boxlang
+            dbengine: sqlite
+          - cfengine: lucee7
+            dbengine: mysql
+          - cfengine: lucee7
+            dbengine: postgres
+          - cfengine: lucee7
+            dbengine: sqlserver
+          - cfengine: lucee7
+            dbengine: h2
+          - cfengine: lucee7
+            dbengine: oracle
+          - cfengine: lucee5
+            dbengine: mysql
+          - cfengine: lucee5
+            dbengine: postgres
+          - cfengine: lucee5
+            dbengine: sqlserver
+          - cfengine: lucee5
+            dbengine: h2
+          - cfengine: lucee5
+            dbengine: oracle
+          - cfengine: lucee6
+            dbengine: mysql
+          - cfengine: lucee6
+            dbengine: postgres
+          - cfengine: lucee6
+            dbengine: sqlserver
+          - cfengine: lucee6
+            dbengine: h2
+          - cfengine: lucee6
+            dbengine: oracle
+          - cfengine: adobe2018
+            dbengine: mysql
+          - cfengine: adobe2018
+            dbengine: postgres
+          - cfengine: adobe2018
+            dbengine: sqlserver
+          - cfengine: adobe2018
+            dbengine: oracle
+          - cfengine: adobe2021
+            dbengine: mysql
+          - cfengine: adobe2021
+            dbengine: postgres
+          - cfengine: adobe2021
+            dbengine: sqlserver
+          - cfengine: adobe2021
+            dbengine: oracle
+          - cfengine: adobe2023
+            dbengine: mysql
+          - cfengine: adobe2023
+            dbengine: postgres
+          - cfengine: adobe2023
+            dbengine: sqlserver
+          - cfengine: adobe2025
+            dbengine: mysql
+          - cfengine: adobe2025
+            dbengine: postgres
+          - cfengine: adobe2025
+            dbengine: sqlserver
+          - cfengine: boxlang
+            dbengine: mysql
+          - cfengine: boxlang
+            dbengine: sqlserver
+          - cfengine: boxlang
+            dbengine: postgres
+          - cfengine: boxlang
+            dbengine: oracle
+        include:
+          - cfengine: adobe2023
+            dbengine: oracle
+          - cfengine: adobe2025
+            dbengine: oracle
+          
+        
     env:
       # Port mappings for each CF engine
       PORT_lucee5: 60005
@@ -214,17 +216,12 @@ jobs:
           # Try a basic curl to see if service responds
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
 
-      - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
-        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
-        run: |
-          docker exec wheels-${{ matrix.cfengine }}-1 sh -c "echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
+      # - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
+      #   if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
+      #   run: |
+      #     docker exec wheels-${{ matrix.cfengine }}-1 sh -c "echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
 
       
-      # - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
-      #   if: ${{ matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }} && ${{ matrix.dbengine == 'oracle' }}
-      #   run: |
-      #     docker exec wheels-${{ matrix.cfengine }}-1 echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> "/wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
-
       - name: Check file content
         if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
         run: |
