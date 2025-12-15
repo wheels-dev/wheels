@@ -215,9 +215,15 @@ jobs:
           curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
 
       - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
-        if: ${{ matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }} && ${{ matrix.dbengine == 'oracle' }}
+        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
         run: |
-          docker exec wheels-${{ matrix.cfengine }}-1 echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> "/wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
+          docker exec wheels-${{ matrix.cfengine }}-1 sh -c "echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
+
+      
+      # - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
+      #   if: ${{ matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }} && ${{ matrix.dbengine == 'oracle' }}
+      #   run: |
+      #     docker exec wheels-${{ matrix.cfengine }}-1 echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> "/wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
 
       - name: Check file content
         if: ${{ matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }} && ${{ matrix.dbengine == 'oracle' }}
