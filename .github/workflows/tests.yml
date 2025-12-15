@@ -226,12 +226,12 @@ jobs:
       #     docker exec wheels-${{ matrix.cfengine }}-1 echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> "/wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt"
 
       - name: Check file content
-        if: ${{ matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }} && ${{ matrix.dbengine == 'oracle' }}
-        run : |
+        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
+        run: |
           docker exec wheels-${{ matrix.cfengine }}-1 cat /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt
 
       - name: Restart CF Engine
-        if: ${{ matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }} && ${{ matrix.dbengine == 'oracle' }}
+        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
         run: |
           docker restart wheels-${{ matrix.cfengine }}-1
       
@@ -240,8 +240,8 @@ jobs:
         run: sleep 120
 
       - name: Check file content
-        if: ${{ matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }} && ${{ matrix.dbengine == 'oracle' }}
-        run : |
+        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
+        run: |
           docker exec wheels-${{ matrix.cfengine }}-1 cat /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/lib/serialfilter.txt
           
       - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
