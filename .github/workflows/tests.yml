@@ -219,12 +219,6 @@ jobs:
         run: |
           docker exec wheels-${{ matrix.cfengine }}-1 sh -c "echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/cfusion/lib/serialfilter.txt"
 
-      
-      - name: Check file content
-        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
-        run: |
-          docker exec wheels-${{ matrix.cfengine }}-1 cat /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/cfusion/lib/serialfilter.txt
-
       - name: Restart CF Engine
         if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
         run: |
@@ -233,11 +227,6 @@ jobs:
       - name: Wait for Oracle to be ready
         if: ${{ matrix.dbengine == 'oracle' }}
         run: sleep 120
-
-      - name: Check file content
-        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
-        run: |
-          docker exec wheels-${{ matrix.cfengine }}-1 cat /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/cfusion/lib/serialfilter.txt
           
       - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
         if: ${{ matrix.cfengine == 'adobe2021' || matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }}
