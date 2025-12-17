@@ -146,10 +146,15 @@ component {
 							}
 						} else {
 							// We have a hasOne or belongsTo association, so just add the object to the root object.
+							local.joinAlias = "";
+							if (structKeyExists(variables.wheels.class.associations[local.include], "joinAlias")) {
+								local.joinAlias = variables.wheels.class.associations[local.include].joinAlias;
+							}
 							local.struct[local.include] = model(variables.wheels.class.associations[local.include].modelName).$queryRowToStruct(
 								properties = arguments.query,
 								row = local.i,
-								base = false
+								base = false,
+								joinAlias = variables.wheels.class.associations[local.include].joinAlias
 							);
 						}
 					}
@@ -180,20 +185,20 @@ component {
 	public struct function $queryRowToStruct(
 		required any properties,
 		string name = "#variables.wheels.class.modelName#",
-		numeric row = "1",
-		boolean base = "true"
+		numeric row = 1,
+		boolean base = true,
+		string joinAlias = ""
 	) {
 		local.rv = {};
 		local.allProperties = ListToArray(ListAppend(variables.wheels.class.propertyList, variables.wheels.class.calculatedPropertyList));
 		// a struct key is much faster than a list element
 		local.columnStruct = $listToStruct(arguments.properties.columnList);
-		local.iEnd = ArrayLen(local.allProperties);
-		for (local.i = 1; local.i <= local.iEnd; local.i++) {
+		local.prefix = Len(arguments.joinAlias)? arguments.joinAlias: arguments.name;
+		for (local.item in local.allProperties) {
 			// Wrap in try/catch because coldfusion has a problem with empty strings in queries for bit types.
 			try {
-				local.item = local.allProperties[local.i];
-				if (!arguments.base && StructKeyExists(local.columnStruct, arguments.name & local.item)) {
-					local.rv[local.item] = arguments.properties[arguments.name & local.item][arguments.row];
+				if (!arguments.base && StructKeyExists(local.columnStruct, local.prefix & local.item)) {
+					local.rv[local.item] = arguments.properties[local.prefix & local.item][arguments.row];
 				} else if (StructKeyExists(local.columnStruct, local.item)) {
 					local.rv[local.item] = arguments.properties[local.item][arguments.row];
 				}
