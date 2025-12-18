@@ -160,6 +160,8 @@ component extends="../base" {
 				case "MySQL5":
 					createDatabase(local.dsInfo, local.dbName, arguments.force, "MySQL");
 					break;
+				case "Postgre":
+				case "Postgres":
 				case "PostgreSQL":
 					createDatabase(local.dsInfo, local.dbName, arguments.force, "PostgreSQL");
 					break;
@@ -246,7 +248,7 @@ component extends="../base" {
 			
 			// Test if driver accepts the URL
 			if (!local.driver.acceptsURL(local.url)) {
-				detailOutput.error(arguments.dbType & " driver does not accept the URL format");
+				detailOutput.error(arguments.dbType & " driver does not accept the URL format: #local.url#");
 				return;
 			}
 			
@@ -579,6 +581,8 @@ component extends="../base" {
 					local.templateKey = "mysql";
 					break;
 				case "PostgreSQL":
+				case "Postgre":
+				case "Postgres":
 					local.templateKey = "postgre";
 					break;
 				case "MSSQLServer":
@@ -874,6 +878,8 @@ component extends="../base" {
 			case "MySQL":
 				return "jdbc:mysql://#arguments.host#:#arguments.port#/#arguments.database#?characterEncoding=UTF-8&serverTimezone=UTC&maxReconnects=3";
 			case "PostgreSQL":
+			case "Postgre":
+			case "Postgres":
 				return "jdbc:postgresql://#arguments.host#:#arguments.port#/#arguments.database#";
 			case "MSSQLServer":
 				return "jdbc:sqlserver://#arguments.host#:#arguments.port#;DATABASENAME=#arguments.database#;trustServerCertificate=true;SelectMethod=direct";
@@ -1241,6 +1247,8 @@ component extends="../base" {
 			case "MySQL":
 			case "MySQL5":
 				return "mysql";
+			case "Postgre":
+			case "Postgres":
 			case "PostgreSQL":
 				return "postgres";
 			case "MSSQLServer":

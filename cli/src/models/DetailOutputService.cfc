@@ -134,9 +134,9 @@ component {
 	 * @width The width of the header (default: 50)
 	 */
 	function header(required string title, numeric width = 50) {
-		print.line(repeatString("=", arguments.width)).toConsole();
+		print.greenLine(repeatString("=", arguments.width)).toConsole();
 		print.boldLine(centerString(arguments.title, arguments.width)).toConsole();
-		print.line(repeatString("=", arguments.width)).toConsole();
+		print.greenLine(repeatString("=", arguments.width)).toConsole();
 		print.line().toConsole();
 		return this;
 	}
@@ -248,9 +248,23 @@ component {
 	 * @message The message to output
 	 * @indent Whether to indent this message
 	 */
-	function output(required string message, boolean indent = false) {
-		var indentText = arguments.indent ? repeatString(" ", variables.indentSize) : "";
-		print.line(indentText & arguments.message).toConsole();
+	public function output(
+		required string message,
+		boolean indent = false
+	) {
+		var prefix = arguments.indent ? 
+			RepeatString(" ", variables.indentSize) : 
+			"";
+		
+		// Determine appropriate formatting based on indentation flag
+		if (arguments.indent) {
+			// Standard output for indented content (typically detailed info)
+			print.line(prefix & arguments.message).toConsole();
+		} else {
+			// Highlighted output for main content
+			print.yellowLine(prefix & arguments.message).toConsole();
+		}
+		
 		return this;
 	}
 
