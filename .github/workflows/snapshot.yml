@@ -53,3 +53,4 @@ jobs:
     uses: ./.github/workflows/docs-sync.yml
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
