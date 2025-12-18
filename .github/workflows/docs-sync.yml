@@ -9,7 +9,7 @@ on:
 
 jobs:
   sync:
-    runs-on: [self-hosted, wheels-FW]
+    runs-on: [self-hosted, Linux, X64, wheels-fw]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
@@ -18,8 +18,9 @@ jobs:
 
       - name: Sync to shared docs folder
         run: |
-          rsync -av --no-perms --no-owner --no-group --del docs/src/ /mnt/shared/docs/3.0.0/guides
-          rsync -av --no-perms --no-owner --no-group docs/src/.gitbook/assets/ /mnt/shared/public/images
-          rsync -av --no-perms --no-owner --no-group --del docs/api/ /mnt/shared/public/json
+          rsync -av --no-perms --no-owner --no-group --del docs/src/ "${{ secrets.DEPLOY_PATH }}/docs/3.0.0/guides"
+          rsync -av --no-perms --no-owner --no-group docs/src/.gitbook/assets/ "${{ secrets.DEPLOY_PATH }}/public/images"
+          rsync -av --no-perms --no-owner --no-group --del docs/api/ "${{ secrets.DEPLOY_PATH }}/public/json"
+
 
 
