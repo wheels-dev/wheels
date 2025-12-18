@@ -4,9 +4,10 @@
  * wheels plugins remove wheels-vue-cli
  * wheels plugins remove wheels-docker
  */
-component alias="wheels plugin remove" extends="../base" {
+component aliases="wheels plugin remove" extends="../base" {
 
     property name="pluginService" inject="PluginService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
      * @name.hint Plugin name to remove
@@ -23,21 +24,21 @@ component alias="wheels plugin remove" extends="../base" {
         if (!arguments.force) {
             var confirm = ask("Are you sure you want to remove the plugin '#arguments.name#'? (y/n): ");
             if (!reFindNoCase("^y(es)?$", trim(confirm))) {
-                print.yellowLine("Plugin removal cancelled.");
+                detailOutput.statusInfo("Plugin removal cancelled.");
                 return;
             }
         }
         
-        print.yellowLine("[*] Removing plugin: #arguments.name#...")
-             .line();
+        detailOutput.output("Removing plugin: #arguments.name#...");
 
         var result = pluginService.remove(name = arguments.name);
 
         if (result.success) {
-            print.greenLine("[OK] Plugin removed successfully");
-            print.line("Run 'wheels plugins list' to see remaining plugins");
+            detailOutput.statusSuccess("Plugin removed successfully");
+            detailOutput.line();
+            detailOutput.statusInfo("Run 'wheels plugins list' to see remaining plugins");
         } else {
-            print.redLine("[ERROR] Failed to remove plugin: #result.error#");
+            detailOutput.statusFailed("Failed to remove plugin: #result.error#");
             setExitCode(1);
         }
     }

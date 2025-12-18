@@ -9,6 +9,7 @@
 component extends="../base" {
     
     property name="environmentService" inject="EnvironmentService@wheels-cli";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @environment.hint Environment name to switch to
@@ -35,224 +36,202 @@ component extends="../base" {
         
         // Display switch information (unless quiet mode)
         if (!arguments.quiet) {
-            print.line()
-                .boldBlueLine("Environment Switch")
-                .line("=".repeatString(50))
-                .line();
+            detailOutput.header("Environment Switch");
+            detailOutput.line();
             
             if (currentEnv != "none") {
-                print.line("Current Environment: ")
-                    .boldText(currentEnv)
-                    .line();
+                detailOutput.metric("Current Environment", currentEnv);
             } else {
-                print.yellowLine("No environment currently set");
+                detailOutput.statusWarning("No environment currently set");
             }
             
-            print.line("Target Environment:  ")
-                .boldText(arguments.environment)
-                .line()
-                .line();
+            detailOutput.metric("Target Environment", arguments.environment);
+            detailOutput.line();
         }
         
         // Validation phase (if check is enabled and not forced)
         if (arguments.check && !arguments.force) {
             if (!arguments.quiet) {
-                print.text("Validating target environment... ");
+                detailOutput.output("Validating target environment...");
             }
             
             var validation = validateEnvironment(arguments.environment, projectRoot);
             
             if (!validation.isValid) {
                 if (!arguments.quiet) {
-                    print.redLine("[FAILED]")
-                        .redLine("  Validation failed: #validation.error#");
+                    detailOutput.statusFailed("Validation failed: #validation.error#");
                 }
                 
                 if (!arguments.force) {
                     if (!arguments.quiet) {
-                        print.line()
-                            .redBoldLine("[X] Switch cancelled due to validation errors")
-                            .yellowLine("  Use --force to override validation")
-                            .line();
+                        detailOutput.error("Switch cancelled due to validation errors");
+                        detailOutput.statusInfo("Use --force to override validation");
                     }
                     setExitCode(1);
                     return;
                 } else if (!arguments.quiet) {
-                    print.yellowLine("  WARNING: Continuing anyway (--force enabled)");
+                    detailOutput.statusWarning("Continuing anyway (--force enabled)");
                 }
             } else if (!arguments.quiet) {
-                print.greenLine("[OK]");
+                detailOutput.statusSuccess("Environment validation passed");
                 if (structKeyExists(validation, "warning") && len(validation.warning)) {
-                    print.yellowLine("  Warning: #validation.warning#");
+                    detailOutput.statusWarning("#validation.warning#");
                 }
             }
         } else if (arguments.force && !arguments.quiet) {
-            print.yellowLine("WARNING: Validation skipped (--force enabled)");
+            detailOutput.statusWarning("Validation skipped (--force enabled)");
         }
         
         // Backup phase (if backup is requested)
         if (arguments.backup) {
             if (!arguments.quiet) {
-                print.text("Creating backup... ");
+                detailOutput.output("Creating backup...");
             }
             
             var backupResult = createBackup(projectRoot);
             
             if (!backupResult.success) {
                 if (!arguments.quiet) {
-                    print.redLine("[FAILED]")
-                        .redLine("  Backup failed: #backupResult.error#");
+                    detailOutput.statusFailed("Backup failed: #backupResult.error#");
                 }
                 
                 if (!arguments.force) {
                     if (!arguments.quiet) {
-                        print.line()
-                            .redBoldLine("[X] Switch cancelled due to backup failure")
-                            .line();
+                        detailOutput.error("Switch cancelled due to backup failure");
                     }
                     setExitCode(1);
                     return;
                 } else if (!arguments.quiet) {
-                    print.yellowLine("  WARNING: Continuing without backup (--force enabled)");
+                    detailOutput.statusWarning("Continuing without backup (--force enabled)");
                 }
             } else if (!arguments.quiet) {
-                print.greenLine("[OK]")
-                    .greyLine("  Backup saved: #backupResult.filename#");
+                detailOutput.statusSuccess("Backup created");
+                detailOutput.metric("Backup saved", "#backupResult.filename#");
             }
         }
         
         // Confirm for production switches (unless forced or quiet)
         if (arguments.environment == "production" && currentEnv != "production" && !arguments.force && !arguments.quiet) {
-            print.yellowLine("WARNING: Switching to PRODUCTION environment")
-                .line("   This will:")
-                .line("   - Disable debug mode")
-                .line("   - Enable full caching")
-                .line("   - Hide detailed error messages")
-                .line();
+            detailOutput.statusWarning("Switching to PRODUCTION environment");
+            detailOutput.output("This will:");
+            detailOutput.output("- Disable debug mode", true);
+            detailOutput.output("- Enable full caching", true);
+            detailOutput.output("- Hide detailed error messages", true);
+            detailOutput.line();
             
             var confirmed = ask("Are you sure you want to continue? (yes/no): ");
             if (confirmed != "yes" && confirmed != "y") {
-                print.redLine("[X] Switch cancelled")
-                    .line();
+                detailOutput.statusInfo("Switch cancelled");
                 return;
             }
-            print.line();
-        }
-        
-        // Show progress (unless quiet)
-        if (!arguments.quiet) {
-            print.text("Switching environment... ");
+            detailOutput.line();
         }
         
         // Perform the switch
+        if (!arguments.quiet) {
+            detailOutput.output("Switching environment...");
+        }
+        
         var result = environmentService.switch(arguments.environment, projectRoot);
         
         if (result.success) {
             if (!arguments.quiet) {
-                print.greenLine("[OK]");
                 
                 // Show what was done
                 if (structKeyExists(result, "oldEnvironment") && len(result.oldEnvironment)) {
-                    print.text("Updated environment variable... ")
-                        .greenLine("[OK]");
+                    detailOutput.update(".env file: Updated from #result.oldEnvironment# to #arguments.environment#", true);
                 } else {
-                    print.text("Set environment variable... ")
-                        .greenLine("[OK]");
+                    detailOutput.create(".env file", "Set to #arguments.environment# environment");
                 }
             }
             
             // Restart services if requested
             if (arguments.restart) {
                 if (!arguments.quiet) {
-                    print.text("Restarting application... ");
+                    detailOutput.output("Restarting application...");
                 }
                 
                 var restartResult = restartApplication(projectRoot);
                 
                 if (restartResult.success) {
                     if (!arguments.quiet) {
-                        print.greenLine("[OK]")
-                            .greyLine("  #restartResult.message#");
+                        detailOutput.statusSuccess("Application restarted");
+                        detailOutput.metric("Status", restartResult.message);
                     }
                 } else {
                     if (!arguments.quiet) {
-                        print.yellowLine("[WARNING]")
-                            .yellowLine("  Restart failed: #restartResult.error#")
-                            .yellowLine("  Please restart manually");
+                        detailOutput.statusWarning("Restart failed: #restartResult.error#");
+                        detailOutput.output("Please restart manually");
                     }
                 }
             }
             
             // Display success message and details (unless quiet)
             if (!arguments.quiet) {
-                print.line()
-                    .line("=".repeatString(50))
-                    .greenBoldLine("[SUCCESS] Environment switched successfully!")
-                    .line();
+                detailOutput.line();
+                detailOutput.statusSuccess("Environment switched successfully!");
+                detailOutput.line();
                 
                 // Show environment details if available
                 if (structKeyExists(result, "database") || structKeyExists(result, "debug") || structKeyExists(result, "cache")) {
-                    print.boldLine("Environment Details:")
-                        .line("- Environment: #arguments.environment#");
+                    detailOutput.subHeader("Environment Details");
+                    detailOutput.metric("Environment", arguments.environment);
                     
                     if (len(result.database) && result.database != "default") {
-                        print.line("- Database:    #result.database#");
+                        detailOutput.metric("Database", result.database);
                     }
                     if (structKeyExists(result, "debug")) {
-                        print.line("- Debug Mode:  #result.debug ? 'Enabled' : 'Disabled'#");
+                        detailOutput.metric("Debug Mode", result.debug ? "Enabled" : "Disabled");
                     }
                     if (len(result.cache) && result.cache != "default") {
-                        print.line("- Cache:       #result.cache#");
+                        detailOutput.metric("Cache", result.cache);
                     }
-                    print.line();
+                    detailOutput.line();
                 }
                 
                 // Show next steps (unless restart was done)
                 if (!arguments.restart) {
-                    print.yellowBoldLine("IMPORTANT:")
-                        .line("- Restart your application server for changes to take effect")
-                        .line("- Run 'wheels reload' if using Wheels development server")
-                        .line("- Or use 'wheels env switch #arguments.environment# --restart' next time")
-                        .line();
+                    detailOutput.statusInfo("IMPORTANT");
+                    detailOutput.output("- Restart your application server for changes to take effect",true);
+                    detailOutput.output("- Run 'wheels reload' if using Wheels development server",true);
+                    detailOutput.output("- Or use 'wheels env switch #arguments.environment# --restart' next time",true);
+                    detailOutput.line();
                 }
                 
                 // Environment-specific tips
                 if (arguments.environment == "production") {
-                    print.cyanLine("Production Tips:")
-                        .line("- Ensure all migrations are up to date")
-                        .line("- Clear application caches after restart")
-                        .line("- Monitor error logs for any issues")
-                        .line();
+                    detailOutput.subHeader("Production Tips");
+                    detailOutput.output("- Ensure all migrations are up to date", true);
+                    detailOutput.output("- Clear application caches after restart", true);
+                    detailOutput.output("- Monitor error logs for any issues", true);
+                    detailOutput.line();
                 } else if (arguments.environment == "development") {
-                    print.cyanLine("Development Mode:")
-                        .line("- Debug information will be displayed")
-                        .line("- Caching may be disabled")
-                        .line("- Detailed error messages will be shown")
-                        .line();
+                    detailOutput.subHeader("Development Mode");
+                    detailOutput.output("- Debug information will be displayed", true);
+                    detailOutput.output("- Caching may be disabled", true);
+                    detailOutput.output("- Detailed error messages will be shown", true);
+                    detailOutput.line();
                 }
             } else {
                 // Minimal output in quiet mode - just success
-                print.greenLine("Environment switched to #arguments.environment#");
+                detailOutput.statusSuccess("Environment switched to #arguments.environment#");
             }
             
         } else {
             if (!arguments.quiet) {
-                print.redLine("[FAILED]");
-                print.line()
-                    .redBoldLine("[X] Failed to switch environment")
-                    .redLine("  Error: #result.error#")
-                    .line();
+                detailOutput.statusFailed("Failed to switch environment");
+                detailOutput.error("#result.error#");
+                detailOutput.line();
                 
                 // Provide helpful suggestions
-                print.yellowLine("Suggestions:")
-                    .line("- Check if you have write permissions for .env file")
-                    .line("- Ensure the environment name is valid")
-                    .line("- Try running with administrator/sudo privileges if needed")
-                    .line("- Use --force to bypass validation checks")
-                    .line();
+                detailOutput.statusInfo("Suggestions");
+                detailOutput.output("- Check if you have write permissions for .env file", true);
+                detailOutput.output("- Ensure the environment name is valid", true);
+                detailOutput.output("- Try running with administrator/sudo privileges if needed", true);
+                detailOutput.output("- Use --force to bypass validation checks", true);
             } else {
                 // Minimal output in quiet mode
-                print.redLine("Failed: #result.error#");
+                detailOutput.statusFailed("#result.error#");
             }
             
             setExitCode(1);

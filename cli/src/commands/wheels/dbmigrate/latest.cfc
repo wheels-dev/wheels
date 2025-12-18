@@ -50,7 +50,7 @@ component aliases='wheels db latest,wheels db migrate' extends="../base" {
 		}
 		
 		// Add a separator before the info command output
-		detailOutput.separator();
+		detailOutput.line();
 		command('wheels dbmigrate info').run();
 	}
 

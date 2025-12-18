@@ -10,6 +10,8 @@
  */
 component aliases='wheels test:integration' extends="../base" {
     
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     /**
      * @type.hint Type of tests to run: (app, core, plugin)
      * @format.hint Output format (txt, json, junit, html)
@@ -48,6 +50,7 @@ component aliases='wheels test:integration' extends="../base" {
         if (!directoryExists(integrationTestPath)) {
             directoryCreate(integrationTestPath, true, true);
             createSampleIntegrationTest(integrationTestPath);
+            detailOutput.create("integration test directory: #arguments.directory#");
         }
         
         // Build the test URL

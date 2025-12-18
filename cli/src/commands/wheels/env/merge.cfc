@@ -10,6 +10,8 @@
  */
 component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @source1.hint First source .env file to merge
 	 * @source2.hint Second source .env file to merge
@@ -35,22 +37,25 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		}
 
 		if (ArrayLen(local.sourceFiles) < 2) {
-			error("At least two source files are required. Usage: wheels env merge file1 file2 [--output=filename] [--dryRun]");
+			detailOutput.error("At least two source files are required. Usage: wheels env merge file1 file2 [--output=filename] [--dryRun]");
+			return;
 		}
 
 		// Validate all source files exist
 		for (local.file in local.sourceFiles) {
 			if (!FileExists(ResolvePath(local.file))) {
-				error("Source file not found: #local.file#");
+				detailOutput.error("Source file not found: #local.file#");
+				return;
 			}
 		}
 
-		print.line();
-		print.boldLine("Merging environment files:");
+		print.line("Merging environment files...").toConsole();
+		detailOutput.line();
+		detailOutput.subHeader("Source Files");
 		for (local.i = 1; local.i <= ArrayLen(local.sourceFiles); local.i++) {
-			print.line("  #local.i#. #local.sourceFiles[local.i]#");
+			detailOutput.metric("#local.i#.", local.sourceFiles[local.i]);
 		}
-		print.line();
+		detailOutput.line();
 
 		// Merge the files
 		local.merged = mergeEnvFiles(local.sourceFiles);
@@ -61,16 +66,16 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		} else {
 			// Write the merged file
 			writeMergedFile(arguments.output, local.merged);
-			print.line();
-			print.greenLine("Merged #ArrayLen(local.sourceFiles)# files into #arguments.output#");
-			print.line("  Total variables: #StructCount(local.merged.vars)#");
+			detailOutput.line();
+			detailOutput.statusSuccess("Merged #ArrayLen(local.sourceFiles)# files into #arguments.output#");
+			detailOutput.metric("Total variables", "#StructCount(local.merged.vars)#");
 			
 			// Show conflicts if any
 			if (ArrayLen(local.merged.conflicts)) {
-				print.line();
-				print.yellowLine("Conflicts resolved (later files take precedence):");
+				detailOutput.line();
+				detailOutput.statusWarning("Conflicts resolved (later files take precedence):");
 				for (local.conflict in local.merged.conflicts) {
-					print.line("  #local.conflict#");
+					detailOutput.output("  - #local.conflict#", true);
 				}
 			}
 		}
@@ -116,7 +121,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 				if (StructKeyExists(local.result.vars, local.key)) {
 					if (local.result.vars[local.key] != local.fileVars[local.key]) {
 						ArrayAppend(local.result.conflicts, 
-							"#local.key#: '#local.result.vars[local.key]#' (#local.result.sources[local.key]#) → '#local.fileVars[local.key]#' (#local.file#)"
+							"#local.key#: '#local.result.vars[local.key]#' (#local.result.sources[local.key]#) -> '#local.fileVars[local.key]#' (#local.file#)"
 						);
 					}
 				}
@@ -131,8 +136,12 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 	}
 
 	private void function displayMergedResult(required struct merged, required boolean dryRun) {
-		print.boldLine("Merged result (#arguments.dryRun ? 'DRY RUN' : ''#):");
-		print.line();
+		detailOutput.header("Merged Result #arguments.dryRun ? '(DRY RUN)' : ''#");
+		detailOutput.metric("Total variables", "#StructCount(arguments.merged.vars)#");
+		if (ArrayLen(arguments.merged.conflicts)) {
+			detailOutput.metric("Conflicts resolved", "#ArrayLen(arguments.merged.conflicts)#");
+		}
+		detailOutput.line();
 
 		// Group variables by prefix
 		local.grouped = {};
@@ -163,7 +172,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		ArraySort(local.prefixes, "textnocase");
 		
 		for (local.prefix in local.prefixes) {
-			print.boldLine("#local.prefix# Variables:");
+			detailOutput.subHeader("#local.prefix# Variables");
 			// Sort variables within group
 			ArraySort(local.grouped[local.prefix], function(a, b) {
 				return CompareNoCase(a.key, b.key);
@@ -176,14 +185,15 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					FindNoCase("key", local.var.key) || FindNoCase("token", local.var.key)) {
 					local.displayValue = "***MASKED***";
 				}
-				print.line("  #local.var.key# = #local.displayValue# (from #local.var.source#)");
+				detailOutput.metric(local.var.key, local.displayValue);
+				detailOutput.output("  (from #local.var.source#)", true);
 			}
-			print.line();
+			detailOutput.line();
 		}
 
 		// Display ungrouped variables
 		if (ArrayLen(local.ungrouped)) {
-			print.boldLine("Other Variables:");
+			detailOutput.subHeader("Other Variables");
 			// Sort ungrouped variables
 			ArraySort(local.ungrouped, function(a, b) {
 				return CompareNoCase(a.key, b.key);
@@ -196,7 +206,17 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 					FindNoCase("key", local.var.key) || FindNoCase("token", local.var.key)) {
 					local.displayValue = "***MASKED***";
 				}
-				print.line("  #local.var.key# = #local.displayValue# (from #local.var.source#)");
+				detailOutput.metric(local.var.key, local.displayValue);
+				detailOutput.output("  (from #local.var.source#)", true);
+			}
+		}
+		
+		// Show conflicts if any
+		if (ArrayLen(arguments.merged.conflicts)) {
+			detailOutput.line();
+			detailOutput.statusWarning("Conflict Resolution Details:");
+			for (local.conflict in arguments.merged.conflicts) {
+				detailOutput.output("  - #local.conflict#", true);
 			}
 		}
 	}
@@ -254,8 +274,10 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		// Write the file
 		try {
 			FileWrite(ResolvePath(arguments.filename), ArrayToList(local.lines, Chr(10)));
+			detailOutput.create("merged environment file: #arguments.filename#");
 		} catch (any e) {
-			error("Failed to write merged file: #e.message#");
+			detailOutput.error("Failed to write merged file: #e.message#");
+			throw(type="FileWriteError", message="Failed to write merged file: #e.message#");
 		}
 	}
 

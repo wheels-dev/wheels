@@ -47,7 +47,8 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 		if (!len(arguments.objectname) && !len(arguments.get) && !len(arguments.post) &&
 			!len(arguments.put) && !len(arguments.patch) && !len(arguments.delete) &&
 			!len(arguments.root) && !arguments.resources) {
-			error("Please provide either an objectname for a resources route or specify a route type (--get, --post, etc.)");
+			details.error("Please provide either an objectname for a resources route or specify a route type (--get, --post, etc.)");
+			return;
 		}
 
 		var target = fileSystemUtil.resolvePath("config/routes.cfm");
@@ -138,7 +139,8 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 	private struct function parseRouteArgument(required string argument) {
 		// Handle edge case of just a comma
 		if (trim(arguments.argument) == ",") {
-			error("Invalid route format. Pattern cannot be empty. Expected: pattern or pattern,handler");
+			details.error("Invalid route format. Pattern cannot be empty. Expected: pattern or pattern,handler");
+			return;
 		}
 
 		// Use includeEmptyFields=true to catch empty patterns/handlers
@@ -147,7 +149,8 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 
 		// Validate we have at least one part with content
 		if (arrayLen(parts) == 0) {
-			error("Invalid route format. Expected: pattern or pattern,handler");
+			details.error("Invalid route format. Expected: pattern or pattern,handler");
+			return;
 		}
 
 		// Trim all parts
@@ -157,7 +160,8 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 
 		// Check if first part (pattern) is empty
 		if (!len(parts[1])) {
-			error("Invalid route format. Pattern cannot be empty. Expected: pattern or pattern,handler");
+			details.error("Invalid route format. Pattern cannot be empty. Expected: pattern or pattern,handler");
+			return;
 		}
 
 		if (arrayLen(parts) == 1) {
@@ -166,7 +170,8 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 		} else if (arrayLen(parts) == 2) {
 			// Both pattern and handler provided
 			if (!len(parts[2])) {
-				error("Invalid route format. Handler cannot be empty. Expected: pattern,controller##action");
+				details.error("Invalid route format. Handler cannot be empty. Expected: pattern,controller##action");
+				return;
 			}
 
 			// Validate handler format
@@ -174,7 +179,8 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 
 			result.inject = 'pattern="' & parts[1] & '", to="' & parts[2] & '"';
 		} else {
-			error("Invalid route format. Expected: pattern,handler (got too many comma-separated values)");
+			details.error("Invalid route format. Expected: pattern,handler (got too many comma-separated values)");
+			return;
 		}
 
 		return result;
@@ -192,38 +198,45 @@ component  aliases='wheels g route, wheels g routes, wheels generate routes' ext
 
 		// If there's an odd number of # characters, user provided single hash
 		if (hashCount % 2 != 0) {
-			error("Invalid handler format. Use double hash (#doubleHash#) to separate controller and action, not single hash (#hashChar#). Example: controller#doubleHash#action");
+			details.error("Invalid handler format. Use double hash (#doubleHash#) to separate controller and action, not single hash (#hashChar#). Example: controller#doubleHash#action");
+			return;
 		}
 
 		// Must contain ## separator
 		if (!find(doubleHash, arguments.handler)) {
-			error("Invalid handler format. Handler must contain #doubleHash# separator. Expected: controller#doubleHash#action");
+			details.error("Invalid handler format. Handler must contain #doubleHash# separator. Expected: controller#doubleHash#action");
+			return;
 		}
 
 		// Check if handler starts with ## (missing controller)
 		if (left(arguments.handler, 2) == doubleHash) {
-			error("Invalid handler format - missing controller. Expected: controller#doubleHash#action");
+			details.error("Invalid handler format - missing controller. Expected: controller#doubleHash#action");
+			return;
 		}
 
 		// Check if handler ends with ## (missing action)
 		if (right(arguments.handler, 2) == doubleHash) {
-			error("Invalid handler format - missing action. Expected: controller#doubleHash#action");
+			details.error("Invalid handler format - missing action. Expected: controller#doubleHash#action");
+			return;
 		}
 
 		// Split by ## and validate
 		var parts = listToArray(arguments.handler, doubleHash);
 
 		if (arrayLen(parts) != 2) {
-			error("Invalid handler format. Handler must have exactly one #doubleHash# separator. Expected: controller#doubleHash#action");
+			details.error("Invalid handler format. Handler must have exactly one #doubleHash# separator. Expected: controller#doubleHash#action");
+			return;
 		}
 
 		// Double-check that both parts have content (in case of edge cases)
 		if (!len(trim(parts[1]))) {
-			error("Invalid handler format - missing controller. Expected: controller#doubleHash#action");
+			details.error("Invalid handler format - missing controller. Expected: controller#doubleHash#action");
+			return;
 		}
 
 		if (!len(trim(parts[2]))) {
-			error("Invalid handler format - missing action. Expected: controller#doubleHash#action");
+			details.error("Invalid handler format - missing action. Expected: controller#doubleHash#action");
+			return;
 		}
 	}
 

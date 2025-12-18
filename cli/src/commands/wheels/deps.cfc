@@ -10,6 +10,8 @@
  * {code}
  */
 component extends="base" {
+    
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
      * @action Action to perform (list, install, update, remove, report)
@@ -32,9 +34,7 @@ component extends="base" {
         );
 
         // Welcome message
-        print.line();
-        print.boldMagentaLine("Wheels Dependency Manager");
-        print.line();
+        detailOutput.header("Wheels Dependency Manager");
         
         // Handle different actions
         switch (lCase(arguments.action)) {
@@ -43,19 +43,22 @@ component extends="base" {
                 break;
             case "install":
                 if (len(trim(arguments.name)) == 0) {
-                    error("Name parameter is required for install action");
+                    detailOutput.error("Name parameter is required for install action");
+                    return;
                 }
                 installDependency(arguments.name, arguments.version, arguments.dev);
                 break;
             case "update":
                 if (len(trim(arguments.name)) == 0) {
-                    error("Name parameter is required for update action");
+                    detailOutput.error("Name parameter is required for update action");
+                    return;
                 }
                 updateDependency(arguments.name);
                 break;
             case "remove":
                 if (len(trim(arguments.name)) == 0) {
-                    error("Name parameter is required for remove action");
+                    detailOutput.error("Name parameter is required for remove action");
+                    return;
                 }
                 removeDependency(arguments.name);
                 break;
@@ -64,21 +67,21 @@ component extends="base" {
                 break;
         }
         
-        print.line();
+        detailOutput.line();
     }
     
     /**
      * List installed dependencies from box.json
      */
     private void function listDependencies() {
-        print.line("Retrieving dependencies from box.json...");
+        detailOutput.output("Retrieving dependencies from box.json...");
         
         try {
             local.boxJsonPath = fileSystemUtil.resolvePath("box.json");
             
             if (!fileExists(local.boxJsonPath)) {
-                print.boldRedLine("No box.json file found");
-                print.line("Run 'box init' to create a box.json file");
+                detailOutput.error("No box.json file found");
+                detailOutput.output("Run 'box init' to create a box.json file");
                 return;
             }
             
@@ -87,7 +90,7 @@ component extends="base" {
             
             // List regular dependencies
             if (structKeyExists(local.boxJson, "dependencies") && structCount(local.boxJson.dependencies) > 0) {
-                print.boldYellowLine("Dependencies:");
+                detailOutput.subHeader("Dependencies");
                 local.depsTable = [];
                 
                 for (local.dep in local.boxJson.dependencies) {
@@ -98,18 +101,16 @@ component extends="base" {
                     arrayAppend(local.depsTable, [local.dep, local.version, "Production", local.status]);
                 }
                 
-                // print.table(local.depsTable, ["Package", "Version", "Type", "Status"]);
                 for (local.row in local.depsTable) {
-                    print.line("  " & local.row[1] & " @ " & local.row[2] & " (" & local.row[3] & ") - " & local.row[4]);
+                    detailOutput.output("  " & local.row[1] & " @ " & local.row[2] & " (" & local.row[3] & ") - " & local.row[4], true);
                 }
                 local.hasDeps = true;
             }
             
             // List dev dependencies
             if (structKeyExists(local.boxJson, "devDependencies") && structCount(local.boxJson.devDependencies) > 0) {
-                if (local.hasDeps) print.line();
-                
-                print.boldYellowLine("Dev Dependencies:");
+                detailOutput.line();
+                detailOutput.subHeader("Dev Dependencies");
                 local.devDepsTable = [];
                 
                 for (local.dep in local.boxJson.devDependencies) {
@@ -120,20 +121,19 @@ component extends="base" {
                     arrayAppend(local.devDepsTable, [local.dep, local.version, "Development", local.status]);
                 }
                 
-                // print.table(local.devDepsTable, ["Package", "Version", "Type", "Status"]);
                 for (local.row in local.devDepsTable) {
-                    print.line("  " & local.row[1] & " @ " & local.row[2] & " (" & local.row[3] & ") - " & local.row[4]);
+                    detailOutput.output("  " & local.row[1] & " @ " & local.row[2] & " (" & local.row[3] & ") - " & local.row[4], true);
                 }
                 local.hasDeps = true;
             }
             
             if (!local.hasDeps) {
-                print.yellowLine("No dependencies found in box.json");
-                print.line("Use 'wheels deps install <package>' to add dependencies");
+                detailOutput.statusWarning("No dependencies found in box.json");
+                detailOutput.output("Use 'wheels deps install <package>' to add dependencies");
             }
             
         } catch (any e) {
-            print.boldRedLine("Error reading dependencies: #e.message#");
+            detailOutput.statusFailed("Error reading dependencies: #e.message#");
         }
     }
     
@@ -145,7 +145,7 @@ component extends="base" {
         string version="",
         boolean dev=false
     ) {
-        print.line("Installing #arguments.name#...");
+        detailOutput.output("Installing #arguments.name#...");
         
         try {
             // Prepare install command
@@ -160,10 +160,10 @@ component extends="base" {
             }
             
             // Run CommandBox install
-            print.line("Running: box #local.installCmd#");
+            detailOutput.output("Running: box #local.installCmd#");
             command(local.installCmd).run();
             
-            print.boldGreenLine("#arguments.name# installed successfully");
+            detailOutput.statusSuccess("#arguments.name# installed successfully");
             
             // Show post-install information
             local.boxJsonPath = fileSystemUtil.resolvePath("box.json");
@@ -173,13 +173,14 @@ component extends="base" {
                 
                 if (structKeyExists(local.boxJson, local.depType) && 
                     structKeyExists(local.boxJson[local.depType], arguments.name)) {
-                    print.yellowLine("Added to #local.depType#: #arguments.name# @ #local.boxJson[local.depType][arguments.name]#");
+                    detailOutput.statusInfo("Added to #local.depType#: #arguments.name# @ #local.boxJson[local.depType][arguments.name]#");
                 }
             }
             
         } catch (any e) {
-            print.boldRedLine("Failed to install #arguments.name#");
-            print.redLine("Error: #e.message#");
+            detailOutput.statusFailed("Failed to install #arguments.name#");
+            detailOutput.error("Error: #e.message#");
+            return;
         }
     }
     
@@ -187,13 +188,13 @@ component extends="base" {
      * Update a dependency
      */
     private void function updateDependency(required string name) {
-        print.line("Updating #arguments.name#...");
+        detailOutput.output("Updating #arguments.name#...");
         
         try {
             // Check if dependency exists in box.json
             local.boxJsonPath = fileSystemUtil.resolvePath("box.json");
             if (!fileExists(local.boxJsonPath)) {
-                print.boldRedLine("No box.json file found");
+                detailOutput.error("No box.json file found");
                 return;
             }
             
@@ -217,23 +218,23 @@ component extends="base" {
             }
             
             if (!local.found) {
-                print.boldRedLine("Dependency '#arguments.name#' not found in box.json");
-                print.line("Use 'wheels deps list' to see available dependencies");
+                detailOutput.statusFailed("Dependency '#arguments.name#' not found in box.json");
+                detailOutput.statusInfo("Use 'wheels deps list' to see available dependencies");
                 return;
             }
             
             // Update the dependency
-            print.yellowLine("Current version: #local.currentVersion#");
+            detailOutput.statusInfo("Current version: #local.currentVersion#");
             
             local.updateCmd = "update #arguments.name#";
             if (local.isDev) {
                 local.updateCmd &= " --dev";
             }
             
-            print.line("Running: box #local.updateCmd#");
+            detailOutput.output("Running: box #local.updateCmd#");
             command(local.updateCmd).run();
             
-            print.boldGreenLine("#arguments.name# updated successfully");
+            detailOutput.statusSuccess("#arguments.name# updated successfully");
             
             // Show new version
             local.boxJson = deserializeJSON(fileRead(local.boxJsonPath));
@@ -243,13 +244,14 @@ component extends="base" {
                 structKeyExists(local.boxJson[local.depType], arguments.name)) {
                 local.newVersion = local.boxJson[local.depType][arguments.name];
                 if (local.currentVersion != local.newVersion) {
-                    print.yellowLine("Updated from #local.currentVersion# to #local.newVersion#");
+                    detailOutput.statusInfo("Updated from #local.currentVersion# to #local.newVersion#");
                 }
             }
             
         } catch (any e) {
-            print.boldRedLine("Failed to update #arguments.name#");
-            print.redLine("Error: #e.message#");
+            detailOutput.statusFailed("Failed to update #arguments.name#");
+            detailOutput.error("Error: #e.message#");
+            return;
         }
     }
     
@@ -258,17 +260,17 @@ component extends="base" {
      */
     private void function removeDependency(required string name) {
         if (!confirm("Are you sure you want to remove #arguments.name#? [y/n]")) {
-            print.line("Aborted");
+            detailOutput.output("Aborted");
             return;
         }
         
-        print.line("Removing #arguments.name#...");
+        detailOutput.output("Removing #arguments.name#...");
         
         try {
             // Check if dependency exists in box.json
             local.boxJsonPath = fileSystemUtil.resolvePath("box.json");
             if (!fileExists(local.boxJsonPath)) {
-                print.boldRedLine("No box.json file found");
+                detailOutput.error("No box.json file found");
                 return;
             }
             
@@ -290,28 +292,29 @@ component extends="base" {
             }
             
             if (!local.found) {
-                print.boldRedLine("Dependency '#arguments.name#' not found in box.json");
-                print.line("Use 'wheels deps list' to see available dependencies");
+                detailOutput.statusFailed("Dependency '#arguments.name#' not found in box.json");
+                detailOutput.output("Use 'wheels deps list' to see available dependencies");
                 return;
             }
             
             // Remove the dependency
             local.uninstallCmd = "uninstall #arguments.name#";
             
-            print.line("Running: box #local.uninstallCmd#");
+            detailOutput.output("Running: box #local.uninstallCmd#");
             command(local.uninstallCmd).run();
             
-            print.boldGreenLine("#arguments.name# removed successfully");
+            detailOutput.statusSuccess("#arguments.name# removed successfully");
             
             if (local.isDev) {
-                print.yellowLine("Removed from devDependencies");
+                detailOutput.statusInfo("Removed from devDependencies");
             } else {
-                print.yellowLine("Removed from dependencies");
+                detailOutput.statusInfo("Removed from dependencies");
             }
             
         } catch (any e) {
-            print.boldRedLine("Failed to remove #arguments.name#");
-            print.redLine("Error: #e.message#");
+            detailOutput.statusFailed("Failed to remove #arguments.name#");
+            detailOutput.error("Error: #e.message#");
+            return;
         }
     }
     
@@ -319,7 +322,7 @@ component extends="base" {
      * Generate dependency report
      */
     private void function generateDependencyReport() {
-        print.line("Generating dependency report...");
+        detailOutput.output("Generating dependency report...");
         
         try {
             local.report = {
@@ -410,22 +413,21 @@ component extends="base" {
             }
             
             // Display report
-            print.boldYellowLine("Dependency Report:");
-            print.line();
-            print.yellowLine("Generated: #dateTimeFormat(local.report.timestamp, 'yyyy-mm-dd HH:nn:ss')#");
+            detailOutput.header("Dependency Report");
+            detailOutput.metric("Generated", dateTimeFormat(local.report.timestamp, 'yyyy-mm-dd HH:nn:ss'));
             if (len(local.report.project)) {
-                print.yellowLine("Project: #local.report.project#");
+                detailOutput.metric("Project", local.report.project);
             }
             if (structKeyExists(local.report, "projectVersion")) {
-                print.yellowLine("Project Version: #local.report.projectVersion#");
+                detailOutput.metric("Project Version", local.report.projectVersion);
             }
-            print.yellowLine("Wheels Version: #local.report.wheelsVersion#");
-            print.yellowLine("CFML Engine: #local.report.cfmlEngine#");
-            print.line();
+            detailOutput.metric("Wheels Version", local.report.wheelsVersion);
+            detailOutput.metric("CFML Engine", local.report.cfmlEngine);
+            detailOutput.line();
             
             // Display dependencies
             if (structCount(local.report.dependencies) > 0) {
-                print.yellowLine("Dependencies:");
+                detailOutput.subHeader("Dependencies");
                 local.depsTable = [];
                 for (local.dep in local.report.dependencies) {
                     local.installed = checkIfInstalled(local.dep);
@@ -435,16 +437,15 @@ component extends="base" {
                         local.installed ? "Yes" : "No"
                     ]);
                 }
-                // print.table(local.depsTable, ["Package", "Version", "Installed"]);
                 for (local.row in local.depsTable) {
-                    print.line("  " & local.row[1] & " @ " & local.row[2] & " - Installed: " & local.row[3]);
+                    detailOutput.output("  " & local.row[1] & " @ " & local.row[2] & " - Installed: " & local.row[3], true);
                 }
-                print.line();
+                detailOutput.line();
             }
             
             // Display dev dependencies
             if (structCount(local.report.devDependencies) > 0) {
-                print.yellowLine("Dev Dependencies:");
+                detailOutput.subHeader("Dev Dependencies");
                 local.devDepsTable = [];
                 for (local.dep in local.report.devDependencies) {
                     local.installed = checkIfInstalled(local.dep);
@@ -454,49 +455,47 @@ component extends="base" {
                         local.installed ? "Yes" : "No"
                     ]);
                 }
-                // print.table(local.devDepsTable, ["Package", "Version", "Installed"]);
                 for (local.row in local.devDepsTable) {
-                    print.line("  " & local.row[1] & " @ " & local.row[2] & " - Installed: " & local.row[3]);
+                    detailOutput.output("  " & local.row[1] & " @ " & local.row[2] & " - Installed: " & local.row[3], true);
                 }
-                print.line();
+                detailOutput.line();
             }
             
             // Display installed modules
             if (arrayLen(local.report.installedModules) > 0) {
-                print.yellowLine("Installed Modules:");
+                detailOutput.subHeader("Installed Modules");
                 local.modulesTable = [];
                 for (local.module in local.report.installedModules) {
                     local.version = structKeyExists(local.module, "version") ? local.module.version : "Unknown";
                     arrayAppend(local.modulesTable, [local.module.name, local.version]);
                 }
-                // print.table(local.modulesTable, ["Module", "Version"]);
                 for (local.row in local.modulesTable) {
-                    print.line("  " & local.row[1] & " (" & local.row[2] & ")");
+                    detailOutput.output("  " & local.row[1] & " (" & local.row[2] & ")", true);
                 }
-                print.line();
+                detailOutput.line();
             }
             
             // Check for outdated packages
-            print.yellowLine("Checking for outdated packages...");
+            detailOutput.output("Checking for outdated packages...");
             try {
                 local.outdatedResult = command("outdated").run(returnOutput=true);
                 if (len(trim(local.outdatedResult))) {
-                    print.line(local.outdatedResult);
+                    detailOutput.code(local.outdatedResult);
                 } else {
-                    print.greenLine("All packages are up to date!");
+                    detailOutput.statusSuccess("All packages are up to date!");
                 }
             } catch (any e) {
-                print.line("Unable to check for outdated packages");
+                detailOutput.statusWarning("Unable to check for outdated packages");
             }
             
             // Save report to file
             local.reportPath = fileSystemUtil.resolvePath("dependency-report-#dateTimeFormat(now(), 'yyyymmdd-HHnnss')#.json");
             fileWrite(local.reportPath, serializeJSON(local.report, true));
-            print.line();
-            print.greenLine("Full report exported to: #local.reportPath#");
+            detailOutput.line();
+            detailOutput.statusSuccess("Full report exported to: #local.reportPath#");
             
         } catch (any e) {
-            print.boldRedLine("Error generating report: #e.message#");
+            detailOutput.statusFailed("Error generating report: #e.message#");
         }
     }
     

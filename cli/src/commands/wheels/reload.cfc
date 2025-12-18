@@ -17,6 +17,9 @@ component aliases='wheels r'  extends="base"  {
 	 * @mode.options development,testing,maintenance,production
 	 * @password The reload password
 	 **/
+
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+	
 	function run(string mode="development", string password="") {
 		arguments=reconstructArgs(arguments);
   		var serverDetails = $getServerInfo();
@@ -24,7 +27,7 @@ component aliases='wheels r'  extends="base"  {
   		getURL = serverDetails.serverURL &
   			"/index.cfm?reload=#mode#&password=#password#";
   		var loc = new Http( url=getURL ).send().getPrefix();
-  		print.line("Reload Request sent");
+  		detailOutput.statusSuccess("Reload Request sent");
 	}
 
 }

@@ -132,31 +132,34 @@ wheels analyze code --path=app/models --fix --report --verbose
 
 ### Console Output (Default)
 ```
+Analyzing code quality...
+
+Scanning for files... Found 51 files to analyze
+Analyzing: [==================================================] 100% Complete!
+Detecting duplicate code... Found 0 duplicate blocks
+
+
 ==================================================
-           CODE QUALITY REPORT
+               CODE QUALITY REPORT
 ==================================================
 
-           Grade: B (85/100)
-           Good code quality with minor issues
+           Excellent code quality
 ==================================================
+
 
 Code Metrics
 --------------------------------------------------
-Files Analyzed:          42
-Total Lines:          3,567
-Functions:              156
-Avg Complexity:           4
-Duplicate Blocks:         3
-Code Smells:              7
-Deprecated Calls:         2
+Files Analyzed:           51
+Total Lines:              1184
+Functions:                51
+Avg Complexity:           0
+Duplicate Blocks:         0
+Code Smells:              0
+Deprecated Calls:         0
 
-Issue Summary
---------------------------------------------------
-Errors:       2 (Critical issues requiring immediate attention)
-Warnings:    12 (Issues that should be addressed)
-Info:        28 (Suggestions for improvement)
 
-[Additional details for each file...]
+           Grade: A (100/100)
+Excellent! No issues found. Your code is pristine!
 ```
 
 ### JSON Output
@@ -248,11 +251,6 @@ stage('Code Analysis') {
 - **Large projects** (500+ files): Several minutes, use `--verbose` to track progress
 - HTML report generation adds 5-30 seconds depending on project size
 
-## Exit Codes
-
-- `0`: Success, no errors found
-- `1`: Analysis completed with errors found
-- `2`: Analysis failed (invalid path, configuration error)
 
 ## Tips
 

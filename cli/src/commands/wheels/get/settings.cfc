@@ -9,6 +9,8 @@
  */
 component extends="../base" {
 
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @settingName Optional specific setting name or pattern to filter
 	 * @help Display all settings or a specific setting value
@@ -56,37 +58,61 @@ component extends="../base" {
 			
 			if (StructCount(local.settings) == 0) {
 				if (Len(arguments.settingName)) {
-					print.yellowLine("No settings found matching '#arguments.settingName#'");
+					detailOutput.statusWarning("No settings found matching '#arguments.settingName#'");
 				} else {
-					print.yellowLine("No settings found");
+					detailOutput.statusWarning("No settings found");
 				}
 				return;
 			}
 			
-			print.line();
-			print.boldLine("Wheels Settings (#local.environment# environment):");
-			print.line();
+			detailOutput.header("Wheels Settings (#local.environment# environment)");
+			detailOutput.line();
 			
 			// Sort settings by key
 			local.sortedKeys = StructKeyArray(local.settings);
 			ArraySort(local.sortedKeys, "textnocase");
 			
-			// Display settings
+			// Display settings in a table format
+			var rows = [];
 			for (local.key in local.sortedKeys) {
 				local.value = local.settings[local.key];
 				local.displayValue = formatSettingValue(local.value);
 				
-				print.text(PadRight(local.key & ":", 30));
-				print.greenLine(local.displayValue);
+				arrayAppend(rows, {
+					"Setting" = local.key,
+					"Value" = local.displayValue
+				});
 			}
 			
-			print.line();
-			print.line("Total settings: " & StructCount(local.settings));
+			// Display the table
+			detailOutput.getPrint().table(rows);
+			
+			detailOutput.line();
+			detailOutput.metric("Total settings", StructCount(local.settings));
+			
+			// Add helpful information
+			detailOutput.line();
+			detailOutput.statusInfo("Settings loaded from:");
+			if (FileExists(local.settingsFile)) {
+				detailOutput.output("- config/settings.cfm (global defaults)", true);
+			}
+			if (FileExists(local.envSettingsFile)) {
+				detailOutput.output("- config/#local.environment#/settings.cfm (environment overrides)", true);
+			}
+			if (!FileExists(local.settingsFile) && !FileExists(local.envSettingsFile)) {
+				detailOutput.output("- Default Wheels settings only (no config files found)", true);
+			}
+			
+			detailOutput.line();
+			if (Len(arguments.settingName) && StructCount(local.settings) > 0) {
+				detailOutput.statusInfo("Filtered by: '#arguments.settingName#'");
+				detailOutput.output("- Showing #StructCount(local.settings)# matching setting(s)", true);
+			}
 			
 		} catch (any e) {
-			error("Error reading settings: " & e.message);
+			detailOutput.error("Error reading settings: #e.message#");
 			if (StructKeyExists(e, "detail") && Len(e.detail)) {
-				error("Details: " & e.detail);
+				detailOutput.output("Details: #e.detail#");
 			}
 		}
 	}
@@ -236,12 +262,4 @@ component extends="../base" {
 			return "[complex value]";
 		}
 	}
-
-	private string function PadRight(required string text, required numeric width) {
-		if (Len(arguments.text) >= arguments.width) {
-			return arguments.text;
-		}
-		return arguments.text & RepeatString(" ", arguments.width - Len(arguments.text));
-	}
-
 }

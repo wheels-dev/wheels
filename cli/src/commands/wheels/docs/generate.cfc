@@ -103,7 +103,7 @@ component extends="../base" {
         }
         
         // Display summary
-        detailOutput.separator();
+        detailOutput.line();
         detailOutput.statusSuccess("Documentation generated successfully!");
         detailOutput.line();
         

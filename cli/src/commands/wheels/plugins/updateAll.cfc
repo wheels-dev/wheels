@@ -10,6 +10,7 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
     property name="packageService" inject="PackageService";
     property name="forgebox" inject="ForgeBox";
     property name="fileSystemUtil" inject="FileSystem";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
      * @dryRun.hint Show what would be updated without actually updating
@@ -22,22 +23,22 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
         requireWheelsApp(getCWD());
         arguments = reconstructArgs(argStruct=arguments);
         try {
-            print.line()
-                 .boldCyanLine("===========================================================")
-                 .boldCyanLine("  Checking for Plugin Updates")
-                 .boldCyanLine("===========================================================")
-                 .line();
+            detailOutput.header("Checking for Plugin Updates");
+            detailOutput.line();
 
             // Get list of installed plugins from /plugins folder
             var plugins = pluginService.list();
 
             if (arrayLen(plugins) == 0) {
-                print.yellowLine("No plugins installed in /plugins folder")
-                     .line();
-                print.line("Install plugins with:")
-                     .cyanLine("  wheels plugin install <plugin-name>");
+                detailOutput.statusWarning("No plugins installed in /plugins folder");
+                detailOutput.line();
+                detailOutput.subHeader("Install plugins with");
+                detailOutput.output("- wheels plugin install <plugin-name>", true);
                 return;
             }
+
+            detailOutput.output("Checking #arrayLen(plugins)# installed plugin(s)...");
+            detailOutput.line();
 
             var updatesAvailable = [];
             var upToDate = [];
@@ -47,11 +48,6 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
             for (var plugin in plugins) {
                 try {
                     var pluginSlug = plugin.slug ?: plugin.name;
-
-                    // Format plugin name with padding for alignment
-                    var displayName = plugin.name;
-                    var padding = repeatString(" ", max(40 - len(displayName), 1));
-                    print.text("  " & displayName & padding);
 
                     // Get latest version using forgebox show command for fresh data
                     var forgeboxResult = command('forgebox show')
@@ -72,8 +68,6 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
 
                     // Compare versions
                     if (cleanCurrent != cleanLatest && latestVersion != "unknown") {
-                        print.yellowBoldText("[UPDATE] ")
-                             .yellowLine("#currentVersion# -> #latestVersion#");
                         arrayAppend(updatesAvailable, {
                             name: plugin.name,
                             slug: pluginSlug,
@@ -81,71 +75,75 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
                             currentVersion: currentVersion,
                             latestVersion: latestVersion
                         });
+                        detailOutput.update("#plugin.name# (v#currentVersion# → v#latestVersion#)");
                     } else {
-                        print.greenBoldText("[OK] ")
-                             .greenLine("v#currentVersion#");
                         arrayAppend(upToDate, plugin.name);
+                        detailOutput.identical("#plugin.name# (v#currentVersion#)");
                     }
 
                 } catch (any e) {
-                    print.redBoldText("[ERROR] ")
-                         .redLine("Failed to check");
                     arrayAppend(errors, {
                         name: plugin.name,
                         error: e.message
                     });
+                    detailOutput.conflict("#plugin.name#");
                 }
             }
 
-            print.line()
-                 .boldLine("-----------------------------------------------------------")
-                 .line();
+            detailOutput.line();
+            detailOutput.divider("-", 60);
+            detailOutput.line();
 
             // Show summary
             if (arrayLen(updatesAvailable) == 0) {
-                print.boldGreenLine("[OK] All plugins are up to date!")
-                     .line();
-
+                detailOutput.statusSuccess("All plugins are up to date!");
+                detailOutput.line();
+                
                 if (arrayLen(errors) > 0) {
-                    print.yellowLine("Note: #arrayLen(errors)# plugin(s) could not be checked");
+                    detailOutput.statusWarning("Note: #arrayLen(errors)# plugin(s) could not be checked");
+                    for (var error in errors) {
+                        detailOutput.output("- #error.name#: #error.error#", true);
+                    }
                 }
                 return;
             }
 
-            // Show available updates table
-            print.boldLine("Updates Available:")
-                 .line();
+            // Show available updates
+            detailOutput.subHeader("Updates Available (#arrayLen(updatesAvailable)#)");
+            detailOutput.line();
 
+            // Create table for updates
+            var updateRows = [];
             for (var update in updatesAvailable) {
-                var namePad = repeatString(" ", max(35 - len(update.name), 1));
-                var versionInfo = update.currentVersion & " -> " & update.latestVersion;
-                print.text("  ")
-                     .boldText(update.name)
-                     .text(namePad)
-                     .yellowLine(versionInfo);
+                arrayAppend(updateRows, {
+                    "Plugin": update.name,
+                    "Current": update.currentVersion,
+                    "Latest": update.latestVersion
+                });
             }
-
-            print.line();
+            
+            print.table(updateRows);
+            detailOutput.line();
 
             if (arguments.dryRun) {
-                print.yellowBoldLine("[DRY RUN] No updates will be performed")
-                     .line();
-                print.line("Remove --dryRun to actually update plugins");
+                detailOutput.statusWarning("[DRY RUN] No updates will be performed");
+                detailOutput.line();
+                detailOutput.output("Remove --dryRun to actually update plugins");
                 return;
             }
 
             // Confirm updates
             if (!arguments.force) {
-                var continue = ask("Update #arrayLen(updatesAvailable)# plugin#arrayLen(updatesAvailable) != 1 ? 's' : ''#? (y/N): ");
+                var continue = ask("Update #arrayLen(updatesAvailable)# plugin(s)? (y/N): ");
                 if (lCase(continue) != "y") {
-                    print.yellowLine("Update cancelled");
+                    detailOutput.statusInfo("Update cancelled");
                     return;
                 }
             }
 
-            print.line()
-                 .boldLine("Updating Plugins...")
-                 .line();
+            detailOutput.line();
+            detailOutput.subHeader("Updating Plugins...");
+            detailOutput.line();
 
             // Perform updates
             var successCount = 0;
@@ -153,14 +151,12 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
 
             for (var update in updatesAvailable) {
                 try {
-                    var updatePad = repeatString(" ", max(35 - len(update.name), 1));
-                    print.text("  " & update.name & updatePad);
-
                     // Remove old version
                     var pluginsDir = fileSystemUtil.resolvePath("plugins");
                     var oldPluginPath = pluginsDir & "/" & update.folderName;
                     if (directoryExists(oldPluginPath)) {
                         directoryDelete(oldPluginPath, true);
+                        detailOutput.remove("#update.name# (v#update.currentVersion#)");
                     }
 
                     // Install new version to /plugins folder
@@ -191,53 +187,59 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
                         }
                     }
 
-                    print.greenLine("[OK] Updated");
+                    detailOutput.update("#update.name# (v#update.latestVersion#)");
                     successCount++;
 
                 } catch (any e) {
-                    print.redLine("[ERROR] #e.message#");
+                    detailOutput.statusFailed("Failed to update #update.name#: #e.message#");
                     failCount++;
                 }
             }
 
             // Show final summary
-            print.line()
-                 .boldLine("===========================================================")
-                 .boldLine("  Update Summary")
-                 .boldLine("===========================================================")
-                 .line();
+            detailOutput.line();
+            detailOutput.divider("=", 60);
+            detailOutput.header("Update Summary");
+            detailOutput.line();
+
+            // Create summary table
+            var summaryRows = [];
+            arrayAppend(summaryRows, { "Status" = "Total plugins checked", "Count" = "#arrayLen(plugins)#" });
+            arrayAppend(summaryRows, { "Status" = "Up to date", "Count" = "#arrayLen(upToDate)#" });
+            arrayAppend(summaryRows, { "Status" = "Updated successfully", "Count" = "#successCount#" });
+            if (failCount > 0) {
+                arrayAppend(summaryRows, { "Status" = "Update failed", "Count" = "#failCount#" });
+            }
+            if (arrayLen(errors) > 0) {
+                arrayAppend(summaryRows, { "Status" = "Check errors", "Count" = "#arrayLen(errors)#" });
+            }
+            
+            print.table(summaryRows);
+            detailOutput.line();
 
             if (successCount > 0) {
-                print.greenBoldText("[OK] ")
-                     .greenLine("#successCount# plugin#successCount != 1 ? 's' : ''# updated successfully");
+                detailOutput.statusSuccess("#successCount# plugin(s) updated successfully!");
+                detailOutput.line();
+                detailOutput.statusInfo("Remember to run 'wheels reload' for changes to take effect");
             }
 
             if (failCount > 0) {
-                print.redBoldText("[ERROR] ")
-                     .redLine("#failCount# plugin#failCount != 1 ? 's' : ''# failed to update");
+                detailOutput.statusFailed("#failCount# plugin(s) failed to update");
             }
 
             if (arrayLen(errors) > 0) {
-                print.yellowBoldText("[!] ")
-                     .yellowLine("#arrayLen(errors)# plugin#arrayLen(errors) != 1 ? 's' : ''# could not be checked");
+                detailOutput.statusWarning("#arrayLen(errors)# plugin(s) could not be checked");
             }
 
-            print.line()
-                 .line("To see all installed plugins:")
-                 .cyanLine("  wheels plugin list");
+            detailOutput.line();
+            detailOutput.subHeader("Next Steps");
+            detailOutput.output("- Run 'wheels plugin list' to see all installed plugins", true);
+            detailOutput.output("- Run 'wheels reload' to reload application with new versions", true);
+            detailOutput.output("- Run 'wheels plugin outdated' to check for updates again", true);
+            detailOutput.line();
 
         } catch (any e) {
-            error("Error updating plugins: #e.message#");
+            detailOutput.error("Error updating plugins: #e.message#");
         }
-    }
-
-    /**
-     * Resolve a file path
-     */
-    private function resolvePath(path) {
-        if (left(arguments.path, 1) == "/" || mid(arguments.path, 2, 1) == ":") {
-            return arguments.path;
-        }
-        return expandPath(".") & "/" & arguments.path;
     }
 }

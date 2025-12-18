@@ -8,6 +8,7 @@
 component aliases="wheels plugin search" extends="../base" {
 
     property name="forgebox" inject="ForgeBox";
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
      * @query.hint Search term to filter plugins
@@ -30,22 +31,17 @@ component aliases="wheels plugin search" extends="../base" {
             }
         );
 
-        print.line()
-             .boldCyanLine("===========================================================")
-             .boldCyanLine("  Searching ForgeBox for Wheels Plugins")
-             .boldCyanLine("===========================================================")
-             .line()
-             .console();
+        detailOutput.header("Searching ForgeBox for Wheels Plugins");
+        detailOutput.line();
 
         if (len(arguments.query)) {
-            print.line("Search term: #arguments.query#")
-                 .line().console();
+            detailOutput.metric("Search term", arguments.query);
+            detailOutput.line();
         }
 
         try {
-            print.line("Searching, Please wait ...")
-                 .line()
-                 .toConsole();
+            detailOutput.output("Searching, please wait...");
+            detailOutput.line();
 
             // Use forgebox show command to get all cfwheels-plugins
             var forgeboxResult = command('forgebox show')
@@ -114,15 +110,14 @@ component aliases="wheels plugin search" extends="../base" {
                 }
             }
 
-            print.line()
-                 .toConsole();
+            detailOutput.line();
 
             if (!arrayLen(results)) {
-                print.yellowLine("No plugins found" & (len(arguments.query) ? " matching '#arguments.query#'" : ""))
-                     .line()
-                     .line("Try:")
-                     .cyanLine("  wheels plugin search <different-keyword>")
-                     .cyanLine("  wheels plugin list --available").console();
+                detailOutput.statusWarning("No plugins found" & (len(arguments.query) ? " matching '#arguments.query#'" : ""));
+                detailOutput.line();
+                detailOutput.subHeader("Try");
+                detailOutput.output("- wheels plugin search <different-keyword>", true);
+                detailOutput.output("- wheels plugin list --available", true);
                 return;
             }
 
@@ -149,85 +144,63 @@ component aliases="wheels plugin search" extends="../base" {
                 };
                 print.line(serializeJSON(jsonOutput, true));
             } else {
-                print.boldLine("Found #arrayLen(results)# plugin#arrayLen(results) != 1 ? 's' : ''#:")
-                     .line();
+                detailOutput.subHeader("Found #arrayLen(results)# plugin(s)");
+                detailOutput.line();
 
-                // Calculate column widths
-                var maxNameLength = 20;
-                var maxSlugLength = 20;
-                var maxVersionLength = 10;
-                var maxDownloadsLength = 10;
-                var maxDescLength = 30;
+                // Create table for results
+                var rows = [];
 
                 for (var plugin in results) {
-                    if (len(plugin.name) > maxNameLength) {
-                        maxNameLength = len(plugin.name);
+                    // use ordered struct so JSON keeps key order
+                    var row = structNew("ordered");
+
+                    row["Name"]        = plugin.name;
+                    row["Slug"]        = plugin.slug;
+                    row["Version"]     = plugin.version;
+                    row["Downloads"]   = numberFormat(plugin.downloads ?: 0);
+                    row["Description"] = plugin.description ?: "No description";
+
+                    // Truncate long descriptions
+                    if (len(row["Description"]) > 50) {
+                        row["Description"] = left(row["Description"], 47) & "...";
                     }
-                    if (len(plugin.slug) > maxSlugLength) {
-                        maxSlugLength = len(plugin.slug);
-                    }
-                    if (len(plugin.version) > maxVersionLength) {
-                        maxVersionLength = len(plugin.version);
-                    }
-                    var dlStr = numberFormat(plugin.downloads ?: 0);
-                    if (len(dlStr) > maxDownloadsLength) {
-                        maxDownloadsLength = len(dlStr);
-                    }
+
+                    arrayAppend(rows, row);
                 }
 
-                maxNameLength += 2;
-                maxSlugLength += 2;
-                maxVersionLength += 2;
-                maxDownloadsLength += 2;
 
-                // Print table header
-                print.boldText(padRight("Name", maxNameLength))
-                     .boldText(padRight("Slug", maxSlugLength))
-                     .boldText(padRight("Version", maxVersionLength))
-                     .boldText(padRight("Downloads", maxDownloadsLength))
-                     .boldLine("Description");
+                // Display the table
+                detailOutput.getPrint().table(rows);
+                
+                detailOutput.line();
+                detailOutput.divider();
+                detailOutput.line();
 
-                print.line(repeatString("-", maxNameLength + maxSlugLength + maxVersionLength + maxDownloadsLength + maxDescLength));
-
-                // Display results
-                for (var plugin in results) {
-                    var desc = plugin.description ?: "No description";
-                    if (len(desc) > maxDescLength) {
-                        desc = left(desc, maxDescLength - 3) & "...";
-                    }
-
-                    print.boldText(padRight(plugin.name, maxNameLength))
-                         .cyanText(padRight(plugin.slug, maxSlugLength))
-                         .greenText(padRight(plugin.version, maxVersionLength))
-                         .yellowText(padRight(numberFormat(plugin.downloads ?: 0), maxDownloadsLength))
-                         .line(desc);
+                // Show summary
+                detailOutput.metric("Total plugins found", "#arrayLen(results)#");
+                detailOutput.metric("Sort order", arguments.orderBy);
+                if (arguments.orderBy == "downloads" && arrayLen(results) > 0) {
+                    detailOutput.metric("Most popular", "#results[1].name# (#numberFormat(results[1].downloads)# downloads)");
                 }
+                detailOutput.line();
 
-                print.line()
-                     .boldLine("-----------------------------------------------------------")
-                     .line()
-                     .boldLine("Commands:")
-                     .cyanLine("  wheels plugin install <name>    Install a plugin")
-                     .cyanLine("  wheels plugin info <name>       View plugin details");
+                // Show commands
+                detailOutput.subHeader("Commands");
+                detailOutput.output("- Install: wheels plugin install <name>", true);
+                detailOutput.output("- Details: wheels plugin info <name>", true);
+                detailOutput.output("- List installed: wheels plugin list", true);
+                detailOutput.line();
+                
+                // Add tip about JSON format
+                detailOutput.statusInfo("Tip");
+                detailOutput.output("Add --format=json for JSON output", true);
+                detailOutput.output("Sort with --orderBy=name,downloads,updated", true);
+                detailOutput.line();
             }
 
         } catch (any e) {
-            print.line()
-                 .boldRedText("[ERROR] ")
-                 .redLine("Error searching for plugins")
-                 .line()
-                 .yellowLine("Error: #e.message#");
+            detailOutput.error("Error searching for plugins: #e.message#");
             setExitCode(1);
         }
-    }
-
-    /**
-     * Pad string to right with spaces
-     */
-    private function padRight(required string text, required numeric length) {
-        if (len(arguments.text) >= arguments.length) {
-            return left(arguments.text, arguments.length);
-        }
-        return arguments.text & repeatString(" ", arguments.length - len(arguments.text));
     }
 }

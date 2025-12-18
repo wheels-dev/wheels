@@ -10,6 +10,8 @@
  */
 component extends="../base" {
 
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @file.hint The .env file to validate (defaults to .env)
 	 * @required.hint Comma-separated list of required keys
@@ -26,14 +28,12 @@ component extends="../base" {
 		local.envFile = resolvePath(arguments.file);
 		
 		if (!fileExists(local.envFile)) {
-			print.redLine("File not found: #arguments.file#");
+			detailOutput.error("File not found: #arguments.file#");
 			setExitCode(1);
 			return;
 		}
 
-		print.line();
-		print.boldLine("Validating: #arguments.file#");
-		print.line();
+		detailOutput.header("Validating: #arguments.file#");
 
 		local.issues = [];
 		local.warnings = [];
@@ -48,8 +48,8 @@ component extends="../base" {
 			try {
 				local.envVars = deserializeJSON(local.content);
 				if (arguments.verbose) {
-					print.greenLine("Valid JSON format detected");
-					print.line();
+					detailOutput.statusInfo("Valid JSON format detected");
+					detailOutput.line();
 				}
 			} catch (any e) {
 				arrayAppend(local.issues, {
@@ -163,38 +163,38 @@ component extends="../base" {
 	) {
 		// Display errors
 		if (arrayLen(arguments.issues)) {
-			print.boldRedLine("Errors found:");
+			detailOutput.statusFailed("Errors found:");
 			for (local.issue in arguments.issues) {
 				if (local.issue.line > 0) {
-					print.redLine("  Line #local.issue.line#: #local.issue.message#");
+					detailOutput.output("- Line #local.issue.line#: #local.issue.message#", true);
 				} else {
-					print.redLine("  #local.issue.message#");
+					detailOutput.output("- #local.issue.message#", true);
 				}
 			}
-			print.line();
+			detailOutput.line();
 		}
 
 		// Display warnings
 		if (arrayLen(arguments.warnings)) {
-			print.boldYellowLine("Warnings:");
+			detailOutput.statusWarning("Warnings:");
 			for (local.warning in arguments.warnings) {
 				if (local.warning.line > 0) {
-					print.yellowLine("  Line #local.warning.line#: #local.warning.message#");
+					detailOutput.output("- Line #local.warning.line#: #local.warning.message#", true);
 				} else {
-					print.yellowLine("  #local.warning.message#");
+					detailOutput.output("- #local.warning.message#", true);
 				}
 			}
-			print.line();
+			detailOutput.line();
 		}
 
 		// Display summary
 		local.keyCount = structCount(arguments.envVars);
-		print.boldLine("Summary:");
-		print.line("  Total variables: #local.keyCount#");
+		detailOutput.subHeader("Summary");
+		detailOutput.metric("Total variables", local.keyCount);
 		
 		if (arguments.verbose && local.keyCount > 0) {
-			print.line();
-			print.boldLine("Environment Variables:");
+			detailOutput.line();
+			detailOutput.subHeader("Environment Variables:");
 			
 			// Group by prefix
 			local.grouped = {};
@@ -214,8 +214,8 @@ component extends="../base" {
 			
 			// Display grouped variables
 			for (local.prefix in local.grouped) {
-				print.line();
-				print.line("  #local.prefix#:");
+				detailOutput.line();
+				detailOutput.output("#local.prefix#:");
 				for (local.key in local.grouped[local.prefix]) {
 					local.value = arguments.envVars[local.key];
 					// Mask sensitive values
@@ -223,14 +223,14 @@ component extends="../base" {
 						findNoCase("key", local.key) || findNoCase("token", local.key)) {
 						local.value = "***MASKED***";
 					}
-					print.line("    #local.key# = #local.value#");
+					detailOutput.output("- #local.key# = #local.value#", true);
 				}
 			}
 			
 			// Display ungrouped variables
 			if (arrayLen(local.ungrouped)) {
-				print.line();
-				print.line("  Other:");
+				detailOutput.line();
+				detailOutput.output("Other:");
 				for (local.key in local.ungrouped) {
 					local.value = arguments.envVars[local.key];
 					// Mask sensitive values
@@ -238,23 +238,24 @@ component extends="../base" {
 						findNoCase("key", local.key) || findNoCase("token", local.key)) {
 						local.value = "***MASKED***";
 					}
-					print.line("    #local.key# = #local.value#");
+					detailOutput.output("  #local.key# = #local.value#", true);
 				}
 			}
 		}
 
-		print.line();
+		detailOutput.line();
 		
 		// Final status
 		if (arrayLen(arguments.issues) == 0) {
 			if (arrayLen(arguments.warnings) == 0) {
-				print.greenLine("Validation passed with no issues!");
+				detailOutput.statusSuccess("Validation passed with no issues!");
 			} else {
-				print.yellowLine("Validation passed with #arrayLen(arguments.warnings)# warning#arrayLen(arguments.warnings) != 1 ? 's' : ''#");
+				detailOutput.statusWarning("Validation passed with #arrayLen(arguments.warnings)# warning#arrayLen(arguments.warnings) != 1 ? 's' : ''#");
 			}
 		} else {
-			print.redLine("Validation failed with #arrayLen(arguments.issues)# error#arrayLen(arguments.issues) != 1 ? 's' : ''#");
+			detailOutput.statusFailed("Validation failed with #arrayLen(arguments.issues)# error#arrayLen(arguments.issues) != 1 ? 's' : ''#");
 			setExitCode(1);
+			return;
 		}
 	}
 }

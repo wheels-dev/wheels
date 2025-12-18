@@ -41,7 +41,7 @@ component aliases='wheels db up' extends="../base" {
 		} else {
 			detailOutput.statusWarning("No more versions to go to?");
 		}		
-		detailOutput.separator();
+		detailOutput.line();
 		command('wheels dbmigrate info').run();
 	}
 

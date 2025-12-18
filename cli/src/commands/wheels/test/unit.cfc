@@ -10,6 +10,8 @@
  */
 component aliases='wheels test:unit' extends="../base" {
     
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     /**
      * @type.hint Type of tests to run: (app, core, plugin)
      * @format.hint Output format (txt, json, junit, html)
@@ -48,6 +50,7 @@ component aliases='wheels test:unit' extends="../base" {
         if (!directoryExists(unitTestPath)) {
             directoryCreate(unitTestPath, true, true);
             createSampleUnitTest(unitTestPath);
+            detailOutput.create("unit test directory: #arguments.directory#");
         }
         
         // Build the test URL using arguments

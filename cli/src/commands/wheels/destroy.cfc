@@ -11,6 +11,8 @@
  **/
 component aliases='wheels d'  extends="base"  {
 
+	property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
 	/**
 	 * @type.hint Type of component to destroy (resource, controller, model, view). Default is resource
 	 * @name.hint Name of object to destroy
@@ -22,14 +24,14 @@ component aliases='wheels d'  extends="base"  {
 		// Validate that name is not empty
 		arguments.name = trim(arguments.name);
 		if (len(arguments.name) == 0) {
-			print.redBoldLine("Error: Name argument cannot be empty.")
-				 .line("Please provide a name for the component to destroy.")
+			detailOutput.error("Name argument cannot be empty.")
+				 .output("Please provide a name for the component to destroy.")
 				 .line()
-				 .line("Examples:")
-				 .line("  wheels destroy User")
-				 .line("  wheels destroy controller Products")
-				 .line("  wheels destroy model Product")
-				 .line("  wheels destroy view products/index")
+				 .output("Examples:")
+				 .output("wheels destroy User", true)
+				 .output("wheels destroy controller Products", true)
+				 .output("wheels destroy model Product", true)
+				 .output("wheels destroy view products/index", true)
 				 .line();
 			return;
 		}
@@ -39,8 +41,8 @@ component aliases='wheels d'  extends="base"  {
 
 		// Validate that type is not empty (though it has a default)
 		if (len(arguments.type) == 0) {
-			print.redBoldLine("Error: Type argument cannot be empty.")
-				 .line("Valid types: resource, controller, model, view")
+			detailOutput.error("Type argument cannot be empty.")
+				 .output("Valid types: resource, controller, model, view", true)
 				 .line();
 			return;
 		}
@@ -77,22 +79,19 @@ component aliases='wheels d'  extends="base"  {
 		var routeFile   			 = fileSystemUtil.resolvePath("config/routes.cfm");
 		var resourceName			 = '.resources("' & obj.objectNamePlural & '")';
 
-		print.redBoldLine("================================================")
-			 .redBoldLine("= Watch Out!                                   =")
-			 .redBoldLine("================================================")
-			 .line("This will delete the associated database table '#obj.objectNamePlural#', and")
-			 .line("the following files and directories:")
+		detailOutput.header("Watch Out!")
+		.output("This will delete the associated database table '#obj.objectNamePlural#', and")
+			 .output("the following files and directories:")
 			 .line()
-			 .line("#modelFile#")
-			 .line("#controllerFile#")
-			 .line("#viewFolder#")
-			 .line("#testmodelFile#")
-			 .line("#testcontrollerFile#")
-			 .line("#testviewFolder#")
-			 .line("#routeFile#")
-			 .line("#resourceName#")
-			 .line()
-			 .toConsole();
+			 .output(modelFile, true)
+			 .output(controllerFile, true)
+			 .output(viewFolder, true)
+			 .output(testmodelFile, true)
+			 .output(testcontrollerFile, true)
+			 .output(testviewFolder, true)
+			 .output(routeFile, true)
+			 .output(resourceName, true)
+			 .line();
 
 		if(confirm("Are you sure? [y/n]")){
 			command('delete').params(path=modelFile, force=true).run();
@@ -109,10 +108,13 @@ component aliases='wheels d'  extends="base"  {
 			file action='write' file='#routeFile#' mode ='777' output='#trim(routeContent)#';
 	
 			//drop the table
-			print.greenline( "Migrating DB" ).toConsole();
+			detailOutput.statusInfo("Migrating DB");
 			command('wheels dbmigrate remove table').params(name=obj.objectNamePlural).run();
 			command('wheels dbmigrate latest').run();
-			print.line();
+			detailOutput.line();
+		}else{
+			detailOutput.getPrint().redLine("Resource destruction cancelled.").toConsole();
+			return;
 		}
 	}
 	
@@ -124,28 +126,29 @@ component aliases='wheels d'  extends="base"  {
 		var controllerFile = fileSystemUtil.resolvePath("app/controllers/#obj.objectNamePluralC#.cfc");
 		var testcontrollerFile = fileSystemUtil.resolvePath("tests/specs/controllers/#obj.objectNamePluralC#ControllerSpec.cfc");
 		
-		print.redBoldLine("================================================")
-			 .redBoldLine("= Watch Out!                                   =")
-			 .redBoldLine("================================================")
-			 .line("This will delete the following files:")
+		detailOutput.header("Watch Out!")
+		.output("This will delete the following files:")
 			 .line()
-			 .line("#controllerFile#")
-			 .line("#testcontrollerFile#")
+			 .output(controllerFile, true)
+			 .output(testcontrollerFile, true)
 			 .line();
 			 
 		if(confirm("Are you sure? [y/n]")){
 			if(fileExists(controllerFile)) {
 				command('delete').params(path=controllerFile, force=true).run();
-				print.greenLine("Deleted: #controllerFile#");
+				detailOutput.statusSuccess("Deleted: #controllerFile#");
 			} else {
-				print.yellowLine("File not found: #controllerFile#");
+				detailOutput.statusWarning("File not found: #controllerFile#");
 			}
 			
 			if(fileExists(testcontrollerFile)) {
 				command('delete').params(path=testcontrollerFile, force=true).run();
-				print.greenLine("Deleted: #testcontrollerFile#");
+				detailOutput.statusSuccess("Deleted: #testcontrollerFile#");
 			}
-			print.line();
+			detailOutput.line();
+		}else{
+			detailOutput.getPrint().redLine("Resource destruction cancelled.").toConsole();
+			return;
 		}
 	}
 	
@@ -157,33 +160,34 @@ component aliases='wheels d'  extends="base"  {
 		var modelFile = fileSystemUtil.resolvePath("app/models/#obj.objectNameSingularC#.cfc");
 		var testmodelFile = fileSystemUtil.resolvePath("tests/specs/models/#obj.objectNameSingularC#Spec.cfc");
 		
-		print.redBoldLine("================================================")
-			 .redBoldLine("= Watch Out!                                   =")
-			 .redBoldLine("================================================")
-			 .line("This will delete the model file and drop the associated database table '#obj.objectNamePlural#'")
+		detailOutput.header("Watch Out!")
+		.output("This will delete the model file and drop the associated database table '#obj.objectNamePlural#'")
 			 .line()
-			 .line("#modelFile#")
-			 .line("#testmodelFile#")
+			 .output(modelFile, true)
+			 .output(testmodelFile, true)
 			 .line();
 			 
 		if(confirm("Are you sure? [y/n]")){
 			if(fileExists(modelFile)) {
 				command('delete').params(path=modelFile, force=true).run();
-				print.greenLine("Deleted: #modelFile#");
+				detailOutput.statusSuccess("Deleted: #modelFile#");
 			} else {
-				print.yellowLine("File not found: #modelFile#");
+				detailOutput.statusWarning("File not found: #modelFile#");
 			}
 			
 			if(fileExists(testmodelFile)) {
 				command('delete').params(path=testmodelFile, force=true).run();
-				print.greenLine("Deleted: #testmodelFile#");
+				detailOutput.statusSuccess("Deleted: #testmodelFile#");
 			}
 			
 			// Drop the table
-			print.greenline( "Migrating DB to drop table" ).toConsole();
+			detailOutput.statusInfo("Migrating DB to drop table");
 			command('wheels dbmigrate remove table').params(name=obj.objectNamePlural).run();
 			command('wheels dbmigrate latest').run();
-			print.line();
+			detailOutput.line();
+		}else{
+			detailOutput.getPrint().redLine("Resource destruction cancelled.").toConsole();
+			return;
 		}
 	}
 	
@@ -197,9 +201,9 @@ component aliases='wheels d'  extends="base"  {
 
 			// Validate that we have both controller and view parts
 			if(arrayLen(parts) != 2 || len(trim(parts[1])) == 0 || len(trim(parts[2])) == 0) {
-				print.redBoldLine("Error: Invalid view path format.")
-					 .line("When destroying a specific view, use format: controller/view")
-					 .line("Example: wheels destroy view products/index")
+				detailOutput.error("Invalid view path format.")
+					 .output("When destroying a specific view, use format: controller/view", true)
+					 .output("Example: wheels destroy view products/index", true)
 					 .line();
 				return;
 			}
@@ -208,22 +212,23 @@ component aliases='wheels d'  extends="base"  {
 			var viewName = trim(parts[2]);
 			var viewFile = fileSystemUtil.resolvePath("app/views/#controllerName#/#viewName#.cfm");
 			
-			print.redBoldLine("================================================")
-				 .redBoldLine("= Watch Out!                                   =")
-				 .redBoldLine("================================================")
-				 .line("This will delete the following file:")
+			detailOutput.header("Watch Out!")
+			.output("This will delete the following file:")
 				 .line()
-				 .line("#viewFile#")
+				 .output(viewFile, true)
 				 .line();
 				 
 			if(confirm("Are you sure? [y/n]")){
 				if(fileExists(viewFile)) {
 					command('delete').params(path=viewFile, force=true).run();
-					print.greenLine("Deleted: #viewFile#");
+					detailOutput.statusSuccess("Deleted: #viewFile#");
 				} else {
-					print.yellowLine("File not found: #viewFile#");
+					detailOutput.statusWarning("File not found: #viewFile#");
 				}
-				print.line();
+				detailOutput.line();
+			}else{
+				detailOutput.getPrint().redLine("Resource destruction cancelled.").toConsole();
+				return;
 			}
 		} else {
 			// Destroy all views for a controller
@@ -231,28 +236,29 @@ component aliases='wheels d'  extends="base"  {
 			var viewFolder = fileSystemUtil.resolvePath("app/views/#obj.objectNamePlural#/");
 			var testviewFolder = fileSystemUtil.resolvePath("tests/specs/views/#obj.objectNamePlural#/");
 			
-			print.redBoldLine("================================================")
-				 .redBoldLine("= Watch Out!                                   =")
-				 .redBoldLine("================================================")
-				 .line("This will delete the following directories:")
+			detailOutput.header("Watch Out!")
+			.output("This will delete the following directories:")
 				 .line()
-				 .line("#viewFolder#")
-				 .line("#testviewFolder#")
+				 .output(viewFolder, true)
+				 .output(testviewFolder, true)
 				 .line();
 				 
 			if(confirm("Are you sure? [y/n]")){
 				if(directoryExists(viewFolder)) {
 					command('delete').params(path=viewFolder, force=true, recurse=true).run();
-					print.greenLine("Deleted: #viewFolder#");
+					detailOutput.statusSuccess("Deleted: #viewFolder#");
 				} else {
-					print.yellowLine("Directory not found: #viewFolder#");
+					detailOutput.statusWarning("Directory not found: #viewFolder#");
 				}
 				
 				if(directoryExists(testviewFolder)) {
 					command('delete').params(path=testviewFolder, force=true, recurse=true).run();
-					print.greenLine("Deleted: #testviewFolder#");
+					detailOutput.statusSuccess("Deleted: #testviewFolder#");
 				}
-				print.line();
+				detailOutput.line();
+			}else{
+				detailOutput.getPrint().redLine("Resource destruction cancelled.").toConsole();
+				return;
 			}
 		}
 	}
