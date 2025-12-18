@@ -5,6 +5,8 @@ on:
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
+      DEPLOY_PATH:
+        required: true
 
 
 jobs:
@@ -21,6 +23,7 @@ jobs:
           rsync -av --no-perms --no-owner --no-group --del docs/src/ "${{ secrets.DEPLOY_PATH }}/docs/3.0.0/guides"
           rsync -av --no-perms --no-owner --no-group docs/src/.gitbook/assets/ "${{ secrets.DEPLOY_PATH }}/public/images"
           rsync -av --no-perms --no-owner --no-group --del docs/api/ "${{ secrets.DEPLOY_PATH }}/public/json"
+
 
 
 
