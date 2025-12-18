@@ -154,7 +154,7 @@ component {
 								properties = arguments.query,
 								row = local.i,
 								base = false,
-								joinAlias = variables.wheels.class.associations[local.include].joinAlias
+								joinAlias = local.joinAlias
 							);
 						}
 					}
