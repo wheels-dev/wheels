@@ -21,6 +21,7 @@ component aliases='wheels r'  extends="base"  {
 	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 	
 	function run(string mode="development", string password="") {
+		requireWheelsApp(getCWD());
 		arguments=reconstructArgs(arguments);
   		var serverDetails = $getServerInfo();
 

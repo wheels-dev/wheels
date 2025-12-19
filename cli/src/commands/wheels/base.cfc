@@ -997,6 +997,8 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 				// Connect to information_schema for MySQL system operations
 				return "jdbc:mysql://#local.host#:#local.port#/information_schema";
 			case "PostgreSQL":
+			case "Postgres":
+			case "Postgre":
 				if (!Len(local.port)) local.port = "5432";
 				// Connect to postgres system database
 				return "jdbc:postgresql://#local.host#:#local.port#/postgres";
@@ -1341,7 +1343,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 			local.username = local.dbConfig.tempDS.username ?: "";
 			local.password = local.dbConfig.tempDS.password ?: "";
 			
-			printStep("Connecting to " & arguments.dbType & " database...");
+			detailOutput.output("Connecting to " & arguments.dbType & " database...");
 			
 			// Try to load driver
 			local.driver = "";
@@ -1352,7 +1354,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 					local.driver = createObject("java", local.driverClass);
 					local.result.driverClass = local.driverClass;
 					local.driverFound = true;
-					printSuccess("Driver found: " & local.driverClass);
+					detailOutput.statusSuccess("Driver found: " & local.driverClass);
 					break;
 				} catch (any driverError) {
 					// Continue trying other drivers
@@ -1376,8 +1378,6 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 			}
 			
 			// Connect using driver directly
-			print.line(local.url);
-			print.redLine(local.props);
 			local.conn = local.driver.connect(local.url, local.props);
 			
 			if (isNull(local.conn)) {
@@ -1387,7 +1387,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 			
 			local.result.success = true;
 			local.result.connection = local.conn;
-			printSuccess("Connected successfully to " & arguments.dbType & " database!");
+			detailOutput.statusSuccess("Connected successfully to " & arguments.dbType & " database!");
 			return local.result;
 			
 		} catch (any e) {

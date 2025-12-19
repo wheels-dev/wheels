@@ -18,7 +18,7 @@ component  extends="base"  {
 	 *
 	 **/
 	function run() {
-		
+
 		requireWheelsApp(getCWD());
 		detailOutput.header("Wheels init")
 				   .output("This function will attempt to add a few things")
@@ -66,7 +66,7 @@ component  extends="base"  {
 		if(!fileExists(serverJsonLocation)){
 			var appName       = ask( message = "Please enter an application name: we use this to make the server.json servername unique: ", defaultResponse = 'myapp');
 				appName 	  = helpers.stripSpecialChars(appName);
-			var setEngine     = ask( message = 'Please enter a default cfengine: ', defaultResponse = 'lucee6' );
+			var setEngine     = ask( message = 'Please enter a default cfengine: ', defaultResponse = 'lucee@6' );
 
 			// Make server.json server name unique to this app: assumes lucee by default
 			detailOutput.statusInfo("Creating default server.json");
