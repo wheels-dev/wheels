@@ -689,6 +689,7 @@ component extends="../base" {
 			local.outputDir = GetDirectoryFromPath(local.outputFile);
 			if (Len(local.outputDir) && !DirectoryExists(local.outputDir)) {
 				DirectoryCreate(local.outputDir, true);
+				detailOutput.statusInfo("Created output directory: #local.outputDir#");
 			}
 			
 			// Check if a folder with the .sql name exists and remove it
@@ -735,12 +736,19 @@ component extends="../base" {
 			// Handle compression
 			if (arguments.options.compress) {
 				local.cmd &= " -Z 9"; // Maximum compression
+				// Add .gz extension if not already present
+				if (ListLast(local.outputFile, ".") != "gz") {
+					local.outputFile &= ".gz";
+				}
 			}
 			
 			// For Windows: Use shell redirection instead of -f option
 			if (isWindows()) {
 				// Use stdout redirection instead of -f parameter
 				local.cmd &= " > " & Chr(34) & local.outputFile & Chr(34);
+			} else if(isMac()) {
+				// Mac OS: Use -f parameter without quotes
+				local.cmd &= " -f " & local.outputFile;
 			} else {
 				// Unix/Linux: Use -f parameter
 				local.cmd &= " -f " & Chr(34) & local.outputFile & Chr(34);

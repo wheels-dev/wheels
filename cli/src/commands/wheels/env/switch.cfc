@@ -141,7 +141,7 @@ component extends="../base" {
                 if (structKeyExists(result, "oldEnvironment") && len(result.oldEnvironment)) {
                     detailOutput.update(".env file: Updated from #result.oldEnvironment# to #arguments.environment#", true);
                 } else {
-                    detailOutput.create(".env file", "Set to #arguments.environment# environment");
+                    detailOutput.create(".env file Set to #arguments.environment# environment", true);
                 }
             }
             
