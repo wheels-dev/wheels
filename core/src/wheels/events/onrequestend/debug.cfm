@@ -261,7 +261,7 @@
 							<cfloop collection="#$get('plugins')#" item="local.i">
 								<cfset local.count = local.count + 1>
 								<a
-									href="#URLFor(route="pluginEntry", name=local.i)#"
+									href="#URLFor(route="wheelspluginEntry", name=local.i)#"
 								>
 									#local.i#
 									<cfif StructCount($get("pluginMeta")) IS NOT 0 && StructKeyExists($get("pluginMeta"), local.i)>
