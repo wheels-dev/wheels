@@ -7,6 +7,7 @@
  * wheels docker logs tail=50 servers=web1.example.com
  * wheels docker logs service=db
  * wheels docker logs since=1h
+ * wheels docker logs --local
  * {code}
  */
 component extends="DockerCommand" {
@@ -17,15 +18,22 @@ component extends="DockerCommand" {
      * @follow Follow log output in real-time (default: false)
      * @service Service to show logs for: app or db (default: app)
      * @since Show logs since timestamp (e.g., "2023-01-01", "1h", "5m")
+     * @local Fetch logs from local Docker container instead of remote
      */
     function run(
         string servers="",
         string tail="100",
         boolean follow=false,
         string service="app",
-        string since=""
+        string since="",
+        boolean local=false
     ) {
         arguments = reconstructArgs(arguments);
+        
+        if (arguments.local) {
+            fetchLocalLogs(arguments.tail, arguments.follow, arguments.service, arguments.since);
+            return;
+        }
         
         // Load servers
         var serverList = [];
@@ -211,6 +219,92 @@ component extends="DockerCommand" {
         
         if (result.exitCode != 0 && result.exitCode != 130) {
             throw("Command failed with exit code: " & result.exitCode);
+        }
+    }
+
+    private function fetchLocalLogs(
+        string tail, 
+        boolean follow, 
+        string service, 
+        string since
+    ) {
+        var projectName = getProjectName();
+        var containerName = "";
+        
+        if (arguments.service == "app") {
+            // Find app container
+            // Filter by name (including blue/green variants)
+            var findCmd = ["docker", "ps", "--format", "{{.Names}}", "--filter", "name=" & projectName];
+            
+            var findResult = runLocalCommand(findCmd, false);
+            var runningContainers = listToArray(trim(findResult.output), chr(10));
+            
+            if (arrayLen(runningContainers) > 0) {
+                // Default to first found
+                containerName = runningContainers[1];
+                
+                // Try to find exact match or blue/green
+                for (var container in runningContainers) {
+                    if (container == projectName || container == projectName & "-blue" || container == projectName & "-green") {
+                        containerName = container;
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Attempt to find service container (e.g. db)
+            // Try common patterns: [project]-[service], [service]
+            var patterns = [
+                projectName & "-" & arguments.service,
+                arguments.service
+            ];
+            
+            for (var pattern in patterns) {
+                var findServiceCmd = ["docker", "ps", "--format", "{{.Names}}", "--filter", "name=" & pattern];
+                
+                var serviceResult = runLocalCommand(findServiceCmd, false);
+                if (serviceResult.exitCode == 0 && len(trim(serviceResult.output))) {
+                    containerName = listFirst(trim(serviceResult.output), chr(10));
+                    break;
+                }
+            }
+        }
+
+        if (!len(containerName)) {
+            error("Could not find running container for service: " & arguments.service);
+        }
+
+        print.line();
+        print.boldMagentaLine("Wheels Deployment Logs (Local)");
+        print.line("==================================================").toConsole();
+        print.cyanLine("Fetching logs from local container: " & containerName).toConsole();
+        
+        if (arguments.follow) {
+            print.yellowLine("Following logs... (Press Ctrl+C to stop)").toConsole();
+        }
+        print.line("----------------------------------------").toConsole();
+        
+        // Construct Docker Logs Command
+        var dockerCmd = ["docker", "logs"];
+        
+        if (len(arguments.tail)) {
+            dockerCmd.addAll(["--tail", arguments.tail]);
+        }
+        
+        if (len(arguments.since)) {
+            dockerCmd.addAll(["--since", arguments.since]);
+        }
+        
+        if (arguments.follow) {
+            dockerCmd.add("-f");
+        }
+        
+        dockerCmd.add(containerName);
+        
+        var result = runInteractiveCommand(dockerCmd);
+        
+        if (result.exitCode != 0 && result.exitCode != 130) {
+            error("Command failed with exit code: " & result.exitCode);
         }
     }
 
