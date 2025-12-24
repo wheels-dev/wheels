@@ -205,8 +205,29 @@ Commands for managing application configuration.
 
 Commands for Docker container management and deployment.
 
-- **`wheels docker init`** - Initialize Docker configuration
+- **`wheels docker init`** - Initialize Docker configuration files
   [Documentation](docker/docker-init.md)
+
+- **`wheels docker build`** - Build Docker images
+  [Documentation](docker/docker-build.md)
+
+- **`wheels docker deploy`** - Build and deploy Docker containers
+  [Documentation](docker/docker-deploy.md)
+
+- **`wheels docker push`** - Push Docker images to registries
+  [Documentation](docker/docker-push.md)
+
+- **`wheels docker login`** - Authenticate with container registries
+  [Documentation](docker/docker-login.md)
+
+- **`wheels docker logs`** - View container logs
+  [Documentation](docker/docker-logs.md)
+
+- **`wheels docker exec`** - Execute commands in containers
+  [Documentation](docker/docker-exec.md)
+
+- **`wheels docker stop`** - Stop Docker containers
+  [Documentation](docker/docker-stop.md)
 
 ## Get Commands
 

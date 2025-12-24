@@ -35,6 +35,9 @@ component extends="DockerCommand" {
         boolean build=false,
         string namespace=""
     ) {
+        //ensure we are in a Wheels app
+        requireWheelsApp(getCWD());
+        // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
 
         // Load defaults from config if available
@@ -66,9 +69,9 @@ component extends="DockerCommand" {
             arguments.registry = "dockerhub";
         }
         
-        // Validate that exactly one push type is specified
+        // set local as default if neither specified
         if (!arguments.local && !arguments.remote) {
-            error("Please specify push type: --local or --remote");
+            arguments.local=true;
         }
         
         if (arguments.local && arguments.remote) {
@@ -106,6 +109,9 @@ component extends="DockerCommand" {
         // Get project name
         local.projectName = getProjectName();
         local.localImageName = local.projectName & ":latest";
+        if(!checkLocalImageExists(local.projectName)){
+            local.localImageName = local.projectName & "-app:latest";
+        }
         
         print.cyanLine("Project: " & local.projectName).toConsole();
         print.cyanLine("Registry: " & arguments.registry).toConsole();

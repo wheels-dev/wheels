@@ -33,11 +33,14 @@ component extends="DockerCommand" {
         boolean skipDockerCheck=false,
         boolean blueGreen=false
     ) {
+        //ensure we are in a Wheels app
+        requireWheelsApp(getCWD());
+        // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
         
-        // Validate that exactly one deployment type is specified
+        // set local as default if neither specified
         if (!arguments.local && !arguments.remote) {
-            error("Please specify deployment type: --local or --remote");
+            arguments.local=true;
         }
         
         if (arguments.local && arguments.remote) {

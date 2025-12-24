@@ -28,6 +28,9 @@ component extends="DockerCommand" {
         string since="",
         boolean local=false
     ) {
+        //ensure we are in a Wheels app
+        requireWheelsApp(getCWD());
+        // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
         
         if (arguments.local) {
