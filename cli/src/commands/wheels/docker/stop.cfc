@@ -23,10 +23,14 @@ component extends="../base" {
         string servers="",
         boolean removeContainer=false
     ) {
-        
-        // Validate that exactly one stop type is specified
+        //ensure we are in a Wheels app
+        requireWheelsApp(getCWD());
+        // Reconstruct arguments for handling --key=value style
+        arguments = reconstructArgs(arguments);
+
+        // set local as default if neither specified
         if (!arguments.local && !arguments.remote) {
-            error("Please specify stop type: --local or --remote");
+            arguments.local=true;
         }
         
         if (arguments.local && arguments.remote) {

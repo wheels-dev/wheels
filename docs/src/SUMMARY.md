@@ -73,6 +73,13 @@
     * [wheels config dump](command-line-tools/commands/config/config-dump.md)
   * Docker Commands
     * [wheels docker init](command-line-tools/commands/docker/docker-init.md)
+    * [wheels docker build](command-line-tools/commands/docker/docker-build.md)
+    * [wheels docker deploy](command-line-tools/commands/docker/docker-deploy.md)
+    * [wheels docker push](command-line-tools/commands/docker/docker-push.md)
+    * [wheels docker login](command-line-tools/commands/docker/docker-login.md)
+    * [wheels docker logs](command-line-tools/commands/docker/docker-logs.md)
+    * [wheels docker exec](command-line-tools/commands/docker/docker-exec.md)
+    * [wheels docker stop](command-line-tools/commands/docker/docker-stop.md)
   * Get Commands
     * [wheels get environment](command-line-tools/commands/get/get-environment.md)
     * [wheels get settings](command-line-tools/commands/get/get-settings.md)

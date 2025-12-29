@@ -17,11 +17,14 @@ component extends="DockerCommand" {
      */
     function run(
         string registry="dockerhub",
-        string username="",
-        string password="",
+        required string username="",
+        required string password="",
         string image="",
         boolean local=true
     ) {
+        //ensure we are in a Wheels app
+        requireWheelsApp(getCWD());
+        // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
 
         // Validate registry type

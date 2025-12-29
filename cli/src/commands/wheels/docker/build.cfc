@@ -27,10 +27,15 @@ component extends="../base" {
         boolean nocache=false,
         boolean pull=false
     ) {
+        // Ensure we are in a Wheels app
+        requireWheelsApp(getCWD());
+
+        // Reconstruct arguments for handling --key=value style
+        arguments=reconstructArgs(arguments);
         
-        // Validate that exactly one build type is specified
+        // set local as default if neither specified
         if (!arguments.local && !arguments.remote) {
-            error("Please specify build type: --local or --remote");
+            arguments.local=true;
         }
         
         if (arguments.local && arguments.remote) {

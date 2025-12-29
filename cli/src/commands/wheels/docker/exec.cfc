@@ -22,6 +22,9 @@ component extends="DockerCommand" {
         string service="app",
         boolean interactive=false
     ) {
+        //ensure we are in a Wheels app
+        requireWheelsApp(getCWD());
+        // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
         
         // Load servers
