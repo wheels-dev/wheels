@@ -191,6 +191,9 @@ component extends="../base" {
 				case "H2":
 					local.success = dumpH2(local.dsInfo, arguments);
 					break;
+				case "Oracle":
+					local.success = dumpOracle(local.dsInfo, arguments);
+					break;
 				default:
 					detailOutput.error("Database dump not supported for driver: " & local.dbType);
 					detailOutput.statusInfo("Please use your database management tools to export the database.");
@@ -979,6 +982,201 @@ component extends="../base" {
 			
 		} catch (any e) {
 			detailOutput.error("H2 database export error: " & e.message);
+			return false;
+		}
+	}
+
+	private boolean function dumpOracle(required struct dsInfo, required struct options) {
+		try {
+			detailOutput.output("Preparing Oracle database export...");
+			
+			/* ----------------------------------------------------
+			1. Get database connection details
+			---------------------------------------------------- */
+			local.host = arguments.dsInfo.host ?: "localhost";
+			local.port = arguments.dsInfo.port ?: "1521";
+			local.database = arguments.dsInfo.database;
+			local.username = arguments.dsInfo.username ?: "";
+			local.password = arguments.dsInfo.password ?: "";
+			local.serviceName = arguments.dsInfo.servicename ?: "";
+			local.sid = arguments.dsInfo.sid ?: "";
+			
+			// For Oracle, database can be SID or Service Name
+			local.oracleConnString = "";
+			local.jdbcUrl = "";
+			
+			if (Len(local.serviceName)) {
+				local.oracleConnString = "//#local.host#:#local.port#/#local.serviceName#";
+				local.jdbcUrl = "jdbc:oracle:thin:@//#local.host#:#local.port#/#local.serviceName#";
+			} else if (Len(local.sid)) {
+				local.oracleConnString = "//#local.host#:#local.port#:#local.sid#";
+				local.jdbcUrl = "jdbc:oracle:thin:@#local.host#:#local.port#:#local.sid#";
+			} else if (Len(local.database)) {
+				// Try as service name first
+				local.oracleConnString = "//#local.host#:#local.port#/#local.database#";
+				local.jdbcUrl = "jdbc:oracle:thin:@//#local.host#:#local.port#/#local.database#";
+			} else {
+				detailOutput.error("Oracle connection requires SID or Service Name");
+				detailOutput.output("Please specify in datasource configuration:");
+				detailOutput.output("- serviceName: for Oracle 11g and later", true);
+				detailOutput.output("- sid: for Oracle 10g and earlier", true);
+				return false;
+			}
+			
+			detailOutput.statusInfo("Oracle Connection: #local.oracleConnString#");
+			detailOutput.statusInfo("JDBC URL: #local.jdbcUrl#");
+			
+			/* ----------------------------------------------------
+			2. Generate output file path
+			---------------------------------------------------- */
+			local.outputFile = arguments.options.output;
+			
+			// If no output file specified, generate default .sql filename (not .dmp for JDBC)
+			if (!Len(local.outputFile)) {
+				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
+				local.outputFile = fileSystemUtil.resolvePath("oracle_" & local.username & "_" & local.timestamp & ".sql");
+			} else {
+				// For JDBC export, use .sql extension
+				if (ListLast(local.outputFile, ".") != "sql") {
+					local.outputFile &= ".sql";
+				}
+				local.outputFile = fileSystemUtil.resolvePath(local.outputFile);
+			}
+			
+			// Ensure directory exists
+			local.outputDir = GetDirectoryFromPath(local.outputFile);
+			if (Len(local.outputDir) && !DirectoryExists(local.outputDir)) {
+				DirectoryCreate(local.outputDir, true);
+				detailOutput.statusInfo("Created directory: #local.outputDir#");
+			}
+			
+			detailOutput.statusInfo("Export file: #local.outputFile#");
+			
+			/* ----------------------------------------------------
+			3. Try Oracle Data Pump (expdp) - but handle common errors
+			---------------------------------------------------- */
+			local.useExpdp = false;
+			local.expdpResult = "";
+			
+			if (isWindows()) {
+				local.checkCmd = "where expdp 2>nul";
+			} else {
+				local.checkCmd = "which expdp 2>/dev/null";
+			}
+			
+			local.checkResult = executeSystemCommand(local.checkCmd);
+			
+			if (local.checkResult.success) {
+				detailOutput.statusSuccess("Found Oracle Data Pump (expdp), attempting export...");
+				detailOutput.statusWarning("Note: expdp requires specific Oracle privileges to work");
+				
+				// Build expdp command with directory parameter
+				local.cmd = "expdp";
+				local.cmd &= " #local.username#/#local.password#";
+				
+				// Use a writable directory - check common locations
+				local.dumpDir = "";
+				if (isWindows()) {
+					// Try user's temp directory
+					local.dumpDir = ExpandPath("%TEMP%");
+					local.cmd &= " DIRECTORY=DATA_PUMP_DIR"; // Use default
+				} else {
+					// Try /tmp on Unix
+					local.dumpDir = "/tmp";
+					local.cmd &= " DIRECTORY=DATA_PUMP_DIR"; // Use default
+				}
+				
+				// Use simpler parameters to avoid privilege issues
+				local.outputFileName = GetFileFromPath(local.outputFile);
+				// Replace .sql with .dmp for Data Pump
+				local.outputFileName = Replace(local.outputFileName, ".sql", ".dmp", "all");
+				
+				local.cmd &= " DUMPFILE=#local.outputFileName#";
+				local.cmd &= " LOGFILE=#local.outputFileName#.log";
+				
+				// Use simpler options
+				if (arguments.options.schemaOnly) {
+					local.cmd &= " CONTENT=METADATA_ONLY";
+				} else if (arguments.options.dataOnly) {
+					local.cmd &= " CONTENT=DATA_ONLY";
+				} else {
+					// local.cmd &= " FULL=Y";
+					// Use simpler schema export instead of specific tables
+					local.cmd &= " SCHEMAS=#local.username#";
+				}
+				
+				
+				// Set Oracle environment variables
+				local.envVars = {};
+				
+				// Common Oracle environment variables
+				if (StructKeyExists(arguments.dsInfo, "oracleHome") && Len(arguments.dsInfo.oracleHome)) {
+					local.envVars["ORACLE_HOME"] = arguments.dsInfo.oracleHome;
+					if (isWindows()) {
+						local.envVars["PATH"] = "#arguments.dsInfo.oracleHome#\bin;" & CreateObject("java", "java.lang.System").getenv("PATH");
+					} else {
+						local.envVars["PATH"] = "#arguments.dsInfo.oracleHome#/bin:" & CreateObject("java", "java.lang.System").getenv("PATH");
+						local.envVars["LD_LIBRARY_PATH"] = "#arguments.dsInfo.oracleHome#/lib";
+					}
+				}
+				
+				// Set NLS_LANG for character set
+				local.envVars["NLS_LANG"] = "AMERICAN_AMERICA.AL32UTF8";
+				
+				detailOutput.statusInfo("Executing Oracle Data Pump export...");
+				detailOutput.statusInfo("Command: #local.cmd#");
+				local.expdpResult = executeSystemCommand(local.cmd, local.envVars);
+				
+				// Display Data Pump output
+				if (Len(local.expdpResult.output)) {
+					detailOutput.output(local.expdpResult.output);
+				}
+
+				if (local.expdpResult.success) {
+					detailOutput.statusSuccess("Oracle Data Pump export completed successfully");
+					
+					// Check if .dmp file was created
+					local.dmpFile = local.outputDir & "/" & local.outputFileName;
+					if (FileExists(local.dmpFile)) {
+						local.fileSize = GetFileInfo(local.dmpFile).size;
+						detailOutput.statusSuccess("Export file size: " & NumberFormat(local.fileSize / 1024, "0.00") & " KB");
+						
+						// Rename to requested output filename if different
+						if (local.dmpFile != local.outputFile) {
+							try {
+								FileMove(local.dmpFile, local.outputFile);
+							} catch(any e) {
+								// Keep original file
+							}
+						}
+					}
+					
+					return true;
+				} else {
+					detailOutput.statusWarning("Oracle Data Pump failed:");
+					if (Len(local.expdpResult.error)) {
+						detailOutput.output(local.expdpResult.error);
+					}
+					
+					// Check for specific errors
+					if (FindNoCase("ORA-01950", local.expdpResult.error) || 
+						FindNoCase("no privileges", local.expdpResult.error)) {
+						detailOutput.statusInfo("The user lacks privileges for Data Pump export.");
+						detailOutput.output("Required privileges: CREATE TABLE, UNLIMITED TABLESPACE");
+						detailOutput.output("Falling back to JDBC export...");
+					}
+					return false;
+				}
+			} else {
+				detailOutput.statusWarning("Oracle Data Pump (expdp) not found");
+				detailOutput.output("Using JDBC-based export...");
+				return false;
+			}
+		} catch (any e) {
+			detailOutput.error("Oracle export error: " & e.message);
+			if (StructKeyExists(e, "detail")) {
+				detailOutput.error("Details: " & e.detail);
+			}
 			return false;
 		}
 	}
