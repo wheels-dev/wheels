@@ -1219,7 +1219,7 @@ component extends="wheels.Testbox" {
 			})
 
 			it("is working with index hint sqlserver", () => {
-				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "SQLServerModel")
+				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "MicrosoftSQLServerModel")
 
 				expect(actual).toBe("FROM c_o_r_e_authors WITH (INDEX(idx_authors_123))")
 			})
