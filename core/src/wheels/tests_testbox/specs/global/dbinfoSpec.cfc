@@ -60,7 +60,7 @@ component extends="wheels.Testbox" {
                 );
 
                 switch( variables.dbAdapter ) {
-                    case "Oracle":
+                    case "OracleModel":
                     case "SQLServer":
                         // If running in BoxLang, expect 1 instead of 2
                         if ( structKeyExists(server, "boxlang") ) {
