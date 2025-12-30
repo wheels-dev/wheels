@@ -1206,20 +1206,20 @@ component extends="wheels.Testbox" {
 				actual = g.model("author").$indexHint(
 					useIndex = {author = "idx_authors_123"},
 					modelName = "author",
-					adapterName = "MySQL"
+					adapterName = "MySQLModel"
 				)
 
 				expect(actual).toBe("USE INDEX(idx_authors_123)")
 			})
 
 			it("is working with index hint mysql", () => {
-				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "MySQL")
+				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "MySQLModel")
 
 				expect(actual).toBe("FROM c_o_r_e_authors USE INDEX(idx_authors_123)")
 			})
 
 			it("is working with index hint sqlserver", () => {
-				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "SQLServer")
+				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "SQLServerModel")
 
 				expect(actual).toBe("FROM c_o_r_e_authors WITH (INDEX(idx_authors_123))")
 			})
@@ -1238,7 +1238,7 @@ component extends="wheels.Testbox" {
 				actual = g.model("author").$fromClause(
 					include = "posts",
 					useIndex = {author = "idx_authors_123", post = "idx_posts_123"},
-					adapterName = "MySQL"
+					adapterName = "MySQLModel"
 				)
 
 				expect(actual).toBe("FROM c_o_r_e_authors USE INDEX(idx_authors_123) LEFT OUTER JOIN c_o_r_e_posts USE INDEX(idx_posts_123) ON c_o_r_e_authors.id = c_o_r_e_posts.authorid AND c_o_r_e_posts.deletedat IS NULL")
