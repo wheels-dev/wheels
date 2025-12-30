@@ -58,10 +58,9 @@ component extends="wheels.Testbox" {
                     type = "index",
                     table = variables.prefix & "roles"
                 );
-
                 switch( variables.dbAdapter ) {
                     case "OracleModel":
-                    case "SQLServer":
+                    case "MicrosoftSQLServerModel":
                         // If running in BoxLang, expect 1 instead of 2
                         if ( structKeyExists(server, "boxlang") ) {
                             expect( local.result.recordCount ).toBe( 1 );

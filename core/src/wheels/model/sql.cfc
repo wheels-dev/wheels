@@ -42,7 +42,7 @@ component {
 			local.indexName = arguments.useIndex[arguments.modelName];
 			if (arguments.adapterName == "MySQLModel") {
 				local.rv = "USE INDEX(#local.indexName#)";
-			} else if (arguments.adapterName == "SQLServerModel") {
+			} else if (arguments.adapterName == "MicrosoftSQLServerModel") {
 				local.rv = "WITH (INDEX(#local.indexName#))";
 			}
 		}

@@ -385,8 +385,8 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			);
 		}
 		if (FindNoCase("SQLServer", local.info.driver_name) || FindNoCase("SQL Server", local.info.driver_name)) {
-			local.folderName = "SQLServer";
-			local.adapterName = "SQLServerModel";
+			local.folderName = "MicrosoftSQLServer";
+			local.adapterName = "MicrosoftSQLServerModel";
 		} else if (FindNoCase("MySQL", local.info.driver_name) || FindNoCase("MariaDB", local.info.driver_name)) {
 			local.folderName = "MySQL";
 			local.adapterName = "MySQLModel";
