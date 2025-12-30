@@ -1,4 +1,4 @@
-component extends="Abstract" {
+component extends="../Abstract" {
 
 	variables.sqlTypes = {};
 	variables.sqlTypes['primaryKey'] = "int NOT NULL IDENTITY (1, 1)";

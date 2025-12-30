@@ -1,4 +1,4 @@
-component extends="Abstract" {
+component extends="../Abstract" {
 
     /**
      * SQL type mappings specific to Oracle Database 12c+

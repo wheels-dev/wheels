@@ -1,4 +1,4 @@
-component extends="Base" output=false {
+component extends="../Base" output=false {
 
 	/**
 	 * Map SQLite types to CFML types.

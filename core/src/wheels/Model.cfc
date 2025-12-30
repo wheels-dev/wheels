@@ -385,17 +385,23 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			);
 		}
 		if (FindNoCase("SQLServer", local.info.driver_name) || FindNoCase("SQL Server", local.info.driver_name)) {
-			local.adapterName = "SQLServer";
+			local.folderName = "SQLServer";
+			local.adapterName = "SQLServerModel";
 		} else if (FindNoCase("MySQL", local.info.driver_name) || FindNoCase("MariaDB", local.info.driver_name)) {
-			local.adapterName = "MySQL";
+			local.folderName = "MySQL";
+			local.adapterName = "MySQLModel";
 		} else if (FindNoCase("PostgreSQL", local.info.driver_name)) {
-			local.adapterName = "PostgreSQL";
+			local.folderName = "PostgreSQL";
+			local.adapterName = "PostgreSQLModel";
 		} else if (FindNoCase("H2", local.info.driver_name)) {
-			local.adapterName = "H2";
+			local.folderName = "H2";
+			local.adapterName = "H2Model";
 		} else if (FindNoCase("Oracle", local.info.driver_name)) {
-			local.adapterName = "Oracle";
+			local.folderName = "Oracle";
+			local.adapterName = "OracleModel";
 		} else if (FindNoCase("SQLite", local.info.driver_name)) {
-			local.adapterName = "SQLite";
+			local.folderName = "SQLite";
+			local.adapterName = "SQLiteModel";
 		} else {
 			Throw(
 				type = "Wheels.DatabaseNotSupported",
@@ -404,7 +410,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			);
 		}
 		$set(adapterName = local.adapterName);
-		return CreateObject("component", "wheels.model.adapters.#local.adapterName#").$init(
+		return CreateObject("component", "wheels.database.#local.folderName#.#local.adapterName#").$init(
 			dataSource = variables.wheels.class.dataSource,
 			username = variables.wheels.class.username,
 			password = variables.wheels.class.password
