@@ -40,9 +40,9 @@ component {
 		local.rv = "";
 		if (StructKeyExists(arguments.useIndex, arguments.modelName)) {
 			local.indexName = arguments.useIndex[arguments.modelName];
-			if (arguments.adapterName == "MySQL") {
+			if (arguments.adapterName == "MySQLModel") {
 				local.rv = "USE INDEX(#local.indexName#)";
-			} else if (arguments.adapterName == "SQLServer") {
+			} else if (arguments.adapterName == "SQLServerModel") {
 				local.rv = "WITH (INDEX(#local.indexName#))";
 			}
 		}
