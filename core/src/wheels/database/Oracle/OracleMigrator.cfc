@@ -1,4 +1,4 @@
-component extends="../Abstract" {
+component extends="wheels.database.Abstract" {
 
     /**
      * SQL type mappings specific to Oracle Database 12c+

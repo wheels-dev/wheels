@@ -1,4 +1,4 @@
-component extends="../Base" output=false {
+component extends="wheels.database.Base" output=false {
 
 	/**
 	 * Map database types to the ones used in CFML.
