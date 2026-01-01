@@ -278,7 +278,7 @@ component output="false" {
 		if (
 			structKeyExists(arguments, "type") &&
 			arguments.type eq "index" &&
-			$get("adapterName") eq "SQLite"
+			$get("adapterName") eq "SQLiteModel"
 		) {
 			local.sql = "
 				SELECT
@@ -833,7 +833,7 @@ component output="false" {
 		}
 
 		// Handle SQLite (TEXT storage)
-		if (get("adapterName") == "SQLite") {
+		if (get("adapterName") == "SQLiteModel") {
 			// Store as quoted ISO 8601 string (standard for SQLite)
 			if (IsDate(local.rv)) {
 				local.rv = "'#DateFormat(local.rv, 'yyyy-mm-dd')# #TimeFormat(local.rv, 'HH:mm:ss')#'";

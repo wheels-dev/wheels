@@ -208,7 +208,7 @@ component extends="wheels.Testbox" {
             ");
         }
 
-        if(get('adapterName') eq 'SQLite') {
+        if(get('adapterName') eq 'SQLiteModel') {
             cfquery(datasource=variables.datasource) {
                 writeOutput("
                     CREATE TABLE #variables.prefix#users (

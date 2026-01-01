@@ -424,7 +424,7 @@ component extends="Base" {
 				} else if (IsBoolean(arguments[local.key])) {
 					local.columnValues = ListAppend(local.columnValues, IIf(arguments[local.key], 1, 0));
 				} else if (IsDate(arguments[local.key])) {
-					if(get("adapterName") == "SQLite" && $isTimestampLiteral(arguments[local.key])){
+					if(get("adapterName") == "SQLiteModel" && $isTimestampLiteral(arguments[local.key])){
 						local.columnValues = '"#$convertToString(arguments[local.key])#"';
 					} else {
 						local.columnValues = ListAppend(local.columnValues, "#arguments[local.key]#");
@@ -486,7 +486,7 @@ component extends="Base" {
 				} else if (IsBoolean(arguments[local.key])) {
 					local.update = local.update & "#IIf(arguments[local.key], 1, 0)#";
 				} else if (IsDate(arguments[local.key])) {
-					if(get("adapterName") == "SQLite" && $isTimestampLiteral(arguments[local.key])){
+					if(get("adapterName") == "SQLiteModel" && $isTimestampLiteral(arguments[local.key])){
 						local.update =  local.update &  '"#$convertToString(arguments[local.key])#"';
 					} else {
 						local.update = local.update & "#arguments[local.key]#";

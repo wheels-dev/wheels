@@ -19,7 +19,7 @@ component {
 				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
 			}
 			// Use cf_sql_varchar in SQLite for TEXT timestamps
-			if(get("adapterName") eq "SQLite") {
+			if(get("adapterName") eq "SQLiteModel") {
 				local.type = "cf_sql_varchar";
 			} else {
 				local.type = "cf_sql_timestamp";

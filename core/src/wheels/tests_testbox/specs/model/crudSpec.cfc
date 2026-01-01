@@ -8,7 +8,7 @@ component extends="wheels.Testbox" {
 
 			beforeEach(() => {
 				binaryData = FileReadBinary(ExpandPath('/wheels/tests_testbox/_assets/files/cfwheels-logo.png'))
-				if( application.wheels.adapterName eq 'SQLite' ){
+				if( application.wheels.adapterName eq 'SQLiteModel' ){
 					binaryData = toBase64(binaryData)
 				}
 			})
