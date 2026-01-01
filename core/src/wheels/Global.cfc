@@ -215,7 +215,7 @@ component output="false" {
 		) {
 			local.adapter = $get("adapterName");
 
-			if (local.adapter == "SQLServer") {
+			if (local.adapter == "MicrosoftSQLServerModel") {
 				local.sql = "
 					SELECT 
 						DB_NAME() AS TABLE_CAT,
@@ -248,7 +248,7 @@ component output="false" {
 				return local.rv;
 			}
 
-			if (local.adapter == "Oracle") {
+			if (local.adapter == "OracleModel") {
 				local.sql = "
 					SELECT 
 						NULL AS TABLE_CAT,
