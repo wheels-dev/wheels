@@ -126,12 +126,20 @@ component extends="../base" {
 			// Generate output filename if not provided
 			if (!Len(arguments.output)) {
 				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
-				arguments.output = fileSystemUtil.resolvePath("dump_" & local.selectedDatabase & "_" & local.timestamp & ".sql");
+				
+				// Determine extension based on driver
+				local.ext = "sql";
+				if (local.dsInfo.driver == "Oracle") {
+					local.ext = "dmp";
+				} else if (local.dsInfo.driver == "MSSQL" || local.dsInfo.driver == "MSSQLServer") {
+					local.ext = "bak";
+				}
+				
+				arguments.output = fileSystemUtil.resolvePath("dump_" & local.selectedDatabase & "_" & local.timestamp & "." & local.ext);
 				if (arguments.compress) {
 					arguments.output &= ".gz";
 				}
-			}
-			
+			}	
 			// Make sure output path is absolute
 			if (!FileExists((arguments.output)) && !DirectoryExists(fileSystemUtil.resolvePath(arguments.output))) {
 				// If no directory specified, use current directory
@@ -990,44 +998,11 @@ component extends="../base" {
 		try {
 			detailOutput.output("Preparing Oracle database export...");
 			
-			/* ----------------------------------------------------
-			1. Get database connection details
-			---------------------------------------------------- */
-			local.host = arguments.dsInfo.host ?: "localhost";
-			local.port = arguments.dsInfo.port ?: "1521";
-			local.database = arguments.dsInfo.database;
-			local.username = arguments.dsInfo.username ?: "";
-			local.password = arguments.dsInfo.password ?: "";
-			local.serviceName = arguments.dsInfo.servicename ?: "";
-			local.sid = arguments.dsInfo.sid ?: "";
-			
-			// For Oracle, database can be SID or Service Name
-			local.oracleConnString = "";
-			local.jdbcUrl = "";
-			
-			if (Len(local.serviceName)) {
-				local.oracleConnString = "//#local.host#:#local.port#/#local.serviceName#";
-				local.jdbcUrl = "jdbc:oracle:thin:@//#local.host#:#local.port#/#local.serviceName#";
-			} else if (Len(local.sid)) {
-				local.oracleConnString = "//#local.host#:#local.port#:#local.sid#";
-				local.jdbcUrl = "jdbc:oracle:thin:@#local.host#:#local.port#:#local.sid#";
-			} else if (Len(local.database)) {
-				// Try as service name first
-				local.oracleConnString = "//#local.host#:#local.port#/#local.database#";
-				local.jdbcUrl = "jdbc:oracle:thin:@//#local.host#:#local.port#/#local.database#";
-			} else {
-				detailOutput.error("Oracle connection requires SID or Service Name");
-				detailOutput.output("Please specify in datasource configuration:");
-				detailOutput.output("- serviceName: for Oracle 11g and later", true);
-				detailOutput.output("- sid: for Oracle 10g and earlier", true);
-				return false;
-			}
-			
-			detailOutput.statusInfo("Oracle Connection: #local.oracleConnString#");
-			detailOutput.statusInfo("JDBC URL: #local.jdbcUrl#");
+			local.username = arguments.dsInfo.username;
+			local.password = arguments.dsInfo.password;
 			
 			/* ----------------------------------------------------
-			2. Generate output file path
+			1. Generate output file path
 			---------------------------------------------------- */
 			local.outputFile = arguments.options.output;
 			
@@ -1035,11 +1010,13 @@ component extends="../base" {
 			if (!Len(local.outputFile)) {
 				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
 				local.outputFile = fileSystemUtil.resolvePath("oracle_" & local.username & "_" & local.timestamp & ".sql");
+			}
+			// If no output file specified, generate default filename (determined by run() function)
+			// But if we are called directly, fallback to .sql
+			if (!Len(local.outputFile)) {
+				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
+				local.outputFile = fileSystemUtil.resolvePath("oracle_" & local.username & "_" & local.timestamp & ".dmp");
 			} else {
-				// For JDBC export, use .sql extension
-				if (ListLast(local.outputFile, ".") != "sql") {
-					local.outputFile &= ".sql";
-				}
 				local.outputFile = fileSystemUtil.resolvePath(local.outputFile);
 			}
 			
@@ -1053,7 +1030,7 @@ component extends="../base" {
 			detailOutput.statusInfo("Export file: #local.outputFile#");
 			
 			/* ----------------------------------------------------
-			3. Try Oracle Data Pump (expdp) - but handle common errors
+			2. Try Oracle Data Pump (expdp) - but handle common errors
 			---------------------------------------------------- */
 			local.useExpdp = false;
 			local.expdpResult = "";
@@ -1070,15 +1047,45 @@ component extends="../base" {
 					detailOutput.statusSuccess("Found Oracle Data Pump (expdp), attempting export...");
 					detailOutput.statusWarning("Note: expdp requires specific Oracle privileges to work");
 					
+					// Connect to Oracle via JDBC to find the directory path
+					local.oracleDir = "";
+					local.connResult = getDatabaseConnection(arguments.dsInfo, "Oracle");
+					
+					if (local.connResult.success) {
+						try {
+							local.conn = local.connResult.connection;
+							local.stmt = local.conn.createStatement();
+							local.rs = local.stmt.executeQuery("SELECT directory_path FROM all_directories WHERE directory_name = 'DATA_PUMP_DIR'");
+							
+							if (local.rs.next()) {
+								local.oracleDir = local.rs.getString("directory_path");
+								detailOutput.statusInfo("Resolved DATA_PUMP_DIR: " & local.oracleDir);
+							}
+							
+							local.rs.close();
+							local.stmt.close();
+						} catch (any e) {
+							// Ignore directory lookup error
+							detailOutput.statusWarning("Could not resolve DATA_PUMP_DIR path: " & e.message);
+						} finally {
+							if (StructKeyExists(local, "conn")) {
+								local.conn.close();
+							}
+						}
+					}
+					
 					// Build expdp command array
 					local.cmdArray = ["expdp"];
 					ArrayAppend(local.cmdArray, "#local.username#/#local.password#");
 					
 					// Use a writable directory - check common locations
 					local.dumpDir = "";
-					if (isWindows()) {
+					if (Len(local.oracleDir)) {
+						local.dumpDir = local.oracleDir;
+						ArrayAppend(local.cmdArray, "DIRECTORY=DATA_PUMP_DIR");
+					} else if (isWindows()) {
 						// Try user's temp directory
-						local.dumpDir = ExpandPath("%TEMP%");
+						local.dumpDir = GetTempDirectory();
 						ArrayAppend(local.cmdArray, "DIRECTORY=DATA_PUMP_DIR"); // Use default
 					} else {
 						// Try /tmp on Unix
@@ -1088,8 +1095,10 @@ component extends="../base" {
 					
 					// Use simpler parameters to avoid privilege issues
 					local.outputFileName = GetFileFromPath(local.outputFile);
-					// Replace .sql with .dmp for Data Pump
-					local.outputFileName = Replace(local.outputFileName, ".sql", ".dmp", "all");
+					// Ensure it ends in .dmp if it doesn't already (e.g. if user supplied .sql output)
+					if (ListLast(local.outputFileName, ".") != "dmp") {
+						local.outputFileName = ListDeleteAt(local.outputFileName, ListLen(local.outputFileName, "."), ".") & ".dmp";
+					}
 					
 					ArrayAppend(local.cmdArray, "DUMPFILE=#local.outputFileName#");
 					ArrayAppend(local.cmdArray, "LOGFILE=#local.outputFileName#.log");
@@ -1132,25 +1141,89 @@ component extends="../base" {
 					if (local.expdpResult.success) {
 						detailOutput.statusSuccess("Oracle Data Pump export completed successfully");
 						
-						// Check if .dmp file was created
-						local.dmpFile = local.outputDir & "/" & local.outputFileName;
+						// Check if .dmp file was created at the resolved location
+						local.dmpFile = local.dumpDir & "/" & local.outputFileName;
+						
+						// Handle Windows vs Unix path separators if needed (Java File should handle mixed, but just to be safe)
+						if (isWindows() && Find("/", local.dmpFile)) {
+							local.dmpFile = Replace(local.dmpFile, "/", "\", "all");
+						}
+						
 						if (FileExists(local.dmpFile)) {
+							// ... (keep existing success logic) ...
 							local.fileSize = GetFileInfo(local.dmpFile).size;
-							detailOutput.statusSuccess("Export file size: " & NumberFormat(local.fileSize / 1024, "0.00") & " KB");
+							detailOutput.statusSuccess("Export file found: " & local.dmpFile);
+							detailOutput.statusSuccess("Size: " & NumberFormat(local.fileSize / 1024, "0.00") & " KB");
 							
-							// Rename to requested output filename if different
+							// Move to requested output location
 							if (local.dmpFile != local.outputFile) {
 								try {
+									detailOutput.statusInfo("Moving file to: " & local.outputFile);
+									if (FileExists(local.outputFile)) {
+										FileDelete(local.outputFile);
+									}
 									FileMove(local.dmpFile, local.outputFile);
+									detailOutput.statusSuccess("File moved successfully.");
 								} catch(any e) {
-									// Keep original file
+									detailOutput.statusWarning("Could not move file: " & e.message);
+									detailOutput.statusInfo("File remains at: " & local.dmpFile);
+								}
+							}
+						} else {
+							// Failsafe: Try to parse output for the actual file path
+							// Look for: "Dump file set for ... is:" followed by path
+							local.parsedPath = "";
+							local.outputLines = ListToArray(local.expdpResult.output, Chr(10));
+							for (local.i = 1; local.i <= ArrayLen(local.outputLines); local.i++) {
+								if (FindNoCase("Dump file set for", local.outputLines[local.i]) && local.i < ArrayLen(local.outputLines)) {
+									// The path is usually on the next line
+									local.nextLine = Trim(local.outputLines[local.i+1]);
+									if (Right(local.nextLine, 4) == ".dmp" || Right(local.nextLine, 4) == ".DMP") {
+										local.parsedPath = local.nextLine;
+										break;
+									}
+								}
+							}
+							
+							if (Len(local.parsedPath) && FileExists(local.parsedPath)) {
+								detailOutput.statusSuccess("Locating dump file from output: " & local.parsedPath);
+								local.dmpFile = local.parsedPath;
+								
+								// Move logic (duplicated for now, could be refactored)
+								if (local.dmpFile != local.outputFile) {
+									try {
+										detailOutput.statusInfo("Moving file to: " & local.outputFile);
+										if (FileExists(local.outputFile)) {
+											FileDelete(local.outputFile);
+										}
+										FileMove(local.dmpFile, local.outputFile);
+										detailOutput.statusSuccess("File moved successfully.");
+									} catch(any e) {
+										detailOutput.statusWarning("Could not move file: " & e.message);
+										detailOutput.statusInfo("File remains at: " & local.dmpFile);
+									}
+								}
+							} else {
+								detailOutput.statusWarning("Dump file not found at expected location: " & local.dmpFile);
+								if (Len(local.oracleDir)) {
+									detailOutput.statusInfo("Checked resolved DATA_PUMP_DIR: " & local.oracleDir);
 								}
 							}
 						}
 						
 						return true;
 					} else {
-						detailOutput.statusFailed("Oracle Data Pump failed");
+						detailOutput.statusWarning("Oracle Data Pump failed:");
+						
+						// Check for specific errors in OUTPUT (since streams are merged)
+						local.mergedOutput = local.expdpResult.output;
+						
+						if (FindNoCase("ORA-01950", local.mergedOutput) || 
+							FindNoCase("no privileges", local.mergedOutput)) {
+							detailOutput.statusInfo("The user lacks privileges for Data Pump export.");
+							detailOutput.output("Required privileges: CREATE TABLE, UNLIMITED TABLESPACE");
+							detailOutput.output("Falling back to JDBC export...");
+						}
 						return false;
 					}
 				} else {
