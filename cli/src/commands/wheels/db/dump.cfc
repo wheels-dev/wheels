@@ -134,8 +134,8 @@ component extends="../base" {
 				} else if (local.dsInfo.driver == "MSSQL" || local.dsInfo.driver == "MSSQLServer") {
 					local.ext = "bak";
 				}
-				
-				arguments.output = fileSystemUtil.resolvePath("dump_" & local.selectedDatabase & "_" & local.timestamp & "." & local.ext);
+					
+				arguments.output = local.selectedDatabase & "_" & local.timestamp & "." & local.ext;
 				if (arguments.compress) {
 					arguments.output &= ".gz";
 				}
@@ -201,6 +201,10 @@ component extends="../base" {
 					break;
 				case "Oracle":
 					local.success = dumpOracle(local.dsInfo, arguments);
+					break;
+				case "SQLite":
+				case "SQLite3":
+					local.success = dumpSQLite(local.dsInfo, arguments);
 					break;
 				default:
 					detailOutput.error("Database dump not supported for driver: " & local.dbType);
@@ -1235,6 +1239,574 @@ component extends="../base" {
 			if (StructKeyExists(e, "detail")) {
 				detailOutput.error("Details: " & e.detail);
 			}
+			return false;
+		}
+	}
+
+	private boolean function dumpSQLite(required struct dsInfo, required struct options) {
+		try {
+			detailOutput.output("Preparing SQLite database export...");
+			
+			/* ----------------------------------------------------
+			1. Get database file path
+			---------------------------------------------------- */
+			local.databasePath = arguments.dsInfo.database;
+			
+			// For SQLite, database is usually a file path
+			if (!Len(local.databasePath)) {
+				detailOutput.error("SQLite database path not specified");
+				return false;
+			}
+			// Resolve the database path
+			local.resolvedPath = fileSystemUtil.resolvePath(local.databasePath);
+			
+			// Check if database file exists
+			if (!FileExists(local.resolvedPath)) {
+				// Try relative to app directory
+				local.appPath = getCWD();
+				local.altPath = fileSystemUtil.resolvePath(local.appPath & "/" & local.databasePath);
+				
+				if (FileExists(local.altPath)) {
+					local.resolvedPath = local.altPath;
+				} else {
+					detailOutput.error("SQLite database file not found: " & local.databasePath);
+					detailOutput.output("Tried locations:");
+					detailOutput.output("1. " & local.resolvedPath, true);
+					detailOutput.output("2. " & local.altPath, true);
+					return false;
+				}
+			}
+			
+			detailOutput.statusInfo("Database file: " & local.resolvedPath);
+			
+			/* ----------------------------------------------------
+			2. Generate output file path
+			---------------------------------------------------- */
+			local.outputFile = arguments.options.output;
+			// Generate final output path
+			local.outputFile = resolveDumpOutputPath(arguments.options, local.resolvedPath);
+			detailOutput.statusInfo("Export file: " & local.outputFile);
+			
+			// If no output file specified, generate default .sql filename
+			if (!Len(local.outputFile)) {
+				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
+				local.dbName = ListLast(local.resolvedPath, "/\");
+				if (ListLen(local.dbName, ".") > 1) {
+					local.dbName = ListDeleteAt(local.dbName, ListLen(local.dbName, "."), ".");
+				}
+				local.outputFile = fileSystemUtil.resolvePath("sqlite_" & local.dbName & "_" & local.timestamp & ".sql");
+			} else {
+				local.outputFile = fileSystemUtil.resolvePath(local.outputFile);
+			}
+			
+
+			detailOutput.statusInfo("Export file: #local.outputFile#");
+			
+			/* ----------------------------------------------------
+			3. Check for sqlite3 command line tool
+			---------------------------------------------------- */
+			local.useSqlite3 = false;
+			local.sqlite3Result = "";
+			
+			if (isWindows()) {
+				local.checkCmd = ["where", "sqlite3"];
+			} else {
+				local.checkCmd = ["which", "sqlite3"];
+			}
+			
+			local.checkResult = runLocalCommand(local.checkCmd, false);
+			
+			if (local.checkResult.success) {
+				detailOutput.statusSuccess("Found sqlite3, attempting native dump...");
+				local.useSqlite3 = true;
+				
+				// Build sqlite3 command
+				local.cmdArray = ["sqlite3"];
+				
+				// Add database file path (properly quoted)
+				local.dbPath = local.resolvedPath;
+				if (isWindows()) {
+					// Windows paths with spaces need special handling
+					if (Find(" ", local.dbPath)) {
+						local.dbPath = Chr(34) & local.dbPath & Chr(34);
+					}
+				} else {
+					// Unix paths: escape spaces and special characters
+					local.dbPath = Replace(local.dbPath, "'", "'\''", "all");
+					if (Find(" ", local.dbPath) || Find("(", local.dbPath) || Find(")", local.dbPath) || Find("&", local.dbPath)) {
+						local.dbPath = "'" & local.dbPath & "'";
+					}
+				}
+				
+				ArrayAppend(local.cmdArray, local.dbPath);
+				
+				// Build the dump command
+				local.dumpCommands = "";
+				
+				if (arguments.options.schemaOnly) {
+					local.dumpCommands &= ".schema";
+				} else if (arguments.options.dataOnly) {
+					// For data only, we need to generate INSERT statements
+					local.dumpCommands &= ".mode insert" & Chr(10);
+					
+					// Get list of tables
+					local.tablesCmd = ArrayDuplicate(local.cmdArray);
+					ArrayAppend(local.tablesCmd, ".tables");
+					local.tablesResult = runLocalCommand(local.tablesCmd, false);
+					
+					if (local.tablesResult.success && Len(Trim(local.tablesResult.output))) {
+						local.tableList = ListToArray(Trim(local.tablesResult.output), " ");
+						for (local.table in local.tableList) {
+							local.dumpCommands &= "SELECT * FROM " & local.table & ";" & Chr(10);
+						}
+					}
+				} else {
+					// Full dump: schema and data
+					local.dumpCommands &= ".dump" & Chr(10);
+				}
+				
+				// Add table filter if specified
+				if (Len(arguments.options.tables)) {
+					local.tableList = ListToArray(arguments.options.tables);
+					local.dumpCommands = ""; // Reset
+					
+					if (!arguments.options.dataOnly) {
+						// Get schema for specified tables
+						for (local.table in local.tableList) {
+							local.dumpCommands &= ".schema " & local.table & Chr(10);
+						}
+					}
+					
+					if (!arguments.options.schemaOnly) {
+						// Get data for specified tables
+						local.dumpCommands &= ".mode insert" & Chr(10);
+						for (local.table in local.tableList) {
+							local.dumpCommands &= "SELECT * FROM " & local.table & ";" & Chr(10);
+						}
+					}
+				}
+				
+				// Add commands to exit sqlite3
+				local.dumpCommands &= ".exit" & Chr(10);
+				
+				// Write commands to temporary file
+				local.tempFile = GetTempDirectory() & "sqlite_dump_" & CreateUUID() & ".txt";
+				FileWrite(local.tempFile, local.dumpCommands);
+				
+				detailOutput.statusInfo("Executing SQLite dump...");
+
+				if (isWindows()) {
+					// Use shell redirection on Windows
+					local.shellCmd = 'sqlite3 "' & local.resolvedPath & '" < "' & local.tempFile & '"';
+
+					local.finalCmd = [
+						"cmd", "/c", local.shellCmd
+					];
+				} else {
+					// Unix-like systems can redirect directly
+					local.finalCmd = [
+						"sh", "-c",
+						'sqlite3 "' & local.resolvedPath & '" < "' & local.tempFile & '"'
+					];
+				}
+
+				local.sqlite3Result = runLocalCommand(local.finalCmd, true);
+
+				
+				// Clean up temp file
+				if (FileExists(local.tempFile)) {
+					try {
+						FileDelete(local.tempFile);
+					} catch (any e) {
+						// Ignore
+					}
+				}
+						
+				
+				if (local.sqlite3Result.success) {
+					// Write output to file
+					if (Len(local.sqlite3Result.output)) {
+						FileWrite(local.outputFile, local.sqlite3Result.output);
+						
+						// Handle compression if requested
+						if (arguments.options.compress) {
+							detailOutput.output("Compressing output file...");
+							if (compressFile(local.outputFile)) {
+								local.outputFile &= ".gz";
+								detailOutput.statusSuccess("File compressed: " & local.outputFile);
+							} else {
+								detailOutput.statusWarning("Compression failed");
+							}
+						}
+						
+						local.fileSize = GetFileInfo(local.outputFile).size;
+						detailOutput.statusSuccess("SQLite dump completed successfully");
+						detailOutput.statusSuccess("File size: " & NumberFormat(local.fileSize / 1024, "0.00") & " KB");
+						
+						return true;
+					} else {
+						detailOutput.statusWarning("SQLite dump produced no output");
+						return false;
+					}
+				} else {
+					detailOutput.statusWarning("sqlite3 command failed");
+					if (Len(local.sqlite3Result.output)) {
+						detailOutput.output("Error: " & local.sqlite3Result.output);
+					}
+				}
+			} else {
+				detailOutput.statusWarning("sqlite3 command not found");
+			}
+			
+			/* ----------------------------------------------------
+			4. JDBC-based export (fallback)
+			---------------------------------------------------- */
+			if (!local.useSqlite3 || !local.sqlite3Result.success) {
+				detailOutput.output("Falling back to JDBC-based export...");
+				return dumpSQLiteViaJDBC(arguments.dsInfo, arguments.options, local.resolvedPath);
+			}
+			
+			return false;
+			
+		} catch (any e) {
+			detailOutput.error("SQLite dump error: " & e.message);
+			if (StructKeyExists(e, "detail")) {
+				detailOutput.error("Details: " & e.detail);
+			}
+			return false;
+		}
+	}
+
+	private boolean function dumpSQLiteViaJDBC(required struct dsInfo, required struct options, required string dbPath) {
+		try {
+			detailOutput.output("Using JDBC connection for SQLite database export");
+
+			// Get database connection
+			local.connResult = getDatabaseConnection(arguments.dsInfo, "SQLite");
+			
+			if (!local.connResult.success) {
+				detailOutput.error("Failed to connect to SQLite database via JDBC");
+				if (Len(local.connResult.error)) {
+					detailOutput.error(local.connResult.error);
+				}
+				return false;
+			}
+			
+			local.conn = local.connResult.connection;
+			local.output = "";
+			local.outputFileHandle = "";
+			
+			try {
+				// Build SQL dump header
+				local.output &= "-- SQLite Database Dump" & Chr(10);
+				local.output &= "-- Generated by Wheels CLI (JDBC Mode)" & Chr(10);
+				local.output &= "-- Database file: " & arguments.dbPath & Chr(10);
+				local.output &= "-- Generation Time: " & DateTimeFormat(Now(), "yyyy-mm-dd HH:nn:ss") & Chr(10);
+				local.output &= Chr(10);
+				local.output &= "PRAGMA foreign_keys=OFF;" & Chr(10);
+				local.output &= "BEGIN TRANSACTION;" & Chr(10);
+				local.output &= Chr(10);
+				
+				// Get list of tables
+				local.tableList = [];
+				if (Len(arguments.options.tables)) {
+					local.tableList = ListToArray(arguments.options.tables);
+				} else {
+					// Get all tables
+					local.stmt = local.conn.createStatement();
+					local.rs = local.stmt.executeQuery("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
+					while (local.rs.next()) {
+						ArrayAppend(local.tableList, local.rs.getString("name"));
+					}
+					local.rs.close();
+					local.stmt.close();
+				}
+				
+				detailOutput.statusInfo("Tables to export: " & ArrayLen(local.tableList));
+				
+				// Track progress
+				local.tableCount = 0;
+				local.totalRows = 0;
+
+				// Ensure output directory exists
+				local.outputDir = GetDirectoryFromPath( arguments.options.output );
+				if ( Len( local.outputDir ) && !DirectoryExists( local.outputDir ) ) {
+					DirectoryCreate( local.outputDir, true );
+				} 
+
+				// Create output file
+				local.outputFileHandle = FileOpen(
+					arguments.options.output,
+					"write",
+					"utf-8"
+				);
+				FileWrite(local.outputFileHandle, local.output);
+				local.output = "";
+				
+				// Process each table
+				for (local.table in local.tableList) {
+					local.tableCount++;
+					detailOutput.statusInfo("Exporting table " & local.tableCount & "/" & ArrayLen(local.tableList) & ": " & local.table);
+					
+					if (!arguments.options.dataOnly) {
+						// Get CREATE TABLE statement
+						local.stmt = local.conn.createStatement();
+						local.rs = local.stmt.executeQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='" & local.table & "'");
+						
+						if (local.rs.next()) {
+							local.ddl = local.rs.getString("sql");
+							if (Len(local.ddl)) {
+								FileWrite(local.outputFileHandle, "-- Table: " & local.table & Chr(10));
+								FileWrite(local.outputFileHandle, "DROP TABLE IF EXISTS " & local.table & ";" & Chr(10));
+								FileWrite(local.outputFileHandle, local.ddl & ";" & Chr(10));
+								
+								// Get CREATE INDEX statements
+								local.stmt2 = local.conn.createStatement();
+								local.rs2 = local.stmt2.executeQuery("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='" & local.table & "' AND sql IS NOT NULL");
+								
+								while (local.rs2.next()) {
+									local.indexDDL = local.rs2.getString("sql");
+									if (Len(local.indexDDL)) {
+										FileWrite(local.outputFileHandle, local.indexDDL & ";" & Chr(10));
+									}
+								}
+								local.rs2.close();
+								local.stmt2.close();
+							}
+						}
+						local.rs.close();
+						local.stmt.close();
+					}
+					
+					if (!arguments.options.schemaOnly) {
+						// Export data
+						local.stmt = local.conn.createStatement();
+						local.countRs = local.stmt.executeQuery("SELECT COUNT(*) as rowcount FROM " & local.table);
+						local.rowCount = 0;
+						if (local.countRs.next()) {
+							local.rowCount = local.countRs.getInt("rowcount");
+						}
+						local.countRs.close();
+						local.stmt.close();
+						
+						if (local.rowCount > 0) {
+							detailOutput.output("  Exporting " & local.rowCount & " rows...");
+							
+							// Get column information
+							local.stmt = local.conn.createStatement();
+							local.rs = local.stmt.executeQuery("PRAGMA table_info('" & local.table & "')");
+							
+							local.columns = [];
+							while (local.rs.next()) {
+								ArrayAppend(local.columns, local.rs.getString("name"));
+							}
+							local.rs.close();
+							local.stmt.close();
+							
+							// Export data in batches
+							local.batchSize = 1000;
+							local.offset = 0;
+							local.batchCount = 0;
+							
+							while (local.offset < local.rowCount) {
+								local.stmt = local.conn.createStatement();
+								local.sql = "SELECT * FROM " & local.table;
+								
+								// Use LIMIT and OFFSET for batching
+								if (local.rowCount > local.batchSize) {
+									local.sql &= " LIMIT " & local.batchSize & " OFFSET " & local.offset;
+								}
+								
+								local.rs = local.stmt.executeQuery(local.sql);
+								
+								while (local.rs.next()) {
+									local.insertStmt = "INSERT INTO " & local.table & " VALUES(";
+									
+									for (local.i = 1; local.i <= ArrayLen(local.columns); local.i++) {
+										if (local.i > 1) local.insertStmt &= ", ";
+										
+										try {
+											local.value = local.rs.getString(local.i);
+											local.columnType = local.rs.getMetaData().getColumnTypeName(local.i);
+											
+											if (IsNull(local.value) || local.rs.wasNull()) {
+												local.insertStmt &= "NULL";
+											} else if (FindNoCase("INT", local.columnType) || FindNoCase("REAL", local.columnType) || FindNoCase("NUMERIC", local.columnType)) {
+												// Numbers don't need quotes
+												local.insertStmt &= local.value;
+											} else if (FindNoCase("BLOB", local.columnType)) {
+												// Handle BLOB data (hex format for SQLite)
+												local.insertStmt &= "X'" & ToBase64(local.value) & "'";
+											} else {
+												// Escape single quotes
+												local.value = Replace(local.value, "'", "''", "all");
+												local.insertStmt &= "'" & local.value & "'";
+											}
+										} catch (any e) {
+											// If there's an error getting the value, use NULL
+											local.insertStmt &= "NULL";
+										}
+									}
+									local.insertStmt &= ");";
+									
+									FileWrite(local.outputFileHandle, local.insertStmt & Chr(10));
+									local.batchCount++;
+									local.totalRows++;
+								}
+								
+								local.rs.close();
+								local.stmt.close();
+								
+								local.offset += local.batchSize;
+								
+								// Show progress for large tables
+								if (local.rowCount > 10000 && local.offset % 10000 == 0) {
+									detailOutput.output("  Progress: " & local.offset & "/" & local.rowCount & " rows");
+								}
+							}
+						}
+					}
+					
+					FileWrite(local.outputFileHandle, Chr(10));
+				}
+				
+				// Add footer
+				local.footer = Chr(10) & "COMMIT;" & Chr(10);
+				local.footer &= "-- Dump completed on " & DateTimeFormat(Now(), "yyyy-mm-dd HH:nn:ss") & Chr(10);
+				local.footer &= "-- Total tables: " & ArrayLen(local.tableList) & Chr(10);
+				if (!arguments.options.schemaOnly) {
+					local.footer &= "-- Total rows exported: " & local.totalRows & Chr(10);
+				}
+				
+				FileWrite(local.outputFileHandle, local.footer);
+				
+				// // Close file
+				FileClose(local.outputFileHandle);
+				
+				// Handle compression if requested
+				if (arguments.options.compress) {
+					detailOutput.output("Compressing output file...");
+					if (compressFile(arguments.options.output)) {
+						detailOutput.statusSuccess("File compressed successfully");
+					} else {
+						detailOutput.statusWarning("Compression failed");
+					}
+				}
+				
+				detailOutput.statusSuccess("SQLite dump completed successfully via JDBC");
+				detailOutput.statusInfo("Exported: " & ArrayLen(local.tableList) & " tables, " & local.totalRows & " rows");
+				detailOutput.statusInfo("Output file: " & arguments.options.output);
+				
+				// Show file size
+				try {
+					local.fileInfo = GetFileInfo(arguments.options.output);
+					local.sizeInMB = NumberFormat(local.fileInfo.size / 1048576, "0.00");
+					detailOutput.statusInfo("File Size: #local.sizeInMB# MB");
+				} catch (any e) {
+					// Ignore
+				}
+				
+				return true;
+				
+			} catch (any e) {
+				detailOutput.error("SQLite JDBC export error: " & e.message);
+				if (StructKeyExists(e, "detail")) {
+					detailOutput.error("Detail: " & e.detail);
+				}
+				
+				// Close file if open
+				if (IsDefined("local.outputFileHandle") && IsSimpleValue(local.outputFileHandle)) {
+					try {
+						FileClose(local.outputFileHandle);
+					} catch (any e2) {
+						// Ignore
+					}
+				}
+				
+				return false;
+			}
+			
+		} catch (any e) {
+			detailOutput.error("SQLite JDBC export error: " & e.message);
+			if (StructKeyExists(e, "detail")) {
+				detailOutput.error("Details: " & e.detail);
+			}
+			return false;
+		}
+	}
+
+	private string function resolveDumpOutputPath(required struct options, required string dbFilePath) {
+		// 1. Use user-provided output if exists
+		if (Len(arguments.options.output)) {
+			local.outPath = ExpandPath(arguments.options.output);
+		} else {
+			// 2. Default: wheels root + sqlite_<dbname>_<timestamp>.sql
+			local.appRoot = getCWD();
+			local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
+			local.dbName = ListLast(arguments.dbFilePath, "/\");
+			if (ListLen(local.dbName, ".") > 1) {
+				local.dbName = ListDeleteAt(local.dbName, ListLen(local.dbName, "."), ".");
+			}
+			local.outPath = local.appRoot & "/sqlite_" & local.dbName & "_" & local.timestamp & ".sql";
+		}
+
+		// 3. Ensure output directory exists
+		local.outDir = GetDirectoryFromPath(local.outPath);
+		if (!DirectoryExists(local.outDir)) {
+			DirectoryCreate(local.outDir, true);
+		}
+
+		// 4. Return canonical absolute path
+		return ExpandPath(local.outPath);
+	}
+
+
+	// Helper function to duplicate an array
+	private array function ArrayDuplicate(required array source) {
+		local.result = [];
+		for (local.item in arguments.source) {
+			ArrayAppend(local.result, local.item);
+		}
+		return local.result;
+	}
+
+	// Helper function to compress a file using gzip
+	private boolean function compressFile(required string filePath) {
+		try {
+			if (!FileExists(arguments.filePath)) {
+				return false;
+			}
+			
+			local.sourceFile = CreateObject("java", "java.io.File").init(arguments.filePath);
+			local.gzipFile = CreateObject("java", "java.io.File").init(arguments.filePath & ".gz");
+			
+			local.sourceStream = CreateObject("java", "java.io.FileInputStream").init(local.sourceFile);
+			local.gzipStream = CreateObject("java", "java.io.FileOutputStream").init(local.gzipFile);
+			local.gzip = CreateObject("java", "java.util.zip.GZIPOutputStream").init(local.gzipStream);
+			
+			local.buffer = CreateObject("java", "java.lang.reflect.Array").newInstance(
+				CreateObject("java", "java.lang.Byte").TYPE, 
+				1024
+			);
+			
+			local.length = 0;
+			while ((local.length = local.sourceStream.read(local.buffer)) >= 0) {
+				local.gzip.write(local.buffer, 0, local.length);
+			}
+			
+			local.sourceStream.close();
+			local.gzip.close();
+			
+			// Delete original file if compression succeeded
+			if (gzipFile.length() > 0) {
+				FileDelete(arguments.filePath);
+				return true;
+			}
+			
+			return false;
+			
+		} catch (any e) {
+			detailOutput.error("Compression error: " & e.message);
 			return false;
 		}
 	}
