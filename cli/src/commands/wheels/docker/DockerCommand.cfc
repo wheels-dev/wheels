@@ -609,26 +609,6 @@ component extends="../base" {
         return "";
     }
 
-    /**
-     * Reconstruct arguments to handle key=value pairs passed as keys
-     */
-    public function reconstructArgs(required struct args) {
-        var newArgs = duplicate(arguments.args);
-        
-        // Check for args in format "key=value" which CommandBox sometimes passes as keys with empty values
-        for (var key in newArgs) {
-            if (find("=", key)) {
-                var parts = listToArray(key, "=");
-                if (arrayLen(parts) >= 2) {
-                    var paramName = parts[1];
-                    var paramValue = right(key, len(key) - len(paramName) - 1);
-                    newArgs[paramName] = paramValue;
-                }
-            }
-        }
-        
-        return newArgs;
-    }
 
     // =============================================================================
     // SHARED HELPER FUNCTIONS (Moved from deploy.cfc)
