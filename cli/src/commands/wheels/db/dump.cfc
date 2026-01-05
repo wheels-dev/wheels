@@ -126,12 +126,20 @@ component extends="../base" {
 			// Generate output filename if not provided
 			if (!Len(arguments.output)) {
 				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
-				arguments.output = fileSystemUtil.resolvePath("dump_" & local.selectedDatabase & "_" & local.timestamp & ".sql");
+				
+				// Determine extension based on driver
+				local.ext = "sql";
+				if (local.dsInfo.driver == "Oracle") {
+					local.ext = "dmp";
+				} else if (local.dsInfo.driver == "MSSQL" || local.dsInfo.driver == "MSSQLServer") {
+					local.ext = "bak";
+				}
+				
+				arguments.output = fileSystemUtil.resolvePath("dump_" & local.selectedDatabase & "_" & local.timestamp & "." & local.ext);
 				if (arguments.compress) {
 					arguments.output &= ".gz";
 				}
-			}
-			
+			}	
 			// Make sure output path is absolute
 			if (!FileExists((arguments.output)) && !DirectoryExists(fileSystemUtil.resolvePath(arguments.output))) {
 				// If no directory specified, use current directory
@@ -190,6 +198,9 @@ component extends="../base" {
 					break;
 				case "H2":
 					local.success = dumpH2(local.dsInfo, arguments);
+					break;
+				case "Oracle":
+					local.success = dumpOracle(local.dsInfo, arguments);
 					break;
 				default:
 					detailOutput.error("Database dump not supported for driver: " & local.dbType);
@@ -983,9 +994,255 @@ component extends="../base" {
 		}
 	}
 
-	private struct function executeSystemCommand(required string command, struct envVars = {}) {
+	private boolean function dumpOracle(required struct dsInfo, required struct options) {
+		try {
+			detailOutput.output("Preparing Oracle database export...");
+			
+			local.username = arguments.dsInfo.username;
+			local.password = arguments.dsInfo.password;
+			
+			/* ----------------------------------------------------
+			1. Generate output file path
+			---------------------------------------------------- */
+			local.outputFile = arguments.options.output;
+			
+			// If no output file specified, generate default .sql filename (not .dmp for JDBC)
+			if (!Len(local.outputFile)) {
+				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
+				local.outputFile = fileSystemUtil.resolvePath("oracle_" & local.username & "_" & local.timestamp & ".sql");
+			}
+			// If no output file specified, generate default filename (determined by run() function)
+			// But if we are called directly, fallback to .sql
+			if (!Len(local.outputFile)) {
+				local.timestamp = DateFormat(Now(), "yyyymmdd") & TimeFormat(Now(), "HHmmss");
+				local.outputFile = fileSystemUtil.resolvePath("oracle_" & local.username & "_" & local.timestamp & ".dmp");
+			} else {
+				local.outputFile = fileSystemUtil.resolvePath(local.outputFile);
+			}
+			
+			// Ensure directory exists
+			local.outputDir = GetDirectoryFromPath(local.outputFile);
+			if (Len(local.outputDir) && !DirectoryExists(local.outputDir)) {
+				DirectoryCreate(local.outputDir, true);
+				detailOutput.statusInfo("Created directory: #local.outputDir#");
+			}
+			
+			detailOutput.statusInfo("Export file: #local.outputFile#");
+			
+			/* ----------------------------------------------------
+			2. Try Oracle Data Pump (expdp) - but handle common errors
+			---------------------------------------------------- */
+			local.useExpdp = false;
+			local.expdpResult = "";
+			
+			if (isWindows()) {
+				local.checkCmd = ["where", "expdp"];
+			} else {
+				local.checkCmd = ["which", "expdp"];
+			}
+			
+			local.checkResult = runLocalCommand(local.checkCmd, false);
+			
+				if (local.checkResult.success) {
+					detailOutput.statusSuccess("Found Oracle Data Pump (expdp), attempting export...");
+					detailOutput.statusWarning("Note: expdp requires specific Oracle privileges to work");
+					
+					// Connect to Oracle via JDBC to find the directory path
+					local.oracleDir = "";
+					local.connResult = getDatabaseConnection(arguments.dsInfo, "Oracle");
+					
+					if (local.connResult.success) {
+						try {
+							local.conn = local.connResult.connection;
+							local.stmt = local.conn.createStatement();
+							local.rs = local.stmt.executeQuery("SELECT directory_path FROM all_directories WHERE directory_name = 'DATA_PUMP_DIR'");
+							
+							if (local.rs.next()) {
+								local.oracleDir = local.rs.getString("directory_path");
+								detailOutput.statusInfo("Resolved DATA_PUMP_DIR: " & local.oracleDir);
+							}
+							
+							local.rs.close();
+							local.stmt.close();
+						} catch (any e) {
+							// Ignore directory lookup error
+							detailOutput.statusWarning("Could not resolve DATA_PUMP_DIR path: " & e.message);
+						} finally {
+							if (StructKeyExists(local, "conn")) {
+								local.conn.close();
+							}
+						}
+					}
+					
+					// Build expdp command array
+					local.cmdArray = ["expdp"];
+					ArrayAppend(local.cmdArray, "#local.username#/#local.password#");
+					
+					// Use a writable directory - check common locations
+					local.dumpDir = "";
+					if (Len(local.oracleDir)) {
+						local.dumpDir = local.oracleDir;
+						ArrayAppend(local.cmdArray, "DIRECTORY=DATA_PUMP_DIR");
+					} else if (isWindows()) {
+						// Try user's temp directory
+						local.dumpDir = GetTempDirectory();
+						ArrayAppend(local.cmdArray, "DIRECTORY=DATA_PUMP_DIR"); // Use default
+					} else {
+						// Try /tmp on Unix
+						local.dumpDir = "/tmp";
+						ArrayAppend(local.cmdArray, "DIRECTORY=DATA_PUMP_DIR"); // Use default
+					}
+					
+					// Use simpler parameters to avoid privilege issues
+					local.outputFileName = GetFileFromPath(local.outputFile);
+					// Ensure it ends in .dmp if it doesn't already (e.g. if user supplied .sql output)
+					if (ListLast(local.outputFileName, ".") != "dmp") {
+						local.outputFileName = ListDeleteAt(local.outputFileName, ListLen(local.outputFileName, "."), ".") & ".dmp";
+					}
+					
+					ArrayAppend(local.cmdArray, "DUMPFILE=#local.outputFileName#");
+					ArrayAppend(local.cmdArray, "LOGFILE=#local.outputFileName#.log");
+					
+					// Use simpler options
+					if (arguments.options.schemaOnly) {
+						ArrayAppend(local.cmdArray, "CONTENT=METADATA_ONLY");
+					} else if (arguments.options.dataOnly) {
+						ArrayAppend(local.cmdArray, "CONTENT=DATA_ONLY");
+					} else {
+						// ArrayAppend(local.cmdArray, " FULL=Y");
+						// Use simpler schema export instead of specific tables
+						ArrayAppend(local.cmdArray, "SCHEMAS=#local.username#");
+					}
+					
+					
+					// Set Oracle environment variables
+					local.envVars = {};
+					
+					// Common Oracle environment variables
+					if (StructKeyExists(arguments.dsInfo, "oracleHome") && Len(arguments.dsInfo.oracleHome)) {
+						local.envVars["ORACLE_HOME"] = arguments.dsInfo.oracleHome;
+						if (isWindows()) {
+							local.envVars["PATH"] = "#arguments.dsInfo.oracleHome#\bin;" & CreateObject("java", "java.lang.System").getenv("PATH");
+						} else {
+							local.envVars["PATH"] = "#arguments.dsInfo.oracleHome#/bin:" & CreateObject("java", "java.lang.System").getenv("PATH");
+							local.envVars["LD_LIBRARY_PATH"] = "#arguments.dsInfo.oracleHome#/lib";
+						}
+					}
+					
+					// Set NLS_LANG for character set
+					local.envVars["NLS_LANG"] = "AMERICAN_AMERICA.AL32UTF8";
+					
+					detailOutput.statusInfo("Executing Oracle Data Pump export...");
+					detailOutput.statusInfo("Command: " & ArrayToList(local.cmdArray, " "));
+					
+					// Execute with live output using new function
+					local.expdpResult = runLocalCommand(local.cmdArray, true, local.envVars);
+					
+					if (local.expdpResult.success) {
+						detailOutput.statusSuccess("Oracle Data Pump export completed successfully");
+						
+						// Check if .dmp file was created at the resolved location
+						local.dmpFile = local.dumpDir & "/" & local.outputFileName;
+						
+						// Handle Windows vs Unix path separators if needed (Java File should handle mixed, but just to be safe)
+						if (isWindows() && Find("/", local.dmpFile)) {
+							local.dmpFile = Replace(local.dmpFile, "/", "\", "all");
+						}
+						
+						if (FileExists(local.dmpFile)) {
+							// ... (keep existing success logic) ...
+							local.fileSize = GetFileInfo(local.dmpFile).size;
+							detailOutput.statusSuccess("Export file found: " & local.dmpFile);
+							detailOutput.statusSuccess("Size: " & NumberFormat(local.fileSize / 1024, "0.00") & " KB");
+							
+							// Move to requested output location
+							if (local.dmpFile != local.outputFile) {
+								try {
+									detailOutput.statusInfo("Moving file to: " & local.outputFile);
+									if (FileExists(local.outputFile)) {
+										FileDelete(local.outputFile);
+									}
+									FileMove(local.dmpFile, local.outputFile);
+									detailOutput.statusSuccess("File moved successfully.");
+								} catch(any e) {
+									detailOutput.statusWarning("Could not move file: " & e.message);
+									detailOutput.statusInfo("File remains at: " & local.dmpFile);
+								}
+							}
+						} else {
+							// Failsafe: Try to parse output for the actual file path
+							// Look for: "Dump file set for ... is:" followed by path
+							local.parsedPath = "";
+							local.outputLines = ListToArray(local.expdpResult.output, Chr(10));
+							for (local.i = 1; local.i <= ArrayLen(local.outputLines); local.i++) {
+								if (FindNoCase("Dump file set for", local.outputLines[local.i]) && local.i < ArrayLen(local.outputLines)) {
+									// The path is usually on the next line
+									local.nextLine = Trim(local.outputLines[local.i+1]);
+									if (Right(local.nextLine, 4) == ".dmp" || Right(local.nextLine, 4) == ".DMP") {
+										local.parsedPath = local.nextLine;
+										break;
+									}
+								}
+							}
+							
+							if (Len(local.parsedPath) && FileExists(local.parsedPath)) {
+								detailOutput.statusSuccess("Locating dump file from output: " & local.parsedPath);
+								local.dmpFile = local.parsedPath;
+								
+								// Move logic (duplicated for now, could be refactored)
+								if (local.dmpFile != local.outputFile) {
+									try {
+										detailOutput.statusInfo("Moving file to: " & local.outputFile);
+										if (FileExists(local.outputFile)) {
+											FileDelete(local.outputFile);
+										}
+										FileMove(local.dmpFile, local.outputFile);
+										detailOutput.statusSuccess("File moved successfully.");
+									} catch(any e) {
+										detailOutput.statusWarning("Could not move file: " & e.message);
+										detailOutput.statusInfo("File remains at: " & local.dmpFile);
+									}
+								}
+							} else {
+								detailOutput.statusWarning("Dump file not found at expected location: " & local.dmpFile);
+								if (Len(local.oracleDir)) {
+									detailOutput.statusInfo("Checked resolved DATA_PUMP_DIR: " & local.oracleDir);
+								}
+							}
+						}
+						
+						return true;
+					} else {
+						detailOutput.statusWarning("Oracle Data Pump failed:");
+						
+						// Check for specific errors in OUTPUT (since streams are merged)
+						local.mergedOutput = local.expdpResult.output;
+						
+						if (FindNoCase("ORA-01950", local.mergedOutput) || 
+							FindNoCase("no privileges", local.mergedOutput)) {
+							detailOutput.statusInfo("The user lacks privileges for Data Pump export.");
+							detailOutput.output("Required privileges: CREATE TABLE, UNLIMITED TABLESPACE");
+							detailOutput.output("Falling back to JDBC export...");
+						}
+						return false;
+					}
+				} else {
+					detailOutput.statusFailed("Oracle Data Pump (expdp) not found");
+					return false;
+				}
+		} catch (any e) {
+			detailOutput.error("Oracle export error: " & e.message);
+			if (StructKeyExists(e, "detail")) {
+				detailOutput.error("Details: " & e.detail);
+			}
+			return false;
+		}
+	}
+
+	private struct function executeSystemCommand(required string command, struct envVars = {}, boolean liveOutput = false) {
 		local.runtime = CreateObject("java", "java.lang.Runtime").getRuntime();
 		local.isWin = isWindows();
+		local.sysOut = CreateObject("java", "java.lang.System").out;
 
 		
 		// Build the command array
@@ -1018,64 +1275,106 @@ component extends="../base" {
 		
 		// Execute the command
 		try {
+			// Start Process
 			if (ArrayLen(local.envArray)) {
 				if (local.isWin && IsArray(local.fullCommand)) {
-					// Use array format for Windows
 					local.process = local.runtime.exec(local.fullCommand, local.envArray);
 				} else {
 					local.process = local.runtime.exec(local.fullCommand, local.envArray);
 				}
 			} else {
 				if (local.isWin && IsArray(local.fullCommand)) {
-					// Use array format for Windows
 					local.process = local.runtime.exec(local.fullCommand);
 				} else {
 					local.process = local.runtime.exec(local.fullCommand);
 				}
 			}
 			
-			// Wait for completion
-			local.exitCode = local.process.waitFor();
+			// Initialize Output Buffers
+			local.output = CreateObject("java", "java.lang.StringBuilder").init();
+			local.errorOutput = CreateObject("java", "java.lang.StringBuilder").init();
 			
-			// Read output
-			local.output = "";
-			try {
-				local.inputStream = local.process.getInputStream();
-				local.inputStreamReader = CreateObject("java", "java.io.InputStreamReader").init(local.inputStream);
-				local.bufferedReader = CreateObject("java", "java.io.BufferedReader").init(local.inputStreamReader);
-				
-				local.line = local.bufferedReader.readLine();
-				while (!IsNull(local.line)) {
-					local.output &= local.line & Chr(10);
-					local.line = local.bufferedReader.readLine();
+			local.inputStream = local.process.getInputStream();
+			local.errorStream = local.process.getErrorStream();
+			
+			// Buffer arrays for reading
+			// 4KB buffer
+			local.bufferSize = 4096;
+			local.buffer = CreateObject("java", "java.lang.reflect.Array").newInstance(CreateObject("java", "java.lang.Byte").TYPE, local.bufferSize);
+			
+			// Loop while process is alive
+			local.alive = true;
+			while (local.alive) {
+				try {
+					// Check if process has exited
+					local.exitCode = local.process.exitValue();
+					local.alive = false;
+				} catch (any e) {
+					// Process is still running
+					local.alive = true;
 				}
-				local.bufferedReader.close();
-			} catch (any e) {
-				// Ignore stream reading errors
+				
+				// Read Standard Output
+				while (local.inputStream.available() > 0) {
+					local.bytesRead = local.inputStream.read(local.buffer);
+					if (local.bytesRead > 0) {
+						local.readStr = CreateObject("java", "java.lang.String").init(local.buffer, 0, local.bytesRead);
+						local.output.append(local.readStr);
+						if (arguments.liveOutput) {
+							local.sysOut.print(local.readStr);
+							local.sysOut.flush();
+						}
+					}
+				}
+				
+				// Read Error Output
+				while (local.errorStream.available() > 0) {
+					local.bytesRead = local.errorStream.read(local.buffer);
+					if (local.bytesRead > 0) {
+						local.readStr = CreateObject("java", "java.lang.String").init(local.buffer, 0, local.bytesRead);
+						local.errorOutput.append(local.readStr);
+						if (arguments.liveOutput) {
+							local.sysOut.print(local.readStr);
+							local.sysOut.flush();
+						}
+					}
+				}
+				
+				if (local.alive) {
+					// Sleep briefly to prevent CPU spinning
+					CreateObject("java", "java.lang.Thread").sleep(50);
+				}
 			}
 			
-			// Read error stream
-			local.errorOutput = "";
-			try {
-				local.errorStream = local.process.getErrorStream();
-				local.errorStreamReader = CreateObject("java", "java.io.InputStreamReader").init(local.errorStream);
-				local.errorBufferedReader = CreateObject("java", "java.io.BufferedReader").init(local.errorStreamReader);
-				
-				local.line = local.errorBufferedReader.readLine();
-				while (!IsNull(local.line)) {
-					local.errorOutput &= local.line & Chr(10);
-					local.line = local.errorBufferedReader.readLine();
+			// Read any remaining output after process exit
+			while (local.inputStream.available() > 0) {
+				local.bytesRead = local.inputStream.read(local.buffer);
+				if (local.bytesRead > 0) {
+					local.readStr = CreateObject("java", "java.lang.String").init(local.buffer, 0, local.bytesRead);
+					local.output.append(local.readStr);
+					if (arguments.liveOutput) {
+						local.sysOut.print(local.readStr);
+						local.sysOut.flush();
+					}
 				}
-				local.errorBufferedReader.close();
-			} catch (any e) {
-				// Ignore stream reading errors
+			}
+			while (local.errorStream.available() > 0) {
+				local.bytesRead = local.errorStream.read(local.buffer);
+				if (local.bytesRead > 0) {
+					local.readStr = CreateObject("java", "java.lang.String").init(local.buffer, 0, local.bytesRead);
+					local.errorOutput.append(local.readStr);
+					if (arguments.liveOutput) {
+						local.sysOut.print(local.readStr);
+						local.sysOut.flush();
+					}
+				}
 			}
 			
 			return {
 				success: local.exitCode == 0,
 				exitCode: local.exitCode,
-				output: local.output,
-				error: local.errorOutput
+				output: local.output.toString(),
+				error: local.errorOutput.toString()
 			};
 			
 		} catch (any e) {
@@ -1098,4 +1397,61 @@ component extends="../base" {
 		local.os = CreateObject("java", "java.lang.System").getProperty("os.name");
 		return FindNoCase("mac", local.os) > 0;
 	}
+
+	/**
+     * Run a local system command
+     */
+    public function runLocalCommand(array cmd, boolean showOutput=true, struct envVars={}) {
+        var local = {};
+        local.javaCmd = createObject("java","java.util.ArrayList").init();
+        for (var c in arguments.cmd) {
+            local.javaCmd.add(c & "");
+        }
+
+        local.pb = createObject("java","java.lang.ProcessBuilder").init(local.javaCmd);
+        
+        // Set working directory to current directory
+        local.currentDir = createObject("java", "java.io.File").init(getCWD());
+        local.pb.directory(local.currentDir);
+        
+        // Set environment variables
+        if (!structIsEmpty(arguments.envVars)) {
+            local.env = local.pb.environment();
+            for (local.key in arguments.envVars) {
+                local.env.put(local.key, arguments.envVars[local.key]);
+            }
+        }
+        
+        local.pb.redirectErrorStream(true);
+        local.proc = local.pb.start();
+
+        local.isr = createObject("java","java.io.InputStreamReader").init(local.proc.getInputStream(), "UTF-8");
+        local.br = createObject("java","java.io.BufferedReader").init(local.isr);
+        local.outputParts = [];
+
+        while (true) {
+            local.line = local.br.readLine();
+            if (isNull(local.line)) break;
+            arrayAppend(local.outputParts, local.line);
+            if (arguments.showOutput) {
+                print.line(local.line).toConsole();
+            }
+        }
+
+        local.exitCode = local.proc.waitFor();
+        local.output = arrayToList(local.outputParts, chr(10));
+        
+        if (local.exitCode neq 0 && arguments.showOutput) {
+            // error("Command failed with exit code: " & local.exitCode);
+            // Don't throw error here, let the caller handle it based on exit code
+        }
+
+        return { 
+            exitCode: local.exitCode, 
+            output: local.output,
+            success: local.exitCode == 0,
+            error: "" // Merged into output
+        };
+    }
+    
 }
