@@ -10,7 +10,9 @@ wheels docker init [options]
 
 ## Description
 
-The `wheels docker init` command creates Docker configuration files for containerizing your Wheels application. It generates a `Dockerfile`, `docker-compose.yml`, `.dockerignore`, configures datasources in `CFConfig.json`, and optionally creates Nginx configuration for reverse proxy support.
+The `wheels docker init` command creates Docker configuration files for containerizing your Wheels application. It generates a `Dockerfile`, `docker-compose.yml`, `.dockerignore`, configures datasources in `CFConfig.json`, and creates a centralized deployment configuration in `config/deploy.yml`.
+
+The command follows an **interactive flow** that prompts you for project-specific details, which are then used to populate your configuration files.
 
 ## Options
 
@@ -107,13 +109,20 @@ wheels docker init --db=postgres --dbVersion=15 --cfengine=lucee --cfVersion=6 -
 
 ## What It Does
 
-1. **Checks for existing files** (unless `--force` is used):
-   - Detects existing `Dockerfile`, `docker-compose.yml`, and `.dockerignore`
+1. **Interactive Configuration Gathering**:
+   - **Application Name**: Prompts for a human-readable name for your app (defaults to folder name).
+   - **Docker Image Name**: Prompts for the repository name to use for builds (defaults to app name).
+   - **Server Host/IP**: Prompts for the production server address for deployments.
+   - **Server User**: Prompts for the SSH user (defaults to `ubuntu`).
+   - These choices are saved to `config/deploy.yml` and used by all other `wheels docker` commands.
+
+2. **Checks for existing files** (unless `--force` is used):
+   - Detects existing `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `config/deploy.yml`
    - Prompts before overwriting existing Docker configuration
    - Lists all files that will be replaced
    - Allows cancellation to prevent accidental overwrites
 
-2. **Creates Dockerfile** optimized for CFML applications:
+3. **Creates Dockerfile** optimized for CFML applications:
    - **Development mode** (default):
      - Hot-reload enabled
      - Development tools installed (curl, nano)
@@ -332,6 +341,16 @@ services:
 
 volumes:
   db_data:
+```
+
+### config/deploy.yml (New Centralized Config)
+```yaml
+name: myapp
+image: myuser/myapp
+servers:
+  - host: 1.2.3.4
+    user: ubuntu
+    role: production
 ```
 
 ### nginx.conf (Generated with --nginx)
@@ -769,15 +788,10 @@ docker-compose up -d --build --force-recreate
 - Manually set `"openBrowser": false` in server.json
 - Rebuild containers: `docker-compose up -d --build`
 
-## Related Commands
+## See Also
 
-- [wheels docker build](docker-build.md) - Build Docker images
-- [wheels docker deploy](docker-deploy.md) - Deploy Docker containers
-- [wheels docker push](docker-push.md) - Push Docker images to registries
-- [wheels docker logs](docker-logs.md) - View container logs
-- [wheels docker exec](docker-exec.md) - Execute commands in containers
-- [wheels docker stop](docker-stop.md) - Stop Docker containers
-
----
-
-**Note**: This command is part of the Wheels CLI tool suite for Docker management.
+- [wheels docker deploy](docker-deploy.md) - Deploy using Docker
+- [wheels deploy](../deploy/deploy.md) - General deployment commands
+- [CommandBox Docker Images](https://hub.docker.com/r/ortussolutions/commandbox) - Official CommandBox images
+- [Docker Compose Documentation](https://docs.docker.com/compose/) - Docker Compose reference
+- [Nginx Documentation](https://nginx.org/en/docs/) - Nginx configuration reference

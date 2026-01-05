@@ -13,13 +13,15 @@ component extends="DockerCommand" {
      * @username Registry username (required for dockerhub, ghcr, private)
      * @password Registry password or token (optional, will prompt if empty)
      * @image Image name (optional, but required for ECR/ACR to determine region/registry)
+     * @namespace Registry namespace/username prefix (default: same as username)
      * @local Execute login locally (default: true)
      */
     function run(
         string registry="dockerhub",
-        required string username="",
-        required string password="",
+        string username="",
+        string password="",
         string image="",
+        string namespace="",
         boolean local=true
     ) {
         //ensure we are in a Wheels app
@@ -39,7 +41,7 @@ component extends="DockerCommand" {
         }
         
         // Call loginToRegistry from base component
-        loginToRegistry(
+        var loginResult = loginToRegistry(
             registry=arguments.registry,
             image=arguments.image,
             username=arguments.username,
@@ -47,11 +49,19 @@ component extends="DockerCommand" {
             isLocal=arguments.local
         );
 
+        // Update arguments from interactive results for saving
+        arguments.username = loginResult.username;
+        arguments.image = loginResult.image;
+        if (len(trim(loginResult.registryUrl)) && !len(trim(arguments.image))) {
+            arguments.image = loginResult.registryUrl & "/" & getProjectName();
+        }
+
         // Save configuration for push command
         var config = {
             "registry": arguments.registry,
             "username": arguments.username,
-            "image": arguments.image
+            "image": arguments.image,
+            "namespace": arguments.namespace
         };
         
         try {

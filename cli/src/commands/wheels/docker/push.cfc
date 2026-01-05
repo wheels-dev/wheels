@@ -40,28 +40,51 @@ component extends="DockerCommand" {
         // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
 
-        // Load defaults from config if available
+        // Load defaults from config if available (prioritize deploy.yml)
+        var ymlConfigPath = fileSystemUtil.resolvePath("config/deploy.yml");
         var configPath = fileSystemUtil.resolvePath("docker-config.json");
+        var projectName = getProjectName();
+
+        if (fileExists(ymlConfigPath)) {
+            var deployConfig = getDeployConfig();
+            if (structKeyExists(deployConfig, "image") && len(trim(deployConfig.image))) {
+                arguments.image = deployConfig.image;
+            }
+        }
+        
         if (fileExists(configPath)) {
             try {
                 var config = deserializeJSON(fileRead(configPath));
                 
                 if (!len(trim(arguments.registry)) && structKeyExists(config, "registry")) {
                     arguments.registry = config.registry;
-                    print.cyanLine("Using registry from config: #arguments.registry#").toConsole();
+                    print.cyanLine("Using registry from session: #arguments.registry#").toConsole();
                 }
                 
                 if (!len(trim(arguments.username)) && structKeyExists(config, "username")) {
                     arguments.username = config.username;
-                    print.cyanLine("Using username from config: #arguments.username#").toConsole();
+                    print.cyanLine("Using username from session: #arguments.username#").toConsole();
                 }
-                
+
+                if (!len(trim(arguments.namespace)) && structKeyExists(config, "namespace")) {
+                    arguments.namespace = config.namespace;
+                    if (len(trim(arguments.namespace))) {
+                        print.cyanLine("Using namespace from session: #arguments.namespace#").toConsole();
+                    }
+                }
+
                 if (!len(trim(arguments.image)) && structKeyExists(config, "image")) {
                     arguments.image = config.image;
+                    if (len(trim(arguments.image))) {
+                        print.cyanLine("Using image from session: #arguments.image#").toConsole();
+                    }
                 }
-            } catch (any e) {
-                // Ignore config errors
-            }
+            } catch (any e) {}
+        }
+
+        // Smart Tagging logic
+        if (len(trim(arguments.tag)) && find(":", arguments.tag)) {
+            arguments.image = arguments.tag;
         }
 
         // Default registry to dockerhub if still empty
@@ -108,9 +131,15 @@ component extends="DockerCommand" {
 
         // Get project name
         local.projectName = getProjectName();
+        local.deployConfig = getDeployConfig();
+        local.baseImageName = (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) ? local.deployConfig.image : local.projectName;
         local.localImageName = local.projectName & ":latest";
-        if(!checkLocalImageExists(local.projectName)){
-            local.localImageName = local.projectName & "-app:latest";
+        
+        if (!checkLocalImageExists(local.localImageName)) {
+            // Check if it was built with the custom image name
+            if (checkLocalImageExists(local.baseImageName & ":latest")) {
+                local.localImageName = local.baseImageName & ":latest";
+            }
         }
         
         print.cyanLine("Project: " & local.projectName).toConsole();
@@ -163,7 +192,7 @@ component extends="DockerCommand" {
         
         // Login to registry if password provided, otherwise assume already logged in
         if (len(trim(arguments.password))) {
-            loginToRegistry(
+            var loginResult = loginToRegistry(
                 registry=arguments.registry, 
                 image=local.finalImage, 
                 username=arguments.username, 
@@ -234,19 +263,32 @@ component extends="DockerCommand" {
         // Check for deploy-servers file
         var textConfigPath = fileSystemUtil.resolvePath("deploy-servers.txt");
         var jsonConfigPath = fileSystemUtil.resolvePath("deploy-servers.json");
+        var ymlConfigPath = fileSystemUtil.resolvePath("config/deploy.yml");
         var allServers = [];
         var serversToPush = [];
+        var projectName = getProjectName();
 
-        if (fileExists(textConfigPath)) {
-            print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
-            allServers = loadServersFromTextFile("deploy-servers.txt");
-            serversToPush = filterServers(allServers, arguments.serverNumbers);
-        } else if (fileExists(jsonConfigPath)) {
-            print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
-            allServers = loadServersFromConfig("deploy-servers.json");
-            serversToPush = filterServers(allServers, arguments.serverNumbers);
-        } else {
-            error("No server configuration found. Create deploy-servers.txt or deploy-servers.json in your project root.");
+        if (len(trim(arguments.serverNumbers)) == 0 && fileExists(ymlConfigPath)) {
+            var deployConfig = getDeployConfig();
+            if (arrayLen(deployConfig.servers)) {
+                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                allServers = deployConfig.servers;
+                serversToPush = allServers;
+            }
+        }
+
+        if (arrayLen(serversToPush) == 0) {
+            if (fileExists(textConfigPath)) {
+                print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
+                allServers = loadServersFromTextFile("deploy-servers.txt");
+                serversToPush = filterServers(allServers, arguments.serverNumbers);
+            } else if (fileExists(jsonConfigPath)) {
+                print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
+                allServers = loadServersFromConfig("deploy-servers.json");
+                serversToPush = filterServers(allServers, arguments.serverNumbers);
+            } else {
+                error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            }
         }
 
         if (arrayLen(serversToPush) == 0) {
@@ -256,7 +298,7 @@ component extends="DockerCommand" {
         print.line().boldCyanLine("Pushing Docker images from #arrayLen(serversToPush)# server(s)...").toConsole();
 
         // Push from all selected servers
-        pushFromServers(serversToPush, arguments.registry, arguments.image, arguments.username, arguments.password, arguments.tag);
+        pushFromServers(serversToPush, arguments.registry, arguments.image, arguments.username, arguments.password, arguments.tag, arguments.namespace);
 
         print.line().boldGreenLine("Push operations completed on all servers!").toConsole();
     }
@@ -290,7 +332,7 @@ component extends="DockerCommand" {
     /**
      * Push from multiple servers
      */
-    private function pushFromServers(required array servers, string registry, string image, string username, string password, string tag) {
+    private function pushFromServers(required array servers, string registry, string image, string username, string password, string tag, string namespace="") {
         var successCount = 0;
         var failureCount = 0;
 
@@ -301,7 +343,7 @@ component extends="DockerCommand" {
             print.line().boldCyanLine("---------------------------------------").toConsole();
 
             try {
-                pushFromServer(serverConfig, arguments.registry, arguments.image, arguments.username, arguments.password, arguments.tag);
+                pushFromServer(serverConfig, arguments.registry, arguments.image, arguments.username, arguments.password, arguments.tag, arguments.namespace);
                 successCount++;
                 print.greenLine("Push from #serverConfig.host# completed successfully").toConsole();
             } catch (any e) {
@@ -321,7 +363,7 @@ component extends="DockerCommand" {
     /**
      * Push from a single server
      */
-    private function pushFromServer(required struct serverConfig, string registry, string image, string username, string password, string tag) {
+    private function pushFromServer(required struct serverConfig, string registry, string image, string username, string password, string tag, string namespace="") {
         var local = {};
         local.host = arguments.serverConfig.host;
         local.user = arguments.serverConfig.user;
@@ -334,26 +376,41 @@ component extends="DockerCommand" {
         print.greenLine("SSH connection successful").toConsole();
 
         print.cyanLine("Registry: " & arguments.registry).toConsole();
-        print.cyanLine("Image: " & arguments.image).toConsole();
         
-        // Apply additional tag if specified
-        if (len(trim(arguments.tag))) {
-            print.yellowLine("Tagging image with additional tag: " & arguments.tag).toConsole();
-            local.tagCmd = "docker tag " & arguments.image & " " & arguments.tag;
+        // Determine final image name
+        local.projectName = getProjectName();
+        local.finalImage = determineImageName(
+            arguments.registry,
+            arguments.image,
+            local.projectName,
+            arguments.tag,
+            arguments.username,
+            arguments.namespace
+        );
+
+        print.cyanLine("Target image: " & local.finalImage).toConsole();
+        
+        // Tag the image on the server if it's different (e.g. if tagging project name to full name)
+        if (local.finalImage != arguments.image) {
+            print.yellowLine("Tagging image on server: " & arguments.image & " -> " & local.finalImage).toConsole();
+            local.tagCmd = "docker tag " & arguments.image & " " & local.finalImage;
             executeRemoteCommand(local.host, local.user, local.port, local.tagCmd);
-            arguments.image = arguments.tag;
         }
+        
+        // Use the final image for the rest of the operation
+        arguments.image = local.finalImage;
         
         // Get login command for registry
         local.loginCmd = "";
         if (len(trim(arguments.password))) {
-             local.loginCmd = loginToRegistry(
+             var loginResult = loginToRegistry(
                 registry=arguments.registry, 
                 image=arguments.image, 
                 username=arguments.username, 
                 password=arguments.password, 
                 isLocal=false
             );
+            local.loginCmd = loginResult.command;
         }
         
         // Execute login on remote server
@@ -373,87 +430,5 @@ component extends="DockerCommand" {
         print.boldGreenLine("Image pushed successfully from #local.host#!").toConsole();
     }
 
-    // =============================================================================
-    // HELPER FUNCTIONS
-    // =============================================================================
 
-    private function loadServersFromTextFile(required string textFile) {
-        var filePath = fileSystemUtil.resolvePath(arguments.textFile);
-        var fileContent = fileRead(filePath);
-        var lines = listToArray(fileContent, chr(10));
-        var servers = [];
-
-        for (var line in lines) {
-            line = trim(line);
-            if (len(line) == 0 || left(line, 1) == "##") continue;
-            
-            var parts = listToArray(line, " " & chr(9), true);
-            if (arrayLen(parts) < 2) continue;
-
-            arrayAppend(servers, {
-                "host": trim(parts[1]),
-                "user": trim(parts[2]),
-                "port": arrayLen(parts) >= 3 ? val(trim(parts[3])) : 22
-            });
-        }
-
-        return servers;
-    }
-
-    private function loadServersFromConfig(required string configFile) {
-        var configPath = fileSystemUtil.resolvePath(arguments.configFile);
-        var configContent = fileRead(configPath);
-        var config = deserializeJSON(configContent);
-        return config.servers;
-    }
-
-    private function testSSHConnection(string host, string user, numeric port) {
-        print.yellowLine("Testing SSH connection to " & arguments.host & "...").toConsole();
-        var result = runProcess([
-            "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
-            "-p", arguments.port, arguments.user & "@" & arguments.host, "echo connected"
-        ]);
-        return (result.exitCode eq 0);
-    }
-
-    private function executeRemoteCommand(string host, string user, numeric port, string cmd) {
-        var result = runProcess([
-            "ssh", "-o", "BatchMode=yes", "-p", arguments.port,
-            arguments.user & "@" & arguments.host, arguments.cmd
-        ]);
-
-        if (result.exitCode neq 0) {
-            error("Remote command failed: " & arguments.cmd);
-        }
-
-        return result;
-    }
-
-    private function runProcess(array cmd) {
-        var local = {};
-        local.javaCmd = createObject("java","java.util.ArrayList").init();
-        for (var c in arguments.cmd) {
-            local.javaCmd.add(c & "");
-        }
-
-        local.pb = createObject("java","java.lang.ProcessBuilder").init(local.javaCmd);
-        local.pb.redirectErrorStream(true);
-        local.proc = local.pb.start();
-
-        local.isr = createObject("java","java.io.InputStreamReader").init(local.proc.getInputStream(), "UTF-8");
-        local.br = createObject("java","java.io.BufferedReader").init(local.isr);
-        local.outputParts = [];
-
-        while (true) {
-            local.line = local.br.readLine();
-            if (isNull(local.line)) break;
-            arrayAppend(local.outputParts, local.line);
-            print.line(local.line).toConsole();
-        }
-
-        local.exitCode = local.proc.waitFor();
-        local.output = arrayToList(local.outputParts, chr(10));
-
-        return { exitCode: local.exitCode, output: local.output };
-    }
 }

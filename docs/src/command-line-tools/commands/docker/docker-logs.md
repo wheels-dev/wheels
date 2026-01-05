@@ -10,26 +10,37 @@ wheels docker logs [options]
 
 ## Description
 
-The `wheels docker logs` command fetches and displays logs from running containers. It supports fetching logs from specific services (app, db) and can stream logs in real-time. It abstracts away the complexity of finding the correct container ID, especially in multi-server or Blue/Green environments.
+The `wheels docker logs` command fetches and displays logs from running containers. It abstracts away the complexity of finding the correct container ID, especially in multi-server or Blue/Green environments.
+
+**Centralized Configuration**:
+- **Source of Truth**: This command prioritizes settings from `config/deploy.yml` for server lists and project names.
+- **Local vs Remote**: You can explicitly switch between viewing local container logs and remote server logs using the `--local` flag.
 
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--servers` | Specific servers to check (comma-separated list of hosts or file path) | `""` |
+| `--servers` | Specific servers to check (defaults to `config/deploy.yml`) | `""` |
+| `--local` | Fetch logs from local Docker environment | `false` |
 | `--tail` | Number of lines to show | `100` |
 | `--follow` | Follow log output in real-time | `false` |
 | `--service` | Service to show logs for: `app` or `db` | `app` |
-| `--since` | Show logs since timestamp (e.g., "2023-01-01", "1h", "5m") | `""` |
+| `--since` | Show logs since timestamp | `""` |
 
 ## Detailed Examples
 
 ### Basic Usage
 
-**View Recent Logs**
-Fetches the last 100 lines of logs from the application container on all configured servers.
+**View Recent Logs (Remote)**
+Fetches the last 100 lines of logs from the application container on all configured remote servers.
 ```bash
 wheels docker logs
+```
+
+**View Local Logs**
+Fetches logs from the local Docker environment.
+```bash
+wheels docker logs --local
 ```
 
 **View Database Logs**
@@ -85,16 +96,3 @@ wheels docker logs --service=db --tail=100
 
 *   **Service Discovery**: Automatically finds the correct container, handling Blue/Green deployment naming (e.g., it knows to look at `myapp-green` if that's the active container).
 *   **SSH**: Uses your local SSH configuration. Ensure you have access to the servers.
-
-## Related Commands
-
-- [wheels docker init](docker-init.md) - Initialize Docker configuration files
-- [wheels docker build](docker-build.md) - Build Docker images
-- [wheels docker deploy](docker-deploy.md) - Build and deploy Docker containers
-- [wheels docker exec](docker-exec.md) - Execute commands in containers
-- [wheels docker stop](docker-stop.md) - Stop Docker containers
-- [wheels docker push](docker-push.md) - Push Docker images to registries
-
----
-
-**Note**: This command is part of the Wheels CLI tool suite for Docker management.
