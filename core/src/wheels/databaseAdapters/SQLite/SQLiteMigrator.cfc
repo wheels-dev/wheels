@@ -1,4 +1,4 @@
-component extends="wheels.database.Abstract" {
+component extends="wheels.databaseAdapters.Abstract" {
 
 	// SQLite type mapping (simpler type system)
 	variables.sqlTypes = {};

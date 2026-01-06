@@ -1,4 +1,4 @@
-component extends="wheels.database.Base" output=false {
+component extends="wheels.databaseAdapters.Base" output=false {
 
 	/**
 	 * Map SQLite types to CFML types.

@@ -385,22 +385,22 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			);
 		}
 		if (FindNoCase("SQLServer", local.info.driver_name) || FindNoCase("SQL Server", local.info.driver_name)) {
-			local.folderName = "MicrosoftSQLServer";
+			local.adapterNamespace = "MicrosoftSQLServer";
 			local.adapterName = "MicrosoftSQLServerModel";
 		} else if (FindNoCase("MySQL", local.info.driver_name) || FindNoCase("MariaDB", local.info.driver_name)) {
-			local.folderName = "MySQL";
+			local.adapterNamespace = "MySQL";
 			local.adapterName = "MySQLModel";
 		} else if (FindNoCase("PostgreSQL", local.info.driver_name)) {
-			local.folderName = "PostgreSQL";
+			local.adapterNamespace = "PostgreSQL";
 			local.adapterName = "PostgreSQLModel";
 		} else if (FindNoCase("H2", local.info.driver_name)) {
-			local.folderName = "H2";
+			local.adapterNamespace = "H2";
 			local.adapterName = "H2Model";
 		} else if (FindNoCase("Oracle", local.info.driver_name)) {
-			local.folderName = "Oracle";
+			local.adapterNamespace = "Oracle";
 			local.adapterName = "OracleModel";
 		} else if (FindNoCase("SQLite", local.info.driver_name)) {
-			local.folderName = "SQLite";
+			local.adapterNamespace = "SQLite";
 			local.adapterName = "SQLiteModel";
 		} else {
 			Throw(
@@ -410,7 +410,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			);
 		}
 		$set(adapterName = local.adapterName);
-		return CreateObject("component", "wheels.database.#local.folderName#.#local.adapterName#").$init(
+		return CreateObject("component", "wheels.databaseAdapters.#local.adapterNamespace#.#local.adapterName#").$init(
 			dataSource = variables.wheels.class.dataSource,
 			username = variables.wheels.class.username,
 			password = variables.wheels.class.password

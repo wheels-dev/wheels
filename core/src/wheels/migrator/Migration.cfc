@@ -9,7 +9,7 @@ component extends="Base" {
 				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, Oracle, SQLite or H2."
 			);
 		} else {
-			this.adapter = CreateObject("component", "wheels.database.#dbType#.#dbType#Migrator");
+			this.adapter = CreateObject("component", "wheels.databaseAdapters.#dbType#.#dbType#Migrator");
 		}
 		return this;
 	}
