@@ -58,10 +58,9 @@ component extends="wheels.Testbox" {
                     type = "index",
                     table = variables.prefix & "roles"
                 );
-
                 switch( variables.dbAdapter ) {
-                    case "Oracle":
-                    case "SQLServer":
+                    case "OracleModel":
+                    case "MicrosoftSQLServerModel":
                         // If running in BoxLang, expect 1 instead of 2
                         if ( structKeyExists(server, "boxlang") ) {
                             expect( local.result.recordCount ).toBe( 1 );
@@ -209,7 +208,7 @@ component extends="wheels.Testbox" {
             ");
         }
 
-        if(get('adapterName') eq 'SQLite') {
+        if(get('adapterName') eq 'SQLiteModel') {
             cfquery(datasource=variables.datasource) {
                 writeOutput("
                     CREATE TABLE #variables.prefix#users (

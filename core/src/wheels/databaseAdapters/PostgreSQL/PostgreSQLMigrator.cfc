@@ -1,4 +1,4 @@
-component extends="Abstract" {
+component extends="wheels.databaseAdapters.Abstract" {
 
 	variables.sqlTypes = {};
 	variables.sqlTypes['binary'] = {name = 'BYTEA'};

@@ -499,7 +499,7 @@ component extends="wheels.Testbox" {
 					author = g.model("Author").findOne()
 					post = author.createPost(title = "test post", body = "here is some text")
 
-					if (get("adapterName") == "SQLite") {
+					if (get("adapterName") == "SQLiteModel") {
 						// Store as quoted ISO 8601 string (standard for SQLite)
 						if (IsDate(utctime)) {
 							utctime = "#DateFormat(utctime, 'yyyy-mm-dd')# #TimeFormat(utctime, 'HH:mm:ss')#";
@@ -521,7 +521,7 @@ component extends="wheels.Testbox" {
 					author = g.model("Author").findOne()
 					post = author.createPost(title = "test post", body = "here is some text")
 
-					if (get("adapterName") == "SQLite") {
+					if (get("adapterName") == "SQLiteModel") {
 						// Store as quoted ISO 8601 string (standard for SQLite)
 						if (IsDate(localtime)) {
 							localtime = "#DateFormat(localtime, 'yyyy-mm-dd')# #TimeFormat(localtime, 'HH:mm:ss')#";
@@ -637,7 +637,7 @@ component extends="wheels.Testbox" {
 						createdAt = CreateDate(1969, 4, 1),
 						updatedAt = CreateDate(1970, 4, 1)
 					)
-					if (get("adapterName") == "SQLite") {
+					if (get("adapterName") == "SQLiteModel") {
 						// Store as quoted ISO 8601 string (standard for SQLite)
 						if (IsDate(utctime)) {
 							utctime = "#DateFormat(utctime, 'yyyy-mm-dd')# #TimeFormat(utctime, 'HH:mm:ss')#";

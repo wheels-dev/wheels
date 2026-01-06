@@ -800,7 +800,7 @@ component extends="wheels.Testbox" {
 		describe("Tests changeColumn", () => {
 
 			it("is changing column", () => {
-				if(get("adapterName") eq 'SQLite') {
+				if(get("adapterName") eq 'SQLiteModel') {
 					skip("SQLite does not allow altering Columns.")
 				}
 				tableName = "dbm_changecolumn_tests"
@@ -915,7 +915,7 @@ component extends="wheels.Testbox" {
 		describe("Tests dropForeignKey", () => {
 
 			it("drops a foreign key constraint", () => {
-				if(get("adapterName") eq 'SQLite') {
+				if(get("adapterName") eq 'SQLiteModel') {
 					skip("SQLite does not allow altering CONSTRAINTS.")
 				}
 				tableName = "dbm_dfk_foos"
