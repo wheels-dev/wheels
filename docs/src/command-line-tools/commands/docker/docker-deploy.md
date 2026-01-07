@@ -1,346 +1,114 @@
-# Wheels Docker Deploy
+# wheels docker deploy
 
-## Overview
+Unified Docker deployment command for Wheels apps. Deploys applications locally or to remote servers with support for Blue/Green deployment.
 
-The `wheels docker deploy` command provides a unified interface for deploying Wheels applications using Docker. It supports both local development deployments and remote server deployments with optional Blue/Green deployment strategy for zero-downtime updates.
-
-## Prerequisites
-
-Before using this command, you must first initialize Docker configuration files:
+## Synopsis
 
 ```bash
-wheels docker init
+wheels docker deploy [options]
 ```
 
-This will create the necessary `Dockerfile` and `docker-compose.yml` files in your project directory.
+## Description
 
-## Command Syntax
+The `wheels docker deploy` command manages the deployment lifecycle of your Dockerized application. It can start containers locally for development or testing, and perform robust deployments to remote servers, including zero-downtime Blue/Green deployments.
 
-```bash
-wheels docker deploy [OPTIONS]
-```
+**Centralized Configuration**:
+- **Source of Truth**: This command prioritizes settings from `config/deploy.yml` for server lists and target environments.
+- **Interactive Versioning**: When multiple images or tags are detected, the command provides an interactive picker to choose exactly which version to deploy.
 
-## Parameters
+## Options
 
-| Parameter | Type | Default | Required | Description |
-|-----------|------|---------|----------|-------------|
-| `--local` | boolean | `true` (if neither flag set) | No | Deploy to local Docker environment |
-| `--remote` | boolean | `false` | No | Deploy to remote server(s) |
-| `--servers` | string | `""` | No | Server configuration file (deploy-servers.txt or deploy-servers.json) - **Remote only** |
-| `--skipDockerCheck` | boolean | `false` | No | Skip Docker installation check on remote servers - **Remote only** |
-| `--blueGreen` | boolean | `false` | No | Enable Blue/Green deployment strategy (zero downtime) - **Remote only** |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--local` | Deploy to local Docker environment | `false` |
+| `--remote` | Deploy to remote server(s) | `false` |
+| `--environment` | Deployment environment (production, staging) - for local deployment | `production` |
+| `--db` | Database to use (h2, mysql, postgres, mssql) - for local deployment | `mysql` |
+| `--cfengine` | ColdFusion engine to use (lucee, adobe) - for local deployment | `lucee` |
+| `--optimize` | Enable production optimizations - for local deployment | `true` |
+| `--servers` | Server configuration file (defaults to `config/deploy.yml`) | `""` |
+| `--skipDockerCheck` | Skip Docker installation check on remote servers | `false` |
+| `--blueGreen` | Enable Blue/Green deployment strategy (zero downtime) - for remote deployment | `false` |
 
-## Usage Examples
+## Detailed Examples
 
 ### Local Deployment
 
-#### Basic Local Deployment
-
-Deploy to local Docker environment:
-
+**Quick Start (Production Mode)**
+Starts the application locally, mimicking a production environment (optimized settings, no hot-reload).
 ```bash
-wheels docker deploy
-# or explicitly
 wheels docker deploy --local
 ```
 
-This will:
-- Use `docker-compose.yml` if available, otherwise use `Dockerfile`
-- Build and start containers locally
+**Staging Environment**
+Deploys locally with staging environment variables.
+```bash
+wheels docker deploy --local --environment=staging
+```
+
+**Custom Stack**
+Deploys locally using PostgreSQL and Adobe ColdFusion.
+```bash
+wheels docker deploy --local --db=postgres --cfengine=adobe
+```
 
 ### Remote Deployment
 
-#### Basic Remote Deployment
-
-Deploy to remote servers using default `deploy-servers.txt` or `deploy-servers.json`:
-
+**Standard Deployment**
+Deploys to all servers defined in your configuration (starting with `config/deploy.yml`). This stops the existing container, pulls/builds the new one, and starts it.
 ```bash
 wheels docker deploy --remote
 ```
 
-#### Remote Deployment with Custom Server File
-
-```bash
-wheels docker deploy --remote --servers=production-servers.txt
-```
-
-or with JSON configuration:
-
-```bash
-wheels docker deploy --remote --servers=deploy-servers.json
-```
-
-#### Remote Deployment with Blue/Green Strategy
-
-Deploy with zero downtime using Blue/Green deployment:
-
+**Zero-Downtime Blue/Green Deployment**
+Uses a Blue/Green strategy to ensure no downtime. Requires Nginx (automatically handled).
 ```bash
 wheels docker deploy --remote --blueGreen
 ```
 
-#### Remote Deployment Skipping Docker Check
+**Deploy to Specific Servers**
+Uses an override server list file for deployment.
+```bash
+wheels docker deploy --remote --servers=staging-servers.yml
+```
 
-Skip the automatic Docker installation check (useful if Docker is already installed):
-
+**Skip Docker Checks**
+Speeds up deployment if you know Docker is already installed and configured on the remote servers.
 ```bash
 wheels docker deploy --remote --skipDockerCheck
 ```
 
-#### Complete Remote Deployment Example
+## Deployment Strategies Explained
 
-```bash
-wheels docker deploy --remote --servers=production-servers.json --blueGreen --skipDockerCheck
-```
+### 1. Standard Remote Deployment
+This is the default strategy when `--remote` is used.
+1.  **Upload**: Tars and uploads your project source code to the remote server.
+2.  **Build/Compose**:
+    *   If `docker-compose.yml` exists: Runs `docker compose down` followed by `docker compose up -d --build`.
+    *   If `Dockerfile` exists: Builds the image, stops/removes the old container, and runs the new one.
+3.  **Downtime**: There is a short period (seconds to minutes) where the service is unavailable while the container restarts.
 
-## Server Configuration
-
-For remote deployments, you need to create a server configuration file.
-
-### Text File Format (deploy-servers.txt)
-
-```text
-192.168.1.100 ubuntu 22
-production.example.com deploy 22 /var/www/myapp myapp-prod
-staging.example.com staginguser 2222 /home/staginguser/app staging-app
-```
-
-**Format:** `host username [port] [remoteDir] [imageName]`
-
-- `host`: Server hostname or IP address (required)
-- `username`: SSH username (required)
-- `port`: SSH port (optional, default: 22)
-- `remoteDir`: Remote deployment directory (optional, default: `/home/username/username-app`)
-- `imageName`: Docker image name (optional, default: `username-app`)
-
-### JSON File Format (deploy-servers.json)
-
-```json
-{
-  "servers": [
-    {
-      "host": "192.168.1.100",
-      "user": "ubuntu",
-      "port": 22,
-      "remoteDir": "/var/www/myapp",
-      "imageName": "myapp-prod"
-    },
-    {
-      "host": "production.example.com",
-      "user": "deploy",
-      "port": 22,
-      "remoteDir": "/home/deploy/production",
-      "imageName": "production-app"
-    }
-  ]
-}
-```
-
-## Deployment Strategies
-
-### Standard Deployment
-
-The default deployment strategy:
-
-1. Stops existing containers
-2. Builds new Docker image
-3. Starts new container
-4. Brief downtime during transition
-
-```bash
-wheels docker deploy --remote
-```
-
-### Blue/Green Deployment
-
-Zero-downtime deployment strategy:
-
-1. Builds new Docker image
-2. Starts new container (green) alongside existing (blue)
-3. Updates nginx proxy to route traffic to new container
-4. Stops old container after successful deployment
-
-```bash
-wheels docker deploy --remote --blueGreen
-```
-
-**Requirements for Blue/Green:**
-- Nginx proxy container (`nginx-proxy`)
-- Docker network (`web`)
-- Both are automatically created if not present
-
-## How It Works
-
-### Local Deployment Process
-
-1. **Check for docker-compose.yml**
-   - If found: uses `docker compose up -d --build`
-   - If not found: uses standard Docker commands with `Dockerfile`
-
-2. **Build and Start**
-   - Builds Docker image from Dockerfile
-   - Stops existing containers (if any)
-   - Starts new container with proper port mapping
-
-3. **Output**
-   - Container name
-   - Access URL (e.g., `http://localhost:8080`)
-   - Useful Docker commands for monitoring
-
-### Remote Deployment Process
-
-1. **Pre-flight Checks**
-   - Verify SSH connection to server
-   - Check Docker installation (or install if missing)
-   - Create remote deployment directory
-
-2. **Upload**
-   - Create tarball of project source
-   - Upload to remote server via SCP
-
-3. **Build and Deploy**
-   - Extract source on remote server
-   - Build Docker image remotely
-   - Stop old container (if exists)
-   - Start new container
-
-4. **Post-deployment**
-   - Display deployment status
-   - Show summary for all servers
-
-## Docker Requirements
-
-### Local Requirements
-
-- Docker Desktop or Docker Engine installed
-- Docker Compose (included in modern Docker installations)
-
-### Remote Requirements
-
-- SSH access to remote server
-- Passwordless sudo access (for automatic Docker installation)
-- Ubuntu/Debian or RHEL/CentOS/Fedora (for automatic Docker installation)
-
-If Docker is not installed on the remote server, the command will:
-1. Detect the OS type
-2. Install Docker automatically (requires passwordless sudo)
-3. Configure Docker for the deployment user
-4. Proceed with deployment
+### 2. Blue/Green Deployment (`--blueGreen`)
+This strategy is designed for zero-downtime updates.
+1.  **State Detection**: The script checks which "color" (Blue or Green) is currently active.
+2.  **Parallel Deployment**: It spins up the *new* version (e.g., Green) alongside the *old* version (Blue).
+3.  **Health Check**: It waits for the new container to initialize.
+4.  **Traffic Switch**: It updates an Nginx proxy to point traffic to the new container.
+5.  **Cleanup**: The old container is stopped and removed.
+*   **Requirement**: This strategy automatically sets up an `nginx-proxy` container on the remote server if one doesn't exist.
 
 ## Troubleshooting
 
-### Local Deployment Issues
+**"User requires passwordless sudo access"**
+If the remote user is not part of the `docker` group, the CLI tries to use `sudo`. If `sudo` requires a password, deployment will fail.
+*   **Fix**: SSH into the server and run `sudo usermod -aG docker $USER`, then log out and back in. Or configure passwordless sudo.
 
-**Error: "Docker is not installed or not accessible"**
+**"SSH connection failed"**
+*   **Fix**: Ensure your SSH keys are correctly loaded (`ssh-add -l`) and you can manually SSH into the server (`ssh user@host`).
 
-- Ensure Docker Desktop is running (Mac/Windows)
-- Ensure Docker Engine is running (Linux): `sudo systemctl start docker`
+**"Deployment script failed"**
+*   **Fix**: Run with verbose output or check the logs on the remote server. Ensure the remote server has enough disk space.
 
-**Error: "No Dockerfile or docker-compose.yml found"**
+## Server Configuration
 
-- Run `wheels docker init` first to create configuration files
-
-### Remote Deployment Issues
-
-**Error: "SSH connection failed"**
-
-- Verify server hostname/IP and SSH credentials
-- Check if SSH key is properly configured
-- Test manual SSH connection: `ssh user@host`
-
-**Error: "User requires passwordless sudo access"**
-
-Follow the instructions provided in the error message to configure sudoers:
-
-```bash
-# SSH into server
-ssh user@host
-
-# Edit sudoers file
-sudo visudo
-
-# Add this line
-username ALL=(ALL) NOPASSWD:ALL
-```
-
-**Error: "No server configuration found"**
-
-- Create `deploy-servers.txt` or `deploy-servers.json` in project root
-- Or specify custom file with `--servers=path/to/file`
-
-### Port Conflicts
-
-If you see port already in use errors:
-
-```bash
-# Check what's using the port
-docker ps
-lsof -i :8080
-
-# Stop conflicting containers
-docker stop container_name
-```
-
-## Monitoring Deployment
-
-### Local Monitoring
-
-```bash
-# Check container status
-docker ps
-# or with compose
-docker compose ps
-
-# View logs
-docker logs -f container_name
-# or with compose
-docker compose logs -f
-
-# Access container shell
-docker exec -it container_name /bin/bash
-```
-
-### Remote Monitoring
-
-```bash
-# SSH into server
-ssh user@host
-
-# Check containers
-docker ps
-
-# View logs
-docker logs -f container_name
-
-# Monitor resources
-docker stats
-```
-
-## Security Notes
-
-1. **SSH Keys**: Use SSH key authentication instead of passwords
-2. **Sudo Access**: Configure minimal sudo permissions for production
-3. **Firewall**: Ensure proper firewall rules are in place
-4. **Docker Socket**: The deployment sets permissions on `/var/run/docker.sock` for convenience; review for production security
-
-## Best Practices
-
-1. **Test Locally First**: Always test deployments locally before remote deployment
-2. **Use Blue/Green for Production**: Minimize downtime with `--blueGreen` flag
-3. **Version Control**: Keep `Dockerfile` and `docker-compose.yml` in version control
-4. **Environment-Specific Configs**: Use different configuration files for staging/production
-5. **Monitor Resources**: Keep track of Docker resource usage on remote servers
-6. **Backup Data**: Always backup databases before major deployments
-7. **Rollback Plan**: Keep previous images for quick rollback if needed
-
-## Related Commands
-
-- [wheels docker init](docker-init.md) - Initialize Docker configuration files
-- [wheels docker build](docker-build.md) - Build Docker images
-- [wheels docker push](docker-push.md) - Push Docker images to registries
-- [wheels docker logs](docker-logs.md) - View container logs
-- [wheels docker stop](docker-stop.md) - Stop Docker containers
-- [wheels docker exec](docker-exec.md) - Execute commands in containers
-
----
-
-**Note**: This command is part of the Wheels CLI tool suite for Docker management.
+See [wheels docker build](docker-build.md#server-configuration) for details on `deploy-servers.txt` and `deploy-servers.json`.

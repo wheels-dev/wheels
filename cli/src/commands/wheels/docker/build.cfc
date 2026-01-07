@@ -9,7 +9,7 @@
  * wheels docker build --remote --servers=1,3
  * {code}
  */
-component extends="../base" {
+component extends="DockerCommand" {
     
     /**
      * @local Build Docker image on local machine
@@ -102,7 +102,18 @@ component extends="../base" {
             
             // Get project name and determine tag
             local.projectName = getProjectName();
-            local.imageTag = len(trim(arguments.customTag)) ? arguments.customTag : local.projectName & ":latest";
+            local.deployConfig = getDeployConfig();
+            local.baseImageName = (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) ? local.deployConfig.image : local.projectName;
+            
+            if (len(trim(arguments.customTag))) {
+                if (find(":", arguments.customTag)) {
+                    local.imageTag = arguments.customTag;
+                } else {
+                    local.imageTag = local.baseImageName & ":" & arguments.customTag;
+                }
+            } else {
+                local.imageTag = local.baseImageName & ":latest";
+            }
             
             print.cyanLine("Building image: " & local.imageTag).toConsole();
             
@@ -194,23 +205,42 @@ component extends="../base" {
         // Check for deploy-servers file (text or json) in current directory
         var textConfigPath = fileSystemUtil.resolvePath("deploy-servers.txt");
         var jsonConfigPath = fileSystemUtil.resolvePath("deploy-servers.json");
+        var ymlConfigPath = fileSystemUtil.resolvePath("config/deploy.yml");
         var allServers = [];
         var serversToBuild = [];
+        var projectName = getProjectName();
 
-        if (fileExists(textConfigPath)) {
-            print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
-            allServers = loadServersFromTextFile("deploy-servers.txt");
-            serversToBuild = filterServers(allServers, arguments.serverNumbers);
-        } else if (fileExists(jsonConfigPath)) {
-            print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
-            allServers = loadServersFromConfig("deploy-servers.json");
-            serversToBuild = filterServers(allServers, arguments.serverNumbers);
-        } else {
-            error("No server configuration found. Create deploy-servers.txt or deploy-servers.json in your project root." & chr(10) & chr(10) &
-                  "Example deploy-servers.txt:" & chr(10) &
-                  "192.168.1.100 ubuntu 22" & chr(10) &
-                  "production.example.com deploy" & chr(10) & chr(10) &
-                  "Or see examples/deploy-servers.example.txt for more details.");
+        if (len(trim(arguments.serverNumbers)) == 0 && fileExists(ymlConfigPath)) {
+            var deployConfig = getDeployConfig();
+            if (arrayLen(deployConfig.servers)) {
+                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                allServers = deployConfig.servers;
+                
+                // Add default remoteDir if not present
+                for (var s in allServers) {
+                    if (!structKeyExists(s, "remoteDir")) {
+                        s.remoteDir = "/home/#s.user#/#projectName#";
+                    }
+                    if (!structKeyExists(s, "port")) {
+                        s.port = 22;
+                    }
+                }
+                serversToBuild = allServers;
+            }
+        } 
+        
+        if (arrayLen(serversToBuild) == 0) {
+            if (fileExists(textConfigPath)) {
+                print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
+                allServers = loadServersFromTextFile("deploy-servers.txt");
+                serversToBuild = filterServers(allServers, arguments.serverNumbers);
+            } else if (fileExists(jsonConfigPath)) {
+                print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
+                allServers = loadServersFromConfig("deploy-servers.json");
+                serversToBuild = filterServers(allServers, arguments.serverNumbers);
+            } else {
+                error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            }
         }
 
         if (arrayLen(serversToBuild) == 0) {
@@ -377,7 +407,19 @@ component extends="../base" {
             print.yellowLine("Building Docker image...").toConsole();
             
             // Determine tag
-            local.imageTag = len(trim(arguments.customTag)) ? arguments.customTag : local.imageName & ":latest";
+            local.projectName = getProjectName();
+            local.deployConfig = getDeployConfig();
+            local.baseImageName = (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) ? local.deployConfig.image : local.imageName;
+
+            if (len(trim(arguments.customTag))) {
+                if (find(":", arguments.customTag)) {
+                    local.imageTag = arguments.customTag;
+                } else {
+                    local.imageTag = local.baseImageName & ":" & arguments.customTag;
+                }
+            } else {
+                local.imageTag = local.baseImageName & ":latest";
+            }
             print.cyanLine("Building image: " & local.imageTag).toConsole();
             
             local.buildCmd = "cd " & local.remoteDir & " && ";

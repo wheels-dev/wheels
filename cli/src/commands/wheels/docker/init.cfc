@@ -10,7 +10,7 @@
  * wheels docker:init --db=oracle --dbVersion=23-slim
  * {code}
  */
-component extends="../base" {
+component extends="DockerCommand" {
 
     property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
@@ -42,6 +42,32 @@ component extends="../base" {
                 cfengine: ["lucee", "adobe"]
             }
         );
+        // Welcome message
+        detailOutput.header("Wheels Docker Configuration");
+
+        // Interactive prompts for Deployment Configuration
+        local.appName = ask("Application Name (default: #listLast(getCWD(), '\/')#): ");
+        if (!len(trim(local.appName))) {
+            local.appName = listLast(getCWD(), '\/');
+        }
+        
+        local.imageName = ask("Docker Image Name (default: #local.appName#): ");
+        if (!len(trim(local.imageName))) {
+            local.imageName = local.appName;
+        }
+        
+        print.line().boldCyanLine("Production Server Configuration").toConsole();
+        local.serverHost = ask("Server Host/IP (e.g. 192.168.1.10): ");
+        local.serverUser = "";
+        
+        if (len(trim(local.serverHost))) {
+            local.serverUser = ask("Server User (default: ubuntu): ");
+            if (!len(trim(local.serverUser))) {
+                local.serverUser = "ubuntu";
+            }
+        }
+        print.line().toConsole();
+
         // Check for existing files if force is not set
         if (!arguments.force) {
             local.existingFiles = [];
@@ -53,6 +79,9 @@ component extends="../base" {
             }
             if (fileExists(fileSystemUtil.resolvePath(".dockerignore"))) {
                 arrayAppend(local.existingFiles, ".dockerignore");
+            }
+            if (fileExists(fileSystemUtil.resolvePath("config/deploy.yml"))) {
+                arrayAppend(local.existingFiles, "config/deploy.yml");
             }
 
             if (arrayLen(local.existingFiles)) {
@@ -92,6 +121,9 @@ component extends="../base" {
         createDockerCompose(arguments.db, arguments.dbVersion, arguments.cfengine, arguments.cfVersion, local.appPort, arguments.production, arguments.nginx);
         createDockerIgnore(arguments.production);
         configureDatasource(arguments.db);
+        
+        // Create Deployment Config
+        createDeployConfig(local.appName, local.imageName, local.serverHost, local.serverUser);
 
         // Create Nginx configuration if requested
         if (arguments["nginx"]) {
@@ -688,5 +720,30 @@ http {
             detailOutput.error("server.json does not exist at #local.serverJsonPath#");
             return;
         }
+    }
+
+    private function createDeployConfig(string appName, string imageName, string serverHost, string serverUser) {
+        if (!directoryExists(fileSystemUtil.resolvePath("config"))) {
+            directoryCreate(fileSystemUtil.resolvePath("config"));
+        }
+        
+        local.deployContent = "name: #arguments.appName#
+image: #arguments.imageName#
+servers:
+";
+        if (len(trim(arguments.serverHost))) {
+            local.deployContent &= "  - host: #arguments.serverHost#
+    user: #arguments.serverUser#
+    role: production
+";
+        } else {
+             local.deployContent &= "  ## - host: 192.168.1.10
+  ##   user: ubuntu
+  ##   role: production
+";
+        }
+        
+        file action='write' file='#fileSystemUtil.resolvePath("config/deploy.yml")#' mode='777' output='#trim(local.deployContent)#';
+        detailOutput.create("config/deploy.yml");
     }
 }

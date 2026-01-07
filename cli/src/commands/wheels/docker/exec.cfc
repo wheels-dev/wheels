@@ -33,6 +33,8 @@ component extends="DockerCommand" {
         // Check for deploy-servers file (text or json) in current directory
         var textConfigPath = fileSystemUtil.resolvePath("deploy-servers.txt");
         var jsonConfigPath = fileSystemUtil.resolvePath("deploy-servers.json");
+        var ymlConfigPath = fileSystemUtil.resolvePath("config/deploy.yml");
+        var projectName = getProjectName();
         
         // If specific servers argument is provided
         if (len(trim(arguments.servers))) {
@@ -49,15 +51,36 @@ component extends="DockerCommand" {
                 for (var host in hosts) {
                     arrayAppend(serverList, {
                         "host": trim(host),
-                        "user": "deploy", // Default user
+                        "user": "deploy", 
                         "port": 22,
-                        "remoteDir": "/home/deploy/app", // Default
-                        "imageName": "app" // Default
+                        "remoteDir": "/home/deploy/#projectName#", 
+                        "imageName": projectName 
                     });
                 }
             }
         } 
-        // Otherwise, look for default files
+        // 1. Look for config/deploy.yml first
+        else if (fileExists(ymlConfigPath)) {
+            var deployConfig = getDeployConfig();
+            if (arrayLen(deployConfig.servers)) {
+                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                serverList = deployConfig.servers;
+                
+                // Add defaults for missing fields
+                for (var s in serverList) {
+                    if (!structKeyExists(s, "remoteDir")) {
+                        s.remoteDir = "/home/#s.user#/#projectName#";
+                    }
+                    if (!structKeyExists(s, "port")) {
+                        s.port = 22;
+                    }
+                    if (!structKeyExists(s, "imageName")) {
+                        s.imageName = projectName;
+                    }
+                }
+            }
+        }
+        // 2. Otherwise, look for default files
         else if (fileExists(textConfigPath)) {
             print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
             serverList = loadServersFromTextFile("deploy-servers.txt");
@@ -65,7 +88,7 @@ component extends="DockerCommand" {
             print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
             serverList = loadServersFromConfig("deploy-servers.json");
         } else {
-            error("No server configuration found. Create deploy-servers.txt or deploy-servers.json in your project root.");
+            error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
         }
 
         if (arrayLen(serverList) == 0) {
@@ -112,7 +135,8 @@ component extends="DockerCommand" {
         local.host = arguments.serverConfig.host;
         local.user = arguments.serverConfig.user;
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
-        local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : "#local.user#-app";
+        local.projectName = getProjectName();
+        local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : local.projectName;
 
         // 1. Check SSH Connection
         if (!testSSHConnection(local.host, local.user, local.port)) {

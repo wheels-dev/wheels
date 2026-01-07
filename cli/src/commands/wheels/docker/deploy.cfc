@@ -21,6 +21,8 @@ component extends="DockerCommand" {
      * @servers Server configuration file (deploy-servers.txt or deploy-servers.json) - for remote deployment
      * @skipDockerCheck Skip Docker installation check on remote servers
      * @blueGreen Enable Blue/Green deployment strategy (zero downtime) - for remote deployment
+     * @image Deprecated. Use unique project name in box.json instead.
+     * @tag Custom tag to use (default: latest). Always treated as suffix to project name.
      */
     function run(
         boolean local=false,
@@ -31,12 +33,78 @@ component extends="DockerCommand" {
         boolean optimize=true,
         string servers="",
         boolean skipDockerCheck=false,
-        boolean blueGreen=false
+        boolean blueGreen=false,
+        string image="",
+        string tag=""
     ) {
         //ensure we are in a Wheels app
         requireWheelsApp(getCWD());
         // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
+        
+        var projectName = getProjectName();
+        
+        // Interactive Tag Selection logic
+        // Only trigger if no tag is specified and we are running?
+        // Actually, if tag is empty, we usually default to 'latest'.
+        // But user requested: "check the images available with different tags and then ask the user to select"
+        
+        if (!len(arguments.tag)) {
+            try {
+                // List images for project with a safe delimiter
+                var imageCheck = runLocalCommand(["docker", "images", "--format", "{{.Repository}}:::{{.Tag}}"], false);
+                
+                if (imageCheck.exitCode == 0) {
+                    var candidates = [];
+                    var lines = listToArray(imageCheck.output, chr(10));
+                    
+                    for (var img in lines) {
+                        // Split by our custom delimiter
+                        var parts = listToArray(img, ":::");
+                        if (arrayLen(parts) >= 2) {
+                            var repo = trim(parts[1]);
+                            var t = trim(parts[2]);
+                            
+                            // Check for exact match on project name
+                            if (repo == projectName) {
+                                arrayAppend(candidates, t);
+                            }
+                        }
+                    }
+                    
+                    // Deduplicate candidates just in case
+                    // (CFML doesn't have a native Set, so we can use a struct key trick or just leave it if docker output is unique enough)
+                    
+                    if (arrayLen(candidates) > 1) {
+                        print.line().toConsole();
+                        print.boldCyanLine("Select a tag to deploy for project '#projectName#':").toConsole();
+                        
+                        for (var i=1; i<=arrayLen(candidates); i++) {
+                             print.line("   #i#. " & candidates[i]).toConsole();
+                        }
+                        print.line().toConsole();
+                        
+                        var selection = ask("Enter number to select, or press Enter for 'latest': ");
+                        
+                        if (len(trim(selection)) && isNumeric(selection) && selection > 0 && selection <= arrayLen(candidates)) {
+                             arguments.tag = candidates[selection];
+                             print.greenLine("Selected tag: " & arguments.tag).toConsole();
+                        } else if (len(trim(selection))) {
+                             // Treat as custom tag input if they typed a string not in the list? 
+                             // Or just fallback to what they typed
+                             arguments.tag = selection;
+                             print.greenLine("Using custom tag: " & arguments.tag).toConsole();
+                        } else {
+                            // Empty selection matches 'latest' default logic later, or we can explicit set it
+                            print.yellowLine("No selection made, defaulting to 'latest'").toConsole();
+                        }
+                    }
+                }
+            } catch (any e) {
+                // Determine if we should show error or just fail silently to defaults
+                // print.redLine("Warning: Failed to list local images: " & e.message).toConsole();
+            }
+        }
         
         // set local as default if neither specified
         if (!arguments.local && !arguments.remote) {
@@ -49,9 +117,9 @@ component extends="DockerCommand" {
         
         // Route to appropriate deployment method
         if (arguments.local) {
-            deployLocal(arguments.environment, arguments.db, arguments.cfengine, arguments.optimize);
+            deployLocal(arguments.environment, arguments.db, arguments.cfengine, arguments.optimize, arguments.tag);
         } else {
-            deployRemote(arguments.servers, arguments.skipDockerCheck, arguments.blueGreen);
+            deployRemote(arguments.servers, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
         }
     }
     
@@ -63,7 +131,8 @@ component extends="DockerCommand" {
         string environment,
         string db,
         string cfengine,
-        boolean optimize
+        boolean optimize,
+        string tag=""
     ) {
         // Welcome message
         print.line();
@@ -76,29 +145,18 @@ component extends="DockerCommand" {
         if (local.useCompose) {
             print.greenLine("Found docker-compose file, will use docker-compose").toConsole();
             
-            // Check if Docker is installed locally
-            if (!isDockerInstalled()) {
-                error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+            // Just run docker-compose up
+            if (len(arguments.tag)) {
+                print.yellowLine("Note: --tag argument is ignored when using docker-compose.").toConsole();
             }
             
-            print.yellowLine("Starting services with docker-compose...").toConsole();
+            print.yellowLine("Starting services...").toConsole();
+            runLocalCommand(["docker-compose", "up", "-d", "--build"]);
             
-            try {
-                // Stop existing containers
-                runLocalCommand(["docker", "compose", "down"]);
-            } catch (any e) {
-                print.yellowLine("No existing containers to stop").toConsole();
-            }
-            
-            // Start containers with build
-            print.yellowLine("Building and starting containers...").toConsole();
-            runLocalCommand(["docker", "compose", "up", "-d", "--build"]);
-            
+             print.line();
+            print.boldGreenLine("Services started successfully!").toConsole();
             print.line();
-            print.boldGreenLine("Docker Compose services started successfully!").toConsole();
-            print.line();
-            print.yellowLine("Check container status with: docker compose ps").toConsole();
-            print.yellowLine("View logs with: docker compose logs -f").toConsole();
+            print.yellowLine("View logs with: docker-compose logs -f").toConsole();
             print.line();
             
         } else {
@@ -125,32 +183,49 @@ component extends="DockerCommand" {
             }
             
             // Get project name for image/container naming
-            local.imageName = getProjectName();
+            local.projectName = getProjectName();
+            local.deployConfig = getDeployConfig();
             
-            print.yellowLine("Building Docker image...").toConsole();
+            // Strict Tag Strategy: projectName:tag
+            local.tag = len(arguments.tag) ? arguments.tag : "latest";
+            
+            // Smart Tag Logic: Check if tag contains colon (full image name)
+            if (find(":", local.tag)) {
+                local.imageName = local.tag;
+            } else if (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) {
+                local.imageName = local.deployConfig.image & ":" & local.tag;
+            } else {
+                local.imageName = local.projectName & ":" & local.tag;
+            }
+            
+            // Container Name: Always use project name for consistency
+            local.containerName = local.projectName;
+            
+            print.yellowLine("Building Docker image (" & local.imageName & ")...").toConsole();
             runLocalCommand(["docker", "build", "-t", local.imageName, "."]);
             
             print.yellowLine("Starting container...").toConsole();
             
             try {
                 // Stop and remove existing container
-                runLocalCommand(["docker", "stop", local.imageName]);
-                runLocalCommand(["docker", "rm", local.imageName]);
+                runLocalCommand(["docker", "stop", local.containerName]);
+                runLocalCommand(["docker", "rm", local.containerName]);
             } catch (any e) {
                 print.yellowLine("No existing container to remove").toConsole();
             }
             
             // Run new container
-            runLocalCommand(["docker", "run", "-d", "--name", local.imageName, "-p", local.exposedPort & ":" & local.exposedPort, local.imageName]);
+            runLocalCommand(["docker", "run", "-d", "--name", local.containerName, "-p", local.exposedPort & ":" & local.exposedPort, local.imageName]);
             
             print.line();
             print.boldGreenLine("Container started successfully!").toConsole();
             print.line();
-            print.yellowLine("Container name: " & local.imageName).toConsole();
+            print.yellowLine("Image: " & local.imageName).toConsole();
+            print.yellowLine("Container: " & local.containerName).toConsole();
             print.yellowLine("Access your application at: http://localhost:" & local.exposedPort).toConsole();
             print.line();
             print.yellowLine("Check container status with: docker ps").toConsole();
-            print.yellowLine("View logs with: docker logs -f " & local.imageName).toConsole();
+            print.yellowLine("View logs with: wheels docker logs --local").toConsole();
             print.line();
         }
     }
@@ -171,11 +246,13 @@ component extends="DockerCommand" {
     // REMOTE DEPLOYMENT
     // =============================================================================
     
-    private function deployRemote(string serversFile, boolean skipDockerCheck, boolean blueGreen) {
+    private function deployRemote(string serversFile, boolean skipDockerCheck, boolean blueGreen, string tag="") {
         // Check for deploy-servers file (text or json) in current directory
         var textConfigPath = fileSystemUtil.resolvePath("deploy-servers.txt");
         var jsonConfigPath = fileSystemUtil.resolvePath("deploy-servers.json");
+        var ymlConfigPath = fileSystemUtil.resolvePath("config/deploy.yml");
         var servers = [];
+        var projectName = getProjectName();
         
         // If specific servers file is provided, use that
         if (len(trim(arguments.serversFile))) {
@@ -190,7 +267,25 @@ component extends="DockerCommand" {
                 servers = loadServersFromTextFile(arguments.serversFile);
             }
         } 
-        // Otherwise, look for default files
+        // 1. Look for config/deploy.yml first
+        else if (fileExists(ymlConfigPath)) {
+            var deployConfig = getDeployConfig();
+            if (arrayLen(deployConfig.servers)) {
+                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                servers = deployConfig.servers;
+                
+                // Add defaults for missing fields
+                for (var s in servers) {
+                    if (!structKeyExists(s, "remoteDir")) {
+                        s.remoteDir = "/home/#s.user#/#projectName#";
+                    }
+                    if (!structKeyExists(s, "port")) {
+                        s.port = 22;
+                    }
+                }
+            }
+        }
+        // 2. Otherwise, look for default files
         else if (fileExists(textConfigPath)) {
             print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
             servers = loadServersFromTextFile("deploy-servers.txt");
@@ -198,11 +293,7 @@ component extends="DockerCommand" {
             print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
             servers = loadServersFromConfig("deploy-servers.json");
         } else {
-            error("No server configuration found. Create deploy-servers.txt or deploy-servers.json in your project root." & chr(10) & chr(10) &
-                  "Example deploy-servers.txt:" & chr(10) &
-                  "192.168.1.100 ubuntu 22" & chr(10) &
-                  "production.example.com deploy" & chr(10) & chr(10) &
-                  "Or see examples/deploy-servers.example.txt for more details.");
+            error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
         }
 
         if (arrayLen(servers) == 0) {
@@ -215,7 +306,7 @@ component extends="DockerCommand" {
         }
 
         // Deploy to all servers sequentially
-        deployToMultipleServersSequential(servers, arguments.skipDockerCheck, arguments.blueGreen);
+        deployToMultipleServersSequential(servers, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
 
         print.line().boldGreenLine("Deployment to all servers completed!").toConsole();
     }
@@ -223,13 +314,22 @@ component extends="DockerCommand" {
     /**
      * Deploy to multiple servers sequentially
      */
-    private function deployToMultipleServersSequential(required array servers, boolean skipDockerCheck, boolean blueGreen) {
+    private function deployToMultipleServersSequential(required array servers, boolean skipDockerCheck, boolean blueGreen, string tag="") {
         var successCount = 0;
         var failureCount = 0;
         var serverConfig = {};
 
         for (var i = 1; i <= arrayLen(servers); i++) {
             serverConfig = servers[i];
+            
+            // Override tag if provided via CLI argument
+            if (len(arguments.tag)) {
+                serverConfig.tag = arguments.tag;
+            } else if (!structKeyExists(serverConfig, "tag")) {
+                 // Default tag is latest if not specified in server config either
+                 serverConfig.tag = "latest";
+            }
+            
             print.line().boldCyanLine("---------------------------------------").toConsole();
             print.boldCyanLine("Deploying to server #i# of #arrayLen(servers)#: #serverConfig.host#").toConsole();
             print.line().boldCyanLine("---------------------------------------").toConsole();
@@ -247,15 +347,8 @@ component extends="DockerCommand" {
                 print.redLine("Failed to deploy to #serverConfig.host#: #e.message#").toConsole();
             }
         }
-
-        print.line().toConsole();
-        print.boldCyanLine("Deployment Summary:").toConsole();
-        print.greenLine("   Successful: #successCount#").toConsole();
-        if (failureCount > 0) {
-            print.redLine("   Failed: #failureCount#").toConsole();
-        }
     }
-
+    
     /**
      * Deploy to a single server (Standard Strategy)
      */
@@ -264,8 +357,23 @@ component extends="DockerCommand" {
         local.host = arguments.serverConfig.host;
         local.user = arguments.serverConfig.user;
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
-        local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.user#-app";
-        local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : "#local.user#-app";
+        local.projectName = getProjectName(); // Use unique project name
+        
+        // Use standard directory based on Project Name
+        local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.projectName#";
+        
+        local.tag = structKeyExists(arguments.serverConfig, "tag") ? arguments.serverConfig.tag : "latest";
+        local.deployConfig = getDeployConfig();
+        
+        // Smart Tag Logic
+        if (find(":", local.tag)) {
+            local.imageName = local.tag;
+        } else if (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) {
+            local.imageName = local.deployConfig.image & ":" & local.tag;
+        } else {
+            local.imageName = local.projectName & ":" & local.tag;
+        }
+        local.containerName = local.projectName;
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
@@ -324,45 +432,37 @@ component extends="DockerCommand" {
         local.deployScript &= "cd " & local.remoteDir & chr(10);
 
         if (local.useCompose) {
-            // Use docker-compose with proper permissions
-            local.deployScript &= "echo 'Starting services with docker-compose...'" & chr(10);
-            
-            // Check if user is in docker group and can run docker without sudo
+            // Use docker-compose
             local.deployScript &= "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then" & chr(10);
-            local.deployScript &= "  ## User has docker access, run without sudo" & chr(10);
             local.deployScript &= "  docker compose down || true" & chr(10);
             local.deployScript &= "  docker compose up -d --build" & chr(10);
             local.deployScript &= "else" & chr(10);
-            local.deployScript &= "  ## User needs sudo for docker" & chr(10);
             local.deployScript &= "  sudo docker compose down || true" & chr(10);
             local.deployScript &= "  sudo docker compose up -d --build" & chr(10);
             local.deployScript &= "fi" & chr(10);
-            local.deployScript &= "echo 'Docker Compose services started!'" & chr(10);
         } else {
-            // Use standard docker commands with proper permissions
+            // Use standard docker commands
             local.deployScript &= "echo 'Building Docker image...'" & chr(10);
             
-            // Check if user is in docker group and can run docker without sudo
+            // Check if user is in docker group
             local.deployScript &= "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then" & chr(10);
-            local.deployScript &= "  ## User has docker access, run without sudo" & chr(10);
             local.deployScript &= "  docker build -t " & local.imageName & " ." & chr(10);
             local.deployScript &= "  echo 'Starting container...'" & chr(10);
-            local.deployScript &= "  docker stop " & local.imageName & " || true" & chr(10);
-            local.deployScript &= "  docker rm " & local.imageName & " || true" & chr(10);
-            local.deployScript &= "  docker run -d --name " & local.imageName & " -p " & local.exposedPort & ":" & local.exposedPort & " " & local.imageName & chr(10);
+            local.deployScript &= "  docker stop " & local.containerName & " || true" & chr(10);
+            local.deployScript &= "  docker rm " & local.containerName & " || true" & chr(10);
+            local.deployScript &= "  docker run -d --name " & local.containerName & " -p " & local.exposedPort & ":" & local.exposedPort & " " & local.imageName & chr(10);
             local.deployScript &= "else" & chr(10);
-            local.deployScript &= "  ## User needs sudo for docker" & chr(10);
             local.deployScript &= "  sudo docker build -t " & local.imageName & " ." & chr(10);
             local.deployScript &= "  echo 'Starting container...'" & chr(10);
-            local.deployScript &= "  sudo docker stop " & local.imageName & " || true" & chr(10);
-            local.deployScript &= "  sudo docker rm " & local.imageName & " || true" & chr(10);
-            local.deployScript &= "  sudo docker run -d --name " & local.imageName & " -p " & local.exposedPort & ":" & local.exposedPort & " " & local.imageName & chr(10);
+            local.deployScript &= "  sudo docker stop " & local.containerName & " || true" & chr(10);
+            local.deployScript &= "  sudo docker rm " & local.containerName & " || true" & chr(10);
+            local.deployScript &= "  sudo docker run -d --name " & local.containerName & " -p " & local.exposedPort & ":" & local.exposedPort & " " & local.imageName & chr(10);
             local.deployScript &= "fi" & chr(10);
         }
 
         local.deployScript &= "echo 'Deployment complete!'" & chr(10);
 
-        // Normalize line endings
+        // Normalize
         local.deployScript = replace(local.deployScript, chr(13) & chr(10), chr(10), "all");
         local.deployScript = replace(local.deployScript, chr(13), chr(10), "all");
 
@@ -377,7 +477,7 @@ component extends="DockerCommand" {
         fileDelete(local.tempFile);
 
         print.yellowLine("Executing deployment script remotely...").toConsole();
-        // Use interactive command to prevent hanging and allow Ctrl+C
+        // Use interactive command
         var execCmd = ["ssh", "-p", local.port];
         execCmd.addAll(getSSHOptions());
         execCmd.addAll([local.user & "@" & local.host, "chmod +x /tmp/deploy-simple.sh && bash /tmp/deploy-simple.sh"]);
@@ -395,8 +495,11 @@ component extends="DockerCommand" {
         local.host = arguments.serverConfig.host;
         local.user = arguments.serverConfig.user;
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
-        local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.user#-app";
-        local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : "#local.user#-app";
+        local.projectName = getProjectName();
+        local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.projectName#";
+        
+        local.tag = structKeyExists(arguments.serverConfig, "tag") ? arguments.serverConfig.tag : "latest";
+        local.imageName = local.projectName; // Just project name, tag is separate variable in B/G script
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
@@ -404,7 +507,7 @@ component extends="DockerCommand" {
         }
         print.greenLine("SSH connection successful").toConsole();
 
-        // Step 1.5: Check and install Docker if needed
+        // Step 1.5: Check and install Docker
         if (!arguments.skipDockerCheck) {
             ensureDockerInstalled(local.host, local.user, local.port);
         }
@@ -449,6 +552,7 @@ component extends="DockerCommand" {
         local.deployScript &= "REMOTE_TAR='" & local.remoteTar & "'" & chr(10);
         local.deployScript &= "NETWORK_NAME='web'" & chr(10);
         local.deployScript &= "PROXY_NAME='nginx-proxy'" & chr(10);
+        local.deployScript &= "TAG='" & local.tag & "'" & chr(10);
         
         // Extract source
         local.deployScript &= "echo 'Extracting source to ' $REMOTE_DIR ' ...'" & chr(10);
@@ -458,7 +562,7 @@ component extends="DockerCommand" {
         
         // Build Image
         local.deployScript &= "echo 'Building Docker image...'" & chr(10);
-        local.deployScript &= "docker build -t $APP_NAME:latest ." & chr(10);
+        local.deployScript &= "docker build -t $APP_NAME:$TAG ." & chr(10);
         
         // Ensure Network Exists
         local.deployScript &= "echo 'Ensuring Docker network exists...'" & chr(10);
@@ -491,15 +595,15 @@ component extends="DockerCommand" {
         local.deployScript &= "echo 'Current active color: ' $CURRENT_COLOR" & chr(10);
         local.deployScript &= "echo 'Deploying to: ' $TARGET_COLOR" & chr(10);
         
-        // Stop Target if exists (cleanup from failed deploy or old state)
+        // Stop Target if exists
         local.deployScript &= "docker stop $TARGET_CONTAINER 2>/dev/null || true" & chr(10);
         local.deployScript &= "docker rm $TARGET_CONTAINER 2>/dev/null || true" & chr(10);
         
         // Start New Container
         local.deployScript &= "echo 'Starting ' $TARGET_CONTAINER ' ...'" & chr(10);
-        local.deployScript &= "docker run -d --name $TARGET_CONTAINER --network $NETWORK_NAME --restart unless-stopped $APP_NAME:latest" & chr(10);
+        local.deployScript &= "docker run -d --name $TARGET_CONTAINER --network $NETWORK_NAME --restart unless-stopped $APP_NAME:$TAG" & chr(10);
         
-        // Wait for container to be ready (simple sleep for now, could be curl loop)
+        // Wait for container
         local.deployScript &= "echo 'Waiting for container to initialize...'" & chr(10);
         local.deployScript &= "sleep 5" & chr(10);
         
@@ -516,7 +620,6 @@ component extends="DockerCommand" {
         local.deployScript &= "}" & chr(10);
         local.deployScript &= "EOF" & chr(10);
         
-        // Copy config to nginx container and reload
         local.deployScript = replace(local.deployScript, chr(13), chr(10), "all");
 
         local.tempFile = getTempFile(getTempDirectory(), "deploy_bg_");
@@ -530,7 +633,6 @@ component extends="DockerCommand" {
         fileDelete(local.tempFile);
 
         print.yellowLine("Executing Blue/Green deployment script remotely...").toConsole();
-        // Use interactive command to prevent hanging and allow Ctrl+C
         var execCmd = ["ssh", "-p", local.port];
         execCmd.addAll(getSSHOptions());
         execCmd.addAll([local.user & "@" & local.host, "chmod +x /tmp/deploy-bluegreen.sh && bash /tmp/deploy-bluegreen.sh"]);
@@ -539,11 +641,7 @@ component extends="DockerCommand" {
 
         print.boldGreenLine("Blue/Green Deployment to #local.host# completed successfully!").toConsole();
     }
-
-    // =============================================================================
-    // HELPER FUNCTIONS
-    // =============================================================================
-
+    
     /**
      * Check if Docker is installed on remote server and install if needed
      */
@@ -592,40 +690,6 @@ component extends="DockerCommand" {
         if (local.sudoCheckResult.exitCode neq 0) {
             print.line().toConsole();
             print.boldRedLine("ERROR: User '#arguments.user#' does not have passwordless sudo access on #arguments.host#!").toConsole();
-            print.line().toConsole();
-            print.yellowLine("To enable passwordless sudo for Docker installation, follow these steps:").toConsole();
-            print.line().toConsole();
-            print.cyanLine("  1. SSH into the server:").toConsole();
-            print.boldWhiteLine("     ssh " & arguments.user & "@" & arguments.host & (arguments.port neq 22 ? " -p " & arguments.port : "")).toConsole();
-            print.line().toConsole();
-            print.cyanLine("  2. Edit the sudoers file:").toConsole();
-            print.boldWhiteLine("     sudo visudo").toConsole();
-            print.line().toConsole();
-            print.cyanLine("  3. Add this line at the end of the file:").toConsole();
-            print.boldWhiteLine("     " & arguments.user & " ALL=(ALL) NOPASSWD:ALL").toConsole();
-            print.line().toConsole();
-            print.cyanLine("  4. Save and exit:").toConsole();
-            print.line("     - Press Ctrl+X").toConsole();
-            print.line("     - Press Y to confirm").toConsole();
-            print.line("     - Press Enter to save").toConsole();
-            print.line().toConsole();
-            print.yellowLine("OR, manually install Docker on the remote server:").toConsole();
-            print.line().toConsole();
-            print.cyanLine("  For Ubuntu/Debian:").toConsole();
-            print.line("    curl -fsSL https://get.docker.com -o get-docker.sh").toConsole();
-            print.line("    sudo sh get-docker.sh").toConsole();
-            print.line("    sudo usermod -aG docker " & arguments.user).toConsole();
-            print.line("    newgrp docker").toConsole();
-            print.line().toConsole();
-            print.cyanLine("  For CentOS/RHEL:").toConsole();
-            print.line("    curl -fsSL https://get.docker.com -o get-docker.sh").toConsole();
-            print.line("    sudo sh get-docker.sh").toConsole();
-            print.line("    sudo usermod -aG docker " & arguments.user).toConsole();
-            print.line("    newgrp docker").toConsole();
-            print.line().toConsole();
-            print.boldYellowLine("After configuring passwordless sudo or installing Docker, run the deployment again.").toConsole();
-            print.line().toConsole();
-            
             error("Cannot install Docker: User '" & arguments.user & "' requires passwordless sudo access on " & arguments.host);
         }
         
@@ -673,10 +737,9 @@ component extends="DockerCommand" {
         fileDelete(local.tempFile);
         
         // Execute install script
-        print.yellowLine("Installing Docker (this may take a few minutes)...").toConsole();
+        print.yellowLine("Installing Docker...").toConsole();
         var installCmd = ["ssh", "-p", arguments.port];
         installCmd.addAll(getSSHOptions());
-        // Increase timeout for installation
         installCmd.addAll(["-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=10"]);
         installCmd.addAll([arguments.user & "@" & arguments.host, "sudo bash /tmp/install-docker.sh"]);
         
@@ -744,46 +807,22 @@ component extends="DockerCommand" {
     private function getDockerInstallScriptDebian() {
         var script = '##!/bin/bash
 set -e
-
-echo "Installing Docker on Debian/Ubuntu..."
-
-## Set non-interactive mode
 export DEBIAN_FRONTEND=noninteractive
-
-## Update package index
 apt-get update
-
-## Install prerequisites
 apt-get install -y ca-certificates curl gnupg lsb-release
-
-## Add Docker GPG key
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-## Set up repository
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-## Install Docker with automatic yes to all prompts
 apt-get update
 apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-## Start and enable Docker
 systemctl start docker
 systemctl enable docker
-
-## Wait for Docker to be ready
 sleep 3
-
-## Add current user to docker group (determine actual user if running via sudo)
 ACTUAL_USER="${SUDO_USER:-$USER}"
 if [ -n "$ACTUAL_USER" ] && [ "$ACTUAL_USER" != "root" ]; then
     usermod -aG docker $ACTUAL_USER
-    echo "Added user $ACTUAL_USER to docker group"
 fi
-
-## Set proper permissions on docker socket
 chmod 666 /var/run/docker.sock
-
 echo "Docker installation completed successfully!"
 ';
         return script;
@@ -795,38 +834,19 @@ echo "Docker installation completed successfully!"
     private function getDockerInstallScriptRHEL() {
         var script = '##!/bin/bash
 set -e
-
-echo "Installing Docker on RHEL/CentOS/Fedora..."
-
-## Install prerequisites
 yum install -y yum-utils
-
-## Add Docker repository
 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-
-## Install Docker
 yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-## Start and enable Docker
 systemctl start docker
 systemctl enable docker
-
-## Wait for Docker to be ready
 sleep 3
-
-## Add current user to docker group
 ACTUAL_USER="${SUDO_USER:-$USER}"
 if [ -n "$ACTUAL_USER" ] && [ "$ACTUAL_USER" != "root" ]; then
     usermod -aG docker $ACTUAL_USER
-    echo "Added user $ACTUAL_USER to docker group"
 fi
-
-## Set proper permissions on docker socket
 chmod 666 /var/run/docker.sock
-
 echo "Docker installation completed successfully!"
 ';
         return script;
     }
-
 }
