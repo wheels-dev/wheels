@@ -113,6 +113,7 @@
 * [Switching Environments](working-with-wheels/switching-environments.md)
 * [Testing Your Application](working-with-wheels/testing-your-application.md)
 * [Using the Test Environment](working-with-wheels/using-the-test-environment.md)
+* [Overriding Core Methods](working-with-wheels/overriding-core-methods.md)
 * [Contributing to Wheels](working-with-wheels/contributing-to-wheels.md)
 * [Contributing to Wheels VS Code Extension](working-with-wheels/contributing-to-wheels-vscode-extension.md)
 * [Contributing to Wheels Windows Installer](working-with-wheels/contributing-to-wheels-windows-installer.md)
