@@ -42,20 +42,22 @@ SQLite is different from traditional client-server databases like MySQL, Postgre
 
 SQLite support is built into most CFML engines, but you may need to add the JDBC driver:
 
-#### Lucee
+#### Lucee and Adobe ColdFusion
 
-Lucee includes SQLite support by default. No additional installation needed.
-
-#### Adobe ColdFusion
-
-Download the SQLite JDBC driver from [GitHub](https://github.com/xerial/sqlite-jdbc/releases) and place it in your ColdFusion classpath:
+Download the SQLite JDBC driver from [GitHub](https://github.com/xerial/sqlite-jdbc/releases) and place it in your server classpath:
 
 ```bash
-# Copy the JAR to ColdFusion's lib directory
+# Copy the JAR to server's lib directory
 cp sqlite-jdbc-3.50.3.0.jar /path/to/coldfusion/lib/
 ```
 
-Restart ColdFusion after adding the driver.
+Restart the server after adding the driver.
+
+{% hint style="info" %}
+**Note for Adobe ColdFusion 2018:**
+Adobe ColdFusion 2018 already ships with a SQLite JDBC driver in its classpath, but this bundled version is outdated and may cause compatibility issues.
+To use a newer SQLite version, you should remove the existing SQLite JAR from the ColdFusion classpath and replace it with the latest driver downloaded from GitHub, then restart the server.
+{% endhint %}
 
 #### Boxlang
 
