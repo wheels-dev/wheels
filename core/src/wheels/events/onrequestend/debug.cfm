@@ -86,8 +86,8 @@
 		margin-right:5px;
 		}</style>
 </cfsavecontent>
-<cfset $htmlhead(text = local.css)>
 <cfoutput>
+	#local.css#
 	<div id="wheels-debug-area">
 		<cfif $get("enablePublicComponent")>
 			<table>
