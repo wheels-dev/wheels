@@ -647,7 +647,7 @@ http {
     }
 
     private function updateServerJsonForDocker(required numeric port) {
-        local.serverJsonPath = fileSystemUtil.resolvePath("dfdf/server.json");
+        local.serverJsonPath = fileSystemUtil.resolvePath("server.json");
 
         // Check if server.json exists
         if (!fileExists(local.serverJsonPath)) {
