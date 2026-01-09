@@ -313,12 +313,6 @@ component extends="../base" {
             arrayAppend(recommendations, "Address code smells to improve maintainability");
         }
 
-        if (!fileExists(".wheelscheck")) {
-            arrayAppend(recommendations, "Create a .wheelscheck config file for custom rules");
-        }
-
-        arrayAppend(recommendations, "Integrate this check into your CI/CD pipeline");
-
         for (var rec in recommendations) {
             detailOutput.output("  * #rec#");
         }
