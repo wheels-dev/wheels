@@ -1322,99 +1322,155 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 		return local.databases;
 	}
 
-private struct function getDatabaseConnection(
-	required struct dsInfo,
-	required string dbType
-) {
-	local.conn = "";
+	private struct function getSqliteDatabaseConnection(required struct dsInfo, required string dbType) {
+		local.conn = "";
 
-	// Get database configuration
-	local.config = getDatabaseConfig( arguments.dbType, arguments.dsInfo );
+		// Get database configuration
+		local.config = getDatabaseConfig( arguments.dbType, arguments.dsInfo );
 
-	// Try each driver class
-	local.driverLoaded = false;
+		// Try each driver class
+		local.driverLoaded = false;
 
-	for ( local.driverClass in local.config.driverClasses ) {
+		for ( local.driverClass in local.config.driverClasses ) {
 
-		// IMPORTANT:
-		// CommandBox CLI + Lucee cannot reliably use Class.forName()
-		// for SQLite, even when the driver is present on the JVM.
-		// SQLite JDBC (JDBC 4+) auto-registers, so touching the class
-		// is sufficient.
-		if ( arguments.dbType == "SQLite" || arguments.dbType == "SQLite3" ) {
+			// IMPORTANT:
+			// CommandBox CLI + Lucee cannot reliably use Class.forName()
+			// for SQLite, even when the driver is present on the JVM.
+			// SQLite JDBC (JDBC 4+) auto-registers, so touching the class
+			// is sufficient.
 			CreateObject( "java", local.driverClass );
 			local.driverLoaded = true;
-			break;
+			break;	
 		}
 
-		// All other databases keep existing behavior
-		CreateObject( "java", "java.lang.Class" ).forName( local.driverClass );
-		local.driverLoaded = true;
-		break;
-	}
+		if ( !local.driverLoaded ) {
+			return {
+				success   : false,
+				error     : "No suitable JDBC driver found for #arguments.dbType#. Tried: "
+						& ArrayToList( local.config.driverClasses, ", " ),
+				connection: ""
+			};
+		}
 
-	if ( !local.driverLoaded ) {
+		// Create properties
+		local.props = CreateObject( "java", "java.util.Properties" ).init();
+
+		// Common credentials
+		if ( Len( arguments.dsInfo.username ) ) {
+			local.props.setProperty( "user", arguments.dsInfo.username );
+		}
+		if ( Len( arguments.dsInfo.password ) ) {
+			local.props.setProperty( "password", arguments.dsInfo.password );
+		}
+
+		// SQLite-specific properties
+		local.props.setProperty( "busy_timeout", "5000" );
+		local.props.setProperty( "journal_mode", "WAL" );
+		local.props.setProperty( "synchronous", "NORMAL" );
+
+		// Ensure database directory exists
+		if (
+			Len( local.config.tempDS.database )
+			&& !FileExists( local.config.tempDS.database )
+		) {
+			local.dbDir = GetDirectoryFromPath(
+				local.config.tempDS.database
+			);
+
+			if ( Len( local.dbDir ) && !DirectoryExists( local.dbDir ) ) {
+				DirectoryCreate( local.dbDir, true );
+			}
+		}
+
+		// Get connection (DriverManager will auto-discover SQLite driver)
+		local.driverManager = CreateObject( "java", "java.sql.DriverManager" );
+		local.conn = local.driverManager.getConnection(
+			local.config.jdbcUrl,
+			local.props
+		);
+
+		// Test connection
+		local.conn.setAutoCommit( false );
+
 		return {
-			success   : false,
-			error     : "No suitable JDBC driver found for #arguments.dbType#. Tried: "
-			          & ArrayToList( local.config.driverClasses, ", " ),
-			connection: ""
+			success : true,
+			connection : local.conn,
+			jdbcUrl : local.config.jdbcUrl
 		};
 	}
 
-	// Create properties
-	local.props = CreateObject( "java", "java.util.Properties" ).init();
-
-	// Common credentials
-	if ( Len( arguments.dsInfo.username ) ) {
-		local.props.setProperty( "user", arguments.dsInfo.username );
-	}
-	if ( Len( arguments.dsInfo.password ) ) {
-		local.props.setProperty( "password", arguments.dsInfo.password );
-	}
-
-	// Database-specific properties
-	switch ( arguments.dbType ) {
-
-		case "SQLite":
-		case "SQLite3":
-
-			local.props.setProperty( "busy_timeout", "5000" );
-			local.props.setProperty( "journal_mode", "WAL" );
-			local.props.setProperty( "synchronous", "NORMAL" );
-
-			// Ensure database directory exists
-			if (
-				Len( local.config.tempDS.database )
-				&& !FileExists( local.config.tempDS.database )
-			) {
-				local.dbDir = GetDirectoryFromPath(
-					local.config.tempDS.database
-				);
-
-				if ( Len( local.dbDir ) && !DirectoryExists( local.dbDir ) ) {
-					DirectoryCreate( local.dbDir, true );
+	private struct function getDatabaseConnection(required struct dsInfo, required string dbType, string systemDatabase = "") {
+		local.result = {
+			success: false,
+			connection: "",
+			error: "",
+			driverClass: ""
+		};
+		
+		try {
+			// Get database-specific configuration
+			local.dbConfig = getDatabaseConfig(arguments.dbType, arguments.dsInfo, arguments.systemDatabase);
+			
+			// Build connection URL
+			local.url = buildJDBCUrl(local.dbConfig.tempDS);
+			local.username = local.dbConfig.tempDS.username ?: "";
+			local.password = local.dbConfig.tempDS.password ?: "";
+			
+			detailOutput.output("Connecting to " & arguments.dbType & " database...");
+			
+			// Try to load driver
+			local.driver = "";
+			local.driverFound = false;
+			
+			for (local.driverClass in local.dbConfig.driverClasses) {
+				try {
+					local.driver = createObject("java", local.driverClass);
+					local.result.driverClass = local.driverClass;
+					local.driverFound = true;
+					detailOutput.statusSuccess("Driver found: " & local.driverClass);
+					break;
+				} catch (any driverError) {
+					// Continue trying other drivers
 				}
 			}
-			break;
+			
+			if (!local.driverFound) {
+				local.result.error = "No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.";
+				return local.result;
+			}
+			
+			// Create properties for connection
+			local.props = createObject("java", "java.util.Properties");
+			local.props.setProperty("user", local.username);
+			local.props.setProperty("password", local.password);
+			
+			// Test if driver accepts the URL
+			if (!local.driver.acceptsURL(local.url)) {
+				local.result.error = arguments.dbType & " driver does not accept the URL format";
+				return local.result;
+			}
+			
+			// Connect using driver directly
+			local.conn = local.driver.connect(local.url, local.props);
+			
+			if (isNull(local.conn)) {
+				local.result.error = "Failed to establish connection to " & arguments.dbType;
+				return local.result;
+			}
+			
+			local.result.success = true;
+			local.result.connection = local.conn;
+			detailOutput.statusSuccess("Connected successfully to " & arguments.dbType & " database!");
+			return local.result;
+			
+		} catch (any e) {
+			local.result.error = e.message;
+			if (StructKeyExists(e, "detail")) {
+				local.result.error &= " - " & e.detail;
+			}
+			return local.result;
+		}
 	}
-
-	// Get connection (DriverManager will auto-discover SQLite driver)
-	local.driverManager = CreateObject( "java", "java.sql.DriverManager" );
-	local.conn = local.driverManager.getConnection(
-		local.config.jdbcUrl,
-		local.props
-	);
-
-	// Test connection
-	local.conn.setAutoCommit( false );
-
-	return {
-		success : true,
-		connection : local.conn,
-		jdbcUrl : local.config.jdbcUrl
-	};
-}
 
 	/**
 	* Get database-specific configuration
