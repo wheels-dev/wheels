@@ -66,7 +66,6 @@
   * Code Analysis
     * [wheels analyze code](command-line-tools/commands/analysis/analyze-code.md)
     * [wheels analyze performance](command-line-tools/commands/analysis/analyze-performance.md)
-    * [wheels analyze security](command-line-tools/commands/analysis/analyze-security.md)
   * Config
     * [wheels config check](command-line-tools/commands/config/config-check.md)
     * [wheels config diff](command-line-tools/commands/config/config-diff.md)
