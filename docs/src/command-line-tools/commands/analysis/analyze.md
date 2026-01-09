@@ -11,7 +11,7 @@ wheels analyze [subcommand] [options]
 
 ## Description
 
-The `wheels analyze` command provides comprehensive code analysis tools for Wheels applications. It helps identify code quality issues, performance bottlenecks, security vulnerabilities, and provides actionable insights for improvement.
+The `wheels analyze` command provides comprehensive code analysis tools for Wheels applications. It helps identify code quality issues, performance bottlenecks, and provides actionable insights for improvement.
 
 ## Subcommands
 
@@ -19,7 +19,6 @@ The `wheels analyze` command provides comprehensive code analysis tools for Whee
 |---------|-------------|
 | `code` | Analyze code quality and patterns |
 | `performance` | Analyze performance characteristics |
-| `security` | Security vulnerability analysis (deprecated) |
 
 
 ## Direct Usage
@@ -32,7 +31,7 @@ wheels analyze help
 
 ## Analysis Overview
 
-The analyze [code, performance, security] commands examines:
+The analyze [code, performance] commands examines:
 
 ### Code Quality
 - Coding standards compliance
@@ -45,12 +44,6 @@ The analyze [code, performance, security] commands examines:
 - Slow query identification
 - Memory usage patterns
 - Cache effectiveness
-
-### Security
-- SQL injection risks
-- XSS vulnerabilities
-- Insecure configurations
-- Outdated dependencies
 
 ## Best Practices
 
@@ -83,5 +76,4 @@ The analyze [code, performance, security] commands examines:
 
 - [wheels analyze code](analyze-code.md) - Code quality analysis
 - [wheels analyze performance](analyze-performance.md) - Performance analysis
-- [wheels security scan](../security/security-scan.md) - Security scanning
 - [wheels test](../testing/test.md) - Run tests

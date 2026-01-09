@@ -190,8 +190,8 @@ component extends="../base" {
                             var icon = getSeverityIcon(issue.severity);
                             var color = getSeverityColor(issue.severity);
 
-                            detailOutput.colored("  #icon# Line #issue.line#:#issue.column# - #issue.message#", color);
-                            print.grayLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
+                            detailOutput.output("  #icon# Line #issue.line#:#issue.column# - #issue.message#");
+                            print.cyanLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
                         }
                     }
                 }
