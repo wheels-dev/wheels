@@ -1,0 +1,5 @@
+// Render the partial `_comment.cfm` located in the current controller's view folder
+renderPartial("comment");
+
+// Render the partial at `app/views/shared/_comment.cfm`
+renderPartial("/shared/comment");

@@ -1,0 +1,17 @@
+{
+    "name": "wheels-test-suite-adobe2018",
+    "version": "1.0.0",
+    "dependencies": {
+        "wirebox": "^7.0.0",
+        "testbox": "^6.0.0"
+    },
+    "devDependencies": {
+        "commandbox-cfformat": "*",
+        "commandbox-dotenv": "*",
+        "commandbox-cfconfig": "*"
+    },
+    "installPaths": {
+        "wirebox": "vendor/wirebox/",
+        "testbox": "vendor/testbox/"
+    }
+}

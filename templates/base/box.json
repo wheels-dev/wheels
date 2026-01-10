@@ -1,0 +1,5 @@
+{
+    "name": "wheels-base-template",
+    "version": "3.0.0-SNAPSHOT.rc.1",
+    "location": "https://github.com/wheels-dev/wheels/tree/3.0/templates/base"
+}

@@ -1,0 +1,87 @@
+|DescriptionComment|component extends="wheels.Controller" {
+
+    function config() {
+        provides("json");
+        filters(through="setJsonResponse");
+    }
+
+    /**
+     * GET /|ObjectNamePlural|
+     * Returns a list of all |ObjectNamePlural|
+     */
+    function index() {
+        local.|ObjectNamePlural| = model("|ObjectNameSingular|").findAll();
+        renderWith(data={ |ObjectNamePlural|=local.|ObjectNamePlural| });
+    }
+
+    /**
+     * GET /|ObjectNamePlural|/:key
+     * Returns a specific |ObjectNameSingular| by ID
+     */
+    function show() {
+        local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);
+
+        if (IsObject(local.|ObjectNameSingular|)) {
+            renderWith(data={ |ObjectNameSingular|=local.|ObjectNameSingular| });
+        } else {
+            renderWith(data={ error="Record not found" }, status=404);
+        }
+    }
+
+    /**
+     * POST /|ObjectNamePlural|
+     * Creates a new |ObjectNameSingular|
+     */
+    function create() {
+        local.|ObjectNameSingular| = model("|ObjectNameSingular|").new(params.|ObjectNameSingular|);
+
+        if (local.|ObjectNameSingular|.save()) {
+            renderWith(data={ |ObjectNameSingular|=local.|ObjectNameSingular| }, status=201);
+        } else {
+            renderWith(data={ error="Validation failed", errors=local.|ObjectNameSingular|.allErrors() }, status=422);
+        }
+    }
+
+    /**
+     * PUT /|ObjectNamePlural|/:key
+     * Updates an existing |ObjectNameSingular|
+     */
+    function update() {
+        local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);
+
+        if (IsObject(local.|ObjectNameSingular|)) {
+            local.|ObjectNameSingular|.update(params.|ObjectNameSingular|);
+
+            if (local.|ObjectNameSingular|.hasErrors()) {
+                renderWith(data={ error="Validation failed", errors=local.|ObjectNameSingular|.allErrors() }, status=422);
+            } else {
+                renderWith(data={ |ObjectNameSingular|=local.|ObjectNameSingular| });
+            }
+        } else {
+            renderWith(data={ error="Record not found" }, status=404);
+        }
+    }
+
+    /**
+     * DELETE /|ObjectNamePlural|/:key
+     * Deletes a |ObjectNameSingular|
+     */
+    function delete() {
+        local.|ObjectNameSingular| = model("|ObjectNameSingular|").findByKey(params.key);
+
+        if (IsObject(local.|ObjectNameSingular|)) {
+            local.|ObjectNameSingular|.delete();
+            renderWith(data={}, status=204);
+        } else {
+            renderWith(data={ error="Record not found" }, status=404);
+        }
+    }
+
+    /**
+     * Set Response to JSON
+     */
+    private function setJsonResponse() {
+        params.format = "json";
+    }
+
+}

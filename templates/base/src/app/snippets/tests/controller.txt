@@ -1,0 +1,27 @@
+component extends="wheels.Testbox" {
+
+	function beforeAll() {
+		// Setup test data once for all tests in this component
+		// Example: variables.baseUrl = "http://localhost:8080";
+	}
+
+	function afterAll() {
+		// Cleanup test data once after all tests complete
+		// Example: Clean up any test records created during testing
+	}
+
+	function run() {
+		// Write the name for your test suite in the describe function
+		describe("Controller Tests", function() {
+
+			// Only use beforeEach/afterEach when tests need isolated state
+			// Most tests should use the component-level beforeAll/afterAll instead
+
+			it("should handle request properly", function() {
+				// Your controller tests here
+				expect(true).toBeTrue();
+			});
+
+		});
+	}
+}

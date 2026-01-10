@@ -1,0 +1,14 @@
+# Node
+node_modules/
+package-lock.json
+
+# Build output
+*.vsix
+
+# VS Code local settings
+.vscode/
+.vscode-test/
+
+# Logs & temp files
+*.log
+.DS_Store

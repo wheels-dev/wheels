@@ -1,0 +1,218 @@
+/**
+ * Generates secure secret keys for application use
+ * 
+ * Examples:
+ * {code:bash}
+ * wheels secret
+ * wheels secret --type=hex --length=64
+ * wheels secret --type=base64
+ * wheels secret --type=uuid
+ * wheels secret --save-to-env=SECRET_KEY
+ * {code}
+ */
+component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
+
+	/**
+	 * @type.hint Type of secret to generate: hex, base64, alphanumeric, or uuid
+	 * @type.options hex,base64,alphanumeric,uuid
+	 * @length.hint Length of the secret (not applicable for uuid)
+	 * @save-to-env.hint Save to .env file with specified key name
+	 **/
+	function run(
+		string type = "hex",
+		numeric length = 32,
+		string saveToEnv = ""
+	) {
+
+		// Validate type
+		if (!ListFindNoCase("hex,base64,alphanumeric,uuid", arguments.type)) {
+			error("Invalid type: #arguments.type#. Valid types are: hex, base64, alphanumeric, uuid");
+		}
+
+		// Generate secret based on type
+		local.secret = "";
+		switch (arguments.type) {
+			case "hex":
+				local.secret = generateHexSecret(arguments.length);
+				break;
+			case "base64":
+				local.secret = generateBase64Secret(arguments.length);
+				break;
+			case "alphanumeric":
+				local.secret = generateAlphanumericSecret(arguments.length);
+				break;
+			case "uuid":
+				local.secret = CreateUUID();
+				break;
+		}
+
+		// Display the secret
+		print.line();
+		print.boldLine("Generated #arguments.type# secret:");
+		print.greenLine(local.secret);
+		print.line();
+
+		// Save to .env if requested
+		if (Len(arguments.saveToEnv)) {
+			saveSecretToEnv(arguments.saveToEnv, local.secret);
+		}
+
+		// Show usage examples
+		showUsageExamples(arguments.type);
+	}
+
+	private string function generateHexSecret(required numeric length) {
+		// Generate random bytes and convert to hex
+		local.bytes = [];
+		local.bytesNeeded = Ceiling(arguments.length / 2);
+		
+		for (local.i = 1; local.i <= local.bytesNeeded; local.i++) {
+			ArrayAppend(local.bytes, RandRange(0, 255));
+		}
+		
+		local.hex = "";
+		for (local.byte in local.bytes) {
+			local.hex &= FormatBaseN(local.byte, 16);
+		}
+		
+		// Ensure proper length and padding
+		local.hex = LCase(local.hex);
+		if (Len(local.hex) < arguments.length) {
+			local.hex = RepeatString("0", arguments.length - Len(local.hex)) & local.hex;
+		}
+		
+		return Left(local.hex, arguments.length);
+	}
+
+	private string function generateBase64Secret(required numeric length) {
+		// Generate random string and encode
+		local.chars = "";
+		local.bytesNeeded = Ceiling((arguments.length * 3) / 4);
+		
+		for (local.i = 1; local.i <= local.bytesNeeded; local.i++) {
+			local.chars &= Chr(RandRange(0, 255));
+		}
+		
+		local.base64 = ToBase64(local.chars);
+		// Remove padding and newlines
+		local.base64 = Replace(local.base64, Chr(10), "", "all");
+		local.base64 = Replace(local.base64, Chr(13), "", "all");
+		
+		return Left(local.base64, arguments.length);
+	}
+
+	private string function generateAlphanumericSecret(required numeric length) {
+		local.chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+		local.secret = "";
+		
+		for (local.i = 1; local.i <= arguments.length; local.i++) {
+			local.secret &= Mid(local.chars, RandRange(1, Len(local.chars)), 1);
+		}
+		
+		return local.secret;
+	}
+
+	private void function saveSecretToEnv(required string key, required string value) {
+		local.envFile = ResolvePath(".env");
+		local.envContent = "";
+		local.keyFound = false;
+		
+		// Read existing .env file
+		if (FileExists(local.envFile)) {
+			local.content = FileRead(local.envFile);
+			
+			// Check if it's JSON format
+			if (IsJSON(local.content)) {
+				local.envData = DeserializeJSON(local.content);
+				local.envData[arguments.key] = arguments.value;
+				local.envContent = SerializeJSON(local.envData, false, false);
+				local.keyFound = true;
+			} else {
+				// Properties format
+				local.lines = ListToArray(local.content, Chr(10));
+				local.newLines = [];
+				
+				for (local.line in local.lines) {
+					local.trimmedLine = Trim(local.line);
+					if (Len(local.trimmedLine) && Left(local.trimmedLine, 1) != "##") {
+						if (Find("=", local.trimmedLine)) {
+							local.lineKey = Trim(ListFirst(local.trimmedLine, "="));
+							if (local.lineKey == arguments.key) {
+								ArrayAppend(local.newLines, "#arguments.key#=#arguments.value#");
+								local.keyFound = true;
+							} else {
+								ArrayAppend(local.newLines, local.line);
+							}
+						} else {
+							ArrayAppend(local.newLines, local.line);
+						}
+					} else {
+						ArrayAppend(local.newLines, local.line);
+					}
+				}
+				
+				// Add key if not found
+				if (!local.keyFound) {
+					ArrayAppend(local.newLines, "#arguments.key#=#arguments.value#");
+				}
+				
+				local.envContent = ArrayToList(local.newLines, Chr(10));
+			}
+		} else {
+			// Create new .env file
+			local.envContent = "## Wheels Environment Configuration" & Chr(10);
+			local.envContent &= "## Generated by wheels secret command" & Chr(10);
+			local.envContent &= Chr(10);
+			local.envContent &= "#arguments.key#=#arguments.value#" & Chr(10);
+		}
+		
+		// Write the file
+		try {
+			FileWrite(local.envFile, local.envContent);
+			print.greenLine("✓ Secret saved to .env file as '#arguments.key#'");
+			
+			// Check if .env is in .gitignore
+			local.gitignore = ResolvePath(".gitignore");
+			if (FileExists(local.gitignore)) {
+				local.gitignoreContent = FileRead(local.gitignore);
+				if (!FindNoCase(".env", local.gitignoreContent)) {
+					print.yellowLine("⚠ Warning: .env file is not in .gitignore!");
+					print.line("  Add .env to .gitignore to prevent committing secrets");
+				}
+			}
+		} catch (any e) {
+			error("Failed to save secret to .env file: #e.message#");
+		}
+	}
+
+	private void function showUsageExamples(required string type) {
+		print.boldLine("Usage in Wheels:");
+		
+		switch (arguments.type) {
+			case "hex":
+			case "base64":
+			case "alphanumeric":
+				print.line("  1. Add to .env file:");
+				print.line("     SECRET_KEY=<your-secret>");
+				print.line();
+				print.line("  2. Use in config/settings.cfm:");
+				print.line("     set(secretKey = application.env['SECRET_KEY']);");
+				break;
+				
+			case "uuid":
+				print.line("  Can be used for:");
+				print.line("  - API keys");
+				print.line("  - Session identifiers");
+				print.line("  - Unique tokens");
+				break;
+		}
+		
+		print.line();
+		print.line("Security tips:");
+		print.line("  • Never commit secrets to version control");
+		print.line("  • Use different secrets for each environment");
+		print.line("  • Rotate secrets regularly");
+		print.line("  • Use sufficient length (32+ characters recommended)");
+	}
+
+}

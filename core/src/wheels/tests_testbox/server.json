@@ -1,0 +1,12 @@
+{
+    "force":true,
+    "web":{
+        "rewrites":{
+            "enable":true
+        }
+    },
+    "app":{
+        "cfengine":"lucee5"
+    },
+    "name":"lucee5a"
+}

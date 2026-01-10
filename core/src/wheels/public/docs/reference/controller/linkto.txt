@@ -1,0 +1,27 @@
+#linkTo(text="Log Out", controller="account", action="logout")#
+<!--- Outputs: <a href="/account/logout">Log Out</a> --->
+
+<!--- If you're already in the `account` controller, CFWheels will assume that's where you want the link to point --->
+#linkTo(text="Log Out", action="logout")#
+<!--- Outputs: <a href="/account/logout">Log Out</a> --->
+
+#linkTo(text="View Post", controller="blog", action="post", key=99)#
+<!--- Outputs: <a href="/blog/post/99">View Post</a> --->
+
+#linkTo(text="View Settings", action="settings", params="show=all&amp;sort=asc")#
+<!--- Outputs: <a href="/account/settings?show=all&amp;amp;sort=asc">View Settings</a> --->
+
+<!--- Given that a `userProfile` route has been configured in `app/config/routes.cfm` --->
+#linkTo(text="Joe's Profile", route="userProfile", userName="joe")#
+<!--- Outputs: <a href="/user/joe">Joe's Profile</a> --->
+
+<!--- Link to an external website --->
+#linkTo(text="ColdFusion Framework", href="http://cfwheels.org/")#
+<!--- Outputs: <a href="http://cfwheels.org/">ColdFusion Framework</a> --->
+
+<!--- Give the link `class` and `id` attributes --->
+#linkTo(text="Delete Post", action="delete", key=99, class="delete", id="delete-99")#
+<!--- Outputs: <a class="delete" href="/blog/delete/99" id="delete-99">Delete Post</a> --->
+
+<!--- Using icons like Font Awesome in the text attribute, notice the use of encode="attributes" --->
+#linkTo(text="<i class='fa fa-trash' aria-hidden='true'></i> " & "Delete Post", encode="attributes", action="delete", key=99, class="delete", id="delete-99")#

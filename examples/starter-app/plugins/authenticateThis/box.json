@@ -1,0 +1,22 @@
+{
+    "name":"Authenticate This!",
+    "version":"1.0.1",
+    "author":"Andrew Bellenie",
+    "location":"andybellenie/cfwheels-authenticate-this#v1.0.1",
+    "directory":"/plugins/",
+    "createPackageDirectory":true,
+    "packageDirectory":"authenticateThis",
+    "slug":"cfwheels-authenticateThis",
+    "type":"cfwheels-plugins",
+    "homepage":"https://github.com/andybellenie/cfwheels-authenticate-this",
+    "shortDescription":"CFWheels 2.x Adds bCrypt authentication helper methods to any model",
+    "keywords":"bCrypt",
+    "private":false,
+    "scripts":{
+        "postVersion":"package set location='andybellenie/cfwheels-authenticate-this#v`package version`'",
+        "postPublish":"!git push --follow-tags",
+        "patch-release":"bump --patch && publish",
+        "minor-release":"bump --minor && publish",
+        "major-release":"bump --major && publish"
+    }
+}

@@ -1,0 +1,69 @@
+//--------------------------------------------------------------------
+// Example 1: List authors page by page, 25 at a time
+
+// Controller code
+param name="params.page" type="integer" default="1";
+authors = model("author").findAll(page=params.page, perPage=25, order="lastName");
+
+// View code
+<ul>
+    <cfoutput query="authors">
+        <li>#EncodeForHtml(firstName)# #EncodeForHtml(lastName)#</li>
+    </cfoutput>
+</ul>
+
+<cfoutput>#paginationLinks(route="authors")#</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 2: Using the same model call above, show all authors with a
+// window size of 5
+
+// View code
+<cfoutput>#paginationLinks(route="authors", windowSize=5)#</cfoutput>
+
+
+//--------------------------------------------------------------------
+// Example 3: If more than one paginated query is being run, then you
+// need to reference the correct `handle` in the view
+
+// Controller code
+authors = model("author").findAll(handle="authQuery", page=5, order="id");
+
+// View code
+<ul>
+    <cfoutput>
+        #paginationLinks(
+            route="authors",
+            handle="authQuery",
+            prependToLink="<li>",
+            appendToLink="</li>"
+        )#
+    </cfoutput>
+</ul>
+
+
+//--------------------------------------------------------------------
+// Example 4: Call to `paginationLinks` using routes
+
+// Route setup in app/config/routes.cfm
+mapper()
+    .get(name="paginatedCommentListing", pattern="blog/[year]/[month]/[day]/[page]", to="blogs##stats")
+    .get(name="commentListing", pattern="blog/[year]/[month]/[day]", to="blogs##stats")
+.end();
+
+// Controller code
+param name="params.page" type="integer" default="1";
+comments = model("comment").findAll(page=params.page, order="createdAt");
+
+// View code
+<ul>
+    <cfoutput>
+        #paginationLinks(
+            route="paginatedCommentListing",
+            year=2009,
+            month="feb",
+            day=10
+        )#
+    </cfoutput>
+</ul>

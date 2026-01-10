@@ -1,0 +1,4 @@
+// Ignore column(s) for finder methods.
+config() {
+	ignoredColumns(columns = ["column1","column2"]);
+}

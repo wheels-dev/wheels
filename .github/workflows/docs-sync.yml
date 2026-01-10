@@ -1,0 +1,30 @@
+name: Sync Docs to Shared Folder
+
+on:
+  workflow_call:
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+      DEPLOY_PATH:
+        required: true
+
+
+jobs:
+  sync:
+    runs-on: [self-hosted, Linux, X64, wheels-fw]
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Sync to shared docs folder
+        run: |
+          rsync -av --no-perms --no-owner --no-group --del docs/src/ "${{ secrets.DEPLOY_PATH }}/docs/3.0.0/guides"
+          rsync -av --no-perms --no-owner --no-group docs/src/.gitbook/assets/ "${{ secrets.DEPLOY_PATH }}/public/images"
+          rsync -av --no-perms --no-owner --no-group --del docs/api/ "${{ secrets.DEPLOY_PATH }}/public/json"
+
+
+
+

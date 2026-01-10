@@ -1,0 +1,14 @@
+{
+	"pdf": {
+		"pageNumbers": true,
+		"fontSize": 12,
+		"fontFamily": "Arial",
+		"paperSize": "letter",
+		"margin": {
+			"top": 56,
+			"bottom": 56,
+			"right": 62,
+			"left": 62
+		}
+	}
+}

@@ -1,0 +1,135 @@
+# wheels destroy
+
+Remove generated code and files associated with a model, controller, views, and tests.
+
+## Synopsis
+
+```bash
+wheels destroy <name>
+wheels d <name>
+```
+
+## CommandBox Parameter Syntax
+
+This command supports multiple parameter formats:
+
+- **Positional parameters**: `wheels destroy user` (resource name as positional)
+- **Named parameters**: `name=value` (e.g., `name=user`)
+
+**Parameter Mixing Rules:**
+
+**ALLOWED:**
+- Positional: `wheels destroy user`
+- Named: `wheels destroy name=user`
+
+**NOT ALLOWED:**
+- Positional + named for same parameter: `wheels destroy user name=other`
+
+**Recommendation:** Use positional parameter for simplicity: `wheels destroy user`
+
+**Note:** This command always prompts for confirmation before proceeding. There is no `--force` flag to skip confirmation.
+
+## Description
+
+The `wheels destroy` command removes all files and code associated with a resource that was previously generated. It's useful for cleaning up mistakes or removing features completely. This command will also drop the associated database table and remove resource routes.
+
+## Arguments
+
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `name` | Name of the resource to destroy | Yes |
+
+## Options
+
+This command has no additional options. It always prompts for confirmation before proceeding.
+
+## What Gets Removed
+
+When you destroy a resource, the following items are deleted:
+- Model file (`/app/models/[Name].cfc`)
+- Controller file (`/app/controllers/[Names].cfc`)
+- Views directory (`/app/views/[names]/`)
+- Model test file (`/tests/specs/models/[Name].cfc`)
+- Controller test file (`/tests/specs/controllers/[Names].cfc`)
+- View test directory (`/tests/specs/views/[names]/`)
+- Resource route entry in `/config/routes.cfm`
+- Database table (if confirmed)
+
+## Examples
+
+### Basic destroy
+```bash
+# Positional (recommended)
+wheels destroy user
+
+# OR named
+wheels destroy name=user
+
+# OR alias (positional)
+wheels d user
+```
+
+This will prompt this along with a confirmation:
+```
+================================================
+= Watch Out!                                   =
+================================================
+This will delete the associated database table 'users', and
+the following files and directories:
+
+/app/models/User.cfc
+/app/controllers/Users.cfc
+/app/views/users/
+/tests/specs/models/User.cfc
+/tests/specs/controllers/Users.cfc
+/tests/specs/views/users/
+/config/routes.cfm
+.resources("users")
+
+Are you sure? [y/n]
+```
+
+## Safety Features
+
+1. **Confirmation**: Always asks for confirmation before proceeding
+2. **Shows All Changes**: Lists all files and directories that will be deleted
+3. **Database Migration**: Creates and runs a migration to drop the table
+4. **Route Cleanup**: Automatically removes resource routes from routes.cfm
+
+## Best Practices
+
+1. **Commit First**: Always commit your changes before destroying
+2. **Review Carefully**: Read the confirmation list carefully
+3. **Check Dependencies**: Make sure other code doesn't depend on what you're destroying
+4. **Backup Database**: Have a database backup before running in production
+
+## Common Workflows
+
+### Undo a generated resource
+```bash
+# Generated the wrong name
+wheels generate resource prduct  # Oops, typo!
+wheels destroy prduct            # Remove it
+wheels generate resource product # Create correct one
+```
+
+### Clean up after experimentation
+```bash
+# Try out a feature
+wheels generate scaffold blog_post title:string,content:text
+# Decide you don't want it
+wheels destroy blog_post
+```
+
+## Important
+
+- Cannot be undone - files are permanently deleted
+- Database table is dropped via migration
+- Resource routes are automatically removed from routes.cfm
+- Only works with resources that follow Wheels naming conventions
+
+## See Also
+
+- [wheels generate resource](../generate/resource.md) - Generate resources
+- [wheels generate scaffold](../generate/scaffold.md) - Generate scaffolding
+- [wheels dbmigrate remove table](../database/dbmigrate-remove-table.md) - Remove database tables

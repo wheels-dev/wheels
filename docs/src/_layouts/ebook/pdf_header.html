@@ -1,0 +1,5 @@
+{% extends "./page.html" %}
+
+{% block body %}
+<div id="pdf-header" class="pdf-header"><span>{{ page.title }}&nbsp;</span> <span class="header-pages-count sub"><a href="{{ config.website }}">{{ config.website }}</a></span></div><script>if (({% for num in config.hidepageheaders %}{{ page.num }} == {{ num }} || {% endfor %}false)) document.getElementById('pdf-header').style.display = 'none'</script>
+{% endblock %}

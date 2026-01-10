@@ -1,6 +1,6 @@
 # This workflow is used to release master releases and also by the snapshot workflow
 # to release snapshots.
-name: CFWheels Release
+name: Wheels Release
 
 on:
   push:
@@ -16,7 +16,7 @@ on:
         required: true
 
 env:
-  CFWHEELS_PRERELEASE: false
+  WHEELS_PRERELEASE: false
 
 jobs:
   #############################################
@@ -24,18 +24,21 @@ jobs:
   #############################################
   build:
     name: Build & Publish Release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        id: Checkout-Repository
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Environment Variables For Build Process
-        id: current_version
+        id: Calculate-Version-And-Branch
         run: |
+          cd ./templates/base/src
+          pwd
           cat box.json
-          echo "CFWHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
+          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
           # main or snapshot
           echo "BRANCH=main" >> $GITHUB_ENV
           if [ $GITHUB_REF == 'refs/heads/develop' ]
@@ -43,44 +46,238 @@ jobs:
             echo "BRANCH=develop" >> $GITHUB_ENV
           fi
 
-      - name: Build CFWheels Variants for ${{ env.BRANCH }} v${{ env.CFWHEELS_VERSION }}
+      - name: Make build scripts executable
         run: |
-          ant -DisPreRelease=${{ env.CFWHEELS_PRERELEASE }} -Dcfwheels.version=${{ env.CFWHEELS_VERSION }} -Dbuild.branch=${{ env.BRANCH }} -Dbuild.number=${{ github.run_number }} -f build/build.xml
+          chmod +x tools/build/scripts/*.sh
+          # List scripts for verification
+          ls -la tools/build/scripts/
 
-      - name: Upload CFWheels Artifacts
-        if: success()
-        uses: actions/upload-artifact@v3
+      #############################################
+      # Pre-Release Validation (main branch only)
+      #############################################
+
+      - name: Validate Release Checklist
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "=========================================="
+          echo "Validating Release Checklist"
+          echo "=========================================="
+
+          # Check that CHANGELOG doesn't contain TBD for this version
+          if grep -q "# \[${WHEELS_VERSION%+*}\].*=> TBD" CHANGELOG.md; then
+            echo "ERROR: CHANGELOG still contains 'TBD' for version ${WHEELS_VERSION%+*}"
+            echo "Please update CHANGELOG.md with the actual release date before releasing."
+            exit 1
+          fi
+
+          # Check that version doesn't contain SNAPSHOT for main releases
+          if echo "$WHEELS_VERSION" | grep -qi "snapshot"; then
+            echo "ERROR: Version contains SNAPSHOT but this is a main branch release"
+            echo "Please remove SNAPSHOT suffix from box.json files before releasing."
+            exit 1
+          fi
+
+          echo "✓ Release checklist validation passed"
+
+      #############################################
+      # Prepare and Publish to ForgeBox
+      #############################################
+
+      - name: Prepare Wheels Base Template for ForgeBox
+        run: |
+          ./tools/build/scripts/prepare-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Prepare Wheels Core for ForgeBox
+        run: |
+          ./tools/build/scripts/prepare-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Prepare Wheels CLI for ForgeBox
+        run: |
+         ./tools/build/scripts/prepare-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+
+      - name: Prepare Wheels Starter App for ForgeBox
+        run: |
+         ./tools/build/scripts/prepare-starterApp.sh "${{ env.WHEELS_VERSION }}"
+
+      - name: Install CommandBox
+        run: |
+          curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo gpg --dearmor -o /usr/share/keyrings/ortussolutions.gpg
+          echo "deb [signed-by=/usr/share/keyrings/ortussolutions.gpg] https://downloads.ortussolutions.com/debs/noarch /" | sudo tee /etc/apt/sources.list.d/ortussolutions.list
+          sudo apt-get update && sudo apt-get install -y commandbox
+
+      #############################################
+      # Validate Packages Before Publishing
+      #############################################
+
+      - name: Validate Package Structure and Versions
+        run: |
+          echo "=========================================="
+          echo "Validating Packages Before ForgeBox Publish"
+          echo "=========================================="
+
+          # Function to validate a package
+          validate_package() {
+            local PACKAGE_DIR=$1
+            local PACKAGE_NAME=$2
+
+            echo ""
+            echo "Validating $PACKAGE_NAME..."
+
+            # Check if directory exists
+            if [ ! -d "$PACKAGE_DIR" ]; then
+              echo "ERROR: Directory $PACKAGE_DIR does not exist!"
+              exit 1
+            fi
+
+            # Check if box.json exists
+            if [ ! -f "$PACKAGE_DIR/box.json" ]; then
+              echo "ERROR: box.json not found in $PACKAGE_DIR!"
+              exit 1
+            fi
+
+            # Validate box.json syntax
+            if ! jq empty "$PACKAGE_DIR/box.json" 2>/dev/null; then
+              echo "ERROR: Invalid JSON in $PACKAGE_DIR/box.json"
+              exit 1
+            fi
+
+            # Extract and display version
+            local VERSION=$(jq -r '.version' "$PACKAGE_DIR/box.json")
+            echo "  Version: $VERSION"
+
+            # Check that version matches expected version
+            if [[ "$VERSION" != "${{ env.WHEELS_VERSION }}" ]]; then
+              echo "  WARNING: Version mismatch! Expected ${{ env.WHEELS_VERSION }}, got $VERSION"
+            fi
+
+            # Count files
+            local FILE_COUNT=$(find "$PACKAGE_DIR" -type f | wc -l)
+            echo "  Files: $FILE_COUNT"
+
+            if [ "$FILE_COUNT" -eq 0 ]; then
+              echo "ERROR: No files found in package directory!"
+              exit 1
+            fi
+
+            echo "  ✓ Package validated successfully"
+          }
+
+          # Validate all packages
+          validate_package "build-wheels-base" "Wheels Base Template"
+          validate_package "build-wheels-core/wheels" "Wheels Core"
+          validate_package "build-wheels-cli/wheels-cli" "Wheels CLI"
+          validate_package "build-wheels-starterApp" "Wheels Starter App"
+
+          echo ""
+          echo "=========================================="
+          echo "All packages validated successfully!"
+          echo "=========================================="
+
+      - name: Publish All Packages to ForgeBox
+        run: |
+          # Publish stable release and mark as current/stable version
+          ./tools/build/scripts/publish-to-forgebox.sh "wheels-dev" "${{ secrets.FORGEBOX_PASS }}" "true" "true"
+
+      #############################################
+      # Build Artifacts for GitHub
+      #############################################
+
+      - name: Build All Wheels Artifacts
+        run: |
+          ./tools/build/scripts/build-base.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-core.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-cli.sh "${{ env.WHEELS_VERSION }}" "${{ env.BRANCH }}" "${{ github.run_number }}" "${{ env.WHEELS_PRERELEASE }}"
+          ./tools/build/scripts/build-starterApp.sh "${{ env.WHEELS_VERSION }}"
+
+      - name: Upload Wheels Base Template Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: cfwheels-variants
+          name: build-artifacts-base-template
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/wheels/wheels-base-template-be.zip
+
+      - name: Upload Wheels Core Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-core
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+            artifacts/wheels/wheels-core-be.zip
+
+      - name: Upload Wheels CLI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-cli
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/wheels/wheels-cli-be.zip
+      
+      - name: Upload Wheels Starter App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-starter-app
+          path: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512
+            artifacts/wheels/wheels-starter-app-be.zip
+      
+      - name: Upload All Wheels Artifacts (Combined)
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-all
           path: |
             artifacts/**/*
 
-      # publish core package
-      - uses: pixl8/github-action-box-publish@v4
+      - name: Upload Workflow Logs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          forgebox_user: cfwheels
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-cfwheels-core/cfwheels
+          name: logs-release
+          path: |
+            ${{ runner.temp }}/_runner_diag/
+            ${{ runner.temp }}/_github_workflow/
 
-      # publish base package
-      - uses: pixl8/github-action-box-publish@v4
+      #############################################
+      # Create GitHub Release (main branch only)
+      #############################################
+
+      - name: Extract Release Notes from CHANGELOG
+        if: github.ref == 'refs/heads/main'
+        id: extract-release-notes
+        run: |
+          # Extract the release notes for the current version from CHANGELOG.md
+          VERSION_PATTERN=$(echo "${WHEELS_VERSION%+*}" | sed 's/\./\\./g')
+          awk '/^# \['"${VERSION_PATTERN}"'\]/,/^---$/ {print}' CHANGELOG.md | sed '1d;$d' > release-notes.md
+          echo "Release notes extracted to release-notes.md"
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
         with:
-          forgebox_user: cfwheels
-          forgebox_pass: ${{ secrets.FORGEBOX_PASS }}
-          force: "true"
-        env:
-          BOXJSON_DIR: /build-cfwheels-base/cfwheels
-
-      - name: Inform Slack
-        if: ${{ always() }}
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_CHANNEL: coding
-          SLACK_COLOR: ${{ job.status }} # or a specific color like 'green' or '#ff00ff'
-          SLACK_ICON_EMOJI: ":bell:"
-          SLACK_MESSAGE: 'CFWheels ${{ env.CFWHEELS_VERSION }} Built with ${{ job.status }}!'
-          SLACK_TITLE: "CFWheels Build"
-          SLACK_USERNAME: CI
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          tag_name: v${{ env.WHEELS_VERSION }}
+          name: Wheels ${{ env.WHEELS_VERSION }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ env.WHEELS_PRERELEASE }}
+          files: |
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-base-template-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-core-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-cli-*.sha512
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.zip
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.md5
+            artifacts/wheels/${{ env.WHEELS_VERSION }}/wheels-starter-app-*.sha512

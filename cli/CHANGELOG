@@ -1,0 +1,59 @@
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+0.5.0
+* app-wizard command [Peter Amiri]
+* Better h2 integration [Peter Amiri]
+
+0.4.2
+* Adds `create app` command [Peter Amiri]
+* Adds basic support for templates [Peter Amiri]
+
+0.2.9
+* Removes cfprocessdirective from default bootstrap layout
+
+0.2.8
+* Fixes Scaffolding edit routing
+
+0.2.5
+* Updates new installation bootstrap flash messages plugin #25 [Peter Amiri, Tom King]
+* New Properties added via scaffold now appear in the default index #24 [Peter Amiri]
+* Fixes Index templates to use routes and buttonTo Delete Links [Tom King]
+* Fixes Encode Attributes as bootstrap template default to form helpers [Tom King]
+
+0.2.4
+* Various scaffolding syntax updates for Wheels 2.0
+
+0.2.2
+* Adds Wheels 2.0
+
+0.1.6
+* Add travis Adapter Test
+
+0.1.4
+
+Enhancements
+=================
+
+* Drops wheels 1.x support
+* Core, App and plugin tests via `wheels test core servername` etc added
+* Restructures Test.cf into single command vs three
+* Removes old plugins
+
+0.1.1
+
+Enhancements
+=================
+
+* Adds command aliases for dbmigrate (db), generate(g), destroy(d) #15
+* CLI can identify Wheels version from box.json #16
+* `wheels reload` (alias `r`) command added #20
+* `wheels new` now offers and configures a H2 database for development when on lucee #19
+* `wheels init` allows for existing Wheels apps to be prepped for CLI usage #21
+
+Bug Fixes
+=================
+
+* `wheels new` now downloads to a unique temp folder #11
+* `wheels scaffold` and `wheels g property` command now prompt for migration #13
+* generated columns are now lowercase #18
+* CLI now only installs dbmigrate + dbmigratebridge plugins for wheels 1.x #22
+* Special Chars now stripped for `generate` and `new` commands #17

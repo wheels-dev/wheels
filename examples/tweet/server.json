@@ -1,0 +1,15 @@
+{
+    "name":"tweet",
+    "web":{
+        "host":"localhost",
+        "webroot":"public",
+        "rewrites":{
+            "enable":true,
+            "config":"public/urlrewrite.xml"
+        }
+    },
+    "app":{
+        "cfengine":"lucee",
+        "libDirs":"app/lib"
+    }
+}

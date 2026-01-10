@@ -1,5 +1,0 @@
-component {
-
-	include "basefunctions.cfm";
-
-}

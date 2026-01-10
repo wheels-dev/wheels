@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "wheels": {
+      "url": "http://localhost:{PORT}/wheels/mcp",
+      "type": "http"
+    },
+    "browsermcp": {
+      "command": "npx",
+      "args": [
+        "@browsermcp/mcp@latest"
+      ]
+    }
+  }
+}

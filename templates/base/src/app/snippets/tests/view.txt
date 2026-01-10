@@ -1,0 +1,28 @@
+component extends="wheels.Testbox" {
+
+	function beforeAll() {
+		// Setup test data once for all tests in this component
+		// Example: variables.testData = queryNew("id,name", "integer,varchar", [[1,"Test"]]);
+	}
+
+	function afterAll() {
+		// Cleanup test data once after all tests complete
+		// Example: Clean up any test files or temporary data
+	}
+
+	function run() {
+		// Write the name for your test suite in the describe function
+		describe("View Tests", function() {
+
+			// Only use beforeEach/afterEach when tests need isolated state
+			// Most tests should use the component-level beforeAll/afterAll instead
+
+			it("should render view correctly", function() {
+				// Your view tests here
+				var result = renderView(view="/path/to/view", layout=false);
+				expect(result).toInclude("expected content");
+			});
+
+		});
+	}
+}

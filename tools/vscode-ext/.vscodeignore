@@ -1,0 +1,11 @@
+# Ignore development files in the VSIX package
+.gitignore
+.yarnrc
+vsc-extension-quickstart.md
+jsconfig.json
+**/*.map
+eslint.config.mjs
+.vscode/
+.vscode-test/**
+node_modules/**
+test/**

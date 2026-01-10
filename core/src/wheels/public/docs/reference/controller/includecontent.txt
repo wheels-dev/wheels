@@ -1,0 +1,16 @@
+<!--- In your view template, let's say `app/views/blog/post.cfm--->
+contentFor(head='<meta name="robots" content="noindex,nofollow">');
+contentFor(head='<meta name="author" content="wheelsdude@wheelsify.com">');
+
+// In `app/views/layout.cfm`
+<html>
+	<head>
+	    <title>My Site</title>
+	    #includeContent("head")#
+	</head>
+	<body>
+		<cfoutput>
+			#includeContent()#
+		</cfoutput>
+	</body>
+</html>

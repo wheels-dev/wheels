@@ -6,8 +6,250 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ----
+## About the CFWheels → Wheels Rebrand
 
-# [2.5.0] => 2023.11.01
+**Note:** Starting with version 3.0.0, the project has been renamed from "CFWheels" to "Wheels" as part of our evolution and modernization efforts. This rebrand includes:
+
+- **Project Name**: CFWheels → Wheels
+- **GitHub Organization**: `cfwheels/cfwheels` → `wheels-dev/wheels`
+- **Domain**: `cfwheels.org` → `wheels.dev`
+
+All historical references to "CFWheels" in this changelog have been preserved for accuracy. When you see "CFWheels" in entries below, that was the project name at the time of that release.
+
+----
+
+
+# [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
+
+**Wheels 3.0.0 - Stable Release**
+
+This is the first stable release of Wheels 3.0, featuring the rebrand from CFWheels to Wheels and major architecture improvements.
+
+## 🎉 Major Changes in 3.0.0
+
+### Rebrand: CFWheels → Wheels
+- Project renamed from "CFWheels" to "Wheels"
+- New domain: wheels.dev (from cfwheels.org)
+- New GitHub organization: wheels-dev/wheels (from cfwheels/cfwheels)
+
+### Architecture Changes
+- **New Project Structure**: Wheels core moved outside app root for cleaner separation
+- **Updated Mappings**: Application.cfm paths restructured for better organization
+- **CLI Enhancements**: New `wheels` CLI tool with enhanced commands
+  - `wheels init` - Initialize new Wheels projects with Docker support
+  - `wheels env setup` - Environment configuration and switching
+  - `wheels db create/drop` - Database management with Oracle support
+- **macOS Installer**: Complete macOS installer package with automated setup
+- **VSCode Extension API**: Enhanced API for better IDE integration
+
+### Model Enhancements
+- **ignoreColumns()**: New model config method to exclude columns from mapping
+- **Improved Model Initialization**: Better race condition handling with automatic recovery
+- **Performance Improvements**: Significant findAll() performance optimizations
+- **Query Enhancements**: Native query returnType support
+- **Calculated Properties**: Fixed invalidation issues for better reliability
+
+### View Enhancements
+- **paginationLinks()**: Enhanced to set active class on parent elements
+
+### Testing & Development
+- **Rewritten TestUI**: Modern Vue-based test runner interface
+- **Database Support**: Updated to latest versions of MySQL, PostgreSQL, SQL Server
+- **Oracle Support**: Full Oracle database support in CLI commands
+- **Migration System**: Updated null property handling (null → allowNull)
+
+### Bug Fixes
+- Fixed model datasource bugs
+- Fixed updateAll() missing JOIN statements with include argument
+- Fixed checkbox bugs when checkedValue is not true
+- Fixed ambiguous column names using wheels alias
+- Fixed duplicate component issues
+- Fixed default route handling
+- Fixed numeric primary key return values
+- Fixed afterFind callback in findAll for structs
+- Fixed reload password check for URL IP exceptions
+
+### Documentation
+- Extensive guide updates and improvements
+- Added WHERE clause nested query limitations
+- Updated beginner tutorials
+- Added ignored columns documentation
+- Spelling and grammar fixes throughout
+- Test framework functions added to documentation
+
+### Testing Infrastructure
+- Added Lucee 6 and 7 support
+- Added Adobe 2021, 2023, 2025 support
+- Updated to Docker Compose v2 syntax
+- Enhanced GitHub Actions testing matrix
+
+### Potentially Breaking Changes
+⚠️ **Important**: Review these changes before upgrading from 2.x
+
+- **Project Structure**: Wheels core location changed - requires Application.cfm updates
+- **Mappings**: New mapping structure in Application.cfm
+- **CLI Commands**: New command syntax for database operations
+- **Dependencies**: Updated WireBox (^7.0.0) and TestBox (^6.0.0) requirements
+
+---
+
+## Detailed Changes
+
+### CLI Enhancements
+- PR-1764-Oracle database support for db create and drop commands [#1764](https://github.com/wheels-dev/wheels/pull/1764) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1760-CLI parameter improvements and required attribute updates [#1760](https://github.com/wheels-dev/wheels/pull/1760) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1755-CLI test commands parameter updates and guides [#1755](https://github.com/wheels-dev/wheels/pull/1755) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1753-CLI commands parameters development and guides updates [#1753](https://github.com/wheels-dev/wheels/pull/1753) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1751-CLI generate test command implementation [#1751](https://github.com/wheels-dev/wheels/pull/1751) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1748-CLI commands parameters development enhancements [#1748](https://github.com/wheels-dev/wheels/pull/1748) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1746-CLI commands parameters development updates [#1746](https://github.com/wheels-dev/wheels/pull/1746) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1743-Fix wheels env setup command base parameter and comprehensive documentation [#1743](https://github.com/wheels-dev/wheels/pull/1743) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1741-CLI commands parameters development improvements [#1741](https://github.com/wheels-dev/wheels/pull/1741) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1737-CLI parameters updates in init and dbmigrate create commands [#1737](https://github.com/wheels-dev/wheels/pull/1737) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1734-CLI JDBC connection verification function without actual DB name [#1734](https://github.com/wheels-dev/wheels/pull/1734) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1732-CLI guides updated with fixes based on post-testing issues [#1732](https://github.com/wheels-dev/wheels/pull/1732) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1727-Fix Wheels plugin management commands and documentation [#1727](https://github.com/wheels-dev/wheels/pull/1727) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1720-CLI test watch command implementation [#1720](https://github.com/wheels-dev/wheels/pull/1720) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1718-Add resolveTestDirectory function and update TestBox CLI guides [#1718](https://github.com/wheels-dev/wheels/pull/1718) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1712-CLI runner.cfm updated with new logic [#1712](https://github.com/wheels-dev/wheels/pull/1712) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1710-CLI update generate test command [#1710](https://github.com/wheels-dev/wheels/pull/1710) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1709-CLI removed extra arguments and updated guides [#1709](https://github.com/wheels-dev/wheels/pull/1709) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1706-CLI test run command implementation [#1706](https://github.com/wheels-dev/wheels/pull/1706) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1698-Wheels CLI fixes and improvements [#1698](https://github.com/wheels-dev/wheels/pull/1698) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1694-Enable parameter support for config and env commands [#1694](https://github.com/wheels-dev/wheels/pull/1694) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1691-Wheels CLI fixes and enhancements [#1691](https://github.com/wheels-dev/wheels/pull/1691) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1690-Add CLI command guides for wheels get settings/environment and clean commands [#1690](https://github.com/wheels-dev/wheels/pull/1690) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1687-Wheels CLI fixes and updates [#1687](https://github.com/wheels-dev/wheels/pull/1687) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1683-Wheels CLI fixes and improvements [#1683](https://github.com/wheels-dev/wheels/pull/1683) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1674-Wheels CLI guides updated with known issues [#1674](https://github.com/wheels-dev/wheels/pull/1674) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1667-Wheels CLI guides updates [#1667](https://github.com/wheels-dev/wheels/pull/1667) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1660-Fix bugs in multiple CLI commands [#1660](https://github.com/wheels-dev/wheels/pull/1660) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### BoxLang Compatibility
+- PR-1705-BoxLang version upgrade to 1.5 [#1705](https://github.com/wheels-dev/wheels/pull/1705) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1695-Add BoxLang support for Oracle [#1695](https://github.com/wheels-dev/wheels/pull/1695) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1684-BoxLang compatibility with 1.4.x and PostgreSQL [#1684](https://github.com/wheels-dev/wheels/pull/1684) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1676-BoxLang compatibility documentation [#1676](https://github.com/wheels-dev/wheels/pull/1676) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1662-BoxLang support documentation updates [#1662](https://github.com/wheels-dev/wheels/pull/1662) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1659-Add BoxLang compatibility support [#1659](https://github.com/wheels-dev/wheels/pull/1659) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### Oracle Support
+- PR-1769-Oracle database support [#1769](https://github.com/wheels-dev/wheels/pull/1769) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### VSCode Extension
+- PR-1768-VSCode extension API function description updates [#1768](https://github.com/wheels-dev/wheels/pull/1768) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1750-VSCode extension upgrades and enhancements [#1750](https://github.com/wheels-dev/wheels/pull/1750) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1747-Fix code snippets suggestion issue [#1747](https://github.com/wheels-dev/wheels/pull/1747) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1745-API documentation extension for VSCode [#1745](https://github.com/wheels-dev/wheels/pull/1745) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1742-VSCode extension updates [#1742](https://github.com/wheels-dev/wheels/pull/1742) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1729-VSCode extension changelog update for v1.0.3 [#1729](https://github.com/wheels-dev/wheels/pull/1729) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1726-VSCode extension changelog entry for v1.0.2 [#1726](https://github.com/wheels-dev/wheels/pull/1726) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1724-VSCode extension changelog entry for v1.0.1 [#1724](https://github.com/wheels-dev/wheels/pull/1724) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1721-VSCode extension function front look description update [#1721](https://github.com/wheels-dev/wheels/pull/1721) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1711-Add VSCode extension for Wheels [#1711](https://github.com/wheels-dev/wheels/pull/1711) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### Installer & Tooling
+- PR-1767-macOS installer update with .dmg file [#1767](https://github.com/wheels-dev/wheels/pull/1767) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1765-Complete macOS installer package with automated setup [#1765](https://github.com/wheels-dev/wheels/pull/1765) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1739-Add Wheels framework installers for Windows [#1739](https://github.com/wheels-dev/wheels/pull/1739) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### Build & Release Process
+- PR-1758-Rebrand CFWheels to Wheels for 3.0.0 release [#1758](https://github.com/wheels-dev/wheels/pull/1758) - [Peter Amiri](https://github.com/bpamiri)
+- PR-1757-Improve release workflow and prepare for 3.0.0 release [#1757](https://github.com/wheels-dev/wheels/pull/1757) - [Peter Amiri](https://github.com/bpamiri)
+- PR-1754-Update docs-sync.yml workflow [#1754](https://github.com/wheels-dev/wheels/pull/1754) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1719-Update wheels path in build configuration [#1719](https://github.com/wheels-dev/wheels/pull/1719) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1699-Fix build release button [#1699](https://github.com/wheels-dev/wheels/pull/1699) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1673-Release starter app to ForgeBox [#1673](https://github.com/wheels-dev/wheels/pull/1673) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1672-Check contents for build-wheels-starterApp folder [#1672](https://github.com/wheels-dev/wheels/pull/1672) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1671-Push starter app to ForgeBox [#1671](https://github.com/wheels-dev/wheels/pull/1671) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1669-Fix starter app issues [#1669](https://github.com/wheels-dev/wheels/pull/1669) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1668-Sync images from docs to wheels.dev [#1668](https://github.com/wheels-dev/wheels/pull/1668) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1666-Update snapshot.yml workflow [#1666](https://github.com/wheels-dev/wheels/pull/1666) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1665-Docs sync with wheels.dev [#1665](https://github.com/wheels-dev/wheels/pull/1665) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1664-ForgeBox release fix [#1664](https://github.com/wheels-dev/wheels/pull/1664) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1663-CLI ForgeBox release fix [#1663](https://github.com/wheels-dev/wheels/pull/1663) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### TestBox/Testing Infrastructure
+- PR-1759-Update TestBox version to 6.0 and update file names [#1759](https://github.com/wheels-dev/wheels/pull/1759) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1744-Insert Wheels functions in TestBox scope [#1744](https://github.com/wheels-dev/wheels/pull/1744) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1728-Bump vite from 6.3.5 to 6.3.6 in testui [#1728](https://github.com/wheels-dev/wheels/pull/1728) - [dependabot](https://github.com/dependabot)
+- PR-1749-Bump tar-fs from 3.1.0 to 3.1.1 in testui [#1749](https://github.com/wheels-dev/wheels/pull/1749) - [dependabot](https://github.com/dependabot)
+- PR-1725-Fix scope resolution for plugins using WireBox in tests [#1725](https://github.com/wheels-dev/wheels/pull/1725) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1717-Add test suite for $dbinfo() function [#1717](https://github.com/wheels-dev/wheels/pull/1717) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1703-Fix randomly failing test case on GitHub Actions [#1703](https://github.com/wheels-dev/wheels/pull/1703) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1702-Fix for issue #1022 Docker GitHub workflow [#1702](https://github.com/wheels-dev/wheels/pull/1702) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1689-Update to run legacy tests in Wheels 3.0 [#1689](https://github.com/wheels-dev/wheels/pull/1689) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1688-Move TestBox folder [#1688](https://github.com/wheels-dev/wheels/pull/1688) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1680-Add legacy test buttons to debug console [#1680](https://github.com/wheels-dev/wheels/pull/1680) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1675-Update app level testing process [#1675](https://github.com/wheels-dev/wheels/pull/1675) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### Architecture Changes
+- PR-1735-Add MCP (Model Context Protocol) integration to Wheels CLI [#1735](https://github.com/wheels-dev/wheels/pull/1735) - [Peter Amiri](https://github.com/bpamiri)
+- PR-1679-Get plugins from root directory [#1679](https://github.com/wheels-dev/wheels/pull/1679) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+### Controller Enhancements
+
+### Model Enhancements
+- PR-1326-ignoreColumns model config method [#1326](https://github.com/cfwheels/cfwheels/pull/1326) - [Adam Chapman](https://github.com/chapmandu)
+- PR-1568-issue #432 improved model initialization to handle race conditions with better error handling and automatic recovery [#1568](https://github.com/wheels-dev/wheels/pull/1568) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- **SQLite Support**: Added full support for SQLite database adapter with automatic datetime conversion to ISO 8601 text format, proper type mapping, and comprehensive test coverage across Lucee, Adobe ColdFusion, and BoxLang
+
+### View Enhancements
+
+### Bug Fixes
+- PR-1327-issue #1319 model datasource bug [#1327](https://github.com/cfwheels/cfwheels/pull/1327) - [Adam Chapman](https://github.com/chapmandu)
+- PR-1360-updateAll() is missing JOIN statement(s) when passing a value for the include argument [#1360](https://github.com/cfwheels/cfwheels/pull/1360) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1752-Adobe ColdFusion 2025 compatibility [#1752](https://github.com/wheels-dev/wheels/pull/1752) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1756-Update H2 driver to latest version [#1756](https://github.com/wheels-dev/wheels/pull/1756) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1763-Update databases to latest versions [#1763](https://github.com/wheels-dev/wheels/pull/1763) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1762-Update null to allowNull in migrations [#1762](https://github.com/wheels-dev/wheels/pull/1762) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1761-Update cfwheels to wheels and fix container names [#1761](https://github.com/wheels-dev/wheels/pull/1761) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1740-Update argument name for migrator functions [#1740](https://github.com/wheels-dev/wheels/pull/1740) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1738-Remove use of findBySql function as it does not exist [#1738](https://github.com/wheels-dev/wheels/pull/1738) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1731-Remove duplicate test command menu items from side menu [#1731](https://github.com/wheels-dev/wheels/pull/1731) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1730-Optimize ListGetAt loops across framework for significant performance improvement [#1730](https://github.com/wheels-dev/wheels/pull/1730) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1722-Add local prefix to variable [#1722](https://github.com/wheels-dev/wheels/pull/1722) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1704-Fix URL rewrite off issues [#1704](https://github.com/wheels-dev/wheels/pull/1704) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1700-Fix missing icons [#1700](https://github.com/wheels-dev/wheels/pull/1700) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1697-Update test icons [#1697](https://github.com/wheels-dev/wheels/pull/1697) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1693-Update migrator table name [#1693](https://github.com/wheels-dev/wheels/pull/1693) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1692-Update cfwheels to wheels branding [#1692](https://github.com/wheels-dev/wheels/pull/1692) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1682-Update tag format to script format [#1682](https://github.com/wheels-dev/wheels/pull/1682) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1681-Fix missing mail part in email content [#1681](https://github.com/wheels-dev/wheels/pull/1681) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1766-**SQLite Datetime Compatibility**: Fixed issue where SQLite would reject JDBC timestamp literals by implementing automatic conversion to ISO 8601 text format in the SQLite adapter
+- PR-1766-**SQLite Locking on Adobe ColdFusion**: Addressed intermittent SQLITE_LOCKED errors during migrations by skipping foreign key enumeration that triggered metadata queries with lingering file locks
+
+### Miscellaneous
+- PR-1316-Feature/fix testui container [#1316](https://github.com/cfwheels/cfwheels/pull/1316) - [Peter Amiri](https://github.com/bpamiri)
+- PR-1328-Backport datasource changes to develop branch [#1328](https://github.com/cfwheels/cfwheels/pull/1328) - [Peter Amiri](https://github.com/bpamiri)
+- PR-1329-use github build vars to remove the hardcoded version number [#1329](https://github.com/cfwheels/cfwheels/pull/1329) - [Peter Amiri](https://github.com/bpamiri)
+- PR-1317-Rewrite the Vue based TestUI app [#1317](https://github.com/cfwheels/cfwheels/pull/1317) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- **SQLite Test Suite**: Added SQLite to the continuous integration test matrix for Lucee, Adobe ColdFusion, and BoxLang with comprehensive migrator and model tests
+
+### Guides
+- PR-1304-Update beginner-tutorial-hello-database.md [#1304](https://github.com/cfwheels/cfwheels/pull/1304) - [MvdO79](https://github.com/MvdO79)
+- PR-1305-Update beginner-tutorial-hello-database.md [#1305](https://github.com/cfwheels/cfwheels/pull/1305) - [MvdO79](https://github.com/MvdO79)
+- PR-1308-Added: "Nested queries not allowed" in WHERE clause documentation [#1308](https://github.com/cfwheels/cfwheels/pull/1308) - [MvdO79](https://github.com/MvdO79)
+- PR-1313-Spelling checks [#1313](https://github.com/cfwheels/cfwheels/pull/1313) - [MvdO79](https://github.com/MvdO79)
+- PR-1323-Update guides with description of the templates directory [#1323](https://github.com/cfwheels/cfwheels/pull/1323) - [MvdO79](https://github.com/MvdO79)
+- PR-1350-Update documentation for  Reading Rrecords [#1350](https://github.com/cfwheels/cfwheels/pull/1350) - [MvdO79](https://github.com/MvdO79)
+- PR-1355-Add examples for IgnoredColumns attribute by creating ignoredcolumns.txt [#1355](https://github.com/cfwheels/cfwheels/pull/1355) - [MvdO79](https://github.com/MvdO79)
+- PR-1736-Update use of ORM functions in claude.md files [#1736](https://github.com/wheels-dev/wheels/pull/1736) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1733-Update md files with clear arguments [#1733](https://github.com/wheels-dev/wheels/pull/1733) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1701-Update guides for Docker instructions [#1701](https://github.com/wheels-dev/wheels/pull/1701) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1686-Documentation updates for datasources [#1686](https://github.com/wheels-dev/wheels/pull/1686) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1685-Testing application documentation [#1685](https://github.com/wheels-dev/wheels/pull/1685) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1661-Update CONTRIBUTING.md [#1661](https://github.com/wheels-dev/wheels/pull/1661) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1766-**SQLite Documentation**: Added comprehensive guide for using SQLite with Wheels, covering setup, configuration, data types, datetime handling, migrations, associations, testing strategies, performance optimization, and troubleshooting
+
+### Potentially Breaking Changes
+- PR-1240-Feature/move wheels outside the app root and make changes to mappings [#1240](https://github.com/cfwheels/cfwheels/pull/1240) - [Zain Ul Abideen](https://github.com/zainforbjs)
+- PR-1310-update paths in application.cfm [#1310](https://github.com/cfwheels/cfwheels/pull/1310) - [Peter Amiri](https://github.com/bpamiri)
+- PR-1314-Added some missing mappings [#1314](https://github.com/cfwheels/cfwheels/pull/1314) - [Zain Ul Abideen](https://github.com/zainforbjs)
+
+---
+
+# [2.5.0](https://github.com/cfwheels/cfwheels/releases/tag/v2.5.0) => 2023.11.01
 
 <!-- ### Controller Enhancements -->
 
@@ -97,7 +339,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 # [2.3.0](https://github.com/cfwheels/cfwheels/releases/tag/v2.3.0) => 2020.05.11
 
-This release finalizes the 2.3.0 release and doesn't include any new enhancements or bug fixes. Bellow is the change log from the 2.3.0.rc.1 release.
+This release finalizes the 2.3.0 release and doesn't include any new enhancements or bug fixes. Below is the change log from the 2.3.0.rc.1 release.
 
 ### View Enhancements
 - Adds association error support via `includeAssociations` argument [#1080](https://github.com/cfwheels/cfwheels/issues/1080) - [Nikolaj Frey]
@@ -113,17 +355,17 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 - Internal Docs search now resets itself properly on backspace with empty value [#982](https://github.com/cfwheels/cfwheels/issues/982) - [Brandon Shea, Tom King]
 - `ValidatesConfirmationOf()` now correctly enforces prescence of confirmation property [#1070](https://github.com/cfwheels/cfwheels/issues/1070) - [Adam Cameron, Tom King]
 - `resource()`/`resources()` now allows empty `only` property to utilise as non-route parent [#1083](https://github.com/cfwheels/cfwheels/issues/1083) - [Brian Ramsey]
-- Handle XSS Injection in development enviroment - [Michael Diederich]
+- Handle XSS Injection in development environment - [Michael Diederich]
 - Fix params bug in CLI API [#1106] - [Peter Amiri]
 
 ### Miscellaneous
 
 - Update Docker Lucee Commandbox version to 5.2.0 - [Adam Chapman, Tom King]
-- Minor internal obselete reference to modelComponentPath removed - [Adam Chapman, Tom King]
+- Minor internal obsolete reference to modelComponentPath removed - [Adam Chapman, Tom King]
 - Minor visual fix for long migration logs overflow in modal (scroll) - [Brian Ramsey]
 - Add test suite for Lucee and H2 Database to the GitHub Actions test suite. - [Peter Amiri]
 - On going changes to update the H2 drivers [#1107] - [Peter Amiri]
-- Fixes some syntax formating introduced by cfformat [#1111] - [Adam Chapman]
+- Fixes some syntax formatting introduced by cfformat [#1111] - [Adam Chapman]
 - Minimum ColdFusion version is now ColdFusion (2018 release) Update 3 (2018,0,03,314033) / ColdFusion (2016 release) Update 10 (2016,0,10,314028) / ColdFusion 11 Update 18 (11,0,18,314030) [#923](https://github.com/cfwheels/cfwheels/issues/923) - [Michael Diederich]
 - Wheels save(allowExplicitTimestamps=true) doesn't produce the expected result [#1113] - [SebastienFCT]
 
@@ -153,17 +395,17 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 - Internal Docs search now resets itself properly on backspace with empty value [#982](https://github.com/cfwheels/cfwheels/issues/982) - [Brandon Shea, Tom King]
 - `ValidatesConfirmationOf()` now correctly enforces prescence of confirmation property [#1070](https://github.com/cfwheels/cfwheels/issues/1070) - [Adam Cameron, Tom King]
 - `resource()`/`resources()` now allows empty `only` property to utilise as non-route parent [#1083](https://github.com/cfwheels/cfwheels/issues/1083) - [Brian Ramsey]
-- Handle XSS Injection in development enviroment - [Michael Diederich]
+- Handle XSS Injection in development environment - [Michael Diederich]
 - Fix params bug in CLI API [#1106] - [Peter Amiri]
 
 ### Miscellaneous
 
 - Update Docker Lucee Commandbox version to 5.2.0 - [Adam Chapman, Tom King]
-- Minor internal obselete reference to modelComponentPath removed - [Adam Chapman, Tom King]
+- Minor internal obsolete reference to modelComponentPath removed - [Adam Chapman, Tom King]
 - Minor visual fix for long migration logs overflow in modal (scroll) - [Brian Ramsey]
 - Add test suite for Lucee and H2 Database to the GitHub Actions test suite. - [Peter Amiri]
 - On going changes to update the H2 drivers [#1107] - [Peter Amiri]
-- Fixes some syntax formating introduced by cfformat [#1111] - [Adam Chapman]
+- Fixes some syntax formatting introduced by cfformat [#1111] - [Adam Chapman]
 - Minimum ColdFusion version is now ColdFusion (2018 release) Update 3 (2018,0,03,314033) / ColdFusion (2016 release) Update 10 (2016,0,10,314028) / ColdFusion 11 Update 18 (11,0,18,314030) [#923](https://github.com/cfwheels/cfwheels/issues/923) - [Michael Diederich]
 - Wheels save(allowExplicitTimestamps=true) doesn't produce the expected result [#1113] - [SebastienFCT]
 
@@ -226,7 +468,7 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 ### Bug Fixes
 
 - Fixed pagination order ambiguous column name exception - [#980](https://github.com/cfwheels/cfwheels/issues/#980) [Adam Chapman, Mike Lange]
-- Renames findLast() to findLastOne() for lucee@5.3.5+92 upwards compatibility [#988](https://github.com/cfwheels/cfwheels/issues/#988)
+- Renames findLast() to findLastOne() for lucee5.3.5+92 upwards compatibility [#988](https://github.com/cfwheels/cfwheels/issues/#988)
 
 ----
 
@@ -292,7 +534,7 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 - CORS Header can now be set via `accessControlAllowHeaders(value)` [#888](https://github.com/cfwheels/cfwheels/issues/888) [Tom King]
 - Performance Improvement: Scanning of Models and Controllers [#917](https://github.com/cfwheels/cfwheels/issues/917) [Adam Chapman]
 - Added the `authenticityToken()` function for returning the raw CSRF authenticity token [#925](https://github.com/cfwheels/cfwheels/issues/925) [Adam Chapman]
-- Adds `enablePublicComponent`, `enableMigratorComponent`,`enablePluginsComponent` enviroment settings to completely disable those features [#926](https://github.com/cfwheels/cfwheels/issues/936) [Tom King]
+- Adds `enablePublicComponent`, `enableMigratorComponent`,`enablePluginsComponent` environment settings to completely disable those features [#926](https://github.com/cfwheels/cfwheels/issues/936) [Tom King]
 - New CFWheels Internal GUI [#931](https://github.com/cfwheels/cfwheels/issues/931) [Tom King]
 - `pluginRunner()` now removed in favour of 1.x plugin behaviour for performance purposes [#916](https://github.com/cfwheels/cfwheels/issues/916) [Core Team]
 - Adds `validateTestPackageMetaData` environment setting for skipping test package validation on large test suites [#950](https://github.com/cfwheels/cfwheels/issues/950) [Adam Chapman]
@@ -865,7 +1107,7 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 - AMPM select displaying twice - [#768](https://github.com/cfwheels/cfwheels/issues/768) [John Bliss, Tony Petruzzi]
 - \$request argumentsCollection: should be argumentCollection - [#772](https://github.com/cfwheels/cfwheels/issues/772) [William Fisk, Tony Petruzzi]
 - Pagination pull incorrect number of results with compounded keys - [#725](https://github.com/cfwheels/cfwheels/issues/725) [Jeff Greenhouse, Tony Petruzzi]
-- Update hasChanged() to properly chech floats - [Andy Bellenie, Tony Petruzzi]
+- Update hasChanged() to properly check floats - [Andy Bellenie, Tony Petruzzi]
 - Date tags selected date throws out of range error - [Ben Garrett, Tony Petruzzi]
 
 ### Miscellaneous
@@ -921,7 +1163,7 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 ### Bug Fixes
 
 - Added the varchar_ignorecase type to the H2 adapter - [#664](https://github.com/cfwheels/cfwheels/issues/664) [Per Djurner]
-- Fix so that the full tablename is always retuned - [#667](https://github.com/cfwheels/cfwheels/issues/667) [Tony Petruzzi]
+- Fix so that the full tablename is always returned - [#667](https://github.com/cfwheels/cfwheels/issues/667) [Tony Petruzzi]
 - Pagaination with parameterize set to false for numeric keys - [#656](https://github.com/cfwheels/cfwheels/issues/656) [levi730, Tony Petruzzi]
 - Blank should be the selected value when includeBlank is set - [#633](https://github.com/cfwheels/cfwheels/issues/633) [Tony Petruzzi]
 - validatesLengthOf failed when both maximum and minimum were specified - [Tony Petruzzi]
@@ -1265,7 +1507,7 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 - Corrected execution time report when reloading application - [Tony Petruzzi, Per Djurner]
 - Allowing negative values in where clause - Groups [Don Humphreys, Tony Petruzzi]
 - Work-around for a Railo mapping bug that was causing slowness - [#268](https://github.com/cfwheels/cfwheels/issues/268) [Tony Petruzzi, Per Djurner]
-- Fixed an includePartial() error with caching that occured in production mode - [#285](https://github.com/cfwheels/cfwheels/issues/285) [James Gibson, Per Djurner]
+- Fixed an includePartial() error with caching that occurred in production mode - [#285](https://github.com/cfwheels/cfwheels/issues/285) [James Gibson, Per Djurner]
 - Support passing in a single column query to select() and selectTag() - [#300](https://github.com/cfwheels/cfwheels/issues/300) [Tony Petruzzi]
 - Fixed radio button ids to work properly with negative number values - [#274](https://github.com/cfwheels/cfwheels/issues/274) [Elezotte, Per Djurner]
 - Removed display of "rewrite.cfm" in error emails - [#280](https://github.com/cfwheels/cfwheels/issues/280) [Raul Riera, Per Djurner]
@@ -1276,7 +1518,7 @@ This release finalizes the 2.3.0 release and doesn't include any new enhancement
 - Fixed so pagination aborts early when no records exist in the table instead of causing an error - Groups [Per Djurner, James Gibson]
 - Fixed so return type is correct when no records are found on using findOne() with returnAs="object" - [Raul Riera, Per Djurner]
 - Fixed Railo bug caused by argument defaults on a number of functions - [#201](https://github.com/cfwheels/cfwheels/issues/201), #264 [William Fisk, Tony Petruzzi, Per Djurner]
-- Fixed so you can order on included tables in finders without speciyfing table name - [Per Djurner]
+- Fixed so you can order on included tables in finders without specifying table name - [Per Djurner]
 - Fixed so pagination returns an empty query instead of the full record set when specifying a page out of range - [Per Djurner]
 
 ### Miscellaneous

@@ -1,0 +1,92 @@
+<bx:script>
+// BoxLang rewrite handler for CFWheels
+// This file handles URL rewriting for BoxLang compatibility
+
+// Get the requested URI
+requestURI = cgi.request_uri ?: "";
+
+// Remove query string for pattern matching  
+if (find("?", requestURI)) {
+    requestURI = listFirst(requestURI, "?");
+}
+
+// Handle requests that come through /index.bxm/path - redirect to clean URL
+if (find("/index.bxm/", requestURI)) {
+    cleanPath = replace(requestURI, "/index.bxm", "");
+    queryString = cgi.query_string ?: "";
+    redirectURL = cleanPath;
+    if (len(queryString)) {
+        redirectURL &= "?" & queryString;
+    }
+    bx:header name="Location" value=redirectURL;
+    bx:header statusCode=301;
+    bx:abort;
+}
+
+// Static paths that should not be rewritten (based on urlrewrite.xml)
+staticPaths = "cf_script,flex2gateway,jrunscripts,CFIDE,lucee,cfformgateway,cffileservlet,files,images,javascripts,miscellaneous,stylesheets,wheels/public/assets";
+specialFiles = "robots.txt,favicon.ico,sitemap.xml,index.cfm";
+
+// Check if this is a static path or special file
+isStatic = false;
+
+if (len(requestURI) && requestURI != "/") {
+    cleanPath = right(requestURI, len(requestURI) - 1); // Remove leading slash
+    
+    // Check special files first
+    fileName = listLast(requestURI, "/");
+    if (listFindNoCase(specialFiles, fileName)) {
+        isStatic = true;
+    }
+    
+    // Check static paths
+    if (!isStatic) {
+        for (staticPath in listToArray(staticPaths)) {
+            if (left(cleanPath, len(staticPath)) == staticPath) {
+                isStatic = true;
+                break;
+            }
+        }
+    }
+    
+    // Check file extensions for static files
+    if (!isStatic && listLen(cleanPath, ".") > 1) {
+        extension = listLast(cleanPath, ".");
+        staticExtensions = "js,css,png,jpg,jpeg,gif,ico,pdf,zip,txt,xml,json";
+        if (listFindNoCase(staticExtensions, extension)) {
+            isStatic = true;
+        }
+    }
+}
+
+// If it's a static file, let it pass through
+if (isStatic) {
+    bx:header statusCode=404;
+    writeOutput("File not found");
+    bx:abort;
+}
+
+// Set up CGI variables for clean URL generation
+if (len(requestURI) && requestURI != "/") {
+    cgi.path_info = requestURI;
+}
+
+// Override script name for clean URL generation
+cgi.script_name = "/index.cfm";
+
+// Clean up request URI
+if (find("/index.bxm", cgi.request_uri ?: "")) {
+    cgi.request_uri = replace(cgi.request_uri, "/index.bxm", "");
+}
+
+// Update request scope for Wheels compatibility
+if (structKeyExists(request, "cgi")) {
+    request.cgi.script_name = "/index.cfm";
+    if (structKeyExists(request.cgi, "request_uri") && find("/index.bxm", request.cgi.request_uri)) {
+        request.cgi.request_uri = replace(request.cgi.request_uri, "/index.bxm", "");
+    }
+}
+</bx:script>
+
+<!--- Include the main CFWheels bootstrap file --->
+<bx:include template="index.cfm" />

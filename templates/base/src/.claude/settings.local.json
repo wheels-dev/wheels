@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "wheels"
+  ],
+  "enableAllProjectMcpServers": true
+}

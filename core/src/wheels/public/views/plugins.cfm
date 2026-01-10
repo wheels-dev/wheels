@@ -1,0 +1,122 @@
+<cfscript>
+// Check for JSON format request
+param name="request.wheels.params.format" default="html";
+
+if(!application.wheels.enablePluginsComponent)
+	throw(type="wheels.plugins", message="The Wheels Plugin component is disabled...");
+
+loadedPlugins = application.wheels.plugins;
+
+// If JSON format is requested, return JSON response
+if (request.wheels.params.format == "json") {
+	local.pluginsData = {
+		"version": application.wheels.version,
+		"timestamp": now(),
+		"plugins": {
+			"enabled": application.wheels.enablePluginsComponent,
+			"loaded": {}
+		}
+	};
+
+	// Add loaded plugins
+	for (local.pluginName in loadedPlugins) {
+		local.pluginsData.plugins.loaded[local.pluginName] = loadedPlugins[local.pluginName];
+	}
+
+	// Add incompatible plugins if any
+	if (isDefined("application.wheels.incompatiblePlugins") && len(application.wheels.incompatiblePlugins)) {
+		local.pluginsData.plugins.incompatible = listToArray(application.wheels.incompatiblePlugins);
+	}
+
+	// Add dependent plugins if any
+	if (isDefined("application.wheels.dependantPlugins") && len(application.wheels.dependantPlugins)) {
+		local.pluginsData.plugins.dependent = [];
+		for (local.dep in listToArray(application.wheels.dependantPlugins)) {
+			arrayAppend(local.pluginsData.plugins.dependent, {
+				"plugin": listFirst(local.dep, "|"),
+				"needs": listLast(local.dep, "|")
+			});
+		}
+	}
+
+	local.pluginsData.plugins.count = structCount(loadedPlugins);
+
+	cfcontent(type="application/json", reset=true);
+	writeOutput(serializeJSON(local.pluginsData));
+	abort;
+}
+
+</cfscript>
+<cfinclude template="../layout/_header.cfm">
+<cfoutput>
+<!--- cfformat-ignore-start --->
+<div class="ui container">
+	#pageHeader("Plugins", "What you've got loaded..")#
+
+		<cfif ($get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)) OR Len(application.wheels.dependantPlugins)>
+			<div class="ui error message">
+				<div class="header">
+					Warnings:
+				</div>
+					<cfif $get("showIncompatiblePlugins") AND Len(application.wheels.incompatiblePlugins)>
+							<cfloop list="#application.wheels.incompatiblePlugins#" index="local.i">The #local.i# plugin may be incompatible with this version of Wheels, please look for a compatible version of the plugin<br></cfloop>
+						</cfif>
+						<cfif Len(application.wheels.dependantPlugins)>
+							<cfloop list="#application.wheels.dependantPlugins#" index="local.i"><cfset needs = ListLast(local.i, "|")>The #ListFirst(local.i, "|")# plugin needs the following plugin<cfif ListLen(needs) GT 1>s</cfif> to work properly: #needs#<br></cfloop>
+						</cfif>
+			</div>
+		</cfif>
+
+<cfif StructCount($get("plugins")) IS NOT 0>
+	<table class="ui celled striped table">
+		<thead>
+			<tr>
+				<th>Name</th>
+				<th>Version</th>
+				<th colspan="2">Info</th>
+			</tr>
+		</thead>
+		<tbody>
+			<cfloop collection="#$get('plugins')#" item="local.i">
+				<tr>
+					<td>
+						<a href="#urlFor(route="wheelsPluginEntry", name=local.i)#">#local.i#</a>
+					</td>
+					<td>
+						<cfif StructCount($get("pluginMeta")) IS NOT 0 && structKeyExists($get("pluginMeta"), local.i) AND len($get("pluginMeta")[local.i]['version'])>
+							#$get("pluginMeta")[local.i]['version']#
+						<cfelse>
+							<em>Unknown</em>
+						</cfif>
+					</td>
+					<td>
+						<a class="ui button tiny teal" href="#urlFor(route='wheelsPluginEntry', name=local.i)#">
+							<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="8 6 8 12" fill="white" style="vertical-align: middle; margin-right: 4px;">
+								<path d="M11 7h2v2h-2V7zm0 4h2v6h-2v-6z"/>
+							</svg>
+							More information
+						</a>
+					<cfif DirectoryExists("#expandPath("/plugins/#LCase(local.i)#/tests")#")>
+
+							<a class="ui button tiny" href="#urlFor(route = "wheelsPackages", type = "#local.i#")#">View Tests</a>
+						</cfif>
+					</td>
+				</tr>
+			</cfloop>
+		</tbody>
+	</table>
+<cfelse>
+	<div class="ui placeholder segment">
+		<div class="ui icon header">
+			<svg xmlns="http://www.w3.org/2000/svg" height="60" width="40" viewBox="0 0 384 512"><path d="M96 0C78.3 0 64 14.3 64 32v96h64V32c0-17.7-14.3-32-32-32zM288 0c-17.7 0-32 14.3-32 32v96h64V32c0-17.7-14.3-32-32-32zM32 160c-17.7 0-32 14.3-32 32s14.3 32 32 32v32c0 77.4 55 142 128 156.8V480c0 17.7 14.3 32 32 32s32-14.3 32-32V412.8C297 398 352 333.4 352 256V224c17.7 0 32-14.3 32-32s-14.3-32-32-32H32z"/></svg>
+			<br>No plugins found!
+		</div>
+		<a href="https://forgebox.io/type/cfwheels-plugins" target="_blank" ref="noopener" class="ui primary button">Browse plugins on Forgebox.io</a>
+	</div>
+</cfif>
+
+</div>
+
+</cfoutput>
+<cfinclude template="../layout/_footer.cfm">
+<!--- cfformat-ignore-end --->

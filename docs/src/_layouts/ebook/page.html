@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ page.title }}{% endblock %}
+{% block description %}{{ page.description }}{% endblock %}
+
+{% block style %}
+    {### Include theme css before plugins css ###}
+    {% if not fileExists(config.styles.print) %}
+        {% if options.format %}
+        <link rel="stylesheet" href="{{ (options.format + ".css")|resolveAsset }}">
+        {% else %}
+        <link rel="stylesheet" href="{{ "ebook.css"|resolveAsset }}">
+        {% endif %}
+    {% endif %}
+
+    {{ super() }}
+
+    {### Custom stylesheets for the book ###}
+
+    {% for type, style in config.styles %}
+        {% if fileExists(style) and (type == "ebook" or type == "print" or type == options.format) %}
+        <link rel="stylesheet" href="{{ style|resolveFile }}">
+        {% endif %}
+    {% endfor %}
+{% endblock %}
+
+{% block body %}
+<div class="page">
+    {% block page %}
+        <h1 class="book-chapter book-chapter-{{ page.depth }}">{{ page.title }}</h1>
+        <div class="section" id="{{ file.path }}">
+            {{ page.content|safe }}
+        </div>
+    {% endblock %}
+</div>
+<script>
+
+window.readyHandlers = [];
+
+window.ready = function ready(handler) {
+  window.readyHandlers.push(handler);
+  handleState();
+};
+
+window.handleState = function handleState () {
+  if (['interactive', 'complete'].indexOf(document.readyState) > -1) {
+    while(window.readyHandlers.length > 0) {
+      (window.readyHandlers.shift())();
+    }
+  }
+};
+
+document.onreadystatechange = window.handleState;
+
+ready(function () {
+  /*
+  $('img.faded').parent().remove();
+  
+  $('table tbody td').wrapInner('<div class="nopb"></div>');
+  
+  [].forEach.call(document.querySelectorAll('.faded'), function (el) {
+    el.style.visibility = 'hidden';
+    el.style.display = 'none';
+  });
+  */
+});
+
+</script>
+{% endblock %}

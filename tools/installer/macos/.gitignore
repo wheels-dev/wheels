@@ -1,0 +1,11 @@
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+
+# DMG artifacts
+*.zip
+*.app
+
+# Test installations
+test-install/

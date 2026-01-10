@@ -1,4 +1,0 @@
-component extends="Model" {
-
-
-}

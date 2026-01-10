@@ -1,0 +1,92 @@
+# Version Bump Workflow
+# This workflow helps automate version bumping after a release
+# It can be manually triggered to update version numbers across all packages
+
+name: Version Bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_version:
+        description: 'New version number (e.g., 3.0.1-SNAPSHOT or 3.1.0-SNAPSHOT)'
+        required: true
+        type: string
+      bump_type:
+        description: 'Type of version bump'
+        required: true
+        type: choice
+        options:
+          - patch-snapshot
+          - minor-snapshot
+          - major-snapshot
+        default: patch-snapshot
+
+jobs:
+  bump-version:
+    name: Bump Version Numbers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Update Version Numbers
+        run: |
+          NEW_VERSION="${{ github.event.inputs.new_version }}"
+          echo "Updating to version: $NEW_VERSION"
+
+          # Update templates/base/src/box.json
+          jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
+            templates/base/src/box.json > templates/base/src/box.json.tmp
+          mv templates/base/src/box.json.tmp templates/base/src/box.json
+
+          # Update examples/starter-app/box.json
+          jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
+            examples/starter-app/box.json > examples/starter-app/box.json.tmp
+          mv examples/starter-app/box.json.tmp examples/starter-app/box.json
+
+          # Update CHANGELOG.md
+          sed -i "1a\\# [$NEW_VERSION](https://github.com/wheels-dev/wheels/tree/develop) => TBD\n\n### Controller Enhancements\n\n### Model Enhancements\n\n### View Enhancements\n\n### Bug Fixes\n\n### Miscellaneous\n\n### Guides\n\n### Potentially Breaking Changes\n\n---\n" CHANGELOG.md
+
+          echo "Version updated to $NEW_VERSION"
+
+      - name: Commit Changes
+        run: |
+          git add templates/base/src/box.json
+          git add examples/starter-app/box.json
+          git add CHANGELOG.md
+
+          git commit -m "$(cat <<'EOF'
+          Bump version to ${{ github.event.inputs.new_version }}
+
+          Automated version bump after release using GitHub Actions.
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+          Co-Authored-By: Claude <noreply@anthropic.com>
+          EOF
+          )"
+
+          git push origin main
+
+      - name: Create Summary
+        run: |
+          echo "## Version Bump Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**New Version:** ${{ github.event.inputs.new_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Bump Type:** ${{ github.event.inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Files Updated:" >> $GITHUB_STEP_SUMMARY
+          echo "- templates/base/src/box.json" >> $GITHUB_STEP_SUMMARY
+          echo "- examples/starter-app/box.json" >> $GITHUB_STEP_SUMMARY
+          echo "- CHANGELOG.md" >> $GITHUB_STEP_SUMMARY

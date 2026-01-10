@@ -1,93 +1,340 @@
-# This is a reusable workflow for executing the full CFWheels Test Suites
-name: CFWheels Test Suites
-
+# This is a reusable workflow that is called from the pr, snapshot, and release workflows
+# This workflow runs the complete Wheels Framework Test Suites
+name: Wheels Test Suites
 # We are a reusable Workflow only
 on:
   workflow_call:
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
-
 jobs:
   tests:
     name: Test Suites
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
-        cf: [lucee5, lucee6, adobe2016, adobe2018, adobe2021, adobe2023]
-        db: [mysql, postgres, sqlserver, h2]
+        cfengine:
+          ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023", "adobe2025", "boxlang"]
+        dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle", sqlite]
+        commandbox_version: ["6.2.1"]
+        jdkVersion: ["21"]
+        experimental: [false]
+        include:
+          - cfengine: lucee7
+            dbengine: sqlite
+          - cfengine: lucee5
+            dbengine: sqlite
+          - cfengine: lucee6
+            dbengine: sqlite
+          - cfengine: adobe2021
+            dbengine: sqlite
+          - cfengine: adobe2023
+            dbengine: sqlite
+          - cfengine: adobe2025
+            dbengine: sqlite
+          - cfengine: boxlang
+            dbengine: sqlite
+          - cfengine: lucee7
+            dbengine: mysql
+          - cfengine: lucee7
+            dbengine: postgres
+          - cfengine: lucee7
+            dbengine: sqlserver
+          - cfengine: lucee7
+            dbengine: h2
+          - cfengine: lucee7
+            dbengine: oracle
+          - cfengine: lucee5
+            dbengine: mysql
+          - cfengine: lucee5
+            dbengine: postgres
+          - cfengine: lucee5
+            dbengine: sqlserver
+          - cfengine: lucee5
+            dbengine: h2
+          - cfengine: lucee5
+            dbengine: oracle
+          - cfengine: lucee6
+            dbengine: mysql
+          - cfengine: lucee6
+            dbengine: postgres
+          - cfengine: lucee6
+            dbengine: sqlserver
+          - cfengine: lucee6
+            dbengine: h2
+          - cfengine: lucee6
+            dbengine: oracle
+          - cfengine: adobe2018
+            dbengine: mysql
+          - cfengine: adobe2018
+            dbengine: postgres
+          - cfengine: adobe2018
+            dbengine: sqlserver
+          - cfengine: adobe2018
+            dbengine: oracle
+          - cfengine: adobe2021
+            dbengine: mysql
+          - cfengine: adobe2021
+            dbengine: postgres
+          - cfengine: adobe2021
+            dbengine: sqlserver
+          - cfengine: adobe2021
+            dbengine: oracle
+          - cfengine: adobe2023
+            dbengine: mysql
+          - cfengine: adobe2023
+            dbengine: postgres
+          - cfengine: adobe2023
+            dbengine: sqlserver
+          - cfengine: adobe2023
+            dbengine: oracle
+          - cfengine: adobe2025
+            dbengine: mysql
+          - cfengine: adobe2025
+            dbengine: postgres
+          - cfengine: adobe2025
+            dbengine: sqlserver
+          - cfengine: adobe2025
+            dbengine: oracle
+          - cfengine: boxlang
+            dbengine: mysql
+          - cfengine: boxlang
+            dbengine: sqlserver
+          - cfengine: boxlang
+            dbengine: postgres
+          - cfengine: boxlang
+            dbengine: oracle
         exclude:
-#          - cf: lucee5
-#            db: mysql
-#          - cf: lucee5
-#            db: postgres
-#          - cf: lucee5
-#            db: sqlserver
-#          - cf: lucee5
-#            db: h2
-#          - cf: lucee6
-#            db: mysql
-#          - cf: lucee6
-#            db: postgres
-#          - cf: lucee6
-#            db: sqlserver
-#          - cf: lucee6
-#            db: h2
-#          - cf: adobe2016
-#            db: mysql
-#          - cf: adobe2016
-#            db: postgres
-#          - cf: adobe2016
-#            db: sqlserver
-          - cf: adobe2016
-            db: h2
-#          - cf: adobe2018
-#            db: mysql
-#          - cf: adobe2018
-#            db: postgres
-#          - cf: adobe2018
-#            db: sqlserver
-          - cf: adobe2018
-            db: h2
-#          - cf: adobe2021
-#            db: mysql
-#          - cf: adobe2021
-#            db: postgres
-#          - cf: adobe2021
-#            db: sqlserver
-          - cf: adobe2021
-            db: h2
-          - cf: adobe2023
-            db: h2
-
+          - cfengine: adobe2018
+            dbengine: sqlite
+          - cfengine: adobe2018
+            dbengine: h2
+          - cfengine: adobe2021
+            dbengine: h2
+          - cfengine: adobe2023
+            dbengine: h2
+          - cfengine: adobe2025
+            dbengine: h2
+          - cfengine: boxlang
+            dbengine: h2
+    env:
+      # Port mappings for each CF engine
+      PORT_lucee5: 60005
+      PORT_lucee6: 60006
+      PORT_lucee7: 60007
+      PORT_adobe2018: 62018
+      PORT_adobe2021: 62021
+      PORT_adobe2023: 62023
+      PORT_adobe2025: 62025
+      PORT_boxlang: 60001
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Print Working Directory
-        run: pwd
+      - name: Download jdbc10 
+        if: ${{ matrix.cfengine == 'adobe2018' }} || ${{ matrix.cfengine == 'adobe2021' }} || ${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}
+        run: |
+          
+          mkdir -p ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib
+          
+          wget https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
+            -O ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+          
+          ls -l ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/
 
-      - name: Start Application Server and DB ${{ matrix.cf }} ${{ matrix.db }}
-        if: ${{ matrix.db != 'h2' }}
-        run: docker compose up ${{ matrix.cf }} ${{ matrix.db }} --detach --wait
+      - name: Start cfengine (${{ matrix.cfengine }}) ...
+        run: docker compose up -d ${{ matrix.cfengine }}
 
-      - name: Or Start just the Application Server for H2 testing ${{ matrix.cf }}
-        if: ${{ matrix.db == 'h2' }}
-        run: docker compose up ${{ matrix.cf }} --detach --wait
+      - name: Start external DB if needed (${{ matrix.dbengine }}) ...
+        if: ${{ matrix.dbengine != 'h2' && matrix.dbengine != 'sqlite'}}
+        run: docker compose up -d ${{ matrix.dbengine }}
 
-      - name: Run core tests ${{ matrix.cf }} ${{ matrix.db }}
-        run: docker/github/core-tests.sh ${{ matrix.cf }} ${{ matrix.db }}
+      - name: Wait for containers to be ready
+        run: |
+          echo "Waiting for ${{ matrix.cfengine }} to be ready..."
+          
+          # First, wait for the container to be running
+          timeout 150 bash -c 'until docker ps --filter "name=${{ matrix.cfengine }}" | grep -q "${{ matrix.cfengine }}"; do
+            echo "Waiting for container to start..."
+            sleep 2
+          done'
+          
+          # Get the port for this CF engine
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+          
+          # Wait for service to respond
+          echo "Waiting for service on port ${PORT} to be ready..."
+          MAX_WAIT=60
+          WAIT_COUNT=0
+          
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            echo -n "Checking service (attempt ${WAIT_COUNT}/${MAX_WAIT})... "
+            
+            # Check if port is open and service responds
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
+              echo "Service is ready!"
+              break
+            else
+              echo "Not ready yet"
+              if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
+                sleep 5
+              fi
+            fi
+          done
+          
+          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+            echo "Warning: Service may not be fully ready after ${MAX_WAIT} attempts"
+          fi
 
-      - name: Slack Notification
-        # Only on failures and NOT in pull requests
-        if: ${{ failure() && !startsWith( 'pull_request', github.event_name ) }}
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_CHANNEL: builds
-          SLACK_COLOR: ${{ job.status }} # or a specific color like 'green' or '#ff00ff'
-          SLACK_ICON_EMOJI: ":bell:"
-          SLACK_MESSAGE: 'CFWheels tests failed :cry:, check them out here: https://github.com/cfwheels/cfwheels/actions'
-          SLACK_TITLE: 'CFWheels Tests For (${{ matrix.cf }}, ${{ matrix.db }}) failed'
-          SLACK_USERNAME: Peter Amiri
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+      - name: Set test variables
+        id: test-vars
+        run: |
+          # Get the port for this CF engine
+          PORT_VAR="PORT_${{ matrix.cfengine }}"
+          PORT="${!PORT_VAR}"
+          echo "port=${PORT}" >> $GITHUB_OUTPUT
+          
+          # Construct test URL
+          TEST_URL="http://localhost:${PORT}/wheels/core/tests?db=${{ matrix.dbengine }}&format=json&only=failure,error"
+          echo "test_url=${TEST_URL}" >> $GITHUB_OUTPUT
+          
+          # Result file path
+          RESULT_FILE="/tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt"
+          echo "result_file=${RESULT_FILE}" >> $GITHUB_OUTPUT
+
+      - name: Check service connectivity
+        run: |
+          echo "Checking if service is ready on localhost:${{ steps.test-vars.outputs.port }}..."
+          nc -zv localhost ${{ steps.test-vars.outputs.port }} || echo "Port not open yet"
+          
+          # Try a basic curl to see if service responds
+          curl -v --connect-timeout 5 "http://localhost:${{ steps.test-vars.outputs.port }}/" || true
+
+      - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
+        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
+        run: |
+          docker exec wheels-${{ matrix.cfengine }}-1 sh -c "echo ';oracle.sql.converter.**;oracle.sql.**;oracle.jdbc.**' >> /wheels-test-suite/.engine/${{ matrix.cfengine }}/WEB-INF/cfusion/lib/serialfilter.txt"
+
+      - name: Restart CF Engine
+        if: ${{ (matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025') && matrix.dbengine == 'oracle' }}
+        run: |
+          docker restart wheels-${{ matrix.cfengine }}-1
+      
+      - name: Wait for Oracle to be ready
+        if: ${{ matrix.dbengine == 'oracle' }}
+        run: sleep 120
+          
+      - name: Running onServerInstall Script for Adobe2021, Adobe2023, and Adobe2025
+        if: ${{ matrix.cfengine == 'adobe2021' || matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }}
+        run: |
+          if [ "${{ matrix.cfengine }}" = "adobe2018" ]; then
+            echo "Skipping cfpm install for adobe2018"
+            exit 0
+          fi
+
+          # Install packages with retry logic
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Installing CFPM packages..."
+
+            # Try to install all packages
+            if docker exec wheels-${{ matrix.cfengine }}-1 box cfpm install image,mail,zip,debugger,caching,mysql,postgresql,sqlserver,oracle; then
+              echo "✅ CFPM packages installed successfully"
+              exit 0
+            else
+              echo "❌ CFPM installation failed on attempt $RETRY_COUNT"
+
+              if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                echo "Waiting 10 seconds before retry..."
+                sleep 10
+
+                # Try to restart the CF service before retry
+                echo "Attempting to restart ColdFusion service..."
+                docker exec wheels-${{ matrix.cfengine }}-1 box server restart || true
+                sleep 10
+              fi
+            fi
+          done
+
+          echo "Failed to install CFPM packages after $MAX_RETRIES attempts"
+          exit 1
+
+      - name: Run Tests with Retry
+        id: run-tests
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          HTTP_CODE="000"
+          
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ] && [ "$HTTP_CODE" = "000" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
+            
+            HTTP_CODE=$(curl -s -o "${{ steps.test-vars.outputs.result_file }}" \
+              --max-time 900 \
+              --write-out "%{http_code}" \
+              "${{ steps.test-vars.outputs.test_url }}" || echo "000")
+            
+            echo "HTTP Code: ${HTTP_CODE}"
+            
+            if [ "$HTTP_CODE" = "000" ] && [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+              echo "Connection failed, waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+          
+          echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
+          
+          if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
+            echo "Response content:"
+            cat "${{ steps.test-vars.outputs.result_file }}"
+          fi
+
+          # Check result
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Tests passed with HTTP 200"
+            exit 0
+          else
+            echo "❌ Tests failed with HTTP code: ${HTTP_CODE}"
+            exit 1
+          fi
+
+      - name: Debug Information
+        if: failure()
+        run: |
+          echo "=== Docker Container Status ==="
+          docker ps -a
+          
+          echo -e "\n=== Container Logs for ${{ matrix.cfengine }} ==="
+          docker logs $(docker ps -aq -f "name=${{ matrix.cfengine }}") 2>&1 | tail -50 || echo "Could not get logs"
+          
+          echo -e "\n=== Test Result File ==="
+          if [ -f "${{ steps.test-vars.outputs.result_file }}" ]; then
+            cat "${{ steps.test-vars.outputs.result_file }}"
+          else
+            echo "Result file not found"
+          fi
+
+      - name: Upload Test Results Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          path: |
+            /tmp/${{ matrix.cfengine }}-${{ matrix.dbengine }}-result.txt
+
+      - name: Upload Workflow Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.cfengine }}-${{ matrix.dbengine }}
+          path: |
+            ${{ runner.temp }}/_runner_diag/
+            ${{ runner.temp }}/_github_workflow/

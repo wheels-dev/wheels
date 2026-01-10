@@ -1,0 +1,493 @@
+# Common Errors and Solutions
+
+## Description
+Frequent issues encountered when developing Wheels applications and their solutions, based on real development experiences.
+
+## Key Points
+- Wheels differs from Rails in several key areas
+- Form helpers have different capabilities than Rails
+- Association syntax has specific Wheels conventions
+- Migration parameter binding can be unreliable
+
+## Common Association Errors
+
+### "Missing argument name" in hasMany()
+**Error:**
+```
+Complex object types cannot be converted to simple values.
+The expression has requested a variable or an intermediate expression result as a simple value. However, the result cannot be converted to a simple value. Simple values are strings, numbers, boolean values, and date/time values. Queries, arrays, and COM objects are examples of complex values.
+```
+
+**Cause:** Mixing positional and named parameters in Wheels function calls.
+
+**Bad Code:**
+```cfm
+component extends="Model" {
+    function config() {
+        hasMany("comments", dependent="delete"); // Error: mixed parameter styles
+    }
+}
+```
+
+**Solutions:**
+```cfm
+component extends="Model" {
+    function config() {
+        // Option 1: Use consistent named parameters
+        hasMany(name="comments", dependent="delete");
+
+        // Option 2: Use all positional parameters (no dependent option)
+        hasMany("comments");
+    }
+}
+```
+
+**Related:** Wheels requires consistent parameter syntax - either all positional or all named parameters, not mixed.
+
+### "Can't cast Object type [Query] to a value of type [Array]"
+**Error:**
+```
+Can't cast Object type [Query] to a value of type [Array]
+Detail: Java type of the object is lucee.runtime.type.QueryImpl
+```
+
+**Cause:** Treating Wheels association results as arrays when they return query objects.
+
+**Bad Code:**
+```cfm
+<!-- In views or controllers -->
+<cfset commentCount = ArrayLen(post.comments())>  <!-- ERROR: comments() returns Query -->
+<cfloop array="#post.comments()#" index="comment"> <!-- ERROR: Can't loop Query as Array -->
+    #comment.content#
+</cfloop>
+```
+
+**Solutions:**
+```cfm
+<!-- Use query methods and properties -->
+<cfset commentCount = post.comments().recordCount>
+<cfset comments = post.comments()>
+
+<!-- Loop as query, not array -->
+<cfloop query="comments">
+    #comments.content#  <!-- Access fields directly from query -->
+</cfloop>
+
+<!-- Check if query has records -->
+<cfif post.comments().recordCount gt 0>
+    <cfloop query="post.comments()">
+        <p>#post.comments().author#: #post.comments().content#</p>
+    </cfloop>
+<cfelse>
+    <p>No comments found.</p>
+</cfif>
+```
+
+**Key Points:**
+- All Wheels association methods return **Query objects**, not arrays
+- Use `.recordCount` for counts, not `ArrayLen()`
+- Use `<cfloop query="...">` for iteration, not `<cfloop array="...">`
+- Model finder methods also return queries: `model("User").findAll()` returns Query
+
+**Related:** This is the #2 most common Wheels error after argument mixing.
+
+## Form Helper Errors
+
+### "No matching function [LABEL] found"
+**Error:** When using `label()` with `text` parameter.
+
+**Cause:** Wheels `label()` helper doesn't accept a `text` parameter like Rails does.
+
+**Bad Code:**
+```cfm
+#label(objectName="comment", property="authorName", text="Name *")#
+```
+
+**Solution:**
+```cfm
+<label for="comment-authorName">Name *</label>
+#textField(objectName="comment", property="authorName")#
+```
+
+### "No matching function [EMAILFIELD] found"
+**Error:** When trying to use specialized form helpers.
+
+**Cause:** Wheels doesn't have specialized form helpers like `emailField()` or `passwordField()`.
+
+**Bad Code:**
+```cfm
+#emailField(objectName="comment", property="email")#
+```
+
+**Solution:**
+```cfm
+#textField(objectName="comment", property="email", type="email")#
+```
+
+**Available Form Helpers in Wheels:**
+- `textField()`
+- `passwordField()` - **Wait, this does exist!**
+- `hiddenField()`
+- `textArea()`
+- `checkBox()`
+- `radioButton()`
+- `select()`
+- `submitTag()`
+
+**Note:** Use `textField()` with `type` parameter for HTML5 input types.
+
+## Routing Errors
+
+### Incorrect .resources() Syntax
+**Problem:** Using incorrect syntax for the `.resources()` function in routes.cfm can cause routing failures.
+
+**Common Incorrect Syntax:**
+```cfm
+mapper()
+  .resources("posts", function(nested) {
+    nested.resources("comments");
+  })
+.end();
+```
+
+**Correct Syntax for Simple Resources:**
+```cfm
+mapper()
+  .resources("posts")
+  .resources("comments")
+.end();
+```
+
+**Correct Syntax for Nested Resources (if supported):**
+```cfm
+mapper()
+  .resources("posts")
+  .resources("comments") // Separate declaration
+.end();
+```
+
+**Route Ordering Issues:**
+Routes must be ordered correctly in routes.cfm:
+1. Resource routes first
+2. Custom routes
+3. Root route
+4. Wildcard route last
+
+```cfm
+mapper()
+  .resources("posts")           // 1. Resources first
+  .resources("comments")
+  .get(name="admin", ...)      // 2. Custom routes
+  .root(to="posts##index")     // 3. Root route
+  .wildcard()                  // 4. Wildcard last
+.end();
+```
+
+**Note:** Wheels routing syntax differs from Rails - always check the Wheels documentation for exact syntax rather than assuming Rails patterns work.
+
+### buttonTo() HTTP Method Routing Errors
+**Error:**
+```
+Wheels.RouteNotFound - Incorrect HTTP Verb for route
+The posts/1 path does not allow POST requests, only GET, PATCH, PUT, DELETE, GET requests.
+Ensure you are using the correct HTTP Verb and that your config/routes.cfm file is configured correctly.
+```
+
+**Cause:** Missing `method` parameter in `buttonTo()` helper for DELETE, PUT, or PATCH actions.
+
+**Bad Code:**
+```cfm
+<!-- This generates POST request, not DELETE -->
+#buttonTo(controller="posts", action="delete", key=post.id, text="Delete", confirm="Are you sure?")#
+#buttonTo(controller="comments", action="delete", key=comment.id, text="Delete")#
+```
+
+**Solution:** Add explicit `method` parameter to match the intended HTTP verb:
+```cfm
+<!-- DELETE requests -->
+#buttonTo(controller="posts", action="delete", method="delete", key=post.id, text="Delete", confirm="Are you sure?")#
+#buttonTo(controller="comments", action="delete", method="delete", key=comment.id, text="Delete")#
+
+<!-- PUT/PATCH requests -->
+#buttonTo(controller="posts", action="update", method="put", key=post.id, text="Update")#
+#buttonTo(controller="posts", action="update", method="patch", key=post.id, text="Update")#
+```
+
+**Key Points:**
+- `buttonTo()` defaults to POST method if no `method` parameter is specified
+- Wheels resource routing expects specific HTTP methods for each action
+- DELETE actions MUST use `method="delete"`
+- PUT/PATCH actions MUST use `method="put"` or `method="patch"`
+- Always test delete functionality in browser to catch these errors early
+
+## Migration Errors
+
+### Parameter Binding Issues in Migrations
+**Problem:** Complex parameter binding in migration `execute()` calls can fail unpredictably.
+
+**Bad Code:**
+```cfm
+execute(
+    sql="INSERT INTO posts (title, slug, body) VALUES (?, ?, ?)",
+    parameters=[
+        {value=title, cfsqltype="cf_sql_varchar"},
+        {value=slug, cfsqltype="cf_sql_varchar"},
+        {value=body, cfsqltype="cf_sql_longvarchar"}
+    ]
+);
+```
+
+**Solution:** Use direct SQL concatenation for migration data seeding:
+```cfm
+execute("INSERT INTO posts (title, slug, body, createdAt, updatedAt)
+         VALUES ('My Blog Post', 'my-blog-post', 'Content here...', NOW(), NOW())");
+```
+
+**Best Practice:** For migrations, prefer simple direct SQL over complex parameter binding for reliability.
+
+## Form Helper Issues
+
+### Duplicate Labels in Forms
+**Symptom:** Form labels appear twice (e.g., "Title Title" or "Content Content")
+
+**Cause:** Using both manual HTML `<label>` tags AND Wheels' automatic label generation in form helpers.
+
+**Bad Code:**
+```cfm
+<!-- This creates duplicate labels -->
+<div>
+    <label for="post-title">Title</label>
+    #textField(objectName="post", property="title")#  <!-- Wheels also generates a label -->
+</div>
+```
+
+**Solution 1:** Disable Wheels automatic labels with `label=false`:
+```cfm
+<!-- Use custom labels with label=false -->
+<div>
+    <label for="post-title" class="custom-label">Title</label>
+    #textField(objectName="post", property="title", label=false, class="form-control")#
+</div>
+```
+
+**Solution 2:** Use Wheels built-in labels only:
+```cfm
+<!-- Let Wheels handle labels automatically -->
+<div>
+    #textField(objectName="post", property="title", label="Title", class="form-control")#
+</div>
+```
+
+**Best Practice:** Choose one approach consistently throughout your application. If you need custom label styling, use Solution 1 with `label=false`.
+
+## Debugging Tips
+
+### Check Function Availability
+When encountering "No matching function" errors:
+1. Check Wheels documentation for exact function names
+2. Verify parameter names and types
+3. Consider that Wheels may differ from Rails conventions
+
+### Association Debugging
+When models fail to load:
+1. Check association syntax matches Wheels conventions
+2. Remove Rails-style options like `dependent`, `class_name`, etc.
+3. Use simple association definitions first, then add complexity
+
+### Migration Debugging
+When migrations fail:
+1. Use direct SQL instead of complex parameter binding
+2. Test SQL queries directly in database before adding to migration
+3. Wrap operations in transactions for atomicity
+
+## Framework Differences from Rails
+
+### Association Options
+- **Rails:** `has_many :comments, dependent: :destroy`
+- **Wheels:** `hasMany("comments")` - no dependent options
+
+### Form Helpers
+- **Rails:** Rich set of specialized helpers (`email_field`, `password_field`, etc.)
+- **Wheels:** More limited set, use `textField()` with `type` parameter
+
+### Parameter Names
+- **Rails:** Uses symbols and underscores (`:text => "Label"`)
+- **Wheels:** Uses strings and camelCase (`text="Label"`)
+
+## Related
+- [Model Associations](../database/associations/)
+- [Form Helpers](../views/helpers/forms.md)
+- [Database Migrations](../database/migrations/)
+
+## View Template Errors
+
+### \"Invalid variable declaration\" in Views
+**Error:** When accessing model properties in Alpine.js or other JavaScript contexts within CFML templates.
+
+**Cause:** Undefined properties being accessed without null safety in new model objects.
+
+**Bad Code:**
+```cfm
+<div x-data="{
+    title: '#JSStringFormat(post.title)#',
+    content: '#JSStringFormat(post.content)#'
+}">
+```
+
+**Solution:**
+```cfm
+<div x-data="{
+    title: '#JSStringFormat(post.title ?: "")#',
+    content: '#JSStringFormat(post.content ?: "")#'
+}">
+```
+
+**Key Points:**
+- Always use null coalescing operator (`?:`) for new model objects
+- Properties may be undefined until form is submitted and validated
+- Apply to all JavaScript contexts where model data is embedded
+
+### \"Invalid variable declaration [queryName.column()]\" in Query Loops
+**Error:** When calling association methods inside query loops.
+
+**Cause:** Trying to call association methods on query rows instead of storing query result first.
+
+**Bad Code:**
+```cfm
+<cfloop query="post.comments()">
+    <p>#post.comments().author#</p>  <!-- ERROR: Can't call method in loop -->
+</cfloop>
+```
+
+**Solution:**
+```cfm
+<cfset comments = post.comments()>
+<cfloop query="comments">
+    <p>#comments.author#</p>  <!-- CORRECT: Access column directly -->
+</cfloop>
+```
+
+**Key Points:**
+- Store association query result in variable before looping
+- Access columns directly from query variable, not association method
+- This is Wheels-specific behavior - differs from Rails
+
+## Controller Parameter Handling
+
+### Comment/Nested Parameter Structure Issues
+**Problem:** Parameters not being properly structured for nested model creation.
+
+**Bad Code:**
+```cfm
+comment = model("Comment").new(params.comment);
+comment.postId = params.postId;  // Separate assignment can fail
+```
+
+**Solution:**
+```cfm
+commentData = params.comment;
+commentData.postId = params.postId;  // Merge into structure first
+comment = model("Comment").new(commentData);
+```
+
+**Best Practice:** Always merge related parameters into single structure before model creation.
+
+## Layout Template Errors
+
+### CFML Expressions Not Rendering in Layout
+**Error:** Navigation links, flash messages, or dynamic content appearing as literal text (e.g., `#urlFor(...)#` displays as-is instead of generating URLs)
+
+**Symptom:** When viewing source, you see `#urlFor(controller='posts', action='index')#` instead of `/posts`
+
+**Cause:** CFML expressions (`#variable#`) placed outside `<cfoutput>` blocks in layout.cfm
+
+**Bad Code:**
+```cfm
+<cfif application.contentOnly>
+    <cfoutput>
+        #flashMessages()#
+        #includeContent()#
+    </cfoutput>
+<cfelse>
+<!DOCTYPE html>
+<html>
+<head>
+    #csrfMetaTags()#  <!-- NOT in cfoutput block -->
+    <title>#contentFor("title", "My App")#</title>  <!-- NOT in cfoutput block -->
+</head>
+<body>
+    <nav>
+        <a href="#urlFor(controller='posts')#">Posts</a>  <!-- NOT in cfoutput block -->
+    </nav>
+
+    <cfoutput>
+        #includeContent()#
+    </cfoutput>
+
+    <footer>
+        &copy; #Year(Now())# My App  <!-- NOT in cfoutput block -->
+    </footer>
+</body>
+</html>
+</cfif>
+```
+
+**Solution:**
+```cfm
+<cfif application.contentOnly>
+    <cfoutput>
+        #flashMessages()#
+        #includeContent()#
+    </cfoutput>
+<cfelse>
+<cfoutput>
+<!DOCTYPE html>
+<html>
+<head>
+    #csrfMetaTags()#
+    <title>#contentFor("title", "My App")#</title>
+</head>
+<body>
+    <nav>
+        <a href="#urlFor(controller='posts')#">Posts</a>
+    </nav>
+
+    #includeContent()#
+
+    <footer>
+        &copy; #Year(Now())# My App
+    </footer>
+</body>
+</html>
+</cfoutput>
+</cfif>
+```
+
+**Key Points:**
+- Open `<cfoutput>` immediately after `<cfelse>` on line following the else
+- Close `</cfoutput>` immediately before `</cfif>` at end of file
+- Do NOT create nested `<cfoutput>` blocks around `#includeContent()#`
+- All `#expression#` syntax must be inside `<cfoutput>` blocks
+- The `application.contentOnly` branch is for API/JSON responses and has its own cfoutput block
+
+**Why This Matters:**
+- Without proper cfoutput blocks, URLs won't generate: navigation breaks
+- Flash messages won't display: user feedback fails
+- CSRF tokens won't render: forms become insecure
+- Dynamic content appears as code: unprofessional appearance
+
+**Testing:**
+```bash
+# View page source - should NOT see literal # expressions
+curl -s http://localhost:8080 | grep '#urlFor'  # Should return nothing
+curl -s http://localhost:8080 | grep 'href="/posts"'  # Should find actual URLs
+```
+
+## Important Notes
+- Always consult Wheels documentation rather than assuming Rails conventions
+- Test association definitions in simple form before adding complexity
+- For migrations, prefer direct SQL over parameter binding for data seeding
+- Wheels form helpers are more limited than Rails - supplement with HTML when needed
+- Use null coalescing operators (`?:`) when embedding model data in JavaScript/Alpine.js contexts
+- Store association query results in variables before looping to avoid method call errors
+- **Wrap entire layout HTML in single cfoutput block** - most common layout mistake

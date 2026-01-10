@@ -1,0 +1,409 @@
+# Description: Docker Compose file for running the Wheels Test Suite
+
+networks:
+  wheels-network:
+    driver: bridge
+
+services:
+  # Modern TestUI
+  testui:
+    build:
+      context: ./tools/docker/testui
+    image: wheels-testui:v2.0.0
+    ports:
+      - "3000:80"
+    # Add extra_hosts to allow container to access host services
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Mount Docker socket and project directory for container management
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./:/wheels-test-suite:ro
+      - ./tools/docker/testui/logs/nginx:/var/log/nginx
+    # Add healthcheck to verify container is working properly
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    # Add restart policy to ensure container stays up
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE=/api
+      - VITE_MOCK_API=false
+    networks:
+      - wheels-network
+
+  lucee5:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/lucee5/Dockerfile
+    image: wheels-test-lucee5:v1.0.2
+    volumes:
+      - ./templates/base/src:/wheels-test-suite
+      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+      - ./tests:/wheels-test-suite/tests
+      - type: bind
+        source: ./tools/docker/lucee5/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/lucee5/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/lucee5/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/lucee5/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-lucee5:/wheels-test-suite/vendor/wirebox
+      - testbox-lucee5:/wheels-test-suite/vendor/testbox
+    ports:
+      - "60005:60005"
+    networks:
+      - wheels-network
+
+  lucee6:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/lucee6/Dockerfile
+    image: wheels-test-lucee6:v1.0.2
+    volumes:
+      - ./templates/base/src:/wheels-test-suite
+      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+      - ./tests:/wheels-test-suite/tests
+      - type: bind
+        source: ./tools/docker/lucee6/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/lucee6/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/lucee6/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/lucee6/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-lucee6:/wheels-test-suite/vendor/wirebox
+      - testbox-lucee6:/wheels-test-suite/vendor/testbox
+    ports:
+      - "60006:60006"
+    networks:
+      - wheels-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:60006/ || wget -q --spider http://localhost:60006/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  lucee7:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/lucee7/Dockerfile
+    image: wheels-test-lucee7:v1.0.0
+    volumes:
+      - ./templates/base/src:/wheels-test-suite
+      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+      - ./tests:/wheels-test-suite/tests
+      - type: bind
+        source: ./tools/docker/lucee7/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/lucee7/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/lucee7/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/lucee7/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-lucee7:/wheels-test-suite/vendor/wirebox
+      - testbox-lucee7:/wheels-test-suite/vendor/testbox
+    ports:
+      - "60007:60007"
+    networks:
+      - wheels-network
+
+  adobe2018:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/adobe2018/Dockerfile
+    image: wheels-test-adobe2018:v1.0.2
+    tty: true          
+    stdin_open: true
+    volumes:
+      - ./templates/base/src:/wheels-test-suite
+      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+      - ./tests:/wheels-test-suite/tests
+      - type: bind
+        source: ./tools/docker/adobe2018/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/adobe2018/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe2018/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe2018/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2018:/wheels-test-suite/vendor/wirebox
+      - testbox-adobe2018:/wheels-test-suite/vendor/testbox
+    ports:
+      - "62018:62018"
+    networks:
+      - wheels-network
+
+  adobe2021:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/adobe2021/Dockerfile
+    image: wheels-test-adobe2021:v1.0.2
+    tty: true          
+    stdin_open: true
+    volumes:
+      - ./templates/base/src:/wheels-test-suite
+      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+      - ./tests:/wheels-test-suite/tests
+      - ./tools/docker/adobe2021:/wheels-test-suite/tools/docker/adobe2021
+      - type: bind
+        source: ./tools/docker/adobe2021/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/adobe2021/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe2021/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe2021/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2021:/wheels-test-suite/vendor/wirebox
+      - testbox-adobe2021:/wheels-test-suite/vendor/testbox
+    ports:
+      - "62021:62021"
+    networks:
+      - wheels-network
+
+  adobe2023:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/adobe2023/Dockerfile
+    image: wheels-test-adobe2023:v1.0.1
+    tty: true          
+    stdin_open: true
+    volumes:
+      - ./templates/base/src:/wheels-test-suite
+      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+      - ./tests:/wheels-test-suite/tests
+      - ./tools/docker/adobe2023:/wheels-test-suite/tools/docker/adobe2023
+      - type: bind
+        source: ./tools/docker/adobe2023/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/adobe2023/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe2023/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe2023/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2023:/wheels-test-suite/vendor/wirebox
+      - testbox-adobe2023:/wheels-test-suite/vendor/testbox
+    ports:
+      - "62023:62023"
+    networks:
+      - wheels-network
+
+  adobe2025:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/adobe2025/Dockerfile
+    image: wheels-test-adobe2025:v1.0.0
+    tty: true          
+    stdin_open: true
+    volumes:
+      - ./templates/base/src:/wheels-test-suite
+      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+      - ./tests:/wheels-test-suite/tests
+      - ./tools/docker/adobe2025:/wheels-test-suite/tools/docker/adobe2025
+      - type: bind
+        source: ./tools/docker/adobe2025/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/adobe2025/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/adobe2025/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/adobe2025/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
+      # Named volumes to prevent dependency pollution
+      - wirebox-adobe2025:/wheels-test-suite/vendor/wirebox
+      - testbox-adobe2025:/wheels-test-suite/vendor/testbox
+    ports:
+      - "62025:62025"
+    networks:
+      - wheels-network
+
+  boxlang:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/boxlang/Dockerfile
+    image: wheels-test-boxlang:v1.0.0
+    tty: true
+    stdin_open: true
+    # volumes:
+    #   - ./templates/base/src:/wheels-test-suite
+    #   - ./core/src/wheels:/wheels-test-suite/vendor/wheels
+    #   - ./tests:/wheels-test-suite/tests
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/server.json
+    #     target: /wheels-test-suite/server.json
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/settings.cfm
+    #     target: /wheels-test-suite/config/settings.cfm
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/box.json
+    #     target: /wheels-test-suite/box.json
+    #   - type: bind
+    #     source: ./tools/docker/boxlang/CFConfig.json
+    #     target: /wheels-test-suite/CFConfig.json
+    #   # Named volumes to prevent dependency pollution
+    #   - wirebox-boxlang:/wheels-test-suite/vendor/wirebox
+    #   - testbox-boxlang:/wheels-test-suite/vendor/testbox
+    ports:
+      - "60001:60001"
+    networks:
+      - wheels-network
+
+  mysql:
+    image: mysql:9
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: wheelstestdb
+      MYSQL_DATABASE: wheelstestdb
+      MYSQL_USER: wheelstestdb
+      MYSQL_PASSWORD: wheelstestdb
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - wheels-network
+
+  postgres:
+    image: postgres:18
+    restart: always
+    environment:
+      POSTGRES_USER: wheelstestdb
+      POSTGRES_PASSWORD: wheelstestdb
+      POSTGRES_INITDB_ARGS: --auth-host=md5
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wheelstestdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - wheels-network
+
+  sqlserver:
+    build:
+      context: ./
+      dockerfile: ./tools/docker/sqlserver/Dockerfile_CICD
+    image: cfwheels-sqlserver:v1.0.2
+    restart: always
+    environment:
+      MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
+      ACCEPT_EULA: Y
+      MSSQL_PID: Developer
+      # Increase memory to ensure stability
+      MSSQL_MEMORY_LIMIT_MB: 4096
+    ports:
+      - "1434:1433"
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" -C || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    networks:
+      - wheels-network
+
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    restart: always
+    environment:
+      ORACLE_PASSWORD: wheelstestdb
+      ORACLE_DATABASE: wheelstestdb
+      APP_USER: wheelstestdb
+      APP_USER_PASSWORD: wheelstestdb
+    ports:
+      - "1522:1521"
+    volumes:
+      - ./tools/docker/Oracle:/container-entrypoint-startdb.d
+    healthcheck:
+      test: ["CMD", "sqlplus", "-S", "wheelstestdb/wheelstestdb@localhost:1521/wheelstestdb", "<<<", "SELECT 1 FROM DUAL;"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    networks:
+      - wheels-network
+
+volumes:
+  mysql_data:
+  postgres_data:
+  sqlserver_data:
+  # Named volumes for dependency isolation
+  wirebox-lucee5:
+  testbox-lucee5:
+  wirebox-lucee6:
+  testbox-lucee6:
+  wirebox-lucee7:
+  testbox-lucee7:
+  wirebox-adobe2018:
+  testbox-adobe2018:
+  wirebox-adobe2021:
+  testbox-adobe2021:
+  wirebox-adobe2023:
+  testbox-adobe2023:
+  wirebox-adobe2025:
+  testbox-adobe2025:
+  # wirebox-boxlang:
+  # testbox-boxlang:

@@ -1,3 +1,0 @@
-t = changeTable(name='employees');
-t.string(columnNames="fullName", default="", null=true, limit="255");
-t.change();
