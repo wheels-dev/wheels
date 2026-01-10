@@ -31,7 +31,7 @@
     "dependencies": {
         "wirebox": "^7.0.0",
         "testbox": "^6.0.0",
-        "wheels-core": "^3.0.0-SNAPSHOT"
+        "wheels-core": "^3.0.0"
     },
     "installPaths": {
         "wirebox": "vendor/wirebox/",

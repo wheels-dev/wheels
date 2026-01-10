@@ -1,6 +1,6 @@
 {
     "name":"Wheels.fw",
-    "version":"3.0.0-SNAPSHOT.rc.1",
+    "version":"3.0.0",
     "author":"Wheels Core Team and Community",
     "shortDescription":"Wheels MVC Framework Core Directory",
     "location":"ForgeboxStorage",
@@ -21,7 +21,7 @@
     "dependencies": {
         "wirebox": "^7.0.0",
         "testbox": "^6.0.0",
-        "wheels-core": "^3.0.0-SNAPSHOT.rc.1"
+        "wheels-core": "^3.0.0"
     },
     "installPaths": {
         "wirebox": "vendor/wirebox/",

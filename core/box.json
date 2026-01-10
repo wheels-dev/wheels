@@ -1,5 +1,5 @@
 {
     "name": "wheels-core",
-    "version": "3.0.0-SNAPSHOT.rc.1",
+    "version": "3.0.0",
     "location": "https://github.com/cfwheels/cfwheels/tree/3.0/core"
 }

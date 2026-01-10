@@ -254,7 +254,8 @@ jobs:
         id: extract-release-notes
         run: |
           # Extract the release notes for the current version from CHANGELOG.md
-          awk '/^# \[3\.0\.0\]/,/^---$/ {print}' CHANGELOG.md | sed '1d;$d' > release-notes.md
+          VERSION_PATTERN=$(echo "${WHEELS_VERSION%+*}" | sed 's/\./\\./g')
+          awk '/^# \['"${VERSION_PATTERN}"'\]/,/^---$/ {print}' CHANGELOG.md | sed '1d;$d' > release-notes.md
           echo "Release notes extracted to release-notes.md"
           cat release-notes.md
 

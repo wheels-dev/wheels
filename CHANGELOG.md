@@ -19,11 +19,11 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ----
 
 
-# [3.0.0-rc.1](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0-rc.1) => 2025-10-20
+# [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
 
-**Release Candidate 1 for Wheels 3.0.0**
+**Wheels 3.0.0 - Stable Release**
 
-This is a pre-release version for community testing. Please report any issues to GitHub.
+This is the first stable release of Wheels 3.0, featuring the rebrand from CFWheels to Wheels and major architecture improvements.
 
 ## 🎉 Major Changes in 3.0.0
 
@@ -90,17 +90,6 @@ This is a pre-release version for community testing. Please report any issues to
 - **Mappings**: New mapping structure in Application.cfm
 - **CLI Commands**: New command syntax for database operations
 - **Dependencies**: Updated WireBox (^7.0.0) and TestBox (^6.0.0) requirements
-
-## Testing Focus Areas
-
-Please help test these areas:
-- Fresh installations on Lucee 5/6/7, Adobe 2021/2023/2025, BoxLang
-- Upgrades from 2.5.0 to 3.0.0-rc.1
-- New CLI commands (`wheels init`, `wheels db create`, etc.)
-- Model ignoreColumns() functionality
-- Application.cfm mapping changes
-- Oracle database support
-- macOS installer
 
 ---
 
