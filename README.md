@@ -170,9 +170,7 @@ Wheels supports the following CFML engines:
 </a>
 
 Made with [contrib.rocks](https://contrib.rocks).
-
 ---
-
 **Wheels 3.0** - Faster, more organized, and just plain fun to use!
 
 [1]: https://wheels.dev/
