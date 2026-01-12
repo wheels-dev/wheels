@@ -14,8 +14,8 @@
  *  {code}
  *
  *  Here are the basic templates that are available for you that come from ForgeBox
- *  - Wheels Base Template - 3.0 Bleeding Edge (default)
- *  - CFWheels Base Template - 2.5 Stable
+ *  - Wheels Base Template - 3.0 Stable (default)
+ *  - Wheels Base Template - Bleeding Edge
  *  - Wheels Template - HelloWorld
  *  - Wheels Template - HelloDynamic
  *  - Wheels Template - HelloPages
@@ -55,7 +55,7 @@ component aliases="wheels g app" extends="../base" {
 
   /**
    * @name           The name of the app you want to create
-   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug). Default is Base@BE (Bleeding Edge)
+   * @template       The name of the app template to generate (or an endpoint ID like a forgebox slug). Default is Bleeding Edge
    * @directory      The directory to create the app in
    * @reloadPassword The reload passwrod to set for the app
    * @datasourceName The datasource name to set for the app
