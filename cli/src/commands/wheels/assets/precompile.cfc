@@ -50,7 +50,7 @@ component extends="../base" {
 		// Normalize environment aliases
 		arguments.environment = normalizeEnvironment(arguments.environment);
 
-		print.greenBoldLine("==> Precompiling assets for #arguments.environment#...").toConsole();
+		detailOutput.output("Precompiling assets for #arguments.environment#...");
 		detailOutput.line();
 		
 		// Define asset directories		
@@ -74,7 +74,7 @@ component extends="../base" {
 		
 		// Process JavaScript files
 		if (directoryExists(jsDir)) {
-			print.boldLine("Processing JavaScript files...").toConsole();
+			detailOutput.output("Processing JavaScript files...");
 			var jsFiles = directoryList(jsDir, true, "query", "*.js");
 			for (var file in jsFiles) {
 				if (file.type == "File" && !findNoCase(".min.js", file.name)) {
@@ -91,7 +91,7 @@ component extends="../base" {
 		
 		// Process CSS files
 		if (directoryExists(cssDir)) {
-			print.boldLine("Processing CSS files...").toConsole();
+			detailOutput.output("Processing CSS files...");
 			var cssFiles = directoryList(cssDir, true, "query", "*.css");
 			for (var file in cssFiles) {
 				if (file.type == "File" && !findNoCase(".min.css", file.name)) {
@@ -108,7 +108,7 @@ component extends="../base" {
 		
 		// Process image files
 		if (directoryExists(imagesDir)) {
-			print.boldLine("Processing image files...").toConsole();
+			detailOutput.output("Processing image files...");
 			var imageFiles = directoryList(imagesDir, true, "query");
 			for (var file in imageFiles) {
 				if (file.type == "File" && isImageFile(file.name)) {
@@ -128,16 +128,16 @@ component extends="../base" {
 		detailOutput.output("Asset manifest written to: #manifestPath#");
 
 		detailOutput.line();
-		print.greenBoldLine("==> Asset precompilation complete!").toConsole();
-		print.greenLine("    Processed #processedCount# files").toConsole();
-		detailOutput.output("    Compiled assets location: #compiledDir#");
+		detailOutput.statusSuccess("Asset precompilation complete!");
+		detailOutput.output("Processed #processedCount# files", true);
+		detailOutput.output("Compiled assets location: #compiledDir#", true);
 
 		// Provide instructions for production
 		detailOutput.line();
-		print.yellowLine("To use precompiled assets in production:").toConsole();
-		detailOutput.output("1. Configure your web server to serve static files from /public/assets/compiled");
-		detailOutput.output("2. Update your application to use the asset manifest for cache-busted URLs");
-		detailOutput.output("3. Set wheels.assetManifest = true in your production environment");
+		detailOutput.output("To use precompiled assets in production:");
+		detailOutput.output("1. Configure your web server to serve static files from /public/assets/compiled", true);
+		detailOutput.output("2. Update your application to use the asset manifest for cache-busted URLs", true);
+		detailOutput.output("3. Set wheels.assetManifest = true in your production environment", true);
 	}
 	
 	/**

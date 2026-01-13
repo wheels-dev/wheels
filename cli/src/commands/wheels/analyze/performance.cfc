@@ -500,9 +500,7 @@ component extends="../base" {
         var score = calculatePerformanceScore(arguments.results);
         var grade = getPerformanceGrade(score);
 
-        detailOutput.divider("=", 50);
-        print.boldLine("Performance Grade: #grade# (#score#/100)").toConsole();
-        detailOutput.divider("=", 50);
+        detailOutput.header("Performance Grade: #grade# (#score#/100)");
         detailOutput.line();
         
         // Recommendations

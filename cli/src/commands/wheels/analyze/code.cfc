@@ -190,8 +190,8 @@ component extends="../base" {
                             var icon = getSeverityIcon(issue.severity);
                             var color = getSeverityColor(issue.severity);
 
-                            detailOutput.colored("  #icon# Line #issue.line#:#issue.column# - #issue.message#", color);
-                            print.grayLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
+                            detailOutput.output("  #icon# Line #issue.line#:#issue.column# - #issue.message#");
+                            print.cyanLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
                         }
                     }
                 }
@@ -312,12 +312,6 @@ component extends="../base" {
         if (results.metrics.codeSmells > 10) {
             arrayAppend(recommendations, "Address code smells to improve maintainability");
         }
-
-        if (!fileExists(".wheelscheck")) {
-            arrayAppend(recommendations, "Create a .wheelscheck config file for custom rules");
-        }
-
-        arrayAppend(recommendations, "Integrate this check into your CI/CD pipeline");
 
         for (var rec in recommendations) {
             detailOutput.output("  * #rec#");
