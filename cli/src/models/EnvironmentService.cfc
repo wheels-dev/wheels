@@ -1188,20 +1188,17 @@ box server start port=8080 host=0.0.0.0";
 
         switch (arguments.template) {
             case "docker":
-                arrayAppend(steps, "1. Start Docker environment: docker-compose -f docker-compose.#arguments.environment#.yml up");
-                arrayAppend(steps, "2. Access application at: http://localhost:8080");
-                arrayAppend(steps, "3. Stop environment: docker-compose -f docker-compose.#arguments.environment#.yml down");
+                arrayAppend(steps, "Start Docker environment: docker-compose -f docker-compose.#arguments.environment#.yml up");
+                arrayAppend(steps, "Stop environment: docker-compose -f docker-compose.#arguments.environment#.yml down");
                 break;
             case "vagrant":
-                arrayAppend(steps, "1. Start Vagrant VM: vagrant up");
-                arrayAppend(steps, "2. Access application at: http://localhost:8080 or http://192.168.56.10:8080");
-                arrayAppend(steps, "3. SSH into VM: vagrant ssh");
-                arrayAppend(steps, "4. Stop VM: vagrant halt");
+                arrayAppend(steps, "Start Vagrant VM: vagrant up");
+                arrayAppend(steps, "SSH into VM: vagrant ssh");
+                arrayAppend(steps, "Stop VM: vagrant halt");
                 break;
             default:
-                arrayAppend(steps, "1. Switch to environment: wheels env switch #arguments.environment#");
-                arrayAppend(steps, "2. Start server: box server start");
-                arrayAppend(steps, "3. Access application at: http://localhost:8080");
+                arrayAppend(steps, "Switch to environment: wheels env switch #arguments.environment#");
+                arrayAppend(steps, "Start server: box server start");
         }
 
         return steps;
