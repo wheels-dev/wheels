@@ -99,7 +99,7 @@ component extends="base" {
 
 	private string function getWheelsCliVersion() {
 		// Read from CLI module's box.json
-		local.boxJsonPath = getDirectoryFromPath(getCurrentTemplatePath()) & "../../../box.json";
+		local.boxJsonPath = expandPath("/wheels-cli/box.json");
 		if (FileExists(local.boxJsonPath)) {
 			try {
 				local.boxJson = DeserializeJSON(FileRead(local.boxJsonPath));

@@ -122,24 +122,28 @@
 		$(".functiondefinition").show();
 		$(".functionlink").show();
 		updateFunctionCount();
+		$('.ui.sticky').sticky('refresh');
 	}
 	function filterByFunctionName(name){
 		$("#function-output").find(".functiondefinition").hide().end()
 			.find("[data-function='" + name + "']").show().end()
 			.find("#" + name).show();
 		window.location.hash="#" + name;
+		$('.ui.sticky').sticky('refresh');
 	}
 	function filterByCategory(section, category){
 		$("#function-navigation").find(".functionlink").hide().end()
 			.find('[data-section="' + section + '"][data-category="' + category + '"]').show();
 		$("#function-output").find(".functiondefinition").hide().end()
 			.find('[data-section="' + section + '"][data-category="' + category + '"]').show();
+		$('.ui.sticky').sticky('refresh');
 	}
 	function filterBySection(section){
 		$("#function-navigation").find(".functionlink").hide().end()
 			.find('[data-section="' + section + '"]').show();
 		$("#function-output").find(".functiondefinition").hide().end()
 			.find('[data-section="' + section + '"]').show();
+		$('.ui.sticky').sticky('refresh');
 	}
 	function updateFunctionCount(){
 		$("#functionResults .resultCount").html($("#function-output .functiondefinition:visible").length);
