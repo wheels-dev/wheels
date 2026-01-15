@@ -23,7 +23,7 @@ readonly COMMANDBOX_DOWNLOAD_URL="https://downloads.ortussolutions.com/ortussolu
 # =============================
 INSTALL_PATH="$HOME/Desktop/commandbox"
 APP_NAME="MyWheelsApp"
-TEMPLATE="wheels-base-template@BE"
+TEMPLATE="wheels-base-template@^3.0.0"
 RELOAD_PASSWORD="changeMe"
 DATASOURCE_NAME="MyWheelsApp"
 CFML_ENGINE="lucee"
@@ -34,9 +34,17 @@ APP_BASE_PATH="$HOME/Desktop/Sites"
 FORCE=false
 SKIP_PATH=false
 
-START_TIME=$(date +%s)
-LOG_FILE="${TMPDIR}wheels-installation.log"
 TEMP_FILES=()
+
+# =============================
+# Temporary installer scripts & status flags
+# =============================
+TEMP_DIR="${TMPDIR:-/tmp}/wheels-installer"
+mkdir -p "$TEMP_DIR"
+
+# Unified installation variables
+INSTALL_FLAG="$TEMP_DIR/install-status.txt"
+UNIFIED_INSTALL_SCRIPT="$TEMP_DIR/install-dependencies.sh"
 
 # =============================
 # Parse Command Line Arguments
@@ -102,6 +110,10 @@ done
 # Logging Functions
 # =============================
 
+START_TIME=$(date +%s)
+mkdir -p "${INSTALL_PATH}/logs"
+LOG_FILE="${INSTALL_PATH}/logs/wheels-installation.log"
+
 log_info() {
     echo "[$(date '+%H:%M:%S')] INFO: $1"
     echo "[$(date '+%H:%M:%S')] INFO: $1" >> "$LOG_FILE"
@@ -158,7 +170,7 @@ stop_with_error() {
     echo "  • Report Issues: https://github.com/wheels-dev/wheels/issues"
     echo "  • Discussion:     https://github.com/wheels-dev/wheels/discussions"
     echo ""
-    echo "Log file saved to: $LOG_FILE"
+    echo "You can view the installation log here: $LOG_FILE"
     echo ""
     cleanup_temp_files
     exit 1
@@ -168,96 +180,261 @@ stop_with_error() {
 # Installation Functions
 # =============================
 
+check_existing_installations() {
+    log_section "EXISTING INSTALLATIONS CHECK"
+
+    # Check application directory
+    local app_path="${APP_BASE_PATH}/${APP_NAME}"
+    if [[ -d "$app_path" ]] && ! $FORCE; then
+        stop_with_error "Application directory already exists: $app_path"
+    fi
+
+    # Check CommandBox servers if CommandBox is installed
+    local box_path="${INSTALL_PATH}/box"
+    if [[ -f "$box_path" ]] && "$box_path" version &> /dev/null; then
+        
+        # Check for existing servers with the same name (moved logic)
+        local servers_json
+        if servers_json=$("$box_path" server list --json 2>/dev/null); then
+            if [[ -n "$servers_json" ]]; then
+                local existing_server
+                existing_server=$(echo "$servers_json" | grep -o '"name":"'"$APP_NAME"'"' || true)
+                
+                if [[ -n "$existing_server" ]]; then
+                    local server_details="Name: $APP_NAME"
+                    local weburl
+                    weburl=$(echo "$servers_json" | grep -o '"weburl":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+                    local webroot
+                    webroot=$(echo "$servers_json" | grep -o '"webroot":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+                    
+                    if [[ -n "$weburl" ]]; then
+                        server_details+="\nURL: $weburl"
+                    fi
+                    if [[ -n "$webroot" ]]; then
+                        server_details+="\nWebroot: $webroot"
+                    fi
+                    
+                    stop_with_error "A CommandBox server already exists with this name: $APP_NAME"
+                fi
+            fi
+        fi
+    fi
+    log_success "No conflicting installations found"
+}
+
 check_java() {
     log_section "JAVA VERSION CHECK"
 
     local java_found=false
     local java_version=0
-    local needs_install=false
+    local homebrew_needed=false
+    local java_needed=false
 
-    # Check if Java is installed
+    # -------------------------------
+    # Detect existing Java
+    # -------------------------------
     if command -v java &> /dev/null; then
-        # Get Java version
-        local java_version_output=$(java -version 2>&1 | head -n 1)
+        local java_version_output
+        java_version_output=$(java -version 2>&1 | head -n 1)
 
-        # Parse version (handles both old format "1.8.0" and new format "17.0.1")
         if [[ $java_version_output =~ \"([0-9]+)\.([0-9]+) ]]; then
             local major="${BASH_REMATCH[1]}"
             local minor="${BASH_REMATCH[2]}"
 
-            # Old format: "1.8.0" means Java 8
             if [[ $major == "1" ]]; then
                 java_version=$minor
             else
-                # New format: "17.0.1" means Java 17
                 java_version=$major
             fi
+
             java_found=true
             log_info "Found Java version: $java_version"
         fi
     fi
 
-    # Check if Java meets requirements
+    # -------------------------------
+    # Check what needs to be installed
+    # -------------------------------
     if [[ $java_found == false ]] || [[ $java_version -lt $MINIMUM_JAVA_VERSION ]]; then
-        needs_install=true
-
+        java_needed=true
         if [[ $java_found == true ]]; then
             log_error "Java version $java_version is below minimum requirement (${MINIMUM_JAVA_VERSION})"
         else
-            log_error "Java not found in PATH"
-        fi
-
-        echo ""
-        echo "CommandBox requires Java ${MINIMUM_JAVA_VERSION} or higher."
-        echo ""
-
-        # Check if Homebrew is available for automatic installation
-        if command -v brew &> /dev/null; then
-            log_info "Homebrew detected - installing Java ${MINIMUM_JAVA_VERSION} automatically..."
-            echo ""
-
-            if brew install openjdk@${MINIMUM_JAVA_VERSION} 2>&1; then
-                # Add to PATH for current session
-                if [[ -d "/opt/homebrew/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin" ]]; then
-                    export PATH="/opt/homebrew/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin:$PATH"
-                elif [[ -d "/usr/local/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin" ]]; then
-                    export PATH="/usr/local/opt/openjdk@${MINIMUM_JAVA_VERSION}/bin:$PATH"
-                fi
-
-                # Verify installation
-                if command -v java &> /dev/null; then
-                    local new_version_output=$(java -version 2>&1 | head -n 1)
-                    log_success "Java ${MINIMUM_JAVA_VERSION} installed successfully"
-                    log_info "Version: $new_version_output"
-                    echo ""
-                    return 0
-                else
-                    log_error "Java installation completed but 'java' command not found in PATH"
-                    stop_with_error "Please restart your terminal and run the installer again"
-                fi
-            else
-                log_error "Failed to install Java via Homebrew"
-                stop_with_error "Please install Java manually and try again"
-            fi
-        else
-            # No Homebrew - stop with instructions
-            log_error "Homebrew not found - cannot auto-install Java"
-            echo ""
-            echo "Please install Java ${MINIMUM_JAVA_VERSION} or higher manually:"
-            echo ""
-            echo "Option 1 - Install Homebrew first (recommended):"
-            echo "  /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-            echo "  brew install openjdk@${MINIMUM_JAVA_VERSION}"
-            echo ""
-            echo "Option 2 - Download Java directly:"
-            echo "  - Temurin (recommended): https://adoptium.net/temurin/releases/"
-            echo "  - Oracle: https://www.oracle.com/java/technologies/downloads/"
-            echo ""
-            stop_with_error "Java ${MINIMUM_JAVA_VERSION}+ is required"
+            log_error "Java not found"
         fi
     fi
 
-    log_success "Java version meets requirements (>= ${MINIMUM_JAVA_VERSION})"
+    if [[ $java_needed == true ]]; then
+        log_info "CommandBox requires Java ${MINIMUM_JAVA_VERSION} or higher."
+
+        # Ensure brew path is included for checking
+        if [ -d "/opt/homebrew/bin" ]; then
+            export PATH="/opt/homebrew/bin:$PATH"
+        elif [ -d "/usr/local/bin" ]; then
+            export PATH="/usr/local/bin:$PATH"
+        fi
+
+        if ! command -v brew &> /dev/null; then
+            homebrew_needed=true
+            log_error "Homebrew not found"
+        else
+            log_success "Homebrew detected"
+        fi
+
+        # -------------------------------
+        # Install dependencies via single terminal session
+        # -------------------------------
+        install_dependencies_via_terminal "$homebrew_needed" "$java_needed"
+
+        # Wait for installation completion
+        local counter=0
+        while true; do
+            counter=$((counter+1))
+            if [[ -f "$INSTALL_FLAG" ]]; then
+                local result
+                result=$(cat "$INSTALL_FLAG")
+                if [[ "$result" == "success" ]]; then
+                    log_success "Dependencies installed successfully"
+                    rm -f "$UNIFIED_INSTALL_SCRIPT" "$INSTALL_FLAG"
+                    # Update PATH after successful installation
+                    if [ -d "/opt/homebrew/bin" ]; then
+                        eval "$(/opt/homebrew/bin/brew shellenv)"
+                    elif [ -d "/usr/local/bin" ]; then
+                        eval "$(/usr/local/bin/brew shellenv)"
+                    fi
+                    export PATH="$(brew --prefix openjdk@${MINIMUM_JAVA_VERSION})/bin:$PATH"
+                    break
+                else
+                    stop_with_error "Dependency installation failed"
+                fi
+            else
+                log_info "Waiting for dependency installation… (${counter} checks so far)"
+            fi
+            sleep 2
+        done
+    else
+        log_success "Java version meets requirements (>= ${MINIMUM_JAVA_VERSION})"
+    fi
+}
+
+install_dependencies_via_terminal() {
+    local need_homebrew=$1
+    local need_java=$2
+    
+    log_section "DEPENDENCY INSTALLATION"
+
+    rm -f "$INSTALL_FLAG"
+
+    log_info "Creating unified dependency installer script"
+
+    cat > "$UNIFIED_INSTALL_SCRIPT" <<EOF
+#!/bin/bash
+clear
+echo ""
+echo "==============================================="
+echo "Wheels Installer – Dependency Setup"
+echo "==============================================="
+echo ""
+echo "This window will install required dependencies."
+echo ""
+
+# Status file path
+STATUS_FILE="$INSTALL_FLAG"
+echo "Status file will be written to: \$STATUS_FILE"
+echo ""
+
+EOF
+
+    # Add Homebrew installation if needed
+    if [[ "$need_homebrew" == true ]]; then
+        cat >> "$UNIFIED_INSTALL_SCRIPT" <<'EOF'
+echo "Step 1: Installing Homebrew..."
+echo "You may be asked for your macOS password."
+echo ""
+
+# Run official Homebrew installer
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Add Homebrew to PATH
+if [ -d "/opt/homebrew/bin" ]; then
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
+
+if [ -d "/usr/local/bin" ]; then
+    echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.zprofile
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+
+# Check if brew installed successfully
+if ! command -v brew >/dev/null 2>&1; then
+    echo "failed" > "$STATUS_FILE"
+    echo ""
+    echo "Homebrew installation failed."
+    echo "Status file created at: $STATUS_FILE"
+    exit 1
+fi
+
+echo "Homebrew installed successfully."
+echo ""
+
+EOF
+    fi
+
+    # Add Java installation if needed
+    if [[ "$need_java" == true ]]; then
+        cat >> "$UNIFIED_INSTALL_SCRIPT" <<EOF
+echo "Step 2: Installing Java ${MINIMUM_JAVA_VERSION}..."
+echo ""
+
+# Ensure Homebrew is in PATH
+if [ -d "/opt/homebrew/bin" ]; then
+    eval "\$(/opt/homebrew/bin/brew shellenv)"
+elif [ -d "/usr/local/bin" ]; then
+    eval "\$(/usr/local/bin/brew shellenv)"
+fi
+
+# Install Java
+brew install openjdk@${MINIMUM_JAVA_VERSION}
+
+# Add Java to PATH temporarily
+JAVA_PREFIX=\$(brew --prefix openjdk@${MINIMUM_JAVA_VERSION})
+export PATH="\$JAVA_PREFIX/bin:\$PATH"
+
+# Add Java to PATH permanently
+SHELL_PROFILE="\$HOME/.zprofile"
+if ! grep -q "openjdk@${MINIMUM_JAVA_VERSION}/bin" "\$SHELL_PROFILE"; then
+    echo "export PATH=\"\$JAVA_PREFIX/bin:\$PATH\"" >> "\$SHELL_PROFILE"
+fi
+
+# Verify Java
+if command -v java >/dev/null 2>&1; then
+    echo ""
+    echo "Java installed successfully."
+    echo "Version: \$(java -version 2>&1 | head -n 1)"
+else
+    echo "failed" > "\$STATUS_FILE"
+    echo ""
+    echo "Java installation failed."
+    echo "Status file created at: \$STATUS_FILE"
+    exit 1
+fi
+
+EOF
+    fi
+
+    # Add completion message to script
+    cat >> "$UNIFIED_INSTALL_SCRIPT" <<'EOF'
+echo ""
+echo "All dependencies installed successfully!"
+echo "success" > "$STATUS_FILE"
+echo ""
+echo "You can now close this Terminal window."
+EOF
+
+    chmod +x "$UNIFIED_INSTALL_SCRIPT"
+    log_info "Launching Terminal for dependency installation"
+    open -a Terminal "$UNIFIED_INSTALL_SCRIPT"
 }
 
 install_commandbox() {
@@ -302,9 +479,26 @@ add_to_path() {
         return 0
     fi
 
-    local shell_rc="$HOME/.zshrc"
-    [[ "$SHELL" == */bash ]] && shell_rc="$HOME/.bash_profile"
+    # Detect shell and choose appropriate rc file
+    local shell_rc
+    case "$SHELL" in
+        */zsh) 
+            shell_rc="$HOME/.zshrc"
+            [[ ! -f "$shell_rc" ]] && shell_rc="$HOME/.zprofile" ;;
+        */bash) 
+            shell_rc="$HOME/.bash_profile"
+            [[ ! -f "$shell_rc" ]] && shell_rc="$HOME/.bashrc" ;;
+        */fish) 
+            shell_rc="$HOME/.config/fish/config.fish" ;;
+        *) 
+            shell_rc="$HOME/.profile" ;;
+    esac
 
+    # Ensure file exists
+    mkdir -p "$(dirname "$shell_rc")"
+    touch "$shell_rc"
+
+    # Check if path already exists
     if grep -q "export PATH=\"$INSTALL_PATH:\$PATH\"" "$shell_rc" 2>/dev/null; then
         log_success "Already in PATH"
         return 0
@@ -337,6 +531,39 @@ create_application() {
     local box_path="${INSTALL_PATH}/box"
     local app_path="${APP_BASE_PATH}/${APP_NAME}"
 
+    log_info "Checking if server already exists for: $APP_NAME"
+
+    # Check for existing servers with the same name
+    local servers_json
+    if servers_json=$("$box_path" server list --json 2>/dev/null); then
+        
+        if [[ -n "$servers_json" ]]; then
+            # Parse JSON and check for existing server with same name
+            local existing_server
+            existing_server=$(echo "$servers_json" | grep -o '"name":"'"$APP_NAME"'"' || true)
+            
+            if [[ -n "$existing_server" ]]; then
+                # Extract server details
+                local server_details="Name: $APP_NAME"
+                local weburl
+                weburl=$(echo "$servers_json" | grep -o '"weburl":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+                local webroot
+                webroot=$(echo "$servers_json" | grep -o '"webroot":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+                
+                if [[ -n "$weburl" ]]; then
+                    server_details+="\nURL: $weburl"
+                fi
+                if [[ -n "$webroot" ]]; then
+                    server_details+="\nWebroot: $webroot"
+                fi
+                
+                stop_with_error "A CommandBox server already exists with this name."
+            fi
+        fi
+    else
+        stop_with_error "Failed to check existing servers Application Name: $APP_NAME"
+    fi
+
     log_info "Creating Wheels application: $APP_NAME"
     log_info "Location: $app_path"
     log_info "Template: $TEMPLATE"
@@ -347,11 +574,6 @@ create_application() {
     echo "  - Setting up development server"
     echo "  Please be patient..."
     echo ""
-
-    # Check existing
-    if [[ -d "$app_path" ]]; then
-        stop_with_error "Application directory already exists: $app_path"
-    fi
 
     mkdir -p "$APP_BASE_PATH"
     cd "$APP_BASE_PATH"
@@ -392,27 +614,6 @@ create_application() {
         fi
 
         stop_with_error "Failed to create application"
-    fi
-}
-
-start_server() {
-    log_section "DEVELOPMENT SERVER"
-
-    local box_path="${INSTALL_PATH}/box"
-    local app_path="${APP_BASE_PATH}/${APP_NAME}"
-
-    cd "$app_path"
-
-    log_info "Starting server..."
-    "$box_path" server start 2>&1
-
-    sleep 3
-
-    local server_url=$("$box_path" server status --json 2>/dev/null | grep -o '"defaultBaseURL":"[^"]*"' | cut -d'"' -f4 || echo "")
-
-    if [[ -n "$server_url" ]]; then
-        log_success "Server running at: $server_url"
-        echo "$server_url" > "${TMPDIR}wheels-server-url.txt"
     fi
 }
 
@@ -470,6 +671,7 @@ main() {
     echo ""
 
     # Perform installation
+    check_existing_installations
     check_java
     install_commandbox
     add_to_path
