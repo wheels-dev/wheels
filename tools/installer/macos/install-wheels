@@ -198,25 +198,14 @@ check_existing_installations() {
         if servers_json=$("$box_path" server list --json 2>/dev/null); then
             if [[ -n "$servers_json" ]]; then
                 local existing_server
-                existing_server=$(echo "$servers_json" | grep -o '"name":"'"$APP_NAME"'"' || true)
+                existing_server=$(echo "$servers_json" | grep -oi '"name":"'"$APP_NAME"'"' || true)
                 
                 if [[ -n "$existing_server" ]]; then
-                    local server_details="Name: $APP_NAME"
-                    local weburl
-                    weburl=$(echo "$servers_json" | grep -o '"weburl":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
-                    local webroot
-                    webroot=$(echo "$servers_json" | grep -o '"webroot":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
-                    
-                    if [[ -n "$weburl" ]]; then
-                        server_details+="\nURL: $weburl"
-                    fi
-                    if [[ -n "$webroot" ]]; then
-                        server_details+="\nWebroot: $webroot"
-                    fi
-                    
                     stop_with_error "A CommandBox server already exists with this name: $APP_NAME"
                 fi
             fi
+        else
+            stop_with_error "Failed to check existing servers Application Name: $APP_NAME"
         fi
     fi
     log_success "No conflicting installations found"
@@ -287,9 +276,7 @@ check_java() {
         install_dependencies_via_terminal "$homebrew_needed" "$java_needed"
 
         # Wait for installation completion
-        local counter=0
         while true; do
-            counter=$((counter+1))
             if [[ -f "$INSTALL_FLAG" ]]; then
                 local result
                 result=$(cat "$INSTALL_FLAG")
@@ -308,7 +295,7 @@ check_java() {
                     stop_with_error "Dependency installation failed"
                 fi
             else
-                log_info "Waiting for dependency installation… (${counter} checks so far)"
+                log_info "Waiting for dependency installation……"
             fi
             sleep 2
         done
@@ -407,7 +394,7 @@ if ! grep -q "openjdk@${MINIMUM_JAVA_VERSION}/bin" "\$SHELL_PROFILE"; then
     echo "export PATH=\"\$JAVA_PREFIX/bin:\$PATH\"" >> "\$SHELL_PROFILE"
 fi
 
-# Verify Java
+# Verify Java (real JVM check)
 if command -v java >/dev/null 2>&1; then
     echo ""
     echo "Java installed successfully."
