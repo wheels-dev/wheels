@@ -30,119 +30,124 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		boolean env = false,
 		boolean settings = false
 	) {
-		requireWheelsApp(getCWD());
-		// Reconstruct and validate arguments
-		arguments = reconstructArgs(
-			argStruct = arguments,
-			allowedValues = {
-				format: ["table", "json"]
-			}
-		);
+		try{
+			requireWheelsApp(getCWD());
+			// Reconstruct and validate arguments
+			arguments = reconstructArgs(
+				argStruct = arguments,
+				allowedValues = {
+					format: ["table", "json"]
+				}
+			);
 
-		// Validate environments are different
-		if (arguments.env1 == arguments.env2) {
-			detailOutput.error("Cannot compare an environment to itself");
-			return;
-		}
-
-		// Determine what to compare
-		local.compareSettings = true;
-		local.compareEnv = true;
-		
-		// If both flags are provided or neither, compare both
-		if (arguments.settings && arguments.env) {
-			local.compareSettings = true;
-			local.compareEnv = true;
-		} else if (arguments.settings) {
-			local.compareSettings = true;
-			local.compareEnv = false;
-		} else if (arguments.env) {
-			local.compareSettings = false;
-			local.compareEnv = true;
-		}
-		// If neither flag is provided, compare both (default behavior)
-
-		local.allDifferences = {};
-
-		// Check if both environments exist (either settings OR .env file)
-		// Get all file paths first
-		local.configPath = ResolvePath("config");
-		local.settingsFile = local.configPath & "/settings.cfm";
-		local.env1SettingsFile = local.configPath & "/" & arguments.env1 & "/settings.cfm";
-		local.env2SettingsFile = local.configPath & "/" & arguments.env2 & "/settings.cfm";
-		local.env1File = ResolvePath(".env.#arguments.env1#");
-		local.env2File = ResolvePath(".env.#arguments.env2#");
-		local.baseEnvFile = ResolvePath(".env");
-
-		// Check if environment 1 exists (either settings OR .env)
-		local.env1SettingsExists = fileExists(local.env1SettingsFile);
-		local.env1EnvExists = fileExists(local.env1File) || (arguments.env1 == "development" && fileExists(local.baseEnvFile));
-
-		if (!local.env1SettingsExists && !local.env1EnvExists) {
-			detailOutput.statusWarning("Environment '#arguments.env1#' not found!");
-			detailOutput.output("  Settings file: #local.env1SettingsFile# (not found)", true);
-			detailOutput.output("  Env file: #local.env1File# (not found)", true);
-			detailOutput.statusFailed("Environment '#arguments.env1#' does not exist. No settings file or .env file found.");
-			return;
-		}
-
-		// Check if environment 2 exists (either settings OR .env)
-		local.env2SettingsExists = fileExists(local.env2SettingsFile);
-		local.env2EnvExists = fileExists(local.env2File) || (arguments.env2 == "development" && fileExists(local.baseEnvFile));
-
-		if (!local.env2SettingsExists && !local.env2EnvExists) {
-			detailOutput.statusWarning("Environment '#arguments.env2#' not found!");
-			detailOutput.output("  Settings file: #local.env2SettingsFile# (not found)", true);
-			detailOutput.output("  Env file: #local.env2File# (not found)", true);
-			detailOutput.statusFailed("Environment '#arguments.env2#' does not exist. No settings file or .env file found.");
-			return;
-		}
-
-		// Compare settings if requested
-		if (local.compareSettings) {
-			if (!FileExists(local.settingsFile)) {
-				detailOutput.error("No settings.cfm file found in config directory");
+			// Validate environments are different
+			if (arguments.env1 == arguments.env2) {
+				detailOutput.error("Cannot compare an environment to itself");
 				return;
 			}
 
-			// Load configurations for both environments (even if files don't exist, will be empty)
-			local.config1 = loadConfiguration(local.settingsFile, local.env1SettingsFile);
-			local.config2 = loadConfiguration(local.settingsFile, local.env2SettingsFile);
+			// Determine what to compare
+			local.compareSettings = true;
+			local.compareEnv = true;
+			
+			// If both flags are provided or neither, compare both
+			if (arguments.settings && arguments.env) {
+				local.compareSettings = true;
+				local.compareEnv = true;
+			} else if (arguments.settings) {
+				local.compareSettings = true;
+				local.compareEnv = false;
+			} else if (arguments.env) {
+				local.compareSettings = false;
+				local.compareEnv = true;
+			}
+			// If neither flag is provided, compare both (default behavior)
 
-			// Compare configurations
-			local.allDifferences.settings = compareConfigurations(local.config1, local.config2);
-		}
+			local.allDifferences = {};
 
-		// Compare environment variables if requested
-		if (local.compareEnv) {
-			local.envVars1 = {};
-			local.envVars2 = {};
+			// Check if both environments exist (either settings OR .env file)
+			// Get all file paths first
+			local.configPath = ResolvePath("config");
+			local.settingsFile = local.configPath & "/settings.cfm";
+			local.env1SettingsFile = local.configPath & "/" & arguments.env1 & "/settings.cfm";
+			local.env2SettingsFile = local.configPath & "/" & arguments.env2 & "/settings.cfm";
+			local.env1File = ResolvePath(".env.#arguments.env1#");
+			local.env2File = ResolvePath(".env.#arguments.env2#");
+			local.baseEnvFile = ResolvePath(".env");
 
-			// Load environment variables for env1
-			if (FileExists(local.env1File)) {
-				local.envVars1 = loadEnvFile(local.env1File);
-			} else if (arguments.env1 == "development" && FileExists(local.baseEnvFile)) {
-				// Fall back to .env for development
-				local.envVars1 = loadEnvFile(local.baseEnvFile);
+			// Check if environment 1 exists (either settings OR .env)
+			local.env1SettingsExists = fileExists(local.env1SettingsFile);
+			local.env1EnvExists = fileExists(local.env1File) || (arguments.env1 == "development" && fileExists(local.baseEnvFile));
+
+			if (!local.env1SettingsExists && !local.env1EnvExists) {
+				detailOutput.statusWarning("Environment '#arguments.env1#' not found!");
+				detailOutput.output("Settings file: #local.env1SettingsFile# (not found)", true);
+				detailOutput.output("Env file: #local.env1File# (not found)", true);
+				detailOutput.statusFailed("Environment '#arguments.env1#' does not exist. No settings file or .env file found.");
+				return;
 			}
 
-			// Load environment variables for env2
-			if (FileExists(local.env2File)) {
-				local.envVars2 = loadEnvFile(local.env2File);
-			} else if (arguments.env2 == "development" && FileExists(local.baseEnvFile)) {
-				// Fall back to .env for development
-				local.envVars2 = loadEnvFile(local.baseEnvFile);
+			// Check if environment 2 exists (either settings OR .env)
+			local.env2SettingsExists = fileExists(local.env2SettingsFile);
+			local.env2EnvExists = fileExists(local.env2File) || (arguments.env2 == "development" && fileExists(local.baseEnvFile));
+
+			if (!local.env2SettingsExists && !local.env2EnvExists) {
+				detailOutput.statusWarning("Environment '#arguments.env2#' not found!");
+				detailOutput.output("Settings file: #local.env2SettingsFile# (not found)", true);
+				detailOutput.output("Env file: #local.env2File# (not found)", true);
+				detailOutput.statusFailed("Environment '#arguments.env2#' does not exist. No settings file or .env file found.");
+				return;
 			}
 
-			// Compare environment variables
-			local.allDifferences.env = compareConfigurations(local.envVars1, local.envVars2);
-		}
+			// Compare settings if requested
+			if (local.compareSettings) {
+				if (!FileExists(local.settingsFile)) {
+					detailOutput.error("No settings.cfm file found in config directory");
+					return;
+				}
 
-		// Output results
-		if (arguments.format == "json") {
-			outputAsJson(local.allDifferences, arguments.env1, arguments.env2, local.compareSettings, local.compareEnv);
-		} else {
-			outputAsTable(local.allDifferences, arguments.env1, arguments.env2, arguments.changesOnly, local.compareSettings, local.compareEnv);
+				// Load configurations for both environments (even if files don't exist, will be empty)
+				local.config1 = loadConfiguration(local.settingsFile, local.env1SettingsFile);
+				local.config2 = loadConfiguration(local.settingsFile, local.env2SettingsFile);
+
+				// Compare configurations
+				local.allDifferences.settings = compareConfigurations(local.config1, local.config2);
+			}
+
+			// Compare environment variables if requested
+			if (local.compareEnv) {
+				local.envVars1 = {};
+				local.envVars2 = {};
+
+				// Load environment variables for env1
+				if (FileExists(local.env1File)) {
+					local.envVars1 = loadEnvFile(local.env1File);
+				} else if (arguments.env1 == "development" && FileExists(local.baseEnvFile)) {
+					// Fall back to .env for development
+					local.envVars1 = loadEnvFile(local.baseEnvFile);
+				}
+
+				// Load environment variables for env2
+				if (FileExists(local.env2File)) {
+					local.envVars2 = loadEnvFile(local.env2File);
+				} else if (arguments.env2 == "development" && FileExists(local.baseEnvFile)) {
+					// Fall back to .env for development
+					local.envVars2 = loadEnvFile(local.baseEnvFile);
+				}
+
+				// Compare environment variables
+				local.allDifferences.env = compareConfigurations(local.envVars1, local.envVars2);
+			}
+
+			// Output results
+			if (arguments.format == "json") {
+				outputAsJson(local.allDifferences, arguments.env1, arguments.env2, local.compareSettings, local.compareEnv);
+			} else {
+				outputAsTable(local.allDifferences, arguments.env1, arguments.env2, arguments.changesOnly, local.compareSettings, local.compareEnv);
+			}
+		}catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
 		}
 	}
 
@@ -353,7 +358,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", arguments.env1, arguments.env2]
-			);
+			).toConsole();
 			detailOutput.line();
 		}
 
@@ -371,7 +376,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", "Value"]
-			);
+			).toConsole();
 			detailOutput.line();
 		}
 
@@ -389,7 +394,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", "Value"]
-			);
+			).toConsole();
 			detailOutput.line();
 		}
 
@@ -406,7 +411,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			detailOutput.getPrint().table(
 				data = local.data,
 				headers = [arguments.type == "env" ? "Variable" : "Setting", "Value"]
-			);
+			).toConsole();
 			detailOutput.line();
 		}
 
@@ -526,7 +531,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		};
 		
 		local.jsonData = SerializeJSON(local.output, false, false);
-		detailOutput.output(deserializeJSON(local.jsonData));
+		print.line(deserializeJSON(local.jsonData)).toConsole();
 	}
 
 	private string function maskSensitiveValue(required string key, required any value) {

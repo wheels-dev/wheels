@@ -28,80 +28,85 @@ component extends="../base" {
         boolean report = false,
         boolean verbose = false
     ) {
-        requireWheelsApp(getCWD());
-        // Reconstruct and validate arguments with allowed values
-        arguments = reconstructArgs(
-            argStruct = arguments,
-            allowedValues = {
-                format: ["console", "json", "junit"],
-                severity: ["info", "warning", "error"]
-            }
-        );
-
-        // Set verbose mode if requested
-        if (arguments.verbose) {
-            print.setVerbose(true);
-        }
-
-        if (arguments.verbose) {
-            print.yellowLine("Analyzing code quality with verbose output...").toConsole();
-            detailOutput.line();
-            detailOutput.output("Configuration:");
-            detailOutput.output("  Path: #resolvePath(arguments.path)#");
-            detailOutput.output("  Severity filter: #arguments.severity#");
-            detailOutput.output("  Fix mode: #(arguments.fix ? 'enabled' : 'disabled')#");
-            detailOutput.output("  Output format: #arguments.format#");
-            detailOutput.output("  Report generation: #(arguments.report ? 'enabled' : 'disabled')#");
-            detailOutput.line();
-        } else {
-            print.yellowLine("Analyzing code quality...").toConsole();
-            detailOutput.line();
-        }
-
-        // Pass the print object to the service
-        var results = analysisService.analyze(
-            path = resolvePath(arguments.path),
-            severity = arguments.severity,
-            printer = print,
-            verbose = arguments.verbose  // Pass verbose flag to service
-        );
-        
-        if (arguments.fix) {
-            detailOutput.line();
-            print.yellowLine("Applying automatic fixes...").toConsole();
-            var fixed = analysisService.autoFix(results, print); // Pass print here too
-            print.greenLine("Fixed #fixed.count# issues automatically").toConsole();
-
-            if (arguments.verbose && arrayLen(fixed.files) > 0) {
-                detailOutput.output("Files modified:");
-                for (var file in fixed.files) {
-                    detailOutput.output("  * #file#");
+        try{
+            requireWheelsApp(getCWD());
+            // Reconstruct and validate arguments with allowed values
+            arguments = reconstructArgs(
+                argStruct = arguments,
+                allowedValues = {
+                    format: ["console", "json", "junit"],
+                    severity: ["info", "warning", "error"]
                 }
-            }
-            detailOutput.line();
+            );
 
-            // Re-analyze after fixes
+            // Set verbose mode if requested
             if (arguments.verbose) {
-                print.yellowLine("Re-analyzing after fixes with verbose output...").toConsole();
-            } else {
-                print.yellowLine("Re-analyzing after fixes...").toConsole();
+                print.setVerbose(true);
             }
-            results = analysisService.analyze(
+
+            if (arguments.verbose) {
+                print.yellowLine("Analyzing code quality with verbose output...").toConsole();
+                detailOutput.line();
+                detailOutput.output("Configuration:");
+                detailOutput.output("Path: #resolvePath(arguments.path)#", true);
+                detailOutput.output("Severity filter: #arguments.severity#", true);
+                detailOutput.output("Fix mode: #(arguments.fix ? 'enabled' : 'disabled')#", true);
+                detailOutput.output("Output format: #arguments.format#", true);
+                detailOutput.output("Report generation: #(arguments.report ? 'enabled' : 'disabled')#", true);
+                detailOutput.line();
+            } else {
+                print.yellowLine("Analyzing code quality...").toConsole();
+                detailOutput.line();
+            }
+
+            // Pass the print object to the service
+            var results = analysisService.analyze(
                 path = resolvePath(arguments.path),
                 severity = arguments.severity,
                 printer = print,
-                verbose = arguments.verbose
+                verbose = arguments.verbose  // Pass verbose flag to service
             );
-        }
+            
+            if (arguments.fix) {
+                detailOutput.line();
+                print.yellowLine("Applying automatic fixes...").toConsole();
+                var fixed = analysisService.autoFix(results, print); // Pass print here too
+                print.greenLine("Fixed #fixed.count# issues automatically").toConsole();
 
-        detailOutput.line();
-        displayResults(results, arguments.format, arguments.severity);
-        
-        if (arguments.report) {
-            generateReport(results);
-        }
-        
-        if (results.hasErrors) {
+                if (arguments.verbose && arrayLen(fixed.files) > 0) {
+                    detailOutput.output("Files modified:");
+                    for (var file in fixed.files) {
+                        detailOutput.output("* #file#", true);
+                    }
+                }
+                detailOutput.line();
+
+                // Re-analyze after fixes
+                if (arguments.verbose) {
+                    print.yellowLine("Re-analyzing after fixes with verbose output...").toConsole();
+                } else {
+                    print.yellowLine("Re-analyzing after fixes...").toConsole();
+                }
+                results = analysisService.analyze(
+                    path = resolvePath(arguments.path),
+                    severity = arguments.severity,
+                    printer = print,
+                    verbose = arguments.verbose
+                );
+            }
+
+            detailOutput.line();
+            displayResults(results, arguments.format, arguments.severity);
+            
+            if (arguments.report) {
+                generateReport(results);
+            }
+            
+            if (results.hasErrors) {
+                setExitCode(1);
+            }
+        } catch (any e) {
+            detailOutput.error("#e.message#");
             setExitCode(1);
         }
     }
@@ -179,7 +184,7 @@ component extends="../base" {
                 var fileIssues = results.files[filePath];
                 var relativePath = replace(filePath, getCWD(), "");
 
-                print.boldLine("#relativePath# (#arrayLen(fileIssues)# issues)");
+                print.boldLine("#relativePath# (#arrayLen(fileIssues)# issues)").toConsole();
 
                 // Group issues by severity for better readability
                 var groupedIssues = groupIssuesBySeverity(fileIssues);
@@ -190,7 +195,7 @@ component extends="../base" {
                             var icon = getSeverityIcon(issue.severity);
                             var color = getSeverityColor(issue.severity);
 
-                            detailOutput.output("  #icon# Line #issue.line#:#issue.column# - #issue.message#");
+                            detailOutput.output("#icon# Line #issue.line#:#issue.column# - #issue.message#", true);
                             print.cyanLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
                         }
                     }
@@ -216,7 +221,7 @@ component extends="../base" {
         detailOutput.header("CODE QUALITY REPORT");
 
         // Display grade with appropriate color
-        print.redBoldLine("           Grade: #grade# (#score#/100)");
+        print.redBoldLine("           Grade: #grade# (#score#/100)").toConsole();
 
         // Display grade description
         var gradeDesc = getGradeDescription(grade);

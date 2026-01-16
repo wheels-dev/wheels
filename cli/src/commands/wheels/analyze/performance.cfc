@@ -24,117 +24,122 @@ component extends="../base" {
         numeric threshold = 100,
         boolean profile = false
     ) {
-        // Validate we're in a Wheels project
-        requireWheelsApp(getCWD());
-        // Reconstruct and validate arguments with allowed values
-        arguments = reconstructArgs(
-            argStruct = arguments,
-            allowedValues = {
-                target: ["all", "controller", "view", "query", "memory"]
-            },
-            numericRanges={
-				duration:{min:1, max:1000},
-                threshold:{min:1, max:5000}
-			}
-        );
-
-        print.yellowLine("Analyzing application performance...").toConsole();
-        detailOutput.line();
-
-        var results = {
-            startTime = now(),
-            endTime = dateAdd("s", arguments.duration, now()),
-            target = arguments.target,
-            threshold = arguments.threshold,
-            metrics = {
-                requests = [],
-                queries = [],
-                views = [],
-                memory = []
-            },
-            summary = {
-                totalRequests = 0,
-                avgResponseTime = 0,
-                maxResponseTime = 0,
-                minResponseTime = 999999,
-                slowRequests = 0,
-                totalQueries = 0,
-                avgQueryTime = 0,
-                slowQueries = 0,
-                memoryUsage = {
-                    avg = 0,
-                    max = 0
+        try{
+            // Validate we're in a Wheels project
+            requireWheelsApp(getCWD());
+            // Reconstruct and validate arguments with allowed values
+            arguments = reconstructArgs(
+                argStruct = arguments,
+                allowedValues = {
+                    target: ["all", "controller", "view", "query", "memory"]
+                },
+                numericRanges={
+                    duration:{min:1, max:1000},
+                    threshold:{min:1, max:5000}
                 }
+            );
+
+            print.yellowLine("Analyzing application performance...").toConsole();
+            detailOutput.line();
+
+            var results = {
+                startTime = now(),
+                endTime = dateAdd("s", arguments.duration, now()),
+                target = arguments.target,
+                threshold = arguments.threshold,
+                metrics = {
+                    requests = [],
+                    queries = [],
+                    views = [],
+                    memory = []
+                },
+                summary = {
+                    totalRequests = 0,
+                    avgResponseTime = 0,
+                    maxResponseTime = 0,
+                    minResponseTime = 999999,
+                    slowRequests = 0,
+                    totalQueries = 0,
+                    avgQueryTime = 0,
+                    slowQueries = 0,
+                    memoryUsage = {
+                        avg = 0,
+                        max = 0
+                    }
+                }
+            };
+            
+            if (arguments.profile) {
+                enableProfiling();
             }
-        };
-        
-        if (arguments.profile) {
-            enableProfiling();
-        }
-        
-        // Start monitoring
-        detailOutput.output("Starting performance monitoring for #arguments.duration# seconds...");
-        detailOutput.output("Target: #arguments.target#");
-        detailOutput.output("Threshold: #arguments.threshold#ms");
-        detailOutput.line();
+            
+            // Start monitoring
+            detailOutput.output("Starting performance monitoring for #arguments.duration# seconds...");
+            detailOutput.output("Target: #arguments.target#");
+            detailOutput.output("Threshold: #arguments.threshold#ms");
+            detailOutput.line();
 
-        // Monitor performance
-        var progress = 0;
-        var spinner = ["|", "/", "-", "\"];
-        var spinIndex = 1;
+            // Monitor performance
+            var progress = 0;
+            var spinner = ["|", "/", "-", "\"];
+            var spinIndex = 1;
 
-        while (now() < results.endTime) {
-            var currentProgress = int((dateDiff("s", results.startTime, now()) / arguments.duration) * 100);
+            while (now() < results.endTime) {
+                var currentProgress = int((dateDiff("s", results.startTime, now()) / arguments.duration) * 100);
 
-            if (currentProgress > progress) {
-                progress = currentProgress;
+                if (currentProgress > progress) {
+                    progress = currentProgress;
 
-                var spinChar = spinner[spinIndex];
-                spinIndex = spinIndex == arrayLen(spinner) ? 1 : spinIndex + 1;
+                    var spinChar = spinner[spinIndex];
+                    spinIndex = spinIndex == arrayLen(spinner) ? 1 : spinIndex + 1;
 
-                var bar = repeatString("=", int(progress / 5)) & repeatString(" ", 20 - int(progress / 5));
-                var progressStr = "[#bar#] #progress#% #spinChar# Monitoring...";
+                    var bar = repeatString("=", int(progress / 5)) & repeatString(" ", 20 - int(progress / 5));
+                    var progressStr = "[#bar#] #progress#% #spinChar# Monitoring...";
 
-                // Print progress on same line
-                print.text(chr(13) & progressStr).toConsole();
+                    // Print progress on same line
+                    print.text(chr(13) & progressStr).toConsole();
 
-                // Collect metrics based on target
-                if (arguments.target == "all" || arguments.target == "controller") {
-                    collectControllerMetrics(results);
+                    // Collect metrics based on target
+                    if (arguments.target == "all" || arguments.target == "controller") {
+                        collectControllerMetrics(results);
+                    }
+                    if (arguments.target == "all" || arguments.target == "query") {
+                        collectQueryMetrics(results);
+                    }
+                    if (arguments.target == "all" || arguments.target == "view") {
+                        collectViewMetrics(results);
+                    }
+                    if (arguments.target == "all" || arguments.target == "memory") {
+                        collectMemoryMetrics(results);
+                    }
                 }
-                if (arguments.target == "all" || arguments.target == "query") {
-                    collectQueryMetrics(results);
-                }
-                if (arguments.target == "all" || arguments.target == "view") {
-                    collectViewMetrics(results);
-                }
-                if (arguments.target == "all" || arguments.target == "memory") {
-                    collectMemoryMetrics(results);
-                }
+
+                sleep(1000); // Check every second
             }
 
-            sleep(1000); // Check every second
-        }
-
-        // Clear the progress line and show completion
-        print.line(chr(13) & "[" & repeatString("=", 20) & "] 100% Complete!     ").toConsole();
-        
-        if (arguments.profile) {
-            disableProfiling();
-        }
-        
-        // Calculate summary statistics
-        calculateSummary(results);
-        
-        // Display results
-        displayResults(results);
-        
-        if (arguments.report) {
-            generatePerformanceReport(results);
-        }
-        
-        // Exit with error if performance issues found
-        if (results.summary.slowRequests > 0 || results.summary.slowQueries > 0) {
+            // Clear the progress line and show completion
+            print.line(chr(13) & "[" & repeatString("=", 20) & "] 100% Complete!     ").toConsole();
+            
+            if (arguments.profile) {
+                disableProfiling();
+            }
+            
+            // Calculate summary statistics
+            calculateSummary(results);
+            
+            // Display results
+            displayResults(results);
+            
+            if (arguments.report) {
+                generatePerformanceReport(results);
+            }
+            
+            // Exit with error if performance issues found
+            if (results.summary.slowRequests > 0 || results.summary.slowQueries > 0) {
+                setExitCode(1);
+            }
+        } catch (any e) {
+            detailOutput.error("#e.message#");
             setExitCode(1);
         }
     }
