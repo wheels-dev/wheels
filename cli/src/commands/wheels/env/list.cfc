@@ -25,36 +25,39 @@ component extends="../base" {
         boolean verbose = false,
         boolean check = false,
         string filter = "All",
-        string sort = "name",
-        boolean help = false
+        string sort = "name"
     ) {
-        requireWheelsApp(getCWD());
-        arguments = reconstructArgs(
-            argStruct=arguments,
-            allowedValues={
-                format: ["table", "json", "yaml"],
-                filter: ["All", "Active", "Inactive"],
-                sort: ["name", "modified", "size"]
+        try{
+            requireWheelsApp(getCWD());
+            arguments = reconstructArgs(
+                argStruct=arguments,
+                allowedValues={
+                    format: ["table", "json", "yaml"],
+                    sort: ["name", "modified", "type"]
+                }
+            );
+            var projectRoot = resolvePath(".");
+            arguments.rootPath = projectRoot;
+            var currentEnv = environmentService.getCurrentEnvironment(projectRoot);
+            
+            print.line("Checking for available environments...").toConsole();
+            
+            var environments = environmentService.list(argumentCollection=arguments);
+            
+            // Handle different format outputs
+            if (arguments.format == "json") {
+                var jsonOutput = formatAsJSON(environments, currentEnv);
+                print.line(jsonOutput).toConsole();
+            } else if (arguments.format == "yaml") {
+                var yamlOutput = formatAsYAML(environments, currentEnv);
+                print.line(yamlOutput).toConsole();
+            } else {
+                // Table format using detailOutput functions
+                formatAsTable(environments, arguments.verbose, currentEnv);
             }
-        );
-        var projectRoot = resolvePath(".");
-        arguments.rootPath = projectRoot;
-        var currentEnv = environmentService.getCurrentEnvironment(projectRoot);
-        
-        print.line("Checking for available environments...").toConsole();
-        
-        var environments = environmentService.list(argumentCollection=arguments);
-        
-        // Handle different format outputs
-        if (arguments.format == "json") {
-            var jsonOutput = formatAsJSON(environments, currentEnv);
-            print.line(jsonOutput).toConsole();
-        } else if (arguments.format == "yaml") {
-            var yamlOutput = formatAsYAML(environments, currentEnv);
-            print.line(yamlOutput).toConsole();
-        } else {
-            // Table format using detailOutput functions
-            formatAsTable(environments, arguments.verbose, currentEnv);
+        } catch (any e) {
+            detailOutput.error("#e.message#");
+            setExitCode(1);
         }
     }
 
