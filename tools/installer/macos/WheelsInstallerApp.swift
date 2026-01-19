@@ -116,11 +116,11 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
 
         templatePopup = NSPopUpButton(frame: NSRect(x: 180, y: yPosition - 3, width: 400, height: 25))
         templatePopup.addItems(withTitles: [
-            "wheels-base-template@BE (3.0.x Bleeding Edge)",
-            "wheels-base-template@stable (2.5.x Stable)",
-            "wheels-htmx-template (HTMX + Alpine.js)",
-            "wheels-starter-template (Starter App)",
-            "wheels-todomvc-template (TodoMVC Demo)"
+            "3.0 - Wheels Base Template - Stable",
+            "Bleeding Edge - Wheels Base Template",
+            "Wheels Template - HTMX - Alpine.js - Simple.css",
+            "Wheels Starter App",
+            "Wheels - TodoMVC - HTMX - Demo App"
         ])
         contentView.addSubview(templatePopup)
         yPosition -= 35
@@ -457,12 +457,12 @@ class WheelsInstallerApp: NSObject, NSApplicationDelegate {
 
     func getTemplateValue() -> String {
         let title = templatePopup.titleOfSelectedItem ?? ""
+        if title.contains("3.0 - Wheels Base Template") { return "wheels-base-template@^3.0.0" }
         if title.contains("Bleeding Edge") { return "wheels-base-template@BE" }
-        if title.contains("Stable") { return "wheels-base-template@stable" }
-        if title.contains("HTMX") { return "wheels-htmx-template" }
-        if title.contains("Starter") { return "wheels-starter-template" }
-        if title.contains("TodoMVC") { return "wheels-todomvc-template" }
-        return "wheels-base-template@BE"
+        if title.contains("HTMX - Alpine.js - Simple.css") { return "cfwheels-template-htmx-alpine-simple" }
+        if title.contains("Wheels Starter App") { return "wheels-starter-app" }
+        if title.contains("TodoMVC - HTMX") { return "cfwheels-todomvc-htmx" }
+        return "wheels-base-template@^3.0.0"
     }
 
     func getEngineValue() -> String {

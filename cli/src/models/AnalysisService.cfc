@@ -146,7 +146,8 @@ component {
                 "packages/",
                 "coldbox/",
                 "modules/",
-                "WEB-INF/"
+                "WEB-INF/",
+                "migrator/"
             ],
             "wheels": {
                 "check-deprecated": true,

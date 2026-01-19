@@ -40,8 +40,10 @@ component aliases='wheels g view' extends="../base"  {
 		);
 		var obj = helpers.getNameVariants(listLast( arguments.objectName, '/\' ));
 		var viewdirectory     = fileSystemUtil.resolvePath( "app/views" );
+		var viewFolderName    = lcase(listLast( arguments.objectName, '/\' ));
 		// Build path from resolved viewdirectory to avoid conflicts with existing directories (e.g., tests/)
-	var directory 		  = viewdirectory & "/" & obj.objectNamePlural;
+		// Use the provided objectName directly instead of forcing plural
+		var directory 		  = viewdirectory & "/" & viewFolderName;
 		
 		// Handle multiple views if comma-separated list is provided
 		var viewNames = listToArray(arguments.name);
@@ -57,11 +59,11 @@ component aliases='wheels g view' extends="../base"  {
 			return;
  		}
 
- 		// Validate views subdirectory, create if doesnt' exist
- 		if( !directoryExists( directory ) ) {
- 			directoryCreate(directory);
- 			detailOutput.create("app/views/" & obj.objectNamePlural);
- 		}
+		// Validate views subdirectory, create if doesnt' exist
+		if( !directoryExists( directory ) ) {
+			directoryCreate(directory);
+			detailOutput.create("app/views/" & viewFolderName);
+		}
 
 		//Copy template files to the application folder if they do not exist there
 		ensureSnippetTemplatesExist();
@@ -104,13 +106,13 @@ component aliases='wheels g view' extends="../base"  {
 
 			if(fileExists(viewPath)){
 				if(arguments.force || confirm( '#viewName# already exists in target directory. Do you want to overwrite? [y/n]' ) ) {
-				    detailOutput.update("app/views/" & obj.objectNamePlural & "/" & viewName);
+				    detailOutput.update("app/views/" & viewFolderName & "/" & viewName);
 				} else {
-				    detailOutput.skip("app/views/" & obj.objectNamePlural & "/" & viewName);
+				    detailOutput.skip("app/views/" & viewFolderName & "/" & viewName);
 				    continue;
 				}
 			} else {
-				detailOutput.create("app/views/" & obj.objectNamePlural & "/" & viewName);
+				detailOutput.create("app/views/" & viewFolderName & "/" & viewName);
 			}
 			file action='write' file='#viewPath#' mode ='777' output='#trim( viewContent )#';
 			arrayAppend(generatedViews, viewName);
@@ -121,9 +123,9 @@ component aliases='wheels g view' extends="../base"  {
 			
 			var nextSteps = [];
 			if (arrayLen(generatedViews) == 1) {
-				arrayAppend(nextSteps, "Review the generated view at app/views/" & obj.objectNamePlural & "/" & generatedViews[1]);
+				arrayAppend(nextSteps, "Review the generated view at app/views/" & viewFolderName & "/" & generatedViews[1]);
 			} else {
-				arrayAppend(nextSteps, "Review the generated views in app/views/" & obj.objectNamePlural & "/");
+				arrayAppend(nextSteps, "Review the generated views in app/views/" & viewFolderName & "/");
 			}
 			arrayAppend(nextSteps, "Customize the HTML content as needed");
 			

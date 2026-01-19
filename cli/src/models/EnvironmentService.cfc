@@ -140,11 +140,6 @@ component {
         string sort = "name",
         boolean help = false
     ) {
-        // Show help information if requested
-        if (arguments.help) {
-            return getHelpInformation();
-        }
-
         var environments = [];
         var projectRoot = arguments.rootPath;
         
@@ -1188,20 +1183,17 @@ box server start port=8080 host=0.0.0.0";
 
         switch (arguments.template) {
             case "docker":
-                arrayAppend(steps, "1. Start Docker environment: docker-compose -f docker-compose.#arguments.environment#.yml up");
-                arrayAppend(steps, "2. Access application at: http://localhost:8080");
-                arrayAppend(steps, "3. Stop environment: docker-compose -f docker-compose.#arguments.environment#.yml down");
+                arrayAppend(steps, "Start Docker environment: docker-compose -f docker-compose.#arguments.environment#.yml up");
+                arrayAppend(steps, "Stop environment: docker-compose -f docker-compose.#arguments.environment#.yml down");
                 break;
             case "vagrant":
-                arrayAppend(steps, "1. Start Vagrant VM: vagrant up");
-                arrayAppend(steps, "2. Access application at: http://localhost:8080 or http://192.168.56.10:8080");
-                arrayAppend(steps, "3. SSH into VM: vagrant ssh");
-                arrayAppend(steps, "4. Stop VM: vagrant halt");
+                arrayAppend(steps, "Start Vagrant VM: vagrant up");
+                arrayAppend(steps, "SSH into VM: vagrant ssh");
+                arrayAppend(steps, "Stop VM: vagrant halt");
                 break;
             default:
-                arrayAppend(steps, "1. Switch to environment: wheels env switch #arguments.environment#");
-                arrayAppend(steps, "2. Start server: box server start");
-                arrayAppend(steps, "3. Access application at: http://localhost:8080");
+                arrayAppend(steps, "Switch to environment: wheels env switch #arguments.environment#");
+                arrayAppend(steps, "Start server: box server start");
         }
 
         return steps;
@@ -1520,6 +1512,9 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
                 case "production":
                     include = (env.TYPE == "Production");
                     break;
+                case "custom":
+                    include = (env.TYPE == "Custom");
+                    break;
                 case "qa":
                     include = (env.TYPE == "QA");
                     break;
@@ -1657,43 +1652,6 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
             errors: errors
         };
     }
-
-    /**
-    * Get help information
-    */
-    private function getHelpInformation() {
-        var help = [];
-        arrayAppend(help, "wheels env list - List available environments");
-        arrayAppend(help, "");
-        arrayAppend(help, "Options:");
-        arrayAppend(help, "  --format <format>       Output format (table, json, yaml) [default: table]");
-        arrayAppend(help, "  --verbose              Show detailed configuration");
-        arrayAppend(help, "  --check                Validate environment configurations");
-        arrayAppend(help, "  --filter <type>        Filter by environment type");
-        arrayAppend(help, "  --sort <field>         Sort by (name, type, modified) [default: name]");
-        arrayAppend(help, "  --help                 Show this help information");
-        arrayAppend(help, "");
-        arrayAppend(help, "Filter options:");
-        arrayAppend(help, "  All                    Show all environments (default)");
-        arrayAppend(help, "  local                  Local environments only");
-        arrayAppend(help, "  development            Development environments");
-        arrayAppend(help, "  staging                Staging environments");
-        arrayAppend(help, "  production             Production environments");
-        arrayAppend(help, "  file                   File-based environments");
-        arrayAppend(help, "  server.json            Server.json environments");
-        arrayAppend(help, "  valid                  Valid environments only");
-        arrayAppend(help, "  issues                 Environments with issues");
-        arrayAppend(help, "");
-        arrayAppend(help, "Examples:");
-        arrayAppend(help, "  wheels env list");
-        arrayAppend(help, "  wheels env list --verbose");
-        arrayAppend(help, "  wheels env list --format json");
-        arrayAppend(help, "  wheels env list --filter production --check");
-        arrayAppend(help, "  wheels env list --sort modified --verbose");
-        
-        return arrayToList(help, chr(10));
-    }
-
 
     /**
     * Gets the current environment using the same logic as Application.cfc

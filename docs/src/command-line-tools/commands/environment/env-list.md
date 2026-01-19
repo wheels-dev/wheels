@@ -21,7 +21,6 @@ The `wheels env list` command displays all configured environments in your Wheel
 | `--check` | Validate environment configurations | `false` |
 | `--filter` | Filter by environment type | All |
 | `--sort` | Sort by (name, type, modified) | `name` |
-| `--help` | Show help information |
 
 ## Examples
 

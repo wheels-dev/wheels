@@ -62,7 +62,7 @@ param(
     [string]$AppName = "MyWheelsApp",
 
     [Parameter()]
-    [string]$Template = "wheels-base-template@BE",
+    [string]$Template = "wheels-base-template@^3.0.0",
 
     [Parameter()]
     [string]$ReloadPassword = "changeMe",
