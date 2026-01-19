@@ -145,10 +145,10 @@ begin
 
   TemplateRadio1 := TRadioButton.Create(WizardForm); TemplateRadio1.Parent := TemplatesPage.Surface;
   TemplateRadio1.Left := 8; TemplateRadio1.Top := topPos; TemplateRadio1.Width := TemplatesPage.SurfaceWidth-16;
-  TemplateRadio1.Caption := '3.0.x - Wheels Base Template - Bleeding Edge'; TemplateRadio1.Checked := True;
+  TemplateRadio1.Caption := '3.0.x - Wheels Base Template - Stable'; TemplateRadio1.Checked := True;
   TemplateRadio2 := TRadioButton.Create(WizardForm); TemplateRadio2.Parent := TemplatesPage.Surface;
   TemplateRadio2.Left := 8; TemplateRadio2.Top := topPos+28; TemplateRadio2.Width := TemplatesPage.SurfaceWidth-16;
-  TemplateRadio2.Caption := '2.5.x - Wheels Base Template - Stable Release';
+  TemplateRadio2.Caption := 'Bleeding Edge - Wheels Base Template';
   TemplateRadio3 := TRadioButton.Create(WizardForm); TemplateRadio3.Parent := TemplatesPage.Surface;
   TemplateRadio3.Left := 8; TemplateRadio3.Top := topPos+56; TemplateRadio3.Width := TemplatesPage.SurfaceWidth-16;
   TemplateRadio3.Caption := 'Wheels Template - HTMX - Alpine.js - Simple.css';
@@ -239,11 +239,11 @@ end;
 // --- Template & Engine getters ---
 function GetTemplate(Param: String): String;
 begin
-  if TemplateRadio1.Checked then Result := 'wheels-base-template@BE'
-  else if TemplateRadio2.Checked then Result := 'wheels-base-template@stable'
-  else if TemplateRadio3.Checked then Result := 'wheels-htmx-template'
-  else if TemplateRadio4.Checked then Result := 'wheels-starter-template'
-  else Result := 'wheels-todomvc-template';
+  if TemplateRadio1.Checked then Result := 'wheels-base-template@^3.0.0'
+  else if TemplateRadio2.Checked then Result := 'wheels-base-template@BE'
+  else if TemplateRadio3.Checked then Result := 'cfwheels-template-htmx-alpine-simple'
+  else if TemplateRadio4.Checked then Result := 'wheels-starter-app'
+  else Result := 'cfwheels-todomvc-htmx';
 end;
 
 function GetEngine(Param: String): String;
