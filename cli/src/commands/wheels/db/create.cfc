@@ -238,6 +238,44 @@ component extends="../base" {
 			
 			if (!local.driverFound) {
 				detailOutput.error("No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.");
+				// Provide database-specific guidance for missing drivers
+				switch (arguments.dbType) {
+					case "Oracle":
+						local.cbHome = getCommandBoxHome();
+						local.libPath = formatLibPath(local.cbHome);
+						detailOutput.divider();
+						detailOutput.statusWarning("Oracle JDBC Driver Installation:");
+						detailOutput.line();
+						detailOutput.output("1. Download the driver from Oracle's official website:");
+						detailOutput.output("   https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html");
+						detailOutput.output("   - Download 'ojdbc11.jar' or 'ojdbc8.jar'");
+						detailOutput.line();
+						
+						if (len(local.cbHome)) {
+							detailOutput.output("2. Place the JAR file in this directory:");
+							detailOutput.output("   #local.libPath#");
+						} else {
+							detailOutput.output("2. Place the JAR file in CommandBox's library directory:");
+							detailOutput.output("   #local.libPath#");
+						}
+						
+						detailOutput.line();
+						detailOutput.output("3. Restart CommandBox completely:");
+						detailOutput.output("   - Close all CommandBox instances (don't just reload)");
+						detailOutput.output("   - This ensures the JDBC driver is properly loaded");
+						detailOutput.line();
+						detailOutput.output("4. Verify installation:");
+						detailOutput.output("   wheels db create datasource=#arguments.dsInfo.datasource#");
+						detailOutput.output("   You should see: '[OK] Driver found: oracle.jdbc.OracleDriver'");
+						break;
+						
+					default:
+						detailOutput.statusWarning("Driver installation guidance:");
+						detailOutput.output("1. Restart CommandBox completely");
+						detailOutput.output("2. Check CommandBox lib directory for appropriate JAR files");
+						detailOutput.output("3. Ensure required bundles are installed");
+				}
+				
 				return;
 			}
 			
@@ -1206,8 +1244,14 @@ component extends="../base" {
 		} else if (FindNoCase("driver not found", local.errorMessage) ||
 		           FindNoCase("JDBC driver", local.errorMessage)) {
 			detailOutput.statusFailed("SQLite JDBC driver not found");
-			detailOutput.statusWarning("Ensure org.xerial.sqlite-jdbc is in the classpath");
-			detailOutput.statusWarning("You may need to add the driver to your application server");
+			detailOutput.statusWarning("SQLite requires the org.xerial.sqlite-jdbc driver in the classpath");
+			detailOutput.line();
+			detailOutput.output("SQLite JDBC Driver Installation:");
+			detailOutput.output("1. SQLite driver should be included with CommandBox/Lucee");
+			detailOutput.output("2. If missing, ensure org.xerial.sqlite-jdbc bundle is installed");
+			detailOutput.output("3. Try restarting CommandBox completely");
+			detailOutput.output("4. Check that the driver is in the CommandBox lib directory");
+			detailOutput.line();
 			local.errorHandled = true;
 		} else if (FindNoCase("Failed to create", local.errorMessage)) {
 			detailOutput.statusFailed("Failed to create SQLite database connection");
@@ -1236,6 +1280,49 @@ component extends="../base" {
 
 		// Always throw to propagate the error up
 		throw(message=arguments.e.message, detail=(StructKeyExists(arguments.e, "detail") ? arguments.e.detail : ""));
+	}
+
+	/**
+	 * Get CommandBox Home directory by running info --json command
+	 * Returns CLIHome path or empty string if not found
+	 */
+	private string function getCommandBoxHome() {
+		local.infoResult = command("info").params(json=true).run(returnOutput=true);
+		local.cleanResult = reReplace(
+			local.infoResult,
+			"\x1B\[[0-9;]*[A-Za-z]",
+			"",
+			"all"
+		);
+
+		local.cleanResult = trim( local.cleanResult );
+		
+		// Parse JSON response to extract CLIHome
+		if (isJSON(local.cleanResult)) {
+			local.infoData = deserializeJSON(local.cleanResult);
+			if (structKeyExists(local.infoData, "CLIHome") && len(local.infoData.CLIHome)) {
+				return local.infoData.CLIHome;
+			}
+		}
+		
+		return "";
+	}
+
+	/**
+	 * Format file path with proper separators for the user's OS
+	 */
+	private string function formatLibPath(required string homeDir) {
+		if (!len(arguments.homeDir)) {
+			return "path/to/CommandBox/lib";
+		}
+		
+		// For Mac/Linux, use forward slashes
+		if (server.os.name contains "mac" || server.os.name contains "linux" || server.os.name contains "unix") {
+			return arguments.homeDir & "/lib";
+		}
+		
+		// For Windows, use backslashes
+		return arguments.homeDir & "\lib";
 	}
 
 	/**

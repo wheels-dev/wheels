@@ -18,6 +18,7 @@ The `wheels db create` command creates a new database using the connection infor
 - **Interactive datasource creation**: Prompts for credentials when datasource doesn't exist
 - **Environment validation**: Checks if environment exists before prompting for credentials
 - **Smart error handling**: Single, clear error messages without duplication
+- **Enhanced driver guidance**: Provides specific installation instructions when JDBC drivers are missing
 - **Post-creation setup**: Automatically creates environment files and writes datasource to `app.cfm` after successful database creation
 
 ## Options
@@ -293,21 +294,28 @@ wheels db create --dbtype=oracle --database=myapp_test  # ✓ Correct
 If you see "Driver not found" error, you need to manually install the Oracle JDBC driver:
 
 1. **Download the driver** from [Oracle's official website](https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html)
-   - Download `ojdbc11.jar` or `ojdbc8.jar`
+    - Download `ojdbc11.jar` or `ojdbc8.jar`
 
-2. **Place the JAR file** in CommandBox's JRE library directory:
-   - **Windows**: `path\to\CommandBox\jre\lib\`
-   - **Mac/Linux**: `/usr/local/lib/CommandBox/jre/lib/`
+2. **Find the correct location on *your* machine**
+    - Run this in CommandBox:
+        ```bash
+        info
+        ```
+    - Look for the line: **CommandBox Home** `/Users/yourname/.CommandBox`, there you will be able to find the exact commandBox path.
 
-3. **Restart CommandBox completely**:
-   - **Important**: Close ALL CommandBox instances (don't just reload)
-   - This ensures the JDBC driver is properly loaded
+3. **Place the JAR file** in CommandBox's library directory:
+    - **Windows**: `path\to\CommandBox\lib\`
+    - **Mac/Linux**: `path\to\CommandBox/lib/`
 
-4. **Verify installation**:
-   ```bash
-   wheels db create datasource=myOracleDS
-   ```
-   You should see: `[OK] Driver found: oracle.jdbc.OracleDriver`
+4. **Restart CommandBox completely**:
+    - **Important**: Close all CommandBox instances (don't just reload)
+    - This ensures the JDBC driver is properly loaded
+
+5. **Verify installation**:
+    ```bash
+    wheels db create datasource=myOracleDS
+    ```
+    You should see: `[OK] Driver found: oracle.jdbc.OracleDriver`
 
 **Common Oracle Errors:**
 - **"Invalid Oracle identifier"**: Database name contains hyphens. Use underscores instead.
@@ -377,9 +385,15 @@ No datasource was specified and none could be found in your Wheels configuration
 The specified datasource doesn't exist in your server configuration. The command will prompt you to create it interactively.
 
 ### "Driver not found" (Oracle-specific)
-Oracle JDBC driver is not installed in CommandBox.
+The JDBC driver for the database type is not available in CommandBox by default.
 
-**Fix:** See the [Oracle Database](#oracle-database) section above for detailed installation instructions.
+**Fix:** The CLI will automatically provide specific installation guidance when a driver is missing:
+
+- **Oracle:** Shows detailed step-by-step Oracle JDBC driver installation instructions
+- **MySQL/PostgreSQL/MSSQL/SQLite:** Provides guidance on verifying CommandBox installation
+- **General:** Suggests restarting CommandBox and checking library directory
+
+**Fix:** See the [Oracle Database](#oracle-database) section above for detailed instructions.
 
 ### "Database already exists"
 The database already exists. Use `--force` flag to drop and recreate it:
