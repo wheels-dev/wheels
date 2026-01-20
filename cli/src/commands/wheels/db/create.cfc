@@ -265,7 +265,7 @@ component extends="../base" {
 						detailOutput.output("   - This ensures the JDBC driver is properly loaded");
 						detailOutput.line();
 						detailOutput.output("4. Verify installation:");
-						detailOutput.output("   wheels db create datasource=#arguments.dsInfo.datasource#");
+						detailOutput.output("   wheels db create datasource=YourDataSourceName");
 						detailOutput.output("   You should see: '[OK] Driver found: oracle.jdbc.OracleDriver'");
 						break;
 						
@@ -748,17 +748,46 @@ component extends="../base" {
 
 			local.password = ask("Password: ", "", true);  // true for password masking
 
-			// For Oracle, ask for SID
+			// For Oracle, ask for connection type and details
 			if (local.dbType == "Oracle") {
-				local.sid = ask("SID [FREE]: ");
-				if (!len(local.sid)) {
-					local.sid = "FREE";
+				detailOutput.output("Oracle Connection Type:");
+				detailOutput.output("1. SID (System Identifier)");
+				detailOutput.output("2. Service Name");
+				detailOutput.line();
+				
+				local.connectionTypeChoice = ask("Select connection type [1-2]: ");
+				
+				if (local.connectionTypeChoice == "2") {
+					// Service Name
+					local.serviceName = ask("Service Name: ");
+					if (!len(local.serviceName)) {
+						detailOutput.statusWarning("Service Name is required");
+						return {};
+					}
+					local.oracleConnectionType = "servicename";
+					local.oracleIdentifier = local.serviceName;
+				} else {
+					// SID (default)
+					local.sid = ask("SID [FREE]: ");
+					if (!len(local.sid)) {
+						local.sid = "FREE";
+					}
+					local.oracleConnectionType = "sid";
+					local.oracleIdentifier = local.sid;
 				}
 			}
 		}
 
 		// Build connection string
-		local.connectionString = buildConnectionString(local.dbType, local.host, local.port, local.database, local.sid ?: "");
+		local.connectionString = buildConnectionString(
+			local.dbType, 
+			local.host, 
+			local.port, 
+			local.database, 
+			local.sid ?: "", 
+			local.serviceName ?: "", 
+			local.oracleConnectionType ?: "sid"
+		);
 
 		detailOutput.subHeader("Configuration Review", 50);
 		detailOutput.metric("Datasource Name", arguments.datasourceName);
@@ -770,6 +799,14 @@ component extends="../base" {
 		}
 		
 		detailOutput.metric("Database", local.database);
+		
+		if (local.dbType == "Oracle") {
+			if (local.oracleConnectionType == "servicename") {
+				detailOutput.metric("Service Name", local.serviceName);
+			} else {
+				detailOutput.metric("SID", local.sid);
+			}
+		}
 		
 		if (local.dbType != "SQLite") {
 			detailOutput.metric("Username", local.username);
@@ -810,6 +847,8 @@ component extends="../base" {
 					username = local.username,
 					password = local.password,
 					sid = local.sid ?: "",
+					servicename = local.serviceName ?: "",
+					oracleConnectionType = local.oracleConnectionType ?: "sid",
 					skipDatabase = true
 				)
 				.run();
@@ -822,15 +861,27 @@ component extends="../base" {
 		}
 
 		// Return datasource info in the format expected by the rest of the code
-		return {
+		local.result = {
 			driver: local.dbType,
 			database: local.database,
 			host: local.host,
 			port: local.port,
 			username: local.username,
-			password: local.password,
-			sid: local.sid ?: ""
+			password: local.password
 		};
+		
+		// Add Oracle-specific connection information
+		if (local.dbType == "Oracle") {
+			if (local.oracleConnectionType == "servicename") {
+				local.result.servicename = local.serviceName;
+				local.result.oracleConnectionType = "servicename";
+			} else {
+				local.result.sid = local.sid;
+				local.result.oracleConnectionType = "sid";
+			}
+		}
+		
+		return local.result;
 	}
 
 	/**
@@ -911,7 +962,7 @@ component extends="../base" {
 	/**
 	 * Build connection string
 	 */
-	private string function buildConnectionString(required string dbType, required string host, required string port, required string database, string sid = "") {
+	private string function buildConnectionString(required string dbType, required string host, required string port, required string database, string sid = "", string servicename = "", string oracleConnectionType = "sid") {
 		switch (arguments.dbType) {
 			case "MySQL":
 				return "jdbc:mysql://#arguments.host#:#arguments.port#/#arguments.database#?characterEncoding=UTF-8&serverTimezone=UTC&maxReconnects=3";
@@ -922,7 +973,11 @@ component extends="../base" {
 			case "MSSQLServer":
 				return "jdbc:sqlserver://#arguments.host#:#arguments.port#;DATABASENAME=#arguments.database#;trustServerCertificate=true;SelectMethod=direct";
 			case "Oracle":
-				return "jdbc:oracle:thin:@#arguments.host#:#arguments.port#:#arguments.sid#";
+				if (arguments.oracleConnectionType == "servicename") {
+					return "jdbc:oracle:thin:@#arguments.host#:#arguments.port#/#arguments.servicename#";
+				} else {
+					return "jdbc:oracle:thin:@#arguments.host#:#arguments.port#:#arguments.sid#";
+				}
 			case "H2":
 				local.appPath = getCWD();
 				return "jdbc:h2:#local.appPath#db/h2/#arguments.database#;MODE=MySQL";
@@ -1010,18 +1065,20 @@ component extends="../base" {
 
 				// Call wheels env setup with skipDatabase to avoid infinite loop
 				command("wheels env setup")
-					.params(
-						environment = arguments.environment,
-						dbtype = normalizeDbType(arguments.dbType),
-						datasource = arguments.datasource,
-						database = arguments.dsInfo.database,
-						host = arguments.dsInfo.host ?: "localhost",
-						port = arguments.dsInfo.port ?: "",
-						username = arguments.dsInfo.username ?: "root",
-						password = arguments.dsInfo.password ?: "",
-						sid = arguments.dsInfo.sid ?: "",
-						skipDatabase = true
-					)
+				.params(
+					environment = arguments.environment,
+					dbtype = normalizeDbType(arguments.dbType),
+					datasource = arguments.datasource,
+					database = arguments.dsInfo.database,
+					host = arguments.dsInfo.host ?: "localhost",
+					port = arguments.dsInfo.port ?: "",
+					username = arguments.dsInfo.username ?: "root",
+					password = arguments.dsInfo.password ?: "",
+					sid = arguments.dsInfo.sid ?: "",
+					servicename = arguments.dsInfo.servicename ?: "",
+					oracleConnectionType = arguments.dsInfo.oracleConnectionType ?: "sid",
+					skipDatabase = true
+				)
 					.run();
 
 				detailOutput.statusSuccess("Environment configuration created!");

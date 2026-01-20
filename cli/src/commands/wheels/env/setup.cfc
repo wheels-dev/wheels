@@ -30,7 +30,9 @@ component extends="../base" {
         string port = "",
         string username = "",
         string password = "",
-        string sid = "",
+                string sid = "",
+                string servicename = "",
+                string oracleConnectionType = "sid",
         boolean force = false,
         string base = "",
         boolean debug = false,
@@ -157,11 +159,34 @@ component extends="../base" {
                     arguments.password = ask(message="Database Password: ", mask="*");
                 }
 
-                // Prompt for SID if Oracle
-                if (lCase(arguments.dbtype) == "oracle" && !len(trim(arguments.sid))) {
-                    arguments.sid = ask("SID [FREE]: ");
-                    if (!len(trim(arguments.sid))) {
-                        arguments.sid = "FREE";
+                // Prompt for Oracle connection details if Oracle
+                if (lCase(arguments.dbtype) == "oracle") {
+                    if (!len(trim(arguments.oracleConnectionType)) || 
+                        (!len(trim(arguments.sid)) && !len(trim(arguments.servicename)))) {
+                        
+                        detailOutput.output("Oracle Connection Type:");
+                        detailOutput.output("1. SID (System Identifier)");
+                        detailOutput.output("2. Service Name");
+                        detailOutput.line();
+                        
+                        var connectionTypeChoice = ask("Select connection type [1-2]: ");
+                        
+                        if (connectionTypeChoice == "2") {
+                            // Service Name
+                            arguments.servicename = ask("Service Name: ");
+                            if (!len(trim(arguments.servicename))) {
+                                detailOutput.statusWarning("Service Name is required");
+                                return;
+                            }
+                            arguments.oracleConnectionType = "servicename";
+                        } else {
+                            // SID (default)
+                            arguments.sid = ask("SID [FREE]: ");
+                            if (!len(trim(arguments.sid))) {
+                                arguments.sid = "FREE";
+                            }
+                            arguments.oracleConnectionType = "sid";
+                        }
                     }
                 }
 
