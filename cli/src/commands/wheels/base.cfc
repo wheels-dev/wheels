@@ -1011,7 +1011,12 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 				if (!Len(local.port)) local.port = "1521";
 				// Connect using SID (Oracle system identifier)
 				local.sid = arguments.dsInfo.sid ?: "FREE";
-				return "jdbc:oracle:thin:@#local.host#:#local.port#:#local.sid#";
+				// Build Oracle JDBC URL
+				if (StructKeyExists(arguments.dsInfo, "serviceName") && Len(arguments.dsInfo.serviceName)) {
+					return "jdbc:oracle:thin:@//#local.host#:#local.port#/#arguments.dsInfo.serviceName#";
+				} else {
+					return "jdbc:oracle:thin:@#local.host#:#local.port#:#local.sid#";
+				}
 			case "H2":
 				// H2 databases are created automatically, no system database needed
 				local.database = arguments.dsInfo.database ?: "";

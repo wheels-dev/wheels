@@ -19,6 +19,8 @@ component {
         string username = "",
         string password = "",
         string sid = "",
+        string servicename = "",
+        string oracleConnectionType = "sid",
         boolean force = false,
         string base = "",
         boolean debug = false,
@@ -49,7 +51,9 @@ component {
                     port = arguments.port,
                     username = arguments.username,
                     password = arguments.password,
-                    sid = arguments.sid
+                    sid = arguments.sid,
+                    servicename = arguments.servicename,
+                    oracleConnectionType = arguments.oracleConnectionType
                 );
             }
 
@@ -493,6 +497,8 @@ component {
         var dbUsername = len(trim(arguments.username)) ? arguments.username : getDefaultUsername(arguments.dbtype);
         var dbPassword = len(trim(arguments.password)) ? arguments.password : getDefaultPassword(arguments.dbtype);
         var dbSid = len(trim(arguments.sid)) ? arguments.sid : "ORCL";
+        var dbServiceName = len(trim(arguments.servicename)) ? arguments.servicename : "";
+        var dbOracleConnectionType = len(trim(arguments.oracleConnectionType)) ? arguments.oracleConnectionType : "sid";
 
         // Database-specific configuration
         switch (arguments.dbtype) {
@@ -530,7 +536,7 @@ component {
                 };
                 break;
             case "oracle":
-                config.datasourceInfo = {
+                var oracleDsInfo = {
                     driver: "Oracle",
                     host: dbHost,
                     port: dbPort,
@@ -538,8 +544,17 @@ component {
                     datasource: datasourceName,
                     username: dbUsername,
                     password: dbPassword,
-                    sid: dbSid
+                    oracleConnectionType: dbOracleConnectionType
                 };
+                
+                // Add SID or Service Name based on connection type
+                if (dbOracleConnectionType == "servicename") {
+                    oracleDsInfo.servicename = dbServiceName;
+                } else {
+                    oracleDsInfo.sid = dbSid;
+                }
+                
+                config.datasourceInfo = oracleDsInfo;
                 break;
             case "sqlite":
                 // SQLite requires absolute path - calculate it now
@@ -751,9 +766,17 @@ component {
             arrayAppend(envContent, "DB_USER=#arguments.config.datasourceInfo.username#");
             arrayAppend(envContent, "DB_PASSWORD=#arguments.config.datasourceInfo.password#");
 
-            // Add Oracle SID if exists
-            if (arguments.config.dbtype == "oracle" && structKeyExists(arguments.config.datasourceInfo, "sid")) {
-                arrayAppend(envContent, "DB_SID=#arguments.config.datasourceInfo.sid#");
+            // Add Oracle connection details if exists
+            if (arguments.config.dbtype == "oracle") {
+                if (structKeyExists(arguments.config.datasourceInfo, "sid") && len(trim(arguments.config.datasourceInfo.sid))) {
+                    arrayAppend(envContent, "DB_SID=#arguments.config.datasourceInfo.sid#");
+                }
+                if (structKeyExists(arguments.config.datasourceInfo, "servicename") && len(trim(arguments.config.datasourceInfo.servicename))) {
+                    arrayAppend(envContent, "DB_SERVICENAME=#arguments.config.datasourceInfo.servicename#");
+                }
+                if (structKeyExists(arguments.config.datasourceInfo, "oracleConnectionType")) {
+                    arrayAppend(envContent, "DB_ORACLE_CONNECTION_TYPE=#arguments.config.datasourceInfo.oracleConnectionType#");
+                }
             }
 
             // Add datasource name
@@ -970,10 +993,14 @@ component {
                 };
                 break;
             case "oracle":
+                // Oracle connection string depends on connection type (SID vs Service Name)
+                // Check for Service Name first, fallback to SID
                 config = {
                     class: "oracle.jdbc.OracleDriver",
                     bundleName: "org.lucee.oracle",
-                    connectionString: "jdbc:oracle:thin:@##this.env.DB_HOST##:##this.env.DB_PORT##:##this.env.DB_SID##"
+                    connectionString: "jdbc:oracle:thin:@##this.env.DB_HOST##:##this.env.DB_PORT##" &
+                        "##(structKeyExists(this.env, 'DB_ORACLE_CONNECTION_TYPE') && this.env.DB_ORACLE_CONNECTION_TYPE == 'servicename' ? '/' : ':')##" &
+                        "##(structKeyExists(this.env, 'DB_ORACLE_CONNECTION_TYPE') && this.env.DB_ORACLE_CONNECTION_TYPE == 'servicename' ? this.env.DB_SERVICENAME : this.env.DB_SID)##"
                 };
                 break;
             case "sqlite":
@@ -1030,6 +1057,17 @@ component {
             serverJson.env[arguments.environment]["DB_DATABASE"] = ds.database;
             serverJson.env[arguments.environment]["DB_USER"] = ds.username;
             serverJson.env[arguments.environment]["DB_PASSWORD"] = ds.password;
+            
+            // Add Oracle-specific connection details
+            if (structKeyExists(ds, "oracleConnectionType")) {
+                serverJson.env[arguments.environment]["DB_ORACLE_CONNECTION_TYPE"] = ds.oracleConnectionType;
+            }
+            if (structKeyExists(ds, "sid") && len(trim(ds.sid))) {
+                serverJson.env[arguments.environment]["DB_SID"] = ds.sid;
+            }
+            if (structKeyExists(ds, "servicename") && len(trim(ds.servicename))) {
+                serverJson.env[arguments.environment]["DB_SERVICENAME"] = ds.servicename;
+            }
         }
 
         fileWrite(serverJsonPath, serializeJSON(serverJson, true));
@@ -1728,7 +1766,9 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
         required string port,
         required string username,
         required string password,
-        required string sid
+        required string sid,
+        string servicename = "",
+        string oracleConnectionType = "sid"
     ) {
         try {
             // Read existing environment file
@@ -1743,6 +1783,8 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
                 DB_USER: false,
                 DB_PASSWORD: false,
                 DB_SID: false,
+                DB_SERVICENAME: false,
+                DB_ORACLE_CONNECTION_TYPE: false,
                 DB_DATASOURCE: false
             };
             var inDatabaseSection = false;
@@ -1816,8 +1858,26 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
                 // Update DB_SID (Oracle only)
                 if (findNoCase("DB_SID=", trimmedLine) == 1) {
                     dbVarsFound.DB_SID = true;
-                    if (lCase(arguments.dbtype) == "oracle" && len(trim(arguments.sid))) {
+                    if (lCase(arguments.dbtype) == "oracle" && len(trim(arguments.sid)) && arguments.oracleConnectionType == "sid") {
                         arrayAppend(updatedLines, "DB_SID=#arguments.sid#");
+                    }
+                    continue;
+                }
+
+                // Update DB_SERVICENAME (Oracle Service Name only)
+                if (findNoCase("DB_SERVICENAME=", trimmedLine) == 1) {
+                    dbVarsFound.DB_SERVICENAME = true;
+                    if (lCase(arguments.dbtype) == "oracle" && len(trim(arguments.servicename)) && arguments.oracleConnectionType == "servicename") {
+                        arrayAppend(updatedLines, "DB_SERVICENAME=#arguments.servicename#");
+                    }
+                    continue;
+                }
+
+                // Update DB_ORACLE_CONNECTION_TYPE (Oracle only)
+                if (findNoCase("DB_ORACLE_CONNECTION_TYPE=", trimmedLine) == 1) {
+                    dbVarsFound.DB_ORACLE_CONNECTION_TYPE = true;
+                    if (lCase(arguments.dbtype) == "oracle" && len(trim(arguments.oracleConnectionType))) {
+                        arrayAppend(updatedLines, "DB_ORACLE_CONNECTION_TYPE=#arguments.oracleConnectionType#");
                     }
                     continue;
                 }
@@ -1862,8 +1922,16 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
                 arrayAppend(missingVars, "DB_PASSWORD=#arguments.password#");
             }
 
-            if (!dbVarsFound.DB_SID && lCase(arguments.dbtype) == "oracle" && len(trim(arguments.sid))) {
+            if (!dbVarsFound.DB_SID && lCase(arguments.dbtype) == "oracle" && len(trim(arguments.sid)) && arguments.oracleConnectionType == "sid") {
                 arrayAppend(missingVars, "DB_SID=#arguments.sid#");
+            }
+
+            if (!dbVarsFound.DB_SERVICENAME && lCase(arguments.dbtype) == "oracle" && len(trim(arguments.servicename)) && arguments.oracleConnectionType == "servicename") {
+                arrayAppend(missingVars, "DB_SERVICENAME=#arguments.servicename#");
+            }
+
+            if (!dbVarsFound.DB_ORACLE_CONNECTION_TYPE && lCase(arguments.dbtype) == "oracle" && len(trim(arguments.oracleConnectionType))) {
+                arrayAppend(missingVars, "DB_ORACLE_CONNECTION_TYPE=#arguments.oracleConnectionType#");
             }
 
             if (!dbVarsFound.DB_DATASOURCE) {
