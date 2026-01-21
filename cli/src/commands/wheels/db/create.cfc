@@ -309,6 +309,21 @@ component extends="../base" {
 			}
 			
 			detailOutput.statusSuccess("Connected successfully to #arguments.dbType# server!");
+			// For Oracle, check admin privileges before proceeding
+			if (arguments.dbType == "Oracle") {
+				detailOutput.output("Checking Oracle user privileges...");
+				local.privilegeCheck = checkOraclePrivileges(local.conn, local.username);
+
+				if (!local.privilegeCheck.hasRequiredPrivileges) {
+					detailOutput.statusFailed("Oracle user '#local.username#' does not have sufficient admin privileges.");
+					detailOutput.line();
+					detailOutput.statusWarning("Please provide credentials for an Oracle user with required privileges");
+					local.conn.close();
+					return;
+				}
+
+				detailOutput.statusSuccess("Oracle user has required admin privileges.");
+			}
 			
 			// Check if database already exists
 			print.line("Checking if database exists...").toConsole();
@@ -788,6 +803,36 @@ component extends="../base" {
 			local.serviceName ?: "", 
 			local.oracleConnectionType ?: "sid"
 		);
+
+		// For Oracle, show admin privilege requirement and get user acknowledgment
+		if (local.dbType == "Oracle") {
+			detailOutput.subHeader("Oracle Admin Privileges Required", 50);
+
+			detailOutput.output("The provided Oracle user must be an ADMIN user.");
+			detailOutput.output("This means the user must have at least one system privilege");
+			detailOutput.output("granted with ADMIN OPTION = YES.");
+			detailOutput.line();
+
+			detailOutput.output("Examples of such users:");
+			detailOutput.output("  - SYSTEM");
+			detailOutput.output("  - Custom DBA users with admin privileges");
+			detailOutput.line();
+
+			detailOutput.output("Normal application users will NOT work.");
+			detailOutput.line();
+
+			local.acknowledgment = ask(
+				"Do you acknowledge that the provided credentials must be an Oracle admin user? [y/n]: "
+			);
+
+			if (local.acknowledgment != "y") {
+				detailOutput.statusWarning("Datasource creation cancelled");
+				return {};
+			}
+
+			detailOutput.statusSuccess("Admin privilege requirement acknowledged.");
+		}
+
 
 		detailOutput.subHeader("Configuration Review", 50);
 		detailOutput.metric("Datasource Name", arguments.datasourceName);
@@ -1337,6 +1382,49 @@ component extends="../base" {
 
 		// Always throw to propagate the error up
 		throw(message=arguments.e.message, detail=(StructKeyExists(arguments.e, "detail") ? arguments.e.detail : ""));
+	}
+
+	/**
+	 * Check Oracle user privileges for database creation
+	 * Verifies that the user has CREATE USER and GRANT ANY PRIVILEGE
+	 */
+	private struct function checkOraclePrivileges(required any conn, required string username) {
+		local.result = {
+			hasRequiredPrivileges = false,
+			missingPrivileges = []
+		};
+		
+		try {
+			local.stmt = arguments.conn.createStatement();
+			
+			// Query to check user system privileges
+			local.query = "SELECT privilege, admin_option FROM user_sys_privs";
+			local.rs = local.stmt.executeQuery(local.query);
+			
+			local.privilegesWithAdmin = [];
+			while (local.rs.next()) {
+				if (ucase(local.rs.getString("admin_option")) == "YES") {
+					arrayAppend(local.privilegesWithAdmin, ucase(local.rs.getString("privilege")));
+				}
+			}
+			
+			local.rs.close();
+			local.stmt.close();
+
+			// If user has any privileges with ADMIN_OPTION = YES, consider admin
+			if (!arrayIsEmpty(local.privilegesWithAdmin)) {
+				local.result.hasRequiredPrivileges = true;
+			} else {
+				local.result.hasRequiredPrivileges = false;
+				arrayAppend(local.result.missingPrivileges, "No privileges with ADMIN_OPTION = YES found");
+			}
+			
+		} catch (any e) {
+			local.result.hasRequiredPrivileges = false;
+			arrayAppend(local.result.missingPrivileges, "Unable to verify privileges - may lack access to user_sys_privs");
+		}
+
+		return local.result;
 	}
 
 	/**
