@@ -12,6 +12,8 @@
  */
 component extends="DockerCommand" {
 
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @servers Specific servers to check (comma-separated list)
      * @tail Number of lines to show (default: 100)
@@ -74,7 +76,7 @@ component extends="DockerCommand" {
         else if (fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 serverList = deployConfig.servers;
                 
                 // Add defaults for missing fields
@@ -93,10 +95,10 @@ component extends="DockerCommand" {
         }
         // 2. Otherwise, look for default files
         else if (fileExists(textConfigPath)) {
-            print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
+            detailOutput.identical("Found deploy-servers.txt, loading server configuration");
             serverList = loadServersFromTextFile("deploy-servers.txt");
         } else if (fileExists(jsonConfigPath)) {
-            print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
+            detailOutput.identical("Found deploy-servers.json, loading server configuration");
             serverList = loadServersFromConfig("deploy-servers.json");
         } else {
             error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
@@ -111,15 +113,11 @@ component extends="DockerCommand" {
             error("Cannot follow logs from multiple servers simultaneously. Please specify a single server using 'servers=host'.");
         }
 
-        print.line();
-        print.boldMagentaLine("Wheels Deployment Logs");
-        print.line("==================================================").toConsole();
+        detailOutput.header("Wheels Deployment Logs");
         
         for (var serverConfig in serverList) {
             if (arrayLen(serverList) > 1) {
-                print.line().toConsole();
-                print.boldCyanLine("=== Server: #serverConfig.host# ===").toConsole();
-                print.line().toConsole();
+                detailOutput.subHeader("=== Server: #serverConfig.host# ===");
             }
             
             try {
@@ -127,11 +125,11 @@ component extends="DockerCommand" {
             } catch (any e) {
                 // Check for UserInterruptException (CommandBox specific) or standard InterruptedException
                 if (findNoCase("UserInterruptException", e.message) || findNoCase("InterruptedException", e.message) || (structKeyExists(e, "type") && findNoCase("UserInterruptException", e.type))) {
-                    print.line().toConsole();
-                    print.yellowLine("Command interrupted by user.").toConsole();
+                    detailOutput.line();
+                    detailOutput.statusFailed("Command interrupted by user.");
                     break;
                 }
-                print.redLine("Failed to fetch logs from #serverConfig.host#: #e.message#").toConsole();
+                detailOutput.statusFailed("Failed to fetch logs from #serverConfig.host#: #e.message#");
             }
         }
     }
@@ -236,11 +234,11 @@ component extends="DockerCommand" {
         // However, runLocalCommand waits for completion. For -f, it will run indefinitely until user interrupts.
         // This is fine for CLI usage.
         
-        print.cyanLine("Fetching logs from container: " & containerName).toConsole();
+        detailOutput.statusInfo("Fetching logs from container: " & containerName);
         if (arguments.follow) {
-            print.yellowLine("Following logs... (Press Ctrl+C to stop)").toConsole();
+           detailOutput.output("Following logs... (Press Ctrl+C to stop)");
         }
-        print.line("----------------------------------------").toConsole();
+        detailOutput.line("----------------------------------------");
         
         var result = runInteractiveCommand(logsCmd);
         
@@ -301,15 +299,13 @@ component extends="DockerCommand" {
             error("Could not find running container for service: " & arguments.service);
         }
 
-        print.line();
-        print.boldMagentaLine("Wheels Deployment Logs (Local)");
-        print.line("==================================================").toConsole();
-        print.cyanLine("Fetching logs from local container: " & containerName).toConsole();
-        
+        detailOutput.header("Wheels Deployment Logs (Local)");
+        detailOutput.statusInfo("Fetching logs from local container: " & containerName);
+
         if (arguments.follow) {
-            print.yellowLine("Following logs... (Press Ctrl+C to stop)").toConsole();
+            detailOutput.output("Following logs... (Press Ctrl+C to stop)");
         }
-        print.line("----------------------------------------").toConsole();
+        detailOutput.output("----------------------------------------");
         
         // Construct Docker Logs Command
         var dockerCmd = ["docker", "logs"];

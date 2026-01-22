@@ -10,6 +10,8 @@
  */
 component extends="DockerCommand" {
 
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @command Command to execute in container
      * @servers Specific servers to execute on (comma-separated list)
@@ -63,7 +65,7 @@ component extends="DockerCommand" {
         else if (fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 serverList = deployConfig.servers;
                 
                 // Add defaults for missing fields
@@ -82,10 +84,10 @@ component extends="DockerCommand" {
         }
         // 2. Otherwise, look for default files
         else if (fileExists(textConfigPath)) {
-            print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
+            detailOutput.identical("Found deploy-servers.txt, loading server configuration");
             serverList = loadServersFromTextFile("deploy-servers.txt");
         } else if (fileExists(jsonConfigPath)) {
-            print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
+            detailOutput.identical("Found deploy-servers.json, loading server configuration");
             serverList = loadServersFromConfig("deploy-servers.json");
         } else {
             error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
@@ -100,15 +102,11 @@ component extends="DockerCommand" {
             error("Cannot run interactive commands on multiple servers simultaneously. Please specify a single server using 'servers=host'.");
         }
 
-        print.line();
-        print.boldMagentaLine("Wheels Deploy Remote Execution");
-        print.line("==================================================").toConsole();
+        detailOutput.header("Wheels Deploy Remote Execution");
         
         for (var serverConfig in serverList) {
             if (arrayLen(serverList) > 1) {
-                print.line().toConsole();
-                print.boldCyanLine("=== Server: #serverConfig.host# ===").toConsole();
-                print.line().toConsole();
+                detailOutput.subHeader("=== Server: #serverConfig.host# ===");
             }
             
             try {
@@ -116,11 +114,11 @@ component extends="DockerCommand" {
             } catch (any e) {
                 // Check for UserInterruptException (CommandBox specific) or standard InterruptedException
                 if (findNoCase("UserInterruptException", e.message) || findNoCase("InterruptedException", e.message) || (structKeyExists(e, "type") && findNoCase("UserInterruptException", e.type))) {
-                    print.line().toConsole();
-                    print.yellowLine("Command interrupted by user.").toConsole();
+                    detailOutput.line();
+                    detailOutput.statusFailed("Command interrupted by user.");
                     break;
                 }
-                print.redLine("Failed to execute command on #serverConfig.host#: #e.message#").toConsole();
+               detailOutput.statusFailed("Failed to execute command on #serverConfig.host#: #e.message#");
             }
         }
     }
@@ -215,9 +213,9 @@ component extends="DockerCommand" {
         execCmd.addAll([local.user & "@" & local.host, dockerCmd]);
         
         // 4. Execute
-        print.cyanLine("Executing: " & arguments.command).toConsole();
-        print.cyanLine("Container: " & containerName).toConsole();
-        print.line().toConsole();
+        detailOutput.output("Executing: " & arguments.command);
+        detailOutput.output("Container: " & containerName);
+        detailOutput.output();
         
         // Use runInteractiveCommand for both interactive and non-interactive
         // For non-interactive, it streams output nicely.

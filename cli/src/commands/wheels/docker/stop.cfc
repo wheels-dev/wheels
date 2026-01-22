@@ -11,6 +11,8 @@
  */
 component extends="DockerCommand" {
     
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @local Stop containers on local machine
      * @remote Stop containers on remote server(s)
@@ -50,9 +52,7 @@ component extends="DockerCommand" {
     // =============================================================================
     
     private function stopLocal(boolean removeContainer) {
-        print.line();
-        print.boldMagentaLine("Wheels Docker Local Stop");
-        print.line();
+        detailOutput.header("Wheels Docker Local Stop");
 
         // Check if Docker is installed locally
         if (!isDockerInstalled()) {
@@ -63,49 +63,44 @@ component extends="DockerCommand" {
         local.useCompose = hasDockerComposeFile();
         
         if (local.useCompose) {
-            print.greenLine("Found docker-compose file, will stop docker-compose services").toConsole();
-            
-            print.yellowLine("Stopping services with docker-compose...").toConsole();
+            detailOutput.statusSuccess("Found docker-compose file, will stop docker-compose services"); 
+            detailOutput.output("Stopping services with docker-compose...");
             
             try {
                 runLocalCommand(["docker", "compose", "down"]);
-                print.boldGreenLine("Docker Compose services stopped successfully!").toConsole();
+                detailOutput.success("Docker Compose services stopped successfully!");
             } catch (any e) {
-                print.yellowLine("Services might not be running").toConsole();
+                detailOutput.statusFailed("Services might not be running");
             }
             
         } else {
-            print.greenLine("No docker-compose file found, will use standard docker commands").toConsole();
+            detailOutput.output("No docker-compose file found, will use standard docker commands");
             
             // Get project name for container naming
             local.containerName = getProjectName();
             
-            print.yellowLine("Stopping Docker container '" & local.containerName & "'...").toConsole();
+            detailOutput.output("Stopping Docker container '" & local.containerName & "'...");
             
             try {
-                runLocalCommand(["docker", "stop", local.containerName]);
-                print.greenLine("Container stopped successfully").toConsole();
+                 runLocalCommand(["docker", "stop", local.containerName]);
+                detailOutput.statusSuccess("Container stopped successfully");
                 
                 if (arguments.removeContainer) {
-                    print.yellowLine("Removing Docker container '" & local.containerName & "'...").toConsole();
+                    detailOutput.update("Removing Docker container '" & local.containerName & "'...");
                     runLocalCommand(["docker", "rm", local.containerName]);
-                    print.greenLine("Container removed successfully").toConsole();
+                    detailOutput.statusSuccess("Container removed successfully").toConsole();
                 }
                 
-                print.boldGreenLine("Container operations completed!").toConsole();
+                detailOutput.statusSuccess("Container operations completed!");
             } catch (any e) {
-                print.yellowLine("Container might not be running: " & e.message).toConsole();
+                detailOutput.output("Container might not be running: " & e.message);
             }
         }
         
-        print.line();
-        print.yellowLine("Check container status with: docker ps -a").toConsole();
-        print.line();
+        detailOutput.line();
+        detailOutput.output("Check container status with: docker ps -a");
+        detailOutput.line();
     }
-    
-
-    
-
     
     // =============================================================================
     // REMOTE STOP
@@ -123,7 +118,7 @@ component extends="DockerCommand" {
         if (len(trim(arguments.serverNumbers)) == 0 && fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 allServers = deployConfig.servers;
                 
                 // Add defaults
@@ -144,11 +139,11 @@ component extends="DockerCommand" {
         
         if (arrayLen(serversToStop) == 0) {
             if (fileExists(textConfigPath)) {
-                print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
+                detailOutput.identical("Found deploy-servers.txt, loading server configuration");
                 allServers = loadServersFromTextFile("deploy-servers.txt");
                 serversToStop = filterServers(allServers, arguments.serverNumbers);
             } else if (fileExists(jsonConfigPath)) {
-                print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
+                detailOutput.identical("Found deploy-servers.json, loading server configuration");
                 allServers = loadServersFromConfig("deploy-servers.json");
                 serversToStop = filterServers(allServers, arguments.serverNumbers);
             } else {
@@ -160,12 +155,14 @@ component extends="DockerCommand" {
             error("No servers configured to stop containers");
         }
 
-        print.line().boldCyanLine("Stopping containers on #arrayLen(serversToStop)# server(s)...").toConsole();
+        detailOutput.line();
+        detailOutput.output("Stopping containers on #arrayLen(serversToStop)# server(s)...");
 
         // Stop containers on all selected servers
         stopContainersOnServers(serversToStop, arguments.removeContainer);
 
-        print.line().boldGreenLine("Container stop operations completed!").toConsole();
+        detailOutput.line();
+        detailOutput.statusSuccess("Container stop operations completed!");
     }
 
     /**
@@ -185,16 +182,16 @@ component extends="DockerCommand" {
             if (num > 0 && num <= arrayLen(arguments.allServers)) {
                 arrayAppend(selectedServers, arguments.allServers[num]);
             } else {
-                print.yellowLine("Skipping invalid server number: " & numStr).toConsole();
+                detailOutput.skip("Skipping invalid server number: " & numStr);
             }
         }
 
         if (arrayLen(selectedServers) == 0) {
-            print.yellowLine("No valid servers selected, using all servers").toConsole();
+            detailOutput.output("No valid servers selected, using all servers");
             return arguments.allServers;
         }
 
-        print.greenLine("Selected #arrayLen(selectedServers)# of #arrayLen(arguments.allServers)# server(s)").toConsole();
+        detailOutput.statusSuccess("Selected #arrayLen(selectedServers)# of #arrayLen(arguments.allServers)# server(s)");
         return selectedServers;
     }
 
@@ -208,25 +205,23 @@ component extends="DockerCommand" {
 
         for (var i = 1; i <= arrayLen(servers); i++) {
             serverConfig = servers[i];
-            print.line().boldCyanLine("---------------------------------------").toConsole();
-            print.boldCyanLine("Stopping container on server #i# of #arrayLen(servers)#: #serverConfig.host#").toConsole();
-            print.line().boldCyanLine("---------------------------------------").toConsole();
-
+            detailOutput.header("Stopping container on server #i# of #arrayLen(servers)#: #serverConfig.host#");
+           
             try {
                 stopContainerOnServer(serverConfig, arguments.removeContainer);
                 successCount++;
-                print.greenLine("Container on #serverConfig.host# stopped successfully").toConsole();
+                detailOutput.statusSuccess("Container on #serverConfig.host# stopped successfully");
             } catch (any e) {
                 failureCount++;
-                print.redLine("Failed to stop container on #serverConfig.host#: #e.message#").toConsole();
+                detailOutput.statusFailed("Failed to stop container on #serverConfig.host#: #e.message#");
             }
         }
 
-        print.line().toConsole();
-        print.boldCyanLine("Stop Operations Summary:").toConsole();
-        print.greenLine("   Successful: #successCount#").toConsole();
-        if (failureCount > 0) {
-            print.redLine("   Failed: #failureCount#").toConsole();
+        detailOutput.line();
+        detailOutput.output("Stop Operations Summary:");
+        detailOutput.statusSuccess("   Successful: #successCount#");
+        if (failureCount > 0) {   
+            detailOutput.statusFailed("   Failed: #failureCount#");
         }
     }
 
@@ -246,7 +241,7 @@ component extends="DockerCommand" {
         if (!testSSHConnection(local.host, local.user, local.port)) {
             error("SSH connection failed to #local.host#. Check credentials and access.");
         }
-        print.greenLine("SSH connection successful").toConsole();
+        detailOutput.statusSuccess("SSH connection successful");
 
         // Check if docker-compose is being used on the remote server
         local.checkComposeCmd = "test -f " & local.remoteDir & "/docker-compose.yml || test -f " & local.remoteDir & "/docker-compose.yaml";
@@ -255,14 +250,14 @@ component extends="DockerCommand" {
         try {
             executeRemoteCommand(local.host, local.user, local.port, local.checkComposeCmd);
             local.useCompose = true;
-            print.greenLine("Found docker-compose file on remote server").toConsole();
+            detailOutput.identical("Found docker-compose file on remote server");
         } catch (any e) {
-            print.yellowLine("No docker-compose file found, using standard docker commands").toConsole();
+            detailOutput.identical("No docker-compose file found, using standard docker commands");
         }
 
         if (local.useCompose) {
             // Stop using docker-compose
-            print.yellowLine("Stopping services with docker-compose...").toConsole();
+            detailOutput.output("Stopping services with docker-compose...").toConsole();
             
             // Check if user can run docker without sudo
             local.stopCmd = "cd " & local.remoteDir & " && ";
@@ -272,13 +267,13 @@ component extends="DockerCommand" {
 
             try {
                 executeRemoteCommand(local.host, local.user, local.port, local.stopCmd);
-                print.greenLine("Docker Compose services stopped").toConsole();
+                detailOutput.statusSuccess("Docker Compose services stopped");
             } catch (any e) {
-                print.yellowLine("Services might not be running: " & e.message).toConsole();
+                detailOutput.statusWarning("Services might not be running: " & e.message);
             }
         } else {
             // Stop the container using standard docker commands
-            print.yellowLine("Stopping Docker container '" & local.imageName & "'...").toConsole();
+            detailOutput.output("Stopping Docker container '" & local.imageName & "'...");
             
             // Check if user can run docker without sudo
             local.stopCmd = "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then ";
@@ -287,15 +282,16 @@ component extends="DockerCommand" {
 
             try {
                 executeRemoteCommand(local.host, local.user, local.port, local.stopCmd);
-                print.greenLine("Container stopped").toConsole();
+                detailOutput.statusSuccess("Container stopped");
             } catch (any e) {
-                print.yellowLine("Container might not be running: " & e.message).toConsole();
+                detailOutput.statusWarning("Container might not be running: " & e.message);
             }
 
             // Remove container if requested
             if (arguments.removeContainer) {
-                print.yellowLine("Removing Docker container '" & local.imageName & "'...").toConsole();
                 
+                detailOutput.output("Removing Docker container '" & local.imageName & "'...");
+
                 // Check if user can run docker without sudo
                 local.removeCmd = "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then ";
                 local.removeCmd &= "docker rm " & local.imageName & "; ";
@@ -303,15 +299,14 @@ component extends="DockerCommand" {
 
                 try {
                     executeRemoteCommand(local.host, local.user, local.port, local.removeCmd);
-                    print.greenLine("Container removed").toConsole();
+                    detailOutput.statusSuccess("Container removed");
                 } catch (any e) {
-                    print.yellowLine("Container might not exist: " & e.message).toConsole();
+                    detailOutput.statusWarning("Container might not exist: " & e.message);
                 }
             }
         }
 
-        print.boldGreenLine("Operations on #local.host# completed!").toConsole();
+        detailOutput.success("Operations on #local.host# completed!");
     }
-
 
 }
