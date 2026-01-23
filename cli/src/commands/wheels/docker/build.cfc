@@ -10,7 +10,9 @@
  * {code}
  */
 component extends="DockerCommand" {
-    
+
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+
     /**
      * @local Build Docker image on local machine
      * @remote Build Docker image on remote server(s)
@@ -55,10 +57,8 @@ component extends="DockerCommand" {
     // =============================================================================
     
     private function buildLocal(string customTag, boolean nocache, boolean pull) {
-        print.line();
-        print.boldMagentaLine("Wheels Docker Local Build");
-        print.line();
-
+        detailOutput.header("Wheels Docker Local Build");
+        
         // Check if Docker is installed locally
         if (!isDockerInstalled()) {
             error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
@@ -68,7 +68,7 @@ component extends="DockerCommand" {
         local.useCompose = hasDockerComposeFile();
         
         if (local.useCompose) {
-            print.greenLine("Found docker-compose file, will build using docker-compose").toConsole();
+            detailOutput.statusSuccess("Found docker-compose file, will build using docker-compose");
             
             // Build command array
             local.buildCmd = ["docker", "compose", "build"];
@@ -81,15 +81,15 @@ component extends="DockerCommand" {
                 arrayAppend(local.buildCmd, "--pull");
             }
             
-            print.yellowLine("Building services with docker-compose...").toConsole();
+            detailOutput.output("Building services with docker-compose...");
             runLocalCommand(local.buildCmd);
             
-            print.line();
-            print.boldGreenLine("Docker Compose services built successfully!").toConsole();
-            print.line();
-            print.yellowLine("View images with: docker images").toConsole();
-            print.yellowLine("Start services with: wheels docker deploy --local").toConsole();
-            print.line();
+            detailOutput.line();
+            detailOutput.statusSuccess("Docker Compose services built successfully!");
+            detailOutput.line();
+            detailOutput.output("View images with: docker images");
+            detailOutput.output("Start services with: wheels docker deploy --local");
+            detailOutput.line();
             
         } else {
             // Check for Dockerfile
@@ -98,7 +98,7 @@ component extends="DockerCommand" {
                 error("No Dockerfile or docker-compose.yml found in current directory");
             }
             
-            print.greenLine("Found Dockerfile, will build using standard docker build").toConsole();
+            detailOutput.statusSuccess("Found Dockerfile, will build using standard docker build");
             
             // Get project name and determine tag
             local.projectName = getProjectName();
@@ -115,7 +115,7 @@ component extends="DockerCommand" {
                 local.imageTag = local.baseImageName & ":latest";
             }
             
-            print.cyanLine("Building image: " & local.imageTag).toConsole();
+            detailOutput.statusInfo("Building image: " & local.imageTag);
             
             // Build command array
             local.buildCmd = ["docker", "build", "-t", local.imageTag];
@@ -130,16 +130,16 @@ component extends="DockerCommand" {
             
             arrayAppend(local.buildCmd, ".");
             
-            print.yellowLine("Building Docker image...").toConsole();
+            detailOutput.output("Building Docker image...");
             runLocalCommand(local.buildCmd);
             
-            print.line();
-            print.boldGreenLine("Docker image built successfully!").toConsole();
-            print.line();
-            print.yellowLine("Image tag: " & local.imageTag).toConsole();
-            print.yellowLine("View image with: docker images " & local.projectName).toConsole();
-            print.yellowLine("Run container with: wheels docker deploy --local").toConsole();
-            print.line();
+            detailOutput.line();
+            detailOutput.statusSuccess("Docker image built successfully!");
+            detailOutput.line();
+            detailOutput.output("Image tag: " & local.imageTag);
+            detailOutput.output("View image with: docker images " & local.projectName);
+            detailOutput.output("Run container with: wheels docker deploy --local");
+            detailOutput.line();
         }
     }
     
@@ -183,7 +183,7 @@ component extends="DockerCommand" {
             if (isNull(local.line)) break;
             arrayAppend(local.outputParts, local.line);
             if (arguments.showOutput) {
-                print.line(local.line).toConsole();
+                detailOutput.output(local.line);
             }
         }
 
@@ -213,7 +213,7 @@ component extends="DockerCommand" {
         if (len(trim(arguments.serverNumbers)) == 0 && fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 allServers = deployConfig.servers;
                 
                 // Add default remoteDir if not present
@@ -231,11 +231,11 @@ component extends="DockerCommand" {
         
         if (arrayLen(serversToBuild) == 0) {
             if (fileExists(textConfigPath)) {
-                print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
+                detailOutput.identical("Found deploy-servers.txt, loading server configuration");
                 allServers = loadServersFromTextFile("deploy-servers.txt");
                 serversToBuild = filterServers(allServers, arguments.serverNumbers);
             } else if (fileExists(jsonConfigPath)) {
-                print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
+                detailOutput.identical("Found deploy-servers.json, loading server configuration");
                 allServers = loadServersFromConfig("deploy-servers.json");
                 serversToBuild = filterServers(allServers, arguments.serverNumbers);
             } else {
@@ -247,12 +247,14 @@ component extends="DockerCommand" {
             error("No servers configured for building");
         }
 
-        print.line().boldCyanLine("Building Docker images on #arrayLen(serversToBuild)# server(s)...").toConsole();
+        detailOutput.line();
+        detailOutput.statusInfo("Building Docker images on #arrayLen(serversToBuild)# server(s)...");
 
         // Build on all selected servers
         buildOnServers(serversToBuild, arguments.customTag, arguments.nocache, arguments.pull);
 
-        print.line().boldGreenLine("Build operations completed on all servers!").toConsole();
+        detailOutput.line();
+        detailOutput.success("Build operations completed on all servers!");
     }
 
     /**
@@ -272,16 +274,16 @@ component extends="DockerCommand" {
             if (num > 0 && num <= arrayLen(arguments.allServers)) {
                 arrayAppend(selectedServers, arguments.allServers[num]);
             } else {
-                print.yellowLine("Skipping invalid server number: " & numStr).toConsole();
+                detailOutput.skip("Skipping invalid server number: " & numStr);
             }
         }
 
         if (arrayLen(selectedServers) == 0) {
-            print.yellowLine("No valid servers selected, using all servers").toConsole();
+            detailOutput.statusFailed("No valid servers selected, using all servers");
             return arguments.allServers;
         }
 
-        print.greenLine("Selected #arrayLen(selectedServers)# of #arrayLen(arguments.allServers)# server(s)").toConsole();
+        detailOutput.statusSuccess("Selected #arrayLen(selectedServers)# of #arrayLen(arguments.allServers)# server(s)");
         return selectedServers;
     }
 
@@ -295,25 +297,23 @@ component extends="DockerCommand" {
 
         for (var i = 1; i <= arrayLen(servers); i++) {
             serverConfig = servers[i];
-            print.line().boldCyanLine("---------------------------------------").toConsole();
-            print.boldCyanLine("Building on server #i# of #arrayLen(servers)#: #serverConfig.host#").toConsole();
-            print.line().boldCyanLine("---------------------------------------").toConsole();
+            detailOutput.header("Building on server #i# of #arrayLen(servers)#: #serverConfig.host#");
 
             try {
                 buildOnServer(serverConfig, arguments.customTag, arguments.nocache, arguments.pull);
                 successCount++;
-                print.greenLine("Build on #serverConfig.host# completed successfully").toConsole();
+                detailOutput.statusSuccess("Build on #serverConfig.host# completed successfully");
             } catch (any e) {
                 failureCount++;
-                print.redLine("Failed to build on #serverConfig.host#: #e.message#").toConsole();
+                detailOutput.statusFailed("Failed to build on #serverConfig.host#: #e.message#");
             }
         }
 
-        print.line().toConsole();
-        print.boldCyanLine("Build Operations Summary:").toConsole();
-        print.greenLine("   Successful: #successCount#").toConsole();
+        detailOutput.line();
+        detailOutput.statusInfo("Build Operations Summary:");
+        detailOutput.statusSuccess("   Successful: #successCount#");
         if (failureCount > 0) {
-            print.redLine("   Failed: #failureCount#").toConsole();
+            detailOutput.statusFailed("   Failed: #failureCount#");
         }
     }
 
@@ -332,19 +332,19 @@ component extends="DockerCommand" {
         if (!testSSHConnection(local.host, local.user, local.port)) {
             error("SSH connection failed to #local.host#. Check credentials and access.");
         }
-        print.greenLine("SSH connection successful").toConsole();
+        detailOutput.statusSuccess("SSH connection successful");
 
         // Check if remote directory exists
-        print.yellowLine("Checking remote directory...").toConsole();
+        detailOutput.statusInfo("Checking remote directory...");
         local.checkDirCmd = "test -d " & local.remoteDir;
         local.dirExists = false;
         
         try {
             executeRemoteCommand(local.host, local.user, local.port, local.checkDirCmd);
             local.dirExists = true;
-            print.greenLine("Remote directory exists").toConsole();
+            detailOutput.statusSuccess("Remote directory exists");
         } catch (any e) {
-            print.yellowLine("Remote directory does not exist, uploading source code...").toConsole();
+            detailOutput.statusInfo("Remote directory does not exist, uploading source code...");
             uploadSourceCode(local.host, local.user, local.port, local.remoteDir);
         }
 
@@ -355,15 +355,15 @@ component extends="DockerCommand" {
         try {
             executeRemoteCommand(local.host, local.user, local.port, local.checkComposeCmd);
             local.useCompose = true;
-            print.greenLine("Found docker-compose file on remote server").toConsole();
+            detailOutput.statusSuccess("Found docker-compose file on remote server");
         } catch (any e) {
-            print.yellowLine("No docker-compose file found, checking for Dockerfile...").toConsole();
+            detailOutput.statusInfo("No docker-compose file found, checking for Dockerfile...");
             
             // Check if Dockerfile exists
             local.checkDockerfileCmd = "test -f " & local.remoteDir & "/Dockerfile";
             try {
                 executeRemoteCommand(local.host, local.user, local.port, local.checkDockerfileCmd);
-                print.greenLine("Found Dockerfile on remote server").toConsole();
+                detailOutput.statusSuccess("Found Dockerfile on remote server");
             } catch (any e2) {
                 error("No Dockerfile or docker-compose.yml found on remote server in: " & local.remoteDir);
             }
@@ -371,7 +371,7 @@ component extends="DockerCommand" {
 
         if (local.useCompose) {
             // Build using docker-compose
-            print.yellowLine("Building with docker-compose...").toConsole();
+            detailOutput.statusInfo("Building with docker-compose...");
             
             local.buildCmd = "cd " & local.remoteDir & " && ";
             
@@ -400,11 +400,11 @@ component extends="DockerCommand" {
             local.buildCmd &= "; fi";
 
             executeRemoteCommand(local.host, local.user, local.port, local.buildCmd);
-            print.greenLine("Docker Compose build completed").toConsole();
+            detailOutput.statusSuccess("Docker Compose build completed");
             
         } else {
             // Build using standard docker build
-            print.yellowLine("Building Docker image...").toConsole();
+            detailOutput.statusInfo("Building Docker image...");
             
             // Determine tag
             local.projectName = getProjectName();
@@ -420,7 +420,7 @@ component extends="DockerCommand" {
             } else {
                 local.imageTag = local.baseImageName & ":latest";
             }
-            print.cyanLine("Building image: " & local.imageTag).toConsole();
+            detailOutput.create("Building image: " & local.imageTag);
             
             local.buildCmd = "cd " & local.remoteDir & " && ";
             
@@ -451,10 +451,10 @@ component extends="DockerCommand" {
             local.buildCmd &= "; fi";
 
             executeRemoteCommand(local.host, local.user, local.port, local.buildCmd);
-            print.greenLine("Docker image built: " & local.imageTag).toConsole();
+            detailOutput.create("Docker image built: " & local.imageTag);
         }
 
-        print.boldGreenLine("Build operations on #local.host# completed!").toConsole();
+        detailOutput.success("Build operations on #local.host# completed!");
     }
     
     /**
@@ -463,7 +463,7 @@ component extends="DockerCommand" {
     private function uploadSourceCode(string host, string user, numeric port, string remoteDir) {
         var local = {};
         
-        print.yellowLine("Creating deployment directory on remote server...").toConsole();
+        detailOutput.statusInfo("Creating deployment directory on remote server...");
         
         // Create remote directory
         local.createDirCmd = "sudo mkdir -p " & arguments.remoteDir & " && sudo chown -R $USER:$USER " & arguments.remoteDir;
@@ -471,7 +471,7 @@ component extends="DockerCommand" {
         try {
             executeRemoteCommand(arguments.host, arguments.user, arguments.port, local.createDirCmd);
         } catch (any e) {
-            print.yellowLine("Note: Creating directory without sudo...").toConsole();
+            detailOutput.statusInfo("Note: Creating directory without sudo...");
             executeRemoteCommand(arguments.host, arguments.user, arguments.port, "mkdir -p " & arguments.remoteDir);
         }
         
@@ -480,18 +480,18 @@ component extends="DockerCommand" {
         local.tarFile = getTempFile(getTempDirectory(), "buildsrc_") & ".tar.gz";
         local.remoteTar = "/tmp/buildsrc_" & local.timestamp & ".tar.gz";
 
-        print.yellowLine("Creating source tarball...").toConsole();
+        detailOutput.statusInfo("Creating source tarball...");
         runProcess(["tar", "-czf", local.tarFile, "-C", getCWD(), "."]);
 
-        print.yellowLine("Uploading source code to remote server...").toConsole();
+        detailOutput.statusInfo("Uploading source code to remote server...");
         runProcess(["scp", "-P", arguments.port, local.tarFile, arguments.user & "@" & arguments.host & ":" & local.remoteTar]);
         fileDelete(local.tarFile);
         
-        print.yellowLine("Extracting source code...").toConsole();
+        detailOutput.statusInfo("Extracting source code...");
         local.extractCmd = "tar -xzf " & local.remoteTar & " -C " & arguments.remoteDir & " && rm " & local.remoteTar;
         executeRemoteCommand(arguments.host, arguments.user, arguments.port, local.extractCmd);
         
-        print.greenLine("Source code uploaded successfully").toConsole();
+        detailOutput.statusSuccess("Source code uploaded successfully");
     }
 
     /**
@@ -587,7 +587,7 @@ component extends="DockerCommand" {
 
     private function testSSHConnection(string host, string user, numeric port) {
         var local = {};
-        print.yellowLine("Testing SSH connection to " & arguments.host & "...").toConsole();
+        detailOutput.statusInfo("Testing SSH connection to " & arguments.host & "...");
         local.result = runProcess([
             "ssh",
             "-o", "BatchMode=yes",
@@ -603,7 +603,7 @@ component extends="DockerCommand" {
 
     private function executeRemoteCommand(string host, string user, numeric port, string cmd) {
         var local = {};
-        print.yellowLine("Running: ssh -p " & arguments.port & " " & arguments.user & "@" & arguments.host & " " & arguments.cmd).toConsole();
+        detailOutput.statusInfo("Running: ssh -p " & arguments.port & " " & arguments.user & "@" & arguments.host & " " & arguments.cmd);
 
         local.result = runProcess([
             "ssh",
@@ -643,7 +643,7 @@ component extends="DockerCommand" {
             local.line = local.br.readLine();
             if (isNull(local.line)) break;
             arrayAppend(local.outputParts, local.line);
-            print.line(local.line).toConsole();
+            detailOutput.output(local.line);
         }
 
         local.exitCode = local.proc.waitFor();

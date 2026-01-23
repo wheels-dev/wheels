@@ -56,7 +56,7 @@ component extends="DockerCommand" {
             local.imageName = local.appName;
         }
         
-        print.line().boldCyanLine("Production Server Configuration").toConsole();
+        detailOutput.subHeader("Production Server Configuration");
         local.serverHost = ask("Server Host/IP (e.g. 192.168.1.10): ");
         local.serverUser = "";
         
@@ -66,7 +66,7 @@ component extends="DockerCommand" {
                 local.serverUser = "ubuntu";
             }
         }
-        print.line().toConsole();
+        detailOutput.line();
 
         // Check for existing files if force is not set
         if (!arguments.force) {
