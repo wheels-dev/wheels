@@ -643,7 +643,7 @@ component extends="DockerCommand" {
             local.line = local.br.readLine();
             if (isNull(local.line)) break;
             arrayAppend(local.outputParts, local.line);
-            print.line(local.line).toConsole();
+            detailOutput.output(local.line);
         }
 
         local.exitCode = local.proc.waitFor();
