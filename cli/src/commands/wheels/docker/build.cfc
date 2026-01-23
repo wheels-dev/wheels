@@ -248,13 +248,13 @@ component extends="DockerCommand" {
         }
 
         detailOutput.line();
-        detailOutput.create("Building Docker images on #arrayLen(serversToBuild)# server(s)...");
+        detailOutput.statusInfo("Building Docker images on #arrayLen(serversToBuild)# server(s)...");
 
         // Build on all selected servers
         buildOnServers(serversToBuild, arguments.customTag, arguments.nocache, arguments.pull);
 
         detailOutput.line();
-        detailOutput.statusSuccess("Build operations completed on all servers!");
+        detailOutput.success("Build operations completed on all servers!");
     }
 
     /**
@@ -310,7 +310,7 @@ component extends="DockerCommand" {
         }
 
         detailOutput.line();
-        detailOutput.output("Build Operations Summary:");
+        detailOutput.statusInfo("Build Operations Summary:");
         detailOutput.statusSuccess("   Successful: #successCount#");
         if (failureCount > 0) {
             detailOutput.statusFailed("   Failed: #failureCount#");
@@ -335,7 +335,7 @@ component extends="DockerCommand" {
         detailOutput.statusSuccess("SSH connection successful");
 
         // Check if remote directory exists
-        detailOutput.output("Checking remote directory...");
+        detailOutput.statusInfo("Checking remote directory...");
         local.checkDirCmd = "test -d " & local.remoteDir;
         local.dirExists = false;
         
@@ -344,7 +344,7 @@ component extends="DockerCommand" {
             local.dirExists = true;
             detailOutput.statusSuccess("Remote directory exists");
         } catch (any e) {
-            detailOutput.output("Remote directory does not exist, uploading source code...");
+            detailOutput.statusInfo("Remote directory does not exist, uploading source code...");
             uploadSourceCode(local.host, local.user, local.port, local.remoteDir);
         }
 
@@ -357,7 +357,7 @@ component extends="DockerCommand" {
             local.useCompose = true;
             detailOutput.statusSuccess("Found docker-compose file on remote server");
         } catch (any e) {
-            detailOutput.output("No docker-compose file found, checking for Dockerfile...");
+            detailOutput.statusInfo("No docker-compose file found, checking for Dockerfile...");
             
             // Check if Dockerfile exists
             local.checkDockerfileCmd = "test -f " & local.remoteDir & "/Dockerfile";
@@ -371,7 +371,7 @@ component extends="DockerCommand" {
 
         if (local.useCompose) {
             // Build using docker-compose
-            detailOutput.output("Building with docker-compose...");
+            detailOutput.statusInfo("Building with docker-compose...");
             
             local.buildCmd = "cd " & local.remoteDir & " && ";
             
@@ -404,7 +404,7 @@ component extends="DockerCommand" {
             
         } else {
             // Build using standard docker build
-            detailOutput.create("Building Docker image...");
+            detailOutput.statusInfo("Building Docker image...");
             
             // Determine tag
             local.projectName = getProjectName();
@@ -451,7 +451,7 @@ component extends="DockerCommand" {
             local.buildCmd &= "; fi";
 
             executeRemoteCommand(local.host, local.user, local.port, local.buildCmd);
-            detailOutput.statusSuccess("Docker image built: " & local.imageTag);
+            detailOutput.create("Docker image built: " & local.imageTag);
         }
 
         detailOutput.success("Build operations on #local.host# completed!");
@@ -463,7 +463,7 @@ component extends="DockerCommand" {
     private function uploadSourceCode(string host, string user, numeric port, string remoteDir) {
         var local = {};
         
-        detailOutput.create("Creating deployment directory on remote server...");
+        detailOutput.statusInfo("Creating deployment directory on remote server...");
         
         // Create remote directory
         local.createDirCmd = "sudo mkdir -p " & arguments.remoteDir & " && sudo chown -R $USER:$USER " & arguments.remoteDir;
@@ -471,7 +471,7 @@ component extends="DockerCommand" {
         try {
             executeRemoteCommand(arguments.host, arguments.user, arguments.port, local.createDirCmd);
         } catch (any e) {
-            detailOutput.output("Note: Creating directory without sudo...");
+            detailOutput.statusInfo("Note: Creating directory without sudo...");
             executeRemoteCommand(arguments.host, arguments.user, arguments.port, "mkdir -p " & arguments.remoteDir);
         }
         
@@ -480,14 +480,14 @@ component extends="DockerCommand" {
         local.tarFile = getTempFile(getTempDirectory(), "buildsrc_") & ".tar.gz";
         local.remoteTar = "/tmp/buildsrc_" & local.timestamp & ".tar.gz";
 
-        detailOutput.create("Creating source tarball...");
+        detailOutput.statusInfo("Creating source tarball...");
         runProcess(["tar", "-czf", local.tarFile, "-C", getCWD(), "."]);
 
-        detailOutput.create("Uploading source code to remote server...");
+        detailOutput.statusInfo("Uploading source code to remote server...");
         runProcess(["scp", "-P", arguments.port, local.tarFile, arguments.user & "@" & arguments.host & ":" & local.remoteTar]);
         fileDelete(local.tarFile);
         
-        detailOutput.create("Extracting source code...");
+        detailOutput.statusInfo("Extracting source code...");
         local.extractCmd = "tar -xzf " & local.remoteTar & " -C " & arguments.remoteDir & " && rm " & local.remoteTar;
         executeRemoteCommand(arguments.host, arguments.user, arguments.port, local.extractCmd);
         
@@ -587,7 +587,7 @@ component extends="DockerCommand" {
 
     private function testSSHConnection(string host, string user, numeric port) {
         var local = {};
-        detailOutput.output("Testing SSH connection to " & arguments.host & "...");
+        detailOutput.statusInfo("Testing SSH connection to " & arguments.host & "...");
         local.result = runProcess([
             "ssh",
             "-o", "BatchMode=yes",
@@ -603,7 +603,7 @@ component extends="DockerCommand" {
 
     private function executeRemoteCommand(string host, string user, numeric port, string cmd) {
         var local = {};
-        detailOutput.output("Running: ssh -p " & arguments.port & " " & arguments.user & "@" & arguments.host & " " & arguments.cmd);
+        detailOutput.statusInfo("Running: ssh -p " & arguments.port & " " & arguments.user & "@" & arguments.host & " " & arguments.cmd);
 
         local.result = runProcess([
             "ssh",

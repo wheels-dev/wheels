@@ -148,15 +148,14 @@ component extends="DockerCommand" {
         
         // Build image if requested
         if (arguments.build) {
-            detailOutput.output("Building image before push...");
+            detailOutput.statusInfo("Building image before push...");
             buildLocalImage();
         }
         
         // Check if local image exists
         if (!checkLocalImageExists(local.localImageName)) {
-            detailOutput.output("Local image '#local.localImageName#' not found.");
-            detailOutput.output("Would you like to build it now? (y/n)");
-            local.answer = ask("");
+            detailOutput.statusInfo("Local image '#local.localImageName#' not found.");
+            local.answer = ask("Would you like to build it now? (y/n)");
             if (lCase(local.answer) == "y") {
                 buildLocalImage();
             } else {
@@ -176,12 +175,12 @@ component extends="DockerCommand" {
             arguments.namespace
         );
         
-        detailOutput.output("Target image: " & local.finalImage);
+        detailOutput.statusInfo("Target image: " & local.finalImage);
         detailOutput.line();
         
         // Tag the image if needed
         if (local.finalImage != local.localImageName) {
-            detailOutput.output("Tagging image: " & local.localImageName & " -> " & local.finalImage);
+            detailOutput.statusInfo("Tagging image: " & local.localImageName & " -> " & local.finalImage);
             try {
                 runLocalCommand(["docker", "tag", local.localImageName, local.finalImage]);
                 detailOutput.statusSuccess("Image tagged successfully");
@@ -204,21 +203,21 @@ component extends="DockerCommand" {
         }
         
         // Push the image
-        detailOutput.output("Pushing image to " & arguments.registry & "...");
+        detailOutput.statusInfo("Pushing image to " & arguments.registry & "...");
         
         try {
             runLocalCommand(["docker", "push", local.finalImage]);
             detailOutput.line();
             detailOutput.statusSuccess("Image pushed successfully to " & arguments.registry & "!");
             detailOutput.line();
-            detailOutput.output("Image: " & local.finalImage);
-            detailOutput.create("Pull with: docker pull " & local.finalImage);
+            detailOutput.statusInfo("Image: " & local.finalImage);
+            detailOutput.statusInfo("Pull with: docker pull " & local.finalImage);
             detailOutput.line();
         } catch (any e) {
             detailOutput.statusFailed("Failed to push image: " & e.message);
             detailOutput.line();
             detailOutput.output("You may need to login first.");
-            detailOutput.invoke("Try running: wheels docker login --registry=" & arguments.registry & " --username=" & arguments.username);
+            detailOutput.output("Try running: wheels docker login --registry=" & arguments.registry & " --username=" & arguments.username);
             detailOutput.output("Or provide a password/token with --password");
             error("Push failed");
         }
@@ -228,7 +227,7 @@ component extends="DockerCommand" {
      * Build the local image
      */
     private function buildLocalImage() {
-        detailOutput.create("Building Docker image...");
+        detailOutput.statusInfo("Building Docker image...");
         detailOutput.line();
         
         // Check for docker-compose file
@@ -374,7 +373,7 @@ component extends="DockerCommand" {
         }
         detailOutput.statusSuccess("SSH connection successful");
 
-        detailOutput.output("Registry: " & arguments.registry);
+        detailOutput.statusInfo("Registry: " & arguments.registry);
         
         // Determine final image name
         local.projectName = getProjectName();
@@ -387,11 +386,11 @@ component extends="DockerCommand" {
             arguments.namespace
         );
 
-        detailOutput.output("Target image: " & local.finalImage);
+        detailOutput.statusInfo("Target image: " & local.finalImage);
         
         // Tag the image on the server if it's different (e.g. if tagging project name to full name)
         if (local.finalImage != arguments.image) {
-            detailOutput.identical("Tagging image on server: " & arguments.image & " -> " & local.finalImage).toConsole();
+            detailOutput.statusInfo("Tagging image on server: " & arguments.image & " -> " & local.finalImage).toConsole();
             local.tagCmd = "docker tag " & arguments.image & " " & local.finalImage;
             executeRemoteCommand(local.host, local.user, local.port, local.tagCmd);
         }
@@ -414,7 +413,7 @@ component extends="DockerCommand" {
         
         // Execute login on remote server
         if (len(local.loginCmd)) {
-            detailOutput.output("Logging in to registry on remote server...");
+            detailOutput.statusInfo("Logging in to registry on remote server...");
             executeRemoteCommand(local.host, local.user, local.port, local.loginCmd);
             detailOutput.statusSuccess("Login successful");
         } else {
@@ -422,7 +421,7 @@ component extends="DockerCommand" {
         }
         
         // Push the image
-        detailOutput.output("Pushing image from remote server...");
+        detailOutput.statusInfo("Pushing image from remote server...");
         local.pushCmd = "docker push " & arguments.image;
         executeRemoteCommand(local.host, local.user, local.port, local.pushCmd);
         detailOutput.success("Image pushed successfully from #local.host#!");

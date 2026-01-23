@@ -30,14 +30,13 @@ component extends="../base" {
         switch(lCase(arguments.registry)) {
             case "dockerhub":
                 if (!len(trim(local.username))) {
-                    detailOutput.output("Enter Docker Hub username:");
-                    local.username = ask("");
+                    local.username = ask("Enter Docker Hub username:");
                 }
                 
                 detailOutput.output("Logging in to Docker Hub...");
                 
                 if (!len(trim(local.password))) {
-                detailOutput.output("Enter Docker Hub password or access token:");
+                    detailOutput.output("Enter Docker Hub password or access token:");
                     local.password = ask(message="", mask="*");
                 }
                 
@@ -52,7 +51,7 @@ component extends="../base" {
                 
             case "ecr":
                detailOutput.output("Logging in to AWS ECR...");
-               detailOutput.invoke("Note: AWS CLI must be configured with valid credentials");
+               detailOutput.output("Note: AWS CLI must be configured with valid credentials");
                 
                 // Extract region from image name
                 if (!len(trim(arguments.image))) {
@@ -87,7 +86,7 @@ component extends="../base" {
                 break;
                 
             case "gcr":
-                detailOutput.create("Logging in to Google Container Registry...");
+                detailOutput.statusInfo("Logging in to Google Container Registry...");
                 local.keyFile = "";
                 
                 if (fileExists(getCWD() & "/gcr-key.json")) {
@@ -139,8 +138,7 @@ component extends="../base" {
 
                 // 2. Resolve Username
                 if (!len(trim(local.username))) {
-                    detailOutput.output("Enter Azure ACR username:");
-                    local.username = ask("");
+                    local.username = ask("Enter Azure ACR username:");
                 }
 
                 detailOutput.create("Logging in to Azure Container Registry: #local.registryUrl#");
@@ -162,10 +160,9 @@ component extends="../base" {
                 
             case "ghcr":
                 if (!len(trim(local.username))) {
-                    detailOutput.output("Enter GitHub username:");
-                    local.username = ask("");
+                    local.username = ask("Enter GitHub username:");
                 }
-                detailOutput.create("Logging in to GitHub Container Registry...");
+                detailOutput.statusInfo("Logging in to GitHub Container Registry...");
                 
                 if (!len(trim(local.password))) {
                     detailOutput.output("Enter Personal Access Token (PAT) with write:packages scope:");
@@ -202,11 +199,10 @@ component extends="../base" {
 
                 // 2. Resolve Username
                 if (!len(trim(local.username))) {
-                    detailOutput.output("Enter registry username:");
-                    local.username = ask("");
+                    local.username = ask("Enter registry username:");
                 }
                 
-                detailOutput.create("Logging in to private registry: #local.registryUrl#");
+                detailOutput.statusInfo("Logging in to private registry: #local.registryUrl#");
                 
                 // 3. Resolve Password
                 if (!len(trim(local.password))) {
@@ -421,8 +417,7 @@ component extends="../base" {
                 if (structKeyExists(deployConfig, "image") && len(trim(deployConfig.image))) {
                     local.registryUrl = listFirst(deployConfig.image, "/");
                 } else {
-                    detailOutput.output("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
-                    local.registryUrl = ask("");
+                    local.registryUrl = ask("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
                     if (!len(trim(local.registryUrl))) {
                         error("Azure ACR requires a registry URL to determine image path.");
                     }
@@ -442,8 +437,7 @@ component extends="../base" {
                 if (structKeyExists(deployConfig, "image") && len(trim(deployConfig.image))) {
                     local.registryUrl = listFirst(deployConfig.image, "/");
                 } else {
-                    detailOutput.output("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
-                    local.registryUrl = ask("");
+                    local.registryUrl = ask("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
                     if (!len(trim(local.registryUrl))) {
                         error("Private registry requires a registry URL to determine image path.");
                     }
@@ -629,7 +623,7 @@ component extends="../base" {
 
     public function testSSHConnection(string host, string user, numeric port) {
         var local = {};
-        detailOutput.output("Testing SSH connection to " & arguments.host & "...");
+        detailOutput.statusInfo("Testing SSH connection to " & arguments.host & "...");
         var sshCmd = ["ssh", "-p", arguments.port];
         sshCmd.addAll(getSSHOptions());
         sshCmd.addAll([arguments.user & "@" & arguments.host, "echo connected"]);

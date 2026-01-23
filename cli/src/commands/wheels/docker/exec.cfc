@@ -115,7 +115,7 @@ component extends="DockerCommand" {
                 // Check for UserInterruptException (CommandBox specific) or standard InterruptedException
                 if (findNoCase("UserInterruptException", e.message) || findNoCase("InterruptedException", e.message) || (structKeyExists(e, "type") && findNoCase("UserInterruptException", e.type))) {
                     detailOutput.line();
-                    detailOutput.statusFailed("Command interrupted by user.");
+                    detailOutput.error("Command interrupted by user.");
                     break;
                 }
                detailOutput.statusFailed("Failed to execute command on #serverConfig.host#: #e.message#");
@@ -213,8 +213,8 @@ component extends="DockerCommand" {
         execCmd.addAll([local.user & "@" & local.host, dockerCmd]);
         
         // 4. Execute
-        detailOutput.output("Executing: " & arguments.command);
-        detailOutput.output("Container: " & containerName);
+        detailOutput.statusInfo("Executing: " & arguments.command);
+        detailOutput.statusInfo("Container: " & containerName);
         detailOutput.output();
         
         // Use runInteractiveCommand for both interactive and non-interactive

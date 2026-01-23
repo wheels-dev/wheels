@@ -126,7 +126,7 @@ component extends="DockerCommand" {
                 // Check for UserInterruptException (CommandBox specific) or standard InterruptedException
                 if (findNoCase("UserInterruptException", e.message) || findNoCase("InterruptedException", e.message) || (structKeyExists(e, "type") && findNoCase("UserInterruptException", e.type))) {
                     detailOutput.line();
-                    detailOutput.statusFailed("Command interrupted by user.");
+                    detailOutput.error("Command interrupted by user.");
                     break;
                 }
                 detailOutput.statusFailed("Failed to fetch logs from #serverConfig.host#: #e.message#");
@@ -236,7 +236,7 @@ component extends="DockerCommand" {
         
         detailOutput.statusInfo("Fetching logs from container: " & containerName);
         if (arguments.follow) {
-           detailOutput.output("Following logs... (Press Ctrl+C to stop)");
+           detailOutput.statusInfo("Following logs... (Press Ctrl+C to stop)");
         }
         detailOutput.line("----------------------------------------");
         
@@ -303,7 +303,7 @@ component extends="DockerCommand" {
         detailOutput.statusInfo("Fetching logs from local container: " & containerName);
 
         if (arguments.follow) {
-            detailOutput.output("Following logs... (Press Ctrl+C to stop)");
+            detailOutput.statusInfo("Following logs... (Press Ctrl+C to stop)");
         }
         detailOutput.output("----------------------------------------");
         

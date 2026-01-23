@@ -64,7 +64,7 @@ component extends="DockerCommand" {
         
         if (local.useCompose) {
             detailOutput.statusSuccess("Found docker-compose file, will stop docker-compose services"); 
-            detailOutput.output("Stopping services with docker-compose...");
+            detailOutput.statusInfo("Stopping services with docker-compose...");
             
             try {
                 runLocalCommand(["docker", "compose", "down"]);
@@ -74,26 +74,26 @@ component extends="DockerCommand" {
             }
             
         } else {
-            detailOutput.output("No docker-compose file found, will use standard docker commands");
+            detailOutput.statusInfo("No docker-compose file found, will use standard docker commands");
             
             // Get project name for container naming
             local.containerName = getProjectName();
             
-            detailOutput.output("Stopping Docker container '" & local.containerName & "'...");
+            detailOutput.statusInfo("Stopping Docker container '" & local.containerName & "'...");
             
             try {
                  runLocalCommand(["docker", "stop", local.containerName]);
                 detailOutput.statusSuccess("Container stopped successfully");
                 
                 if (arguments.removeContainer) {
-                    detailOutput.update("Removing Docker container '" & local.containerName & "'...");
+                    detailOutput.statusInfo("Removing Docker container '" & local.containerName & "'...");
                     runLocalCommand(["docker", "rm", local.containerName]);
                     detailOutput.statusSuccess("Container removed successfully").toConsole();
                 }
                 
                 detailOutput.statusSuccess("Container operations completed!");
             } catch (any e) {
-                detailOutput.output("Container might not be running: " & e.message);
+                detailOutput.statusFailed("Container might not be running: " & e.message);
             }
         }
         
@@ -156,7 +156,7 @@ component extends="DockerCommand" {
         }
 
         detailOutput.line();
-        detailOutput.output("Stopping containers on #arrayLen(serversToStop)# server(s)...");
+        detailOutput.statusInfo("Stopping containers on #arrayLen(serversToStop)# server(s)...");
 
         // Stop containers on all selected servers
         stopContainersOnServers(serversToStop, arguments.removeContainer);
@@ -218,7 +218,7 @@ component extends="DockerCommand" {
         }
 
         detailOutput.line();
-        detailOutput.output("Stop Operations Summary:");
+        detailOutput.statusInfo("Stop Operations Summary:");
         detailOutput.statusSuccess("   Successful: #successCount#");
         if (failureCount > 0) {   
             detailOutput.statusFailed("   Failed: #failureCount#");
@@ -250,14 +250,14 @@ component extends="DockerCommand" {
         try {
             executeRemoteCommand(local.host, local.user, local.port, local.checkComposeCmd);
             local.useCompose = true;
-            detailOutput.identical("Found docker-compose file on remote server");
+            detailOutput.statusInfo("Found docker-compose file on remote server");
         } catch (any e) {
-            detailOutput.identical("No docker-compose file found, using standard docker commands");
+            detailOutput.statusInfo("No docker-compose file found, using standard docker commands");
         }
 
         if (local.useCompose) {
             // Stop using docker-compose
-            detailOutput.output("Stopping services with docker-compose...").toConsole();
+            detailOutput.statusInfo("Stopping services with docker-compose...").toConsole();
             
             // Check if user can run docker without sudo
             local.stopCmd = "cd " & local.remoteDir & " && ";
@@ -273,7 +273,7 @@ component extends="DockerCommand" {
             }
         } else {
             // Stop the container using standard docker commands
-            detailOutput.output("Stopping Docker container '" & local.imageName & "'...");
+            detailOutput.statusInfo("Stopping Docker container '" & local.imageName & "'...");
             
             // Check if user can run docker without sudo
             local.stopCmd = "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then ";
@@ -290,7 +290,7 @@ component extends="DockerCommand" {
             // Remove container if requested
             if (arguments.removeContainer) {
                 
-                detailOutput.output("Removing Docker container '" & local.imageName & "'...");
+                detailOutput.statusInfo("Removing Docker container '" & local.imageName & "'...");
 
                 // Check if user can run docker without sudo
                 local.removeCmd = "if groups | grep -q docker && [ -w /var/run/docker.sock ]; then ";
