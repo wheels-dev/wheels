@@ -10,6 +10,8 @@
  * {code}
  */
 component extends="DockerCommand" {
+
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
     
     /**
      * @local Deploy to local Docker environment
@@ -76,27 +78,27 @@ component extends="DockerCommand" {
                     // (CFML doesn't have a native Set, so we can use a struct key trick or just leave it if docker output is unique enough)
                     
                     if (arrayLen(candidates) > 1) {
-                        print.line().toConsole();
-                        print.boldCyanLine("Select a tag to deploy for project '#projectName#':").toConsole();
+                        detailOutput.line();
+                        detailOutput.output("Select a tag to deploy for project '#projectName#':");
                         
                         for (var i=1; i<=arrayLen(candidates); i++) {
-                             print.line("   #i#. " & candidates[i]).toConsole();
+                            detailOutput.output("   #i#. " & candidates[i]);
                         }
-                        print.line().toConsole();
+                        detailOutput.line();
                         
                         var selection = ask("Enter number to select, or press Enter for 'latest': ");
                         
                         if (len(trim(selection)) && isNumeric(selection) && selection > 0 && selection <= arrayLen(candidates)) {
-                             arguments.tag = candidates[selection];
-                             print.greenLine("Selected tag: " & arguments.tag).toConsole();
+                            arguments.tag = candidates[selection];
+                            detailOutput.statusSuccess("Selected tag: " & arguments.tag);
                         } else if (len(trim(selection))) {
-                             // Treat as custom tag input if they typed a string not in the list? 
-                             // Or just fallback to what they typed
-                             arguments.tag = selection;
-                             print.greenLine("Using custom tag: " & arguments.tag).toConsole();
+                            // Treat as custom tag input if they typed a string not in the list? 
+                            // Or just fallback to what they typed
+                            arguments.tag = selection;
+                            detailOutput.statusSuccess("Using custom tag: " & arguments.tag);
                         } else {
                             // Empty selection matches 'latest' default logic later, or we can explicit set it
-                            print.yellowLine("No selection made, defaulting to 'latest'").toConsole();
+                            detailOutput.statusInfo("No selection made, defaulting to 'latest'");
                         }
                     }
                 }
@@ -135,29 +137,27 @@ component extends="DockerCommand" {
         string tag=""
     ) {
         // Welcome message
-        print.line();
-        print.boldMagentaLine("Wheels Docker Local Deployment");
-        print.line();
+        detailOutput.header("Wheels Docker Local Deployment");
 
         // Check for docker-compose file
         local.useCompose = hasDockerComposeFile();
         
         if (local.useCompose) {
-            print.greenLine("Found docker-compose file, will use docker-compose").toConsole();
+            detailOutput.statusSuccess("Found docker-compose file, will use docker-compose");
             
             // Just run docker-compose up
             if (len(arguments.tag)) {
-                print.yellowLine("Note: --tag argument is ignored when using docker-compose.").toConsole();
+                detailOutput.statusInfo("Note: --tag argument is ignored when using docker-compose.");
             }
             
-            print.yellowLine("Starting services...").toConsole();
+            detailOutput.statusInfo("Starting services...");
             runLocalCommand(["docker-compose", "up", "-d", "--build"]);
             
-             print.line();
-            print.boldGreenLine("Services started successfully!").toConsole();
-            print.line();
-            print.yellowLine("View logs with: docker-compose logs -f").toConsole();
-            print.line();
+            detailOutput.line();
+            detailOutput.statusSuccess("Services started successfully!");
+            detailOutput.line();
+            detailOutput.output("View logs with: docker-compose logs -f");
+            detailOutput.line();
             
         } else {
             // Check for Dockerfile
@@ -166,7 +166,7 @@ component extends="DockerCommand" {
                 error("No Dockerfile or docker-compose.yml found in current directory");
             }
             
-            print.greenLine("Found Dockerfile, will use standard docker commands").toConsole();
+            detailOutput.statusSuccess("Found Dockerfile, will use standard docker commands");
             
             // Check if Docker is installed locally
             if (!isDockerInstalled()) {
@@ -176,10 +176,10 @@ component extends="DockerCommand" {
             // Extract port from Dockerfile
             local.exposedPort = getDockerExposedPort();
             if (!len(local.exposedPort)) {
-                print.yellowLine("No EXPOSE directive found in Dockerfile, using default port 8080").toConsole();
+                detailOutput.statusInfo("No EXPOSE directive found in Dockerfile, using default port 8080");
                 local.exposedPort = "8080";
             } else {
-                print.greenLine("Found EXPOSE port: " & local.exposedPort).toConsole();
+                detailOutput.statusSuccess("Found EXPOSE port: " & local.exposedPort);
             }
             
             // Get project name for image/container naming
@@ -201,32 +201,32 @@ component extends="DockerCommand" {
             // Container Name: Always use project name for consistency
             local.containerName = local.projectName;
             
-            print.yellowLine("Building Docker image (" & local.imageName & ")...").toConsole();
+            detailOutput.statusInfo("Building Docker image (" & local.imageName & ")...");
             runLocalCommand(["docker", "build", "-t", local.imageName, "."]);
             
-            print.yellowLine("Starting container...").toConsole();
+            detailOutput.statusInfo("Starting container...");
             
             try {
                 // Stop and remove existing container
                 runLocalCommand(["docker", "stop", local.containerName]);
                 runLocalCommand(["docker", "rm", local.containerName]);
             } catch (any e) {
-                print.yellowLine("No existing container to remove").toConsole();
+                detailOutput.output("No existing container to remove");
             }
             
             // Run new container
             runLocalCommand(["docker", "run", "-d", "--name", local.containerName, "-p", local.exposedPort & ":" & local.exposedPort, local.imageName]);
             
-            print.line();
-            print.boldGreenLine("Container started successfully!").toConsole();
-            print.line();
-            print.yellowLine("Image: " & local.imageName).toConsole();
-            print.yellowLine("Container: " & local.containerName).toConsole();
-            print.yellowLine("Access your application at: http://localhost:" & local.exposedPort).toConsole();
-            print.line();
-            print.yellowLine("Check container status with: docker ps").toConsole();
-            print.yellowLine("View logs with: wheels docker logs --local").toConsole();
-            print.line();
+            detailOutput.line();
+            detailOutput.statusSuccess("Container started successfully!");
+            detailOutput.line();
+            detailOutput.create("Image: " & local.imageName);
+            detailOutput.create("Container: " & local.containerName);
+            detailOutput.statusInfo("Access your application at: http://localhost:" & local.exposedPort);
+            detailOutput.line();
+            detailOutput.output("Check container status with: docker ps");
+            detailOutput.output("View logs with: wheels docker logs --local");
+            detailOutput.line();
         }
     }
     
@@ -271,7 +271,7 @@ component extends="DockerCommand" {
         else if (fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                print.cyanLine("Found config/deploy.yml, loading server configuration").toConsole();
+                 detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 servers = deployConfig.servers;
                 
                 // Add defaults for missing fields
@@ -287,10 +287,10 @@ component extends="DockerCommand" {
         }
         // 2. Otherwise, look for default files
         else if (fileExists(textConfigPath)) {
-            print.cyanLine("Found deploy-servers.txt, loading server configuration").toConsole();
+           detailOutput.identical("Found deploy-servers.txt, loading server configuration");
             servers = loadServersFromTextFile("deploy-servers.txt");
         } else if (fileExists(jsonConfigPath)) {
-            print.cyanLine("Found deploy-servers.json, loading server configuration").toConsole();
+           detailOutput.identical("Found deploy-servers.json, loading server configuration");
             servers = loadServersFromConfig("deploy-servers.json");
         } else {
             error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
@@ -300,15 +300,16 @@ component extends="DockerCommand" {
             error("No servers configured for deployment");
         }
 
-        print.line().boldCyanLine("Starting remote deployment to #arrayLen(servers)# server(s)...").toConsole();
+        detailOutput.statusInfo("Starting remote deployment to #arrayLen(servers)# server(s)...");
         if (arguments.blueGreen) {
-            print.boldMagentaLine("Strategy: Blue/Green Deployment (Zero Downtime)").toConsole();
+        detailOutput.output("Strategy: Blue/Green Deployment (Zero Downtime)");
         }
 
         // Deploy to all servers sequentially
         deployToMultipleServersSequential(servers, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
 
-        print.line().boldGreenLine("Deployment to all servers completed!").toConsole();
+        detailOutput.line();
+        detailOutput.success("Deployment to all servers completed!");
     }
 
     /**
@@ -330,9 +331,7 @@ component extends="DockerCommand" {
                  serverConfig.tag = "latest";
             }
             
-            print.line().boldCyanLine("---------------------------------------").toConsole();
-            print.boldCyanLine("Deploying to server #i# of #arrayLen(servers)#: #serverConfig.host#").toConsole();
-            print.line().boldCyanLine("---------------------------------------").toConsole();
+            detailOutput.header("Deploying to server #i# of #arrayLen(servers)#: #serverConfig.host#");
 
             try {
                 if (arguments.blueGreen) {
@@ -341,10 +340,10 @@ component extends="DockerCommand" {
                     deployToSingleServer(serverConfig, arguments.skipDockerCheck);
                 }
                 successCount++;
-                print.greenLine("Server #serverConfig.host# deployed successfully").toConsole();
+                detailOutput.statusSuccess("Server #serverConfig.host# deployed successfully");
             } catch (any e) {
                 failureCount++;
-                print.redLine("Failed to deploy to #serverConfig.host#: #e.message#").toConsole();
+                detailOutput.statusFailed("Failed to deploy to #serverConfig.host#: #e.message#");
             }
         }
     }
@@ -379,31 +378,31 @@ component extends="DockerCommand" {
         if (!testSSHConnection(local.host, local.user, local.port)) {
             error("SSH connection failed to #local.host#. Check credentials and access.");
         }
-        print.greenLine("SSH connection successful").toConsole();
+        detailOutput.statusSuccess("SSH connection successful");
 
         // Step 1.5: Check and install Docker if needed (unless skipped)
         if (!arguments.skipDockerCheck) {
             ensureDockerInstalled(local.host, local.user, local.port);
         } else {
-            print.yellowLine("Skipping Docker installation check (--skipDockerCheck flag is set)").toConsole();
+            detailOutput.skip("Skipping Docker installation check (--skipDockerCheck flag is set)");
         }
 
         // Step 2: Create remote directory
-        print.yellowLine("Creating remote directory...").toConsole();
+        detailOutput.statusInfo("Creating remote directory...");
         executeRemoteCommand(local.host, local.user, local.port, "mkdir -p " & local.remoteDir);
 
         // Step 3: Check for docker-compose file
         local.useCompose = hasDockerComposeFile();
         if (local.useCompose) {
-            print.greenLine("Found docker-compose file, will use docker-compose").toConsole();
+            detailOutput.statusSuccess("Found docker-compose file, will use docker-compose");
         } else {
             // Extract port from Dockerfile for standard docker run
             local.exposedPort = getDockerExposedPort();
             if (!len(local.exposedPort)) {
-                print.yellowLine(" No EXPOSE directive found in Dockerfile, using default port 8080").toConsole();
+                detailOutput.statusInfo(" No EXPOSE directive found in Dockerfile, using default port 8080");
                 local.exposedPort = "8080";
             } else {
-                print.greenLine("Found EXPOSE port: " & local.exposedPort).toConsole();
+                detailOutput.statusSuccess("Found EXPOSE port: " & local.exposedPort);
             }
         }
 
@@ -412,10 +411,10 @@ component extends="DockerCommand" {
         local.tarFile = getTempFile(getTempDirectory(), "deploysrc_") & ".tar.gz";
         local.remoteTar = "/tmp/deploysrc_" & local.timestamp & ".tar.gz";
 
-        print.yellowLine("Creating source tarball...").toConsole();
+        detailOutput.statusInfo("Creating source tarball...");
         runLocalCommand(["tar", "-czf", local.tarFile, "-C", getCWD(), "."]);
 
-        print.yellowLine(" Uploading to remote server...").toConsole();
+        detailOutput.statusInfo(" Uploading to remote server...");
         var scpCmd = ["scp", "-P", local.port];
         scpCmd.addAll(getSSHOptions());
         scpCmd.addAll([local.tarFile, local.user & "@" & local.host & ":" & local.remoteTar]);
@@ -469,14 +468,14 @@ component extends="DockerCommand" {
         local.tempFile = getTempFile(getTempDirectory(), "deploy_");
         fileWrite(local.tempFile, local.deployScript);
 
-        print.yellowLine("Uploading deployment script...").toConsole();
+        detailOutput.statusInfo("Uploading deployment script...");
         var scpScriptCmd = ["scp", "-P", local.port];
         scpScriptCmd.addAll(getSSHOptions());
         scpScriptCmd.addAll([local.tempFile, local.user & "@" & local.host & ":/tmp/deploy-simple.sh"]);
         runLocalCommand(scpScriptCmd);
         fileDelete(local.tempFile);
 
-        print.yellowLine("Executing deployment script remotely...").toConsole();
+        detailOutput.statusInfo("Executing deployment script remotely...");
         // Use interactive command
         var execCmd = ["ssh", "-p", local.port];
         execCmd.addAll(getSSHOptions());
@@ -484,7 +483,7 @@ component extends="DockerCommand" {
         
         runInteractiveCommand(execCmd);
 
-        print.boldGreenLine("Deployment to #local.host# completed successfully!").toConsole();
+        detailOutput.success("Deployment to #local.host# completed successfully!");
     }
 
     /**
@@ -505,7 +504,7 @@ component extends="DockerCommand" {
         if (!testSSHConnection(local.host, local.user, local.port)) {
             error("SSH connection failed to #local.host#. Check credentials and access.");
         }
-        print.greenLine("SSH connection successful").toConsole();
+        detailOutput.statusSuccess("SSH connection successful");
 
         // Step 1.5: Check and install Docker
         if (!arguments.skipDockerCheck) {
@@ -513,16 +512,16 @@ component extends="DockerCommand" {
         }
 
         // Step 2: Create remote directory
-        print.yellowLine("Creating remote directory...").toConsole();
+        detailOutput.statusInfo("Creating remote directory...");
         executeRemoteCommand(local.host, local.user, local.port, "mkdir -p " & local.remoteDir);
 
         // Step 3: Determine Port
         local.exposedPort = getDockerExposedPort();
         if (!len(local.exposedPort)) {
-            print.yellowLine(" No EXPOSE directive found in Dockerfile, using default port 8080").toConsole();
+            detailOutput.statusInfo(" No EXPOSE directive found in Dockerfile, using default port 8080");
             local.exposedPort = "8080";
         } else {
-            print.greenLine("Found EXPOSE port: " & local.exposedPort).toConsole();
+            detailOutput.statusSuccess("Found EXPOSE port: " & local.exposedPort);
         }
 
         // Step 4: Tar and upload project
@@ -530,10 +529,10 @@ component extends="DockerCommand" {
         local.tarFile = getTempFile(getTempDirectory(), "deploysrc_") & ".tar.gz";
         local.remoteTar = "/tmp/deploysrc_" & local.timestamp & ".tar.gz";
 
-        print.yellowLine("Creating source tarball...").toConsole();
+        detailOutput.statusInfo("Creating source tarball...");
         runLocalCommand(["tar", "-czf", local.tarFile, "-C", getCWD(), "."]);
 
-        print.yellowLine(" Uploading to remote server...").toConsole();
+        detailOutput.statusInfo(" Uploading to remote server...");
         var scpCmd = ["scp", "-P", local.port];
         scpCmd.addAll(getSSHOptions());
         scpCmd.addAll([local.tarFile, local.user & "@" & local.host & ":" & local.remoteTar]);
@@ -625,21 +624,21 @@ component extends="DockerCommand" {
         local.tempFile = getTempFile(getTempDirectory(), "deploy_bg_");
         fileWrite(local.tempFile, local.deployScript);
 
-        print.yellowLine("Uploading Blue/Green deployment script...").toConsole();
+        detailOutput.statusInfo("Uploading Blue/Green deployment script...");
         var scpScriptCmd = ["scp", "-P", local.port];
         scpScriptCmd.addAll(getSSHOptions());
         scpScriptCmd.addAll([local.tempFile, local.user & "@" & local.host & ":/tmp/deploy-bluegreen.sh"]);
         runLocalCommand(scpScriptCmd);
         fileDelete(local.tempFile);
 
-        print.yellowLine("Executing Blue/Green deployment script remotely...").toConsole();
+        detailOutput.statusInfo("Executing Blue/Green deployment script remotely...");
         var execCmd = ["ssh", "-p", local.port];
         execCmd.addAll(getSSHOptions());
         execCmd.addAll([local.user & "@" & local.host, "chmod +x /tmp/deploy-bluegreen.sh && bash /tmp/deploy-bluegreen.sh"]);
         
         runInteractiveCommand(execCmd);
 
-        print.boldGreenLine("Blue/Green Deployment to #local.host# completed successfully!").toConsole();
+        detailOutput.success("Blue/Green Deployment to #local.host# completed successfully!");
     }
     
     /**
@@ -648,7 +647,7 @@ component extends="DockerCommand" {
     private function ensureDockerInstalled(string host, string user, numeric port) {
         var local = {};
         
-        print.yellowLine("Checking Docker installation on remote server...").toConsole();
+        detailOutput.statusInfo("Checking Docker installation on remote server...");
         
         // Check if Docker is installed
         var checkCmd = ["ssh", "-p", arguments.port];
@@ -658,7 +657,7 @@ component extends="DockerCommand" {
         local.checkResult = runLocalCommand(checkCmd);
         
         if (local.checkResult.exitCode eq 0) {
-            print.greenLine("Docker is already installed").toConsole();
+            detailOutput.statusSuccess("Docker is already installed");
             
             // Get Docker version
             var versionCmd = ["ssh", "-p", arguments.port];
@@ -668,7 +667,7 @@ component extends="DockerCommand" {
             local.versionResult = runLocalCommand(versionCmd);
             
             if (local.versionResult.exitCode eq 0) {
-                print.cyanLine("Docker version: " & trim(local.versionResult.output)).toConsole();
+                detailOutput.statusInfo("Docker version: " & trim(local.versionResult.output));
             }
             
             // Check if docker compose is available
@@ -677,10 +676,10 @@ component extends="DockerCommand" {
             return true;
         }
         
-        print.yellowLine("Docker is not installed. Attempting to install Docker...").toConsole();
+        detailOutput.statusInfo("Docker is not installed. Attempting to install Docker...");
         
         // Check if user has passwordless sudo access
-        print.yellowLine("Checking sudo access...").toConsole();
+        detailOutput.statusInfo("Checking sudo access...");
         var sudoCheckCmd = ["ssh", "-p", arguments.port];
         sudoCheckCmd.addAll(getSSHOptions());
         sudoCheckCmd.addAll([arguments.user & "@" & arguments.host, "sudo -n true 2>&1"]);
@@ -688,12 +687,12 @@ component extends="DockerCommand" {
         local.sudoCheckResult = runLocalCommand(sudoCheckCmd);
         
         if (local.sudoCheckResult.exitCode neq 0) {
-            print.line().toConsole();
-            print.boldRedLine("ERROR: User '#arguments.user#' does not have passwordless sudo access on #arguments.host#!").toConsole();
+            detailOutput.line();
+            detailOutput.statusFailed("ERROR: User '#arguments.user#' does not have passwordless sudo access on #arguments.host#!");
             error("Cannot install Docker: User '" & arguments.user & "' requires passwordless sudo access on " & arguments.host);
         }
         
-        print.greenLine("User has sudo access").toConsole();
+        detailOutput.statusSuccess("User has sudo access");
         
         // Detect OS type
         var osCmd = ["ssh", "-p", arguments.port];
@@ -711,10 +710,10 @@ component extends="DockerCommand" {
         
         if (findNoCase("ubuntu", local.osResult.output) || findNoCase("debian", local.osResult.output)) {
             local.installScript = getDockerInstallScriptDebian();
-            print.cyanLine("Detected Debian/Ubuntu system").toConsole();
+            detailOutput.identical("Detected Debian/Ubuntu system");
         } else if (findNoCase("centos", local.osResult.output) || findNoCase("rhel", local.osResult.output) || findNoCase("fedora", local.osResult.output)) {
             local.installScript = getDockerInstallScriptRHEL();
-            print.cyanLine("Detected RHEL/CentOS/Fedora system").toConsole();
+            detailOutput.identical("Detected RHEL/CentOS/Fedora system");
         } else {
             error("Unsupported OS. Docker installation is only automated for Ubuntu/Debian and RHEL/CentOS/Fedora systems.");
         }
@@ -729,7 +728,7 @@ component extends="DockerCommand" {
         fileWrite(local.tempFile, local.installScript);
         
         // Upload install script
-        print.yellowLine("Uploading Docker installation script...").toConsole();
+        detailOutput.statusInfo("Uploading Docker installation script...");
         var scpInstallCmd = ["scp", "-P", arguments.port];
         scpInstallCmd.addAll(getSSHOptions());
         scpInstallCmd.addAll([local.tempFile, arguments.user & "@" & arguments.host & ":/tmp/install-docker.sh"]);
@@ -737,7 +736,7 @@ component extends="DockerCommand" {
         fileDelete(local.tempFile);
         
         // Execute install script
-        print.yellowLine("Installing Docker...").toConsole();
+        detailOutput.statusInfo("Installing Docker...");
         var installCmd = ["ssh", "-p", arguments.port];
         installCmd.addAll(getSSHOptions());
         installCmd.addAll(["-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=10"]);
@@ -749,7 +748,7 @@ component extends="DockerCommand" {
             error("Failed to install Docker on remote server");
         }
         
-        print.boldGreenLine("Docker installed successfully!").toConsole();
+        detailOutput.statusSuccess("Docker installed successfully!");
         
         // Verify installation
         var verifyCmd = ["ssh", "-p", arguments.port];
@@ -759,7 +758,7 @@ component extends="DockerCommand" {
         local.verifyResult = runLocalCommand(verifyCmd);
         
         if (local.verifyResult.exitCode eq 0) {
-            print.greenLine("Docker version: " & trim(local.verifyResult.output)).toConsole();
+            detailOutput.statusSuccess("Docker version: " & trim(local.verifyResult.output));
         }
         
         return true;
@@ -779,8 +778,8 @@ component extends="DockerCommand" {
         local.composeResult = runLocalCommand(composeCmd);
         
         if (local.composeResult.exitCode eq 0) {
-            print.greenLine("Docker Compose is available").toConsole();
-            print.cyanLine("Compose version: " & trim(local.composeResult.output)).toConsole();
+            detailOutput.statusSuccess("Docker Compose is available");
+            detailOutput.statusInfo("Compose version: " & trim(local.composeResult.output));
             return true;
         }
         
@@ -792,12 +791,12 @@ component extends="DockerCommand" {
         local.oldComposeResult = runLocalCommand(oldComposeCmd);
         
         if (local.oldComposeResult.exitCode eq 0) {
-            print.greenLine("Docker Compose (standalone) is available").toConsole();
-            print.cyanLine("Compose version: " & trim(local.oldComposeResult.output)).toConsole();
+            detailOutput.statusSuccess("Docker Compose (standalone) is available");
+            detailOutput.statusInfo("Compose version: " & trim(local.oldComposeResult.output));
             return true;
         }
         
-        print.yellowLine("Docker Compose is not available, but docker compose plugin should be included in modern Docker installations").toConsole();
+        detailOutput.output("Docker Compose is not available, but docker compose plugin should be included in modern Docker installations");
         return false;
     }
     
