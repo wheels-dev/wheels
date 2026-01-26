@@ -304,7 +304,7 @@ component {
 		// Perform update if changes have been made.
 		if (hasChanged()) {
 			// Allow explicit assignment of the createdAt/updatedAt properties if allowExplicitTimestamps is true
-			local.allowExplicitTimestamps = StructKeyExists(this, "allowExplicitTimestamps") && this.allowExplicitTimestamps;
+			local.allowExplicitTimestamps = StructKeyExists(arguments, "allowExplicitTimestamps") && arguments.allowExplicitTimestamps;
 			if (
 				local.allowExplicitTimestamps
 				&& StructKeyExists(this, $get("timeStampOnUpdateProperty"))

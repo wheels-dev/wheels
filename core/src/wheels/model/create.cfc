@@ -172,7 +172,7 @@ component {
 					if (!Len(key())) {
 						local.rollback = true;
 					}
-					$create(parameterize = arguments.parameterize, reload = arguments.reload);
+					$create(parameterize = arguments.parameterize, reload = arguments.reload, allowExplicitTimestamps = arguments.allowExplicitTimestamps?:false);
 					if (
 						$saveAssociations(argumentCollection = arguments)
 						&& $callback("afterCreate", arguments.callbacks)
@@ -198,7 +198,7 @@ component {
 					&& $callback("beforeSave", arguments.callbacks)
 					&& $callback("beforeUpdate", arguments.callbacks)
 				) {
-					$update(parameterize = arguments.parameterize, reload = arguments.reload);
+					$update(parameterize = arguments.parameterize, reload = arguments.reload, allowExplicitTimestamps = arguments.allowExplicitTimestamps?:false);
 					if (
 						$saveAssociations(argumentCollection = arguments)
 						&& $callback("afterUpdate", arguments.callbacks)
@@ -225,7 +225,7 @@ component {
 	 */
 	public boolean function $create(required any parameterize, required boolean reload) {
 		// Allow explicit assignment of the createdAt/updatedAt properties if allowExplicitTimestamps is true
-		local.allowExplicitTimestamps = StructKeyExists(this, "allowExplicitTimestamps") && this.allowExplicitTimestamps;
+		local.allowExplicitTimestamps = StructKeyExists(arguments, "allowExplicitTimestamps") && arguments.allowExplicitTimestamps;
 		if (
 			local.allowExplicitTimestamps
 			&& StructKeyExists(this, $get("timeStampOnCreateProperty"))
