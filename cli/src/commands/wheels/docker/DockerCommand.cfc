@@ -2,6 +2,8 @@
  * Base component for Docker commands
  */
 component extends="../base" {
+    
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
      * Login to container registry
@@ -28,14 +30,13 @@ component extends="../base" {
         switch(lCase(arguments.registry)) {
             case "dockerhub":
                 if (!len(trim(local.username))) {
-                    print.line("Enter Docker Hub username:");
-                    local.username = ask("");
+                    local.username = ask("Enter Docker Hub username:");
                 }
                 
-                print.yellowLine("Logging in to Docker Hub...").toConsole();
+                detailOutput.output("Logging in to Docker Hub...");
                 
                 if (!len(trim(local.password))) {
-                    print.line("Enter Docker Hub password or access token:");
+                    detailOutput.output("Enter Docker Hub password or access token:");
                     local.password = ask(message="", mask="*");
                 }
                 
@@ -49,8 +50,8 @@ component extends="../base" {
                 break;
                 
             case "ecr":
-                print.yellowLine("Logging in to AWS ECR...").toConsole();
-                print.cyanLine("Note: AWS CLI must be configured with valid credentials").toConsole();
+               detailOutput.output("Logging in to AWS ECR...");
+               detailOutput.output("Note: AWS CLI must be configured with valid credentials");
                 
                 // Extract region from image name
                 if (!len(trim(arguments.image))) {
@@ -58,7 +59,7 @@ component extends="../base" {
                 }
                 
                 var region = extractAWSRegion(arguments.image);
-                print.cyanLine("Detected region: " & region).toConsole();
+                detailOutput.identical("Detected region: " & region);
                 
                 if (arguments.isLocal) {
                     // aws ecr get-login-password --region region | docker login --username AWS --password-stdin account.dkr.ecr.region.amazonaws.com
@@ -85,14 +86,14 @@ component extends="../base" {
                 break;
                 
             case "gcr":
-                print.yellowLine("Logging in to Google Container Registry...").toConsole();
+                detailOutput.statusInfo("Logging in to Google Container Registry...");
                 local.keyFile = "";
                 
                 if (fileExists(getCWD() & "/gcr-key.json")) {
                     local.keyFile = getCWD() & "/gcr-key.json";
-                    print.cyanLine("Found service account key: gcr-key.json").toConsole();
+                    detailOutput.statusSuccess("Found service account key: gcr-key.json");
                 } else {
-                    print.line("Enter path to service account key file (JSON):");
+                    detailOutput.output("Enter path to service account key file (JSON):");
                     local.keyFile = ask(message="");
                 }
                 
@@ -127,7 +128,7 @@ component extends="../base" {
                         local.image = deployConfig.image;
                         local.registryUrl = listFirst(local.image, "/");
                     } else {
-                        print.line("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
+                        detailOutput.output("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
                         local.registryUrl = ask(message="");
                         if (!len(trim(local.registryUrl))) {
                              error("Azure ACR requires a registry URL.");
@@ -137,15 +138,14 @@ component extends="../base" {
 
                 // 2. Resolve Username
                 if (!len(trim(local.username))) {
-                    print.line("Enter Azure ACR username:");
-                    local.username = ask("");
+                    local.username = ask("Enter Azure ACR username:");
                 }
 
-                print.yellowLine("Logging in to Azure Container Registry: #local.registryUrl#").toConsole();
+                detailOutput.create("Logging in to Azure Container Registry: #local.registryUrl#");
                 
                 // 3. Resolve Password
-                 if (!len(trim(local.password))) {
-                    print.line("Enter ACR password:");
+                if (!len(trim(local.password))) {
+                    detailOutput.output("Enter ACR password:");
                     local.password = ask(message="", mask="*");
                 }
                 
@@ -160,13 +160,12 @@ component extends="../base" {
                 
             case "ghcr":
                 if (!len(trim(local.username))) {
-                    print.line("Enter GitHub username:");
-                    local.username = ask("");
+                    local.username = ask("Enter GitHub username:");
                 }
-                print.yellowLine("Logging in to GitHub Container Registry...").toConsole();
+                detailOutput.statusInfo("Logging in to GitHub Container Registry...");
                 
                 if (!len(trim(local.password))) {
-                    print.line("Enter Personal Access Token (PAT) with write:packages scope:");
+                    detailOutput.output("Enter Personal Access Token (PAT) with write:packages scope:");
                     local.password = ask(message="", mask="*");
                 }
                 
@@ -190,7 +189,7 @@ component extends="../base" {
                         local.image = deployConfig.image;
                         local.registryUrl = listFirst(local.image, "/");
                     } else {
-                        print.line("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
+                        detailOutput.output("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
                         local.registryUrl = ask(message="");
                         if (!len(trim(local.registryUrl))) {
                              error("Private registry URL is required.");
@@ -200,15 +199,14 @@ component extends="../base" {
 
                 // 2. Resolve Username
                 if (!len(trim(local.username))) {
-                    print.line("Enter registry username:");
-                    local.username = ask("");
+                    local.username = ask("Enter registry username:");
                 }
                 
-                print.yellowLine("Logging in to private registry: #local.registryUrl#").toConsole();
+                detailOutput.statusInfo("Logging in to private registry: #local.registryUrl#");
                 
                 // 3. Resolve Password
                 if (!len(trim(local.password))) {
-                    print.line("Enter registry password:");
+                    detailOutput.output("Enter registry password:");
                     local.password = ask(message="", mask="*");
                 }
                 
@@ -223,7 +221,7 @@ component extends="../base" {
         }
         
         if (arguments.isLocal) {
-            print.greenLine("Login successful").toConsole();
+            detailOutput.statusSuccess("Login successful");
         }
         
         return {
@@ -419,8 +417,7 @@ component extends="../base" {
                 if (structKeyExists(deployConfig, "image") && len(trim(deployConfig.image))) {
                     local.registryUrl = listFirst(deployConfig.image, "/");
                 } else {
-                    print.line("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
-                    local.registryUrl = ask("");
+                    local.registryUrl = ask("Enter Azure ACR Registry URL (e.g. myacr.azurecr.io):");
                     if (!len(trim(local.registryUrl))) {
                         error("Azure ACR requires a registry URL to determine image path.");
                     }
@@ -440,8 +437,7 @@ component extends="../base" {
                 if (structKeyExists(deployConfig, "image") && len(trim(deployConfig.image))) {
                     local.registryUrl = listFirst(deployConfig.image, "/");
                 } else {
-                    print.line("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
-                    local.registryUrl = ask("");
+                    local.registryUrl = ask("Enter Private Registry URL (e.g. 192.168.1.10:5000 or registry.example.com):");
                     if (!len(trim(local.registryUrl))) {
                         error("Private registry requires a registry URL to determine image path.");
                     }
@@ -487,7 +483,7 @@ component extends="../base" {
             if (isNull(local.line)) break;
             arrayAppend(local.outputParts, local.line);
             if (arguments.showOutput) {
-                print.line(local.line).toConsole();
+                detailOutput.output(local.line);
             }
         }
 
@@ -533,7 +529,7 @@ component extends="../base" {
             local.line = local.br.readLine();
             if (isNull(local.line)) break;
             arrayAppend(local.outputParts, local.line);
-            print.line(local.line).toConsole();
+            detailOutput.output(local.line);
         }
 
         local.exitCode = local.proc.waitFor();
@@ -627,7 +623,7 @@ component extends="../base" {
 
     public function testSSHConnection(string host, string user, numeric port) {
         var local = {};
-        print.yellowLine("Testing SSH connection to " & arguments.host & "...").toConsole();
+        detailOutput.statusInfo("Testing SSH connection to " & arguments.host & "...");
         var sshCmd = ["ssh", "-p", arguments.port];
         sshCmd.addAll(getSSHOptions());
         sshCmd.addAll([arguments.user & "@" & arguments.host, "echo connected"]);
@@ -678,7 +674,7 @@ component extends="../base" {
                 var parts = listToArray(line, " " & chr(9), true);
 
                 if (arrayLen(parts) < 2) {
-                    print.yellowLine(" Skipping invalid line #lineNum#: #line#").toConsole();
+                    detailOutput.skip(" Skipping invalid line #lineNum#: #line#");
                     continue;
                 }
 
@@ -699,7 +695,7 @@ component extends="../base" {
                 error("No valid servers found in text file");
             }
 
-            print.greenLine("Loaded #arrayLen(servers)# server(s) from text file").toConsole();
+            detailOutput.statusSuccess("Loaded #arrayLen(servers)# server(s) from text file");
             return servers;
 
         } catch (any e) {
@@ -750,7 +746,7 @@ component extends="../base" {
                 }
             }
 
-            print.greenLine("Loaded #arrayLen(config.servers)# server(s) from config file").toConsole();
+            detailOutput.statusSuccess("Loaded #arrayLen(config.servers)# server(s) from config file");
             return config.servers;
 
         } catch (any e) {

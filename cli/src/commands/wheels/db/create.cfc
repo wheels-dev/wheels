@@ -238,6 +238,44 @@ component extends="../base" {
 			
 			if (!local.driverFound) {
 				detailOutput.error("No " & arguments.dbType & " driver found. Ensure JDBC driver is in classpath.");
+				// Provide database-specific guidance for missing drivers
+				switch (arguments.dbType) {
+					case "Oracle":
+						local.cbHome = getCommandBoxHome();
+						local.libPath = formatLibPath(local.cbHome);
+						detailOutput.divider();
+						detailOutput.statusWarning("Oracle JDBC Driver Installation:");
+						detailOutput.line();
+						detailOutput.output("1. Download the driver from Oracle's official website:");
+						detailOutput.output("   https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html");
+						detailOutput.output("   - Download 'ojdbc11.jar' or 'ojdbc8.jar'");
+						detailOutput.line();
+						
+						if (len(local.cbHome)) {
+							detailOutput.output("2. Place the JAR file in this directory:");
+							detailOutput.output("   #local.libPath#");
+						} else {
+							detailOutput.output("2. Place the JAR file in CommandBox's library directory:");
+							detailOutput.output("   #local.libPath#");
+						}
+						
+						detailOutput.line();
+						detailOutput.output("3. Restart CommandBox completely:");
+						detailOutput.output("   - Close all CommandBox instances (don't just reload)");
+						detailOutput.output("   - This ensures the JDBC driver is properly loaded");
+						detailOutput.line();
+						detailOutput.output("4. Verify installation:");
+						detailOutput.output("   wheels db create datasource=YourDataSourceName");
+						detailOutput.output("   You should see: '[OK] Driver found: oracle.jdbc.OracleDriver'");
+						break;
+						
+					default:
+						detailOutput.statusWarning("Driver installation guidance:");
+						detailOutput.output("1. Restart CommandBox completely");
+						detailOutput.output("2. Check CommandBox lib directory for appropriate JAR files");
+						detailOutput.output("3. Ensure required bundles are installed");
+				}
+				
 				return;
 			}
 			
@@ -271,6 +309,21 @@ component extends="../base" {
 			}
 			
 			detailOutput.statusSuccess("Connected successfully to #arguments.dbType# server!");
+			// For Oracle, check admin privileges before proceeding
+			if (arguments.dbType == "Oracle") {
+				detailOutput.output("Checking Oracle user privileges...");
+				local.privilegeCheck = checkOraclePrivileges(local.conn, local.username);
+
+				if (!local.privilegeCheck.hasRequiredPrivileges) {
+					detailOutput.statusFailed("Oracle user '#local.username#' does not have sufficient admin privileges.");
+					detailOutput.line();
+					detailOutput.statusWarning("Please provide credentials for an Oracle user with required privileges");
+					local.conn.close();
+					return;
+				}
+
+				detailOutput.statusSuccess("Oracle user has required admin privileges.");
+			}
 			
 			// Check if database already exists
 			print.line("Checking if database exists...").toConsole();
@@ -710,17 +763,76 @@ component extends="../base" {
 
 			local.password = ask("Password: ", "", true);  // true for password masking
 
-			// For Oracle, ask for SID
+			// For Oracle, ask for connection type and details
 			if (local.dbType == "Oracle") {
-				local.sid = ask("SID [FREE]: ");
-				if (!len(local.sid)) {
-					local.sid = "FREE";
+				detailOutput.output("Oracle Connection Type:");
+				detailOutput.output("1. SID (System Identifier)");
+				detailOutput.output("2. Service Name");
+				detailOutput.line();
+				
+				local.connectionTypeChoice = ask("Select connection type [1-2]: ");
+				
+				if (local.connectionTypeChoice == "2") {
+					// Service Name
+					local.serviceName = ask("Service Name: ");
+					if (!len(local.serviceName)) {
+						detailOutput.statusWarning("Service Name is required");
+						return {};
+					}
+					local.oracleConnectionType = "servicename";
+					local.oracleIdentifier = local.serviceName;
+				} else {
+					// SID (default)
+					local.sid = ask("SID [FREE]: ");
+					if (!len(local.sid)) {
+						local.sid = "FREE";
+					}
+					local.oracleConnectionType = "sid";
+					local.oracleIdentifier = local.sid;
 				}
 			}
 		}
 
 		// Build connection string
-		local.connectionString = buildConnectionString(local.dbType, local.host, local.port, local.database, local.sid ?: "");
+		local.connectionString = buildConnectionString(
+			local.dbType, 
+			local.host, 
+			local.port, 
+			local.database, 
+			local.sid ?: "", 
+			local.serviceName ?: "", 
+			local.oracleConnectionType ?: "sid"
+		);
+
+		// For Oracle, show admin privilege requirement and get user acknowledgment
+		if (local.dbType == "Oracle") {
+			detailOutput.subHeader("Oracle Admin Privileges Required", 50);
+
+			detailOutput.output("The provided Oracle user must be an ADMIN user.");
+			detailOutput.output("This means the user must have at least one system privilege");
+			detailOutput.output("granted with ADMIN OPTION = YES.");
+			detailOutput.line();
+
+			detailOutput.output("Examples of such users:");
+			detailOutput.output("  - SYSTEM");
+			detailOutput.output("  - Custom DBA users with admin privileges");
+			detailOutput.line();
+
+			detailOutput.output("Normal application users will NOT work.");
+			detailOutput.line();
+
+			local.acknowledgment = ask(
+				"Do you acknowledge that the provided credentials must be an Oracle admin user? [y/n]: "
+			);
+
+			if (local.acknowledgment != "y") {
+				detailOutput.statusWarning("Datasource creation cancelled");
+				return {};
+			}
+
+			detailOutput.statusSuccess("Admin privilege requirement acknowledged.");
+		}
+
 
 		detailOutput.subHeader("Configuration Review", 50);
 		detailOutput.metric("Datasource Name", arguments.datasourceName);
@@ -732,6 +844,14 @@ component extends="../base" {
 		}
 		
 		detailOutput.metric("Database", local.database);
+		
+		if (local.dbType == "Oracle") {
+			if (local.oracleConnectionType == "servicename") {
+				detailOutput.metric("Service Name", local.serviceName);
+			} else {
+				detailOutput.metric("SID", local.sid);
+			}
+		}
 		
 		if (local.dbType != "SQLite") {
 			detailOutput.metric("Username", local.username);
@@ -772,6 +892,8 @@ component extends="../base" {
 					username = local.username,
 					password = local.password,
 					sid = local.sid ?: "",
+					servicename = local.serviceName ?: "",
+					oracleConnectionType = local.oracleConnectionType ?: "sid",
 					skipDatabase = true
 				)
 				.run();
@@ -784,15 +906,27 @@ component extends="../base" {
 		}
 
 		// Return datasource info in the format expected by the rest of the code
-		return {
+		local.result = {
 			driver: local.dbType,
 			database: local.database,
 			host: local.host,
 			port: local.port,
 			username: local.username,
-			password: local.password,
-			sid: local.sid ?: ""
+			password: local.password
 		};
+		
+		// Add Oracle-specific connection information
+		if (local.dbType == "Oracle") {
+			if (local.oracleConnectionType == "servicename") {
+				local.result.servicename = local.serviceName;
+				local.result.oracleConnectionType = "servicename";
+			} else {
+				local.result.sid = local.sid;
+				local.result.oracleConnectionType = "sid";
+			}
+		}
+		
+		return local.result;
 	}
 
 	/**
@@ -873,7 +1007,7 @@ component extends="../base" {
 	/**
 	 * Build connection string
 	 */
-	private string function buildConnectionString(required string dbType, required string host, required string port, required string database, string sid = "") {
+	private string function buildConnectionString(required string dbType, required string host, required string port, required string database, string sid = "", string servicename = "", string oracleConnectionType = "sid") {
 		switch (arguments.dbType) {
 			case "MySQL":
 				return "jdbc:mysql://#arguments.host#:#arguments.port#/#arguments.database#?characterEncoding=UTF-8&serverTimezone=UTC&maxReconnects=3";
@@ -884,7 +1018,11 @@ component extends="../base" {
 			case "MSSQLServer":
 				return "jdbc:sqlserver://#arguments.host#:#arguments.port#;DATABASENAME=#arguments.database#;trustServerCertificate=true;SelectMethod=direct";
 			case "Oracle":
-				return "jdbc:oracle:thin:@#arguments.host#:#arguments.port#:#arguments.sid#";
+				if (arguments.oracleConnectionType == "servicename") {
+					return "jdbc:oracle:thin:@#arguments.host#:#arguments.port#/#arguments.servicename#";
+				} else {
+					return "jdbc:oracle:thin:@#arguments.host#:#arguments.port#:#arguments.sid#";
+				}
 			case "H2":
 				local.appPath = getCWD();
 				return "jdbc:h2:#local.appPath#db/h2/#arguments.database#;MODE=MySQL";
@@ -972,18 +1110,20 @@ component extends="../base" {
 
 				// Call wheels env setup with skipDatabase to avoid infinite loop
 				command("wheels env setup")
-					.params(
-						environment = arguments.environment,
-						dbtype = normalizeDbType(arguments.dbType),
-						datasource = arguments.datasource,
-						database = arguments.dsInfo.database,
-						host = arguments.dsInfo.host ?: "localhost",
-						port = arguments.dsInfo.port ?: "",
-						username = arguments.dsInfo.username ?: "root",
-						password = arguments.dsInfo.password ?: "",
-						sid = arguments.dsInfo.sid ?: "",
-						skipDatabase = true
-					)
+				.params(
+					environment = arguments.environment,
+					dbtype = normalizeDbType(arguments.dbType),
+					datasource = arguments.datasource,
+					database = arguments.dsInfo.database,
+					host = arguments.dsInfo.host ?: "localhost",
+					port = arguments.dsInfo.port ?: "",
+					username = arguments.dsInfo.username ?: "root",
+					password = arguments.dsInfo.password ?: "",
+					sid = arguments.dsInfo.sid ?: "",
+					servicename = arguments.dsInfo.servicename ?: "",
+					oracleConnectionType = arguments.dsInfo.oracleConnectionType ?: "sid",
+					skipDatabase = true
+				)
 					.run();
 
 				detailOutput.statusSuccess("Environment configuration created!");
@@ -1206,8 +1346,14 @@ component extends="../base" {
 		} else if (FindNoCase("driver not found", local.errorMessage) ||
 		           FindNoCase("JDBC driver", local.errorMessage)) {
 			detailOutput.statusFailed("SQLite JDBC driver not found");
-			detailOutput.statusWarning("Ensure org.xerial.sqlite-jdbc is in the classpath");
-			detailOutput.statusWarning("You may need to add the driver to your application server");
+			detailOutput.statusWarning("SQLite requires the org.xerial.sqlite-jdbc driver in the classpath");
+			detailOutput.line();
+			detailOutput.output("SQLite JDBC Driver Installation:");
+			detailOutput.output("1. SQLite driver should be included with CommandBox/Lucee");
+			detailOutput.output("2. If missing, ensure org.xerial.sqlite-jdbc bundle is installed");
+			detailOutput.output("3. Try restarting CommandBox completely");
+			detailOutput.output("4. Check that the driver is in the CommandBox lib directory");
+			detailOutput.line();
 			local.errorHandled = true;
 		} else if (FindNoCase("Failed to create", local.errorMessage)) {
 			detailOutput.statusFailed("Failed to create SQLite database connection");
@@ -1236,6 +1382,92 @@ component extends="../base" {
 
 		// Always throw to propagate the error up
 		throw(message=arguments.e.message, detail=(StructKeyExists(arguments.e, "detail") ? arguments.e.detail : ""));
+	}
+
+	/**
+	 * Check Oracle user privileges for database creation
+	 * Verifies that the user has CREATE USER and GRANT ANY PRIVILEGE
+	 */
+	private struct function checkOraclePrivileges(required any conn, required string username) {
+		local.result = {
+			hasRequiredPrivileges = false,
+			missingPrivileges = []
+		};
+		
+		try {
+			local.stmt = arguments.conn.createStatement();
+			
+			// Query to check user system privileges
+			local.query = "SELECT privilege, admin_option FROM user_sys_privs";
+			local.rs = local.stmt.executeQuery(local.query);
+			
+			local.privilegesWithAdmin = [];
+			while (local.rs.next()) {
+				if (ucase(local.rs.getString("admin_option")) == "YES") {
+					arrayAppend(local.privilegesWithAdmin, ucase(local.rs.getString("privilege")));
+				}
+			}
+			
+			local.rs.close();
+			local.stmt.close();
+
+			// If user has any privileges with ADMIN_OPTION = YES, consider admin
+			if (!arrayIsEmpty(local.privilegesWithAdmin)) {
+				local.result.hasRequiredPrivileges = true;
+			} else {
+				local.result.hasRequiredPrivileges = false;
+				arrayAppend(local.result.missingPrivileges, "No privileges with ADMIN_OPTION = YES found");
+			}
+			
+		} catch (any e) {
+			local.result.hasRequiredPrivileges = false;
+			arrayAppend(local.result.missingPrivileges, "Unable to verify privileges - may lack access to user_sys_privs");
+		}
+
+		return local.result;
+	}
+
+	/**
+	 * Get CommandBox Home directory by running info --json command
+	 * Returns CLIHome path or empty string if not found
+	 */
+	private string function getCommandBoxHome() {
+		local.infoResult = command("info").params(json=true).run(returnOutput=true);
+		local.cleanResult = reReplace(
+			local.infoResult,
+			"\x1B\[[0-9;]*[A-Za-z]",
+			"",
+			"all"
+		);
+
+		local.cleanResult = trim( local.cleanResult );
+		
+		// Parse JSON response to extract CLIHome
+		if (isJSON(local.cleanResult)) {
+			local.infoData = deserializeJSON(local.cleanResult);
+			if (structKeyExists(local.infoData, "CLIHome") && len(local.infoData.CLIHome)) {
+				return local.infoData.CLIHome;
+			}
+		}
+		
+		return "";
+	}
+
+	/**
+	 * Format file path with proper separators for the user's OS
+	 */
+	private string function formatLibPath(required string homeDir) {
+		if (!len(arguments.homeDir)) {
+			return "path/to/CommandBox/lib";
+		}
+		
+		// For Mac/Linux, use forward slashes
+		if (server.os.name contains "mac" || server.os.name contains "linux" || server.os.name contains "unix") {
+			return arguments.homeDir & "/lib";
+		}
+		
+		// For Windows, use backslashes
+		return arguments.homeDir & "\lib";
 	}
 
 	/**

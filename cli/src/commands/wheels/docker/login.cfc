@@ -8,6 +8,8 @@
  */
 component extends="DockerCommand" {
 
+    property name="detailOutput" inject="DetailOutputService@wheels-cli";
+    
     /**
      * @registry Registry type: dockerhub, ecr, gcr, acr, ghcr, private (default: dockerhub)
      * @username Registry username (required for dockerhub, ghcr, private)
@@ -67,9 +69,9 @@ component extends="DockerCommand" {
         try {
             var configPath = fileSystemUtil.resolvePath("docker-config.json");
             fileWrite(configPath, serializeJSON(config));
-            print.greenLine("Configuration saved to docker-config.json").toConsole();
+            detailOutput.statusSuccess("Configuration saved to docker-config.json");
         } catch (any e) {
-            print.yellowLine("Warning: Could not save configuration: #e.message#").toConsole();
+            detailOutput.statusWarning("Warning: Could not save configuration: #e.message#");
         }
     }
 }
