@@ -40,24 +40,37 @@ wheels plugins list
 
 **Output:**
 ```
-===========================================================
-  Installed Wheels Plugins (3)
-===========================================================
+==================================================
+           Installed Wheels Plugins (3)
+==================================================
 
-Plugin Name           Version     Description
----------------------------------------------------------------
-bcrypt                0.0.4       Bcrypt encryption for Wheels
-shortcodes            0.0.4       Shortcode support
-wheels-test           1.0.0       Testing utilities
 
------------------------------------------------------------
+╔══════════════════╤═════════╤════════════════════════════════════════════════════╗
+║ Plugin Name      │ Version │ Description                                        ║
+╠══════════════════╪═════════╪════════════════════════════════════════════════════╣
+║ wheels-api-tools │ 1.0.0   │                                                    ║
+╟──────────────────┼─────────┼────────────────────────────────────────────────────╢
+║ CFWheels bCrypt  │ 1.0.2   │ CFWheels 2.x plugin helper methods for the bCrypt  ║
+╟──────────────────┼─────────┼────────────────────────────────────────────────────╢
+║ wheels-my-helper │ 1.0.0   │                                                    ║
+╚══════════════════╧═════════╧════════════════════════════════════════════════════╝
 
-[OK] 3 plugins installed
+------------------------------------------------------------
 
-Commands:
-  wheels plugin info <name>      View plugin details
-  wheels plugin update:all       Update all plugins
-  wheels plugin outdated         Check for updates
+Total plugins:            3
+Latest plugin:            wheels-api-tools (1.0.0)
+
+
+Commands
+--------------------------------------------------
+  - wheels plugin info <name>      View plugin details
+  - wheels plugin update:all       Update all plugins
+  - wheels plugin outdated         Check for updates
+  - wheels plugin install <name>   Install new plugin
+  - wheels plugin remove <name>    Remove a plugin
+
+[INFO]: Tip
+  Add --format=json for JSON output
 ```
 
 ### List with no plugins installed
@@ -119,6 +132,8 @@ wheels plugins list --available
 ===========================================================
   Available Wheels Plugins on ForgeBox
 ===========================================================
+
+Contacting ForgeBox, please wait...
 
 [Lists all cfwheels-plugins type packages from ForgeBox using 'forgebox show']
 ```

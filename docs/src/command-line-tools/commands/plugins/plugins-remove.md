@@ -70,18 +70,18 @@ wheels plugins remove wheels-testing --force
 ### With confirmation prompt (default)
 ```
 Are you sure you want to remove the plugin 'wheels-vue-cli'? (y/n): y
-[*] Removing plugin: wheels-vue-cli...
+Removing plugin: wheels-vue-cli...
+[SUCCESS]: Plugin removed successfully
 
-[OK] Plugin removed successfully
-Run 'wheels plugins list' to see remaining plugins
+[INFO]: Run 'wheels plugins list' to see remaining plugins
 ```
 
 ### With force flag
 ```
 [*] Removing plugin: wheels-vue-cli...
+[SUCCESS]: Plugin removed successfully
 
-[OK] Plugin removed successfully
-Run 'wheels plugins list' to see remaining plugins
+[INFO]: Run 'wheels plugins list' to see remaining plugins
 ```
 
 ### Plugin not installed
@@ -89,7 +89,7 @@ Run 'wheels plugins list' to see remaining plugins
 Are you sure you want to remove the plugin 'bcrypt'? (y/n): y
 [*] Removing plugin: bcrypt...
 
-[ERROR] Failed to remove plugin: Plugin 'bcrypt' is not installed
+[FAILED]: Failed to remove plugin: Plugin 'wheels-vue-cli' is not installed in plugins folder
 ```
 
 ### Cancellation

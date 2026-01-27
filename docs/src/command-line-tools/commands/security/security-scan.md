@@ -37,6 +37,14 @@ wheels security scan
 🔍 Scanning for security issues...
 
 Scan complete!
+Summary:
+Critical: 11
+High: 107
+
+Security Scan Results
+====================
+Path: C:\Users\Hp\cli_testingapp\db_app\
+Date: 2026-01-26 15:27:46
 
 Summary:
 Critical: 2

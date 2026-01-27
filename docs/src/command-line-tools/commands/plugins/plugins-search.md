@@ -60,26 +60,88 @@ wheels plugin search
 
 **Output:**
 ```
-===========================================================
-  Searching ForgeBox for Wheels Plugins
-===========================================================
+==================================================
+      Searching ForgeBox for Wheels Plugins
+==================================================
 
-Found 5 plugins:
 
-Name                          Version     Downloads   Description
--------------------------------------------------------------------------------
-cfwheels-bcrypt               1.0.2       4393        CFWheels 2.x plugin helper meth...
-shortcodes                    0.0.4       189         Shortcodes Plugin for CFWheels
-cfwheels-authenticateThis     2.0.0       523         Adds bCrypt authentication helpe...
-cfwheels-jwt                  2.1.0       412         CFWheels plugin for encoding and...
-cfwheels-htmx-plugin          1.0.0       678         HTMX Plugin for CFWheels
+Searching, please wait...
 
------------------------------------------------------------
 
-Commands:
-  wheels plugin install <name>    Install a plugin
-  wheels plugin info <name>       View plugin details
-```
+
+Found 25 plugin(s)
+--------------------------------------------------
+
+╔═══════════════════════════════════════╤══════════════════════════════════════╤═════════╤═══════════╤════════════════════════════════════════════════════╗
+║ Name                                  │ Slug                                 │ Version │ Downloads │ Description                                        ║
+╠═══════════════════════════════════════╪══════════════════════════════════════╪═════════╪═══════════╪════════════════════════════════════════════════════╣
+║ CFWheels Models Default Scope         │ defaultScope                         │ 0.0.20  │ 4,804     │ CFWheels 2.1+ Add default scope to models for F... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels bCrypt                       │ cfwheels-bcrypt                      │ 1.0.2   │ 4,788     │ CFWheels 2.x plugin helper methods for the bCry... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels FlashMessages Bootstrap      │ cfwheels-flashmessages-bootstrap     │ 1.0.4   │ 3,965     │ CFWheels 2.0 plugin to add Bootstrap tags to fl... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels JS Confirm                   │ cfwheels-js-confirm                  │ 1.0.5   │ 3,916     │ JS Confirm - CFWheels Plugin                       ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ Datepicker                            │ datepicker                           │ 2.0.6   │ 3,906     │ Datepicker Plugin for CFWheels                     ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels Example Plugin               │ cfwheels-plugin-example              │ 0.0.4   │ 3,804     │ CFWheels Example Plugin                            ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ Shortcodes                            │ shortcodes                           │ 0.0.4   │ 3,700     │ Shortcodes Plugin for CFWheels                     ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ Bens Json Serializer For Wheels       │ cfwheels-bens-json-serializer        │ 0.1.7   │ 3,683     │ Swaps renderWith()'s use of serializeJson() wit... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ UnitTest Fixtures                     │ fixtures                             │ 0.0.9   │ 3,628     │ Use JSON files to lazily initialize (Create and... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels JWT                          │ cfwheels-jwt                         │ 1.0.2   │ 3,535     │ CFWheels plugin for encoding and decoding JSON ... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ UpgradeAdvisor                        │ upgradeadvisor                       │ 0.8.1   │ 3,515     │ CFWheels 2.x Upgrade Advisor                       ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels iCal4j                       │ cfwheels-ical4j                      │ 2.0.0   │ 3,475     │ CFWheels 2.x Plugin Date Repeats Methods via iC... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels HTMX Plugin                  │ cfwheels-htmx-plugin                 │ 1.0.4   │ 3,465     │ HTMX Plugin for CFWheels                           ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels JS Disable                   │ cfwheels-js-disable                  │ 1.1     │ 3,231     │ JS Disable - CFWheels Plugin                       ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ Authenticate This!                    │ cfwheels-authenticateThis            │ 1.0.1   │ 3,114     │ CFWheels 2.x Adds bCrypt authentication helper ... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels LinkToDefaultTitle           │ link-to-default-title                │ 0.0.9   │ 3,107     │ This helper plugin will automatically display t... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels File Bin                     │ cfwheels-filebin                     │ 0.1.0   │ 3,105     │ CFWheels File Bin                                  ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ cfwheels ckEditor plugin              │ cfwheels-ckeditor-plugin             │ 1.0.1   │ 3,087     │ Over-ride the textArea() function                  ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels Model Nesting                │ cfwheels-model-nesting               │ 0.0.5   │ 3,072     │ Model Nesting - fixes cfquery dot notation         ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels SAML                         │ cfwheels-saml                        │ 1.0.0   │ 3,026     │ CFWheels plugin for SAML Single Sign-On            ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels Disable Form Default IDs     │ cfwheels-disable-form-default-id     │ 0.0.2   │ 2,960     │ Disable IDs from being added to form inputs        ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ TitleTag Plugin                       │ cfwheels-titletag-plugin             │ 1.0.2   │ 2,934     │ DRY up your title tags. Allows you to define ea... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ CFWheels DotEnvSettings Plugin        │ cfwheels-dotenvsettings              │ 1.0.0   │ 2,734     │ DotEnvSettings Plugin for CFWheels                 ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ cfwheels Bootstrap Multiselect plugin │ cfwheels-bootstrapmultiselect-plugin │ 1.0     │ 2,596     │ Creates a new function to allow for a multisele... ║
+╟───────────────────────────────────────┼──────────────────────────────────────┼─────────┼───────────┼────────────────────────────────────────────────────╢
+║ wheels I18n                           │ Wheels-i18n                          │ 1.0.0   │ 173       │ Internationalization (i18n) plugin for Wheels      ║
+╚═══════════════════════════════════════╧══════════════════════════════════════╧═════════╧═══════════╧════════════════════════════════════════════════════╝
+
+--------------------------------------------------
+
+Total plugins found:      25
+Sort order:               downloads
+Most popular:             CFWheels Models Default Scope (4,804 downloads)
+
+
+Commands
+--------------------------------------------------
+  - Install: wheels plugin install <name>
+  - Details: wheels plugin info <name>
+  - List installed: wheels plugin list
+
+[INFO]: Tip
+  Add --format=json for JSON output
+  Sort with --orderBy=name,downloads,updated```
 
 ### Search for specific plugin
 
@@ -89,23 +151,42 @@ wheels plugin search bcrypt
 
 **Output:**
 ```
-===========================================================
-  Searching ForgeBox for Wheels Plugins
-===========================================================
+==================================================
+      Searching ForgeBox for Wheels Plugins
+==================================================
 
-Search term: bcrypt
 
-Found 1 plugin:
+Search term:              bcrypt
 
-Name                    Version     Downloads   Description
------------------------------------------------------------------------
-cfwheels-bcrypt         1.0.2       4393        CFWheels 2.x plugin helper meth...
+Searching, please wait...
 
------------------------------------------------------------
 
-Commands:
-  wheels plugin install <name>    Install a plugin
-  wheels plugin info <name>       View plugin details
+
+Found 1 plugin(s)
+--------------------------------------------------
+
+╔═════════════════╤═════════════════╤═════════╤═══════════╤════════════════════════════════════════════════════╗
+║ Name            │ Slug            │ Version │ Downloads │ Description                                        ║
+╠═════════════════╪═════════════════╪═════════╪═══════════╪════════════════════════════════════════════════════╣
+║ CFWheels bCrypt │ cfwheels-bcrypt │ 1.0.2   │ 4,788     │ CFWheels 2.x plugin helper methods for the bCry... ║
+╚═════════════════╧═════════════════╧═════════╧═══════════╧════════════════════════════════════════════════════╝
+
+--------------------------------------------------
+
+Total plugins found:      1
+Sort order:               downloads
+Most popular:             CFWheels bCrypt (4,788 downloads)
+
+
+Commands
+--------------------------------------------------
+  - Install: wheels plugin install <name>
+  - Details: wheels plugin info <name>
+  - List installed: wheels plugin list
+
+[INFO]: Tip
+  Add --format=json for JSON output
+  Sort with --orderBy=name,downloads,updated
 ```
 
 ### No results found
@@ -116,17 +197,23 @@ wheels plugin search nonexistent
 
 **Output:**
 ```
-===========================================================
-  Searching ForgeBox for Wheels Plugins
-===========================================================
+==================================================
+      Searching ForgeBox for Wheels Plugins
+==================================================
 
-Search term: nonexistent
 
-No plugins found matching 'nonexistent'
+Search term:              nonexistent
 
-Try:
-  wheels plugin search <different-keyword>
-  wheels plugin list --available
+Searching, please wait...
+
+
+[WARNING]: No plugins found matching 'nonexistent'
+
+
+Try
+--------------------------------------------------
+  - wheels plugin search <different-keyword>
+  - wheels plugin list --available
 ```
 
 ### Sort by name

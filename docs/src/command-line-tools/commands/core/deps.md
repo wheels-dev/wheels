@@ -126,18 +126,27 @@ The report includes:
 
 Example output:
 ```
-Dependency Report:
+==================================================
+            Wheels Dependency Manager
+==================================================
+
+Generating dependency report...
+==================================================
+                Dependency Report
+==================================================
 
 Generated: 2025-09-19 11:38:44
 Wheels Version: 3.0.0-SNAPSHOT
 CFML Engine: Lucee 5.4.6.9
 
 Dependencies:
+--------------------------------------------------
   cbvalidation @ ^4.6.0+28 - Installed: No
   shortcodes @ ^0.0.4 - Installed: No
   wirebox @ ^7.4.2+24 - Installed: No
 
 Dev Dependencies:
+--------------------------------------------------
   testbox @ ^6.4.0+17 - Installed: Yes
 
 Checking for outdated packages...
@@ -147,9 +156,12 @@ Checking for outdated packages...
 │ testbox@^6.4.. │ 6.4.0+17  │ 6.4.0+17 │ 6.4.0+17 │ /testbox            │
 └────────────────┴───────────┴──────────┴──────────┴─────────────────────┘
 
+Checking for outdated packages...
+
+Checking for outdated dependencies, please wait...
 There are no outdated dependencies!
 
-Full report exported to: dependency-report-20250919-113851.json
+[SUCCESS]: Full report exported to: dependency-report-20250919-113851.json
 ```
 
 ## Integration with CommandBox
