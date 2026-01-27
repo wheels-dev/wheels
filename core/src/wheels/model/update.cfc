@@ -244,15 +244,14 @@ component {
 		$args(name = "update", args = arguments);
 		$setProperties(
 			argumentCollection = arguments,
-			filterList = "properties,parameterize,reload,validate,transaction,callbacks,allowExplicitTimestamps"
+			filterList = "properties,parameterize,reload,validate,transaction,callbacks"
 		);
 		return save(
 			callbacks = arguments.callbacks,
 			parameterize = arguments.parameterize,
 			reload = arguments.reload,
 			transaction = arguments.transaction,
-			validate = arguments.validate,
-			allowExplicitTimestamps = arguments.allowExplicitTimestamps
+			validate = arguments.validate
 		);
 	}
 

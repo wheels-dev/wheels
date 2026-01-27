@@ -27,7 +27,7 @@ component {
 		$args(name = "create", args = arguments);
 		$setProperties(
 			argumentCollection = arguments,
-			filterList = "properties,parameterize,reload,validate,transaction,callbacks,allowExplicitTimestamps"
+			filterList = "properties,parameterize,reload,validate,transaction,callbacks"
 		);
 		local.rv = new (argumentCollection = arguments);
 		local.rv.save(
@@ -172,6 +172,7 @@ component {
 					if (!Len(key())) {
 						local.rollback = true;
 					}
+
 					$create(parameterize = arguments.parameterize, reload = arguments.reload);
 					if (
 						$saveAssociations(argumentCollection = arguments)
@@ -226,6 +227,7 @@ component {
 	public boolean function $create(required any parameterize, required boolean reload) {
 		// Allow explicit assignment of the createdAt/updatedAt properties if allowExplicitTimestamps is true
 		local.allowExplicitTimestamps = StructKeyExists(this, "allowExplicitTimestamps") && this.allowExplicitTimestamps;
+
 		if (
 			local.allowExplicitTimestamps
 			&& StructKeyExists(this, $get("timeStampOnCreateProperty"))
