@@ -27,7 +27,7 @@ component {
 		$args(name = "create", args = arguments);
 		$setProperties(
 			argumentCollection = arguments,
-			filterList = "properties,parameterize,reload,validate,transaction,callbacks,allowExplicitTimestamps"
+			filterList = "properties,parameterize,reload,validate,transaction,callbacks"
 		);
 		local.rv = new (argumentCollection = arguments);
 		local.rv.save(
@@ -35,8 +35,7 @@ component {
 			parameterize = arguments.parameterize,
 			reload = arguments.reload,
 			transaction = arguments.transaction,
-			validate = arguments.validate,
-			allowExplicitTimestamps = arguments.allowExplicitTimestamps
+			validate = arguments.validate
 		);
 		return local.rv;
 	}
@@ -173,7 +172,8 @@ component {
 					if (!Len(key())) {
 						local.rollback = true;
 					}
-					$create(parameterize = arguments.parameterize, reload = arguments.reload, allowExplicitTimestamps = arguments.allowExplicitTimestamps?:false);
+
+					$create(parameterize = arguments.parameterize, reload = arguments.reload);
 					if (
 						$saveAssociations(argumentCollection = arguments)
 						&& $callback("afterCreate", arguments.callbacks)
@@ -199,7 +199,7 @@ component {
 					&& $callback("beforeSave", arguments.callbacks)
 					&& $callback("beforeUpdate", arguments.callbacks)
 				) {
-					$update(parameterize = arguments.parameterize, reload = arguments.reload, allowExplicitTimestamps = arguments.allowExplicitTimestamps?:false);
+					$update(parameterize = arguments.parameterize, reload = arguments.reload);
 					if (
 						$saveAssociations(argumentCollection = arguments)
 						&& $callback("afterUpdate", arguments.callbacks)
@@ -226,7 +226,8 @@ component {
 	 */
 	public boolean function $create(required any parameterize, required boolean reload) {
 		// Allow explicit assignment of the createdAt/updatedAt properties if allowExplicitTimestamps is true
-		local.allowExplicitTimestamps = StructKeyExists(arguments, "allowExplicitTimestamps") && arguments.allowExplicitTimestamps;
+		local.allowExplicitTimestamps = StructKeyExists(this, "allowExplicitTimestamps") && this.allowExplicitTimestamps;
+
 		if (
 			local.allowExplicitTimestamps
 			&& StructKeyExists(this, $get("timeStampOnCreateProperty"))

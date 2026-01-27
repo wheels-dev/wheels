@@ -244,15 +244,14 @@ component {
 		$args(name = "update", args = arguments);
 		$setProperties(
 			argumentCollection = arguments,
-			filterList = "properties,parameterize,reload,validate,transaction,callbacks,allowExplicitTimestamps"
+			filterList = "properties,parameterize,reload,validate,transaction,callbacks"
 		);
 		return save(
 			callbacks = arguments.callbacks,
 			parameterize = arguments.parameterize,
 			reload = arguments.reload,
 			transaction = arguments.transaction,
-			validate = arguments.validate,
-			allowExplicitTimestamps = arguments.allowExplicitTimestamps
+			validate = arguments.validate
 		);
 	}
 
@@ -304,7 +303,7 @@ component {
 		// Perform update if changes have been made.
 		if (hasChanged()) {
 			// Allow explicit assignment of the createdAt/updatedAt properties if allowExplicitTimestamps is true
-			local.allowExplicitTimestamps = StructKeyExists(arguments, "allowExplicitTimestamps") && arguments.allowExplicitTimestamps;
+			local.allowExplicitTimestamps = StructKeyExists(this, "allowExplicitTimestamps") && this.allowExplicitTimestamps;
 			if (
 				local.allowExplicitTimestamps
 				&& StructKeyExists(this, $get("timeStampOnUpdateProperty"))
