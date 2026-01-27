@@ -35,7 +35,8 @@ component {
 			parameterize = arguments.parameterize,
 			reload = arguments.reload,
 			transaction = arguments.transaction,
-			validate = arguments.validate
+			validate = arguments.validate,
+			allowExplicitTimestamps = arguments.allowExplicitTimestamps
 		);
 		return local.rv;
 	}
