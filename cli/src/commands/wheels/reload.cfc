@@ -41,6 +41,7 @@ component aliases='wheels r'  extends="base"  {
 				getURL &= "&password=#password#";
 			} else {
 				detailOutput.error("Reload password is configured but not provided!");
+				return;
 			}
 		} else {
 			// No password configured - check if user provided one unnecessarily
