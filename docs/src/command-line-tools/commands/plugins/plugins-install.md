@@ -64,24 +64,29 @@ wheels plugins install cfwheels-bcrypt
 
 **Output:**
 ```
-===========================================================
-  Installing Plugin
-===========================================================
+==================================================
+                Installing Plugin
+==================================================
 
-Plugin:  cfwheels-bcrypt
-Version: latest
 
-[CommandBox installation output...]
+Plugin:                   cfwheels-bcrypt
+Version:                  latest
 
-===========================================================
+Creating C:\Users\Hp\cli_testingapp\db_app\plugins\/api-tools-1.0.0.zip
+ ------------------------------------------------------------
+Creating C:\Users\Hp\cli_testingapp\db_app\plugins\/my-helper-1.0.0.zip
+ √ | Installing package [forgebox:cfwheels-bcrypt]
+============================================================
 
-[OK] Plugin installed successfully!
+[SUCCESS]: Plugin installed successfully!
 
-Bcrypt encryption support for Wheels
+CFWheels 2.x plugin helper methods for the bCrypt Java Lib
 
-Commands:
-  wheels plugin list          View all installed plugins
-  wheels plugin info cfwheels-bcrypt   View plugin details
+
+Commands
+--------------------------------------------------
+  - wheels plugin list          View all installed plugins
+  - wheels plugin info cfwheels-bcrypt   View plugin details
 ```
 
 ### Install specific version

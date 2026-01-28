@@ -72,20 +72,21 @@ wheels plugin update bcrypt
 
 **Output:**
 ```
-===========================================================
-  Updating Plugin: bcrypt
-===========================================================
+==================================================
+             Updating Plugin: bcrypt
+==================================================
 
-Plugin:          bcrypt
-Current version: 0.0.4
-Latest version:  0.0.4
 
-===========================================================
+Plugin Information
+--------------------------------------------------
+Plugin:                   CFWheels bCrypt
+Current version:          1.0.2
+Latest version:           1.0.2
 
-[OK] Plugin is already at the latest version (0.0.4)
+[SUCCESS]: Plugin is already at the latest version (1.0.2)
 
-Use --force to reinstall anyway:
-  wheels plugin update bcrypt --force
+[INFO]: Use --force to reinstall anyway
+  - wheels plugin update bcrypt --force
 ```
 
 ### Update to specific version

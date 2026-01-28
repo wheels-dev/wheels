@@ -40,7 +40,9 @@ wheels generate snippets --list
 
 Output:
 ```
-Available Snippets
+==================================================
+                Available Snippets
+==================================================
 
 Authentication:
   - login-form - Login form with remember me

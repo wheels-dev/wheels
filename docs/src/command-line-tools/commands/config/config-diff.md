@@ -109,11 +109,13 @@ project_root/
 The table output is organized into clear sections:
 
 ```
-========================================
+==================================================
 Configuration Comparison: development vs production
-========================================
+==================================================
 
-[SETTINGS CONFIGURATION]
+
+ENVIRONMENT VARIABLES
+--------------------------------------------------
 
 Different Values:
 ┌──────────────────────┬────────────┬────────────┐
@@ -147,72 +149,72 @@ Different Values:
 │ DEBUG_MODE   │ true           │ false          │
 └──────────────┴────────────────┴────────────────┘
 
-========================================
-SUMMARY
-========================================
+==================================================
+                     SUMMARY
+==================================================
 Settings:
-  Total: 25
-  Identical: 20
-  Different: 2
-  Unique: 3
+Total: 25
+Identical: 20
+Different: 2
+Unique: 3
 
 Environment Variables:
-  Total: 15
-  Identical: 10
-  Different: 2
-  Unique: 3
+Total: 15
+Identical: 10
+Different: 2
+Unique: 3
 
 Overall:
-  Total configurations: 40
-  Identical: 30
-  Different: 4
-  Unique: 6
-  Similarity: 75%
+Total configurations: 40
+Identical: 30
+Different: 4
+Unique: 6
+Similarity: 75%
 ```
 
 ### JSON Format
 
 ```json
 {
-  "env1": "development",
-  "env2": "production",
-  "comparisons": {
-    "settings": {
-      "identical": [...],
-      "different": [...],
-      "onlyInFirst": [...],
-      "onlyInSecond": [...]
+    "ENV1": "development",
+    "ENV2": "production",
+    "COMPARISONS":{
+        "SETTINGS":{
+            "IDENTICAL":[...],
+            "DIFFERENT":[...],
+            "ONLYINSECOND":[...],
+            "ONLYINFIRST":[...]
+        },
+        "ENV": {
+            "ONLYINSECOND":[...],
+            "DIFFERENT":[...],
+            "IDENTICAL":[...],
+            "ONLYINFIRST":[...]
+        }
     },
-    "env": {
-      "identical": [...],
-      "different": [...],
-      "onlyInFirst": [...],
-      "onlyInSecond": [...]
+    "SUMMARY": {
+        "ENV":{
+            "TOTALVARIABLES":12,
+            "ONLYINSECOND":1,
+            "DIFFERENT":0,
+            "IDENTICAL":0,
+            "ONLYINFIRST":11
+        },
+        "OVERALL":{
+            "UNIQUE":12,
+            "SIMILARITY":14,
+            "DIFFERENT":0,
+            "TOTAL":14,
+            "IDENTICAL":2
+        },
+        "SETTINGS":{
+            "ONLYINSECOND":0,
+            "TOTALSETTINGS":2,
+            "DIFFERENT":0,
+            "IDENTICAL":2,
+            "ONLYINFIRST":0
+        }
     }
-  },
-  "summary": {
-    "settings": {
-      "totalSettings": 25,
-      "identical": 20,
-      "different": 2,
-      "onlyInFirst": 1,
-      "onlyInSecond": 2
-    },
-    "env": {
-      "totalVariables": 15,
-      "identical": 10,
-      "different": 2,
-      "onlyInFirst": 1,
-      "onlyInSecond": 2
-    },
-    "overall": {
-      "total": 40,
-      "identical": 30,
-      "different": 4,
-      "unique": 6,
-      "similarity": 75
-    }
-  }
 }
 ```
 
