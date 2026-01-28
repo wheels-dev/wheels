@@ -90,8 +90,8 @@ component extends="base" {
 		
 		// Helpful Links
 		print.boldGreenLine("Resources");
-		print.cyanLine("  Documentation: https://wheels.dev/docs");
-		print.cyanLine("  API Reference: https://wheels.dev/api");
+		print.cyanLine("  Documentation: https://wheels.dev/guides");
+		print.cyanLine("  API Reference: https://wheels.dev/api/v3.0.0");
 		print.cyanLine("  GitHub: https://github.com/wheels-dev/wheels");
 		print.cyanLine("  Community: https://wheels.dev/community");
 		print.line();
