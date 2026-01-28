@@ -97,21 +97,41 @@ Total settings: 17
 wheels get settings cache
 ```
 ```
-Wheels Settings (development environment):
+==================================================
+    Wheels Settings (development environment)
+==================================================
 
-cacheActions:                   false
-cacheCullInterval:              5
-cacheCullPercentage:            10
-cacheDatabaseSchema:            false
-cacheFileChecking:              false
-cacheImages:                    false
-cacheModelConfig:               false
-cachePages:                     false
-cachePartials:                  false
-cacheQueries:                   true
-cacheRoutes:                    false
 
-Total settings: 11
+╔═══════════════════════╤═══════╗
+║ Setting               │ Value ║
+╠═══════════════════════╪═══════╣
+║ cacheActions          │ false ║
+╟───────────────────────┼───────╢
+║ cacheControllerConfig │ false ║
+╟───────────────────────┼───────╢
+║ cacheCullInterval     │ true  ║
+╟───────────────────────┼───────╢
+║ cacheCullPercentage   │ true  ║
+╟───────────────────────┼───────╢
+║ cacheDatabaseSchema   │ false ║
+╟───────────────────────┼───────╢
+║ cacheFileChecking     │ false ║
+╟───────────────────────┼───────╢
+║ cacheImages           │ false ║
+╟───────────────────────┼───────╢
+║ cacheModelConfig      │ false ║
+╟───────────────────────┼───────╢
+║ cachePages            │ false ║
+╟───────────────────────┼───────╢
+║ cachePartials         │ false ║
+╟───────────────────────┼───────╢
+║ cacheQueries          │ false ║
+╟───────────────────────┼───────╢
+║ cacheRoutes           │ false ║
+╟───────────────────────┼───────╢
+║ cacheViewConfig       │ false ║
+╚═══════════════════════╧═══════╝
+Total settings:           13
 ```
 
 ### Single Setting Display
@@ -119,11 +139,25 @@ Total settings: 11
 wheels get settings dataSourceName
 ```
 ```
-Wheels Settings (production environment):
+==================================================
+    Wheels Settings (development environment)
+==================================================
 
-dataSourceName:                 production_db
 
-Total settings: 1
+╔════════════════╤══════════════╗
+║ Setting        │ Value        ║
+╠════════════════╪══════════════╣
+║ dataSourceName │ wheelstestdb ║
+╚════════════════╧══════════════╝
+
+Total settings:           1
+
+[INFO]: Settings loaded from:
+  - config/settings.cfm (global defaults)
+  - config/development/settings.cfm (environment overrides)
+
+[INFO]: Filtered by: 'dataSourceName'
+  - Showing 1 matching setting(s)
 ```
 
 ### No Matches Found
@@ -131,7 +165,7 @@ Total settings: 1
 wheels get settings nonexistent
 ```
 ```
-No settings found matching 'nonexistent'
+[WARNING]: No settings found matching 'nonexistent'
 ```
 
 ## Common Wheels Settings

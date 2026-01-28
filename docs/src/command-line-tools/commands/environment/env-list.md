@@ -53,25 +53,36 @@ wheels env list --filter=production
 
 ### Basic Output
 ```
-Available Environments
-=====================
+==================================================
+              Available Environments
+==================================================
 
-  NAME          TYPE         DATABASE           STATUS
-  development * Development  wheels_dev         OK Valid
-  testing       Testing      wheels_test        OK Valid
-  staging       Staging      wheels_staging     OK Valid
-  production    Production   wheels_prod        OK Valid
-  qa            Custom       wheels_qa          WARN Invalid
 
-* = Current environment
+╔═════════════╤═════════════╤══════════╤════════════╤════════╤═════════╗
+║ Name        │ Type        │ Database │ Status     │ Active │ DB Type ║
+╠═════════════╪═════════════╪══════════╪════════════╪════════╪═════════╣
+║ development │ Development │ mydb_app │ [OK] Valid │ NO     │ mysql   ║
+╚═════════════╧═════════════╧══════════╧════════════╧════════╧═════════╝
+
+
+Total Environments:       1
+Current Environment:
+[INFO]: * = Currently active environment
+[INFO]: Use 'wheels env list --verbose' for detailed information
 ```
 
 ### Verbose Output
 ```
-Available Environments
-=====================
+==================================================
+              Available Environments
+==================================================
+
+Total Environments:       1
+Current Environment:
+
 
 development * [Active]
+--------------------------------------------------
   Type:        Development
   Database:    wheels_dev
   Datasource:  wheels_development
@@ -81,6 +92,7 @@ development * [Active]
   Modified:    2024-01-10 14:23:45
   
 testing
+--------------------------------------------------
   Type:        Testing
   Database:    wheels_test
   Datasource:  wheels_testing
@@ -90,6 +102,7 @@ testing
   Modified:    2024-01-08 09:15:22
 
 staging
+--------------------------------------------------
   Type:        Staging
   Database:    wheels_staging
   Datasource:  wheels_staging

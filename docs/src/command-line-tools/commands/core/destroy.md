@@ -71,9 +71,9 @@ wheels d user
 
 This will prompt this along with a confirmation:
 ```
-================================================
-= Watch Out!                                   =
-================================================
+==================================================
+                    Watch Out!
+==================================================
 This will delete the associated database table 'users', and
 the following files and directories:
 

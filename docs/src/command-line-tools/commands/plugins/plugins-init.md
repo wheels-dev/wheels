@@ -36,28 +36,26 @@ The `plugin init` command creates a new CFWheels plugin following the standard C
 ### Basic plugin initialization
 
 ```bash
-wheels plugin init my-helper
+wheels plugin init myHelper
 ```
 
 **Output:**
 ```
-===========================================================
-  Initializing Wheels Plugin: wheels-my-helper
-===========================================================
+==================================================
+    Initializing Wheels Plugin: wheels-myHelper
+==================================================
 
 Creating plugin in /plugins/myHelper/...
 
-===========================================================
+[SUCCESS]: Plugin created successfully in /plugins/myHelper/
 
-[OK] Plugin created successfully in /plugins/myHelper/
+[INFO]: Files Created:
+  - myHelper.cfc: Main plugin component
+  - index.cfm: Documentation page
+  - box.json: Package metadata
+  - README.md: Project documentation
 
-Files Created:
-  myHelper.cfc      Main plugin component
-  index.cfm         Documentation page
-  box.json          Package metadata
-  README.md         Project documentation
-
-Next Steps:
+[INFO]: Next Steps:
   1. Edit myHelper.cfc to add your plugin functions
   2. Update index.cfm and README.md with usage examples
   3. Test: wheels reload (then call your functions)
@@ -101,7 +99,7 @@ plugins/
 ### myHelper.cfc (Main Plugin Component)
 
 ```cfml
-component hint="wheels-my-helper" output="false" mixin="global" {
+component hint="wheels-myHelper" output="false" mixin="global" {
 
     public function init() {
         this.version = "1.0.0";
@@ -132,12 +130,12 @@ component hint="wheels-my-helper" output="false" mixin="global" {
 ### index.cfm (Documentation Page)
 
 ```html
-<h1>wheels-my-helper</h1>
+<h1>wheels-myHelper</h1>
 <p>Plugin description</p>
 
 <h3>Installation</h3>
 <pre>
-wheels plugin install wheels-my-helper
+wheels plugin install wheels-myHelper
 </pre>
 
 <h3>Usage</h3>
@@ -152,10 +150,10 @@ result = myHelperExample("test");
 
 ```json
 {
-    "name": "wheels-my-helper",
+    "name": "wheels-myHelper",
     "version": "1.0.0",
     "author": "Your Name",
-    "slug": "wheels-my-helper",
+    "slug": "wheels-myHelper",
     "type": "cfwheels-plugins",
     "keywords": "cfwheels,wheels,plugin",
     "homepage": "",
@@ -169,7 +167,7 @@ result = myHelperExample("test");
 ### 1. Initialize Plugin
 
 ```bash
-wheels plugin init my-helper --author="Your Name"
+wheels plugin init myHelper --author="Your Name"
 ```
 
 ### 2. Add Your Functions
@@ -227,7 +225,7 @@ cd plugins/myHelper
 git init
 git add .
 git commit -m "Initial commit"
-git remote add origin https://github.com/username/wheels-my-helper.git
+git remote add origin https://github.com/username/wheels-myHelper.git
 git push -u origin main
 
 box login

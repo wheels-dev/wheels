@@ -50,22 +50,22 @@ wheels docs serve --root=docs/generated --port=3000
 ## Server Output
 
 ```
-Output directory: D:\Command Box\wheels\templates\base\src\docs\api\
-CommandBox:src> wheels docs serve
+==================================================
+               Documentation Server
+==================================================
+
+Starting documentation server...
  √ | Starting Server
    | √ | Setting site [wheels-docs-BBAA12EF-7A83-4D03-BD6DBFE4AC17C1F9] Profile to [development]
    | √ | Loading CFConfig into server
 
-Status: starting
-Server is still starting... waiting...
-Server is up and running!
-Starting documentation server...
+[SUCCESS]: Documentation server started!
 
-Documentation server started!
-
-Serving: D:\Command Box\wheels\templates\base\src\docs\api\
+Serving directory: D:\Command Box\wheels\templates\base\src\docs\api\
 URL: http://localhost:35729
 Opening browser...
+
+[SUCCESS]: Server is up and running!
 
 Press Ctrl+C to stop the server
 ```

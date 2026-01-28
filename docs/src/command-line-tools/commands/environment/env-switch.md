@@ -84,11 +84,12 @@ wheels env switch production --backup --restart --check
 ## Output Example
 
 ```
-Environment Switch
+==================================================
+                Environment Switch
 ==================================================
 
-Current Environment: development
-Target Environment:  staging
+Current Environment:      development
+Target Environment:       staging
 
 Validating target environment... [OK]
 Creating backup... [OK]
@@ -96,16 +97,17 @@ Creating backup... [OK]
 Switching environment... [OK]
 Updated environment variable... [OK]
 
-==================================================
-[SUCCESS] Environment switched successfully!
+[SUCCESS]: Environment switched successfully!
 
-Environment Details:
-- Environment: staging
-- Database:    wheels_staging
-- Debug Mode:  Enabled
-- Cache:       Partial
 
-IMPORTANT:
+Environment Details
+--------------------------------------------------
+Current Environment:      production
+Target Environment:       staging
+Debug Mode:               Enabled
+Cache:                    Partial
+
+[INFO]: IMPORTANT
 - Restart your application server for changes to take effect
 - Run 'wheels reload' if using Wheels development server
 - Or use 'wheels env switch staging --restart' next time

@@ -121,12 +121,16 @@ Identifies common placeholder values in sensitive variables:
 
 ### Successful Validation
 ```
-Validating: .env
+==================================================
+                 Validating: .env
+==================================================
 
-Summary:
-  Total variables: 12
 
-Validation passed with no issues!
+Summary
+--------------------------------------------------
+Total variables:          4
+
+[SUCCESS]: Validation passed with no issues!
 ```
 
 ### Validation with Warnings
@@ -145,48 +149,55 @@ Validation passed with 2 warnings
 
 ### Validation with Errors
 ```
-Validating: .env.production
+==================================================
+                 Validating: .env
+==================================================
 
-Errors found:
-  Line 3: Invalid format (missing '='): DB_HOST localhost
-  Required key missing: 'API_KEY'
-  Line 8: Empty key name
+[FAILED]: Errors found:
+  - Required key missing: 'DB_HOST'
+  - Required key missing: 'API_KEY'
 
-Warnings:
-  Line 10: Duplicate key: 'DB_PORT' (previous value will be overwritten)
 
-Summary:
-  Total variables: 6
+Summary
+--------------------------------------------------
+Total variables:          4
 
-Validation failed with 3 errors
+[FAILED]: Validation failed with 2 errors
 ```
 
 ### Verbose Output
 ```
-Validating: .env
+==================================================
+                 Validating: .env
+==================================================
 
-Summary:
-  Total variables: 10
+Summary
+--------------------------------------------------
+Total variables:          4
+
 
 Environment Variables:
+--------------------------------------------------
 
-  DB:
-    DB_HOST = localhost
-    DB_NAME = myapp
-    DB_PASSWORD = ***MASKED***
-    DB_PORT = 3306
-    DB_USER = admin
+wheels:
+  - wheels_env = development
 
-  API:
-    API_BASE_URL = https://api.example.com
-    API_KEY = ***MASKED***
-    API_TIMEOUT = 30
+DB:
+  - DB_USER = root
+  - DB_NAME = myapp
+  - DB_PORT = 3306
+ 
 
-  Other:
-    APP_NAME = My Application
-    WHEELS_ENV = development
+API:
+  -  API_BASE_URL = https://api.example.com
+  -  API_KEY = ***MASKED***
+   - API_TIMEOUT = 30
 
-Validation passed with no issues!
+Other:
+  - APP_NAME = My Application
+  - WHEELS_ENV = development
+
+[SUCCESS]: Validation passed with no issues!
 ```
 
 ## Error Types and Solutions

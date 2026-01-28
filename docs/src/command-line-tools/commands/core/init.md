@@ -38,7 +38,9 @@ wheels init
 
 Example interaction:
 ```
-==================================== Wheels init ===================================
+==================================================
+                   Wheels init
+==================================================
  This function will attempt to add a few things
  to an EXISTING Wheels installation to help
  the CLI interact.
@@ -50,10 +52,10 @@ Example interaction:
  We're going to try and do the following:
   - create a box.json to help keep track of the wheels version
   - create a server.json
-====================================================================================
+--------------------------------------------------
 
 Sound ok? [y/n] y
-Please enter an application name: myapp
+Please enter an application name (we use this to make the server.json servername unique): myapp
 Please enter a default cfengine: lucee5
 ```
 

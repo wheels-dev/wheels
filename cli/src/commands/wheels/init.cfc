@@ -64,7 +64,7 @@ component  extends="base"  {
 
 		// Create a server.json if one doesn't exist
 		if(!fileExists(serverJsonLocation)){
-			var appName       = ask( message = "Please enter an application name: we use this to make the server.json servername unique: ", defaultResponse = 'myapp');
+			var appName       = ask( message = "Please enter an application name (we use this to make the server.json servername unique): ", defaultResponse = 'myapp');
 				appName 	  = helpers.stripSpecialChars(appName);
 			var setEngine     = ask( message = 'Please enter a default cfengine: ', defaultResponse = 'lucee@6' );
 
@@ -84,7 +84,7 @@ component  extends="base"  {
 		// Create a box.json if one doesn't exist
 		if(!fileExists(boxJsonLocation)){
 			if(!isDefined("appName")) {
-				var appName = ask("Please enter an application name: we use this to make the box.json servername unique: ");
+				var appName = ask("Please enter an application name (we use this to make the box.json servername unique): ");
 				appName 	  = helpers.stripSpecialChars(appName);
 			}
 			var boxJSON = fileRead( getTemplate('/BoxJSON.txt' ) );

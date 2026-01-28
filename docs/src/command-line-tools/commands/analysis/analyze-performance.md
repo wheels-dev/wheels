@@ -101,7 +101,7 @@ Target: all
 Threshold: 100ms
 
 [====================] 100% Complete!
-
+Profiling mode disabled
 ==================================================
        PERFORMANCE ANALYSIS COMPLETE
 ==================================================
