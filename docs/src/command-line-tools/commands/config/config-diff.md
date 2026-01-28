@@ -180,6 +180,7 @@ Similarity: 75%
     "ENV2": "production",
     "COMPARISONS":{
         "SETTINGS":{
+            "IDENTICAL":[...],
             "DIFFERENT":[...],
             "ONLYINSECOND":[...],
             "ONLYINFIRST":[...]
