@@ -131,7 +131,8 @@ component aliases='wheels g model' extends="../base" {
                             name = arguments.name,
                             properties = parsedProperties,
                             baseDirectory = getCWD(),
-                            tableName = arguments.tableName
+                            tableName = arguments.tableName,
+                            primaryKey = arguments.primaryKey
                         );
                     } else {
                         var actualTableName = len(arguments.tableName) ? arguments.tableName : helpers.pluralize(lCase(arguments.name));
@@ -176,7 +177,13 @@ component aliases='wheels g model' extends="../base" {
         var properties = [];
 
         if (len(arguments.propertiesString)) {
-            var propList = listToArray(arguments.propertiesString);
+            var propList = listToArray(trim(arguments.propertiesString));
+            // Remove empty elements and trim each property
+            propList = propList.map(function(prop) {
+                return trim(prop);
+            }).filter(function(prop) {
+                return len(prop) > 0;
+            });
 
             for (var prop in propList) {
                 var parts = listToArray(prop, ":");
