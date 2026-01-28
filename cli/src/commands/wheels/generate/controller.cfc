@@ -56,7 +56,13 @@ component aliases="wheels g controller" extends="../base" {
 
         if (hasCustomActions) {
             // HIGHEST PRIORITY: Custom actions specified
-            actionList = listToArray(arguments.actions);
+            actionList = listToArray(trim(arguments.actions));
+            // Remove empty elements and trim each action
+            actionList = actionList.map(function(action) {
+                return trim(action);
+            }).filter(function(action) {
+                return len(action) > 0;
+            });
         } else if (arguments.crud) {
             if (arguments.api) {
                 // API: No form actions (new, edit)

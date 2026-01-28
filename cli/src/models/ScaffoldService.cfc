@@ -212,7 +212,8 @@ component {
         required string name,
         required array properties,
         string baseDirectory = "",
-        string tableName = ""
+        string tableName = "",
+        string primaryKey = "id"
     ) {
         var timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
         var actualTableName = len(arguments.tableName) ? arguments.tableName : variables.helpers.pluralize(lCase(arguments.name));
@@ -231,7 +232,8 @@ component {
         var content = generateMigrationContentWithProperties(
             className = className,
             tableName = actualTableName,
-            properties = arguments.properties
+            properties = arguments.properties,
+            primaryKey = arguments.primaryKey
         );
         
         // Write migration file
@@ -246,7 +248,8 @@ component {
     private function generateMigrationContentWithProperties(
         required string className,
         required string tableName,
-        required array properties
+        required array properties,
+        string primaryKey = "id"
     ) {
         var content = '/*' & chr(10);
         content &= '  |----------------------------------------------------------------------------------------------|' & chr(10);
@@ -270,7 +273,7 @@ component {
         content &= '	function up() {' & chr(10);
         content &= '		transaction {' & chr(10);
         content &= '			try {' & chr(10);
-        content &= '				t = createTable(name = ''#arguments.tableName#'', force=''false'', id=''true'', primaryKey=''id'');' & chr(10);
+        content &= '				t = createTable(name = ''#arguments.tableName#'', force=''false'', id=''true'', primaryKey=''#arguments.primaryKey#'');' & chr(10);
         
         // Add properties (skip association properties that don't have database columns)
         for (var prop in arguments.properties) {
