@@ -67,7 +67,10 @@ Commands for generating application code and resources.
 - **`wheels generate test`** - Generate tests
   [Documentation](generate/test.md)
 
-- **`wheels generate snippets`** - Code snippets
+- **`wheels generate code`** - Code snippets
+  [Documentation](generate/code.md)
+
+- **`wheels generate snippets`** - Snippets Template
   [Documentation](generate/snippets.md)
 
 - **`wheels generate scaffold`** - Complete CRUD
