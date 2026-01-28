@@ -74,10 +74,18 @@ wheels db drop --datasource=sqlite_app
 
 Output:
 ```
-[WARN] WARNING: This will permanently drop the database!
-Are you sure you want to drop the database 'D:\MyApp\db\myapp_dev.db'? Type 'yes' to confirm: yes
+==================================================
+              Database Drop Process
+==================================================
+[WARNING]: This will permanently drop the database!
 
-[OK] SQLite database dropped successfully!
+Datasource:               db_app
+Environment:              development
+--------------------------------------------------
+Database Type:            H2
+Database Name:            mydb_app
+--------------------------------------------------
+Are you sure you want to drop the database 'mydb_app'? Type 'yes' to confirm:
 ```
 
 If server is running, it will automatically stop and retry:

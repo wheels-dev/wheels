@@ -151,41 +151,30 @@ component extends="Controller" {
 ## Output Example
 
 ```
-Documentation Generator
+==================================================
+             Documentation Generator
 ==================================================
 
 Generating documentation...
 
-Scanning source files...
-[OK] Found 1 models
-[OK] Found 1 controllers
+      create  directory public/api-docs
 
-Writing documentation... [OK] HTML files generated
+Scanning Source Files
+--------------------------------------------------
+[SUCCESS]: Found 1 models
+[SUCCESS]: Found 4 controllers
 
-==================================================
-[SUCCESS] Documentation generated successfully!
+Writing documentation...
+[SUCCESS]: HTML files generated
 
-Summary:
-  - Models: 1 files
-  - Controllers: 1 files
-  - Total: 2 components documented
-
-Output directory: C:\path\to\docs\api\
-```
-
-## Documentation Features
-
-### Auto-generated Content
-- Class hierarchies and inheritance
-- Method signatures and parameters
-- Property types and defaults
-- Relationship diagrams
-- Route mappings
-- Database ERD
+[SUCCESS]: Documentation generated successfully!
 
 
-## Notes
+Summary
+--------------------------------------------------
+Models:                   1 files
+Controllers:              4 files
+Total Components:         5 documented
 
-- Documentation is generated from code comments
-- Use consistent JavaDoc format for best results
-- Private methods are excluded by default
+[INFO]: Output directory: C:\Users\Hp\cli_testingapp\db_app\public\api-docs
+

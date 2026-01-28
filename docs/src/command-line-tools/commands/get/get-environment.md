@@ -28,10 +28,16 @@ wheels get environment
 
 This will output something like:
 ```
-Current Environment:
-development
+==================================================
+         Current Environment: development
+==================================================
 
-Configured in: .env file (WHEELS_ENV)
+Configured in:            Using default
+
+To set an environment:
+  - wheels env set environment_name
+  - wheels env switch environment_name
+  - Set WHEELS_ENV in .env file
 ```
 
 ## How It Works
@@ -183,7 +189,7 @@ The command will show an error if:
 
 ### Not a Wheels Application
 ```
-Error: This command must be run from a Wheels application directory
+Error: This command must be run from a Wheels application root directory
 ```
 
 ### Read Error

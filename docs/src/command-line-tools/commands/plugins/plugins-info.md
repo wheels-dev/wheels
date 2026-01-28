@@ -52,7 +52,9 @@ wheels plugins info wheels-core
   Plugin Information: wheels-core
 ===========================================================
 
-Status:
+
+Status
+--------------------------------------------------
   [OK] Installed locally
 
 Wheels Core
@@ -71,9 +73,10 @@ Links:
   Docs:        https://wheels.dev/docs
   Issues:      https://github.com/wheels-dev/wheels/issues
 
-Commands:
-  Update:  wheels plugin update wheels-core
-  Search:  wheels plugin search
+Commands
+--------------------------------------------------
+  - Update:  wheels plugin update wheels-core
+  - Search:  wheels plugin search
 ```
 
 ### Check plugin not installed
@@ -83,18 +86,30 @@ wheels plugins info wheels-vue-cli
 
 **Output:**
 ```
-===========================================================
-  Plugin Information: wheels-vue-cli
-===========================================================
+==================================================
+        Plugin Information: wheels-vue-cli
+==================================================
 
-Status:
-  [X] Not installed
 
-[ForgeBox package information displayed]
 
-Commands:
-  Install: wheels plugin install wheels-vue-cli
-  Search:  wheels plugin search
+Status
+--------------------------------------------------
+[WARNING]: Not installed
+
+[FAILED]: Plugin Not Found
+
+The plugin 'wheels-vue-cli' was not found in:
+  - Local installation (box.json dependencies)
+  - ForgeBox repository
+
+[INFO]: Possible reasons
+  - Plugin name may be misspelled
+  - Plugin may not exist on ForgeBox
+  - Network connection issues
+
+[INFO]: Suggestions
+  - Search for available plugins: wheels plugin list --available
+  - Verify the correct plugin name
 ```
 
 ### Plugin not found anywhere
@@ -104,27 +119,30 @@ wheels plugins info nonexistent-plugin
 
 **Output:**
 ```
-===========================================================
-  Plugin Information: nonexistent-plugin
-===========================================================
+==================================================
+      Plugin Information: nonexistent-plugin
+==================================================
 
-Status:
-  [X] Not installed
 
-Plugin Not Installed
+
+Status
+--------------------------------------------------
+[WARNING]: Not installed
+
+[FAILED]: Plugin Not Found
 
 The plugin 'nonexistent-plugin' was not found in:
- Local installation (box.json dependencies)
- ForgeBox repository
+  - Local installation (box.json dependencies)
+  - ForgeBox repository
 
-Possible reasons:
- Plugin name may be misspelled
- Plugin may not exist on ForgeBox
- Network connection issues
+[INFO]: Possible reasons
+  - Plugin name may be misspelled
+  - Plugin may not exist on ForgeBox
+  - Network connection issues
 
-Suggestions:
- Search for available plugins: wheels plugin list --available
- Verify the correct plugin name
+[INFO]: Suggestions
+  - Search for available plugins: wheels plugin list --available
+  - Verify the correct plugin name
 ```
 
 ## How It Works

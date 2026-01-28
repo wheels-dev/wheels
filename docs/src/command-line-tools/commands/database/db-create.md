@@ -177,27 +177,27 @@ wheels db create --dbtype=mysql --database=myapp_dev --force
 
 **Output Example:**
 ```
-==================================================================
-  Database Creation Process
-==================================================================
+==================================================
+                Database Creation
+==================================================
   Datasource:         myapp_dev
   Environment:        development
-------------------------------------------------------------------
+--------------------------------------------------
   Database Type:      MySQL
   Database Name:      myapp_dev
-------------------------------------------------------------------
-
->> Initializing MySQL database creation...
-  [OK] Driver found: com.mysql.cj.jdbc.Driver
-  [OK] Connected successfully to MySQL server!
-
->> Creating MySQL database 'myapp_dev'...
-  [OK] Database 'myapp_dev' created successfully!
-
->> Verifying database creation...
-  [OK] Database 'myapp_dev' verified successfully!
-------------------------------------------------------------------
-  [OK] MySQL database creation completed successfully!
+--------------------------------------------------
+Initializing MySQL database creation...
+Connecting to MySQL server...
+[SUCCESS]: Driver found: com.mysql.cj.jdbc.Driver
+[SUCCESS]: Connected successfully to MySQL server!
+Checking if database exists...
+Creating MySQL database 'myapp_dev'...
+[SUCCESS]: Database 'myapp_dev' created successfully!
+Verifying database creation...
+[SUCCESS]: Database 'myapp_dev' verified successfully!
+--------------------------------------------------
+MySQL database creation completed successfully!
+Writing datasource to app.cfm...
 ```
 
 ---
@@ -330,10 +330,13 @@ If the specified datasource doesn't exist, the command will prompt you to create
 Datasource 'myapp_dev' not found in server configuration.
 
 Would you like to create this datasource now? [y/n]: y
+==================================================
+         Interactive Datasource Creation
+==================================================
 
-=== Interactive Datasource Creation ===
 
-Select database type:
+Supported Database Types
+--------------------------------------------------
   1. MySQL
   2. PostgreSQL
   3. SQL Server (MSSQL)
@@ -342,16 +345,18 @@ Select database type:
   6. SQLite
 
 Select database type [1-6]: 1
-Selected: MySQL
+[SUCCESS]: Selected: MySQL
 
-Enter connection details:
+Connection Details
+--------------------------------------------------
 Host [localhost]:
 Port [3306]:
 Database name [wheels_dev]: myapp_dev
 Username [root]:
 Password: ****
 
-Review datasource configuration:
+Configuration Review
+--------------------------------------------------
   Datasource Name: myapp_dev
   Database Type: MySQL
   Host: localhost

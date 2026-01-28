@@ -74,43 +74,31 @@ wheels env show --key=API_KEY
 The table format groups variables by prefix and displays them in an organized, readable way:
 
 ```
-Environment Variables Viewer
+==================================================
+           Environment Variables Viewer
+==================================================
 
-Environment Variables from .env:
 
-╔════════╤══════════════════════════╤═══════════════════════════╗
-║ Source │ Variable                 │ Value                     ║
-╠════════╪══════════════════════════╪═══════════════════════════╣
-║ .env   │ DB_HOST                  │ localhost                 ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ DB_NAME                  │ myapp                     ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ DB_PASSWORD              │ ********                  ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ DB_PORT                  │ 3306                      ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ DB_USER                  │ wheels                    ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ API_BASE_URL             │ https://api.example.com   ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ API_KEY                  │ ********                  ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ API_TIMEOUT              │ 30                        ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ WHEELS_ENV               │ development               ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ WHEELS_RELOAD_PASSWORD   │ ********                  ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ APP_NAME                 │ My Application            ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ DEBUG_MODE               │ true                      ║
-╟────────┼──────────────────────────┼───────────────────────────╢
-║ .env   │ PORT                     │ 3000                      ║
-╚════════╧══════════════════════════╧═══════════════════════════╝
+Environment Variables from .env
+--------------------------------------------------
+╔════════════╤═════════════╤════════╗
+║ Variable   │ Value       │ Source ║
+╠════════════╪═════════════╪════════╣
+║ DB_NAME    │ myapp       │ .env   ║
+╟────────────┼─────────────┼────────╢
+║ DB_PORT    │ 3306        │ .env   ║
+╟────────────┼─────────────┼────────╢
+║ DB_USER    │ root        │ .env   ║
+╟────────────┼─────────────┼────────╢
+║ wheels_env │ development │ .env   ║
+╚════════════╧═════════════╧════════╝
 
-Tip: Access these in your app with application.env['KEY_NAME']
-Or use them in config files: set(dataSourceName=application.env['DB_NAME'])
-Wheels automatically loads .env on application start
+Total variables:          4
+[INFO]: Usage tips:
+  - Access in app: application.env['VARIABLE_NAME']
+  - Use in config: set(value=application.env['VARIABLE_NAME'])
+  - Wheels loads .env automatically on app start
+  - Update: wheels env set KEY=VALUE
 ```
 
 ### JSON Format
@@ -195,30 +183,50 @@ If the specified `.env` file doesn't exist, you'll see helpful guidance:
 No .env file found in project root
 
 Create a .env file with key=value pairs, for example:
+--------------------------------------------------
 
-## Database Configuration
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=myapp
-DB_USER=wheels
-DB_PASSWORD=secret
 
-## Application Settings
-WHEELS_ENV=development
-WHEELS_RELOAD_PASSWORD=mypassword
+[INFO]: Use 'wheels env set KEY=VALUE' to create environment variables
+╔══════════════╤══════════════════════════╤═════════════╗
+║ Source       │ Variable                 │ Value       ║
+╠══════════════╪══════════════════════════╪═════════════╣
+║              │ # Database Configuration │             ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║ .env.example │ DB_HOST                  │ localhost   ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║ .env.example │ DB_PORT                  │ 3306        ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║ .env.example │ DB_NAME                  │ myapp       ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║ .env.example │ DB_USER                  │ wheels      ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║ .env.example │ DB_PASSWORD              │ secret      ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║              │ # Application Settings   │             ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║ .env.example │ WHEELS_ENV               │ development ║
+╟──────────────┼──────────────────────────┼─────────────╢
+║ .env.example │ WHEELS_RELOAD_PASSWORD   │ mypassword  ║
+╚══════════════╧══════════════════════════╧═════════════╝
 ```
 
 ### Key Not Found
 When requesting a specific key that doesn't exist:
 ```
-Environment variable 'MISSING_KEY' not found
+[WARNING]: Environment variable 'API_BASE_URL' not found in .env
 
-Available keys in .env:
-  - API_KEY
-  - DB_HOST
-  - DB_NAME
-  - DEBUG_MODE
-  - WHEELS_ENV
+
+Available Variables in .env
+--------------------------------------------------
+╔═══════════════╤═════════════════════╗
+║ Current Value │ Available Variables ║
+╠═══════════════╪═════════════════════╣
+║ myapp         │ DB_NAME             ║
+╟───────────────┼─────────────────────╢
+║ 3306          │ DB_PORT             ║
+╟───────────────┼─────────────────────╢
+║ root          │ DB_USER             ║
+╚═══════════════╧═════════════════════╝
 ```
 
 ## Common Use Cases
