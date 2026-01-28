@@ -287,17 +287,17 @@ result = #functionList[1]#("some input");
     
     private string function generateHighlightFunction() {
         var content = chr(9) & chr(9) & "// Highlight search terms in text" & chr(10);
-        content &= chr(9) & chr(9) & "local.searchTerm = arguments.options.term ?: """";" & chr(10);
+        content &= chr(9) & chr(9) & "local.term = arguments.options.term ?: """";" & chr(10);
         content &= chr(9) & chr(9) & "local.highlightClass = arguments.options.class ?: ""highlight"";" & chr(10);
         content &= chr(10);
-        content &= chr(9) & chr(9) & "if (!len(local.searchTerm)) {" & chr(10);
+        content &= chr(9) & chr(9) & "if (!len(local.term)) {" & chr(10);
         content &= chr(9) & chr(9) & chr(9) & "return arguments.value;" & chr(10);
         content &= chr(9) & chr(9) & "}" & chr(10);
         content &= chr(10);
         content &= chr(9) & chr(9) & "return reReplaceNoCase(" & chr(10);
         content &= chr(9) & chr(9) & chr(9) & "arguments.value," & chr(10);
-        content &= chr(9) & chr(9) & chr(9) & """(#local.searchTerm#)""," & chr(10);
-        content &= chr(9) & chr(9) & chr(9) & """<span class=\""#local.highlightClass#\"">\\1</span>""," & chr(10);
+        content &= chr(9) & chr(9) & chr(9) & """('' & local.term & '')""," & chr(10);
+        content &= chr(9) & chr(9) & chr(9) & """<span class=''' & local.highlightClass & '''>\\1</span>""," & chr(10);
         content &= chr(9) & chr(9) & chr(9) & """all""" & chr(10);
         content &= chr(9) & chr(9) & ");" & chr(10);
         return content;
