@@ -43,11 +43,11 @@ component aliases="wheels g app" extends="../base" {
 
     // Map these shortcut names to the actual ForgeBox slugs
     variables.templateMap = {
-      'Base'        : 'wheels-base-template@BE',
-      'Base@BE'     : 'wheels-base-template@BE',
-      'HelloWorld'  : 'cfwheels-template-helloworld',
-      'HelloDynamic': 'cfwheels-template-hellodynamic',
-      'HelloPages'  : 'cfwheels-template-hellopages'
+      'WheelsBaseTemplate'        : 'wheels-base-template@^3.0.0',
+      'BleedingEdge'              : 'wheels-base-template@BE',
+      'WheelsTemplateHTMX'        : 'cfwheels-template-htmx-alpine-simple',
+      'WheelsStarterApp'          : 'wheels-starter-app',
+      'WheelsTodoMVCHTMX'         : 'cfwheels-todomvc-htmx'
     };
 
     return this;
@@ -68,7 +68,7 @@ component aliases="wheels g app" extends="../base" {
    **/
   function run(
     name     = 'MyApp',
-    template = 'wheels-base-template@BE',
+    template = 'wheels-base-template@^3.0.0',
     directory,
     reloadPassword = '',
     datasourceName,
