@@ -16,7 +16,7 @@ wheels g app [name] [template] [directory] [options]
 This command supports multiple parameter formats:
 
 - **Positional parameters**: `wheels generate app blog` (most common)
-- **Named parameters**: `name=value` (e.g., `name=blog`, `template=HelloWorld`)
+- **Named parameters**: `name=value` (e.g., `name=blog`, `template=WheelsBaseTemplate`)
 - **Flag parameters**: `--flag` equals `flag=true` (e.g., `--useBootstrap` equals `useBootstrap=true`)
 
 **Parameter Mixing Rules:**
@@ -24,7 +24,7 @@ This command supports multiple parameter formats:
 **ALLOWED:**
 - All positional: `wheels generate app blog`
 - All positional + flags: `wheels generate app blog --useBootstrap --init`
-- All named: `name=blog template=HelloWorld --useBootstrap`
+- All named: `name=blog template=WheelsBaseTemplate --useBootstrap`
 
 **NOT ALLOWED:**
 - Positional + named: `wheels generate app blog name=myapp` (causes error)
@@ -40,7 +40,7 @@ The `wheels generate app` command creates a new Wheels application with a comple
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `name` | Application name | `MyApp` |
-| `template` | Template to use | `wheels-base-template@BE` |
+| `template` | Template to use | `wheels-base-template@^3.0.0` |
 | `directory` | Target directory | `./{name}` |
 
 ## Options
@@ -57,38 +57,54 @@ The `wheels generate app` command creates a new Wheels application with a comple
 
 ## Available Templates
 
-### wheels-base-template@BE (Default)
+### wheels-base-template@^3.0.0 (stable)
 ```bash
 wheels generate app myapp
+```
+- Backend Edition default template
+- Complete MVC structure with proven, production-ready defaults
+- Sample code with minimal, predictable configuration
+- H2 database setup by default
+
+### BleedingEdge
+```bash
+wheels generate app myapp BleedingEdge
 ```
 - Backend Edition template
 - Complete MVC structure
 - Sample code and configuration
 - H2 database setup by default
 
-### HelloWorld
+### WheelsStarterApp
 ```bash
-wheels generate app myapp HelloWorld
+wheels generate app myapp WheelsStarterApp
 ```
-- Simple "Hello World" example
-- One controller and view
-- Great for learning
+- Starter user management and authentication application built with Wheels 3.0
+- Demonstrates best practices for security, conventions, and MVC architecture
+- Full authentication & authorization flow (registration, verification, RBAC, admin panel)
+- Built-in security features: CSRF protection, audit logging, bcrypt passwords, role checks
+- Modern, responsive UI using Bootstrap with Wheels helpers
+- Multi-database support with easy setup via CommandBox (MySQL, PostgreSQL, MSSQL, Oracle, H2)
 
-### HelloDynamic
+### WheelsTemplateHTMX
 ```bash
-wheels generate app myapp HelloDynamic
+wheels generate app myapp WheelsTemplateHTMX
 ```
-- Dynamic content example
-- Database interaction
-- Form handling
+- Blank starter application for Wheels
+- Full MVC structure pre-configured
+- htmx integrated for server-side AJAX interactions
+- Alpine.js included for lightweight client-side interactivity
+- simple.css bundled for clean, minimal styling
+- Ready-to-extend layout with sample configuration
 
-### HelloPages
+### WheelsTodoMVCHTMX
 ```bash
-wheels generate app myapp HelloPages
+wheels generate app myapp WheelsTodoMVCHTMX
 ```
-- Static pages example
-- Layout system
-- Navigation structure
+- Reference TodoMVC implementation built with CFWheels
+- Uses HTMX for server-driven interactivity
+- Demonstrates real-world MVC and CRUD patterns
+- Quick setup using CommandBox, CFWheels CLI, and H2
 
 ## Examples
 

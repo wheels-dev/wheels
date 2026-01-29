@@ -33,7 +33,7 @@ The `wheels generate app-wizard` command provides an interactive, step-by-step w
 | `directory` | Directory to create app in | Valid directory path | `{current directory}/{name}` |
 | `reloadPassword` | Reload password for the app | Any string | `changeMe` |
 | `datasourceName` | Database datasource name | Valid datasource name | `{app name}` |
-| `cfmlEngine` | CFML engine for server.json | `lucee`, `adobe`, `lucee6`, `lucee5`, `adobe2023`, etc. | `lucee` |
+| `cfmlEngine` | CFML engine for server.json | `lucee5, lucee6, lucee7`, `adobe2018`, `adobe2021`, `adobe2023`, `adobe2025`, `boxlang`, etc. | `lucee` |
 | `useBootstrap` | Add Bootstrap to the app | `true`, `false` | `false` |
 | `setupH2` | Setup H2 database for development | `true`, `false` | `true` |
 | `init` | Initialize directory as a package | `true`, `false` | `false` |

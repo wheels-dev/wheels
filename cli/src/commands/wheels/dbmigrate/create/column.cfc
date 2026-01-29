@@ -50,7 +50,7 @@
 		arguments = reconstructArgs(
 			argStruct = arguments,
             allowedValues = {
-                dataType= ["string", "text", "integer", "biginteger", "float", "boolean", "date", "time", "datetime", "timestamp", "binary"]
+                dataType: ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "text", "time", "timestamp", "uuid"]
             }
 		);
 		

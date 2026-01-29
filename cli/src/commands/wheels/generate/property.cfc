@@ -58,7 +58,7 @@ component aliases='wheels g property'  extends="../base"  {
 		arguments = reconstructArgs(
 			argStruct=arguments,
 			allowedValues={
-				dataType: ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "limit", "text", "time", "timestamp", "uuid"]
+				dataType: ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "text", "time", "timestamp", "uuid"]
 			}
 		);
 

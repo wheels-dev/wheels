@@ -26,41 +26,40 @@ wheels about
 
 Output:
 ```
- \ \        / / |             | |
-  \ \  /\  / /| |__   ___  ___| |___
+ __          ___               _     
+ \ \        / / |             | |    
+  \ \  /\  / /| |__   ___  ___| |___ 
    \ \/  \/ / | '_ \ / _ \/ _ \ / __|
     \  /\  /  | | | |  __/  __/ \__ \
      \/  \/   |_| |_|\___|\___|_|___/
 
 Wheels Framework
-  Version: 2.5.0
+  Version: 3.0.0
 
 Wheels CLI
-  Version: 1.0.0
+  Version: 3.0.0
   Location: /commandbox/modules/wheels-cli/
 
 Application
   Path: /Users/developer/myapp
-  Name: MyWheelsApp
   Environment: development
   Database: Configured
 
 Server Environment
-  CFML Engine: Lucee 5.4.1.8
-  Java Version: 11.0.15
-  OS: macOS 13.0
+  CFML Engine: Lucee 7.0.1+100
+  Java Version: 17.0.17
+  OS: Mac OS X 15.7.3
   Architecture: x86_64
 
 CommandBox
-  Version: 5.9.0
-  Home: /Users/developer/.CommandBox
+  Version: 6.3.1+00853
 
 Application Statistics
-  Controllers: 12
-  Models: 8
-  Views: 45
-  Tests: 23
-  Migrations: 15
+  Controllers: 15
+  Models: 7
+  Views: 31
+  Tests: 3
+  Migrations: 9
 
 Resources
   Documentation: https://wheels.dev/guides
