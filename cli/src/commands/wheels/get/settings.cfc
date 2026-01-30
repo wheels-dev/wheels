@@ -207,39 +207,35 @@ component extends="../base" {
 
 	private void function parseSettings(required string content, required struct settings) {
 		// Parse set() calls in the settings file
-		local.pattern = 'set\s*\(\s*([^=]+)\s*=\s*([^)]+)\)';
+		local.pattern = 'set\s*\(\s*([^=\s]+(?:\s*[^=\s]*)*)\s*=\s*([^)]+)\)';
 		local.matches = REMatchNoCase(local.pattern, arguments.content);
 		
 		for (local.match in local.matches) {
 			try {
 				// Extract key and value
-				local.parts = REFind(local.pattern, local.match, 1, true);
+				local.extractPattern = 'set\s*\(\s*([^=]+?)\s*=\s*([^)]+)\)';
+				local.parts = REFindNoCase(local.extractPattern, local.match, 1, true);
+				
 				if (local.parts.pos[1] > 0) {
-					local.assignment = Mid(local.match, local.parts.pos[2], local.parts.len[2]);
-					local.assignParts = ListToArray(local.assignment, "=");
-					if (ArrayLen(local.assignParts) >= 2) {
-						local.key = Trim(local.assignParts[1]);
-						// Join remaining parts with = in case value contains =
-					local.valueParts = [];
-					for (local.i = 2; local.i <= ArrayLen(local.assignParts); local.i++) {
-						ArrayAppend(local.valueParts, local.assignParts[local.i]);
+					// Extract key (trim whitespace)
+					local.key = Trim(Mid(local.match, local.parts.pos[2], local.parts.len[2]));
+					
+					// Extract value (trim whitespace)
+					local.value = Trim(Mid(local.match, local.parts.pos[3], local.parts.len[3]));
+					
+					// Clean up quotes from the value
+					local.value = REReplace(local.value, "^['""]|['""]$", "", "all");
+					
+					// Try to parse boolean/numeric values
+					if (local.value == "true") {
+						local.value = true;
+					} else if (local.value == "false") {
+						local.value = false;
+					} else if (IsNumeric(local.value)) {
+						local.value = Val(local.value);
 					}
-					local.value = Trim(ArrayToList(local.valueParts, "="));
-						
-						// Clean up the value
-						local.value = REReplace(local.value, "^['""]|['""]$", "", "all");
-						
-						// Try to parse boolean/numeric values
-						if (local.value == "true") {
-							local.value = true;
-						} else if (local.value == "false") {
-							local.value = false;
-						} else if (IsNumeric(local.value)) {
-							local.value = Val(local.value);
-						}
-						
-						arguments.settings[local.key] = local.value;
-					}
+					
+					arguments.settings[local.key] = local.value;
 				}
 			} catch (any e) {
 				// Skip malformed settings
