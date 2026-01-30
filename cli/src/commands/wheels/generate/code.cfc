@@ -21,7 +21,7 @@ component aliases="wheels g code" extends="../base" {
      * @force.hint Overwrite existing files
      */
     function run(
-        required string pattern,
+        string pattern,
         boolean list = false,
         string category = "",
         string output = "console",
@@ -53,8 +53,8 @@ component aliases="wheels g code" extends="../base" {
 
         if (!len(arguments.pattern)) {
             detailOutput.error("Pattern name is required");
-            detailOutput.getPrint().line("Usage: wheels g code <pattern-name>");
-            detailOutput.getPrint().line("Run 'wheels g code --list' to see available patterns");
+            detailOutput.output("Usage: wheels g code <pattern-name>", true);
+            detailOutput.output("Run 'wheels g code --list' to see available patterns", true);
             setExitCode(1);
             return;
         }
@@ -62,7 +62,7 @@ component aliases="wheels g code" extends="../base" {
         var snippet = getSnippetByName(arguments.pattern);
         if (!structCount(snippet)) {
             detailOutput.error("Code snippet '#arguments.pattern#' not found");
-            detailOutput.getPrint().line("Run 'wheels g code --list' to see available patterns");
+            detailOutput.output("Run 'wheels g code --list' to see available patterns", true);
             setExitCode(1);
             return;
         }
@@ -102,16 +102,16 @@ component aliases="wheels g code" extends="../base" {
         for (var cat in categoryOrder) {
             var key = lCase(cat);
             if (structKeyExists(categories, key)) {
-                detailOutput.getPrint().line("");
-                detailOutput.getPrint().boldLine("#cat#:");
+                detailOutput.line();
+                detailOutput.getPrint().boldLine("#cat#:").toConsole();
                 for (var snippet in categories[key]) {
-                    detailOutput.getPrint().line("  - #snippet.name# - #snippet.description#");
+                    detailOutput.output("  - #snippet.name# - #snippet.description#", true);
                 }
             }
         }
 
-        detailOutput.getPrint().line("");
-        detailOutput.getPrint().line("");
+        detailOutput.line();
+        detailOutput.line();
         detailOutput.nextSteps([
             "Generate a code snippet: wheels g code <pattern-name>"
         ]);
@@ -122,11 +122,11 @@ component aliases="wheels g code" extends="../base" {
      */
     private function printSnippet(required struct snippet) {
         detailOutput.header("Generating Code Snippet: #arguments.snippet.name#");
-        detailOutput.getPrint().line("");
+        detailOutput.line();
 
         var content = getSnippetContent(arguments.snippet);
-        detailOutput.getPrint().line(content);
-        detailOutput.getPrint().line("");
+        detailOutput.output("#content#");
+        detailOutput.line();
 
         detailOutput.success("Code snippet '#arguments.snippet.name#' generated successfully!");
     }
@@ -140,7 +140,7 @@ component aliases="wheels g code" extends="../base" {
 
         if (fileExists(resolvedPath) && !arguments.force) {
             detailOutput.error("File already exists: #resolvedPath#");
-            detailOutput.getPrint().line("Use --force to overwrite");
+            detailOutput.output("Use --force to overwrite", true);
             setExitCode(1);
             return;
         }
@@ -429,9 +429,9 @@ component aliases="wheels g code" extends="../base" {
      */
     private function showCustomizationOptions() {
         detailOutput.header("Customization Options");
-        detailOutput.getPrint().line("You can customize code snippets by:");
-        detailOutput.getPrint().line("  1. Creating custom code snippets with --create");
-        detailOutput.getPrint().line("  2. Saving code snippets to files with --output=file");
-        detailOutput.getPrint().line("  3. Filtering by category with --category");
+        detailOutput.output("You can customize code snippets by:");
+        detailOutput.output("  1. Creating custom code snippets with --create");
+        detailOutput.output("  2. Saving code snippets to files with --output=file");
+        detailOutput.output("  3. Filtering by category with --category");
     }
 }
