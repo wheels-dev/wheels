@@ -88,7 +88,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			// Output to console if not table format
 			if(arguments.format == "json"){
 				detailOutput.line();
-				detailOutput.output(deserializeJSON(local.outputContent));
+				detailOutput.getPrint().line(deserializeJSON(local.outputContent)).toConsole();
 			} else {
 				detailOutput.line();
 				detailOutput.output(local.outputContent);
