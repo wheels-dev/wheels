@@ -180,6 +180,7 @@ component extends="../base" {
         // Display issues by file
         if (structCount(results.files) > 0) {
             detailOutput.subHeader("Issues by File");
+            var filteredSeverity = lcase(arguments.severity);
             for (var filePath in results.files) {
                 var fileIssues = results.files[filePath];
                 var relativePath = replace(filePath, getCWD(), "");
@@ -189,15 +190,13 @@ component extends="../base" {
                 // Group issues by severity for better readability
                 var groupedIssues = groupIssuesBySeverity(fileIssues);
 
-                for (var severity in ["error", "warning", "info"]) {
-                    if (structKeyExists(groupedIssues, severity) && arrayLen(groupedIssues[severity]) > 0) {
-                        for (var issue in groupedIssues[severity]) {
-                            var icon = getSeverityIcon(issue.severity);
-                            var color = getSeverityColor(issue.severity);
+                if (structKeyExists(groupedIssues, filteredSeverity) && arrayLen(groupedIssues[filteredSeverity]) > 0) {
+                    for (var issue in groupedIssues[filteredSeverity]) {
+                        var icon = getSeverityIcon(issue.severity);
+                        var color = getSeverityColor(issue.severity);
 
-                            detailOutput.output("#icon# Line #issue.line#:#issue.column# - #issue.message#", true);
-                            print.cyanLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
-                        }
+                        detailOutput.output("#icon# Line #issue.line#:#issue.column# - #issue.message#", true);
+                        print.cyanLine("     Rule: #issue.rule#" & (issue.fixable ? " [Auto-fixable]" : "")).toConsole();
                     }
                 }
 

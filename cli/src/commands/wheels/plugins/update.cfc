@@ -196,7 +196,7 @@ component aliases="wheels plugin update" extends="../base" {
             // Show version comparison
             detailOutput.subHeader("Update Summary");
             detailOutput.metric("Plugin", pluginInfo.name);
-            detailOutput.update("Version", "v#currentVersion# → v#targetVersion#");
+            detailOutput.metric("Version", "v#currentVersion# → v#targetVersion#");
             detailOutput.metric("Location", "/plugins/#foundPlugin.folderName#");
             detailOutput.line();
 

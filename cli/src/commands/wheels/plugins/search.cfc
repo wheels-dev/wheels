@@ -170,7 +170,7 @@ component aliases="wheels plugin search" extends="../base" {
 
 
                 // Display the table
-                detailOutput.getPrint().table(rows);
+                detailOutput.getPrint().table(rows).toConsole();
                 
                 detailOutput.line();
                 detailOutput.divider();
