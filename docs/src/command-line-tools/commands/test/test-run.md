@@ -454,7 +454,4 @@ box server restart
 
 ## See Also
 
-- [wheels test](test.md) - Run framework tests
-- [wheels test coverage](test-coverage.md) - Generate coverage
-- [wheels test debug](test-debug.md) - Debug tests
 - [wheels generate test](../generate/test.md) - Generate test files
