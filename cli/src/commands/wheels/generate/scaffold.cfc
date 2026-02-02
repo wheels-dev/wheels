@@ -101,13 +101,13 @@ component aliases="wheels g scaffold, wheels g resource, wheels generate resourc
         // Run migrations if requested
         if (arguments.migrate) {
             detailOutput.invoke("dbmigrate");
-            command('wheels dbmigrate up').run();
+            command('wheels dbmigrate latest').run();
         } else if (!arguments.api) {
             // Only ask to migrate in interactive mode
             try {
                 if (confirm("Would you like to run migrations now? [y/n]")) {
                     detailOutput.invoke("dbmigrate");
-                    command('wheels dbmigrate up').run();
+                    command('wheels dbmigrate latest').run();
                 }
             } catch (any e) {
                 // Skip if non-interactive

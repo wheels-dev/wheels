@@ -4,7 +4,7 @@
  * wheels plugin update:all
  * wheels plugin update:all --dryRun
  */
-component aliases="wheels plugin update:all,wheels plugins update:all" extends="../base" {
+component aliases="wheels plugin update:all,wheels plugins update:all, wheels plugin updateall" extends="../base" {
 
     property name="pluginService" inject="PluginService@wheels-cli";
     property name="packageService" inject="PackageService";
@@ -122,7 +122,7 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
                 });
             }
             
-            print.table(updateRows);
+            print.table(updateRows).toConsole();
             detailOutput.line();
 
             if (arguments.dryRun) {
@@ -198,7 +198,6 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
 
             // Show final summary
             detailOutput.line();
-            detailOutput.divider("=", 60);
             detailOutput.header("Update Summary");
             detailOutput.line();
 
@@ -214,7 +213,7 @@ component aliases="wheels plugin update:all,wheels plugins update:all" extends="
                 arrayAppend(summaryRows, { "Status" = "Check errors", "Count" = "#arrayLen(errors)#" });
             }
             
-            print.table(summaryRows);
+            print.table(summaryRows).toConsole();
             detailOutput.line();
 
             if (successCount > 0) {
