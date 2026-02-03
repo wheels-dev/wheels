@@ -11,12 +11,12 @@ component {
 					adapterName = get("adapterName")
 				);
 				if (Len(local.indexHint)) {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.indexHint# SET #variables.wheels.class.softDeleteColumn# = ");
+					ArrayAppend(arguments.sql, "UPDATE #variables.wheels.class.adapter.$escapeReservedWords(tableName())# #local.indexHint# SET #variables.wheels.class.softDeleteColumn# = ");
 				} else {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
+					ArrayAppend(arguments.sql, "UPDATE #variables.wheels.class.adapter.$escapeReservedWords(tableName())# SET #variables.wheels.class.softDeleteColumn# = ");
 				}
 			} else {
-				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
+				ArrayAppend(arguments.sql, "UPDATE #variables.wheels.class.adapter.$escapeReservedWords(tableName())# SET #variables.wheels.class.softDeleteColumn# = ");
 			}
 			// Use cf_sql_varchar in SQLite for TEXT timestamps
 			if(get("adapterName") eq "SQLiteModel") {
@@ -28,9 +28,9 @@ component {
 			ArrayAppend(arguments.sql, local.param);
 		} else {
 			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
-				ArrayAppend(arguments.sql, "DELETE tbl FROM #tableName()# tbl");
+				ArrayAppend(arguments.sql, "DELETE tbl FROM #variables.wheels.class.adapter.$escapeReservedWords(tableName())# tbl");
 			} else {
-				ArrayAppend(arguments.sql, "DELETE FROM #tableName()#");
+				ArrayAppend(arguments.sql, "DELETE FROM #variables.wheels.class.adapter.$escapeReservedWords(tableName())#");
 			}
 		}
 		return arguments.sql;
@@ -59,7 +59,7 @@ component {
 		string adapterName = get("adapterName")
 	) {
 		// start the from statement with the SQL keyword and the table name for the current model
-		local.rv = "FROM " & tableName();
+		local.rv = "FROM " & variables.wheels.class.adapter.$escapeReservedWords(tableName());
 
 		// add the index hint
 		local.indexHint = this.$indexHint(
@@ -85,7 +85,7 @@ component {
 			local.hasOuterJoins = false;
 			local.hasThroughAssociation = false;
 			local.iEnd = ArrayLen(local.associations);
-			
+
 			// Check if this is specifically a through association pattern
 			local.originalInclude = Replace(arguments.include, " ", "", "all");
 			if (Find("(", local.originalInclude)) {
@@ -95,7 +95,7 @@ component {
 					local.hasThroughAssociation = true;
 				}
 			}
-			
+
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				if (FindNoCase("INNER", local.associations[local.i].join)) {
 					local.hasInnerJoins = true;
@@ -104,7 +104,7 @@ component {
 					local.hasOuterJoins = true;
 				}
 			}
-			
+
 			// Only apply nesting for through associations with mixed join types
 			local.needsNesting = local.hasInnerJoins && local.hasOuterJoins && local.hasThroughAssociation;
 
@@ -113,7 +113,7 @@ component {
 				// group inner joins with parentheses and outer joins separately
 				local.innerJoins = [];
 				local.outerJoins = [];
-				
+
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
 					local.indexHint = this.$indexHint(
 						useIndex = arguments.useIndex,
@@ -131,36 +131,36 @@ component {
 							"one"
 						);
 					}
-					
+
 					if (FindNoCase("INNER", local.join)) {
 						ArrayAppend(local.innerJoins, local.join);
 					} else {
 						ArrayAppend(local.outerJoins, local.join);
 					}
 				}
-				
+
 				for (local.i = 1; local.i <= ArrayLen(local.outerJoins); local.i++) {
 					local.outerJoin = local.outerJoins[local.i];
-					
+
 					// If we have inner joins, we need to group them in the outer join
 					if (ArrayLen(local.innerJoins) > 0) {
 						// Find the table being joined in the outer join
 						local.joinTableMatch = ReFindNoCase("LEFT OUTER JOIN ([^\s]+)", local.outerJoin, 1, true);
 						if (ArrayLen(local.joinTableMatch.pos) >= 2 && local.joinTableMatch.pos[2] > 0) {
 							local.joinTable = Mid(local.outerJoin, local.joinTableMatch.pos[2], local.joinTableMatch.len[2]);
-							
+
 							// Build grouped inner joins: (subscriptions INNER JOIN magazines ON ...)
 							local.groupedInner = "(" & local.joinTable;
 							for (local.j = 1; local.j <= ArrayLen(local.innerJoins); local.j++) {
 								local.groupedInner &= " " & local.innerJoins[local.j];
 							}
 							local.groupedInner &= ")";
-							
+
 							// Replace in the outer join
 							local.outerJoin = Replace(local.outerJoin, "LEFT OUTER JOIN " & local.joinTable, "LEFT OUTER JOIN " & local.groupedInner);
 						}
 					}
-					
+
 					local.rv = ListAppend(local.rv, local.outerJoin, " ");
 				}
 			} else {
@@ -258,7 +258,7 @@ component {
 							local.toAdd = "";
 							local.classData = local.classes[local.j];
 							if (StructKeyExists(local.classData.propertyStruct, local.property)) {
-								local.toAdd = local.classData.tableName & "." & local.classData.properties[local.property].column;
+								local.toAdd = variables.wheels.class.adapter.$escapeReservedWords(local.classData.tableName) & "." & variables.wheels.class.adapter.$escapeReservedWords(local.classData.properties[local.property].column);
 							} else if (StructKeyExists(local.classData.calculatedProperties, local.property)) {
 								local.sql = local.classData.calculatedProperties[local.property].sql;
 								local.toAdd = "(" & Replace(local.sql, ",", "[[comma]]", "all") & ")";
@@ -349,13 +349,13 @@ component {
 			includeSoftDeletes = arguments.includeSoftDeletes,
 			returnAs = arguments.returnAs
 		);
-		
+
 		// Look for " AS " followed by text containing multiple dots (namespaced aliases)
 		if (Find(" AS ", local.rv)) {
 			// Wrap column aliases that contain multiple dots with double quotes (ANSI SQL standard)
 			local.rv = REReplace(local.rv, " AS ([^,\s]+\.[^,\s]*\.[^,\s]*)", " AS ""\1""", "all");
 		}
-		
+
 		local.rv = "SELECT " & local.rv;
 		return local.rv;
 	}
@@ -494,9 +494,9 @@ component {
 							local.toAppend &= "[[duplicate]]" & local.j;
 						}
 						if (StructKeyExists(local.classData.propertyStruct, local.iItem)) {
-							local.toAppend &= local.classData.tableName & ".";
+							local.toAppend &= variables.wheels.class.adapter.$escapeReservedWords(local.classData.tableName) & ".";
 							if (StructKeyExists(local.classData.columnStruct, local.iItem)) {
-								local.toAppend &= local.iItem;
+								local.toAppend &= variables.wheels.class.adapter.$escapeReservedWords(local.iItem);
 							} else {
 								local.toAppend &= local.classData.properties[local.iItem].column;
 								if (arguments.clause == "select") {
@@ -647,7 +647,7 @@ component {
 		}
 		else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "FROM #tablename()#");
+				ArrayAppend(arguments.sql, "FROM #variables.wheels.class.adapter.$escapeReservedWords(tableName())#");
 			}
 		}
 		else if(arguments.include != "" && ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
@@ -747,7 +747,7 @@ component {
 									local.param.column = "tbl." & local.classData.properties[local.column].column;
 								} else {
 									local.param.column = local.classData.tableName & "." & local.classData.properties[local.column].column;
-								}								
+								}
 								local.param.dataType = local.classData.properties[local.column].dataType;
 								local.param.type = local.classData.properties[local.column].type;
 								local.param.scale = local.classData.properties[local.column].scale;
@@ -812,12 +812,12 @@ component {
 		if (!arguments.includeSoftDeletes) {
 			local.addToWhere = "";
 			if ($softDeletion() && arguments.softDelete) {
-				local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
+				local.addToWhere = ListAppend(local.addToWhere, variables.wheels.class.adapter.$escapeReservedWords(tableName()) & "." & $softDeleteColumn() & " IS NULL");
 			} else if ($softDeletion()) {
 				if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
 					local.addToWhere = ListAppend(local.addToWhere, "tbl." & $softDeleteColumn() & " IS NULL");
 				} else {
-					local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
+					local.addToWhere = ListAppend(local.addToWhere, variables.wheels.class.adapter.$escapeReservedWords(tableName()) & "." & $softDeleteColumn() & " IS NULL");
 				}
 			}
 			local.addToWhere = Replace(local.addToWhere, ",", " AND ", "all");
@@ -858,14 +858,14 @@ component {
 						if (Left(local.processedValue, 1) == "(" && Right(local.processedValue, 1) == ")") {
 							local.processedValue = Mid(local.processedValue, 2, Len(local.processedValue) - 2);
 						}
-						
+
 						// BoxLang: Only apply quote cleanup if the value contains quotes
 						if (Find("'", local.processedValue) > 0 || Find(Chr(34), local.processedValue) > 0) {
-							local.cleanedValue = local.processedValue;							
+							local.cleanedValue = local.processedValue;
 							local.cleanedValue = ReReplace(local.cleanedValue, "'([^']*)'", "\1", "ALL");
 							local.doubleQuote = Chr(34);
 							local.cleanedValue = ReReplace(local.cleanedValue, "#local.doubleQuote#([^#local.doubleQuote#]*)#local.doubleQuote#", "\1", "ALL");
-							
+
 							ArrayAppend(local.originalValues, local.cleanedValue);
 						} else {
 							ArrayAppend(local.originalValues, local.processedValue);
@@ -951,44 +951,44 @@ component {
 	public string function $expandThroughAssociations(required string include) {
 		local.rv = "";
 		local.associations = variables.wheels.class.associations;
-		
+
 		// If the include string contains parentheses, it's already a complex nested include
 		// Don't try to process it for through associations - return as-is
 		if (Find("(", arguments.include)) {
 			return arguments.include;
 		}
-		
+
 		// Split the include string by commas to handle multiple simple includes
 		local.includeList = ListToArray(arguments.include);
-		
+
 		for (local.i = 1; local.i <= ArrayLen(local.includeList); local.i++) {
 			local.currentInclude = Trim(local.includeList[local.i]);
-			
+
 			// Check if this association has a 'through' defined
-			if (StructKeyExists(local.associations, local.currentInclude) 
+			if (StructKeyExists(local.associations, local.currentInclude)
 				&& StructKeyExists(local.associations[local.currentInclude], "through")
 				&& Len(local.associations[local.currentInclude].through)) {
-				
+
 				local.throughPath = local.associations[local.currentInclude].through;
-				
+
 				if (ListLen(local.throughPath) == 1) {
 					local.intermediateAssociationName = local.throughPath;
-					
+
 					// Get the current association info for the target we're trying to include
 					local.currentAssociation = local.associations[local.currentInclude];
-					
+
 					// Check if we have a direct association to the intermediate model
 					if (StructKeyExists(local.associations, local.intermediateAssociationName)) {
 						local.intermediateAssociation = local.associations[local.intermediateAssociationName];
-						
+
 						// Get the intermediate model to find what it relates to
 						local.intermediateModel = model(local.intermediateAssociation.modelName);
 						local.intermediateAssociations = local.intermediateModel.$classData().associations;
-						
+
 						// Find the association that leads to our target model
 						local.targetModelName = local.currentAssociation.modelName;
 						local.targetAssociation = "";
-						
+
 						for (local.assocName in local.intermediateAssociations) {
 							local.assoc = local.intermediateAssociations[local.assocName];
 							if (local.assoc.modelName == local.targetModelName) {
@@ -996,7 +996,7 @@ component {
 								break;
 							}
 						}
-						
+
 						if (Len(local.targetAssociation)) {
 							local.expandedInclude = local.intermediateAssociationName & "(" & local.targetAssociation & ")";
 							local.rv = ListAppend(local.rv, local.expandedInclude);
@@ -1011,7 +1011,7 @@ component {
 				} else {
 					local.firstAssociation = ListFirst(local.throughPath);
 					local.targetAssociation = ListLast(local.throughPath);
-					
+
 					local.expandedInclude = local.firstAssociation & "(" & local.targetAssociation & ")";
 					local.rv = ListAppend(local.rv, local.expandedInclude);
 				}
@@ -1020,7 +1020,7 @@ component {
 				local.rv = ListAppend(local.rv, local.currentInclude);
 			}
 		}
-		
+
 		return local.rv;
 	}
 
@@ -1043,7 +1043,7 @@ component {
 		local.include = Replace(local.include, " ", "", "all") & ",";
 
 		// store all tables used in the query so we can alias them when needed
-		local.tables = tableName();
+		local.tables = variables.wheels.class.adapter.$escapeReservedWords(tableName());
 
 		local.pos = 1;
 
@@ -1110,7 +1110,7 @@ component {
 			// create the join string if it hasn't already been done
 			if (!StructKeyExists(local.classAssociations[local.name], "join")) {
 				local.joinType = UCase(ReplaceNoCase(local.classAssociations[local.name].joinType, "outer", "left outer", "one"));
-				local.join = local.joinType & " JOIN " & local.classAssociations[local.name].tableName;
+				local.join = local.joinType & " JOIN " & variables.wheels.class.adapter.$escapeReservedWords(local.classAssociations[local.name].tableName);
 				// alias the table as the association name when joining to itself
 				if (ListFindNoCase(local.tables, local.classAssociations[local.name].tableName)) {
 					local.join = variables.wheels.class.adapter.$tableAlias(
@@ -1157,7 +1157,7 @@ component {
 					if (!arguments.includeSoftDeletes && local.associatedClass.$softDeletion()) {
 						local.toAppend = ListAppend(
 							local.toAppend,
-							"#local.associatedClass.tableName()#.#local.associatedClass.$softDeleteColumn()# IS NULL"
+							"#local.associatedClass.variables.wheels.class.adapter.$escapeReservedWords(tableName())#.#local.associatedClass.$softDeleteColumn()# IS NULL"
 						);
 					}
 				}

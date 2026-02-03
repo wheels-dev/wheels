@@ -79,7 +79,7 @@ component {
 				modelName = variables.wheels.class.modelName,
 				adapterName = get("adapterName")
 			);
-			
+
 			if (ListFind('MySQL', local.migration.adapter.adapterName())){
 				local.list = "";
 				local.associations = [];
@@ -96,7 +96,7 @@ component {
 				} else {
 					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.list# SET");
 				}
-				
+
 			}
 			else if (ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
 				if (Len(local.indexHint)) {
@@ -111,7 +111,7 @@ component {
 			local.pos = 0;
 			for (local.key in arguments.properties) {
 				local.pos++;
-				ArrayAppend(arguments.sql, "#variables.wheels.class.properties[local.key].column# = ");
+				ArrayAppend(arguments.sql, "#variables.wheels.class.adapter.$escapeReservedWords(variables.wheels.class.properties[local.key].column)# = ");
 				local.param = {
 					value = arguments.properties[local.key],
 					type = variables.wheels.class.properties[local.key].type,
@@ -314,12 +314,12 @@ component {
 				$timestampProperty(property = variables.wheels.class.timeStampOnUpdateProperty);
 			}
 			local.sql = [];
-			ArrayAppend(local.sql, "UPDATE #tableName()# SET ");
+			ArrayAppend(local.sql, "UPDATE #variables.wheels.class.adapter.$escapeReservedWords(tableName())# SET ");
 
 			// Include all changed non-key values in the update.
 			for (local.key in variables.wheels.class.properties) {
 				if (StructKeyExists(this, local.key) && !ListFindNoCase(primaryKeys(), local.key) && hasChanged(local.key)) {
-					ArrayAppend(local.sql, "#variables.wheels.class.properties[local.key].column# = ");
+					ArrayAppend(local.sql, "#variables.wheels.class.adapter.$escapeReservedWords(variables.wheels.class.properties[local.key].column)# = ");
 					local.param = $buildQueryParamValues(local.key);
 					ArrayAppend(local.sql, local.param);
 					ArrayAppend(local.sql, ",");

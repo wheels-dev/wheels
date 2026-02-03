@@ -104,7 +104,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
                     ",,"
                 );
             }
-            
+
             // If the primary key column wasn't part of the INSERT, we fetch last inserted ID
             if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
                 local.rv = {};
@@ -124,6 +124,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $defaultValues() {
 		return " DEFAULT VALUES";
+	}
+
+	/**
+	 * Define SQLite reserved words.
+	 */
+	public string function $escapeReservedWords(required string word) {
+		// TODO
+		return arguments.word;
 	}
 
 }

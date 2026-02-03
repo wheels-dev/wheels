@@ -235,16 +235,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			);
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
-				
+
 				// Use @@IDENTITY instead of SCOPE_IDENTITY() for BoxLang compatibility
 				// SCOPE_IDENTITY() returns empty values in BoxLang with SQL Server
 				query = $query(sql = "SELECT @@IDENTITY AS lastId", argumentCollection = arguments.queryAttributes);
-				
+
 				// Fallback to SCOPE_IDENTITY() if @@IDENTITY fails (for other CFML engines)
 				if (!len(query.lastId)) {
 					query = $query(sql = "SELECT SCOPE_IDENTITY() AS lastId", argumentCollection = arguments.queryAttributes);
 				}
-				
+
 				local.rv[$generatedKey()] = query.lastId;
 				return local.rv;
 			}
@@ -258,5 +258,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return "NEWID()";
 	}
 
+	/**
+	 * Define MSSQL reserved words.
+	 */
+	public string function $escapeReservedWords(required string word) {
+		// TODO
+		return arguments.word;
+	}
 
 }

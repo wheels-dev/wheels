@@ -177,10 +177,10 @@ component extends="wheels.Testbox" {
 					result = author.isPersisted()
 
 					expect(result).toBeFalse()
-					
+
 					author.save(transaction = "none")
 					result = author.isPersisted()
-					
+
 					expect(result).toBeTrue()
 
 					transaction action="rollback";
@@ -204,7 +204,7 @@ component extends="wheels.Testbox" {
 				result = author.hasChanged()
 
 				expect(result).toBeTrue()
-				
+
 				author.lastName = "Djurner"
 				result = author.hasChanged()
 
@@ -234,7 +234,7 @@ component extends="wheels.Testbox" {
 					result = author.hasChanged()
 
 					expect(result).toBeFalse()
-					
+
 					transaction action="rollback";
 				}
 			})
@@ -255,7 +255,7 @@ component extends="wheels.Testbox" {
 				author = g.model("author").findOne(where = "lastName = 'Djurner'")
 				author.lastName = "Petruzzi"
 				result = author.changedFrom(property = "lastName")
-				
+
 				expect(result).toBe("Djurner")
 			})
 
@@ -263,7 +263,7 @@ component extends="wheels.Testbox" {
 				author = g.model("author").findOne(where = "lastName = 'Djurner'")
 				author.lastName = "Petruzzi"
 				result = author.lastNameChangedFrom(property = "lastName")
-				
+
 				expect(result).toBe("Djurner")
 			})
 
@@ -274,7 +274,7 @@ component extends="wheels.Testbox" {
 				} else {
 					user.birthday = "11/01/1975 12:00 AM"
 				}
-				
+
 				e = user.hasChanged("birthday")
 
 				expect(e).toBeFalse()
@@ -364,7 +364,7 @@ component extends="wheels.Testbox" {
 					expect(results.shop).toBeInstanceOf("shop")
 					expect(results.shop).toHaveKey(results.shop.primaryKey())
 					expect(results.shop[results.shop.primaryKey()]).toBe(99)
-					
+
 					transaction action="rollback";
 				}
 			})
@@ -778,27 +778,27 @@ component extends="wheels.Testbox" {
 
 			it("function findByKey returns correct type when no records", () => {
 				q = user.findByKey("0")
-				
+
 				expect(q).toBeBoolean()
 				expect(q).toBeFalse()
 
 				q = user.findByKey(key = "0", returnas = "query")
-				
+
 				expect(q).toBeQuery()
 				expect(q.recordcount).toBe(0)
 
 				q = user.findByKey(key = "0", returnas = "object")
-				
+
 				expect(q).toBeBoolean()
 				expect(q).toBeFalse()
 
 				q = user.findByKey(key = "0", returnas = "struct")
-				
+
 				expect(q).toBeStruct()
 				expect(q).toBeEmpty()
 
 				q = user.findByKey(key = "0", returnas = "array")
-				
+
 				expect(q).toBeArray()
 				expect(q).toBeEmpty()
 
@@ -1023,7 +1023,7 @@ component extends="wheels.Testbox" {
 					authorAfter = g.model("author").findByKey(1)
 					transaction action="rollback";
 				}
-				
+
 				expect(authorAfter.lastName).toBe("D")
 
 				application.wheels.cacheQueriesDuringRequest = local.oldCacheQueriesDuringRequest
@@ -1047,9 +1047,9 @@ component extends="wheels.Testbox" {
 				result = g.model("author").findOne(where = "lastName IS NULL")
 
 				expect(result).toBeFalse()
-				
+
 				result = g.model("author").findOne(where = "lastName IS NOT NULL")
-				
+
 				expect(result).toBeInstanceOf("author")
 			})
 
@@ -1242,6 +1242,14 @@ component extends="wheels.Testbox" {
 				)
 
 				expect(actual).toBe("FROM c_o_r_e_authors USE INDEX(idx_authors_123) LEFT OUTER JOIN c_o_r_e_posts USE INDEX(idx_posts_123) ON c_o_r_e_authors.id = c_o_r_e_posts.authorid AND c_o_r_e_posts.deletedat IS NULL")
+			})
+
+			it("escapes MySQL reserved word 'groups' in from clause", () => {
+				g.model("author").table("groups")
+				actual = g.model("author").$fromClause(include = "", adapterName = "MySQLModel")
+				g.model("author").table("c_o_r_e_authors")
+
+				expect(actual).toBe("FROM `groups`")
 			})
 		})
 

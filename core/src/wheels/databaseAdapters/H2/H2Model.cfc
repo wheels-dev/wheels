@@ -180,5 +180,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return local.columns;
 	}
 
+	/**
+	 * Define H2 reserved words.
+	 */
+	public string function $escapeReservedWords(required string word) {
+		// TODO
+		return arguments.word;
+	}
 
 }
