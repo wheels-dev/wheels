@@ -1157,7 +1157,7 @@ component {
 					if (!arguments.includeSoftDeletes && local.associatedClass.$softDeletion()) {
 						local.toAppend = ListAppend(
 							local.toAppend,
-							"#$escapeReservedWords(local.associatedClass.variables.wheels.class.adapter.tableName())#.#local.associatedClass.$softDeleteColumn()# IS NULL"
+							"#local.associatedClass.adapter.$escapeReservedWords(local.associatedClass.tableName())#.#local.associatedClass.$softDeleteColumn()# IS NULL"
 						);
 					}
 				}
