@@ -20,6 +20,7 @@
   * Core Commands
     * [wheels init](command-line-tools/commands/core/init.md)
     * [wheels info](command-line-tools/commands/core/info.md)
+    * [wheels about](command-line-tools/commands/application-utilities/about.md)
     * [wheels reload](command-line-tools/commands/core/reload.md)
     * [wheels deps](command-line-tools/commands/core/deps.md)
     * [wheels destroy](command-line-tools/commands/core/destroy.md)

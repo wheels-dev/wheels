@@ -87,7 +87,7 @@ component aliases="wheels plugin list" extends="../base" {
             }
 
             // Display the table
-            detailOutput.getPrint().table(rows);
+            detailOutput.getPrint().table(rows).toConsole();
             
             detailOutput.line();
             detailOutput.divider("-", 60);

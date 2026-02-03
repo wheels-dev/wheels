@@ -38,7 +38,7 @@ component aliases="wheels g scaffold, wheels g resource, wheels generate resourc
 
         // Custom validation for properties parameter format (name:type,name2:type2)
         if (len(trim(arguments.properties))) {
-            var validTypes = ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "limit", "text", "time", "timestamp", "uuid"];
+            var validTypes = ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "text", "time", "timestamp", "uuid"];
             var properties = listToArray(arguments.properties, ",");
             var invalidTypes = [];
 
@@ -101,13 +101,13 @@ component aliases="wheels g scaffold, wheels g resource, wheels generate resourc
         // Run migrations if requested
         if (arguments.migrate) {
             detailOutput.invoke("dbmigrate");
-            command('wheels dbmigrate up').run();
+            command('wheels dbmigrate latest').run();
         } else if (!arguments.api) {
             // Only ask to migrate in interactive mode
             try {
                 if (confirm("Would you like to run migrations now? [y/n]")) {
                     detailOutput.invoke("dbmigrate");
-                    command('wheels dbmigrate up').run();
+                    command('wheels dbmigrate latest').run();
                 }
             } catch (any e) {
                 // Skip if non-interactive

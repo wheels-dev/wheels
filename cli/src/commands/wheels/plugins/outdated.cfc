@@ -130,7 +130,7 @@ component aliases="wheels plugin outdated,wheels plugins outdated" extends="../b
                 }
 
                 // Display the table
-                print.table(rows);
+                print.table(rows).toConsole();
                 
                 detailOutput.line();
                 detailOutput.divider("-", 60);
