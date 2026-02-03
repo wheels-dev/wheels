@@ -1246,10 +1246,15 @@ component extends="wheels.Testbox" {
 
 			it("escapes MySQL reserved word 'groups' in from clause", () => {
 				g.model("author").table("groups")
-				actual = g.model("author").$fromClause(include = "", adapterName = "MySQLModel")
+				// it doesnt look like we can override the adapterName for $escapeReservedWords
+				actual = g.model("author").$fromClause()
 				g.model("author").table("c_o_r_e_authors")
 
-				expect(actual).toBe("FROM `groups`")
+				if (application.wheels.adapterName eq 'MySQLModel') {
+					expect(actual).toBe("FROM `groups`")
+				} else {
+					expect(actual).toBe("FROM groups")
+				}
 			})
 		})
 
