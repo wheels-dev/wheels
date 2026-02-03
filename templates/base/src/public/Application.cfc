@@ -265,8 +265,23 @@ component output="false" {
 	}
 
 	public void function onError( any Exception, string EventName ) {
-		wirebox = new wirebox.system.ioc.Injector("wheels.Wirebox");
-		application.wo = wirebox.getInstance("global");
+		try {
+			wirebox = new wirebox.system.ioc.Injector("wheels.Wirebox");
+			application.wo = wirebox.getInstance("global");
+
+			// Make exception available to the event template
+			request.wheels = request.wheels ?: {};
+			request.wheels.exception = Exception;
+			request.wheels.eventName = EventName;
+
+			// Run early error event if it exists
+			application.wo.$include(
+				template = "#application.wheels.eventPath#/onerrorstart.cfm",
+				silent = true
+			);
+		} catch (any e) {
+			// Must never break error handling
+		}
 
 		// In case the error was caused by a timeout we have to add extra time for error handling.
 		// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.
