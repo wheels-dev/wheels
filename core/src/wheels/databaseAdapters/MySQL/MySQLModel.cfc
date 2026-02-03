@@ -381,7 +381,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			"WRITE",
 			"XOR",
 			"YEAR_MONTH",
-			"ZEROFILL",
+			"ZEROFILL"
 		];
 		local.rv = arguments.word;
 		if (local.reservedWords.findNoCase(arguments.word)) {
