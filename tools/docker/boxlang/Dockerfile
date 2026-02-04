@@ -1,4 +1,4 @@
-FROM ortussolutions/commandbox:boxlang
+FROM ortussolutions/commandbox:latest
 
 LABEL maintainer "Wheels Core Team"
 
