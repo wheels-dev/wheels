@@ -172,5 +172,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return "random()";
 	}
 
+	/**
+	 * Define Postgres reserved words.
+	 */
+	public string function $escapeReservedWords(required string word) {
+		// TODO
+		return arguments.word;
+	}
 
 }

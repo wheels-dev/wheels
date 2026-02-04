@@ -141,5 +141,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return arguments.table & " " & arguments.alias;
 	}
 
+	/**
+	 * Define Oracle reserved words.
+	 */
+	public string function $escapeReservedWords(required string word) {
+		// TODO
+		return arguments.word;
+	}
 
 }
