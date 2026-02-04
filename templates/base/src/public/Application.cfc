@@ -275,10 +275,7 @@ component output="false" {
 			request.wheels.eventName = EventName;
 
 			// Run early error event if it exists
-			application.wo.$include(
-				template = "#application.wheels.eventPath#/onerrorstart.cfm",
-				silent = true
-			);
+			application.wo.$include(template = "/wheels/events/onerror/onerrorstart.cfm");
 		} catch (any e) {
 			// Must never break error handling
 		}
