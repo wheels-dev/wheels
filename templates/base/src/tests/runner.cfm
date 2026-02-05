@@ -319,7 +319,7 @@
 
         local.populate = StructKeyExists(url, "populate") ? url.populate : true
         if (local.populate) {
-            include "populate.cfm"
+            include "/tests/populate.cfm"
         }
     }
 

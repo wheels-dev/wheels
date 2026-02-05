@@ -112,6 +112,8 @@ component output=false extends="wheels.Global"{
 		);
 
 		if (structKeyExists(wheels,"id") && isStruct(wheels.id) && !structIsEmpty(wheels.id)) {
+			// BoxLang-safe: ensure modifiable
+			wheels.result = duplicate(wheels.result);
 			structAppend(wheels.result, wheels.id);
 		}
 
