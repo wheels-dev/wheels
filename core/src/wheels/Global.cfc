@@ -1557,7 +1557,7 @@ component output="false" {
 			local.minimumMinor = "0";
 			local.minimumPatch = "0";
 			local.maximumMajor = "1";
-			local.maximumMinor = "9";
+			local.maximumMinor = "15";
 			local.maximumPatch = "999";
 			
 			// Check minimum version
