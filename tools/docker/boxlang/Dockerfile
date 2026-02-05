@@ -30,5 +30,16 @@ COPY tools/docker/boxlang/settings.cfm ${APP_DIR}/config/settings.cfm
 # Install dependencies
 RUN box install
 
+# Start once to create BoxLang engine
+RUN box server start --background && sleep 10 && box server stop
+
+# Move bx-* modules if engine modules dir exists
+RUN if [ -d ".engine/boxlang/WEB-INF/boxlang/modules" ]; then \
+        echo "Moving bx-* modules"; \
+        mv bx-* .engine/boxlang/WEB-INF/boxlang/modules/ 2>/dev/null || true; \
+    else \
+        echo "Engine modules directory missing"; \
+    fi
+
 # WARM UP THE SERVER
 RUN ${BUILD_DIR}/util/warmup-server.sh
