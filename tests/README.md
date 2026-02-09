@@ -56,7 +56,7 @@ component extends="wheels.Testbox" {
 - `specs/` - Test specifications
   - `unit/` - Isolated unit tests
   - `integration/` - Integration tests
-  - `functional/` - End-to-end tests
+  - `functions/` - End-to-end tests
 - `fixtures/` - Test data and fixtures
 - `support/` - Test utilities and factories
 
@@ -126,6 +126,9 @@ wheels test migrate tests --recursive
 ```
 
 ## Tips
+
+> [!IMPORTANT]
+> Test file names must include either 'Spec' or 'Test'.
 
 1. Tests run in transactions that roll back automatically
 2. Use descriptive test names that explain the behavior
