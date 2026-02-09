@@ -6,10 +6,6 @@ This repository contains a **user management and authentication web application*
 
 **Important**: This is **not a complete, full-featured app**, but rather a **starter/example app** built with Wheels 3.0. It is designed to help you get started and to showcase best practices in authentication, authorization, auditing, and modern web UI using Wheels.
 
-## Installation
-
-See [Installation](https://github.com/wheels-dev/Wheels-example-app/wiki/Installation)
-
 ## Key Features
 
 ### User Registration & Verification
@@ -99,6 +95,7 @@ app/
 │   ├── PasswordResets.cfc # Password management
 │   ├── Accounts.cfc    # User account management
 │   └── admin/          # Admin controllers
+│   └── functions/          # helper functions
 ├── models/             # Data models
 │   ├── User.cfc        # User model with authentication
 │   ├── Role.cfc        # Role model
@@ -107,7 +104,7 @@ app/
 |── global/             # application-wide globally accessible functions
 ├── views/              # Presentation layer
 ├── mailers/            # Email templates
-└── plugins/            # Third-party plugins
+plugins/            # Third-party plugins
 ```
 
 ### Key Design Principles
@@ -122,8 +119,8 @@ app/
 ### Backend
 
 - **3.0.0-snapshot** - MVC Framework
-- **Lucee 5, Lucee 6** - CFML Engine
-- **Database** - MySQL, PostgreSQL, Microsoft SQL Server, Oracle, H2
+- **Lucee 5,6,7, Adobe 2018-2025, Boxlang** - CFML Engine
+- **Database** - MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, H2
 - **WireBox** - Dependency injection
 - **TestBox** - Testing framework
 
@@ -144,13 +141,15 @@ app/
 
 - **CommandBox** - Latest version
 - **CFML Engine**: Choose one of the following:
-  - Adobe ColdFusion 2018/2021/2023
+  - Adobe ColdFusion 2018/2021/2023/2025
   - Lucee 5, Lucee 6, Lucee 7
+  - Boxlang
 - **Database Engine**: Choose one of the following:
   - MySQL
   - PostgreSQL
   - Microsoft SQL Server
   - Oracle Database
+  - SQLite Database
   - H2 Database (for development/testing)
 
 ### Environment Configuration
