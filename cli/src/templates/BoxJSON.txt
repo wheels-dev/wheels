@@ -4,7 +4,7 @@
     "author":"Wheels Core Team and Community, repackaged by Peter Amiri",
     "shortDescription":"Wheels MVC Framework Base Template",
     "location":"",
-    "slug":"myapp",
+    "slug":"|appName|",
     "createPackageDirectory":false,
     "type":"wheels-templates",
     "keywords":[
