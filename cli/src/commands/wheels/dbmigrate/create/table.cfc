@@ -35,35 +35,41 @@
 		required string name,
 		boolean force    = false,
 		boolean id 		 = true,
-		string primaryKey="id") {
-		
-		// Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
-		
+		string primaryKey="id"
+	) {
+		try{
+			// Reconstruct arguments for handling --prefixed options
+			arguments = reconstructArgs(arguments);
+			
 
-		// Get Template
-		var content=fileRead(getTemplate("dbmigrate/create-table.txt"));
+			// Get Template
+			var content=fileRead(getTemplate("dbmigrate/create-table.txt"));
 
-		// Changes here
-		content=replaceNoCase(content, "|tableName|", "#name#", "all");
-		content=replaceNoCase(content, "|force|", "#force#", "all");
-		content=replaceNoCase(content, "|id|", "#id#", "all");
-		content=replaceNoCase(content, "|primaryKey|", "#arguments.primaryKey#", "all");
+			// Changes here
+			content=replaceNoCase(content, "|tableName|", "#name#", "all");
+			content=replaceNoCase(content, "|force|", "#force#", "all");
+			content=replaceNoCase(content, "|id|", "#id#", "all");
+			content=replaceNoCase(content, "|primaryKey|", "#arguments.primaryKey#", "all");
 
-		// Output detail header
-		detailOutput.header("Migration Generation");
+			// Output detail header
+			detailOutput.header("Migration Generation");
+			
+			// Make File
+			var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);
+			
+			detailOutput.create(migrationPath);
+			detailOutput.line();
+			detailOutput.statusSuccess("Table migration created successfully!");
+			
+			var nextSteps = [];
+			arrayAppend(nextSteps, "Edit the migration to add columns: #migrationPath#");
+			arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
+			arrayAppend(nextSteps, "Generate a model for this table: wheels generate model #arguments.name#");
+			detailOutput.nextSteps(nextSteps);
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
 		
-		// Make File
-		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="create_table",	content=content);
-		
-		detailOutput.create(migrationPath);
-		detailOutput.line();
-		detailOutput.statusSuccess("Table migration created successfully!");
-		
-		var nextSteps = [];
-		arrayAppend(nextSteps, "Edit the migration to add columns: #migrationPath#");
-		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
-		arrayAppend(nextSteps, "Generate a model for this table: wheels generate model #arguments.name#");
-		detailOutput.nextSteps(nextSteps);
 	}
 }

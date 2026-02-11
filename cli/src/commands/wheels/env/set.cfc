@@ -19,26 +19,30 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 	 **/
 	function run(
 		string file = ".env"
-	)
-	{
-		requireWheelsApp(getCWD());
-		arguments = reconstructArgs(argStruct=arguments);
-		local.updates = {};
+	) {
+		try {
+			requireWheelsApp(getCWD());
+			arguments = reconstructArgs(argStruct=arguments);
+			local.updates = {};
 
-		for (local.key in arguments) {
-			// Skip reserved keywords like "file"
-			if (local.key != "file") {
-				local.updates[local.key] = arguments[local.key];
+			for (local.key in arguments) {
+				// Skip reserved keywords like "file"
+				if (local.key != "file") {
+					local.updates[local.key] = arguments[local.key];
+				}
 			}
-		}
 
-		if (StructIsEmpty(local.updates)) {
-			detailOutput.error("No key=value pairs provided. Usage: wheels env set KEY=VALUE");
-		}
+			if (StructIsEmpty(local.updates)) {
+				detailOutput.error("No key=value pairs provided. Usage: wheels env set KEY=VALUE");
+			}
 
-		// Update the .env file
-		local.envFile = ResolvePath(arguments.file);
-		updateEnvFile(local.envFile, local.updates);
+			// Update the .env file
+			local.envFile = ResolvePath(arguments.file);
+			updateEnvFile(local.envFile, local.updates);
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
 	}
 
 

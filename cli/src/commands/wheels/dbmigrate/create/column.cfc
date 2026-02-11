@@ -44,74 +44,79 @@
 		boolean allowNull=true,
 		number limit,
 		number precision,
-		number scale) {
-	
-		// Reconstruct arguments for handling -- prefixed options
-		arguments = reconstructArgs(
-			argStruct = arguments,
-            allowedValues = {
-                dataType: ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "text", "time", "timestamp", "uuid"]
-            }
-		);
-		
-		// Get Template
-		var content=fileRead(getTemplate("dbmigrate/create-column.txt"));
-		var argumentArr=[];
-		var argumentString="";
+		number scale
+	) {
+		try{
+			// Reconstruct arguments for handling -- prefixed options
+			arguments = reconstructArgs(
+				argStruct = arguments,
+				allowedValues = {
+					dataType: ["biginteger", "binary", "boolean", "date", "datetime", "decimal", "float", "integer", "string", "text", "time", "timestamp", "uuid"]
+				}
+			);
+			
+			// Get Template
+			var content=fileRead(getTemplate("dbmigrate/create-column.txt"));
+			var argumentArr=[];
+			var argumentString="";
 
-		// Changes here
-		content=replaceNoCase(content, "|tableName|", "#arguments.tableName#", "all");
-		content=replaceNoCase(content, "|columnType|", "#arguments.dataType#", "all");
-		content=replaceNoCase(content, "|columnName|", "#arguments.name#", "all");
-		//content=replaceNoCase(content, "|referenceName|", "#referenceName#", "all");
+			// Changes here
+			content=replaceNoCase(content, "|tableName|", "#arguments.tableName#", "all");
+			content=replaceNoCase(content, "|columnType|", "#arguments.dataType#", "all");
+			content=replaceNoCase(content, "|columnName|", "#arguments.name#", "all");
+			//content=replaceNoCase(content, "|referenceName|", "#referenceName#", "all");
 
-		// Construct additional arguments(only add/replace if passed through)
-		if(structKeyExists(arguments,"default") && len(arguments.default)){
-			if(isnumeric(arguments.default)){
-			arrayAppend(argumentArr, "default = #arguments.default#");
-			} else {
-			arrayAppend(argumentArr, "default = '#arguments.default#'");
+			// Construct additional arguments(only add/replace if passed through)
+			if(structKeyExists(arguments,"default") && len(arguments.default)){
+				if(isnumeric(arguments.default)){
+				arrayAppend(argumentArr, "default = #arguments.default#");
+				} else {
+				arrayAppend(argumentArr, "default = '#arguments.default#'");
+				}
 			}
-		}
-		if(structKeyExists(arguments,"allowNull") && len(arguments.allowNull) && isBoolean(arguments.allowNull)){
-			arrayAppend(argumentArr, "allowNull = #arguments.allowNull#");
-		}
-		if(structKeyExists(arguments,"limit") && len(arguments.limit) && isnumeric(arguments.limit) && arguments.limit != 0){
-			arrayAppend(argumentArr, "limit = #arguments.limit#");
-		}
-		if(structKeyExists(arguments,"precision") && len(arguments.precision) && isnumeric(arguments.precision) && arguments.precision != 0){
-			arrayAppend(argumentArr, "precision = #arguments.precision#");
-		}
-		if(structKeyExists(arguments,"scale") && len(arguments.scale) && isnumeric(arguments.scale) && arguments.scale != 0){
-			arrayAppend(argumentArr, "scale = #arguments.scale#");
-		}
-		if(arrayLen(argumentArr)){
-			argumentString&=", ";
-			argumentString&=$constructArguments(argumentArr);
-		}
+			if(structKeyExists(arguments,"allowNull") && len(arguments.allowNull) && isBoolean(arguments.allowNull)){
+				arrayAppend(argumentArr, "allowNull = #arguments.allowNull#");
+			}
+			if(structKeyExists(arguments,"limit") && len(arguments.limit) && isnumeric(arguments.limit) && arguments.limit != 0){
+				arrayAppend(argumentArr, "limit = #arguments.limit#");
+			}
+			if(structKeyExists(arguments,"precision") && len(arguments.precision) && isnumeric(arguments.precision) && arguments.precision != 0){
+				arrayAppend(argumentArr, "precision = #arguments.precision#");
+			}
+			if(structKeyExists(arguments,"scale") && len(arguments.scale) && isnumeric(arguments.scale) && arguments.scale != 0){
+				arrayAppend(argumentArr, "scale = #arguments.scale#");
+			}
+			if(arrayLen(argumentArr)){
+				argumentString&=", ";
+				argumentString&=$constructArguments(argumentArr);
+			}
 
-		// Finally, replace |arguments| with appropriate string
-		content=replaceNoCase(content, "|arguments|", "#argumentString#", "all");
-		//content=replaceNoCase(content, "|null|", "#null#", "all");
-		//content=replaceNoCase(content, "|limit|", "#limit#", "all");
-		//content=replaceNoCase(content, "|precision|", "#precision#", "all");
-		//content=replaceNoCase(content, "|scale|", "#scale#", "all");
+			// Finally, replace |arguments| with appropriate string
+			content=replaceNoCase(content, "|arguments|", "#argumentString#", "all");
+			//content=replaceNoCase(content, "|null|", "#null#", "all");
+			//content=replaceNoCase(content, "|limit|", "#limit#", "all");
+			//content=replaceNoCase(content, "|precision|", "#precision#", "all");
+			//content=replaceNoCase(content, "|scale|", "#scale#", "all");
 
-		// Output detail header
-		detailOutput.header("Migration Generation");
-		
-		// Make File
-		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.tableName)) & '_' & lcase(trim(arguments.name)),	action="create_column",	content=content);
-		
-		detailOutput.create(migrationPath);
-		detailOutput.line();
-		detailOutput.statusSuccess("Column migration created successfully!");
-		
-		var nextSteps = [];
-		arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
-		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
-		arrayAppend(nextSteps, "Or run all pending migrations: wheels dbmigrate latest");
-		detailOutput.nextSteps(nextSteps);
+			// Output detail header
+			detailOutput.header("Migration Generation");
+			
+			// Make File
+			var migrationPath = $createMigrationFile(name=lcase(trim(arguments.tableName)) & '_' & lcase(trim(arguments.name)),	action="create_column",	content=content);
+			
+			detailOutput.create(migrationPath);
+			detailOutput.line();
+			detailOutput.statusSuccess("Column migration created successfully!");
+			
+			var nextSteps = [];
+			arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
+			arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
+			arrayAppend(nextSteps, "Or run all pending migrations: wheels dbmigrate latest");
+			detailOutput.nextSteps(nextSteps);
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
 	}
 
 	function $constructArguments(args, string operator=","){

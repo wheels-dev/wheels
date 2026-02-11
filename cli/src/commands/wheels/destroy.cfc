@@ -17,7 +17,8 @@ component aliases='wheels d'  extends="base"  {
 	 * @type.hint Type of component to destroy (resource, controller, model, view). Default is resource
 	 * @name.hint Name of object to destroy
 	 **/
-	function run(required string name, string type="resource") {
+	function run(
+		required string name, string type="resource") {
 
 		requireWheelsApp(getCWD());
 		arguments=reconstructArgs(arguments);

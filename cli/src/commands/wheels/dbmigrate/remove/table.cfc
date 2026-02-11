@@ -14,28 +14,34 @@ component aliases='wheels db remove table' extends="../../base"  {
 	 * 
 	 **/
 	function run(
-		required string name ) {
-		arguments = reconstructArgs(arguments);
-		// Get Template
-		var content=fileRead(getTemplate("dbmigrate/remove-table.txt"));
+		required string name 
+	) {
+		try{
+			arguments = reconstructArgs(arguments);
+			// Get Template
+			var content=fileRead(getTemplate("dbmigrate/remove-table.txt"));
 
-		// Changes here
-		content=replaceNoCase(content, "|tableName|", "#name#", "all");
+			// Changes here
+			content=replaceNoCase(content, "|tableName|", "#name#", "all");
 
-		// Output detail header
-		detailOutput.header("Migration Generation");
-		
-		// Make File
-		var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="remove_table",	content=content);
-		
-		detailOutput.remove(migrationPath);
-		detailOutput.line();
-		detailOutput.statusSuccess("Table removal migration created successfully!");
-		
-		var nextSteps = [];
-		arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
-		arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
-		arrayAppend(nextSteps, "Run all pending migrations: wheels dbmigrate latest");
-		detailOutput.nextSteps(nextSteps);
+			// Output detail header
+			detailOutput.header("Migration Generation");
+			
+			// Make File
+			var migrationPath = $createMigrationFile(name=lcase(trim(arguments.name)),	action="remove_table",	content=content);
+			
+			detailOutput.remove(migrationPath);
+			detailOutput.line();
+			detailOutput.statusSuccess("Table removal migration created successfully!");
+			
+			var nextSteps = [];
+			arrayAppend(nextSteps, "Review the migration file: #migrationPath#");
+			arrayAppend(nextSteps, "Run the migration: wheels dbmigrate up");
+			arrayAppend(nextSteps, "Run all pending migrations: wheels dbmigrate latest");
+			detailOutput.nextSteps(nextSteps);
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
 	}
 }

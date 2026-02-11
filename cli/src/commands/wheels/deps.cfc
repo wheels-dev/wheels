@@ -25,49 +25,55 @@ component extends="base" {
         string version="",
         boolean dev=false
     ) {
-        requireWheelsApp(getCWD());
-        arguments = reconstructArgs(
-            argStruct=arguments,
-            allowedValues={
-                action=["list", "install", "update", "remove", "report"]
-            }
-        );
+        try {
+            requireWheelsApp(getCWD());
+            arguments = reconstructArgs(
+                argStruct=arguments,
+                allowedValues={
+                    action=["list", "install", "update", "remove", "report"]
+                }
+            );
 
-        // Welcome message
-        detailOutput.header("Wheels Dependency Manager");
-        
-        // Handle different actions
-        switch (lCase(arguments.action)) {
-            case "list":
-                listDependencies();
-                break;
-            case "install":
-                if (len(trim(arguments.name)) == 0) {
-                    detailOutput.error("Name parameter is required for install action");
-                    return;
-                }
-                installDependency(arguments.name, arguments.version, arguments.dev);
-                break;
-            case "update":
-                if (len(trim(arguments.name)) == 0) {
-                    detailOutput.error("Name parameter is required for update action");
-                    return;
-                }
-                updateDependency(arguments.name);
-                break;
-            case "remove":
-                if (len(trim(arguments.name)) == 0) {
-                    detailOutput.error("Name parameter is required for remove action");
-                    return;
-                }
-                removeDependency(arguments.name);
-                break;
-            case "report":
-                generateDependencyReport();
-                break;
-        }
-        
-        detailOutput.line();
+            // Welcome message
+            detailOutput.header("Wheels Dependency Manager");
+            
+            // Handle different actions
+            switch (lCase(arguments.action)) {
+                case "list":
+                    listDependencies();
+                    break;
+                case "install":
+                    if (len(trim(arguments.name)) == 0) {
+                        detailOutput.error("Name parameter is required for install action");
+                        return;
+                    }
+                    installDependency(arguments.name, arguments.version, arguments.dev);
+                    break;
+                case "update":
+                    if (len(trim(arguments.name)) == 0) {
+                        detailOutput.error("Name parameter is required for update action");
+                        return;
+                    }
+                    updateDependency(arguments.name);
+                    break;
+                case "remove":
+                    if (len(trim(arguments.name)) == 0) {
+                        detailOutput.error("Name parameter is required for remove action");
+                        return;
+                    }
+                    removeDependency(arguments.name);
+                    break;
+                case "report":
+                    generateDependencyReport();
+                    break;
+            }
+            
+            detailOutput.line();
+
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
     }
     
     /**
