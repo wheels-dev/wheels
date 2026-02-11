@@ -40,9 +40,13 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
+      - name: Make scripts executable
+        run: chmod +x tools/build/scripts/*.sh
+
       - name: Update Version Numbers
+        env:
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          NEW_VERSION="${{ github.event.inputs.new_version }}"
           echo "Updating to version: $NEW_VERSION"
 
           # Update templates/base/src/box.json
@@ -55,38 +59,42 @@ jobs:
             examples/starter-app/box.json > examples/starter-app/box.json.tmp
           mv examples/starter-app/box.json.tmp examples/starter-app/box.json
 
-          # Update CHANGELOG.md
-          sed -i "1a\\# [$NEW_VERSION](https://github.com/wheels-dev/wheels/tree/develop) => TBD\n\n### Controller Enhancements\n\n### Model Enhancements\n\n### View Enhancements\n\n### Bug Fixes\n\n### Miscellaneous\n\n### Guides\n\n### Potentially Breaking Changes\n\n---\n" CHANGELOG.md
-
           echo "Version updated to $NEW_VERSION"
 
+      - name: Generate Changelog from Merged PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
+        run: |
+          # Strip -SNAPSHOT suffix for changelog header
+          CHANGELOG_VERSION="${NEW_VERSION%-SNAPSHOT}"
+          ./tools/build/scripts/generate-changelog.sh "$CHANGELOG_VERSION" "" --write
+
       - name: Commit Changes
+        env:
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
           git add templates/base/src/box.json
           git add examples/starter-app/box.json
           git add CHANGELOG.md
 
-          git commit -m "$(cat <<'EOF'
-          Bump version to ${{ github.event.inputs.new_version }}
+          git commit -m "Bump version to $NEW_VERSION
 
-          Automated version bump after release using GitHub Actions.
-
-          🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-          Co-Authored-By: Claude <noreply@anthropic.com>
-          EOF
-          )"
+          Automated version bump and changelog generation using GitHub Actions."
 
           git push origin main
 
       - name: Create Summary
+        env:
+          NEW_VERSION: ${{ github.event.inputs.new_version }}
+          BUMP_TYPE: ${{ github.event.inputs.bump_type }}
         run: |
           echo "## Version Bump Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**New Version:** ${{ github.event.inputs.new_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Bump Type:** ${{ github.event.inputs.bump_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**New Version:** $NEW_VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Bump Type:** $BUMP_TYPE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Files Updated:" >> $GITHUB_STEP_SUMMARY
           echo "- templates/base/src/box.json" >> $GITHUB_STEP_SUMMARY
           echo "- examples/starter-app/box.json" >> $GITHUB_STEP_SUMMARY
-          echo "- CHANGELOG.md" >> $GITHUB_STEP_SUMMARY
+          echo "- CHANGELOG.md (auto-generated from merged PRs)" >> $GITHUB_STEP_SUMMARY

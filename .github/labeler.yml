@@ -1,0 +1,37 @@
+# Configuration for actions/labeler
+# Automatically labels PRs based on changed file paths
+
+enhancement:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'core/src/**'
+      - 'templates/base/src/app/**'
+
+bug:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'core/src/**/*.cfc'
+    - all-globs-to-all-files:
+      - head-branch: ['^fix/', '^hotfix/', '^bugfix/']
+
+docs:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docs/**'
+      - '**/*.md'
+      - '.ai/**'
+
+javascript:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.vue'
+      - '**/package.json'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/box.json'
+      - '**/package.json'
+      - '**/package-lock.json'
