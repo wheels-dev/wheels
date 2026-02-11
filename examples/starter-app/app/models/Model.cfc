@@ -38,9 +38,14 @@ component extends="wheels.Model" {
 	* Simple sanitization: this could probably be improved somewhat.
 	**/
 	private function sanitizeInput(string){
-		local.rv = REReplaceNoCase(arguments.string, "<\ *[a-z].*?>", "", "all");
-		local.rv = REReplaceNoCase(local.rv, "<\ */\ *[a-z].*?>", "", "all");
-		local.rv = trim(htmleditFormat(local.rv));
+		local.rv = reReplaceNoCase(arguments.string, "<[^>]*>", "", "all");
+		local.rv = trim(local.rv);
+
+		local.rv = replace(local.rv, "&", "&amp;", "all");
+		local.rv = replace(local.rv, "<", "&lt;", "all");
+		local.rv = replace(local.rv, ">", "&gt;", "all");
+		local.rv = replace(local.rv, '"', "&quot;", "all");
+
 		return local.rv;
 	}
 
