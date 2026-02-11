@@ -1,37 +1,33 @@
-# Configuration for actions/labeler
-# Automatically labels PRs based on changed file paths
+# Configuration for actions/labeler v5
+# Automatically labels PRs based on changed file paths and branch names
 
 enhancement:
-  - changed-files:
-    - any-glob-to-any-file:
-      - 'core/src/**'
-      - 'templates/base/src/app/**'
+- changed-files:
+  - any-glob-to-any-file:
+    - 'core/src/**'
+    - 'templates/base/src/app/**'
 
 bug:
-  - changed-files:
-    - any-glob-to-any-file:
-      - 'core/src/**/*.cfc'
-    - all-globs-to-all-files:
-      - head-branch: ['^fix/', '^hotfix/', '^bugfix/']
+- head-branch: ['^fix/', '^hotfix/', '^bugfix/']
 
 docs:
-  - changed-files:
-    - any-glob-to-any-file:
-      - 'docs/**'
-      - '**/*.md'
-      - '.ai/**'
+- changed-files:
+  - any-glob-to-any-file:
+    - 'docs/**'
+    - '**/*.md'
+    - '.ai/**'
 
 javascript:
-  - changed-files:
-    - any-glob-to-any-file:
-      - '**/*.js'
-      - '**/*.ts'
-      - '**/*.vue'
-      - '**/package.json'
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.js'
+    - '**/*.ts'
+    - '**/*.vue'
+    - '**/package.json'
 
 dependencies:
-  - changed-files:
-    - any-glob-to-any-file:
-      - '**/box.json'
-      - '**/package.json'
-      - '**/package-lock.json'
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/box.json'
+    - '**/package.json'
+    - '**/package-lock.json'
