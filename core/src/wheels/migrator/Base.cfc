@@ -114,6 +114,40 @@ component extends="wheels.Global"{
 		}
 	}
 
+	/**
+	 * Executes a parameterized SQL statement for safe data operations.
+	 */
+	private void function $executeWithParams(required string sql, required array params) {
+		local.appKey = $appKey();
+		local.sql = Trim(arguments.sql);
+		local.info = $dbinfo(
+			type = "version",
+			datasource = application.wheels.dataSourceName,
+			username = application.wheels.dataSourceUserName,
+			password = application.wheels.dataSourcePassword
+		);
+		if (Right(local.sql, 1) neq ";" && !FindNoCase("Oracle", local.info.database_productname)) {
+			local.sql = local.sql & ";";
+		}
+		if (StructKeyExists(request, "$wheelsMigrationSQLFile") && application[local.appKey].writeMigratorSQLFiles) {
+			$file(
+				action = "append",
+				file = request.$wheelsMigrationSQLFile,
+				output = "#local.sql#",
+				addNewLine = "yes",
+				fixNewLine = "yes"
+			);
+		}
+		if (StructKeyExists(request, "$wheelsDebugSQL") && request.$wheelsDebugSQL) {
+			if (!StructKeyExists(request, "$wheelsDebugSQLResult")) {
+				request.$wheelsDebugSQLResult = [];
+			}
+			ArrayAppend(request.$wheelsDebugSQLResult, local.sql);
+		} else {
+			queryExecute(local.sql, arguments.params, {datasource: application[local.appKey].dataSourceName});
+		}
+	}
+
 	public string function $getColumns(required string tableName) {
 		local.appKey = $appKey();
 		local.columns = $dbinfo(

@@ -11,7 +11,7 @@ component accessors="true" {
 	 */
 	function init(){
 		variables.mixins = {
-			"$wbMixer"            : true,
+			"$mixed"            : true,
 			"removeMixin"         : variables.removeMixin,
 			"injectMixin"         : variables.injectMixin,
 			"invokerMixin"        : variables.invokerMixin,
@@ -33,7 +33,7 @@ component accessors="true" {
 	 * @target target object
 	 */
 	function start( required target ){
-		if ( !structKeyExists( arguments.target, "$wbMixer" ) ) {
+		if ( !structKeyExists( arguments.target, "$mixed" ) ) {
 			structAppend( arguments.target, variables.mixins, true );
 		}
 		return arguments.target;

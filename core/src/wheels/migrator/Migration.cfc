@@ -401,7 +401,8 @@ component extends="Base" {
 	public void function addRecord(required string table) {
 		local.appKey = $appKey();
 		local.columnNames = "";
-		local.columnValues = "";
+		local.placeholders = "";
+		local.params = [];
 		if (
 			!StructKeyExists(arguments, application[local.appKey].timeStampOnCreateProperty)
 			&& ListFindNoCase($getColumns(arguments.table), application[local.appKey].timeStampOnCreateProperty)
@@ -419,40 +420,32 @@ component extends="Base" {
 		for (local.key in arguments) {
 			if (local.key neq "table") {
 				local.columnNames = ListAppend(local.columnNames, this.adapter.quoteColumnName(local.key));
-				if (IsNumeric(arguments[local.key])) {
-					local.columnValues = ListAppend(local.columnValues, arguments[local.key]);
-				} else if (IsBoolean(arguments[local.key])) {
-					local.columnValues = ListAppend(local.columnValues, IIf(arguments[local.key], 1, 0));
-				} else if (IsDate(arguments[local.key])) {
-					if(get("adapterName") == "SQLiteModel" && $isTimestampLiteral(arguments[local.key])){
-						local.columnValues = '"#$convertToString(arguments[local.key])#"';
-					} else {
-						local.columnValues = ListAppend(local.columnValues, "#arguments[local.key]#");
-					}
+				local.placeholders = ListAppend(local.placeholders, "?");
+				local.value = arguments[local.key];
+				// Strip wrapping single quotes if present (legacy convention)
+				if (IsSimpleValue(local.value) && REFind("^'.*'$", local.value)) {
+					local.value = Mid(local.value, 2, Len(local.value) - 2);
+				}
+				if (IsNumeric(local.value) && !REFind("^0\d", local.value)) {
+					ArrayAppend(local.params, {value: local.value, cfsqltype: "cf_sql_numeric"});
+				} else if (IsBoolean(local.value) && !IsNumeric(local.value)) {
+					ArrayAppend(local.params, {value: local.value ? 1 : 0, cfsqltype: "cf_sql_integer"});
+				} else if (IsDate(local.value) && !IsNumeric(local.value)) {
+					ArrayAppend(local.params, {value: local.value, cfsqltype: "cf_sql_timestamp"});
 				} else {
-					if (REFind("^'.*'$", arguments[local.key])) {
-						// strip only first and last quote
-						local.cleaned = Mid(arguments[local.key], 2, Len(arguments[local.key]) - 2);
-						// wrap in double quotes
-						local.columnValues = ListAppend(local.columnValues, '"' & local.cleaned & '"');
-					} else {
-						// normal values
-						local.columnValues = ListAppend(
-							local.columnValues,
-							"'#Replace(arguments[local.key], "'", "''", "all")#'"
-						);
-					}
+					ArrayAppend(local.params, {value: local.value, cfsqltype: "cf_sql_varchar"});
 				}
 			}
 		}
 		if (local.columnNames != '') {
-			if (ListContainsNoCase(local.columnnames, "[id]")) {
+			if (ListContainsNoCase(local.columnNames, "[id]")) {
 				$execute(this.adapter.addRecordPrefix(arguments.table));
 			}
-			$execute(
-				"INSERT INTO #this.adapter.quoteTableName(arguments.table)# ( #local.columnNames# ) VALUES ( #local.columnValues# )"
+			$executeWithParams(
+				sql = "INSERT INTO #this.adapter.quoteTableName(arguments.table)# ( #local.columnNames# ) VALUES ( #local.placeholders# )",
+				params = local.params
 			);
-			if (ListContainsNoCase(local.columnnames, "[id]")) {
+			if (ListContainsNoCase(local.columnNames, "[id]")) {
 				$execute(this.adapter.addRecordSuffix(arguments.table));
 			}
 			announce("Added record to table #arguments.table#");
@@ -471,7 +464,8 @@ component extends="Base" {
 	 */
 	public void function updateRecord(required string table, string where = "") {
 		local.appKey = $appKey();
-		local.columnUpdates = "";
+		local.setClauses = "";
+		local.params = [];
 		if (
 			!StructKeyExists(arguments, application[local.appKey].timeStampOnUpdateProperty)
 			&& ListFindNoCase($getColumns(arguments.table), application[local.appKey].timeStampOnUpdateProperty)
@@ -480,39 +474,31 @@ component extends="Base" {
 		}
 		for (local.key in arguments) {
 			if (local.key neq "table" && local.key neq "where") {
-				local.update = "#this.adapter.quoteColumnName(local.key)# = ";
-				if (IsNumeric(arguments[local.key])) {
-					local.update = local.update & "#arguments[local.key]#";
-				} else if (IsBoolean(arguments[local.key])) {
-					local.update = local.update & "#IIf(arguments[local.key], 1, 0)#";
-				} else if (IsDate(arguments[local.key])) {
-					if(get("adapterName") == "SQLiteModel" && $isTimestampLiteral(arguments[local.key])){
-						local.update =  local.update &  '"#$convertToString(arguments[local.key])#"';
-					} else {
-						local.update = local.update & "#arguments[local.key]#";
-					}
-				} else {
-					if (REFind("^'.*'$", arguments[local.key])) {
-						// strip only first and last quote
-						local.cleaned = Mid(arguments[local.key], 2, Len(arguments[local.key]) - 2);
-						// wrap in double quotes
-						local.update = local.update & '"' & local.cleaned & '"';
-					} else {
-						arguments[local.key] = ReplaceNoCase(arguments[local.key], "'", "''", "all");
-						local.update = local.update & "'#arguments[local.key]#'";
-					}
+				local.setClauses = ListAppend(local.setClauses, "#this.adapter.quoteColumnName(local.key)# = ?");
+				local.value = arguments[local.key];
+				// Strip wrapping single quotes if present (legacy convention)
+				if (IsSimpleValue(local.value) && REFind("^'.*'$", local.value)) {
+					local.value = Mid(local.value, 2, Len(local.value) - 2);
 				}
-				local.columnUpdates = ListAppend(local.columnUpdates, local.update);
+				if (IsNumeric(local.value) && !REFind("^0\d", local.value)) {
+					ArrayAppend(local.params, {value: local.value, cfsqltype: "cf_sql_numeric"});
+				} else if (IsBoolean(local.value) && !IsNumeric(local.value)) {
+					ArrayAppend(local.params, {value: local.value ? 1 : 0, cfsqltype: "cf_sql_integer"});
+				} else if (IsDate(local.value) && !IsNumeric(local.value)) {
+					ArrayAppend(local.params, {value: local.value, cfsqltype: "cf_sql_timestamp"});
+				} else {
+					ArrayAppend(local.params, {value: local.value, cfsqltype: "cf_sql_varchar"});
+				}
 			}
 		}
-		if (local.columnUpdates != '') {
-			local.sql = 'UPDATE #this.adapter.quoteTableName(arguments.table)# SET #local.columnUpdates#';
+		if (local.setClauses != '') {
+			local.sql = 'UPDATE #this.adapter.quoteTableName(arguments.table)# SET #local.setClauses#';
 			local.message = 'Updated record(s) in table #arguments.table#';
 			if (arguments.where != '') {
 				local.sql = local.sql & ' WHERE #arguments.where#';
 				local.message = local.message & ' where #arguments.where#';
 			}
-			$execute(local.sql);
+			$executeWithParams(sql = local.sql, params = local.params);
 			announce(local.message);
 		}
 	}
