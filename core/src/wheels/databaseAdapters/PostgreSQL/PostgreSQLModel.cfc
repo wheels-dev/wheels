@@ -182,7 +182,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * PostgreSQL uses double-quotes to quote identifiers (ANSI SQL standard).
 	 */
 	public string function $quoteIdentifier(required string name) {
-		return """#arguments.name#""";
+		// PostgreSQL folds unquoted identifiers to lowercase, so we must lowercase
+		// before quoting to match the actual stored name
+		return """#LCase(arguments.name)#""";
 	}
 
 }

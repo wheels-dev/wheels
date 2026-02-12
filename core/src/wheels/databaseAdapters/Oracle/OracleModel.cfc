@@ -148,7 +148,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 * Oracle uses double-quotes to quote identifiers.
 	 */
 	public string function $quoteIdentifier(required string name) {
-		return """#arguments.name#""";
+		// Oracle folds unquoted identifiers to uppercase, so we must uppercase
+		// before quoting to match the actual stored name
+		return """#UCase(arguments.name)#""";
 	}
 
 }
