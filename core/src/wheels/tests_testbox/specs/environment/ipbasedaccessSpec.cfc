@@ -29,16 +29,9 @@ component extends="wheels.Testbox" {
 	}
 
 	function run() {
-
+		
 		describe("IP-Based Debug Access Tests", () => {
-
-			beforeEach(() => {
-				// Reset shared application state before each test to prevent bleed-through
-				application.wheels.enablePublicComponent = false;
-				application.wheels.showDebugInformation = false;
-				application.wheels.showErrorInformation = false;
-			});
-
+			
 			it("development environment always enables public component regardless of IP", () => {
 				// Set up development environment
 				application.wheels.environment = "development";
