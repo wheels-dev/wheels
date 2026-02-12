@@ -5,12 +5,13 @@ component extends="wheels.Testbox" {
 		g = application.wo
 
 		// Calculate the expected WHERE column reference length dynamically based on quoting
-		// Unquoted: " c_o_r_e_authors.id " = 19 chars before operator
+		// result[2] from $whereClause is: quotedTable.quotedColumn + " " + operator
+		// Unquoted: "c_o_r_e_authors.id " = 19 chars before operator
 		// With quoting the length varies by adapter
 		qi = function(required string name) {
 			return g.model("author").$quoteColumn(arguments.name);
 		};
-		whereBaseLen = Len(" " & qi("c_o_r_e_authors") & "." & qi("id") & " ");
+		whereBaseLen = Len(qi("c_o_r_e_authors") & "." & qi("id") & " ");
 
 		describe("Tests that whereclause", () => {
 
