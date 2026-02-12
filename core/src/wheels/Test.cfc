@@ -1,6 +1,5 @@
 component output="false" displayName="Test" extends="wheels.Global"{
 
-	property name="Mixins" inject="id:Plugins";
 
 	function init(){
 		return this;
@@ -795,7 +794,7 @@ component output="false" displayName="Test" extends="wheels.Global"{
 		if (structKeyExists(server, "boxlang")) {
 			variables.this = this;
 		}
-		Mixins.$initializeMixins(variables);
+		new wheels.Plugins().$initializeMixins(variables);
 	}
 
 }

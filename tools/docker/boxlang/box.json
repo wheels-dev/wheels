@@ -2,8 +2,6 @@
     "name": "wheels-test-suite-boxlang",
     "version": "1.0.0",
     "dependencies": {
-        "wirebox": "^8.0.0",
-        "testbox": "^6.0.0",
         "bx-compat-cfml":"^1.27.0+35",
         "bx-csrf":"^1.2.0+3",
         "bx-esapi":"^1.6.0+9",
@@ -16,7 +14,5 @@
         "bx-sqlite":"^1.1.0+2"
     },
     "installPaths": {
-        "wirebox": "vendor/wirebox/",
-        "testbox": "vendor/testbox/"
     }
 }

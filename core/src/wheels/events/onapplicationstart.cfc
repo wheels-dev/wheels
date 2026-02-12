@@ -1,6 +1,5 @@
 component {
 
-	property name="Mixins" inject="id:Plugins";
 
 	public void function $init(struct keys = {}) {
 
@@ -161,6 +160,11 @@ component {
 		// Set the coreTestDatasourceName to the application dataSourceName if it doesn't exits
 		if (!StructKeyExists(application.$wheels, "coreTestDataSourceName")) {
 			application.$wheels.coreTestDataSourceName = application.$wheels.dataSourceName;
+		}
+
+		// Test framework: "testbox" (default) or "rocketunit"
+		if (!StructKeyExists(application.$wheels, "testFramework")) {
+			application.$wheels.testFramework = "testbox";
 		}
 
 		application.$wheels.dataSourceUserName = "";
@@ -954,7 +958,7 @@ component {
 			if (structKeyExists(server, "boxlang")) {
 				variables.this = this;
 			}
-			Mixins.$initializeMixins(variables);
+			new wheels.Plugins().$initializeMixins(variables);
 		}
 
 		// Create the mapper that will handle creating routes.

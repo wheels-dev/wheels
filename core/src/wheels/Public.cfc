@@ -46,26 +46,36 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 	
 	public function tests_testbox(){
+		// Delegate to RocketUnit if testFramework setting says so
+		if (
+			structKeyExists(application, "wheels")
+			&& structKeyExists(application.wheels, "testFramework")
+			&& application.wheels.testFramework == "rocketunit"
+		) {
+			include "/wheels/public/views/tests.cfm";
+			return "";
+		}
+
 		// Set proper HTTP status first
 		cfheader(statuscode="200");
-		
+
 		// Simple test to ensure the endpoint works
 		if (structKeyExists(url, "test") && url.test == "simple") {
 			cfcontent(type="application/json");
 			writeOutput('{"success":true,"message":"TestBox endpoint is working"}');
 			abort;
 		}
-		
+
 		// Set content type based on format
 		if (structKeyExists(url, "format") && url.format == "json") {
 			cfcontent(type="application/json");
 		} else if (structKeyExists(url, "format") && url.format == "txt") {
 			cfcontent(type="text/plain");
 		}
-		
+
 		// Include the TestBox runner directly without buffering
 		include "/wheels/tests_testbox/runner.cfm";
-		
+
 		// Ensure we abort to prevent any further processing
 		abort;
 	}

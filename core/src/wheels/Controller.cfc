@@ -1,7 +1,5 @@
 component output="false" displayName="Controller" extends="wheels.Global"{
 
-	property name="Mixins" inject="id:Plugins";
-
 	function init(){
 		$integrateComponents("wheels.controller");
 		$integrateComponents("wheels.view");
@@ -210,6 +208,6 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 		if (structKeyExists(server, "boxlang")) {
 			variables.this = this;
 		}
-		Mixins.$initializeMixins(variables);
+		new wheels.Plugins().$initializeMixins(variables);
 	}
 }

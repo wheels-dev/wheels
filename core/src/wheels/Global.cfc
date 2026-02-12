@@ -483,11 +483,6 @@ component output="false" {
 			);
 		}
 
-		/* Wirebox adjustment */
-		if (isStruct(arguments.data) && StructKeyExists(arguments.data, '$wbMixer')){
-			structDelete(arguments.data, '$wbMixer');
-		}
-
 		return request.wheels.toXml.toXml(arguments.data);
 	}
 

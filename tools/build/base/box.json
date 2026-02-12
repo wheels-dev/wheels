@@ -35,14 +35,10 @@
 			"wheels-plugins":"vendor/"
 		},
     "installPaths":{
-        "wheels-core":"vendor/wheels/",
-				"wirebox":"vendor/wirebox/",
-				"testbox":"vendor/testbox/"
+        "wheels-core":"vendor/wheels/"
     },
     "dependencies":{
-        "wheels-core":"@build.version@",
-				"wirebox":"^7",
-				"testbox":"^6"
+        "wheels-core":"@build.version@"
     },
     "private":false,
     "license":[

@@ -35,14 +35,10 @@
         "wheels-plugins":"vendor/"
     },
     "installPaths":{
-        "wheels-core":"vendor/wheels/",
-        "wirebox":"vendor/wirebox/",
-        "testbox":"vendor/testbox/"
+        "wheels-core":"vendor/wheels/"
     },
     "dependencies":{
         "wheels-core":"3.0.0-SNAPSHOT.rc.1+1053",
-        "wirebox":"^7",
-        "testbox":"^6",
         "orgh213172lex":"lex:https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex"
     },
     "private":false,

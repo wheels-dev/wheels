@@ -1,4 +1,4 @@
 <cfscript>
-    testbox = new testbox.system.TestBox();
+    testbox = new wheels.testbox.system.TestBox();
     testbox.run( directory = "tests.specs" );
 </cfscript>

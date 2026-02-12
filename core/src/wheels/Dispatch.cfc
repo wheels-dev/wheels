@@ -1,6 +1,5 @@
 component output="false" extends="wheels.Global"{
 
-	property name="Mixins" inject = "wheels.Plugins";
 
 	/**
 	 * Returns itself (the Dispatch object).
@@ -547,6 +546,6 @@ component output="false" extends="wheels.Global"{
 		if (structKeyExists(server, "boxlang")) {
 			variables.this = this;
 		}
-		Mixins.$initializeMixins(variables);
+		new wheels.Plugins().$initializeMixins(variables);
 	}
 }

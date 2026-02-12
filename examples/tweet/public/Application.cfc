@@ -14,14 +14,10 @@ component output="false" {
 	this.appDir     = expandPath("../app/");
 	this.vendorDir  = expandPath("../vendor/");
 	this.wheelsDir  = this.vendorDir & "wheels/";
-	this.wireboxDir = this.vendorDir & "wirebox/";
-	this.testboxDir = this.vendorDir & "testbox/";
 	// Set up the mappings for the application.
 	this.mappings["/app"]     = this.appDir;
 	this.mappings["/vendor"]  = this.vendorDir;
 	this.mappings["/wheels"]  = this.wheelsDir;
-	this.mappings["/wirebox"] = this.wireboxDir;
-	this.mappings["/testbox"] = this.testboxDir;
 	this.mappings["/tests"] = expandPath("../tests");
 	this.mappings["/config"] = expandPath("../config");
 	this.mappings["/plugins"] = expandPath("../plugins");
@@ -95,10 +91,10 @@ component output="false" {
 	include "../config/app.cfm";
 
 	function onApplicationStart() {
-		wirebox = new wirebox.system.ioc.Injector("wheels.Wirebox");
+		injector = new wheels.Injector("wheels.Bindings");
 
 		/* wheels/global object */
-		application.wo = wirebox.getInstance("global");
+		application.wo = injector.getInstance("global");
 		initArgs.path="wheels";
 		initArgs.filename="onapplicationstart";
 		application.wirebox.getInstance(name = "wheels.events.onapplicationstart", initArguments = initArgs).$init(this);
@@ -265,8 +261,8 @@ component output="false" {
 	}
 
 	public void function onError( any Exception, string EventName ) {
-		wirebox = new wirebox.system.ioc.Injector("wheels.Wirebox");
-		application.wo = wirebox.getInstance("global");
+		injector = new wheels.Injector("wheels.Bindings");
+		application.wo = injector.getInstance("global");
 
 		// In case the error was caused by a timeout we have to add extra time for error handling.
 		// We have to check if onErrorRequestTimeout exists since errors can be triggered before the application.wheels struct has been created.

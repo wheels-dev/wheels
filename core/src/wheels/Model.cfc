@@ -1,6 +1,5 @@
 component output="false" displayName="Model" extends="wheels.Global"{
 
-	property name="Mixins" inject="id:Plugins";
 
 	function init(){
 		$integrateComponents("wheels.model");
@@ -619,6 +618,6 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		if (structKeyExists(server, "boxlang")) {
 			variables.this = this;
 		}
-		Mixins.$initializeMixins(variables);
+		new wheels.Plugins().$initializeMixins(variables);
 	}
 }
