@@ -151,10 +151,15 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				}
 			}
 
+			// Strip identifier quotes from column list for comparison
+			local.columnList = $stripIdentifierQuotes(local.columnList);
+
 			// Lucee/ACF doesn't support PostgreSQL natively when it comes to returning the primary key value of the last inserted record so we have to do it manually by using the sequence.
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
+				// Strip identifier quotes that may have been added by $quoteIdentifier
+				local.tbl = ReReplace(local.tbl, '^"|"$', "", "all");
 				query = $query(
 					sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",
 					argumentCollection = arguments.queryAttributes
@@ -172,5 +177,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return "random()";
 	}
 
+	/**
+	 * Override Base adapter's function.
+	 * PostgreSQL uses double-quotes to quote identifiers (ANSI SQL standard).
+	 */
+	public string function $quoteIdentifier(required string name) {
+		return """#arguments.name#""";
+	}
 
 }

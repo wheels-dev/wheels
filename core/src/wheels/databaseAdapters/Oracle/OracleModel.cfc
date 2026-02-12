@@ -106,6 +106,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				"#Chr(10)#,#Chr(13)#, ",
 				",,"
 			);
+			// Strip identifier quotes from column list for comparison
+			local.columnList = $stripIdentifierQuotes(local.columnList);
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
@@ -141,5 +143,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return arguments.table & " " & arguments.alias;
 	}
 
+	/**
+	 * Override Base adapter's function.
+	 * Oracle uses double-quotes to quote identifiers.
+	 */
+	public string function $quoteIdentifier(required string name) {
+		return """#arguments.name#""";
+	}
 
 }

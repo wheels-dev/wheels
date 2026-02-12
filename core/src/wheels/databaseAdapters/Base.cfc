@@ -161,6 +161,8 @@ component output=false extends="wheels.Global"{
 				"#Chr(10)#,#Chr(13)#, ",
 				",,"
 			);
+			// Strip identifier quotes from column list for comparison
+			local.columnList = $stripIdentifierQuotes(local.columnList);
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 				query = $query(sql = "SELECT LAST_INSERT_ID() AS lastId", argumentCollection = arguments.queryAttributes);
@@ -184,6 +186,23 @@ component output=false extends="wheels.Global"{
 	 */
 	public string function $defaultValues() {
 		return " DEFAULT VALUES";
+	}
+
+	/**
+	 * Quote a database identifier (table or column name) using the adapter's quoting character.
+	 * Base implementation is a no-op; individual adapters override with their specific quoting.
+	 * This prevents reserved word conflicts across all supported databases.
+	 */
+	public string function $quoteIdentifier(required string name) {
+		return arguments.name;
+	}
+
+	/**
+	 * Strip all identifier quote characters from a string.
+	 * Used when parsing rendered SQL to compare column names without quoting artifacts.
+	 */
+	public string function $stripIdentifierQuotes(required string str) {
+		return ReReplace(arguments.str, '`|\[|\]|"', "", "all");
 	}
 
 	/**

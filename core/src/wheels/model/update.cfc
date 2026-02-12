@@ -92,26 +92,26 @@ component {
 					local.list &= local.associations[local.i].join;
 				}
 				if (Len(local.indexHint)) {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.indexHint# #local.list# SET");
+					ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# #local.indexHint# #local.list# SET");
 				} else {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.list# SET");
+					ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# #local.list# SET");
 				}
-				
+
 			}
 			else if (ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName())){
 				if (Len(local.indexHint)) {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.indexHint# SET");
+					ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# #local.indexHint# SET");
 				} else {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# SET");
+					ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# SET");
 				}
 			}
 			else if (ListFind('PostgreSQL,H2,Oracle,SQLite', local.migration.adapter.adapterName())){
-				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET");
+				ArrayAppend(arguments.sql, "UPDATE #$quotedTableName()# SET");
 			}
 			local.pos = 0;
 			for (local.key in arguments.properties) {
 				local.pos++;
-				ArrayAppend(arguments.sql, "#variables.wheels.class.properties[local.key].column# = ");
+				ArrayAppend(arguments.sql, "#$quoteColumn(variables.wheels.class.properties[local.key].column)# = ");
 				local.param = {
 					value = arguments.properties[local.key],
 					type = variables.wheels.class.properties[local.key].type,
@@ -314,12 +314,12 @@ component {
 				$timestampProperty(property = variables.wheels.class.timeStampOnUpdateProperty);
 			}
 			local.sql = [];
-			ArrayAppend(local.sql, "UPDATE #tableName()# SET ");
+			ArrayAppend(local.sql, "UPDATE #$quotedTableName()# SET ");
 
 			// Include all changed non-key values in the update.
 			for (local.key in variables.wheels.class.properties) {
 				if (StructKeyExists(this, local.key) && !ListFindNoCase(primaryKeys(), local.key) && hasChanged(local.key)) {
-					ArrayAppend(local.sql, "#variables.wheels.class.properties[local.key].column# = ");
+					ArrayAppend(local.sql, "#$quoteColumn(variables.wheels.class.properties[local.key].column)# = ");
 					local.param = $buildQueryParamValues(local.key);
 					ArrayAppend(local.sql, local.param);
 					ArrayAppend(local.sql, ",");

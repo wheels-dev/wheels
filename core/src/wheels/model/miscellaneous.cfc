@@ -186,6 +186,22 @@ component {
 	}
 
 	/**
+	 * Returns the table name quoted with the adapter's identifier quoting character.
+	 * Used internally when building SQL to prevent reserved word conflicts.
+	 */
+	public string function $quotedTableName() {
+		return variables.wheels.class.adapter.$quoteIdentifier(tableName());
+	}
+
+	/**
+	 * Quotes a column name using the adapter's identifier quoting character.
+	 * Used internally when building SQL to prevent reserved word conflicts.
+	 */
+	public string function $quoteColumn(required string column) {
+		return variables.wheels.class.adapter.$quoteIdentifier(arguments.column);
+	}
+
+	/**
 	 * Returns the table name prefix set for the table.
 	 *
 	 * [section: Model Class]

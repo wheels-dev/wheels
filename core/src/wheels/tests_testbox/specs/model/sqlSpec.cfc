@@ -4,6 +4,14 @@ component extends="wheels.Testbox" {
 
 		g = application.wo
 
+		// Calculate the expected WHERE column reference length dynamically based on quoting
+		// Unquoted: " c_o_r_e_authors.id " = 19 chars before operator
+		// With quoting the length varies by adapter
+		qi = function(required string name) {
+			return g.model("author").$quoteColumn(arguments.name);
+		};
+		whereBaseLen = Len(" " & qi("c_o_r_e_authors") & "." & qi("id") & " ");
+
 		describe("Tests that whereclause", () => {
 
 			it("works with numeric operators", () => {
@@ -12,21 +20,21 @@ component extends="wheels.Testbox" {
 				for (i in operators) {
 					result = g.model("author").$whereClause(where = "id#i#0")
 
-					expect(result[2]).toHaveLength(19+len(i))
+					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
 					expect(result[3].type).toBe("cf_sql_integer")
 					expect(Right(result[2], Len(i))).toBe(i)
 
 					result = g.model("author").$whereClause(where = "id#i# 11")
 
-					expect(result[2]).toHaveLength(19+len(i))
+					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
 					expect(result[3].type).toBe("cf_sql_integer")
 					expect(Right(result[2], Len(i))).toBe(i)
-					
+
 					result = g.model("author").$whereClause(where = "id #i#999")
 
-					expect(result[2]).toHaveLength(19+len(i))
+					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
 					expect(result[3].type).toBe("cf_sql_integer")
 					expect(Right(result[2], Len(i))).toBe(i)

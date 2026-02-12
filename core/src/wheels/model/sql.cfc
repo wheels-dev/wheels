@@ -4,6 +4,8 @@ component {
 	 */
 	public array function $addDeleteClause(required array sql, required boolean softDelete, struct useIndex = {}) {
 		if (variables.wheels.class.softDeletion && arguments.softDelete) {
+			local.qTable = $quotedTableName();
+			local.qColumn = $quoteColumn(variables.wheels.class.softDeleteColumn);
 			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
 				local.indexHint = this.$indexHint(
 					useIndex = arguments.useIndex,
@@ -11,12 +13,12 @@ component {
 					adapterName = get("adapterName")
 				);
 				if (Len(local.indexHint)) {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# #local.indexHint# SET #variables.wheels.class.softDeleteColumn# = ");
+					ArrayAppend(arguments.sql, "UPDATE #local.qTable# #local.indexHint# SET #local.qColumn# = ");
 				} else {
-					ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
+					ArrayAppend(arguments.sql, "UPDATE #local.qTable# SET #local.qColumn# = ");
 				}
 			} else {
-				ArrayAppend(arguments.sql, "UPDATE #tableName()# SET #variables.wheels.class.softDeleteColumn# = ");
+				ArrayAppend(arguments.sql, "UPDATE #local.qTable# SET #local.qColumn# = ");
 			}
 			// Use cf_sql_varchar in SQLite for TEXT timestamps
 			if(get("adapterName") eq "SQLiteModel") {
@@ -27,10 +29,11 @@ component {
 			local.param = {value = $timestamp(variables.wheels.class.timeStampMode), type = local.type};
 			ArrayAppend(arguments.sql, local.param);
 		} else {
+			local.qTable = $quotedTableName();
 			if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
-				ArrayAppend(arguments.sql, "DELETE tbl FROM #tableName()# tbl");
+				ArrayAppend(arguments.sql, "DELETE tbl FROM #local.qTable# tbl");
 			} else {
-				ArrayAppend(arguments.sql, "DELETE FROM #tableName()#");
+				ArrayAppend(arguments.sql, "DELETE FROM #local.qTable#");
 			}
 		}
 		return arguments.sql;
@@ -59,7 +62,7 @@ component {
 		string adapterName = get("adapterName")
 	) {
 		// start the from statement with the SQL keyword and the table name for the current model
-		local.rv = "FROM " & tableName();
+		local.rv = "FROM " & $quotedTableName();
 
 		// add the index hint
 		local.indexHint = this.$indexHint(
@@ -113,7 +116,7 @@ component {
 				// group inner joins with parentheses and outer joins separately
 				local.innerJoins = [];
 				local.outerJoins = [];
-				
+
 				for (local.i = 1; local.i <= local.iEnd; local.i++) {
 					local.indexHint = this.$indexHint(
 						useIndex = arguments.useIndex,
@@ -122,12 +125,13 @@ component {
 					);
 					local.join = local.associations[local.i].join;
 					if (Len(local.indexHint)) {
-						// replace the table name with the table name & index hint
+						// replace the quoted table name with the quoted table name & index hint
 						// TODO: factor in table aliases.. the index hint is placed after the table alias
+						local.quotedAssocTable = variables.wheels.class.adapter.$quoteIdentifier(local.associations[local.i].tableName);
 						local.join = Replace(
 							local.join,
-							" #local.associations[local.i].tableName# ",
-							" #local.associations[local.i].tableName# #local.indexHint# ",
+							" #local.quotedAssocTable# ",
+							" #local.quotedAssocTable# #local.indexHint# ",
 							"one"
 						);
 					}
@@ -173,12 +177,13 @@ component {
 					);
 					local.join = local.associations[local.i].join;
 					if (Len(local.indexHint)) {
-						// replace the table name with the table name & index hint
+						// replace the quoted table name with the quoted table name & index hint
 						// TODO: factor in table aliases.. the index hint is placed after the table alias
+						local.quotedAssocTable = variables.wheels.class.adapter.$quoteIdentifier(local.associations[local.i].tableName);
 						local.join = Replace(
 							local.join,
-							" #local.associations[local.i].tableName# ",
-							" #local.associations[local.i].tableName# #local.indexHint# ",
+							" #local.quotedAssocTable# ",
+							" #local.quotedAssocTable# #local.indexHint# ",
 							"one"
 						);
 					}
@@ -197,7 +202,7 @@ component {
 		local.iEnd = ListLen(primaryKeys());
 		for (local.i = 1; local.i <= local.iEnd; local.i++) {
 			local.key = primaryKeys(local.i);
-			ArrayAppend(arguments.sql, variables.wheels.class.properties[local.key].column & " = ");
+			ArrayAppend(arguments.sql, $quoteColumn(variables.wheels.class.properties[local.key].column) & " = ");
 			if (hasChanged(local.key)) {
 				local.value = changedFrom(local.key);
 			} else {
@@ -258,7 +263,7 @@ component {
 							local.toAdd = "";
 							local.classData = local.classes[local.j];
 							if (StructKeyExists(local.classData.propertyStruct, local.property)) {
-								local.toAdd = local.classData.tableName & "." & local.classData.properties[local.property].column;
+								local.toAdd = variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & "." & variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.property].column);
 							} else if (StructKeyExists(local.classData.calculatedProperties, local.property)) {
 								local.sql = local.classData.calculatedProperties[local.property].sql;
 								local.toAdd = "(" & Replace(local.sql, ",", "[[comma]]", "all") & ")";
@@ -494,7 +499,7 @@ component {
 							local.toAppend &= "[[duplicate]]" & local.j;
 						}
 						if (StructKeyExists(local.classData.propertyStruct, local.iItem)) {
-							local.toAppend &= local.classData.tableName & ".";
+							local.toAppend &= variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & ".";
 							if (StructKeyExists(local.classData.columnStruct, local.iItem)) {
 								local.toAppend &= local.iItem;
 							} else {
@@ -647,7 +652,7 @@ component {
 		}
 		else if(arguments.include != "" && ListFind('MicrosoftSQLServer', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			if(left(arguments.sql[1], 6) == 'UPDATE'){
-				ArrayAppend(arguments.sql, "FROM #tablename()#");
+				ArrayAppend(arguments.sql, "FROM #$quotedTableName()#");
 			}
 		}
 		else if(arguments.include != "" && ListFind('H2,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
@@ -744,10 +749,10 @@ component {
 						if (!Find(".", local.param.property) || local.table == local.classData.tableName) {
 							if (StructKeyExists(local.classData.propertyStruct, local.column)) {
 								if ((structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) && !($softDeletion() && arguments.softDelete)) {
-									local.param.column = "tbl." & local.classData.properties[local.column].column;
+									local.param.column = "tbl." & variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.column].column);
 								} else {
-									local.param.column = local.classData.tableName & "." & local.classData.properties[local.column].column;
-								}								
+									local.param.column = variables.wheels.class.adapter.$quoteIdentifier(local.classData.tableName) & "." & variables.wheels.class.adapter.$quoteIdentifier(local.classData.properties[local.column].column);
+								}
 								local.param.dataType = local.classData.properties[local.column].dataType;
 								local.param.type = local.classData.properties[local.column].type;
 								local.param.scale = local.classData.properties[local.column].scale;
@@ -812,12 +817,12 @@ component {
 		if (!arguments.includeSoftDeletes) {
 			local.addToWhere = "";
 			if ($softDeletion() && arguments.softDelete) {
-				local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
+				local.addToWhere = ListAppend(local.addToWhere, $quotedTableName() & "." & $quoteColumn($softDeleteColumn()) & " IS NULL");
 			} else if ($softDeletion()) {
 				if (structKeyExists(arguments, "useIndex") && !structIsEmpty(arguments.useIndex)) {
-					local.addToWhere = ListAppend(local.addToWhere, "tbl." & $softDeleteColumn() & " IS NULL");
+					local.addToWhere = ListAppend(local.addToWhere, "tbl." & $quoteColumn($softDeleteColumn()) & " IS NULL");
 				} else {
-					local.addToWhere = ListAppend(local.addToWhere, tableName() & "." & $softDeleteColumn() & " IS NULL");
+					local.addToWhere = ListAppend(local.addToWhere, $quotedTableName() & "." & $quoteColumn($softDeleteColumn()) & " IS NULL");
 				}
 			}
 			local.addToWhere = Replace(local.addToWhere, ",", " AND ", "all");
@@ -1110,7 +1115,7 @@ component {
 			// create the join string if it hasn't already been done
 			if (!StructKeyExists(local.classAssociations[local.name], "join")) {
 				local.joinType = UCase(ReplaceNoCase(local.classAssociations[local.name].joinType, "outer", "left outer", "one"));
-				local.join = local.joinType & " JOIN " & local.classAssociations[local.name].tableName;
+				local.join = local.joinType & " JOIN " & variables.wheels.class.adapter.$quoteIdentifier(local.classAssociations[local.name].tableName);
 				// alias the table as the association name when joining to itself
 				if (ListFindNoCase(local.tables, local.classAssociations[local.name].tableName)) {
 					local.join = variables.wheels.class.adapter.$tableAlias(
@@ -1152,12 +1157,12 @@ component {
 					}
 					local.toAppend = ListAppend(
 						local.toAppend,
-						"#local.class.$classData().tableName#.#local.class.$classData().properties[local.first].column# = #local.tableName#.#local.associatedClass.$classData().properties[local.second].column#"
+						"#variables.wheels.class.adapter.$quoteIdentifier(local.class.$classData().tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(local.class.$classData().properties[local.first].column)# = #variables.wheels.class.adapter.$quoteIdentifier(local.tableName)#.#variables.wheels.class.adapter.$quoteIdentifier(local.associatedClass.$classData().properties[local.second].column)#"
 					);
 					if (!arguments.includeSoftDeletes && local.associatedClass.$softDeletion()) {
 						local.toAppend = ListAppend(
 							local.toAppend,
-							"#local.associatedClass.tableName()#.#local.associatedClass.$softDeleteColumn()# IS NULL"
+							"#variables.wheels.class.adapter.$quoteIdentifier(local.associatedClass.tableName())#.#variables.wheels.class.adapter.$quoteIdentifier(local.associatedClass.$softDeleteColumn())# IS NULL"
 						);
 					}
 				}

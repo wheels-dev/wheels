@@ -235,7 +235,7 @@ component {
 			if (StructKeyExists(variables.wheels.class.propertyStruct, local.item)) {
 				local.properties = ListAppend(
 					local.properties,
-					tableName() & "." & variables.wheels.class.properties[local.item].column
+					$quotedTableName() & "." & $quoteColumn(variables.wheels.class.properties[local.item].column)
 				);
 			} else if (StructKeyExists(variables.wheels.class.calculatedProperties, local.item)) {
 				local.properties = ListAppend(local.properties, variables.wheels.class.calculatedProperties[local.item].sql);
