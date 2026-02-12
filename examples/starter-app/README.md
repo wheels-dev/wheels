@@ -8,7 +8,7 @@ This repository contains a **user management and authentication web application*
 
 ## Installation
 
-See [Installation](https://github.com/wheels-dev/Wheels-example-app/wiki/Installation)
+See the [Quick Start](#quick-start) section below for setup instructions.
 
 ## Key Features
 
