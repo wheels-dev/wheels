@@ -4,6 +4,11 @@ component extends="wheels.Testbox" {
 
 		g = application.wo
 
+		// Helper to quote identifiers using the current adapter's quoting character
+		qi = function(required string name) {
+			return g.model("author").$quoteColumn(arguments.name);
+		};
+
 		describe("Tests that binarydata", () => {
 
 			beforeEach(() => {
@@ -563,7 +568,7 @@ component extends="wheels.Testbox" {
 				// trim extra whitespace
 				actual = Trim(actual)
 
-				expected = "SELECT c_o_r_e_authors.id FROM c_o_r_e_authors"
+				expected = "SELECT #qi('c_o_r_e_authors')#.id FROM #qi('c_o_r_e_authors')#"
 
 				expect(actual).toBe(expected)
 			})
@@ -1185,7 +1190,7 @@ component extends="wheels.Testbox" {
 			it("is working", () => {
 				result = g.model("author").$fromClause(include = "")
 
-				expect(result).toBe("FROM c_o_r_e_authors")
+				expect(result).toBe("FROM #qi('c_o_r_e_authors')#")
 			})
 
 			it("is working with mapped table", () => {
@@ -1193,13 +1198,13 @@ component extends="wheels.Testbox" {
 				result = g.model("author").$fromClause(include = "")
 				g.model("author").table("c_o_r_e_authors")
 
-				expect(result).toBe("FROM tbl_authors")
+				expect(result).toBe("FROM #qi('tbl_authors')#")
 			})
 
 			it("is working with include", () => {
 				result = g.model("author").$fromClause(include = "posts")
 
-				expect(result).toBe("FROM c_o_r_e_authors LEFT OUTER JOIN c_o_r_e_posts ON c_o_r_e_authors.id = c_o_r_e_posts.authorid AND c_o_r_e_posts.deletedat IS NULL")
+				expect(result).toBe("FROM #qi('c_o_r_e_authors')# LEFT OUTER JOIN #qi('c_o_r_e_posts')# ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL")
 			})
 
 			it("$indexHint", () => {
@@ -1215,13 +1220,13 @@ component extends="wheels.Testbox" {
 			it("is working with index hint mysql", () => {
 				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "MySQLModel")
 
-				expect(actual).toBe("FROM c_o_r_e_authors USE INDEX(idx_authors_123)")
+				expect(actual).toBe("FROM #qi('c_o_r_e_authors')# USE INDEX(idx_authors_123)")
 			})
 
 			it("is working with index hint sqlserver", () => {
 				actual = g.model("author").$fromClause(include = "", useIndex = {author = "idx_authors_123"}, adapterName = "MicrosoftSQLServerModel")
 
-				expect(actual).toBe("FROM c_o_r_e_authors WITH (INDEX(idx_authors_123))")
+				expect(actual).toBe("FROM #qi('c_o_r_e_authors')# WITH (INDEX(idx_authors_123))")
 			})
 
 			it("is working with index hint on unsupportive db", () => {
@@ -1231,7 +1236,7 @@ component extends="wheels.Testbox" {
 					adapterName = "PostgreSQL"
 				)
 
-				expect(actual).toBe("FROM c_o_r_e_authors")
+				expect(actual).toBe("FROM #qi('c_o_r_e_authors')#")
 			})
 
 			it("is working with include and index hints", () => {
@@ -1241,7 +1246,7 @@ component extends="wheels.Testbox" {
 					adapterName = "MySQLModel"
 				)
 
-				expect(actual).toBe("FROM c_o_r_e_authors USE INDEX(idx_authors_123) LEFT OUTER JOIN c_o_r_e_posts USE INDEX(idx_posts_123) ON c_o_r_e_authors.id = c_o_r_e_posts.authorid AND c_o_r_e_posts.deletedat IS NULL")
+				expect(actual).toBe("FROM #qi('c_o_r_e_authors')# USE INDEX(idx_authors_123) LEFT OUTER JOIN #qi('c_o_r_e_posts')# USE INDEX(idx_posts_123) ON #qi('c_o_r_e_authors')#.#qi('id')# = #qi('c_o_r_e_posts')#.#qi('authorid')# AND #qi('c_o_r_e_posts')#.#qi('deletedat')# IS NULL")
 			})
 		})
 
@@ -1645,7 +1650,9 @@ component extends="wheels.Testbox" {
 					"text"
 				)
 
-				expect(columnList).toBe("c_o_r_e_authors.firstname,c_o_r_e_authors.id,c_o_r_e_authors.id AS Authorid,c_o_r_e_authors.lastname,c_o_r_e_posts.averagerating AS postaveragerating,c_o_r_e_posts.body AS postbody,c_o_r_e_posts.createdat AS postcreatedat,c_o_r_e_posts.deletedat AS postdeletedat,c_o_r_e_posts.id AS postid,c_o_r_e_posts.title AS posttitle,c_o_r_e_posts.updatedat AS postupdatedat,c_o_r_e_posts.views AS postviews")
+				local.a = qi("c_o_r_e_authors");
+				local.p = qi("c_o_r_e_posts");
+				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating AS postaveragerating,#local.p#.body AS postbody,#local.p#.createdat AS postcreatedat,#local.p#.deletedat AS postdeletedat,#local.p#.id AS postid,#local.p#.title AS posttitle,#local.p#.updatedat AS postupdatedat,#local.p#.views AS postviews")
 			})
 
 			it("works with association with expanded aliases disabled", () => {
@@ -1660,7 +1667,9 @@ component extends="wheels.Testbox" {
 					"text"
 				)
 
-				expect(columnList).toBe("c_o_r_e_authors.firstname,c_o_r_e_authors.id,c_o_r_e_authors.id AS Authorid,c_o_r_e_authors.lastname,c_o_r_e_posts.averagerating,c_o_r_e_posts.body,c_o_r_e_posts.createdat,c_o_r_e_posts.deletedat,c_o_r_e_posts.id AS postid,c_o_r_e_posts.title,c_o_r_e_posts.updatedat,c_o_r_e_posts.views")
+				local.a = qi("c_o_r_e_authors");
+				local.p = qi("c_o_r_e_posts");
+				expect(columnList).toBe("#local.a#.firstname,#local.a#.id,#local.a#.id AS Authorid,#local.a#.lastname,#local.p#.averagerating,#local.p#.body,#local.p#.createdat,#local.p#.deletedat,#local.p#.id AS postid,#local.p#.title,#local.p#.updatedat,#local.p#.views")
 			})
 
 			it("works on calculated property", () => {

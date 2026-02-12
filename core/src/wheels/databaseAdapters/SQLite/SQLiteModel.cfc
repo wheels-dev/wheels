@@ -105,6 +105,8 @@ component extends="wheels.databaseAdapters.Base" output=false {
                 );
             }
             
+            // Strip identifier quotes from column list for comparison
+            local.columnList = $stripIdentifierQuotes(local.columnList);
             // If the primary key column wasn't part of the INSERT, we fetch last inserted ID
             if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
                 local.rv = {};
@@ -124,6 +126,14 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	 */
 	public string function $defaultValues() {
 		return " DEFAULT VALUES";
+	}
+
+	/**
+	 * Override Base adapter's function.
+	 * SQLite uses double-quotes to quote identifiers (ANSI SQL standard).
+	 */
+	public string function $quoteIdentifier(required string name) {
+		return """#arguments.name#""";
 	}
 
 }
