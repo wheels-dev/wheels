@@ -134,7 +134,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download jdbc10 
-        if: ${{ matrix.cfengine == 'adobe2018' }} || ${{ matrix.cfengine == 'adobe2021' }} || ${{ matrix.cfengine == 'adobe2023' }} || ${{ matrix.cfengine == 'adobe2025' }}
+        if: ${{ matrix.cfengine == 'adobe2018' || matrix.cfengine == 'adobe2021' || matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }}
         run: |
           
           mkdir -p ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib
