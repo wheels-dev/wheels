@@ -19,36 +19,41 @@ component extends="../base" {
         string source="",
         string target=""
     ) {
-        requireWheelsApp(getCWD());
-        arguments = reconstructArgs(arguments);
-        // Welcome message
-        print.line();
-        print.boldMagentaLine("Wheels Environment Manager");
-        print.line();
-        
-        // Handle different actions
-        switch (lCase(arguments.action)) {
-            case "list":
-                listEnvironments();
-                break;
-            case "create":
-                if (len(trim(arguments.target)) == 0) {
-                    error("Target environment is required for create action");
-                }
-                createEnvironment(arguments.target);
-                break;
-            case "copy":
-                if (len(trim(arguments.source)) == 0 || len(trim(arguments.target)) == 0) {
-                    error("Source and target environments are required for copy action");
-                }
-                copyEnvironment(arguments.source, arguments.target);
-                break;
-            default:
-                error("Invalid action. Choose from: list, create, copy");
-                break;
-        }
-        
-        print.line();
+        try{
+            requireWheelsApp(getCWD());
+            arguments = reconstructArgs(arguments);
+            // Welcome message
+            print.line();
+            print.boldMagentaLine("Wheels Environment Manager");
+            print.line();
+            
+            // Handle different actions
+            switch (lCase(arguments.action)) {
+                case "list":
+                    listEnvironments();
+                    break;
+                case "create":
+                    if (len(trim(arguments.target)) == 0) {
+                        error("Target environment is required for create action");
+                    }
+                    createEnvironment(arguments.target);
+                    break;
+                case "copy":
+                    if (len(trim(arguments.source)) == 0 || len(trim(arguments.target)) == 0) {
+                        error("Source and target environments are required for copy action");
+                    }
+                    copyEnvironment(arguments.source, arguments.target);
+                    break;
+                default:
+                    error("Invalid action. Choose from: list, create, copy");
+                    break;
+            }
+            
+            print.line();
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}   
     }
     
     /**

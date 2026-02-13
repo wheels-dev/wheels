@@ -24,60 +24,65 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		string output = ".env.merge",
 		boolean dryRun = false
 	) {
-		requireWheelsApp(getCWD());
-		// Reconstruct arguments to handle -- prefixed options
-		arguments = reconstructArgs(arguments);
-		local.sourceFiles = [arguments.source1, arguments.source2];
-		
-		// Check for additional positional arguments (source3, source4, etc.)
-		local.i = 3;
-		while (StructKeyExists(arguments, "source" & local.i)) {
-			ArrayAppend(local.sourceFiles, arguments["source" & local.i]);
-			local.i++;
-		}
+		try {
+			requireWheelsApp(getCWD());
+			// Reconstruct arguments to handle -- prefixed options
+			arguments = reconstructArgs(arguments);
+			local.sourceFiles = [arguments.source1, arguments.source2];
+			
+			// Check for additional positional arguments (source3, source4, etc.)
+			local.i = 3;
+			while (StructKeyExists(arguments, "source" & local.i)) {
+				ArrayAppend(local.sourceFiles, arguments["source" & local.i]);
+				local.i++;
+			}
 
-		if (ArrayLen(local.sourceFiles) < 2) {
-			detailOutput.error("At least two source files are required. Usage: wheels env merge file1 file2 [--output=filename] [--dryRun]");
-			return;
-		}
-
-		// Validate all source files exist
-		for (local.file in local.sourceFiles) {
-			if (!FileExists(ResolvePath(local.file))) {
-				detailOutput.error("Source file not found: #local.file#");
+			if (ArrayLen(local.sourceFiles) < 2) {
+				detailOutput.error("At least two source files are required. Usage: wheels env merge file1 file2 [--output=filename] [--dryRun]");
 				return;
 			}
-		}
 
-		print.line("Merging environment files...").toConsole();
-		detailOutput.line();
-		detailOutput.subHeader("Source Files");
-		for (local.i = 1; local.i <= ArrayLen(local.sourceFiles); local.i++) {
-			detailOutput.metric("#local.i#.", local.sourceFiles[local.i]);
-		}
-		detailOutput.line();
-
-		// Merge the files
-		local.merged = mergeEnvFiles(local.sourceFiles);
-
-		// Display the result
-		if (arguments.dryRun) {
-			displayMergedResult(local.merged, true);
-		} else {
-			// Write the merged file
-			writeMergedFile(arguments.output, local.merged);
-			detailOutput.line();
-			detailOutput.statusSuccess("Merged #ArrayLen(local.sourceFiles)# files into #arguments.output#");
-			detailOutput.metric("Total variables", "#StructCount(local.merged.vars)#");
-			
-			// Show conflicts if any
-			if (ArrayLen(local.merged.conflicts)) {
-				detailOutput.line();
-				detailOutput.statusWarning("Conflicts resolved (later files take precedence):");
-				for (local.conflict in local.merged.conflicts) {
-					detailOutput.output("  - #local.conflict#", true);
+			// Validate all source files exist
+			for (local.file in local.sourceFiles) {
+				if (!FileExists(ResolvePath(local.file))) {
+					detailOutput.error("Source file not found: #local.file#");
+					return;
 				}
 			}
+
+			print.line("Merging environment files...").toConsole();
+			detailOutput.line();
+			detailOutput.subHeader("Source Files");
+			for (local.i = 1; local.i <= ArrayLen(local.sourceFiles); local.i++) {
+				detailOutput.metric("#local.i#.", local.sourceFiles[local.i]);
+			}
+			detailOutput.line();
+
+			// Merge the files
+			local.merged = mergeEnvFiles(local.sourceFiles);
+
+			// Display the result
+			if (arguments.dryRun) {
+				displayMergedResult(local.merged, true);
+			} else {
+				// Write the merged file
+				writeMergedFile(arguments.output, local.merged);
+				detailOutput.line();
+				detailOutput.statusSuccess("Merged #ArrayLen(local.sourceFiles)# files into #arguments.output#");
+				detailOutput.metric("Total variables", "#StructCount(local.merged.vars)#");
+				
+				// Show conflicts if any
+				if (ArrayLen(local.merged.conflicts)) {
+					detailOutput.line();
+					detailOutput.statusWarning("Conflicts resolved (later files take precedence):");
+					for (local.conflict in local.merged.conflicts) {
+						detailOutput.output("  - #local.conflict#", true);
+					}
+				}
+			}
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
 		}
 	}
 

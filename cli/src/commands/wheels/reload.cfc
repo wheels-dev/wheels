@@ -21,38 +21,43 @@ component aliases='wheels r'  extends="base"  {
 	property name="detailOutput" inject="DetailOutputService@wheels-cli";
 	
 	function run(string mode="development", string password="") {
-		requireWheelsApp(getCWD());
-		arguments=reconstructArgs(arguments);
-  		var serverDetails = $getServerInfo();
-		var appSettings = $getAppSettings(mode);
+		try {
+			requireWheelsApp(getCWD());
+			arguments=reconstructArgs(arguments);
+			var serverDetails = $getServerInfo();
+			var appSettings = $getAppSettings(mode);
 
-		var reloadPassword = StructKeyExists(appSettings, "reloadPassword") ? appSettings.reloadPassword : "";
-		getURL = serverDetails.serverURL & "/index.cfm?reload=#mode#";
+			var reloadPassword = StructKeyExists(appSettings, "reloadPassword") ? appSettings.reloadPassword : "";
+			getURL = serverDetails.serverURL & "/index.cfm?reload=#mode#";
 
-		// Handle password logic
-		if (len(reloadPassword)) {
-			// Password is configured
-			if (len(password)) {
-				// User provided a password, validate it against configured one
-				if (password != reloadPassword) {
-					detailOutput.error("Invalid password. The configured reload password does not match the provided password.");
+			// Handle password logic
+			if (len(reloadPassword)) {
+				// Password is configured
+				if (len(password)) {
+					// User provided a password, validate it against configured one
+					if (password != reloadPassword) {
+						detailOutput.error("Invalid password. The configured reload password does not match the provided password.");
+						return;
+					}
+					getURL &= "&password=#password#";
+				} else {
+					detailOutput.error("Reload password is configured but not provided!");
 					return;
 				}
-				getURL &= "&password=#password#";
 			} else {
-				detailOutput.error("Reload password is configured but not provided!");
-				return;
+				// No password configured - check if user provided one unnecessarily
+				if (len(password)) {
+					detailOutput.statusWarning("No reload password is configured in settings, but you provided one. Proceeding without password.");
+				}
 			}
-		} else {
-			// No password configured - check if user provided one unnecessarily
-			if (len(password)) {
-				detailOutput.statusWarning("No reload password is configured in settings, but you provided one. Proceeding without password.");
-			}
+			getURL = serverDetails.serverURL &
+				"/index.cfm?reload=#mode#&password=#password#";
+			var loc = new Http( url=getURL ).send().getPrefix();
+			detailOutput.statusSuccess("Reload Request sent");
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
 		}
-  		getURL = serverDetails.serverURL &
-  			"/index.cfm?reload=#mode#&password=#password#";
-  		var loc = new Http( url=getURL ).send().getPrefix();
-  		detailOutput.statusSuccess("Reload Request sent");
 	}
 
 	private struct function $getAppSettings(required string mode="development") {
