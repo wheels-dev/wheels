@@ -259,7 +259,7 @@ component output="false" {
 			&& StructKeyExists(application.wo, "$restoreTestRunnerApplicationScope")
 		) {
 			application.wo.$restoreTestRunnerApplicationScope();
-			application.wo.$include(template = "#application.wheels.eventPath#/onabort.cfm");
+			application.wo.$include(template = "../../#application.wheels.eventPath#/onabort.cfm");
 		}
 		return true;
 	}
