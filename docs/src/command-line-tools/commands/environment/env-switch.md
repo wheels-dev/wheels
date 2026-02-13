@@ -10,7 +10,7 @@ wheels env switch [name] [options]
 
 ## Description
 
-The `wheels env switch` command changes the active environment for your Wheels application by updating the `wheels_env` variable in the `.env` file. It validates the environment configuration, optionally creates backups, and can restart the application server.
+The `wheels env switch` command changes the active environment for your Wheels application by updating the `WHEELS_ENV` variable in the `.env` file. It validates the environment configuration, optionally creates backups, and can restart the application server.
 
 ## Arguments
 
@@ -73,8 +73,8 @@ wheels env switch production --backup --restart --check
    - Creates timestamped backup files
 
 3. **Updates Configuration**:
-   - Updates or creates `wheels_env` variable in `.env`
-   - Falls back to `environment` variable if `wheels_env` doesn't exist
+   - Updates or creates `WHEELS_ENV` variable in `.env`
+   - Falls back to `environment` variable if `WHEELS_ENV` doesn't exist
    - Updates `server.json` profile if file exists
 
 4. **Restarts Application** (if `--restart` is enabled):
@@ -116,23 +116,23 @@ Cache:                    Partial
 ## Environment File Updates
 
 ### .env File
-The command updates or creates the `wheels_env` variable:
+The command updates or creates the `WHEELS_ENV` variable:
 
 Before:
 ```
-wheels_env=development
+WHEELS_ENV=development
 # or
 environment=development
 ```
 
 After:
 ```
-wheels_env=staging
+WHEELS_ENV=staging
 ```
 
 If no environment variable exists, it adds:
 ```
-wheels_env=staging
+WHEELS_ENV=staging
 ```
 
 ## Validation Process
@@ -342,7 +342,7 @@ wheels env switch development --quiet
 
 ### Application Not Responding After Switch
 - Ensure server was restarted
-- Check `.env` file for correct `wheels_env` value
+- Check `.env` file for correct `WHEELS_ENV` value
 - Review application logs for errors
 - Manually restart services if needed
 
@@ -375,7 +375,7 @@ wheels env switch development --quiet
 ## Notes
 
 - The command modifies the `.env` file in place
-- Creates `wheels_env` variable if it doesn't exist
+- Creates `WHEELS_ENV` variable if it doesn't exist
 - Falls back to updating `environment` variable if found
 - Some changes require application restart to take effect
 - Database connections may need to be reset after switching

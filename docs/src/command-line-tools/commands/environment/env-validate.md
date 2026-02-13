@@ -180,7 +180,7 @@ Environment Variables:
 --------------------------------------------------
 
 wheels:
-  - wheels_env = development
+  - WHEELS_ENV = development
 
 DB:
   - DB_USER = root

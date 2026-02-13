@@ -124,7 +124,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 			local.startFixed = ArrayLen(local.fixed);
 			checkEnvFile(local.issues, local.warnings, arguments.fix, local.fixed);
 			if (ArrayLen(local.fixed) > local.startFixed) {
-				detailOutput.statusFixed();
+				detailOutput.statusFixed(".env File Configuration");
 			} else if (ArrayLen(local.issues) > local.startCount) {
 				detailOutput.statusFailed(".env File Configuration");
 			} else if (ArrayLen(local.warnings) > local.startWarnings) {
