@@ -52,7 +52,6 @@
         }
     ],
     "scripts":{
-        "postPublish":"!git push --follow-tags",
         "postInstall":"pathExists .env || cp env.example .env && mv env.example .env.example",
         "format":"cfformat run config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc --overwrite",
         "format:check":"cfformat check config/,controllers/,events/,files/,global/,miscellaneous/,models/,tests/,views/,*.cfc",
