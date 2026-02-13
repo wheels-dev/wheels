@@ -28,117 +28,121 @@ component aliases="clean" extends="../base" {
 		numeric keep = 3,
 		boolean dryRun = false
 	) {
-		requireWheelsApp(getCWD());
-		arguments = reconstructArgs(
-			argStruct=arguments,
-			numericRanges={
-				keep:{min:1, max:100}
-			}
-		);
-		var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
+		try{
+			requireWheelsApp(getCWD());
+			arguments = reconstructArgs(
+				argStruct=arguments,
+				numericRanges={
+					keep:{min:1, max:100}
+				}
+			);
+			var compiledDir = fileSystemUtil.resolvePath("public/assets/compiled");
 
-		if (!directoryExists(compiledDir)) {
-			print.yellowLine("No compiled assets directory found. Nothing to clean.").toConsole();
-			return;
-		}
-		
-		// Read current manifest
-		var manifestPath = compiledDir & "/manifest.json";
-		var currentManifest = {};
-		
-		if (fileExists(manifestPath)) {
-			try {
-				currentManifest = deserializeJSON(fileRead(manifestPath));
-			} catch (any e) {
-				detailOutput.error("Error reading manifest file: #e.message#");
+			if (!directoryExists(compiledDir)) {
+				print.yellowLine("No compiled assets directory found. Nothing to clean.").toConsole();
 				return;
 			}
-		}
-
-		detailOutput.line();
-		if(!dryRun){
-			print.greenBoldLine("Cleaning old compiled assets...").toConsole();
-		}else{
-			print.cyanBoldLine("Dry Running old compiled assets...").toConsole();
-		}
-		detailOutput.line();
-		
-		// Group files by base name
-		var fileGroups = {};
-		var files = directoryList(compiledDir, false, "query", "*.*");
-
-		for (var file in files) {
-			if (file.type == "File" && file.name != "manifest.json") {
-				var baseName = extractBaseName(file.name);
-				if (!structKeyExists(fileGroups, baseName)) {
-					fileGroups[baseName] = [];
+			
+			// Read current manifest
+			var manifestPath = compiledDir & "/manifest.json";
+			var currentManifest = {};
+			
+			if (fileExists(manifestPath)) {
+				try {
+					currentManifest = deserializeJSON(fileRead(manifestPath));
+				} catch (any e) {
+					detailOutput.error("Error reading manifest file: #e.message#");
+					return;
 				}
-				arrayAppend(fileGroups[baseName], {
-					name: file.name,
-					path: file.directory & "/" & file.name,
-					dateLastModified: file.dateLastModified
-				});
 			}
-		}
 
-		var deletedCount = 0;
-		var freedSpace = 0;
+			detailOutput.line();
+			if(!dryRun){
+				print.greenBoldLine("Cleaning old compiled assets...").toConsole();
+			}else{
+				print.cyanBoldLine("Dry Running old compiled assets...").toConsole();
+			}
+			detailOutput.line();
+			
+			// Group files by base name
+			var fileGroups = {};
+			var files = directoryList(compiledDir, false, "query", "*.*");
 
-		// Process each group
-		for (var baseName in fileGroups) {
-			var group = fileGroups[baseName];
-			
-			// Sort by date modified (newest first)
-			arraySort(group, function(a, b) {
-				return dateCompare(b.dateLastModified, a.dateLastModified);
-			});
-			
-			// Keep the specified number of versions (array is sorted newest first)
-			// Delete from the end of the array (oldest files)
-			if (arrayLen(group) > arguments.keep) {
-				if (arguments.dryRun) {
-					print.boldLine("Analyzing #baseName#...").toConsole();
-				} else {
-					print.boldLine("Cleaning #baseName#...").toConsole();
+			for (var file in files) {
+				if (file.type == "File" && file.name != "manifest.json") {
+					var baseName = extractBaseName(file.name);
+					if (!structKeyExists(fileGroups, baseName)) {
+						fileGroups[baseName] = [];
+					}
+					arrayAppend(fileGroups[baseName], {
+						name: file.name,
+						path: file.directory & "/" & file.name,
+						dateLastModified: file.dateLastModified
+					});
 				}
+			}
 
-				// Delete from the end (oldest) since array is sorted newest first
-				for (var i = arrayLen(group); i > arguments.keep; i--) {
-					var fileInfo = group[i];
-					var fileSize = getFileInfo(fileInfo.path).size;
+			var deletedCount = 0;
+			var freedSpace = 0;
 
+			// Process each group
+			for (var baseName in fileGroups) {
+				var group = fileGroups[baseName];
+				
+				// Sort by date modified (newest first)
+				arraySort(group, function(a, b) {
+					return dateCompare(b.dateLastModified, a.dateLastModified);
+				});
+				
+				// Keep the specified number of versions (array is sorted newest first)
+				// Delete from the end of the array (oldest files)
+				if (arrayLen(group) > arguments.keep) {
 					if (arguments.dryRun) {
-						detailOutput.output("Would delete: #fileInfo.name# (#formatFileSize(fileSize)#)");
-						deletedCount++;
-						freedSpace += fileSize;
+						print.boldLine("Analyzing #baseName#...").toConsole();
 					} else {
-						try {
-							fileDelete(fileInfo.path);
-							print.redLine("Deleted: #fileInfo.name# (#formatFileSize(fileSize)#)").toConsole();
+						print.boldLine("Cleaning #baseName#...").toConsole();
+					}
+
+					// Delete from the end (oldest) since array is sorted newest first
+					for (var i = arrayLen(group); i > arguments.keep; i--) {
+						var fileInfo = group[i];
+						var fileSize = getFileInfo(fileInfo.path).size;
+
+						if (arguments.dryRun) {
+							detailOutput.output("Would delete: #fileInfo.name# (#formatFileSize(fileSize)#)");
 							deletedCount++;
 							freedSpace += fileSize;
-						} catch (any e) {
-							detailOutput.error("Error deleting #fileInfo.name#: #e.message#");
+						} else {
+							try {
+								fileDelete(fileInfo.path);
+								print.redLine("Deleted: #fileInfo.name# (#formatFileSize(fileSize)#)").toConsole();
+								deletedCount++;
+								freedSpace += fileSize;
+							} catch (any e) {
+								detailOutput.error("Error deleting #fileInfo.name#: #e.message#");
+							}
 						}
 					}
 				}
 			}
-		}
 
+			detailOutput.line();
 
-		detailOutput.line();
-
-		if (arguments.dryRun) {
-			print.yellowLine("Dry run complete. No files were deleted.").toConsole();
-			detailOutput.output("Would delete #deletedCount# files");
-			detailOutput.output("Would free #formatFileSize(freedSpace)# of disk space");
-		} else if (deletedCount > 0) {
-			detailOutput.success("Asset cleaning complete!");
-			print.greenLine("Deleted #deletedCount# old asset files").toConsole();
-			print.greenLine("Freed #formatFileSize(freedSpace)# of disk space").toConsole();
-		} else {
-			detailOutput.statusWarning("No old assets found to clean.");
-		}
+			if (arguments.dryRun) {
+				print.yellowLine("Dry run complete. No files were deleted.").toConsole();
+				detailOutput.output("Would delete #deletedCount# files");
+				detailOutput.output("Would free #formatFileSize(freedSpace)# of disk space");
+			} else if (deletedCount > 0) {
+				detailOutput.success("Asset cleaning complete!");
+				print.greenLine("Deleted #deletedCount# old asset files").toConsole();
+				print.greenLine("Freed #formatFileSize(freedSpace)# of disk space").toConsole();
+			} else {
+				detailOutput.statusWarning("No old assets found to clean.");
+			}
+		} catch (any e) {
+            detailOutput.error("#e.message#");
+            setExitCode(1);
+        }
 	}
 	
 	/**

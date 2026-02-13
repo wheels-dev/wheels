@@ -27,72 +27,77 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 		string output = "",
 		boolean noMask = false
 	) {
-		requireWheelsApp(getCWD());
-		arguments = reconstructArgs(
-			argStruct = arguments,
-			allowedValues = {
-				format: ["table", "json", "env", "cfml"]
+		try{
+			requireWheelsApp(getCWD());
+			arguments = reconstructArgs(
+				argStruct = arguments,
+				allowedValues = {
+					format: ["table", "json", "env", "cfml"]
+				}
+			);
+
+			// Determine environment
+			local.env = Len(arguments.environment) ? arguments.environment : getEnvironment();
+			
+			// Get configuration path
+			local.configPath = ResolvePath("config");
+			local.settingsFile = local.configPath & "/settings.cfm";
+			local.envSettingsFile = local.configPath & "/" & local.env & "/settings.cfm";
+
+			if (!FileExists(local.settingsFile)) {
+				detailOutput.error("No settings.cfm file found in config directory");
+				return;
 			}
-		);
 
-		// Determine environment
-		local.env = Len(arguments.environment) ? arguments.environment : getEnvironment();
-		
-		// Get configuration path
-		local.configPath = ResolvePath("config");
-		local.settingsFile = local.configPath & "/settings.cfm";
-		local.envSettingsFile = local.configPath & "/" & local.env & "/settings.cfm";
+			// Load configuration
+			local.config = loadConfiguration(local.settingsFile, local.envSettingsFile);
 
-		if (!FileExists(local.settingsFile)) {
-			detailOutput.error("No settings.cfm file found in config directory");
-			return;
-		}
-
-		// Load configuration
-		local.config = loadConfiguration(local.settingsFile, local.envSettingsFile);
-
-		// Mask sensitive values unless --no-mask is specified
-		if (!arguments.noMask) {
-			local.config = maskSensitiveValues(local.config);
-		}
-
-		// Format output
-		local.outputContent = "";
-		switch (arguments.format) {
-			case "json":
-				local.outputContent = SerializeJSON(local.config, false, false);
-				break;
-			case "env":
-				local.outputContent = formatAsEnv(local.config);
-				break;
-			case "cfml":
-				local.outputContent = formatAsCfml(local.config);
-				break;
-			default:
-				// Table format is handled differently
-				formatAsTable(local.config, local.env, arguments.noMask);
-		}
-
-		// Save to file if specified
-		if (Len(arguments.output)) {
-			if (arguments.format == "table") {
-				// For table format, we need to capture the output differently
-				local.tableOutput = captureTableOutput(local.config, local.env);
-				FileWrite(ResolvePath(arguments.output), local.tableOutput);
-				detailOutput.statusSuccess("Configuration saved to: #arguments.output#");
-			} else {
-				FileWrite(ResolvePath(arguments.output), local.outputContent);
-				detailOutput.statusSuccess("Configuration saved to: #arguments.output#");
+			// Mask sensitive values unless --no-mask is specified
+			if (!arguments.noMask) {
+				local.config = maskSensitiveValues(local.config);
 			}
-		} else if (arguments.format != "table") {
-			// Output to console if not table format
-			if(arguments.format == "json"){
-				detailOutput.line();
-				detailOutput.getPrint().line(deserializeJSON(local.outputContent)).toConsole();
-			} else {
-				detailOutput.line();
-				detailOutput.output(local.outputContent);
+
+			// Format output
+			local.outputContent = "";
+			switch (arguments.format) {
+				case "json":
+					local.outputContent = SerializeJSON(local.config, false, false);
+					break;
+				case "env":
+					local.outputContent = formatAsEnv(local.config);
+					break;
+				case "cfml":
+					local.outputContent = formatAsCfml(local.config);
+					break;
+				default:
+					// Table format is handled differently
+					formatAsTable(local.config, local.env, arguments.noMask);
 			}
+
+			// Save to file if specified
+			if (Len(arguments.output)) {
+				if (arguments.format == "table") {
+					// For table format, we need to capture the output differently
+					local.tableOutput = captureTableOutput(local.config, local.env);
+					FileWrite(ResolvePath(arguments.output), local.tableOutput);
+					detailOutput.statusSuccess("Configuration saved to: #arguments.output#");
+				} else {
+					FileWrite(ResolvePath(arguments.output), local.outputContent);
+					detailOutput.statusSuccess("Configuration saved to: #arguments.output#");
+				}
+			} else if (arguments.format != "table") {
+				// Output to console if not table format
+				if(arguments.format == "json"){
+					detailOutput.line();
+					detailOutput.getPrint().line(deserializeJSON(local.outputContent)).toConsole();
+				} else {
+					detailOutput.line();
+					detailOutput.output(local.outputContent);
+				}
+			}
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
 		}
 	}
 
