@@ -595,7 +595,13 @@ The command automatically updates your `server.json` with Docker-specific settin
   "web": {
     "host": "0.0.0.0",
     "http": {
+      "enable": true,
       "port": "8080"
+    },
+    "webroot":"public",
+    "rewrites":{ 
+      "enable":true,
+      "config":"public/urlrewrite.xml"
     }
   },
   "openBrowser": false,

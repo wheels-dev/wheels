@@ -700,6 +700,9 @@ component output="false" displayName="Test" extends="wheels.Global"{
 				if (StructKeyExists(arguments.options, "skip") && local.packageName contains arguments.options.skip) {
 					local.useTest = false;
 				}
+				if (StructKeyExists(arguments.options, "filter") && !FindNoCase(arguments.options.filter, local.packageName)) {
+					local.useTest = false;
+				}
 				if (local.useTest) {
 					QueryAddRow(local.rv);
 					QuerySetCell(local.rv, "package", local.packageName);

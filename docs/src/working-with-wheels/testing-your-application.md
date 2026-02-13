@@ -551,7 +551,7 @@ For detailed information on testing functions and utility methods, refer to the 
 
 ### Example Function Testing
 
-Create `tests/specs/functions/ExampleSpec.cfc`:
+Create `tests/specs/functional/ExampleSpec.cfc`:
 
 ```cfscript
 component extends="wheels.Testbox" {
@@ -1117,7 +1117,7 @@ When migrating from the legacy RocketUnit system to TestBox 6, consider the foll
 
 #### Structure Migration
 
-- `tests/functions/` → `tests/specs/functions/`
+- `tests/functions/` → `tests/specs/functional/`
 - `tests/requests/` → `tests/specs/controllers/`
 - Component extensions change from `app.tests.Test` to `wheels.Testbox`
 - File names changed to include `Spec` or `Test` to align with TestBox 6 naming requirements

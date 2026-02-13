@@ -6,6 +6,10 @@ This repository contains a **user management and authentication web application*
 
 **Important**: This is **not a complete, full-featured app**, but rather a **starter/example app** built with Wheels 3.0. It is designed to help you get started and to showcase best practices in authentication, authorization, auditing, and modern web UI using Wheels.
 
+## Installation
+
+See the [Quick Start](#quick-start) section below for setup instructions.
+
 ## Key Features
 
 ### User Registration & Verification

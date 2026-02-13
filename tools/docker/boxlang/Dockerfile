@@ -30,6 +30,14 @@ COPY tools/docker/boxlang/settings.cfm ${APP_DIR}/config/settings.cfm
 # Install dependencies
 RUN box install
 
+# Pre-install JDK with retry to avoid transient Adoptium API failures
+RUN for i in 1 2 3; do \
+        echo "Attempt $i: Installing OpenJDK 21..."; \
+        box install java:openjdk21 && break; \
+        echo "Attempt $i failed, waiting 10s..."; \
+        sleep 10; \
+    done
+
 # Start once to create BoxLang engine
 RUN box server start --background && sleep 10 && box server stop
 
