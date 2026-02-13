@@ -30,6 +30,8 @@ component extends="wheels.Global"{
 			local.adapterName = "MicrosoftSQLServer";
 		} else if (local.info.driver_name Contains "MySQL") {
 			local.adapterName = "MySQL";
+		} else if (local.info.database_productname Contains "CockroachDB") {
+			local.adapterName = "CockroachDB";
 		} else if (local.info.driver_name Contains "PostgreSQL") {
 			local.adapterName = "PostgreSQL";
 			// NB: using mySQL adapter for H2 as the cli defaults to this for development

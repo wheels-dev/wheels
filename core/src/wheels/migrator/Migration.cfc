@@ -6,7 +6,7 @@ component extends="Base" {
 			Throw(
 				type = "wheels.model.migrate.DatabaseNotSupported",
 				message = "#dbType# is not supported by Wheels.",
-				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, Oracle, SQLite or H2."
+				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, CockroachDB, Oracle, SQLite or H2."
 			);
 		} else {
 			this.adapter = CreateObject("component", "wheels.databaseAdapters.#dbType#.#dbType#Migrator");
