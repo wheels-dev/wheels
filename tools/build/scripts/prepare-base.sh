@@ -43,7 +43,6 @@ cp -r .ai "${BUILD_DIR}/"
 cp templates/base/src/CLAUDE.md "${BUILD_DIR}/"
 cp templates/base/src/AGENTS.md "${BUILD_DIR}/"
 cp -r .claude "${BUILD_DIR}/"
-cp -r .opencode "${BUILD_DIR}/"
 
 # Copy Apache License how are you?
 cp LICENSE "${BUILD_DIR}/"
