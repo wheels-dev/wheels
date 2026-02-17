@@ -47,7 +47,7 @@ Specifies the output format for the configuration dump:
 When specified, saves the configuration to a file instead of displaying to console. If no format is explicitly specified with `--output`, JSON format is automatically used for better file compatibility.
 
 #### `--noMask`
-**⚠️ Security Warning**: This option exposes sensitive configuration data including passwords, API keys, and tokens. Only use when absolutely necessary and ensure the output is stored securely.
+** Security Warning**: This option exposes sensitive configuration data including passwords, API keys, and tokens. Only use when absolutely necessary and ensure the output is stored securely.
 
 ## Output Formats
 
