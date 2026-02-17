@@ -34,6 +34,7 @@ component extends="commandbox.modules.wheels-cli.commands.wheels.base" {
 
 			if (StructIsEmpty(local.updates)) {
 				detailOutput.error("No key=value pairs provided. Usage: wheels env set KEY=VALUE");
+				return;
 			}
 
 			// Update the .env file
