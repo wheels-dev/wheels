@@ -34,6 +34,12 @@ component aliases="wheels plugin init" extends="../base" {
 
         try {
 
+            if (!reFind("^[a-z][a-z0-9-]*$", arguments.name)) {
+                detailOutput.error("Invalid plugin name. Use letters, numbers, and hyphens only (no spaces).");
+                setExitCode(1);
+                return;
+            }
+
             // Ensure plugin name follows convention
             var pluginName = arguments.name;
             if (!reFindNoCase("^wheels-", pluginName)) {
