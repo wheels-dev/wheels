@@ -193,14 +193,14 @@ Customize generated code by overriding templates:
 
 #### Parameter Syntax Errors
 
-❌ **Wrong:**
+ **Wrong:**
 ```bash
 wheels generate scaffold Product properties="name:string"    # Positional + named (ERROR)
 wheels generate scaffold Product --properties=name:string    # Missing quotes
 wheels generate scaffold Comment --belongsTo=product         # Wrong case (should be Product)
 ```
 
-✅ **Correct:**
+ **Correct:**
 ```bash
 wheels generate scaffold Product --properties="name:string,price:decimal"
 wheels generate scaffold Comment --belongsTo=Product --hasMany=replies

@@ -19,12 +19,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+ **ALLOWED:**
 - Named KEY=VALUE pairs: `wheels env set DB_HOST=localhost DB_PORT=3306`
 - Named + file flag: `wheels env set DB_HOST=localhost --file=.env.production`
 - Multiple variables: `wheels env set KEY1=value1 KEY2=value2 KEY3=value3`
 
-❌ **NOT ALLOWED:**
+ **NOT ALLOWED:**
 - Positional parameters: This command does not support positional parameters
 
 **Recommendation:** Use KEY=VALUE format with optional --file flag: `wheels env set DB_HOST=localhost --file=.env.production`
