@@ -10,6 +10,17 @@ on:
       - develop
 
 jobs:
+  label:
+    name: Auto-Label PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
   tests:
     uses: ./.github/workflows/tests.yml
     secrets:

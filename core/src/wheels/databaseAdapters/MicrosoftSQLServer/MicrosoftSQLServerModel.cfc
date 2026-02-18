@@ -140,7 +140,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 			local.iEnd = ListLen(local.thirdOrder);
 			for (local.i = 1; local.i <= local.iEnd; local.i++) {
 				local.item = ReReplace(ReReplace(ListGetAt(local.thirdOrder, local.i), " ASC\b", ""), " DESC\b", "");
-				if (!ListFindNoCase(local.thirdSelect, local.item)) {
+				// Strip identifier quotes for comparison since SELECT may have different quoting than ORDER BY
+				local.itemStripped = $stripIdentifierQuotes(local.item);
+				local.thirdSelectStripped = $stripIdentifierQuotes(local.thirdSelect);
+				if (!ListFindNoCase(local.thirdSelectStripped, local.itemStripped) && !ListFindNoCase(local.thirdSelect, local.item)) {
 					// The test "order_clause_with_paginated_include_and_ambiguous_columns" passes in a complex order (CASE WHEN registration IN ('foo') THEN 0 ELSE 1 END DESC).
 					// This gets moved up to the SELECT clause to support pagination.
 					// However, we need to add "AS" to it otherwise we get a "No column name was specified" error.
@@ -233,9 +236,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				"#Chr(10)#,#Chr(13)#, ",
 				",,"
 			);
+			// Strip identifier quotes from column list for comparison
+			local.columnList = $stripIdentifierQuotes(local.columnList);
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
-				
+
 				// Use @@IDENTITY instead of SCOPE_IDENTITY() for BoxLang compatibility
 				// SCOPE_IDENTITY() returns empty values in BoxLang with SQL Server
 				query = $query(sql = "SELECT @@IDENTITY AS lastId", argumentCollection = arguments.queryAttributes);
@@ -258,5 +263,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return "NEWID()";
 	}
 
+	/**
+	 * Override Base adapter's function.
+	 * SQL Server uses square brackets to quote identifiers.
+	 */
+	public string function $quoteIdentifier(required string name) {
+		return "[#arguments.name#]";
+	}
 
 }

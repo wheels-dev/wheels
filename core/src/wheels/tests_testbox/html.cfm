@@ -153,6 +153,11 @@
 
 <cfoutput>
 <cfinclude template="/wheels/public/layout/_header.cfm">
+<cfif get("URLRewriting") eq 'On'>
+    <cfset queryStringSeparator='?'>
+<cfelse>
+    <cfset queryStringSeparator='&'>
+</cfif>
 <div class="ui container">
 
     #pageHeader(title="TestBox #type# Test Results")#
@@ -193,8 +198,8 @@
             <tbody>
                 <cfloop array="#failures#" index="result">
                     <tr class="error">
-                        <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td class="failed">#result.status#</td>
                     </tr>
@@ -205,8 +210,8 @@
 
                 <cfloop array="#skipped#" index="result">
                     <tr>
-                        <td><a href="?directory=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?directory=#result.packageName#&testSpecs=#result.testName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td>#result.status#</td>
                     </tr>
@@ -232,8 +237,8 @@
                 <cfif arraylen(errors) gt 0>
                     <cfloop array="#errors#" index="result">
                         <tr class="error">
-                            <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                            <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
+                            <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                            <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                             <td class="n">#result.time#</td>
                             <td class="failed">#result.status#</td>
                         </tr>
@@ -249,7 +254,7 @@
                                 <td colspan="4" class="failed">
                                     <strong>#bundle.name#</strong><br/>
                                     <em>Bundle has #bundle.totalError# error(s), but individual test details are not available in the TestBox results.</em><br/>
-                                    <a href="?method=runRemote&testBundles=#bundle.name#&#_baseParams#">Re-run this bundle</a> to see detailed error information.
+                                    <a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testBundles=#bundle.name#&#_baseParams#">Re-run this bundle</a> to see detailed error information.
                                 </td>
                             </tr>
                         </cfif>
@@ -272,8 +277,8 @@
             <tbody>
                 <cfloop array="#passes#" index="result">
                     <tr class="positive">
-                        <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td class="success">#result.status#</td>
                     </tr>
@@ -281,8 +286,8 @@
 
                 <cfloop array="#skipped#" index="result">
                     <tr>
-                        <td><a href="?method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
-                        <td><a href="?method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestCase#</a></td>
+                        <td><a href="#URLFor(route = route)##queryStringSeparator#method=runRemote&testSpecs=#structKeyExists(result, 'testId') AND len(result.testId) ? result.testId : ReplaceNoCase(result.testName,' ','%20','all')#&testBundles=#result.packageName#&#_baseParams#">#result.cleanTestName#</a></td>
                         <td class="n">#result.time#</td>
                         <td>#result.status#</td>
                     </tr>

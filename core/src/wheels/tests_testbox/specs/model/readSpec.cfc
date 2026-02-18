@@ -19,6 +19,15 @@ component extends="wheels.Testbox" {
 				} else if(structKeyExists(server, "boxlang")) {
 					isTestable = false
 				}
+				// When the primary adapter uses identifier quoting that H2 doesn't support
+				// (brackets for SQL Server, double quotes causing case-sensitivity), skip these
+				// cross-database tests since the SQL is built with the primary adapter's quoting
+				if(isTestable) {
+					quoted = g.model("author").$quoteColumn("test");
+					if(quoted != "test" && quoted != "`test`") {
+						isTestable = false;
+					}
+				}
 			})
 
 			// Commenting this test temporarily to make the github actions work as it is not working in testbox

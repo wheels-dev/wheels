@@ -390,6 +390,9 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		} else if (FindNoCase("MySQL", local.info.driver_name) || FindNoCase("MariaDB", local.info.driver_name)) {
 			local.adapterNamespace = "MySQL";
 			local.adapterName = "MySQLModel";
+		} else if (FindNoCase("CockroachDB", local.info.database_productname)) {
+			local.adapterNamespace = "CockroachDB";
+			local.adapterName = "CockroachDBModel";
 		} else if (FindNoCase("PostgreSQL", local.info.driver_name)) {
 			local.adapterNamespace = "PostgreSQL";
 			local.adapterName = "PostgreSQLModel";
@@ -406,7 +409,7 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			Throw(
 				type = "Wheels.DatabaseNotSupported",
 				message = "#local.info.database_productname# is not supported by Wheels.",
-				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, Oracle, SQLite or H2."
+				extendedInfo = "Use SQL Server, MySQL, MariaDB, PostgreSQL, CockroachDB, Oracle, SQLite or H2."
 			);
 		}
 		$set(adapterName = local.adapterName);

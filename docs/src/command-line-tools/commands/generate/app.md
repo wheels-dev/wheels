@@ -101,10 +101,10 @@ wheels generate app myapp WheelsTemplateHTMX
 ```bash
 wheels generate app myapp WheelsTodoMVCHTMX
 ```
-- Reference TodoMVC implementation built with CFWheels
+- Reference TodoMVC implementation built with Wheels
 - Uses HTMX for server-driven interactivity
 - Demonstrates real-world MVC and CRUD patterns
-- Quick setup using CommandBox, CFWheels CLI, and H2
+- Quick setup using CommandBox, Wheels CLI, and H2
 
 ## Examples
 

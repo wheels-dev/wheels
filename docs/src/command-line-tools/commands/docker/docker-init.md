@@ -512,13 +512,13 @@ http {
 
 | Feature | Development | Production |
 |---------|-------------|------------|
-| Source Volume Mount | ✅ Yes | ❌ No |
-| Hot Reload | ✅ Enabled | ❌ Disabled |
+| Source Volume Mount |  Yes |  No |
+| Hot Reload |  Enabled |  Disabled |
 | User | root | appuser (1001) |
 | Restart Policy | none | always |
-| Health Checks | ❌ No | ✅ Yes |
-| Security Headers | ❌ No | ✅ Yes (with nginx) |
-| Gzip Compression | ❌ No | ✅ Yes (with nginx) |
+| Health Checks |  No |  Yes |
+| Security Headers |  No |  Yes (with nginx) |
+| Gzip Compression |  No |  Yes (with nginx) |
 | Install Command | `box install` | `box install --production` |
 | Image Size | Larger | Optimized |
 
@@ -595,7 +595,13 @@ The command automatically updates your `server.json` with Docker-specific settin
   "web": {
     "host": "0.0.0.0",
     "http": {
+      "enable": true,
       "port": "8080"
+    },
+    "webroot":"public",
+    "rewrites":{ 
+      "enable":true,
+      "config":"public/urlrewrite.xml"
     }
   },
   "openBrowser": false,

@@ -301,7 +301,7 @@ component {
 					)
 				)
 			) {
-				ArrayAppend(local.sql, variables.wheels.class.properties[local.key].column);
+				ArrayAppend(local.sql, $quoteColumn(variables.wheels.class.properties[local.key].column));
 				ArrayAppend(local.sql, ",");
 				ArrayAppend(local.sql2, $buildQueryParamValues(local.key));
 				ArrayAppend(local.sql2, ",");
@@ -310,7 +310,7 @@ component {
 
 		if (ArrayLen(local.sql)) {
 			// Create wrapping SQL code and merge the second array that holds the values with the first one.
-			ArrayPrepend(local.sql, "INSERT INTO #tableName()# (");
+			ArrayPrepend(local.sql, "INSERT INTO #$quotedTableName()# (");
 			ArrayPrepend(local.sql2, " VALUES (");
 			ArrayDeleteAt(local.sql, ArrayLen(local.sql));
 			ArrayDeleteAt(local.sql2, ArrayLen(local.sql2));
@@ -332,7 +332,7 @@ component {
 			local.pks = primaryKey(0);
 			ArrayAppend(
 				local.sql,
-				"INSERT INTO #tableName()#" & variables.wheels.class.adapter.$defaultValues($primaryKey = local.pks)
+				"INSERT INTO #$quotedTableName()#" & variables.wheels.class.adapter.$defaultValues($primaryKey = local.pks)
 			);
 		}
 

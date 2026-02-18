@@ -318,27 +318,27 @@ wheels generate route --delete="logout,sessions##destroy"
 
 ### Common Parameter Mistakes
 
-❌ **Missing equals sign:**
+ **Missing equals sign:**
 ```bash
 wheels generate route --get products/sale,products##sale
 ```
 
-❌ **Missing quotes:**
+ **Missing quotes:**
 ```bash
 wheels generate route --get=products/sale,products##sale
 ```
 
-❌ **Single hash instead of double:**
+ **Single hash instead of double:**
 ```bash
 wheels generate route --get="products/sale,products#sale"
 ```
 
-❌ **Missing objectname with resources:**
+ **Missing objectname with resources:**
 ```bash
 wheels generate route --resources=true        # No objectname
 ```
 
-✅ **Correct formats:**
+ **Correct formats:**
 ```bash
 wheels generate route --get="products/sale,products##sale"
 wheels generate route products --resources
@@ -448,13 +448,13 @@ mapper()
 
 **Issue**: `"Missing argument"` errors when using HTTP method parameters
 
-❌ **Incorrect:**
+ **Incorrect:**
 ```bash
 wheels generate route --get products/sale,products##sale    # Missing =
 wheels generate route --post contact send                   # Missing quotes and =
 ```
 
-✅ **Correct:**
+ **Correct:**
 ```bash
 wheels generate route --get="products/sale,products##sale"  # With = and quotes
 wheels generate route --post="contact,sessions##create"     # Proper format
@@ -466,12 +466,12 @@ wheels generate route --post="contact,sessions##create"     # Proper format
 
 **Issue**: Template compilation errors with single hash (`#`) in handlers
 
-❌ **Incorrect:**
+ **Incorrect:**
 ```bash
 wheels generate route --get="users,users#show"   # Single # causes CFML errors
 ```
 
-✅ **Correct:**
+ **Correct:**
 ```bash
 wheels generate route --get="users,users##show"  # Double ## for CFML escaping
 ```
@@ -504,7 +504,7 @@ http://localhost:8080/?reload=true
 
 **Issue**: Complex patterns not parsed correctly
 
-❌ **Problematic:**
+ **Problematic:**
 ```bash
 # Spaces in patterns without quotes
 wheels generate route --get=api/v1/users,api##index
@@ -513,7 +513,7 @@ wheels generate route --get=api/v1/users,api##index
 wheels generate route --get="api-users,api#index"
 ```
 
-✅ **Solutions:**
+ **Solutions:**
 ```bash
 # Always quote complex patterns
 wheels generate route --get="api/v1/users,api##index"
@@ -526,14 +526,14 @@ wheels generate route --get="api-users,api##index"
 
 **Issue**: Resources flag not working or missing objectname
 
-❌ **Common Mistakes:**
+ **Common Mistakes:**
 ```bash
 wheels generate route --resources=true              # Missing objectname
 wheels generate route --resources products          # Missing =true
 wheels generate route products --resource           # Wrong flag name
 ```
 
-✅ **Correct Usage:**
+ **Correct Usage:**
 ```bash
 wheels generate route --resources=true products     # Explicit flag with objectname
 wheels generate route products --resources=true     # Alternative order
@@ -634,8 +634,8 @@ curl -X DELETE http://localhost:8080/api/users/1
 #### 1. Parameter Formatting
 ```bash
 # Always use consistent formatting
-wheels generate route --get="pattern,handler"    # ✅ Consistent
-wheels generate route --get pattern,handler      # ❌ Inconsistent
+wheels generate route --get="pattern,handler"    #  Consistent
+wheels generate route --get pattern,handler      #  Inconsistent
 ```
 
 #### 2. Route Planning

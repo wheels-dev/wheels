@@ -1,547 +1,220 @@
-# CLAUDE.md
+# Wheels Framework
 
-Guidance for Claude Code when working with Wheels applications.
+CFML MVC framework with ActiveRecord ORM. Models in `app/models/`, controllers in `app/controllers/`, views in `app/views/`, migrations in `app/migrator/migrations/`, config in `config/`, tests in `tests/`.
 
-## 🚨 MANDATORY: 5-Step Development Workflow
+## Directory Layout
 
-**AI ASSISTANTS MUST FOLLOW THIS EXACT ORDER:**
-
-### 🛑 STEP 1: Check MCP Tools
-```bash
-ls .mcp.json  # If exists → MCP tools are MANDATORY
 ```
-- ✅ Use `mcp__wheels__*` tools for ALL development
-- ❌ NEVER use CLI commands (`wheels g`, `wheels test`)
-
-### 🛑 STEP 2: Verify MCP Connection
-```javascript
-mcp__wheels__wheels_server(action="status")
+app/controllers/    app/models/    app/views/    app/views/layout.cfm
+app/migrator/migrations/    app/events/    app/global/    app/lib/
+app/mailers/    app/jobs/    app/plugins/    app/snippets/
+config/settings.cfm    config/routes.cfm    config/environment.cfm
+public/    tests/    vendor/    .env (never commit)
 ```
 
-### 🛑 STEP 3: Invoke Claude Code Skills (MANDATORY)
+## Development Tools
 
-**🔴 CRITICAL: Invoke appropriate skill BEFORE any code generation or debugging**
+Prefer MCP tools when the Wheels MCP server is available (`mcp__wheels__*`). Fall back to CLI otherwise.
 
-**Available Skills:**
-- `wheels-model-generator` - Models, validations, associations
-- `wheels-controller-generator` - Controllers, actions, filters
-- `wheels-view-generator` - Views, forms, layouts, partials
-- `wheels-migration-generator` - Database migrations
-- `wheels-routing-generator` - RESTful routes, nested routes
-- `wheels-email-generator` - Mailers, email templates
-- `wheels-plugin-generator` - Create Wheels plugins
-- `wheels-test-generator` - TestBox tests
-- `wheels-debugging` - Troubleshoot errors (use during testing!)
-- `wheels-auth-generator` - Authentication systems
-- `wheels-api-generator` - RESTful APIs
-- `wheels-anti-pattern-detector` - Prevent common errors
-- `wheels-refactoring` - Optimize code
-- `wheels-deployment` - Production configuration
-- `wheels-documentation-generator` - Generate documentation
+| Task | MCP | CLI |
+|------|-----|-----|
+| Generate | `wheels_generate(type, name, attributes)` | `wheels g model/controller/scaffold Name attrs` |
+| Migrate | `wheels_migrate(action="latest\|up\|down\|info")` | `wheels dbmigrate latest\|up\|down\|info` |
+| Test | `wheels_test()` | `wheels test run` |
+| Reload | `wheels_reload()` | `?reload=true&password=...` |
+| Server | `wheels_server(action="status")` | `wheels server start\|stop\|status` |
+| Analyze | `wheels_analyze(target="all")` | — |
 
-**When to Invoke:**
-- ✅ Before generating ANY Wheels code
-- ✅ **Immediately when encountering errors during testing**
-- ✅ When creating missing views or fixing bugs
-- ✅ When debugging form/validation issues
+## Critical Anti-Patterns (Top 10)
 
-### 🛑 STEP 4: Generate Code with MCP Tools
-```javascript
-// After skill guidance, use MCP tools
-mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string")
-mcp__wheels__wheels_migrate(action="latest")
-```
+These are the most common mistakes when generating Wheels code. Check every time.
 
-### 🛑 STEP 5: Browser Testing (MANDATORY)
-
-**When errors occur during testing:**
-1. **STOP immediately**
-2. **Invoke appropriate skill** (`wheels-debugging`, `wheels-view-generator`)
-3. **Follow skill guidance** for fixes
-4. **Apply fixes** using skill patterns
-5. **Re-test** to verify
-
-**Browser Testing Options (in order of preference):**
-
-**Option A: Puppeteer MCP (Preferred)**
-```javascript
-// 1. Verify server
-mcp__wheels__wheels_server(action="status")
-
-// 2. Navigate and test
-mcp__puppeteer__puppeteer_navigate(url="http://localhost:PORT")
-mcp__puppeteer__puppeteer_screenshot(name="test")
-
-// 3. Test user flows (navigation, forms, CRUD operations)
-```
-
-**Option B: Playwright MCP**
-```javascript
-mcp__playwright__playwright_navigate(url="http://localhost:PORT")
-mcp__playwright__playwright_screenshot()
-```
-
-**Option C: Browser MCP (if Puppeteer/Playwright unavailable)**
-```javascript
-mcp__browsermcp__browser_navigate(url="http://localhost:PORT")
-mcp__browsermcp__browser_screenshot()
-```
-
-**When error occurs during testing:**
-```javascript
-// 4. INVOKE SKILL FIRST - Get guidance before fixing
-Skill("wheels-debugging")
-```
-
----
-
-## 🔴 Critical Anti-Patterns (Production-Tested)
-
-### View Anti-Patterns
-
-#### 1. CSRF Token Conflicts (CRITICAL)
-**❌ WRONG - Causes `Wheels.InvalidAuthenticityToken`:**
+### 1. Mixed Argument Styles
+Wheels functions cannot mix positional and named arguments. This is the #1 error source.
 ```cfm
-#startFormTag(route="login", method="post")#
-    <input type="hidden" name="authenticityToken" value="#authenticityToken()#">
-```
-**✅ CORRECT - startFormTag() includes token automatically:**
-```cfm
-#startFormTag(route="login", method="post")#
-    <!-- NO manual token needed -->
-```
+// WRONG — mixed positional + named
+hasMany("comments", dependent="delete");
+validatesPresenceOf("name", message="Required");
 
-#### 2. Property Access on New Objects (CRITICAL)
-**❌ WRONG - Causes "no accessible Member" error:**
-```cfm
-value="#post.title#"
-```
-**✅ CORRECT - Use structKeyExists():**
-```cfm
-value="#structKeyExists(post, 'title') ? post.title : ''#"
+// RIGHT — all named when using options
+hasMany(name="comments", dependent="delete");
+validatesPresenceOf(properties="name", message="Required");
+
+// RIGHT — positional only (no options)
+hasMany("comments");
+validatesPresenceOf("name");
 ```
 
-For select options:
+### 2. Query vs Array Confusion in Views
+Model finders return query objects, not arrays. Loop accordingly.
 ```cfm
-<option value="draft" #(structKeyExists(post, 'status') AND post.status EQ 'draft') ? 'selected' : ''#>
+// WRONG
+<cfloop array="#users#" index="user">
+
+// RIGHT
+<cfloop query="users">
+    #users.firstName#
+</cfloop>
 ```
 
-Special case - property/method conflicts (e.g., `excerpt`):
+### 3. No Nested Resource Routes
+Wheels does not support Rails-style nested resource blocks.
 ```cfm
-<cfif post.hasProperty('excerpt') && len(post.excerpt)>#post.excerpt#</cfif>
-```
+// WRONG
+.resources("posts", function(r) { r.resources("comments"); })
 
-#### 3. Query vs Array Confusion (CRITICAL)
-**❌ WRONG:**
-```cfm
-<cfif ArrayLen(posts)>
-    <cfloop array="#posts#" index="post">
-```
-**✅ CORRECT - Wheels returns QUERIES:**
-```cfm
-<cfif posts.recordCount>
-    <cfloop query="posts">
-        #posts.title#
-    </cfloop>
-```
-
-#### 4. Creating Missing Views
-**Template for new views:**
-```cfm
-<cfparam name="items">
-<cfoutput>
-#contentFor(name="title", content="Page Title")#
-
-<cfif items.recordCount>
-    <cfloop query="items">
-        #linkTo(text=items.title, action="show", key=items.id)#
-    </cfloop>
-<cfelse>
-    <p>No items found.</p>
-</cfif>
-</cfoutput>
-```
-
-### Model Anti-Patterns
-
-#### 1. Validation Parameters (CRITICAL)
-**❌ WRONG - Uses singular:**
-```cfm
-validatesPresenceOf(property="username")
-validate(method="customValidator")
-```
-**✅ CORRECT - Always use PLURAL:**
-```cfm
-validatesPresenceOf(properties="username,email")
-validatesUniquenessOf(properties="email")
-validatesFormatOf(properties="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$")
-validate(methods="customValidator")
-```
-
-#### 2. Primary Key Configuration (CRITICAL)
-**Always include in every model:**
-```cfm
-component extends="Model" {
-    function config() {
-        table("tablename");
-        setPrimaryKey("id");  // ⚠️ REQUIRED - Must be explicit
-        // Rest of configuration...
-    }
-}
-```
-
-#### 3. Callback Property Access (CRITICAL)
-**❌ WRONG:**
-```cfm
-function setDefaults() {
-    if (!len(this.counter)) {
-        this.counter = 0;
-    }
-}
-```
-**✅ CORRECT:**
-```cfm
-function setDefaults() {
-    if (!structKeyExists(this, "counter") || !len(this.counter)) {
-        this.counter = 0;
-    }
-}
-```
-
-### Controller Anti-Patterns
-
-#### Mixed Parameters (CRITICAL)
-**❌ WRONG:**
-```cfm
-hasMany("comments", dependent="delete")
-```
-**✅ CORRECT - All named OR all positional:**
-```cfm
-hasMany(name="comments", dependent="delete")
-// OR
-hasMany("comments")
-```
-
-### Migration Anti-Patterns
-
-#### 1. Boolean Parameters
-**❌ CLI generates WRONG:**
-```cfm
-t = createTable(name='users', force='false', id='true');
-```
-**✅ Fix to proper booleans:**
-```cfm
-t = createTable(name='users');  // Use defaults
-// OR
-t = createTable(name='users', force=false, id=true);
-```
-
-#### 2. Foreign Key Naming
-**For self-referential tables:**
-```cfm
-addForeignKey(
-    table="follows",
-    column="followerId",
-    referenceTable="users",
-    keyName="FK_follows_follower",  // Explicit name prevents conflicts
-    onDelete="cascade"
-);
-```
-
-#### 3. Composite Index Order
-**✅ CORRECT - Composite FIRST:**
-```cfm
-addIndex(table="likes", columnNames="userId,tweetId", unique=true);  // First
-addIndex(table="likes", columnNames="tweetId");  // Then second column
-```
-
----
-
-## 🔍 Common Errors & Solutions
-
-### View Errors (Most Common)
-
-**1. `Wheels.InvalidAuthenticityToken`**
-- Cause: Manual CSRF token inside `startFormTag()`
-- Fix: Remove `<input type="hidden" name="authenticityToken">`
-
-**2. "Component has no accessible Member [PROPERTY]"**
-- Cause: Accessing property on new/unsaved model
-- Fix: Use `structKeyExists(object, 'property') ? object.property : ''`
-
-**3. `Wheels.ViewNotFound`**
-- Cause: Missing view file
-- Fix: Create view with proper Wheels patterns (query loops, recordCount)
-
-**4. "Can't find component [ModelName]"**
-- Cause: Using `createObject("component", "Model")`
-- Fix: Use `model("ModelName").new()`
-
-### Association Errors
-
-**"Missing argument name" in hasMany()**
-- Cause: Mixing positional and named parameters
-- Fix: Use consistent parameter style (all named or all positional)
-
-### Routing Issues
-
-**Resources syntax differs from Rails:**
-```cfm
-// ❌ WRONG (Rails-style)
-.resources("posts", function(nested) { nested.resources("comments"); })
-
-// ✅ CORRECT (Wheels)
+// RIGHT — separate declarations
 .resources("posts")
 .resources("comments")
 ```
 
-### Form Helper Limitations
+### 4. Non-Existent Form Helpers
+These helpers don't exist in Wheels: `emailField()`, `urlField()`, `numberField()`, `phoneField()`.
+```cfm
+// WRONG
+#emailField(objectName="user", property="email")#
 
-**Not available in Wheels:**
-- `emailField()` - Use `textField(type="email")`
-- `label(text="Name")` - Use `<label>Name</label>`
+// RIGHT
+#textFieldTag(name="user[email]", type="email", value=user.email)#
+```
 
----
+### 5. Migration Seed Data — Use Direct SQL
+Parameter binding in `execute()` is unreliable. Use inline SQL for seed data.
+```cfm
+// WRONG
+execute(sql="INSERT INTO roles (name) VALUES (?)", parameters=[{value="admin"}]);
 
-## 🔧 Quick Reference
+// RIGHT
+execute("INSERT INTO roles (name, createdAt, updatedAt) VALUES ('admin', NOW(), NOW())");
+```
 
-### Model Structure
+### 6. Route Order Matters
+Routes are matched first-to-last. Wrong order = wrong matches.
+```
+Order: MCP routes → resources → custom named routes → root → wildcard (last!)
+```
+
+### 7. timestamps() Includes createdAt and updatedAt
+Don't also add separate datetime columns for these.
+```cfm
+// WRONG — duplicates
+t.timestamps();
+t.datetime(columnNames="createdAt");
+
+// RIGHT
+t.timestamps();  // creates both createdAt and updatedAt
+```
+
+### 8. Database-Agnostic Dates in Migrations
+Use `NOW()` — it works across MySQL, PostgreSQL, SQL Server, H2.
+```cfm
+// WRONG — database-specific
+execute("INSERT INTO users (name, createdAt) VALUES ('Admin', CURRENT_TIMESTAMP)");
+
+// RIGHT
+execute("INSERT INTO users (name, createdAt, updatedAt) VALUES ('Admin', NOW(), NOW())");
+```
+
+### 9. Controller Filters Must Be Private
+Filter functions (authentication, data loading) must be declared `private`.
+```cfm
+// WRONG — public filter becomes a routable action
+function authenticate() { ... }
+
+// RIGHT
+private function authenticate() { ... }
+```
+
+### 10. Always cfparam View Variables
+Every variable passed from controller to view needs a cfparam declaration.
+```cfm
+// At top of every view file
+<cfparam name="users" default="">
+<cfparam name="user" default="">
+```
+
+## Wheels Conventions
+
+- **config()**: All model associations/validations/callbacks and controller filters/verifies go in `config()`
+- **Naming**: Models are singular PascalCase (`User.cfc`), controllers are plural PascalCase (`Users.cfc`), table names are plural lowercase (`users`)
+- **Parameters**: `params.key` for URL key, `params.user` for form struct, `params.user.firstName` for nested
+- **extends**: Models extend `"Model"`, controllers extend `"Controller"`, tests extend `"wheels.Test"` or `"wheels.Testbox"`
+- **Associations**: All named params when using options: `hasMany(name="orders")`, `belongsTo(name="user")`, `hasOne(name="profile")`
+- **Validations**: Property param is `property` (singular) for single, `properties` (plural) for list: `validatesPresenceOf(properties="name,email")`
+
+## Model Quick Reference
+
 ```cfm
 component extends="Model" {
     function config() {
-        table("tablename");
-        setPrimaryKey("id");  // REQUIRED
+        // Table/key (only if non-conventional)
+        tableName("tbl_users");
+        setPrimaryKey("userId");
 
-        hasMany(name="children");
-        belongsTo(name="parent");
+        // Associations — all named params when using options
+        hasMany(name="orders", dependent="delete");
+        belongsTo(name="role");
 
-        validatesPresenceOf(properties="field1,field2");
-        validatesUniquenessOf(properties="field1");
-        validate(methods="customValidator");
+        // Validations
+        validatesPresenceOf("firstName,lastName,email");
+        validatesUniquenessOf(property="email");
+        validatesFormatOf(property="email", regEx="^[\w\.-]+@[\w\.-]+\.\w+$");
 
-        beforeCreate("setDefaults");
-    }
-
-    function setDefaults() {
-        if (!structKeyExists(this, "counter") || !len(this.counter)) {
-            this.counter = 0;
-        }
+        // Callbacks
+        beforeSave("sanitizeInput");
     }
 }
 ```
 
-### Controller Structure
+Finders: `model("User").findAll()`, `model("User").findOne(where="...")`, `model("User").findByKey(params.key)`.
+Create: `model("User").new(params.user)` then `.save()`, or `model("User").create(params.user)`.
+Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
+
+## Routing Quick Reference
+
 ```cfm
-component extends="Controller" {
-    function config() {
-        filters(through="authenticate", except="index");
-        verifies(except="index,new,create", params="key", paramsTypes="integer");
-        provides("html,json");
-    }
-
-    function index() {
-        items = model("Item").findAll(include="associations", order="createdAt DESC");
-    }
-
-    function create() {
-        item = model("Item").new(params.item);
-        if (item.save()) {
-            redirectTo(route="item", key=item.id, success="Created!");
-        } else {
-            renderView(action="new");
-        }
-    }
-}
+// config/routes.cfm
+mapper()
+    .resources("users")                              // standard CRUD
+    .resources("products", except="delete")           // skip actions
+    .get(name="login", to="sessions##new")           // named route
+    .post(name="authenticate", to="sessions##create")
+    .root(to="home##index", method="get")            // homepage
+    .wildcard()                                       // keep last!
+.end();
 ```
 
-### View Structure
+Helpers: `linkTo(route="user", key=user.id, text="View")`, `urlFor(route="users")`, `redirectTo(route="user", key=user.id)`, `startFormTag(route="user", method="put", key=user.id)`.
+
+## Testing Quick Reference
+
 ```cfm
-<cfparam name="items">
-<cfoutput>
-#contentFor(name="title", content="Items")#
-
-<h1>Items</h1>
-
-<cfif items.recordCount>
-    <table>
-        <cfloop query="items">
-        <tr>
-            <td>#linkTo(route="item", key=items.id, text=items.name)#</td>
-        </tr>
-        </cfloop>
-    </table>
-<cfelse>
-    <p>No items found.</p>
-</cfif>
-</cfoutput>
-```
-
-### Form View (with Safe Property Access)
-```cfm
-<cfparam name="item">
-<cfoutput>
-#startFormTag(route="items", method="post")#
-    #textField(
-        objectName="item",
-        property="name",
-        value="#structKeyExists(item, 'name') ? item.name : ''#"
-    )#
-
-    <textarea name="item[description]">
-    #structKeyExists(item, 'description') ? item.description : ''#
-    </textarea>
-
-    <select name="item[status]">
-        <option value="active" #(structKeyExists(item, 'status') AND item.status EQ 'active') ? 'selected' : ''#>
-            Active
-        </option>
-    </select>
-
-    <button type="submit">Save</button>
-#endFormTag()#
-</cfoutput>
-```
-
-### Migration Structure
-```cfm
-component extends="wheels.migrator.Migration" {
-    function up() {
-        transaction {
-            t = createTable(name="items");  // Use defaults for booleans
-            t.string(columnNames="name", allowNull=false);
-            t.text(columnNames="description");
-            t.boolean(columnNames="active", default=true);
-            t.timestamps();
-            t.create();
-
-            addIndex(table="items", columnNames="name", unique=true);
-        }
-    }
-
-    function down() {
-        dropTable("items");
+component extends="wheels.Testbox" {
+    function run() {
+        describe("User", function() {
+            it("validates presence of name", function() {
+                var user = model("User").new();
+                expect(user.valid()).toBeFalse();
+            });
+        });
     }
 }
 ```
 
----
+Tests live in `tests/models/`, `tests/controllers/`, `tests/integration/`. Run with MCP `wheels_test()` or CLI `wheels test run`.
 
-## 🔐 Security Best Practices
+## Reference Docs
 
-### CSRF Protection
-- `startFormTag()` includes CSRF automatically - never add manual token
-- Use `csrfMetaTags()` in layout `<head>`
+Deeper documentation lives in `.ai/` — Claude will search it automatically when needed:
+- `.ai/cfml/` — CFML language reference (syntax, data types, components)
+- `.ai/wheels/models/` — ORM details, associations, validations
+- `.ai/wheels/controllers/` — filters, rendering, security
+- `.ai/wheels/views/` — layouts, partials, form helpers, link helpers
+- `.ai/wheels/database/` — migration column types, queries, advanced operations
+- `.ai/wheels/configuration/` — routing, environments, settings
 
-### Password Hashing (Lucee Limitation)
-**❌ BCrypt NOT supported natively:**
-```cfm
-hash(password, "BCrypt")  // Runtime error!
-```
-**✅ Use SHA-256:**
-```cfm
-passwordHash = hash(password, "SHA-256")
-```
+## MCP Server
 
-### SQL Injection Prevention
-```cfm
-// Use Wheels model methods (auto-sanitized)
-users = model("User").findAll(where="email = '#params.email#'");
+Endpoint: `/wheels/mcp` (routes must come before `.wildcard()` in routes.cfm).
 
-// Or use cfqueryparam
-users = queryExecute(
-    "SELECT * FROM users WHERE email = :email",
-    { email = { value = params.email, cfsqltype = "cf_sql_varchar" } }
-);
-```
-
----
-
-## 📦 MCP Tools Reference
-
-```javascript
-// Code Generation
-mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string")
-mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show")
-mcp__wheels__wheels_generate(type="view", name="posts/index")
-mcp__wheels__wheels_generate(type="migration", name="CreatePostsTable")
-
-// Database
-mcp__wheels__wheels_migrate(action="latest")
-mcp__wheels__wheels_migrate(action="info")
-
-// Testing & Validation
-mcp__wheels__wheels_test()
-mcp__wheels__wheels_validate(model="all")
-
-// Server Management
-mcp__wheels__wheels_server(action="status")
-mcp__wheels__wheels_reload()
-
-// Analysis
-mcp__wheels__wheels_analyze(target="all", verbose=true)
-```
-
----
-
-## 🚀 Complete Example Workflow
-
-```javascript
-// 1. Check MCP
-mcp__wheels__wheels_server(action="status")
-
-// 2. Invoke skill BEFORE generation
-Skill("wheels-model-generator")
-mcp__wheels__wheels_generate(type="model", name="Post", attributes="title:string,content:text")
-
-Skill("wheels-controller-generator")
-mcp__wheels__wheels_generate(type="controller", name="Posts", actions="index,show,new,create")
-
-Skill("wheels-view-generator")
-// Create view following skill guidance
-
-Skill("wheels-migration-generator")
-mcp__wheels__wheels_migrate(action="latest")
-
-// 3. Browser test (use available MCP tool)
-// Puppeteer (preferred):
-mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080/posts")
-mcp__puppeteer__puppeteer_screenshot(name="posts-index")
-
-// OR Playwright:
-mcp__playwright__playwright_navigate(url="http://localhost:8080/posts")
-mcp__playwright__playwright_screenshot()
-
-// OR Browser MCP (fallback):
-mcp__browsermcp__browser_navigate(url="http://localhost:8080/posts")
-mcp__browsermcp__browser_screenshot()
-
-// 4. Error encountered - INVOKE SKILL
-Skill("wheels-debugging")
-// Follow guidance, apply fix, re-test
-
-// 5. Success - test form submission
-mcp__puppeteer__puppeteer_navigate(url="http://localhost:8080/posts/new")
-mcp__puppeteer__puppeteer_screenshot(name="posts-new")
-```
-
----
-
-## ⚠️ Critical Rules
-
-**✅ ALWAYS:**
-- Invoke skills BEFORE code generation
-- Invoke skills IMMEDIATELY when debugging errors
-- Use MCP tools when `.mcp.json` exists
-- Test in browser after ANY development
-- Use `structKeyExists()` for new model objects
-- Use query loops, not array loops
-- Use plural parameter names (properties, methods)
-
-**❌ NEVER:**
-- Skip skill invocation
-- Guess at fixes without skills
-- Add manual CSRF tokens inside `startFormTag()`
-- Use CLI commands when MCP available
-- Mix positional and named parameters
-- Assume Rails conventions work
-- Access properties without existence checks on new objects
+Tools: `wheels_generate`, `wheels_migrate`, `wheels_test`, `wheels_server`, `wheels_reload`, `wheels_analyze`, `wheels_validate`.

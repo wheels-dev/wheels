@@ -1,0 +1,102 @@
+# Generate Changelog Workflow
+# Generates changelog entries from merged PRs since the last release tag.
+# Can be run manually before a release.
+#
+# PRs are categorized by GitHub labels:
+#   enhancement → Controller/Model/View Enhancements (auto-detected by title keywords)
+#   bug         → Bug Fixes
+#   docs        → Guides
+#   breaking    → Potentially Breaking Changes
+#   (unlabeled) → Categorized by title keywords, or Miscellaneous
+
+name: Generate Changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to generate changelog for (leave empty to auto-detect from box.json)'
+        required: false
+        type: string
+      since_tag:
+        description: 'Generate changes since this tag (leave empty for latest tag)'
+        required: false
+        type: string
+      write_to_file:
+        description: 'Write generated changelog to CHANGELOG.md'
+        required: false
+        type: boolean
+        default: false
+      create_pr:
+        description: 'Create a PR with the changelog update'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  generate:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Make scripts executable
+        run: chmod +x tools/build/scripts/*.sh
+
+      - name: Generate Changelog (Preview)
+        if: ${{ !inputs.write_to_file }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_SINCE_TAG: ${{ inputs.since_tag }}
+        run: |
+          ./tools/build/scripts/generate-changelog.sh \
+            "$INPUT_VERSION" \
+            "$INPUT_SINCE_TAG"
+
+      - name: Generate Changelog (Write to File)
+        if: ${{ inputs.write_to_file }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_SINCE_TAG: ${{ inputs.since_tag }}
+        run: |
+          ./tools/build/scripts/generate-changelog.sh \
+            "$INPUT_VERSION" \
+            "$INPUT_SINCE_TAG" \
+            --write
+
+      - name: Create Pull Request
+        if: ${{ inputs.write_to_file && inputs.create_pr }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Detect version from box.json
+          VERSION=$(jq -r '.version' templates/base/src/box.json)
+          VERSION="${VERSION%-SNAPSHOT}"
+
+          BRANCH="changelog/$VERSION"
+          git checkout -b "$BRANCH"
+          git add CHANGELOG.md
+          git commit -m "Update CHANGELOG.md for $VERSION"
+          git push -u origin "$BRANCH"
+
+          gh pr create \
+            --title "Update CHANGELOG.md for $VERSION" \
+            --body "Auto-generated changelog entries from merged PRs since the last release. PRs categorized by GitHub labels and title keywords. Please review and edit as needed before merging." \
+            --base develop

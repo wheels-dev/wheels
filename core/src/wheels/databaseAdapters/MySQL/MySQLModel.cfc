@@ -115,5 +115,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return "() VALUES()";
 	}
 
+	/**
+	 * Override Base adapter's function.
+	 * MySQL uses backticks to quote identifiers.
+	 */
+	public string function $quoteIdentifier(required string name) {
+		return "`#arguments.name#`";
+	}
 
 }

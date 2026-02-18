@@ -1,14 +1,16 @@
 {
     "name": "|appName|",
-    "app": {
-        "cfengine": "|setEngine|",
-        "serverHomeDirectory": ".wheels/server"
-    },
     "web": {
+        "host":"localhost",
         "webroot": "public",
         "rewrites": {
             "enable": true,
             "config": "public/urlrewrite.xml"
         }
+    },
+    "app": {
+        "cfengine": "|setEngine|",
+        "serverHomeDirectory": ".wheels/server",
+        "libDirs":"app/lib"
     }
 }

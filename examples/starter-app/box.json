@@ -31,12 +31,14 @@
     "dependencies": {
         "wirebox": "^7.0.0",
         "testbox": "^6.0.0",
-        "wheels-core": "^3.0.0"
+        "wheels-core": "^3.0.0",
+        "cfwheels-authenticateThis":"^1"
     },
     "installPaths": {
         "wirebox": "vendor/wirebox/",
         "testbox": "vendor/testbox/",
-        "wheels-core": "vendor/wheels/"
+        "wheels-core": "vendor/wheels/",
+        "cfwheels-authenticateThis":"plugins/authenticateThis/"
     },
     "private":false,
     "license":[

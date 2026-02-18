@@ -246,7 +246,7 @@ The TestUI includes features to help manage the test environment:
 When contributing to Wheels, you may need to create new tests for your code changes:
 
 1. Create a new test file in the appropriate directory:
-   - For core functions: `core/src/wheels/tests_testbox/specs/functions/YourTest.cfc`
+   - For core functions: `core/src/wheels/tests_testbox/specs/functional/YourTest.cfc`
 
 If you are adding in the already created test files, then you have to add in the same tests file, otherwise you can create a separate test file.
 
