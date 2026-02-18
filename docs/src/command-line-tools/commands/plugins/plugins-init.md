@@ -1,6 +1,6 @@
 # wheels plugin init
 
-Initialize a new CFWheels plugin in the `/plugins` directory.
+Initialize a new Wheels plugin in the `/plugins` directory.
 
 ## Usage
 
@@ -20,12 +20,12 @@ wheels plugin init <name> [--author=<name>] [--description=<text>] [--version=<v
 
 ## Description
 
-The `plugin init` command creates a new CFWheels plugin following the standard CFWheels plugin structure. The plugin is created directly in your application's `/plugins` directory and includes all necessary files to get started.
+The `plugin init` command creates a new Wheels plugin following the standard Wheels plugin structure. The plugin is created directly in your application's `/plugins` directory and includes all necessary files to get started.
 
 ### Features
 
 - Creates plugin in `/plugins` directory
-- Follows CFWheels plugin conventions
+- Follows Wheels plugin conventions
 - Includes `mixin="global"` for framework-wide availability
 - Generates documentation files
 - Includes test suite
@@ -234,7 +234,7 @@ box publish
 
 ## Plugin Types
 
-Common CFWheels plugin categories:
+Common Wheels plugin categories:
 
 - **Data Helpers** - String manipulation, date formatting, validation
 - **Authentication** - User authentication, session management, encryption

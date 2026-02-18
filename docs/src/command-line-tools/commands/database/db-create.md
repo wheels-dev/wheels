@@ -371,7 +371,7 @@ Create this datasource? [y/n]: y
 The datasource will be saved to both `/config/app.cfm` and `CFConfig.json`.
 
 ## Prerequisites
-> **⚠️ Note:** This command depends on configuration values. Please verify your database configuration before executing it.
+> ** Note:** This command depends on configuration values. Please verify your database configuration before executing it.
 
 1. **Datasource Configuration**: The datasource can be configured in `/config/app.cfm` or created interactively
 2. **Database Privileges**: The database user must have CREATE DATABASE privileges (CREATE USER for Oracle, not applicable for H2/SQLite)
