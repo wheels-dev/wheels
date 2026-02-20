@@ -272,8 +272,8 @@ component {
         
         // Check if .env file exists
         if (!fileExists(envFile)) {
-            // Create new .env file with wheels_env variable
-            fileWrite(envFile, "wheels_env=#arguments.environment#");
+            // Create new .env file with WHEELS_ENV variable
+            fileWrite(envFile, "WHEELS_ENV=#arguments.environment#");
             return {
                 success: true,
                 message: "Created new .env file and set environment to '#arguments.environment#'",
@@ -300,24 +300,24 @@ component {
                 continue;
             }
             
-            // Check for wheels_env or environment variable
-            if (findNoCase("wheels_env=", trimmedLine) == 1) {
+            // Check for WHEELS_ENV or environment variable
+            if (findNoCase("WHEELS_ENV=", trimmedLine) == 1) {
                 oldEnvironment = listLast(trimmedLine, "=");
-                updatedLines.append("wheels_env=#arguments.environment#");
+                updatedLines.append("WHEELS_ENV=#arguments.environment#");
                 envVarFound = true;
             } else if (!envVarFound && findNoCase("environment=", trimmedLine) == 1) {
                 oldEnvironment = listLast(trimmedLine, "=");
-                // Replace environment with wheels_env
-                updatedLines.append("wheels_env=#arguments.environment#");
+                // Replace environment with WHEELS_ENV
+                updatedLines.append("WHEELS_ENV=#arguments.environment#");
                 envVarFound = true;
             } else {
                 updatedLines.append(line);
             }
         }
         
-        // If no environment variable was found, add wheels_env
+        // If no environment variable was found, add WHEELS_ENV
         if (!envVarFound) {
-            updatedLines.append("wheels_env=#arguments.environment#");
+            updatedLines.append("WHEELS_ENV=#arguments.environment#");
         }
         
         // Write updated content back to .env file
@@ -400,8 +400,8 @@ component {
         for (var line in envLines) {
             var trimmedLine = trim(line);
             
-            // Check for wheels_env first
-            if (findNoCase("wheels_env=", trimmedLine) == 1) {
+            // Check for WHEELS_ENV first
+            if (findNoCase("WHEELS_ENV=", trimmedLine) == 1) {
                 return trim(listLast(trimmedLine, "="));
             }
             // Fallback to environment
@@ -1711,8 +1711,8 @@ sudo -u postgres psql -c ""GRANT ALL PRIVILEGES ON DATABASE #arguments.databaseN
             var matches = reMatchNoCase("WHEELS_ENV\s*=\s*([^\r\n]+)", envContent);
             if (arrayLen(matches)) {
                 currentEnv = trim(matches[1]);
-                // Remove quotes if present and remove key name "wheels_env="
-                currentEnv = reReplace(currentEnv, "^([""']|wheels_env=)|([""'])$", "", "all");
+                // Remove quotes if present and remove key name "WHEELS_ENV="
+                currentEnv = reReplace(currentEnv, "^([""']|WHEELS_ENV=)|([""'])$", "", "all");
             }
         }
 
