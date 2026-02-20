@@ -29,11 +29,11 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 			local.boxJsonPath = fileSystemUtil.resolvePath("vendor/wheels/box.json");
 			local.rootJson = fileSystemUtil.resolvePath("box.json");
 		}
-		// Check if we're in wheels source structure (core/src/wheels)
+		// Check if we're in wheels monorepo (has cli/ and tools/ alongside vendor/wheels)
 		else if(isWheelsInstall(getCWD())) {
-			local.wheelsPath = fileSystemUtil.resolvePath("core/src/wheels");
-			local.boxJsonPath = fileSystemUtil.resolvePath("core/src/wheels/box.json");
-			local.rootJson = fileSystemUtil.resolvePath("template/base/src/box.json");
+			local.wheelsPath = fileSystemUtil.resolvePath("vendor/wheels");
+			local.boxJsonPath = fileSystemUtil.resolvePath("vendor/wheels/box.json");
+			local.rootJson = fileSystemUtil.resolvePath("box.json");
 		}
 		// If neither structure is detected, throw an error
 		else {
@@ -73,9 +73,9 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 			local.content = listFirst(mid(local.content, (find('application.$wheels.version', local.content) + 31), 20), '"');
 			return local.content;
 		}
-		else if(isWheelsInstall() && fileExists(fileSystemUtil.resolvePath("templates/base/src/app/events/onapplicationstart.cfm"))) {
-			// For wheels source structure
-			local.target = fileSystemUtil.resolvePath("templates/base/src/app/events/onapplicationstart.cfm");
+		else if(isWheelsInstall() && fileExists(fileSystemUtil.resolvePath("app/events/onapplicationstart.cfm"))) {
+			// For wheels monorepo structure
+			local.target = fileSystemUtil.resolvePath("app/events/onapplicationstart.cfm");
 			local.content = fileRead(local.target);
 			local.content = listFirst(mid(local.content, (find('application.$wheels.version', local.content) + 31), 20), '"');
 			return local.content;
@@ -110,18 +110,19 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 		return true;
 	}
 
-	// Use this function for commands that should work even if the application is not running
+	// Use this function to detect the Wheels monorepo development environment
+	// (has cli/ and tools/ directories alongside a working app structure)
 	boolean function isWheelsInstall(string path = getCWD()) {
-		// Check for /core/src/wheels folder
-		if (!directoryExists(arguments.path & "/core/src/wheels")) {
+		// Check for vendor/wheels folder
+		if (!directoryExists(arguments.path & "/vendor/wheels")) {
 			return false;
 		}
-		// Check for config folder
-		if (!directoryExists(arguments.path & "/templates/base/src/config")) {
+		// Check for cli/ directory (monorepo indicator)
+		if (!directoryExists(arguments.path & "/cli")) {
 			return false;
 		}
-		// Check for app folder
-		if (!directoryExists(arguments.path & "/templates/base/src/app")) {
+		// Check for tools/ directory (monorepo indicator)
+		if (!directoryExists(arguments.path & "/tools")) {
 			return false;
 		}
 		return true;
@@ -316,7 +317,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
  			}
 
 		// Wheels folder in expected place? (just a good check to see if the user has actually installed wheels...)
- 		var wheelsFolder=fileSystemUtil.resolvePath("core/src/wheels");
+ 		var wheelsFolder=fileSystemUtil.resolvePath("vendor/wheels");
  			if(!isWheelsApp()){
  				error("We can't find your wheels folder. Check you have installed Wheels, and you're running this from the site root: If you've not started an app yet, try wheels new myApp");
  			}

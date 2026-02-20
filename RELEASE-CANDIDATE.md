@@ -40,9 +40,8 @@ git checkout -b release/3.0.0-rc.1
 Update version in all box.json files to include `-rc.1` suffix:
 
 **Files to update:**
-- `templates/base/src/box.json` → `"version": "3.0.0-rc.1"`
+- `box.json` (root) → `"version": "3.0.0-rc.1"`
 - `examples/starter-app/box.json` → `"version": "3.0.0-rc.1"`
-- `core/box.json` → `"version": "3.0.0-rc.1"`
 
 **Update dependencies:**
 ```json

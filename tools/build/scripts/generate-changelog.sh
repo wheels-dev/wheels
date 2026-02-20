@@ -21,8 +21,8 @@ REPO="wheels-dev/wheels"
 # Auto-detect version from box.json if not provided
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-  if [ -f "templates/base/src/box.json" ]; then
-    VERSION=$(jq -r '.version' templates/base/src/box.json)
+  if [ -f "box.json" ]; then
+    VERSION=$(jq -r '.version' box.json)
     VERSION="${VERSION%-SNAPSHOT}"
   else
     echo "ERROR: Cannot detect version. Provide it as first argument or run from repo root."

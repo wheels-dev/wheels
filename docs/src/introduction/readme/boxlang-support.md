@@ -294,7 +294,7 @@ If using the Wheels base template structure:
 
 ```bash
 java -jar /path/to/boxlang-miniserver-1.6.0.jar \
-  --webroot /path/to/your/app/templates/base/src/public \
+  --webroot /path/to/your/app/public \
   --rewrite \
   --port 8080
 ```

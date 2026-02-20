@@ -13,11 +13,14 @@ WEB-INF
 /manual/
 /bin/
 /migrator/sql/
-/templates/base/src/vendor
-/templates/base/src/vendor/testbox/
-/templates/base/src/vendor/wirebox/
+# Vendor dependencies (except wheels core which is tracked as source)
+/vendor/*
+!/vendor/wheels/
 /cli/workspace/
 /cli/simpletestapp/
+
+# Database files
+/db/
 
 settings.json
 settings.xml

@@ -389,12 +389,46 @@ The root `server.json` should be updated to point to `public/` as the web root:
 | `vendor/wheels/` tracked in git | Add `.gitattributes` to mark it as framework source, not a dependency |
 | Existing forks/PRs broken | Coordinate timing, announce in advance |
 
-## Open Questions
+## Open Questions — Resolved
 
-1. **Should `vendor/wheels/` be the actual directory name?** It matches the convention users see in their apps, but some may find it odd that "vendor" code is first-party source. Alternative: keep it as `wheels/` at root (matches the historical layout from v1/v2) and have build scripts map it to `vendor/wheels/` when producing the base-template package.
+Resolved based on cross-framework research (Laravel, Rails, Django, Symfony, Next.js, Nuxt, ColdBox).
 
-2. **Test directory merge strategy:** Should framework tests and app-level test scaffolding share a single `tests/` directory, or should framework tests move to `vendor/wheels/tests/`?
+### 1. Should `vendor/wheels/` be the actual directory name?
 
-3. **Should the starter-app example remain separate?** It duplicates much of the base template structure. Could it become a branch or be generated from the repo itself?
+**Decision: Yes — use `vendor/wheels/`.** This matches the convention users see in their apps after `wheels new`. Every major framework keeps runtime dependencies in a vendored location (`vendor/` in PHP, `node_modules/` in JS, `lib/` in Ruby). The fact that the source is first-party is already documented and understood — ColdBox uses a similar pattern with `system/` containing its own source. A `.gitattributes` annotation clarifies the intent.
 
-4. **Timing:** Should this land before or after the 3.0 stable release?
+### 2. Test directory merge strategy
+
+**Decision: Keep framework tests in `tests/` at root; app scaffold tests stay as a minimal placeholder.** This matches the Django/ColdBox/Next.js pattern — a single top-level `tests/` for framework tests. The app scaffold's `tests/` subdirectory (from `templates/base/src/tests/`) contains only a `runner.cfm` placeholder, not real tests, so it merges cleanly. The core framework already has its own internal tests at `vendor/wheels/tests/` (co-located, like Rails/Symfony). Structure after merge:
+
+```
+tests/
+├── specs/          ← framework functional tests (current tests/specs/)
+├── _assets/        ← test fixtures (current tests/_assets/)
+├── runner.cfm      ← test runner
+├── routes.cfm
+└── populate.cfm
+```
+
+### 3. Should the starter-app example remain separate?
+
+**Decision: Yes — keep `examples/` at root.** It serves a different purpose (a pre-built demo app) than the base template (an empty scaffold). No major framework merges its example apps with its scaffold. It stays at `examples/starter-app/`.
+
+### 4. Timing
+
+**Decision: Land on the development branch now.** The reorganization is structural, not functional — no framework code changes. It should be validated before 3.0 stable so the stable release ships with the clean structure.
+
+### 5. Ancillary directory organization (new — from research)
+
+**Decision: Keep `cli/`, `docs/`, `tools/`, `examples/`, `design_docs/` flat at root.** Research across 8 major frameworks confirmed that no framework groups dev infrastructure into a single umbrella directory. Flat, descriptive root-level directories are the universal standard. The `_src/` and `_build/` patterns from Option D are unconventional and provide no real benefit over Option A.
+
+---
+
+## Research Summary
+
+Cross-framework analysis of monorepo layouts (Laravel, Rails, Django, Symfony, Next.js, Nuxt, ColdBox, CFWheels current):
+
+- **Test separation**: Django/ColdBox/Next.js use top-level `tests/`; Rails/Symfony co-locate tests per sub-package. Both work — we use the top-level pattern since Wheels is a single-package framework.
+- **Ancillary directories**: Every framework puts `docs/`, `tools/`, `scripts/`, `examples/` at root. No framework uses `_dev/`, `internal/`, or other umbrella groupings.
+- **ColdBox precedent**: The closest CFML framework uses `system/` (framework core), `test-harness/` (test app), `build/` (scripts), `tests/` (test suite) — all flat at root. Our approach matches this.
+- **The `packages/` pattern** (Next.js, Nuxt) is for multi-package monorepos publishing independent npm packages. Not applicable to Wheels' single-core-package model.

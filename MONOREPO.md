@@ -24,26 +24,39 @@ Wheels 3.0 uses a monorepo structure to maintain all framework components in a s
 
 ## Directory Structure
 
+The repo root IS a runnable Wheels application. Clone and `box server start` just works.
+
 ```
-wheels-monorepo/
+wheels/
+├── app/                          # Application code (controllers, models, views)
+├── config/                       # Configuration files (routes, settings, environments)
+├── public/                       # Web root (Application.cfc, index.cfm, assets)
+├── vendor/
+│   └── wheels/                   # Framework core runtime (tracked as source)
+├── db/                           # Database files (H2 embedded)
+├── plugins/                      # Application plugins
+├── tests/                        # Framework test suite
+├── box.json                      # Application/package manifest
+├── server.json                   # CommandBox server configuration
+│
+│  ── Development infrastructure (not part of the app) ──
+│
 ├── cli/                          # Wheels CLI (CommandBox module)
-├── core/                          # Framework core runtime
-├── templates/                     # Application templates
-│   └── base/                      # Base starter template
-├── docs/                          # Documentation (MkDocs)
-├── examples/                      # Example applications
-├── tests/                         # Framework test suite
-├── tools/                         # Build and development tools
-│   ├── build/                     # Build scripts
-│   ├── docker/                    # Docker test environments
-│   ├── installer/                 # Installation tools
-│   ├── scripts/                   # Utility scripts
-│   ├── vscode-ext/                # VSCode extension
-│   └── workspace/                 # Development workspace
-├── design_docs/                   # Architecture and design docs
-├── .github/                       # GitHub Actions and templates
-├── compose.yml                    # Docker Compose configuration
-└── [config files]                 # Project configuration
+├── docs/                         # Documentation (MkDocs)
+├── examples/                     # Example applications
+├── tools/                        # Build and development tools
+│   ├── build/                    # Build scripts and packaging
+│   ├── docker/                   # Docker test environments
+│   ├── installer/                # Installation tools
+│   ├── scripts/                  # Utility scripts
+│   ├── vscode-ext/               # VSCode extension
+│   └── workspace/                # Development workspace
+├── design_docs/                  # Architecture and design docs
+├── .ai/                          # AI reference documentation
+├── .claude/                      # Claude Code configuration
+├── .github/                      # GitHub Actions and templates
+├── compose.yml                   # Docker Compose configuration
+└── [config files]                # .gitignore, .gitattributes, etc.
 ```
 
 ## Core Components
@@ -88,24 +101,28 @@ cli/
 box install wheels-cli
 ```
 
-### 2. Core Framework (`/core`)
+### 2. Core Framework (`/vendor/wheels`)
 
 **Published as:** `wheels-core`
 **Type:** CFML framework library
 **Purpose:** The actual MVC framework runtime
 
 ```
-core/
-├── box.json                      # Package metadata (v3.0.0-rc.1)
-├── src/
-│   └── wheels/                   # Framework code (27 directories)
-│       ├── controller/           # Controller base class
-│       ├── model/                # Model/ORM functionality
-│       ├── view/                 # View rendering
-│       ├── dispatch/             # Request routing
-│       ├── global/               # Global helpers
-│       └── ...
-└── tests/                        # Framework tests (7 directories)
+vendor/wheels/
+├── Controller.cfc                # Controller base class
+├── Model.cfc                     # Model/ORM base class
+├── Dispatch.cfc                  # Request routing
+├── Global.cfc                    # Global helpers
+├── Mapper.cfc                    # Route mapper
+├── Migrator.cfc                  # Database migrations
+├── controller/                   # Controller mixins
+├── model/                        # Model mixins
+├── view/                         # View rendering
+├── databaseAdapters/             # DB engine adapters
+├── public/                       # Built-in pages and docs
+├── tests/                        # Core unit tests
+├── tests_testbox/                # TestBox integration tests
+└── box.json                      # Package metadata
 ```
 
 **Installation:**
@@ -115,40 +132,38 @@ box install wheels-core
 
 **Runtime Location:** Installed to `/vendor/wheels/` in application projects
 
-### 3. Base Template (`/templates/base`)
+### 3. Base Template (repo root)
 
 **Published as:** `wheels-base-template`
 **Type:** Application scaffold
 **Purpose:** Starting structure for new Wheels applications
 
+The app scaffold now lives at the repo root (not in a separate `templates/` directory). The build scripts extract the relevant directories to produce the ForgeBox package.
+
 ```
-templates/base/
-├── box.json                      # Template package config
-├── src/
-│   ├── app/                      # Application code structure
-│   │   ├── controllers/          # Controller directory
-│   │   ├── models/               # Model directory
-│   │   ├── views/                # View templates
-│   │   ├── helpers/              # Helper functions
-│   │   └── ...
-│   ├── config/                   # Configuration files
-│   │   ├── app.cfm               # Application settings
-│   │   ├── database.cfm          # Database configuration
-│   │   ├── environment.cfm       # Environment-specific config
-│   │   ├── routes.cfm            # Route definitions
-│   │   └── ...
-│   ├── public/                   # Web-accessible assets
-│   │   ├── assets/               # CSS, JS, images
-│   │   ├── index.cfm             # Application entry point
-│   │   └── ...
-│   ├── tests/                    # Test files
-│   │   ├── models/               # Model tests
-│   │   ├── controllers/          # Controller tests
-│   │   └── ...
-│   └── box.json                  # App dependencies
-├── routes.cfm                    # Route configuration
-├── runner.cfm                    # Test runner
-└── populate.cfm                  # Data population script
+(repo root)
+├── app/                          # Application code structure
+│   ├── controllers/              # Controller directory
+│   ├── models/                   # Model directory
+│   ├── views/                    # View templates
+│   ├── events/                   # Application event handlers
+│   ├── jobs/                     # Background job definitions
+│   ├── mailers/                  # Email mailers
+│   ├── migrator/                 # Database migrations
+│   └── ...
+├── config/                       # Configuration files
+│   ├── app.cfm                   # Application settings
+│   ├── environment.cfm           # Environment detection
+│   ├── routes.cfm                # Route definitions
+│   ├── settings.cfm              # Framework settings
+│   └── [env dirs]/               # Per-environment overrides
+├── public/                       # Web root
+│   ├── Application.cfc           # CFML application bootstrap
+│   ├── index.cfm                 # Entry point
+│   └── [asset dirs]/             # CSS, JS, images
+├── db/                           # Database files (H2)
+├── plugins/                      # Application plugins
+└── box.json                      # App manifest and dependencies
 ```
 
 **Used by:** CLI command `wheels new myapp` downloads this template from ForgeBox
@@ -306,25 +321,25 @@ design_docs/
 
 ### Making Changes
 
-1. **Clone the monorepo:**
+1. **Clone and run:**
    ```bash
    git clone https://github.com/wheels-dev/wheels.git
    cd wheels
+   box install
+   box server start
    ```
+   The repo root IS a working Wheels application with an H2 embedded database.
 
 2. **Make changes in respective directories:**
-   - CLI changes: `cli/src/`
-   - Core changes: `core/src/wheels/`
-   - Template changes: `templates/base/src/`
+   - Core framework: `vendor/wheels/`
+   - App scaffold: `app/`, `config/`, `public/`
+   - CLI: `cli/src/`
    - Documentation: `docs/src/`
 
 3. **Test changes locally:**
    ```bash
-   # Run framework tests
-   cd tests && box testbox run
-
-   # Or use Docker for multi-engine testing
-   docker-compose up
+   # Use Docker for multi-engine testing
+   docker compose up
    ```
 
 4. **Build packages:**
@@ -337,10 +352,9 @@ design_docs/
 
 All components share the same version number defined in their `box.json` files. When releasing:
 
-1. Update version in all `box.json` files:
-   - `cli/box.json`
-   - `core/box.json`
-   - `templates/base/box.json`
+1. Update version in `box.json` files:
+   - `box.json` (root — the base template manifest)
+   - `examples/starter-app/box.json`
 
 2. Update `CHANGELOG.md` with release notes
 
@@ -412,9 +426,9 @@ User Application
 **In Monorepo (Development):**
 ```
 wheels/
-├── cli/src/              → Source code
-├── core/src/wheels/      → Source code
-└── templates/base/src/   → Source code
+├── app/, config/, public/ → App scaffold (published as wheels-base-template)
+├── vendor/wheels/         → Framework core (published as wheels-core)
+└── cli/src/               → CLI source (published as wheels-cli)
 ```
 
 **After Distribution:**
@@ -564,15 +578,10 @@ Usage: /wheels_execute create a blog with posts and comments
 
 ### Distribution of AI Configuration
 
-**In Monorepo (Development):**
+**In Monorepo (Development) and distributed with Base Template:**
 - `/.ai/` - Complete knowledge base (100+ markdown files)
 - `/.claude/` - Claude Code configuration
 - Root `CLAUDE.md` and `AGENTS.md` - AI guidance files
-
-**In Base Template (User Projects):**
-- `/.ai/` - Subset of documentation relevant to application development
-- `/.claude/settings.local.json` - Project-specific permissions
-- Root `CLAUDE.md` - Points to `.ai` documentation
 
 **Benefits for Contributors:**
 
@@ -636,12 +645,11 @@ cd wheels
 # Install dependencies
 box install
 
-# Start development server
+# Start development server (repo root is a runnable Wheels app)
 box server start
 
-# Run tests
-cd tests
-box testbox run
+# Run tests with Docker (multi-engine)
+docker compose up
 ```
 
 ### Using AI Assistance

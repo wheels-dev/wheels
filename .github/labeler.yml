@@ -4,8 +4,8 @@
 enhancement:
 - changed-files:
   - any-glob-to-any-file:
-    - 'core/src/**'
-    - 'templates/base/src/app/**'
+    - 'vendor/wheels/**'
+    - 'app/**'
 
 bug:
 - head-branch: ['^fix/', '^hotfix/', '^bugfix/']

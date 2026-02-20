@@ -42,9 +42,7 @@ services:
       dockerfile: ./tools/docker/lucee5/Dockerfile
     image: wheels-test-lucee5:v1.0.2
     volumes:
-      - ./templates/base/src:/wheels-test-suite
-      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-      - ./tests:/wheels-test-suite/tests
+      - ./:/wheels-test-suite
       - type: bind
         source: ./tools/docker/lucee5/server.json
         target: /wheels-test-suite/server.json
@@ -68,9 +66,7 @@ services:
       dockerfile: ./tools/docker/lucee6/Dockerfile
     image: wheels-test-lucee6:v1.0.2
     volumes:
-      - ./templates/base/src:/wheels-test-suite
-      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-      - ./tests:/wheels-test-suite/tests
+      - ./:/wheels-test-suite
       - type: bind
         source: ./tools/docker/lucee6/server.json
         target: /wheels-test-suite/server.json
@@ -100,9 +96,7 @@ services:
       dockerfile: ./tools/docker/lucee7/Dockerfile
     image: wheels-test-lucee7:v1.0.0
     volumes:
-      - ./templates/base/src:/wheels-test-suite
-      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-      - ./tests:/wheels-test-suite/tests
+      - ./:/wheels-test-suite
       - type: bind
         source: ./tools/docker/lucee7/server.json
         target: /wheels-test-suite/server.json
@@ -128,9 +122,7 @@ services:
     tty: true          
     stdin_open: true
     volumes:
-      - ./templates/base/src:/wheels-test-suite
-      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-      - ./tests:/wheels-test-suite/tests
+      - ./:/wheels-test-suite
       - type: bind
         source: ./tools/docker/adobe2018/server.json
         target: /wheels-test-suite/server.json
@@ -156,9 +148,7 @@ services:
     tty: true          
     stdin_open: true
     volumes:
-      - ./templates/base/src:/wheels-test-suite
-      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-      - ./tests:/wheels-test-suite/tests
+      - ./:/wheels-test-suite
       - ./tools/docker/adobe2021:/wheels-test-suite/tools/docker/adobe2021
       - type: bind
         source: ./tools/docker/adobe2021/server.json
@@ -185,9 +175,7 @@ services:
     tty: true          
     stdin_open: true
     volumes:
-      - ./templates/base/src:/wheels-test-suite
-      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-      - ./tests:/wheels-test-suite/tests
+      - ./:/wheels-test-suite
       - ./tools/docker/adobe2023:/wheels-test-suite/tools/docker/adobe2023
       - type: bind
         source: ./tools/docker/adobe2023/server.json
@@ -214,9 +202,7 @@ services:
     tty: true          
     stdin_open: true
     volumes:
-      - ./templates/base/src:/wheels-test-suite
-      - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-      - ./tests:/wheels-test-suite/tests
+      - ./:/wheels-test-suite
       - ./tools/docker/adobe2025:/wheels-test-suite/tools/docker/adobe2025
       - type: bind
         source: ./tools/docker/adobe2025/server.json
@@ -243,9 +229,7 @@ services:
     tty: true
     stdin_open: true
     # volumes:
-    #   - ./templates/base/src:/wheels-test-suite
-    #   - ./core/src/wheels:/wheels-test-suite/vendor/wheels
-    #   - ./tests:/wheels-test-suite/tests
+    #   - ./:/wheels-test-suite
     #   - type: bind
     #     source: ./tools/docker/boxlang/server.json
     #     target: /wheels-test-suite/server.json

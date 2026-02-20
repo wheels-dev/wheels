@@ -246,7 +246,7 @@ component {
     this.name = "WheelsTestHarness";
 
     // Point to local development version
-    this.mappings["/wheels"] = expandPath("../../core/src/wheels");
+    this.mappings["/wheels"] = expandPath("../../vendor/wheels");
 
     // Test-specific settings
     this.datasource = "wheels_test";
@@ -533,7 +533,7 @@ component {
         var docbox = new docbox.DocBox();
 
         docbox.generate(
-            source = expandPath("../../core/src/wheels"),
+            source = expandPath("../../vendor/wheels"),
             mapping = "wheels",
             output = expandPath("../../docs/src/api")
         );

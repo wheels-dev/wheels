@@ -127,7 +127,7 @@ compose.yml
 
 **cli/** - Source code for command-line interface tools including generators and database migration utilities.
 
-**core/src/wheels/** - The core Wheels framework code. This is the actual framework that gets distributed. When new versions are released, this directory often contains all necessary updates.
+**vendor/wheels/** - The core Wheels framework code. This is the actual framework that gets distributed. When new versions are released, this directory often contains all necessary updates. In the monorepo, this is tracked as first-party source code (not an installed dependency).
 
 **design_docs/** - Architecture documentation, design decisions, and planning materials explaining the framework's structural choices.
 
@@ -164,7 +164,7 @@ When working on applications, your primary focus areas are:
 
 The `/` folder in the framework repository becomes the root directory of every new Wheels application. When contributing to the framework:
 
-- Work primarily in `core/src/wheels/` for framework code
+- Work primarily in `vendor/wheels/` for framework code
 - Update `docs/` for documentation changes
 - Test changes using applications in `/` or `examples/`
 - Use `tests/` for framework testing
