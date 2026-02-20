@@ -74,7 +74,7 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          git add templates/base/src/box.json
+          git add box.json
           git add examples/starter-app/box.json
           git add CHANGELOG.md
 
