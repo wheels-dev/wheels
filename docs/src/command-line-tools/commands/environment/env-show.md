@@ -90,7 +90,7 @@ Environment Variables from .env
 ╟────────────┼─────────────┼────────╢
 ║ DB_USER    │ root        │ .env   ║
 ╟────────────┼─────────────┼────────╢
-║ wheels_env │ development │ .env   ║
+║ WHEELS_ENV │ development │ .env   ║
 ╚════════════╧═════════════╧════════╝
 
 Total variables:          4
