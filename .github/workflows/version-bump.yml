@@ -95,6 +95,6 @@ jobs:
           echo "**Bump Type:** $BUMP_TYPE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Files Updated:" >> $GITHUB_STEP_SUMMARY
-          echo "- templates/base/src/box.json" >> $GITHUB_STEP_SUMMARY
+          echo "- box.json" >> $GITHUB_STEP_SUMMARY
           echo "- examples/starter-app/box.json" >> $GITHUB_STEP_SUMMARY
           echo "- CHANGELOG.md (auto-generated from merged PRs)" >> $GITHUB_STEP_SUMMARY
