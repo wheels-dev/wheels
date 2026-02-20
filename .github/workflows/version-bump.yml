@@ -49,10 +49,10 @@ jobs:
         run: |
           echo "Updating to version: $NEW_VERSION"
 
-          # Update templates/base/src/box.json
-          jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
-            templates/base/src/box.json > templates/base/src/box.json.tmp
-          mv templates/base/src/box.json.tmp templates/base/src/box.json
+          # Update templates/base/src/box.
+          jq ... box.json > box.json.tmp
+          mv box.json.tmp box.json
+
 
           # Update examples/starter-app/box.json
           jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
