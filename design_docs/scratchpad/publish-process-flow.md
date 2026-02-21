@@ -33,7 +33,7 @@ flowchart TD
 
     I --> J[Calculate version number]
     J --> K[Version = box.json version + GitHub run number]
-    K --> L[e.g., 3.0.0-SNAPSHOT+123]
+    K --> L[e.g., 3.1.0-SNAPSHOT+123]
 
     L --> M[Run Ant build]
     M --> N[Build 3 variants]
@@ -75,7 +75,7 @@ flowchart TD
 
 ### 3. Build Phase (release.yml)
 - **Version Calculation**:
-  - Base version from box.json (3.0.0-SNAPSHOT)
+  - Base version from box.json (3.1.0-SNAPSHOT)
   - Appends GitHub run number (e.g., +123)
 - **Build Process**: Uses Ant (build.xml) to create 3 variants:
   1. **wheels-core**: Core framework files

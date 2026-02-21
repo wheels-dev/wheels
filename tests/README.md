@@ -138,4 +138,4 @@ wheels test migrate tests --recursive
 For comprehensive documentation, see:
 - [Testing with TestBox Guide](/docs/testing-with-testbox.md)
 - [TestBox Documentation](https://testbox.ortusbooks.com/)
-- [Wheels Testing Guide](https://wheels.dev/3.0.0/guides/working-with-wheels/testing-your-application)
+- [Wheels Testing Guide](https://wheels.dev/3.1.0/guides/working-with-wheels/testing-your-application)

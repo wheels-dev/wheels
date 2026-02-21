@@ -37,7 +37,7 @@ We welcome contributions via **Issues** and **Pull Requests (PRs)**. Before you 
 * If it's a **security issue**, please use our [Responsible Disclosure Program](mailto:webmaster@wheels.dev?subject=Responsible%20Disclosure%20Program) — do not post it publicly.
 * Search existing Issues and PRs to avoid duplicates.
 * If your issue is urgent or blocking, you can leave a polite comment pinging the maintainers.
-* If you're new to contributing, check out the [Contributing to Wheels Guide](https://wheels.dev/3.0.0/guides/working-with-wheels/contributing-to-wheels) for tips and examples.
+* If you're new to contributing, check out the [Contributing to Wheels Guide](https://wheels.dev/3.1.0/guides/working-with-wheels/contributing-to-wheels) for tips and examples.
 
 ### Development Environment Setup
 
@@ -146,7 +146,7 @@ If you're making a **breaking change** or working on **core functionality**, it'
 ### Developing with Docker
 
 You can develop and test Wheels locally on multiple CFML engines using Docker.
-Follow the [Docker Instructions](https://wheels.dev/3.0.0/guides/working-with-wheels/contributing-to-wheels#developing-with-docker) to get set up quickly.
+Follow the [Docker Instructions](https://wheels.dev/3.1.0/guides/working-with-wheels/contributing-to-wheels#developing-with-docker) to get set up quickly.
 
 ---
 

@@ -46,7 +46,7 @@ Example output:
 Dependencies:
   wirebox @ ^7.0.0 (Production) - Installed
   testbox @ ^6.0.0 (Production) - Installed
-  wheels-core @ ^3.0.0-SNAPSHOT.rc.1 (Production) - Installed
+  wheels-core @ ^3.1.0-SNAPSHOT.rc.1 (Production) - Installed
 
 Dev Dependencies:
   shortcodes @ ^0.0.4 (Production) - Not Installed
@@ -67,7 +67,7 @@ Examples:
 wheels deps install cbvalidation
 
 # Install specific version
-wheels deps install cbvalidation 3.0.0
+wheels deps install cbvalidation 3.1.0
 
 # Install as development dependency (saves to devDependencies)
 wheels deps install testbox --dev
@@ -136,7 +136,7 @@ Generating dependency report...
 ==================================================
 
 Generated: 2025-09-19 11:38:44
-Wheels Version: 3.0.0-SNAPSHOT
+Wheels Version: 3.1.0-SNAPSHOT
 CFML Engine: Lucee 5.4.6.9
 
 Dependencies:
@@ -182,7 +182,7 @@ The command manages two dependency sections in box.json:
 ```json
 {
   "dependencies": {
-    "wheels-core": "^3.0.0",
+    "wheels-core": "^3.1.0",
     "wirebox": "^7"
   }
 }

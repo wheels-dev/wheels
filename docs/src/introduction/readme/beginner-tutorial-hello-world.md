@@ -176,7 +176,7 @@ Open the `say/hello.cfm` view file. We are going to add a line of code to the en
 ```
 {% endcode %}
 
-The [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) function is a built-in Wheels function. In this case, we are passing 2 named parameters to it. The first parameter, `text`, is the text that will be displayed in the hyperlink. The second parameter, `action`, defines the action to point the link to. By using this built-in function, your application's main URL may change, and even controllers and actions may get shifted around, but you won't suffer from the dreaded dead link. Wheels will always create a valid link for you as long as you configure it correctly when you make infrastructure changes to your application.
+The [linkTo()](https://wheels.dev/api/v3.1.0/controller.linkto.html) function is a built-in Wheels function. In this case, we are passing 2 named parameters to it. The first parameter, `text`, is the text that will be displayed in the hyperlink. The second parameter, `action`, defines the action to point the link to. By using this built-in function, your application's main URL may change, and even controllers and actions may get shifted around, but you won't suffer from the dreaded dead link. Wheels will always create a valid link for you as long as you configure it correctly when you make infrastructure changes to your application.
 
 Once you have added the additional line of code to the end of the `say/hello.cfm` view file, save your file and call the `say/hello` action from your browser. Your browser should look like _Figure 6_ below.
 

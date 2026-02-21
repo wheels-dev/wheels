@@ -26,7 +26,7 @@ The routing system may match the request to a route like this, which tells Wheel
 
 To configure routes, open the file at `/config/routes.cfm`.
 
-The Wheels router begins with a call to [mapper()](https://wheels.dev/api/v3.0.0/controller.mapper.html), various methods chained from that, and lastly ends with a call to `end()`.
+The Wheels router begins with a call to [mapper()](https://wheels.dev/api/v3.1.0/controller.mapper.html), various methods chained from that, and lastly ends with a call to `end()`.
 
 In many cases, if you need to know where to go in the code to work with existing functionality in an application, the `routes.cfm` file can be a handy map, telling you which controller and action to start looking in.
 
@@ -38,7 +38,7 @@ The terminology goes like this:
 
 #### Name
 
-A route _name_ is set up for reference in your CFML code for building [links](https://wheels.dev/3.0.0/guides/displaying-views-to-users/linking-pages), [forms](https://wheels.dev/3.0.0/guides/displaying-views-to-users/form-helpers-and-showing-errors), and such. To build URLs, you'll use this name along with helpers like [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html), [startFormTag()](https://wheels.dev/api/v3.0.0/controller.startformtag.html), [urlFor()](https://wheels.dev/api/v3.0.0/controller.urlfor.html), and so on.
+A route _name_ is set up for reference in your CFML code for building [links](https://wheels.dev/3.1.0/guides/displaying-views-to-users/linking-pages), [forms](https://wheels.dev/3.1.0/guides/displaying-views-to-users/form-helpers-and-showing-errors), and such. To build URLs, you'll use this name along with helpers like [linkTo()](https://wheels.dev/api/v3.1.0/controller.linkto.html), [startFormTag()](https://wheels.dev/api/v3.1.0/controller.startformtag.html), [urlFor()](https://wheels.dev/api/v3.1.0/controller.urlfor.html), and so on.
 
 #### Method
 
@@ -71,7 +71,7 @@ In this example, `key` and `slug` are parameters that must be present in the URL
 When a request is made to Wheels, the router will look for the first route that matches the requested URL. As an example, this means that if `key` is present in the URL but not `slug`, then it's the second route above that will match.
 
 {% hint style="warning" %}
-Please note that `.` is treated as a special characters in patterns and should generally not be used (one exception being when you are [responding with multiple formats](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/responding-with-multiple-formats)). If your parameters may have `.` in their value, please use the long form URL format: `/?controller=[controller_name]&action=[action_name]&[parameter_name]=[parameter_value]`
+Please note that `.` is treated as a special characters in patterns and should generally not be used (one exception being when you are [responding with multiple formats](https://wheels.dev/3.1.0/guides/handling-requests-with-controllers/responding-with-multiple-formats)). If your parameters may have `.` in their value, please use the long form URL format: `/?controller=[controller_name]&action=[action_name]&[parameter_name]=[parameter_value]`
 {% endhint %}
 
 ### Viewing a List of Routes
@@ -82,7 +82,7 @@ In the debugging footer, you'll see a **Routes** link:
 
 Clicking that will load a filterable list of routes drawn in the `/config/routes.cfm` file, including name, method, pattern, controller, and action.
 
-If you don't see debugging information at the bottom of the page, see the docs for the `showDebugInformation` setting in the [Configuration and Defaults](https://wheels.dev/3.0.0/guides/working-with-wheels/configuration-and-defaults) chapter.
+If you don't see debugging information at the bottom of the page, see the docs for the `showDebugInformation` setting in the [Configuration and Defaults](https://wheels.dev/3.1.0/guides/working-with-wheels/configuration-and-defaults) chapter.
 
 ### Resource Routing
 
@@ -94,7 +94,7 @@ Many parts of your application will likely be CRUD-based (create, read, update, 
 You'll want to pay close attention to how resource-based routing works because this is considered an important convention in Wheels applications.
 {% endhint %}
 
-If we have a `products` table and want to have a section of our application for managing the products, we can set up the routes using the [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) method like this in `/config/routes.cfm`:
+If we have a `products` table and want to have a section of our application for managing the products, we can set up the routes using the [resources()](https://wheels.dev/api/v3.1.0/mapper.resources.html) method like this in `/config/routes.cfm`:
 
 {% code title="/config/routes.cfm" %}
 ```javascript
@@ -126,7 +126,7 @@ There has been some confusion in the web community on whether requests to update
 
 ### Singular Resources
 
-Standard resources using the [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) method assume that there is a primary key associated with the resource. (Notice the `[key]` placeholder in the paths listed above in the _Strongly Encouraged: Resource Routing_ section.)
+Standard resources using the [resources()](https://wheels.dev/api/v3.1.0/mapper.resources.html) method assume that there is a primary key associated with the resource. (Notice the `[key]` placeholder in the paths listed above in the _Strongly Encouraged: Resource Routing_ section.)
 
 Wheels also provides a _singular_ resource for routing that will not expose a primary key through the URL.
 
@@ -138,7 +138,7 @@ mapper()
 
 This is handy especially when you're manipulating records related directly to the user's session (e.g., a profile or a cart can be managed by the user without exposing the primary key of the underlying database records).
 
-Calling [resource()](https://wheels.dev/api/v3.0.0/mapper.resource.html) (notice that there's no "s" on the end) then exposes the following routes:
+Calling [resource()](https://wheels.dev/api/v3.1.0/mapper.resource.html) (notice that there's no "s" on the end) then exposes the following routes:
 
 | Name     | HTTP Verb | Path       | Controller & Action | Description                            |
 | -------- | --------- | ---------- | ------------------- | -------------------------------------- |
@@ -157,7 +157,7 @@ Also, this example is slightly contrived because it doesn't make much sense to c
 
 As you've seen, defining a resource creates several routes for you automatically, and it is great for setting up groupings of routes for managing resources within your application.
 
-But sometimes you just need to define a single one-off route pattern. For this case, you have a method for each HTTP verb: [get()](https://wheels.dev/api/v3.0.0/mapper.get.html), [post()](https://wheels.dev/api/v3.0.0/mapper.post.html), [patch()](https://wheels.dev/api/v3.0.0/mapper.patch.html), [put()](https://wheels.dev/api/v3.0.0/mapper.put.html), and [delete()](https://wheels.dev/api/v3.0.0/mapper.delete.html).
+But sometimes you just need to define a single one-off route pattern. For this case, you have a method for each HTTP verb: [get()](https://wheels.dev/api/v3.1.0/mapper.get.html), [post()](https://wheels.dev/api/v3.1.0/mapper.post.html), [patch()](https://wheels.dev/api/v3.1.0/mapper.patch.html), [put()](https://wheels.dev/api/v3.1.0/mapper.put.html), and [delete()](https://wheels.dev/api/v3.1.0/mapper.delete.html).
 
 As a refresher, these are the intended purpose for each HTTP verb:
 
@@ -217,7 +217,7 @@ mapper()
 ```
 {% endcode %}
 
-If you need to limit the actions that are exposed by [resources()](https://wheels.dev/api/v3.0.0/mapper.resources.html) and [resource()](https://wheels.dev/api/v3.0.0/mapper.resource.html), you can also pass in `only` or `except`arguments:
+If you need to limit the actions that are exposed by [resources()](https://wheels.dev/api/v3.1.0/mapper.resources.html) and [resource()](https://wheels.dev/api/v3.1.0/mapper.resource.html), you can also pass in `only` or `except`arguments:
 
 {% code title="/config/routes.cfm" %}
 ```javascript
@@ -249,7 +249,7 @@ To get around this, the Wheels router recognizes the specialized verbs from brow
 * Via a `POST` request with a
 * `POST` variable named `_method` specifying the specific HTTP verb (e.g., `_method=delete`)
 
-See the chapter on [Linking Pages](https://wheels.dev/3.0.0/guides/displaying-views-to-users/linking-pages) for strategies for working with this constraint.
+See the chapter on [Linking Pages](https://wheels.dev/3.1.0/guides/displaying-views-to-users/linking-pages) for strategies for working with this constraint.
 
 Note that using Wheels to write a REST API doesn't typically have this constraint. You should confidently require API clients to use the specific verbs like `PATCH` and `DELETE`.
 
@@ -259,7 +259,7 @@ The Wheels router allows for _namespaces_: the ability to add a route to a "subf
 
 Let's say that we want to have an "admin" section of the application that is separate from other "public" sections. We'd want for all of the "admin" controllers to be within an admin subfolder both in the URL and our application.
 
-That's what the [namespace()](https://wheels.dev/api/v3.0.0/mapper.namespace.html) method is for:
+That's what the [namespace()](https://wheels.dev/api/v3.1.0/mapper.namespace.html) method is for:
 
 ```javascript
 mapper()
@@ -367,7 +367,7 @@ GET /news/show/5
 
 With this convention, the URL above told Wheels to invoke the `show` action in the `news` controller. It also passed a parameter called `key` to the action, with a value of `5`.
 
-If you're upgrading from 1.x or still prefer this style of routing for your Wheels 2+ application, you can use the [wildcard()](https://wheels.dev/api/v3.0.0/mapper.wildcard.html) method to enable it part of it:&#x20;
+If you're upgrading from 1.x or still prefer this style of routing for your Wheels 2+ application, you can use the [wildcard()](https://wheels.dev/api/v3.1.0/mapper.wildcard.html) method to enable it part of it:&#x20;
 
 ```javascript
 mapper()
@@ -465,7 +465,7 @@ mapper()
 .end();
 ```
 
-`products` and `sessions` are your normal controllers. By adding them to the top of the routes file, Wheels looks for them first. But your catch-all route is more specific than the site root (`/`), so your catch-all should be listed before the call to [root()](https://wheels.dev/api/v3.0.0/mapper.root.html).
+`products` and `sessions` are your normal controllers. By adding them to the top of the routes file, Wheels looks for them first. But your catch-all route is more specific than the site root (`/`), so your catch-all should be listed before the call to [root()](https://wheels.dev/api/v3.1.0/mapper.root.html).
 
 ### Constraints
 

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       new_version:
-        description: 'New version number (e.g., 3.0.1-SNAPSHOT or 3.1.0-SNAPSHOT)'
+        description: 'New version number (e.g., 3.1.1 or 3.2.0). No -SNAPSHOT suffix — the release workflow adds it automatically for develop builds.'
         required: true
         type: string
       bump_type:
@@ -16,10 +16,10 @@ on:
         required: true
         type: choice
         options:
-          - patch-snapshot
-          - minor-snapshot
-          - major-snapshot
-        default: patch-snapshot
+          - patch
+          - minor
+          - major
+        default: patch
 
 jobs:
   bump-version:
@@ -66,9 +66,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          # Strip -SNAPSHOT suffix for changelog header
-          CHANGELOG_VERSION="${NEW_VERSION%-SNAPSHOT}"
-          ./tools/build/scripts/generate-changelog.sh "$CHANGELOG_VERSION" "" --write
+          ./tools/build/scripts/generate-changelog.sh "$NEW_VERSION" "" --write
 
       - name: Commit Changes
         env:

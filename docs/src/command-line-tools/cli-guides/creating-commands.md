@@ -15,7 +15,7 @@ Make sure these properties exist: "name", "version", "slug" and "type"
 ```json
 {
     "name": "wheels-cli",
-    "version": "3.0.0-SNAPSHOT",
+    "version": "3.1.0-SNAPSHOT",
     "slug": "wheels-cli",
     "type": "modules"
 }
@@ -568,7 +568,7 @@ Create `box.json`:
     "version": "1.0.0",
     "type": "commandbox-modules",
     "dependencies": {
-        "wheels-cli": "^3.0.0"
+        "wheels-cli": "^3.1.0"
     }
 }
 ```

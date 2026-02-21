@@ -40,7 +40,7 @@ The `wheels generate app` command creates a new Wheels application with a comple
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `name` | Application name | `MyApp` |
-| `template` | Template to use | `wheels-base-template@^3.0.0` |
+| `template` | Template to use | `wheels-base-template@^3.1.0` |
 | `directory` | Target directory | `./{name}` |
 
 ## Options
@@ -57,7 +57,7 @@ The `wheels generate app` command creates a new Wheels application with a comple
 
 ## Available Templates
 
-### wheels-base-template@^3.0.0 (stable)
+### wheels-base-template@^3.1.0 (stable)
 ```bash
 wheels generate app myapp
 ```
@@ -204,7 +204,7 @@ myapp/
     "testbox": "vendor/testbox/"
   },
   "dependencies": {
-    "wheels-core": "3.0.0",
+    "wheels-core": "3.1.0",
     "wirebox": "^7",
     "testbox": "^6",
   }

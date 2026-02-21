@@ -122,7 +122,7 @@ plugins/            # Third-party plugins
 
 ### Backend
 
-- **3.0.0-snapshot** - MVC Framework
+- **3.1.0-snapshot** - MVC Framework
 - **Lucee 5,6,7, Adobe 2018-2025, Boxlang** - CFML Engine
 - **Database** - MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, H2
 - **WireBox** - Dependency injection
@@ -305,7 +305,7 @@ box testbox run --directory tests/requests/
 ### Documentation
 
 - [Wheels Guides](https://wheels.dev/guides)
-- [Wheels Api Reference](https://wheels.dev/api/v3.0.0)
+- [Wheels Api Reference](https://wheels.dev/api/v3.1.0)
 
 ### Community
 
