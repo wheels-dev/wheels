@@ -15,10 +15,14 @@ component extends="wheels.Testbox" {
 			$$oldCGIScope = request.cgi;
 			$$oldHeaders = request.wheels.httprequestdata.headers;
 			$$originalRoutes = application.wheels.routes;
+			$$originalRouteIndex = StructKeyExists(application.wheels, "routeIndex") ? Duplicate(application.wheels.routeIndex) : {};
+			$$originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? Duplicate(application.wheels.staticRoutes) : {};
 			application.wheels.allowCorsRequests = true;
 			d = $createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
 			$resetHeaders();
 			application.wheels.routes = [];
+			application.wheels.routeIndex = {};
+			application.wheels.staticRoutes = {};
 			config = {path = "wheels", fileName = "Mapper", method = "$init"};
 		}
 	}
@@ -28,6 +32,8 @@ component extends="wheels.Testbox" {
 			request.cgi = $$oldCGIScope;
 			request.wheels.httprequestdata.headers = $$oldHeaders;
 			application.wheels.routes = $$originalRoutes;
+			application.wheels.routeIndex = $$originalRouteIndex;
+			application.wheels.staticRoutes = $$originalStaticRoutes;
 			application[$appKey()].allowCorsRequests = false;
 			d = "";
 			$resetHeaders();

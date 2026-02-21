@@ -2,6 +2,8 @@ component extends="wheels.Testbox" {
 
 	function beforeAll() {
 		_originalRoutes = Duplicate(application.wheels.routes)
+		_originalRouteIndex = StructKeyExists(application.wheels, "routeIndex") ? Duplicate(application.wheels.routeIndex) : {}
+		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? Duplicate(application.wheels.staticRoutes) : {}
 		nounPlurals = [
 			"people",
 			"dogs",
@@ -81,6 +83,8 @@ component extends="wheels.Testbox" {
 
 	function afterAll() {
 		application.wheels.routes = _originalRoutes
+		application.wheels.routeIndex = _originalRouteIndex
+		application.wheels.staticRoutes = _originalStaticRoutes
 	}
 	
 	function run() {
@@ -121,5 +125,7 @@ component extends="wheels.Testbox" {
 
 	public void function $clearRoutes() {
 		application.wheels.routes = []
+		application.wheels.routeIndex = {}
+		application.wheels.staticRoutes = {}
 	}
 }

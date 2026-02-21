@@ -4,10 +4,14 @@ component extends="wheels.Testbox" {
 		config = {path = "wheels", fileName = "Mapper", method = "$init"}
 		_params = {controller = "test", action = "index"}
 		_originalRoutes = Duplicate(application.wheels.routes)
+		_originalRouteIndex = StructKeyExists(application.wheels, "routeIndex") ? Duplicate(application.wheels.routeIndex) : {}
+		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? Duplicate(application.wheels.staticRoutes) : {}
 	}
 
 	function afterAll() {
 		application.wheels.routes = _originalRoutes
+		application.wheels.routeIndex = _originalRouteIndex
+		application.wheels.staticRoutes = _originalStaticRoutes
 	}
 
 	function run() {
@@ -706,6 +710,8 @@ component extends="wheels.Testbox" {
 
 	public void function $clearRoutes() {
 		application.wheels.routes = []
+		application.wheels.routeIndex = {}
+		application.wheels.staticRoutes = {}
 	}
 
 	public boolean function validateRegexPattern(required string pattern) {
