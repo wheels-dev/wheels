@@ -767,9 +767,9 @@ component {
 		}
 		for (local.name in ListToArray(local.enumDef.names)) {
 			local.storedValue = local.enumDef.values[local.name];
-			variables.wheels.class.scopes[local.name] = {
-				where: "#arguments.property# = '#local.storedValue#'"
-			};
+			local.scopeDef = {};
+			local.scopeDef.where = "#arguments.property# = '#local.storedValue#'";
+			variables.wheels.class.scopes[local.name] = local.scopeDef;
 		}
 	}
 }

@@ -644,16 +644,19 @@ component {
 		local.keepGoing = true;
 
 		while (local.keepGoing) {
-			local.finderArgs = {
-				where: arguments.where,
-				order: arguments.order,
-				include: arguments.include,
-				select: arguments.select,
-				page: local.page,
-				perPage: arguments.batchSize,
-				returnAs: arguments.returnAs == "struct" ? "structs" : "objects",
-				includeSoftDeletes: arguments.includeSoftDeletes
-			};
+			local.finderArgs = {};
+			local.finderArgs.where = arguments.where;
+			local.finderArgs.order = arguments.order;
+			local.finderArgs.include = arguments.include;
+			local.finderArgs.select = arguments.select;
+			local.finderArgs.page = local.page;
+			local.finderArgs.perPage = arguments.batchSize;
+			local.finderArgs.includeSoftDeletes = arguments.includeSoftDeletes;
+			if (arguments.returnAs == "struct") {
+				local.finderArgs.returnAs = "structs";
+			} else {
+				local.finderArgs.returnAs = "objects";
+			}
 			if (StructKeyExists(arguments, "parameterize")) {
 				local.finderArgs.parameterize = arguments.parameterize;
 			}
@@ -712,16 +715,15 @@ component {
 		local.keepGoing = true;
 
 		while (local.keepGoing) {
-			local.finderArgs = {
-				where: arguments.where,
-				order: arguments.order,
-				include: arguments.include,
-				select: arguments.select,
-				page: local.page,
-				perPage: arguments.batchSize,
-				returnAs: arguments.returnAs,
-				includeSoftDeletes: arguments.includeSoftDeletes
-			};
+			local.finderArgs = {};
+			local.finderArgs.where = arguments.where;
+			local.finderArgs.order = arguments.order;
+			local.finderArgs.include = arguments.include;
+			local.finderArgs.select = arguments.select;
+			local.finderArgs.page = local.page;
+			local.finderArgs.perPage = arguments.batchSize;
+			local.finderArgs.returnAs = arguments.returnAs;
+			local.finderArgs.includeSoftDeletes = arguments.includeSoftDeletes;
 			if (StructKeyExists(arguments, "parameterize")) {
 				local.finderArgs.parameterize = arguments.parameterize;
 			}

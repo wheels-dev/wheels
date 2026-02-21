@@ -209,7 +209,7 @@ component output="false" {
 
 		// Check if this is a QueryBuilder method — transition from scope chain to query builder
 		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset,select,include,group,distinct", arguments.missingMethodName)) {
-			local.builder = new QueryBuilder(modelReference = variables.modelReference, scopeSpecs = variables.specs);
+			local.builder = new wheels.model.query.QueryBuilder(modelReference = variables.modelReference, scopeSpecs = variables.specs);
 			return Invoke(local.builder, arguments.missingMethodName, arguments.missingMethodArguments);
 		}
 

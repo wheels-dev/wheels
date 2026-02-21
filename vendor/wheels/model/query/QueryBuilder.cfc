@@ -48,15 +48,15 @@ component output="false" {
 	public any function where() {
 		if (StructCount(arguments) == 1) {
 			// Raw WHERE string: .where("status = 'active'")
-			ArrayAppend(variables.whereClauses, {type: "AND", clause: arguments[1]});
+			ArrayAppend(variables.whereClauses, {type = "AND", clause = arguments[1]});
 		} else if (StructCount(arguments) == 2) {
 			// Property + value: .where("status", "active") -> status = 'active'
 			local.clause = $buildCondition(arguments[1], "=", arguments[2]);
-			ArrayAppend(variables.whereClauses, {type: "AND", clause: local.clause});
+			ArrayAppend(variables.whereClauses, {type = "AND", clause = local.clause});
 		} else if (StructCount(arguments) == 3) {
 			// Property + operator + value: .where("age", ">", 18) -> age > 18
 			local.clause = $buildCondition(arguments[1], arguments[2], arguments[3]);
-			ArrayAppend(variables.whereClauses, {type: "AND", clause: local.clause});
+			ArrayAppend(variables.whereClauses, {type = "AND", clause = local.clause});
 		}
 		return this;
 	}
@@ -66,13 +66,13 @@ component output="false" {
 	 */
 	public any function orWhere() {
 		if (StructCount(arguments) == 1) {
-			ArrayAppend(variables.whereClauses, {type: "OR", clause: arguments[1]});
+			ArrayAppend(variables.whereClauses, {type = "OR", clause = arguments[1]});
 		} else if (StructCount(arguments) == 2) {
 			local.clause = $buildCondition(arguments[1], "=", arguments[2]);
-			ArrayAppend(variables.whereClauses, {type: "OR", clause: local.clause});
+			ArrayAppend(variables.whereClauses, {type = "OR", clause = local.clause});
 		} else if (StructCount(arguments) == 3) {
 			local.clause = $buildCondition(arguments[1], arguments[2], arguments[3]);
-			ArrayAppend(variables.whereClauses, {type: "OR", clause: local.clause});
+			ArrayAppend(variables.whereClauses, {type = "OR", clause = local.clause});
 		}
 		return this;
 	}
@@ -83,7 +83,7 @@ component output="false" {
 	 * @property The property name to check for NULL.
 	 */
 	public any function whereNull(required string property) {
-		ArrayAppend(variables.whereClauses, {type: "AND", clause: "#arguments.property# IS NULL"});
+		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# IS NULL"});
 		return this;
 	}
 
@@ -93,7 +93,7 @@ component output="false" {
 	 * @property The property name to check for NOT NULL.
 	 */
 	public any function whereNotNull(required string property) {
-		ArrayAppend(variables.whereClauses, {type: "AND", clause: "#arguments.property# IS NOT NULL"});
+		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# IS NOT NULL"});
 		return this;
 	}
 
@@ -107,7 +107,7 @@ component output="false" {
 	public any function whereBetween(required string property, required any low, required any high) {
 		local.lowQuoted = $quoteValue(arguments.property, arguments.low);
 		local.highQuoted = $quoteValue(arguments.property, arguments.high);
-		ArrayAppend(variables.whereClauses, {type: "AND", clause: "#arguments.property# BETWEEN #local.lowQuoted# AND #local.highQuoted#"});
+		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# BETWEEN #local.lowQuoted# AND #local.highQuoted#"});
 		return this;
 	}
 
@@ -119,7 +119,7 @@ component output="false" {
 	 */
 	public any function whereIn(required string property, required any values) {
 		local.valueList = $quoteValueList(arguments.property, arguments.values);
-		ArrayAppend(variables.whereClauses, {type: "AND", clause: "#arguments.property# IN (#local.valueList#)"});
+		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# IN (#local.valueList#)"});
 		return this;
 	}
 
@@ -131,7 +131,7 @@ component output="false" {
 	 */
 	public any function whereNotIn(required string property, required any values) {
 		local.valueList = $quoteValueList(arguments.property, arguments.values);
-		ArrayAppend(variables.whereClauses, {type: "AND", clause: "#arguments.property# NOT IN (#local.valueList#)"});
+		ArrayAppend(variables.whereClauses, {type = "AND", clause = "#arguments.property# NOT IN (#local.valueList#)"});
 		return this;
 	}
 
@@ -212,7 +212,7 @@ component output="false" {
 
 		// Start with scope specs if present
 		if (ArrayLen(variables.scopeSpecs)) {
-			local.scopeChain = new ScopeChain(modelReference = variables.modelReference, specs = variables.scopeSpecs);
+			local.scopeChain = new wheels.model.query.ScopeChain(modelReference = variables.modelReference, specs = variables.scopeSpecs);
 			local.args = local.scopeChain.$mergeSpecs();
 		}
 
