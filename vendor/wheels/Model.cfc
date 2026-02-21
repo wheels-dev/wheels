@@ -36,6 +36,8 @@ component output="false" displayName="Model" extends="wheels.Global"{
 		variables.wheels.class.calculatedProperties = {};
 		variables.wheels.class.ignoredColumns = {};
 		variables.wheels.class.associations = {};
+		variables.wheels.class.scopes = {};
+		variables.wheels.class.enums = {};
 		variables.wheels.class.callbacks = {};
 		variables.wheels.class.keys = "";
 		variables.wheels.class.dataSource = application.wheels.dataSourceName;

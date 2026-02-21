@@ -6,6 +6,58 @@ component {
 	 * [category: Miscellaneous Functions]
 	 */
 	public any function onMissingMethod(required string missingMethodName, required struct missingMethodArguments) {
+		// --- Query Scopes ---
+		// Check if the called method matches a named scope defined in config().
+		// Returns a ScopeChain proxy that supports further chaining and terminal finder methods.
+		if (
+			StructKeyExists(variables.wheels.class, "scopes")
+			&& StructKeyExists(variables.wheels.class.scopes, arguments.missingMethodName)
+		) {
+			local.scopeDef = variables.wheels.class.scopes[arguments.missingMethodName];
+			if (StructKeyExists(local.scopeDef, "handler") && Len(local.scopeDef.handler)) {
+				local.spec = $invoke(method = local.scopeDef.handler, invokeArgs = arguments.missingMethodArguments);
+			} else {
+				local.spec = Duplicate(local.scopeDef);
+			}
+			local.rv = new wheels.model.query.ScopeChain(modelReference = this, specs = [local.spec]);
+			return local.rv;
+		}
+
+		// --- Enum is<Value>() boolean checkers ---
+		// For a property with enum(property="status", values="draft,published,archived"),
+		// generates isDraft(), isPublished(), isArchived() that return true/false.
+		if (
+			Left(arguments.missingMethodName, 2) == "is"
+			&& Len(arguments.missingMethodName) > 2
+			&& StructKeyExists(variables.wheels.class, "enums")
+		) {
+			local.valueName = Right(arguments.missingMethodName, Len(arguments.missingMethodName) - 2);
+			// Check against each enum definition
+			for (local.enumProp in variables.wheels.class.enums) {
+				local.enumDef = variables.wheels.class.enums[local.enumProp];
+				// Match case-insensitively against enum value names
+				for (local.name in ListToArray(local.enumDef.names)) {
+					if (CompareNoCase(local.valueName, local.name) == 0) {
+						// Found a match — return true if the property equals the stored value
+						if (StructKeyExists(this, local.enumProp)) {
+							local.rv = (Compare(this[local.enumProp], local.enumDef.values[local.name]) == 0);
+						} else {
+							local.rv = false;
+						}
+						return local.rv;
+					}
+				}
+			}
+		}
+
+		// --- Chainable Query Builder entry points ---
+		// Allow calling .where(), .orWhere(), .orderBy() etc. directly on a model to start a query builder chain.
+		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset", arguments.missingMethodName)) {
+			local.builder = new wheels.model.query.QueryBuilder(modelReference = this);
+			// Delegate the call to the query builder
+			return Invoke(local.builder, arguments.missingMethodName, arguments.missingMethodArguments);
+		}
+
 		if (
 			Right(arguments.missingMethodName, 10) == "hasChanged"
 			&& StructKeyExists(variables.wheels.class.properties, ReplaceNoCase(arguments.missingMethodName, "hasChanged", ""))
