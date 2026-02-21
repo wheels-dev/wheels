@@ -189,9 +189,13 @@ component {
 		}
 
 		// Data lines (each line of data gets its own "data:" prefix per SSE spec)
-		local.dataLines = ListToArray(arguments.data, Chr(10));
-		for (local.line in local.dataLines) {
-			ArrayAppend(local.lines, "data: #local.line#");
+		if (Len(arguments.data)) {
+			local.dataLines = ListToArray(arguments.data, Chr(10));
+			for (local.line in local.dataLines) {
+				ArrayAppend(local.lines, "data: #local.line#");
+			}
+		} else {
+			ArrayAppend(local.lines, "data: ");
 		}
 
 		// End with double newline to terminate the event

@@ -39,6 +39,11 @@ component {
 	) {
 		local.args = {};
 
+		// If a callback function is provided, enable nested mode automatically.
+		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
+			arguments.nested = true;
+		}
+
 		// If name is a list, add each of the resources in the list.
 		if (Find(",", arguments.name)) {
 			// Error if the user asked for a nested resource.
@@ -157,11 +162,6 @@ component {
 		// Pass along mapFormat preference
 		if (StructKeyExists(arguments, "mapFormat")) {
 			local.args.mapFormat = arguments.mapFormat;
-		}
-
-		// If a callback function is provided, enable nested mode automatically.
-		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
-			arguments.nested = true;
 		}
 
 		// Scope the resource.

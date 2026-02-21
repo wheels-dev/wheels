@@ -127,24 +127,21 @@ component {
 		local.now = Now();
 
 		try {
-			local.sql = "
-				INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
-				VALUES (
-					'#local.id#',
-					'#arguments.jobClass#',
-					'#arguments.queue#',
-					'#Replace(local.serializedData, "'", "''", "all")#',
-					#arguments.priority#,
-					'pending',
-					0,
-					#this.maxRetries#,
-					'#DateTimeFormat(arguments.runAt, 'yyyy-mm-dd HH:nn:ss')#',
-					'#DateTimeFormat(local.now, 'yyyy-mm-dd HH:nn:ss')#',
-					'#DateTimeFormat(local.now, 'yyyy-mm-dd HH:nn:ss')#'
-				)
-			";
-
-			queryExecute(local.sql);
+			queryExecute(
+				"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+				VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
+				{
+					id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+					jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
+					queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
+					data = {value = local.serializedData, cfsqltype = "cf_sql_longvarchar"},
+					priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
+					maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
+					runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
+					createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+				}
+			);
 		} catch (any e) {
 			// If the table doesn't exist, fall back to logging
 			writeLog(
@@ -171,20 +168,24 @@ component {
 	 */
 	public struct function processQueue(string queue = "", numeric limit = 10) {
 		local.result = {processed = 0, failed = 0, errors = []};
-		local.whereClause = "status = 'pending' AND runAt <= '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'";
+		local.params = {
+			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+			limit = {value = arguments.limit, cfsqltype = "cf_sql_integer"}
+		};
+
+		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
+			FROM _wheels_jobs
+			WHERE status = 'pending' AND runAt <= :runAt";
 
 		if (Len(arguments.queue)) {
-			local.whereClause &= " AND queue = '#arguments.queue#'";
+			local.sql &= " AND queue = :queue";
+			local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 		}
 
+		local.sql &= " ORDER BY priority DESC, runAt ASC LIMIT :limit";
+
 		try {
-			local.jobs = queryExecute(
-				"SELECT id, jobClass, queue, data, attempts, maxRetries
-				FROM _wheels_jobs
-				WHERE #local.whereClause#
-				ORDER BY priority DESC, runAt ASC
-				LIMIT #arguments.limit#"
-			);
+			local.jobs = queryExecute(local.sql, local.params);
 		} catch (any e) {
 			ArrayAppend(local.result.errors, "Queue table not found. Run the job queue migration first.");
 			return local.result;
@@ -211,11 +212,15 @@ component {
 
 		// Mark as processing
 		try {
-			queryExecute("
-				UPDATE _wheels_jobs
-				SET status = 'processing', attempts = attempts + 1, updatedAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'
-				WHERE id = '#arguments.jobRow.id#'
-			");
+			queryExecute(
+				"UPDATE _wheels_jobs
+				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
+				WHERE id = :id",
+				{
+					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+				}
+			);
 		} catch (any e) {
 			local.result.error = "Failed to lock job #arguments.jobRow.id#: #e.message#";
 			return local.result;
@@ -228,11 +233,16 @@ component {
 			local.jobInstance.perform(data = local.jobData);
 
 			// Mark as completed
-			queryExecute("
-				UPDATE _wheels_jobs
-				SET status = 'completed', completedAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#', updatedAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'
-				WHERE id = '#arguments.jobRow.id#'
-			");
+			queryExecute(
+				"UPDATE _wheels_jobs
+				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
+				WHERE id = :id",
+				{
+					completedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+				}
+			);
 
 			writeLog(
 				text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] completed successfully",
@@ -252,14 +262,20 @@ component {
 				local.backoffSeconds = 2 ^ (local.currentAttempts + 1);
 				local.nextRunAt = DateAdd("s", local.backoffSeconds, Now());
 
-				queryExecute("
-					UPDATE _wheels_jobs
+				queryExecute(
+					"UPDATE _wheels_jobs
 					SET status = 'pending',
-						lastError = '#Replace(Left(e.message, 1000), "'", "''", "all")#',
-						runAt = '#DateTimeFormat(local.nextRunAt, 'yyyy-mm-dd HH:nn:ss')#',
-						updatedAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'
-					WHERE id = '#arguments.jobRow.id#'
-				");
+						lastError = :lastError,
+						runAt = :runAt,
+						updatedAt = :updatedAt
+					WHERE id = :id",
+					{
+						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
+						runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+					}
+				);
 
 				writeLog(
 					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] failed (attempt #local.currentAttempts#/#local.maxRetries#), retrying in #local.backoffSeconds#s: #e.message#",
@@ -268,14 +284,20 @@ component {
 				);
 			} else {
 				// Max retries exceeded — mark as failed (dead letter)
-				queryExecute("
-					UPDATE _wheels_jobs
+				queryExecute(
+					"UPDATE _wheels_jobs
 					SET status = 'failed',
-						failedAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#',
-						lastError = '#Replace(Left(e.message, 1000), "'", "''", "all")#',
-						updatedAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'
-					WHERE id = '#arguments.jobRow.id#'
-				");
+						failedAt = :failedAt,
+						lastError = :lastError,
+						updatedAt = :updatedAt
+					WHERE id = :id",
+					{
+						failedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
+						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
+					}
+				);
 
 				writeLog(
 					text = "Job '#arguments.jobRow.jobClass#' [#arguments.jobRow.id#] permanently failed after #local.maxRetries# attempts: #e.message#",
@@ -298,17 +320,16 @@ component {
 		local.stats = {pending = 0, processing = 0, completed = 0, failed = 0, total = 0};
 
 		try {
-			local.whereClause = "1=1";
+			local.sql = "SELECT status, COUNT(*) as cnt FROM _wheels_jobs";
+			local.params = {};
+
 			if (Len(arguments.queue)) {
-				local.whereClause = "queue = '#arguments.queue#'";
+				local.sql &= " WHERE queue = :queue";
+				local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
 
-			local.result = queryExecute("
-				SELECT status, COUNT(*) as cnt
-				FROM _wheels_jobs
-				WHERE #local.whereClause#
-				GROUP BY status
-			");
+			local.sql &= " GROUP BY status";
+			local.result = queryExecute(local.sql, local.params);
 
 			for (local.row in local.result) {
 				if (StructKeyExists(local.stats, local.row.status)) {
@@ -328,19 +349,22 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public numeric function retryFailed(string queue = "") {
-		local.whereClause = "status = 'failed'";
+		local.sql = "UPDATE _wheels_jobs
+			SET status = 'pending', attempts = 0, lastError = NULL, failedAt = NULL,
+				runAt = :runAt, updatedAt = :updatedAt
+			WHERE status = 'failed'";
+		local.params = {
+			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+		};
+
 		if (Len(arguments.queue)) {
-			local.whereClause &= " AND queue = '#arguments.queue#'";
+			local.sql &= " AND queue = :queue";
+			local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 		}
 
 		try {
-			local.result = queryExecute("
-				UPDATE _wheels_jobs
-				SET status = 'pending', attempts = 0, lastError = NULL, failedAt = NULL,
-					runAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#',
-					updatedAt = '#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')#'
-				WHERE #local.whereClause#
-			");
+			local.result = queryExecute(local.sql, local.params);
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
 			return 0;
@@ -354,14 +378,18 @@ component {
 	 */
 	public numeric function purgeCompleted(numeric days = 7, string queue = "") {
 		local.cutoff = DateAdd("d", -arguments.days, Now());
-		local.whereClause = "status = 'completed' AND completedAt < '#DateTimeFormat(local.cutoff, 'yyyy-mm-dd HH:nn:ss')#'";
+		local.sql = "DELETE FROM _wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
+		local.params = {
+			cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
+		};
 
 		if (Len(arguments.queue)) {
-			local.whereClause &= " AND queue = '#arguments.queue#'";
+			local.sql &= " AND queue = :queue";
+			local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 		}
 
 		try {
-			local.result = queryExecute("DELETE FROM _wheels_jobs WHERE #local.whereClause#");
+			local.result = queryExecute(local.sql, local.params);
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
 			return 0;

@@ -10,10 +10,10 @@ component extends="wheels.Testbox" {
 		g = application.wo;
 
 		// =============================================
-		// Object-Bound Form Helpers
+		// HTML5 Form Helpers (via tag-based API)
 		// =============================================
 
-		describe("emailField (object-bound)", function() {
+		describe("emailField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");
@@ -52,7 +52,7 @@ component extends="wheels.Testbox" {
 			});
 		});
 
-		describe("urlField (object-bound)", function() {
+		describe("urlField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");
@@ -69,7 +69,7 @@ component extends="wheels.Testbox" {
 			});
 		});
 
-		describe("numberField (object-bound)", function() {
+		describe("numberField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");
@@ -110,7 +110,7 @@ component extends="wheels.Testbox" {
 			});
 		});
 
-		describe("telField (object-bound)", function() {
+		describe("telField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");
@@ -127,7 +127,7 @@ component extends="wheels.Testbox" {
 			});
 		});
 
-		describe("dateField (object-bound)", function() {
+		describe("dateField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");
@@ -149,7 +149,7 @@ component extends="wheels.Testbox" {
 			});
 		});
 
-		describe("colorField (object-bound)", function() {
+		describe("colorField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");
@@ -166,7 +166,7 @@ component extends="wheels.Testbox" {
 			});
 		});
 
-		describe("rangeField (object-bound)", function() {
+		describe("rangeField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");
@@ -191,7 +191,7 @@ component extends="wheels.Testbox" {
 			});
 		});
 
-		describe("searchField (object-bound)", function() {
+		describe("searchField", function() {
 
 			beforeEach(function() {
 				_controller = g.controller(name = "dummy");

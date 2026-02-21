@@ -405,6 +405,7 @@ component {
 		string position,
 		string min,
 		string max,
+		string step,
 		string label,
 		string labelPlacement,
 		string prepend,
