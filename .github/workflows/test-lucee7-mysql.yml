@@ -1,0 +1,123 @@
+name: Test Lucee 7 + MySQL
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+
+jobs:
+  test-lucee7-mysql:
+    name: Lucee 7 + MySQL
+    runs-on: ubuntu-latest
+    env:
+      PORT: 60007
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Start Lucee 7
+        run: docker compose up -d lucee7
+
+      - name: Start MySQL
+        run: docker compose up -d mysql
+
+      - name: Wait for containers to be ready
+        run: |
+          echo "Waiting for Lucee 7 to be ready..."
+
+          # Wait for container to exist
+          timeout 150 bash -c 'until docker ps --filter "name=lucee7" | grep -q "lucee7"; do
+            echo "Waiting for container to start..."
+            sleep 2
+          done'
+
+          # Wait for service to respond
+          MAX_WAIT=60
+          WAIT_COUNT=0
+
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            echo -n "Checking service (attempt ${WAIT_COUNT}/${MAX_WAIT})... "
+
+            if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
+              echo "Service is ready!"
+              break
+            else
+              echo "Not ready yet"
+              if [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; then
+                sleep 5
+              fi
+            fi
+          done
+
+          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+            echo "Warning: Service may not be fully ready after ${MAX_WAIT} attempts"
+          fi
+
+      - name: Run Tests
+        id: run-tests
+        run: |
+          TEST_URL="http://localhost:${PORT}/wheels/core/tests?db=mysql&format=json&only=failure,error"
+          RESULT_FILE="/tmp/lucee7-mysql-result.txt"
+
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          HTTP_CODE="000"
+
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ] && [ "$HTTP_CODE" = "000" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
+
+            HTTP_CODE=$(curl -s -o "${RESULT_FILE}" \
+              --max-time 900 \
+              --write-out "%{http_code}" \
+              "${TEST_URL}" || echo "000")
+
+            echo "HTTP Code: ${HTTP_CODE}"
+
+            if [ "$HTTP_CODE" = "000" ] && [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+              echo "Connection failed, waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+
+          echo "http_code=${HTTP_CODE}" >> $GITHUB_OUTPUT
+
+          if [ -f "$RESULT_FILE" ]; then
+            echo "Response content:"
+            cat "$RESULT_FILE"
+          fi
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "Tests passed with HTTP 200"
+            exit 0
+          else
+            echo "Tests failed with HTTP code: ${HTTP_CODE}"
+            exit 1
+          fi
+
+      - name: Debug Information
+        if: failure()
+        run: |
+          echo "=== Docker Container Status ==="
+          docker ps -a
+
+          echo -e "\n=== Container Logs for lucee7 ==="
+          docker logs $(docker ps -aq -f "name=lucee7") 2>&1 | tail -50 || echo "Could not get logs"
+
+          echo -e "\n=== Container Logs for mysql ==="
+          docker logs $(docker ps -aq -f "name=mysql") 2>&1 | tail -50 || echo "Could not get logs"
+
+          echo -e "\n=== Test Result File ==="
+          if [ -f "/tmp/lucee7-mysql-result.txt" ]; then
+            cat "/tmp/lucee7-mysql-result.txt"
+          else
+            echo "Result file not found"
+          fi
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-lucee7-mysql
+          path: /tmp/lucee7-mysql-result.txt
