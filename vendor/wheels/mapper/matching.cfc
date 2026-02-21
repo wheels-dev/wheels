@@ -527,7 +527,7 @@ component {
 	 * Applies a regex constraint to the specified variable(s) on the most recently added route(s).
 	 * Supports comma-delimited variable names to constrain multiple variables at once.
 	 */
-	private struct function $applyConstraintToLastRoute(required string variableName, required string pattern) {
+	public struct function $applyConstraintToLastRoute(required string variableName, required string pattern) {
 		local.routeCount = ArrayLen(application[$appKey()].routes);
 		if (local.routeCount == 0) {
 			Throw(

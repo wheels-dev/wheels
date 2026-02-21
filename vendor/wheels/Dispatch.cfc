@@ -128,27 +128,8 @@ component output="false" extends="wheels.Global"{
 			}
 		}
 
-		// --- Fast path 2: Method-indexed route scan ---
-		// Instead of scanning ALL routes, only scan routes registered for this HTTP method.
-		// For a typical app with 100+ routes across all methods, this reduces the search space by ~5x.
-		if (!StructKeyExists(local, "rv") && StructKeyExists(application.wheels, "routeIndex") && StructKeyExists(application.wheels.routeIndex, local.methodKey)) {
-			local.methodRoutes = application.wheels.routeIndex[local.methodKey];
-			for (local.route in local.methodRoutes) {
-				// Make sure route has been converted to regular expression.
-				if (!StructKeyExists(local.route, "regex")) {
-					local.route.regex = arguments.mapper.$patternToRegex(local.route.pattern);
-				}
-
-				// If route matches regular expression, set it for return.
-				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
-					local.rv = Duplicate(local.route);
-					break;
-				}
-			}
-		}
-
-		// --- Fallback: Full linear scan (backward compatibility) ---
-		// Used when route indexes are not available (e.g., routes defined outside the mapper).
+		// --- Fallback: Full linear scan ---
+		// Scan all routes in registration order, filtering by HTTP method.
 		if (!StructKeyExists(local, "rv")) {
 			for (local.route in arguments.routes) {
 				// If method doesn't match, skip this route.
