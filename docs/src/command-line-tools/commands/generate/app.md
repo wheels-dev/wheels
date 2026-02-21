@@ -199,14 +199,10 @@ myapp/
   "version": "1.0.0",
   "author": "Wheels Core Team and Community",
   "installPaths": {
-    "wheels-core": "vendor/wheels/",
-    "wirebox": "vendor/wirebox/",
-    "testbox": "vendor/testbox/"
+    "wheels-core": "vendor/wheels/"
   },
   "dependencies": {
-    "wheels-core": "3.1.0",
-    "wirebox": "^7",
-    "testbox": "^6",
+    "wheels-core": "3.1.0"
   }
 }
 ```

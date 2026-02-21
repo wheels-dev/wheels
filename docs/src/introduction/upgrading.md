@@ -128,13 +128,9 @@ At your project root, define dependencies and where they should be installed:
     "name": "wheels-app",
     "version": "1.0.0",
     "dependencies": {
-        "wirebox": "^7.0.0",
-        "testbox": "^6.0.0",
-        "wheels-core": "^3.1.0-SNAPSHOT"
+        "wheels-core": "^3.1.0"
     },
     "installPaths": {
-        "wirebox": "vendor/wirebox/",
-        "testbox": "vendor/testbox/",
         "wheels-core": "vendor/wheels/"
     }
 }
@@ -155,8 +151,8 @@ box install
 
 This will:
 
-* Download `wheels-core`, `wirebox`, and `testbox`
-* Place them into the correct `vendor/` subfolders based on `installPaths`
+* Download `wheels-core` (which includes TestBox and a built-in DI container)
+* Place it into the `vendor/wheels/` folder based on `installPaths`
 
 #### 3.3 Check Application Mappings
 
@@ -169,8 +165,6 @@ Ensure `Application.cfc` includes mappings for the new locations:
 /public
 /vendor
   /wheels
-  /wirebox
-  /testbox
 /tests
 ```
 
@@ -214,8 +208,6 @@ urlrewrite.xml
     urlrewrite.xml
 /vendor
     /wheels
-    /wirebox
-    /testbox
 .env
 box.json
 server.json

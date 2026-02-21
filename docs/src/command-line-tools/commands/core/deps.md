@@ -44,12 +44,10 @@ Output shows:
 Example output:
 ```
 Dependencies:
-  wirebox @ ^7.0.0 (Production) - Installed
-  testbox @ ^6.0.0 (Production) - Installed
-  wheels-core @ ^3.1.0-SNAPSHOT.rc.1 (Production) - Installed
+  wheels-core @ ^3.1.0 (Production) - Installed
 
 Dev Dependencies:
-  shortcodes @ ^0.0.4 (Production) - Not Installed
+  commandbox-cfformat @ * (Development) - Installed
 ```
 
 ### Install
@@ -84,7 +82,7 @@ wheels deps update <name>
 
 Example:
 ```bash
-wheels deps update wirebox
+wheels deps update wheels-core
 ```
 
 The command will:
@@ -141,13 +139,11 @@ CFML Engine: Lucee 5.4.6.9
 
 Dependencies:
 --------------------------------------------------
-  cbvalidation @ ^4.6.0+28 - Installed: No
-  shortcodes @ ^0.0.4 - Installed: No
-  wirebox @ ^7.4.2+24 - Installed: No
+  wheels-core @ ^3.1.0 - Installed: Yes
 
 Dev Dependencies:
 --------------------------------------------------
-  testbox @ ^6.4.0+17 - Installed: Yes
+  commandbox-cfformat @ * - Installed: Yes
 
 Checking for outdated packages...
 ┌────────────────┬───────────┬──────────┬──────────┬─────────────────────┐
@@ -182,8 +178,7 @@ The command manages two dependency sections in box.json:
 ```json
 {
   "dependencies": {
-    "wheels-core": "^3.1.0",
-    "wirebox": "^7"
+    "wheels-core": "^3.1.0"
   }
 }
 ```
@@ -207,15 +202,14 @@ The command checks for installed packages using the `installPaths` defined in bo
 2. **Fallback**: Checks standard locations like `/modules` directory
 
 ### Supported Package Formats:
-- Simple names: `wirebox`
-- Namespaced: `forgebox:wirebox`
-- Versioned: `wirebox@7.0.0`
+- Simple names: `cbvalidation`
+- Namespaced: `forgebox:cbvalidation`
+- Versioned: `cbvalidation@4.6.0`
 
 ### Example Install Paths:
 ```json
 "installPaths": {
-    "testbox": "testbox/",
-    "wirebox": "wirebox/",
+    "wheels-core": "vendor/wheels/",
     "cbvalidation": "modules/cbvalidation/",
     "shortcodes": "plugins/Shortcodes/"
 }

@@ -16,9 +16,6 @@ component {
 	this.appDir     = getCanonicalPath("_assets");
 
 	this.mappings['/app']      = this.appDir;
-	// this.mappings['/tests']    = this.testDir;
-	// this.mappings['/testbox']  = this.vendorDir & 'testbox';
-	// this.mappings['/wirebox']  = this.vendorDir & 'wheels/vendor/wirebox';
 	this.mappings['/wheels']   = this.webrootDir & 'wheels';
 
 	//If a plugin has a jar or class file, automatically add the mapping to this.javasettings.

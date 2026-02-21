@@ -125,8 +125,7 @@ plugins/            # Third-party plugins
 - **3.1.0-snapshot** - MVC Framework
 - **Lucee 5,6,7, Adobe 2018-2025, Boxlang** - CFML Engine
 - **Database** - MySQL, PostgreSQL, Microsoft SQL Server, Oracle, SQLite, H2
-- **WireBox** - Dependency injection
-- **TestBox** - Testing framework
+- **TestBox** - Testing framework (vendored with Wheels)
 
 ### Frontend
 
