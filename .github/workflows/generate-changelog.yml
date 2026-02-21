@@ -87,7 +87,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Detect version from box.json
-          VERSION=$(jq -r '.version' templates/base/src/box.json)
+          VERSION=$(jq -r '.version' box.json)
           VERSION="${VERSION%-SNAPSHOT}"
 
           BRANCH="changelog/$VERSION"

@@ -29,8 +29,6 @@ jobs:
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
         run: |
-          cd ./templates/base/src
-          pwd
           cat box.json
 
           # Extract version from box.json (should be something like 3.0.0-rc.1)

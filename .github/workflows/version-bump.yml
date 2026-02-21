@@ -49,10 +49,10 @@ jobs:
         run: |
           echo "Updating to version: $NEW_VERSION"
 
-          # Update templates/base/src/box.json
+          # Update root box.json
           jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
-            templates/base/src/box.json > templates/base/src/box.json.tmp
-          mv templates/base/src/box.json.tmp templates/base/src/box.json
+            box.json > box.json.tmp
+          mv box.json.tmp box.json
 
           # Update examples/starter-app/box.json
           jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
@@ -74,7 +74,7 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.new_version }}
         run: |
-          git add templates/base/src/box.json
+          git add box.json
           git add examples/starter-app/box.json
           git add CHANGELOG.md
 
@@ -95,6 +95,6 @@ jobs:
           echo "**Bump Type:** $BUMP_TYPE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Files Updated:" >> $GITHUB_STEP_SUMMARY
-          echo "- templates/base/src/box.json" >> $GITHUB_STEP_SUMMARY
+          echo "- box.json" >> $GITHUB_STEP_SUMMARY
           echo "- examples/starter-app/box.json" >> $GITHUB_STEP_SUMMARY
           echo "- CHANGELOG.md (auto-generated from merged PRs)" >> $GITHUB_STEP_SUMMARY
