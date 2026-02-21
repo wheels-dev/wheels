@@ -165,7 +165,7 @@ component {
 	 *   data: <line2>\n
 	 *   \n
 	 */
-	private string function $formatSSEEvent(
+	public string function $formatSSEEvent(
 		required string data,
 		string event = "",
 		string id = "",

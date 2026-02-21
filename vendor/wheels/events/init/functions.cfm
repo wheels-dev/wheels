@@ -296,6 +296,168 @@
 			appendToLabel = "",
 			encode = true
 		};
+		// HTML5 form helpers (object-based)
+		application.$wheels.functions.emailField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		application.$wheels.functions.urlField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		application.$wheels.functions.numberField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		application.$wheels.functions.telField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		application.$wheels.functions.dateField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		application.$wheels.functions.colorField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		application.$wheels.functions.rangeField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		application.$wheels.functions.searchField = {
+			label = "useDefaultLabel",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			errorElement = "span",
+			errorClass = "field-with-errors",
+			encode = true
+		};
+		// HTML5 form helpers (tag-based)
+		application.$wheels.functions.emailFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
+		application.$wheels.functions.urlFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
+		application.$wheels.functions.numberFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
+		application.$wheels.functions.telFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
+		application.$wheels.functions.dateFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
+		application.$wheels.functions.colorFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
+		application.$wheels.functions.rangeFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
+		application.$wheels.functions.searchFieldTag = {
+			label = "",
+			labelPlacement = "around",
+			prepend = "",
+			append = "",
+			prependToLabel = "",
+			appendToLabel = "",
+			encode = true
+		};
 		application.$wheels.functions.processRequest = {method = "get", returnAs = "", rollback = false};
 		application.$wheels.functions.protectsFromForgery = {with = "exception", only = "", except = ""};
 		application.$wheels.functions.radioButton = {

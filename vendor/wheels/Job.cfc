@@ -3,6 +3,8 @@
  * Provides background job processing with database-backed persistence,
  * retry logic with exponential backoff, and priority queue support.
  *
+ * The _wheels_jobs table is auto-created on first use — no migration needed.
+ *
  * Usage:
  *   // In app/jobs/SendWelcomeEmailJob.cfc
  *   component extends="wheels.Job" {
@@ -143,13 +145,32 @@ component {
 				}
 			);
 		} catch (any e) {
-			// If the table doesn't exist, fall back to logging
-			writeLog(
-				text = "Job '#arguments.jobClass#' enqueued (in-memory). Run the job queue migration to enable persistence. Error: #e.message#",
-				type = "warning",
-				file = "wheels_jobs"
-			);
-			return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = false};
+			// Auto-create table on first use and retry
+			if ($ensureJobTable()) {
+				try {
+					queryExecute(
+						"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+						VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
+						{
+							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
+							jobClass = {value = arguments.jobClass, cfsqltype = "cf_sql_varchar"},
+							queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"},
+							data = {value = local.serializedData, cfsqltype = "cf_sql_longvarchar"},
+							priority = {value = arguments.priority, cfsqltype = "cf_sql_integer"},
+							maxRetries = {value = this.maxRetries, cfsqltype = "cf_sql_integer"},
+							runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
+							createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
+							updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
+						}
+					);
+				} catch (any e2) {
+					writeLog(text = "Job enqueue failed after table creation: #e2.message#", type = "error", file = "wheels_jobs");
+					return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = false};
+				}
+			} else {
+				writeLog(text = "Job '#arguments.jobClass#' could not be persisted: #e.message#", type = "warning", file = "wheels_jobs");
+				return {id = local.id, jobClass = arguments.jobClass, status = "pending", persisted = false};
+			}
 		}
 
 		writeLog(
@@ -187,7 +208,8 @@ component {
 		try {
 			local.jobs = queryExecute(local.sql, local.params);
 		} catch (any e) {
-			ArrayAppend(local.result.errors, "Queue table not found. Run the job queue migration first.");
+			// Auto-create table and return empty result (no jobs to process yet)
+			$ensureJobTable();
 			return local.result;
 		}
 
@@ -338,7 +360,8 @@ component {
 				local.stats.total += local.row.cnt;
 			}
 		} catch (any e) {
-			// Table doesn't exist yet
+			// Table doesn't exist yet — auto-create for next time
+			$ensureJobTable();
 		}
 
 		return local.stats;
@@ -367,6 +390,7 @@ component {
 			local.result = queryExecute(local.sql, local.params);
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
+			$ensureJobTable();
 			return 0;
 		}
 	}
@@ -392,7 +416,59 @@ component {
 			local.result = queryExecute(local.sql, local.params);
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
+			$ensureJobTable();
 			return 0;
+		}
+	}
+
+	/**
+	 * Auto-create the _wheels_jobs table if it doesn't exist.
+	 * Uses database-agnostic SQL compatible with MySQL, PostgreSQL, SQL Server, H2, and SQLite.
+	 * Returns true if the table was created or already exists, false if creation failed.
+	 */
+	private boolean function $ensureJobTable() {
+		try {
+			// Check if table already exists by querying it
+			queryExecute("SELECT COUNT(*) AS cnt FROM _wheels_jobs WHERE 1=0");
+			return true;
+		} catch (any e) {
+			// Table doesn't exist — create it
+		}
+
+		try {
+			queryExecute("
+				CREATE TABLE _wheels_jobs (
+					id VARCHAR(36) NOT NULL PRIMARY KEY,
+					jobClass VARCHAR(255) NOT NULL,
+					queue VARCHAR(100) NOT NULL DEFAULT 'default',
+					data TEXT,
+					priority INT NOT NULL DEFAULT 0,
+					status VARCHAR(20) NOT NULL DEFAULT 'pending',
+					attempts INT NOT NULL DEFAULT 0,
+					maxRetries INT NOT NULL DEFAULT 3,
+					lastError TEXT,
+					runAt DATETIME,
+					completedAt DATETIME,
+					failedAt DATETIME,
+					createdAt DATETIME,
+					updatedAt DATETIME
+				)
+			");
+
+			// Add indexes for efficient queue processing
+			try {
+				queryExecute("CREATE INDEX idx_wheels_jobs_processing ON _wheels_jobs (status, runAt, priority)");
+				queryExecute("CREATE INDEX idx_wheels_jobs_queue ON _wheels_jobs (queue, status)");
+				queryExecute("CREATE INDEX idx_wheels_jobs_cleanup ON _wheels_jobs (status, completedAt)");
+			} catch (any indexError) {
+				// Indexes are optional — don't fail if they can't be created
+			}
+
+			writeLog(text = "Auto-created _wheels_jobs table", type = "information", file = "wheels_jobs");
+			return true;
+		} catch (any createError) {
+			writeLog(text = "Failed to auto-create _wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
+			return false;
 		}
 	}
 }

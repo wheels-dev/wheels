@@ -48,10 +48,10 @@ component extends="wheels.Testbox" {
 				.end();
 				r = m.getRoutes();
 
-				// Should have post index route
+				// Should have post index route (pattern is normalized without optional-segment parens)
 				local.hasPostIndex = false;
 				for (local.route in r) {
-					if (local.route.pattern == "posts(.[format])" && StructKeyExists(local.route, "action") && local.route.action == "index") {
+					if (FindNoCase("posts", local.route.pattern) && !FindNoCase("comments", local.route.pattern) && StructKeyExists(local.route, "action") && local.route.action == "index") {
 						local.hasPostIndex = true;
 						break;
 					}

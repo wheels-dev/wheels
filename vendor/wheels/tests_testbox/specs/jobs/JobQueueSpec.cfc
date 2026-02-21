@@ -22,9 +22,9 @@ component extends="wheels.Testbox" {
 			});
 
 			it("throws NotImplemented when perform() is called on base class", function() {
-				local.job = new wheels.Job();
+				var job = new wheels.Job();
 				expect(function() {
-					local.job.perform();
+					job.perform();
 				}).toThrow(type = "Wheels.NotImplemented");
 			});
 		});
