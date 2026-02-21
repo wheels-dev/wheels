@@ -73,6 +73,34 @@ if (request.wheels.params.format == "json") {
 		<cfif datasourceAvailable>
 		<cfif arrayLen(availableMigrations)>
 
+			<!--- Migration Status Summary --->
+			<cfscript>
+			migratedCount = 0;
+			pendingCount = 0;
+			for (local.mig in availableMigrations) {
+				if (local.mig.status EQ "migrated") migratedCount++;
+				else pendingCount++;
+			}
+			</cfscript>
+			<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:1.5em;">
+				<div style="background:##181825;border:1px solid ##45475a;border-radius:6px;padding:14px 16px;">
+					<div style="font-size:10px;font-weight:700;color:##6c7086;text-transform:uppercase;letter-spacing:.5px;">Total</div>
+					<div style="font-size:24px;font-weight:700;color:##cdd6f4;margin-top:2px;">#ArrayLen(availableMigrations)#</div>
+				</div>
+				<div style="background:##181825;border:1px solid ##45475a;border-radius:6px;padding:14px 16px;">
+					<div style="font-size:10px;font-weight:700;color:##6c7086;text-transform:uppercase;letter-spacing:.5px;">Migrated</div>
+					<div style="font-size:24px;font-weight:700;color:##a6e3a1;margin-top:2px;">#migratedCount#</div>
+				</div>
+				<div style="background:##181825;border:1px solid ##45475a;border-radius:6px;padding:14px 16px;">
+					<div style="font-size:10px;font-weight:700;color:##6c7086;text-transform:uppercase;letter-spacing:.5px;">Pending</div>
+					<div style="font-size:24px;font-weight:700;<cfif pendingCount GT 0>color:##f9e2af;<cfelse>color:##a6adc8;</cfif>margin-top:2px;">#pendingCount#</div>
+				</div>
+				<div style="background:##181825;border:1px solid ##45475a;border-radius:6px;padding:14px 16px;">
+					<div style="font-size:10px;font-weight:700;color:##6c7086;text-transform:uppercase;letter-spacing:.5px;">Current Version</div>
+					<div style="font-size:13px;font-weight:600;color:##89b4fa;margin-top:6px;font-family:monospace;">#currentVersion#</div>
+				</div>
+			</div>
+
 			<div class="ui segment">
 
 			<cfscript>
@@ -106,7 +134,7 @@ if (request.wheels.params.format == "json") {
 					<tr class="#class#">
 						<td>
 							<cfif hasMigrated>
-								<svg xmlns="http://www.w3.org/2000/svg" height="15px" width="15px" viewBox="0 0 448 512"><path d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"/></svg>
+								<svg xmlns="http://www.w3.org/2000/svg" height="15px" width="15px" viewBox="0 0 448 512"><path fill="##a6e3a1" d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"/></svg>
 							<cfelse>
 								<div class="ui icon button teal tiny previewsql"
 									data-data-url="#urlFor(route='wheelsMigratorSQL', version='#mig.version#')#"
@@ -150,7 +178,7 @@ if (request.wheels.params.format == "json") {
 		<cfelse>
 		<div class="ui placeholder segment">
 			<div class="ui icon header">
-				<svg xmlns="http://www.w3.org/2000/svg" height="70" width="50" viewBox="0 0 448 512"><path d="M448 73.1v45.7C448 159.1 347.7 192 224 192S0 159.1 0 118.9V73.1C0 32.9 100.3 0 224 0s224 32.9 224 73.1zM448 176v102.9C448 319.1 347.7 352 224 352S0 319.1 0 278.9V176c48.1 33.1 136.2 48.6 224 48.6S399.9 209.1 448 176zm0 160v102.9C448 479.1 347.7 512 224 512S0 479.1 0 438.9V336c48.1 33.1 136.2 48.6 224 48.6S399.9 369.1 448 336z"/></svg><br>
+				<svg xmlns="http://www.w3.org/2000/svg" height="70" width="50" viewBox="0 0 448 512"><path fill="##6c7086" d="M448 73.1v45.7C448 159.1 347.7 192 224 192S0 159.1 0 118.9V73.1C0 32.9 100.3 0 224 0s224 32.9 224 73.1zM448 176v102.9C448 319.1 347.7 352 224 352S0 319.1 0 278.9V176c48.1 33.1 136.2 48.6 224 48.6S399.9 209.1 448 176zm0 160v102.9C448 479.1 347.7 512 224 512S0 479.1 0 438.9V336c48.1 33.1 136.2 48.6 224 48.6S399.9 369.1 448 336z"/></svg><br>
 				No migration files found!<br><small>Perhaps start by using the templating system?</small>
 			</div>
 		</div>
