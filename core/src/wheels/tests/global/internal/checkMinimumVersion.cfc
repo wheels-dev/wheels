@@ -1,7 +1,7 @@
 component extends="wheels.tests.Test" {
 
 	function test_railo_invalid() {
-		assert('Len($checkMinimumVersion(version="4.3.0.003", engine="Railo"))');
+		assert('Len($checkMinimumVersion(version="4.3.1.003", engine="Railo"))');
 		assert('Len($checkMinimumVersion(version="4.2.1.008", engine="Railo"))');
 		assert('Len($checkMinimumVersion(version="3.0.2", engine="Railo"))');
 		assert('Len($checkMinimumVersion(version="4.2.1.000", engine="Railo"))');

@@ -38,7 +38,7 @@
         "wheels-core":"vendor/wheels/"
     },
     "dependencies":{
-        "wheels-core":"3.0.0-SNAPSHOT.rc.1+1053",
+        "wheels-core":"^3.1.0",
         "orgh213172lex":"lex:https://ext.lucee.org/org.lucee.h2-2.1.214.0001L.lex"
     },
     "private":false,

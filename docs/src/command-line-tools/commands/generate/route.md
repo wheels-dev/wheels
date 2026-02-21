@@ -684,4 +684,4 @@ If you encounter issues not covered here:
 - [wheels generate scaffold](scaffold.md) - Generate complete CRUD with routes
 - [wheels generate controller](controller.md) - Generate controllers
 - [wheels generate model](model.md) - Generate models
-- [Wheels Routing Guide](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) - Complete routing documentation
+- [Wheels Routing Guide](https://wheels.dev/3.1.0/guides/handling-requests-with-controllers/routing) - Complete routing documentation

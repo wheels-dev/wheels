@@ -34,10 +34,10 @@ Output:
      \/  \/   |_| |_|\___|\___|_|___/
 
 Wheels Framework
-  Version: 3.0.0
+  Version: 3.1.0
 
 Wheels CLI
-  Version: 3.0.0
+  Version: 3.1.0
   Location: /commandbox/modules/wheels-cli/
 
 Application
@@ -63,7 +63,7 @@ Application Statistics
 
 Resources
   Documentation: https://wheels.dev/guides
-  API Reference: https://wheels.dev/api/v3.0.0
+  API Reference: https://wheels.dev/api/v3.1.0
   GitHub: https://github.com/wheels-dev/wheels
   Community: https://wheels.dev/community
 ```

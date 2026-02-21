@@ -88,7 +88,6 @@ jobs:
         run: |
           # Detect version from box.json
           VERSION=$(jq -r '.version' templates/base/src/box.json)
-          VERSION="${VERSION%-SNAPSHOT}"
 
           BRANCH="changelog/$VERSION"
           git checkout -b "$BRANCH"

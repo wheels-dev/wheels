@@ -16,11 +16,11 @@ You can also set values based on what environment you have set. For example, you
 
 ### How to Set Configurations
 
-To change a Wheels application default, you generally use the [set()](https://wheels.dev/api/v3.0.0/controller.set.html) function. With it, you can perform all sorts of tweaks to the framework's default behaviors.
+To change a Wheels application default, you generally use the [set()](https://wheels.dev/api/v3.1.0/controller.set.html) function. With it, you can perform all sorts of tweaks to the framework's default behaviors.
 
 ### How to Access Configuration Values
 
-Use the [get()](https://wheels.dev/api/v3.0.0/controller.get.html) function to access the value of a Wheels application setting. Just pass it the name of the setting.
+Use the [get()](https://wheels.dev/api/v3.1.0/controller.get.html) function to access the value of a Wheels application setting. Just pass it the name of the setting.
 
 
 
@@ -189,7 +189,7 @@ The code above will tell Wheels to skip its automatic detection of the URL Rewri
 
 You can also set it to "Partial" if you believe that your web server is capable of rewriting the URL as folders after `index.cfm`.
 
-For more information, read the chapter about [URL Rewriting](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/url-rewriting/README).
+For more information, read the chapter about [URL Rewriting](https://wheels.dev/3.1.0/guides/handling-requests-with-controllers/url-rewriting/README).
 
 ### Data Source Settings
 
@@ -239,7 +239,7 @@ set(functionName="findAll", perPage=20);
 ```
 {% endcode %}
 
-That little line of code will make all calls to the [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) method in Wheels return a maximum number of 20 record per page (if pagination is enabled for that [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) call). How great is that? You don't need to set the `perPage` value for every single call to [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) if you have a different requirement than the Wheels default of 10 records.
+That little line of code will make all calls to the [findAll()](https://wheels.dev/api/v3.1.0/model.findall.html) method in Wheels return a maximum number of 20 record per page (if pagination is enabled for that [findAll()](https://wheels.dev/api/v3.1.0/model.findall.html) call). How great is that? You don't need to set the `perPage` value for every single call to [findAll()](https://wheels.dev/api/v3.1.0/model.findall.html) if you have a different requirement than the Wheels default of 10 records.
 
 ### Debugging and Error Settings
 
@@ -343,7 +343,7 @@ set(overwritePlugins=false);
 ```
 {% endcode %}
 
-See the chapter on [Installing and Using Plugins](https://wheels.dev/3.0.0/guides/plugins/installing-and-using-plugins) for more information.
+See the chapter on [Installing and Using Plugins](https://wheels.dev/3.1.0/guides/plugins/installing-and-using-plugins) for more information.
 
 | Name                    | Type    | Default | Description                                                                                                                                                                                                                                                  |
 | ----------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -354,7 +354,7 @@ See the chapter on [Installing and Using Plugins](https://wheels.dev/3.0.0/guide
 
 ### Media Settings
 
-Configure how Wheels handles linking to assets through view helpers like [imageTag()](https://wheels.dev/api/v3.0.0/controller.imagetag.html), [styleSheetLinkTag()](https://wheels.dev/api/v3.0.0/controller.stylesheetlinktag.html), and [javaScriptIncludeTag()](https://wheels.dev/api/v3.0.0/controller.javascriptincludetag.html).
+Configure how Wheels handles linking to assets through view helpers like [imageTag()](https://wheels.dev/api/v3.1.0/controller.imagetag.html), [styleSheetLinkTag()](https://wheels.dev/api/v3.1.0/controller.stylesheetlinktag.html), and [javaScriptIncludeTag()](https://wheels.dev/api/v3.1.0/controller.javascriptincludetag.html).
 
 See the chapter about [Date, Media, and Text Helpers](../displaying-views-to-users/date-media-and-text-helpers.md) for more information.
 
@@ -369,7 +369,7 @@ See the chapter about [Date, Media, and Text Helpers](../displaying-views-to-use
 
 Wheels includes a powerful routing system. Parts of it are configurable with the following settings.
 
-See the chapters about [Using Routes](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) and [Obfuscating URLs](../handling-requests-with-controllers/obfuscating-urls.md) for more information about how this all works together.
+See the chapters about [Using Routes](https://wheels.dev/3.1.0/guides/handling-requests-with-controllers/routing) and [Obfuscating URLs](../handling-requests-with-controllers/obfuscating-urls.md) for more information about how this all works together.
 
 **Full Listing of Routing Settings**
 

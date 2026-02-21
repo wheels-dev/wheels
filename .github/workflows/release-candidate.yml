@@ -1,6 +1,6 @@
 # Release Candidate Workflow
 # This workflow builds and publishes Release Candidates for testing before final releases
-# Triggers on release candidate branches (e.g., release/3.0.0-rc.1)
+# Triggers on release candidate branches (e.g., release/3.1.0-rc.1)
 
 name: Wheels Release Candidate
 
@@ -33,7 +33,7 @@ jobs:
           pwd
           cat box.json
 
-          # Extract version from box.json (should be something like 3.0.0-rc.1)
+          # Extract version from box.json (should be something like 3.1.0-rc.1)
           VERSION=$(cat box.json | jq '.version' -r)
           echo "WHEELS_VERSION=${VERSION}+${{ github.run_number }}" >> $GITHUB_ENV
 

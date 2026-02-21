@@ -66,7 +66,7 @@ Download the SQLite module for Boxlang from [ForgeBox](https://forgebox.io/view/
 ```bash
 {
   "dependencies" : {
-    "wheels-core":"3.0.0-SNAPSHOT",
+    "wheels-core":"3.1.0-SNAPSHOT",
     "wirebox":"^7",
     "testbox":"^6",
     "bx-compat-cfml":"^1.27.0+35",

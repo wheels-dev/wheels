@@ -139,7 +139,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that $checkMinimumVersion", () => {
 
 			it("checks railo invalid", () => {
-				expect(len(g.$checkMinimumVersion(version="4.3.0.003", engine="Railo"))).toBeGT(0)
+				expect(len(g.$checkMinimumVersion(version="4.3.1.003", engine="Railo"))).toBeGT(0)
 				expect(len(g.$checkMinimumVersion(version="4.2.1.008", engine="Railo"))).toBeGT(0)
 				expect(len(g.$checkMinimumVersion(version="3.0.2", engine="Railo"))).toBeGT(0)
 				expect(len(g.$checkMinimumVersion(version="4.2.1.000", engine="Railo"))).toBeGT(0)
