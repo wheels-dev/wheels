@@ -111,6 +111,57 @@ component output="false" extends="wheels.Global"{
 	}
 
 	/**
+	 * Runs a single specific migration's up() regardless of sequence order.
+	 * Used for out-of-sequence migrations that were created by other developers
+	 * and need to be applied individually without affecting the current version pointer.
+	 *
+	 * [section: Migrator]
+	 * [category: General Functions]
+	 *
+	 * @version The version number of the specific migration to run
+	 */
+	public string function migrateIndividual(required string version) {
+		local.rv = "";
+		local.appKey = $appKey();
+		local.migrations = getAvailableMigrations();
+		local.migrationArray = ArrayFilter(local.migrations, function(i) {
+			return i.version == version;
+		});
+		if (!ArrayLen(local.migrationArray)) {
+			return "Error: Migration version #arguments.version# was not found.#Chr(13)#";
+		}
+		local.migration = local.migrationArray[1];
+		if (local.migration.status == "migrated") {
+			return "Migration #arguments.version# has already been applied.#Chr(13)#";
+		}
+		if (!DirectoryExists(this.paths.sql) && application[local.appKey].writeMigratorSQLFiles) {
+			DirectoryCreate(this.paths.sql);
+		}
+		local.rv = "Running individual migration #arguments.version#.#Chr(13)#";
+		transaction {
+			try {
+				if (structKeyExists(server, "boxlang")) {
+					$query(datasource = application[local.appKey].dataSourceName, sql = "SELECT 1 as test");
+				}
+				local.rv = local.rv & "#Chr(13)#-------- " & local.migration.cfcfile & " #RepeatString("-", Max(5, 50 - Len(local.migration.cfcfile)))##Chr(13)#";
+				request.$wheelsMigrationOutput = "";
+				request.$wheelsMigrationSQLFile = "#this.paths.sql#/#local.migration.cfcfile#_up.sql";
+				if (application[local.appKey].writeMigratorSQLFiles) {
+					$writeMigrationFile(request.$wheelsMigrationSQLFile, "");
+				}
+				local.migration.cfc.up();
+				local.rv = local.rv & request.$wheelsMigrationOutput;
+				$setVersionAsMigrated(local.migration.version);
+			} catch (any e) {
+				local.rv = local.rv & "Error migrating #local.migration.version#.#Chr(13)##e.message##Chr(13)##e.detail##Chr(13)#";
+				transaction action="rollback";
+			}
+			transaction action="commit";
+		}
+		return local.rv;
+	}
+
+	/**
 	 * Shortcut function to migrate to the latest version
 	 *
 	 * [section: Migrator]

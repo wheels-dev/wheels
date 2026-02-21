@@ -25,6 +25,9 @@ if (executeAction) {
 		case "redoMigration":
 			result = migrator.redoMigration(request.wheels.params.version);
 			break;
+		case "migrateIndividual":
+			result = migrator.migrateIndividual(request.wheels.params.version);
+			break;
 		default:
 	}
 } else {
@@ -37,6 +40,9 @@ if (executeAction) {
 			break;
 		case "redoMigration":
 			message = "This will redo the database migration at #request.wheels.params.version#";
+			break;
+		case "migrateIndividual":
+			message = "This will run migration #request.wheels.params.version# individually (out of sequence)";
 			break;
 		default:
 	}

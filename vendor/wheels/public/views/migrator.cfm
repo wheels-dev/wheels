@@ -20,6 +20,16 @@ if(structKeyExists(variables, "latestVersion") && currentVersion == latestVersio
 	}
 }
 
+// Detect out-of-sequence migrations: unmigrated files with version < currentVersion
+outOfSequenceMigrations = [];
+if (datasourceAvailable && structKeyExists(variables, "currentVersion") && currentVersion > 0) {
+	for (local.mig in availableMigrations) {
+		if (local.mig.status != "migrated" && local.mig.version < currentVersion) {
+			ArrayAppend(outOfSequenceMigrations, local.mig);
+		}
+	}
+}
+
 // If JSON format is requested, return JSON response
 if (request.wheels.params.format == "json") {
 	local.migratorData = {
@@ -50,6 +60,7 @@ if (request.wheels.params.format == "json") {
 		}
 		local.migratorData.migrator.migratedCount = local.migratedCount;
 		local.migratorData.migrator.pendingCount = local.pendingCount;
+		local.migratorData.migrator.outOfSequenceCount = ArrayLen(outOfSequenceMigrations);
 
 		if (structKeyExists(variables, "local") && structKeyExists(local, "remainingMigrations")) {
 			local.migratorData.migrator.remainingMigrations = local.remainingMigrations;
@@ -99,7 +110,45 @@ if (request.wheels.params.format == "json") {
 					<div style="font-size:10px;font-weight:700;color:##6c7086;text-transform:uppercase;letter-spacing:.5px;">Current Version</div>
 					<div style="font-size:13px;font-weight:600;color:##89b4fa;margin-top:6px;font-family:monospace;">#currentVersion#</div>
 				</div>
+				<cfif ArrayLen(outOfSequenceMigrations)>
+				<div style="background:##181825;border:1px solid ##f38ba8;border-radius:6px;padding:14px 16px;">
+					<div style="font-size:10px;font-weight:700;color:##f38ba8;text-transform:uppercase;letter-spacing:.5px;">Out of Sequence</div>
+					<div style="font-size:24px;font-weight:700;color:##f38ba8;margin-top:2px;">#ArrayLen(outOfSequenceMigrations)#</div>
+				</div>
+				</cfif>
 			</div>
+
+			<!--- Out-of-Sequence Warning Banner --->
+			<cfif ArrayLen(outOfSequenceMigrations)>
+			<div style="background:##2a1f2e;border:1px solid ##f38ba8;border-radius:8px;padding:16px 20px;margin-bottom:1.5em;">
+				<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+					<svg xmlns="http://www.w3.org/2000/svg" height="18" width="18" viewBox="0 0 512 512"><path fill="##f38ba8" d="M256 32c14.2 0 27.3 7.5 34.5 19.8l216 368c7.3 12.4 7.3 27.7 .2 40.1S486.3 480 472 480H40c-14.3 0-27.6-7.7-34.7-20.1s-7-27.8 .2-40.1l216-368C228.7 39.5 241.8 32 256 32zm0 128c-13.3 0-24 10.7-24 24V296c0 13.3 10.7 24 24 24s24-10.7 24-24V184c0-13.3-10.7-24-24-24zm32 224a32 32 0 1 0 -64 0 32 32 0 1 0 64 0z"/></svg>
+					<strong style="color:##f38ba8;font-size:14px;">Out-of-Sequence Migrations Detected</strong>
+				</div>
+				<p style="color:##cdd6f4;margin:0 0 12px;font-size:13px;line-height:1.5;">
+					#ArrayLen(outOfSequenceMigrations)# migration<cfif ArrayLen(outOfSequenceMigrations) GT 1>s</cfif>
+					exist with version numbers lower than the current database version (#currentVersion#).
+					This typically happens when multiple developers create migrations on separate branches.
+					These migrations can be run individually if they don't conflict with existing schema.
+				</p>
+				<div style="display:flex;flex-wrap:wrap;gap:8px;">
+					<cfloop array="#outOfSequenceMigrations#" index="oosMig">
+						<div class="ui small button violet performmigration"
+							data-command="migrateIndividual"
+							data-version="#oosMig.version#"
+							data-data-url="#urlFor(route='wheelsMigratorCommand', command="migrateIndividual", version='#oosMig.version#')#"
+							style="margin:0;">
+							Run #oosMig.version# &mdash; #replace(oosMig.name, '_', ' ', 'all')#
+						</div>
+					</cfloop>
+					<cfif ArrayLen(outOfSequenceMigrations) GT 1>
+						<div class="ui small button teal runAllOutOfSequence" style="margin:0;">
+							Run All Out-of-Sequence
+						</div>
+					</cfif>
+				</div>
+			</div>
+			</cfif>
 
 			<div class="ui segment">
 
@@ -117,12 +166,41 @@ if (request.wheels.params.format == "json") {
 
 					<div class="ui button red #resetClass#"
 						data-data-url="#urlFor(route='wheelsMigratorCommand', command="migrateto", version=0)#">Reset Database</div>
-				#startTable(title="Available Migrations", colspan=4)#
+
+				<!--- Inline Results Section (replaces modal popup) --->
+				<div id="migrationResults" style="display:none;margin-top:16px;">
+					<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+						<strong style="color:##cdd6f4;font-size:13px;" id="resultsHeader">Migration Results</strong>
+						<div style="display:flex;gap:8px;">
+							<button onclick="copyMigrationResults()" class="ui tiny button"
+								style="background:##313244;color:##cdd6f4;border:1px solid ##45475a;margin:0;"
+								title="Copy to clipboard">
+								<svg xmlns="http://www.w3.org/2000/svg" height="12" width="12" viewBox="0 0 448 512" style="margin-right:4px;vertical-align:middle;"><path fill="##cdd6f4" d="M208 0H332.1c12.7 0 24.9 5.1 33.9 14.1l67.9 67.9c9 9 14.1 21.2 14.1 33.9V336c0 26.5-21.5 48-48 48H208c-26.5 0-48-21.5-48-48V48c0-26.5 21.5-48 48-48zM48 128h80v64H64V448H256V416h64v48c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V176c0-26.5 21.5-48 48-48z"/></svg>
+								Copy
+							</button>
+							<button onclick="toggleResultsCollapse()" class="ui tiny button"
+								style="background:##313244;color:##cdd6f4;border:1px solid ##45475a;margin:0;"
+								id="toggleResultsBtn">
+								Collapse
+							</button>
+							<button onclick="clearResults()" class="ui tiny button"
+								style="background:##313244;color:##f38ba8;border:1px solid ##45475a;margin:0;">
+								Clear
+							</button>
+						</div>
+					</div>
+					<div id="resultsContent">
+						<pre id="resultsOutput" style="background:##11111b;border:1px solid ##45475a;border-radius:6px;padding:16px;color:##cdd6f4;font-family:'JetBrains Mono',Consolas,monospace;font-size:12px;line-height:1.6;max-height:500px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin:0;user-select:text;-webkit-user-select:text;"></pre>
+					</div>
+				</div>
+
+				#startTable(title="Available Migrations", colspan=5)#
 				<cfloop from="1" to="#arrayLen(availableMigrations)#" index="m">
 					<cfscript>
 						mig = availableMigrations[m];
 						class="";
 						hasMigrated=false;
+						isOutOfSequence=false;
 						if(mig.status EQ "migrated"){
 							class="positive";
 							hasMigrated=true;
@@ -130,11 +208,17 @@ if (request.wheels.params.format == "json") {
 						if(mig.version EQ currentVersion){
 							class="active";
 						}
+						// Check if this is an out-of-sequence migration
+						if (!hasMigrated && mig.version < currentVersion) {
+							isOutOfSequence = true;
+						}
 					</cfscript>
-					<tr class="#class#">
+					<tr class="#class#"<cfif isOutOfSequence> style="background:##2a1f2e !important;"</cfif>>
 						<td>
 							<cfif hasMigrated>
 								<svg xmlns="http://www.w3.org/2000/svg" height="15px" width="15px" viewBox="0 0 448 512"><path fill="##a6e3a1" d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"/></svg>
+							<cfelseif isOutOfSequence>
+								<svg xmlns="http://www.w3.org/2000/svg" height="15px" width="15px" viewBox="0 0 512 512"><path fill="##f38ba8" d="M256 32c14.2 0 27.3 7.5 34.5 19.8l216 368c7.3 12.4 7.3 27.7 .2 40.1S486.3 480 472 480H40c-14.3 0-27.6-7.7-34.7-20.1s-7-27.8 .2-40.1l216-368C228.7 39.5 241.8 32 256 32zm0 128c-13.3 0-24 10.7-24 24V296c0 13.3 10.7 24 24 24s24-10.7 24-24V184c0-13.3-10.7-24-24-24zm32 224a32 32 0 1 0 -64 0 32 32 0 1 0 64 0z"/></svg>
 							<cfelse>
 								<div class="ui icon button teal tiny previewsql"
 									data-data-url="#urlFor(route='wheelsMigratorSQL', version='#mig.version#')#"
@@ -143,11 +227,36 @@ if (request.wheels.params.format == "json") {
 								</div>
 							</cfif>
 						</td>
-						<td>#mig.version#</td>
-						<td>#replace(mig.name, '_', ' ', 'all')#</td>
+						<td style="font-family:monospace;font-size:12px;">#mig.version#</td>
 						<td>
-
-							<cfif !hasMigrated>
+							#replace(mig.name, '_', ' ', 'all')#
+							<cfif isOutOfSequence>
+								<span style="display:inline-block;background:##f38ba8;color:##1e1e2e;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;margin-left:6px;vertical-align:middle;">OUT OF SEQUENCE</span>
+							</cfif>
+						</td>
+						<td>
+							<cfif mig.loadError NEQ "">
+								<span style="color:##f38ba8;font-size:12px;" data-content="#EncodeForHTMLAttribute(mig.loadError)#" class="popup-trigger"
+									title="#EncodeForHTMLAttribute(mig.loadError)#">Load Error</span>
+							<cfelse>
+								<span style="color:##6c7086;font-size:12px;">#mig.details#</span>
+							</cfif>
+						</td>
+						<td>
+							<cfif isOutOfSequence>
+								<div class="ui icon button violet tiny performmigration"
+									data-command="migrateIndividual"
+									data-version="#mig.version#"
+									data-data-url="#urlFor(route='wheelsMigratorCommand', command="migrateIndividual", version='#mig.version#')#"
+									data-content="Run this migration individually">
+									<svg xmlns="http://www.w3.org/2000/svg" height="12px" width="12px" viewBox="0 0 384 512"><path fill="##ffffff" d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.8 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg>
+								</div>
+								<div class="ui icon button teal tiny previewsql"
+									data-data-url="#urlFor(route='wheelsMigratorSQL', version='#mig.version#')#"
+									data-content="Preview SQL">
+									<svg xmlns="http://www.w3.org/2000/svg" height="12" width="14" viewBox="0 0 640 512"><path fill="##ffffff" d="M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z"/></svg>
+								</div>
+							<cfelseif !hasMigrated>
 								<div class="ui icon button violet tiny performmigration"
 									data-data-url="#urlFor(route='wheelsMigratorCommand', command="migrateto", version='#mig.version#')#"
 									data-content="Migrate To this schema (Up)">
@@ -196,6 +305,7 @@ if (request.wheels.params.format == "json") {
 
 	</div><!--/container-->
 
+	<!--- SQL Preview Modal (kept as modal since it's reference only, not results) --->
 	<div class="ui longer previewsqlmodal modal">
 		<svg xmlns="http://www.w3.org/2000/svg" height="16" width="12" viewBox="0 0 384 512"><path fill="##ffffff" d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"/></svg>
 		<div class="header">
@@ -223,80 +333,262 @@ if (request.wheels.params.format == "json") {
 		</div>
 	</div>
 
-
-	<div class="ui migratorcommandmodal modal">
-		<svg xmlns="http://www.w3.org/2000/svg" height="16" width="12" viewBox="0 0 384 512"><path fill="##ffffff" d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"/></svg>
-		<div class="header">
-			Perform Migration
-		</div>
-		<div class="content longer"></div>
-		<div class="actions">
-			<div class="ui cancel button">Close</div>
-		</div>
-	</div>
 <cfif get("URLRewriting") eq "Off">
 	<cfset method = 'get'>
 <cfelse>
 	<cfset method = 'post'>
 </cfif>
+<style>
+##migrationResults pre::selection,
+##migrationResults pre *::selection {
+	background: ##89b4fa;
+	color: ##1e1e2e;
+}
+.migration-running {
+	opacity: 0.6;
+	pointer-events: none;
+}
+.migration-spinner {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 2px solid ##45475a;
+	border-top-color: ##89b4fa;
+	border-radius: 50%;
+	animation: migspin 0.6s linear infinite;
+	margin-right: 6px;
+	vertical-align: middle;
+}
+@keyframes migspin {
+	to { transform: rotate(360deg); }
+}
+</style>
 <script>
+var resultsCollapsed = false;
+
+function showResults(html, label) {
+	var container = document.getElementById('migrationResults');
+	var output = document.getElementById('resultsOutput');
+	var header = document.getElementById('resultsHeader');
+	container.style.display = 'block';
+	// Strip HTML tags and extract text content for clean output
+	var temp = document.createElement('div');
+	temp.innerHTML = html;
+	// Check if it contains a confirmation prompt (not yet executed)
+	var confirmBtn = temp.querySelector('.execute');
+	if (confirmBtn) {
+		// This is a confirmation step - show it and wire up the execute button
+		output.innerHTML = '';
+		var msgDiv = temp.querySelector('.ui.red.message');
+		if (msgDiv) {
+			output.textContent = msgDiv.textContent.trim();
+		}
+		output.innerHTML += '\n\n';
+		var executeBtn = document.createElement('button');
+		executeBtn.className = 'ui small button red';
+		executeBtn.textContent = 'Confirm & Execute';
+		executeBtn.style.cssText = 'margin-top:8px;';
+		executeBtn.setAttribute('data-url', confirmBtn.getAttribute('data-data-url'));
+		executeBtn.onclick = function() {
+			var url = this.getAttribute('data-url');
+			this.remove();
+			output.textContent = output.textContent.trim() + '\n\nExecuting...\n';
+			runMigrationRequest(url, label);
+		};
+		output.appendChild(executeBtn);
+	} else {
+		// This is the actual result
+		var pre = temp.querySelector('pre');
+		if (pre) {
+			output.textContent = pre.textContent;
+		} else {
+			output.textContent = temp.textContent.trim();
+		}
+	}
+	if (label) header.textContent = label;
+	container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function runMigrationRequest(url, label) {
+	var output = document.getElementById('resultsOutput');
+	var container = document.getElementById('migrationResults');
+	container.style.display = 'block';
+	output.textContent = 'Running migration...\n';
+	if (label) document.getElementById('resultsHeader').textContent = label;
+
+	var xhr = new XMLHttpRequest();
+	xhr.open('#method#', url, true);
+	xhr.onload = function() {
+		if (xhr.status >= 200 && xhr.status < 300) {
+			showResults(xhr.responseText, label);
+		} else {
+			output.textContent = 'Error: HTTP ' + xhr.status + '\n' + xhr.responseText;
+		}
+	};
+	xhr.onerror = function() {
+		output.textContent = 'Network error occurred.';
+	};
+	xhr.send();
+}
+
+function copyMigrationResults() {
+	var output = document.getElementById('resultsOutput');
+	var text = output.textContent || output.innerText;
+	if (navigator.clipboard) {
+		navigator.clipboard.writeText(text).then(function() {
+			// Brief visual feedback
+			var btn = document.querySelector('[onclick="copyMigrationResults()"]');
+			var orig = btn.innerHTML;
+			btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="12" width="12" viewBox="0 0 448 512" style="margin-right:4px;vertical-align:middle;"><path fill="##a6e3a1" d="M438.6 105.4c12.5 12.5 12.5 32.8 0 45.3l-256 256c-12.5 12.5-32.8 12.5-45.3 0l-128-128c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0L160 338.7 393.4 105.4c12.5-12.5 32.8-12.5 45.3 0z"/></svg>Copied';
+			setTimeout(function() { btn.innerHTML = orig; }, 1500);
+		});
+	} else {
+		// Fallback for older browsers
+		var range = document.createRange();
+		range.selectNodeContents(output);
+		var sel = window.getSelection();
+		sel.removeAllRanges();
+		sel.addRange(range);
+		document.execCommand('copy');
+	}
+}
+
+function toggleResultsCollapse() {
+	var content = document.getElementById('resultsContent');
+	var btn = document.getElementById('toggleResultsBtn');
+	resultsCollapsed = !resultsCollapsed;
+	content.style.display = resultsCollapsed ? 'none' : 'block';
+	btn.textContent = resultsCollapsed ? 'Expand' : 'Collapse';
+}
+
+function clearResults() {
+	document.getElementById('migrationResults').style.display = 'none';
+	document.getElementById('resultsOutput').textContent = '';
+}
+
 $(document).ready(function() {
 
-// Click handlers
+// SQL Preview (still uses modal since it's reference info)
 $(".previewsql").on("click", function(e){
 	var url = $(this).data("data-url");
-	var resp = $.ajax({
+	$.ajax({
 		url: url,
 		method: 'get'
 	})
-	.done(function(data, status, req) {
+	.done(function(data) {
 		var res = $(".previewsqlmodal > .content");
 		res.html(data);
 		$('.ui.modal.longer.previewsqlmodal')
 			.modal({
 				onVisible: function(){
-					hljs.initHighlightingOnLoad();
+					if (typeof hljs !== 'undefined') hljs.initHighlightingOnLoad();
 				}
 			})
-			.modal('show')
-		;
-		hljs.initHighlightingOnLoad();
-	})
-	.fail(function(e) {
-		//alert( "error" );
-	})
-	.always(function(r) {
-		//console.log(r);
+			.modal('show');
+		if (typeof hljs !== 'undefined') hljs.initHighlightingOnLoad();
 	});
 });
+
+// Migration execution - now inline instead of modal
 $(".performmigration").on("click", function(e){
+	if ($(this).hasClass('disabled')) return;
 	var url = $(this).data("data-url");
-	var resp = $.ajax({
-		url: url,
-		method: '#method#'
-	})
-	.done(function(data, status, req) {
-		var res = $(".migratorcommandmodal > .content");
-		res.html(data);
-		$('.ui.modal.migratorcommandmodal')
-			.modal({
-				onHidden: function(){
-					location.reload();
-				},
-				onVisible: function(){
-					hljs.initHighlightingOnLoad();
-				}
-			})
-			.modal('show')
-		;
-	})
-	.fail(function(e) {
-		//alert( "error" );
-	})
-	.always(function(r) {
-		//console.log(r);
-	});
+	var btn = $(this);
+	var label = 'Migration Results';
+
+	// Build a descriptive label
+	var version = btn.data('version');
+	var command = btn.data('command');
+	if (command === 'migrateIndividual' && version) {
+		label = 'Individual Migration: ' + version;
+	} else if (btn.text().trim().indexOf('Latest') >= 0) {
+		label = 'Migrate To Latest';
+	} else if (btn.text().trim().indexOf('Reset') >= 0) {
+		label = 'Reset Database';
+	} else if (btn.text().trim().indexOf('Missing') >= 0) {
+		label = 'Missing Migrations';
+	}
+
+	runMigrationRequest(url, label);
 });
+
+// Run All Out-of-Sequence button
+$(".runAllOutOfSequence").on("click", function(e) {
+	var oosButtons = $(".performmigration[data-command='migrateIndividual']");
+	if (oosButtons.length === 0) return;
+
+	var output = document.getElementById('resultsOutput');
+	var container = document.getElementById('migrationResults');
+	container.style.display = 'block';
+	document.getElementById('resultsHeader').textContent = 'Running All Out-of-Sequence Migrations';
+	output.textContent = 'Running ' + oosButtons.length + ' out-of-sequence migration(s)...\n\n';
+
+	var urls = [];
+	oosButtons.each(function() {
+		urls.push({
+			url: $(this).data('data-url'),
+			version: $(this).data('version')
+		});
+	});
+
+	// Run sequentially to avoid conflicts
+	function runNext(index) {
+		if (index >= urls.length) {
+			output.textContent += '\n--- All out-of-sequence migrations complete ---\n';
+			output.textContent += 'Reload the page to see updated status.\n';
+			return;
+		}
+		var item = urls[index];
+		// First request gets the confirmation
+		output.textContent += 'Migration ' + item.version + '...\n';
+		var xhr = new XMLHttpRequest();
+		xhr.open('#method#', item.url, true);
+		xhr.onload = function() {
+			// Parse response for confirm URL
+			var temp = document.createElement('div');
+			temp.innerHTML = xhr.responseText;
+			var confirmBtn = temp.querySelector('.execute');
+			if (confirmBtn) {
+				var confirmUrl = confirmBtn.getAttribute('data-data-url');
+				// Execute the confirmed migration
+				var xhr2 = new XMLHttpRequest();
+				xhr2.open('#method#', confirmUrl, true);
+				xhr2.onload = function() {
+					var temp2 = document.createElement('div');
+					temp2.innerHTML = xhr2.responseText;
+					var pre = temp2.querySelector('pre');
+					if (pre) {
+						output.textContent += pre.textContent + '\n';
+					} else {
+						output.textContent += temp2.textContent.trim() + '\n';
+					}
+					runNext(index + 1);
+				};
+				xhr2.onerror = function() {
+					output.textContent += 'Error running migration ' + item.version + '\n';
+					runNext(index + 1);
+				};
+				xhr2.send();
+			} else {
+				// Direct result (no confirmation needed)
+				var pre = temp.querySelector('pre');
+				if (pre) {
+					output.textContent += pre.textContent + '\n';
+				} else {
+					output.textContent += temp.textContent.trim() + '\n';
+				}
+				runNext(index + 1);
+			}
+		};
+		xhr.onerror = function() {
+			output.textContent += 'Network error for migration ' + item.version + '\n';
+			runNext(index + 1);
+		};
+		xhr.send();
+	}
+	runNext(0);
+});
+
 // Popups
 $('.ui.icon.button')
 	.popup()
