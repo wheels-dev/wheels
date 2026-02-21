@@ -54,3 +54,29 @@ We cover caching in greater detail in the [Caching](https://wheels.dev/3.1.0/gui
 ### Using a Layout
 
 The [renderView()](https://wheels.dev/api/v3.1.0/controller.renderview.html) function accepts an argument named `layout`. Using this you can wrap your content with common header/footer style code. This is such an important concept though so we'll cover all the details of it in the chapter called [Using Layouts](https://wheels.dev/3.1.0/guides/displaying-views-to-users/layouts).
+
+### Rendering Server-Sent Events (SSE)
+
+Wheels includes built-in support for Server-Sent Events, a standard for pushing real-time updates from the server to the browser. See the dedicated [Server-Sent Events](server-sent-events.md) chapter for full details.
+
+For a quick overview, use `renderSSE()` to send a single event response:
+
+```javascript
+function notifications() {
+    var data = model("Notification").findAll(where="userId=#params.userId# AND sent=0");
+    renderSSE(data=SerializeJSON(data), event="notifications");
+}
+```
+
+Or use `initSSEStream()` for streaming multiple events over a long-lived connection:
+
+```javascript
+function stream() {
+    var writer = initSSEStream();
+    var items = model("Activity").findAll(where="new=1");
+    for (var item in items) {
+        sendSSEEvent(writer=writer, data=SerializeJSON(item), event="update", id=item.id);
+    }
+    closeSSEStream(writer=writer);
+}
+```

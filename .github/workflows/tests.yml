@@ -137,12 +137,12 @@ jobs:
         if: ${{ matrix.cfengine == 'adobe2018' || matrix.cfengine == 'adobe2021' || matrix.cfengine == 'adobe2023' || matrix.cfengine == 'adobe2025' }}
         run: |
           
-          mkdir -p ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib
+          mkdir -p ./.engine/${{ matrix.cfengine }}/WEB-INF/lib
 
           wget https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
-            -O ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+            -O ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
 
-          ls -l ./templates/base/src/.engine/${{ matrix.cfengine }}/WEB-INF/lib/
+          ls -l ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/
 
       - name: Start cfengine (${{ matrix.cfengine }}) ...
         run: docker compose up -d ${{ matrix.cfengine }}

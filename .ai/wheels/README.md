@@ -28,6 +28,7 @@ MVC controller layer documentation:
 - Request handling and routing
 - Filters, callbacks, and lifecycle management
 - RESTful API development
+- Server-Sent Events (SSE) for real-time communication
 
 ### [Core Concepts](./core-concepts/)
 Fundamental Wheels framework concepts:
@@ -47,6 +48,13 @@ File handling and management:
 - File uploads and downloads
 - Static asset management
 - File system interactions
+
+### [Jobs](./jobs/)
+Background job processing:
+- Database-backed job queue with retry logic
+- Priority queues with named queue support
+- Job creation, enqueueing, and processing
+- Queue statistics and management
 
 ### [Patterns](./patterns/)
 Common development patterns in Wheels:

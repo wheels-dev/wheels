@@ -343,7 +343,7 @@ CMD ["box", "server", "start", "--console", "--force"]';
             local.volumes = '
     volumes:
       - .:/app
-      - ../../../core/src/wheels:/app/vendor/wheels
+      - ../../../vendor/wheels:/app/vendor/wheels
       - ../../../docs:/app/vendor/wheels/docs
       - ../../../tests:/app/tests';
         }

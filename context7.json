@@ -4,17 +4,16 @@
   "folders": [
     "docs/api",
     "docs/src",
-		"templates/base/src/app/snippets",
+		"app/snippets",
 		"guides"
   ],
   "excludeFolders": [
     "cli",
-    "core",
     "design_docs",
     "docs/overrides",
     "docs/public",
     "examples",
-    "templates",
+    "vendor",
     "test-artifacts",
 		"tests",
 		"tools"

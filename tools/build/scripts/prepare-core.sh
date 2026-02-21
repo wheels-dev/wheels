@@ -23,9 +23,9 @@ mkdir -p "${BUILD_DIR}/wheels"
 BUILD_LABEL="wheels-core-${VERSION}-$(date +%Y%m%d%H%M%S)"
 echo "Built on $(date)" > "${BUILD_DIR}/wheels/${BUILD_LABEL}"
 
-# Copy core files
+# Copy core files from vendor/wheels/
 echo "Copying core files..."
-cp -r core/src/wheels/* "${BUILD_DIR}/wheels/"
+cp -r vendor/wheels/* "${BUILD_DIR}/wheels/"
 
 # Copy docs
 echo "Copying docs..."

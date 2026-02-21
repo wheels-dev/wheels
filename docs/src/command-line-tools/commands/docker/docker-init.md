@@ -274,7 +274,7 @@ services:
       DB_PASSWORD: wheels
     volumes:
       - .:/app
-      - ../../../core/src/wheels:/app/vendor/wheels
+      - ../../../vendor/wheels:/app/vendor/wheels
       - ../../../docs:/app/vendor/wheels/docs
       - ../../../tests:/app/tests
     command: sh -c "box install && box server start --console --force"

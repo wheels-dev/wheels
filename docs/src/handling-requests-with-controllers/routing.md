@@ -300,7 +300,21 @@ GET /customers/489/appointments/1909/edit
 ```
 {% endcode %}
 
-To code up this nested resource, we'd write this code in `/config/routes.cfm`:
+#### Callback Syntax (Recommended)
+
+The recommended way to nest resources is with the `callback` parameter. This clearly scopes the child resources inside the parent:
+
+```javascript
+mapper()
+    .resources(name="customers", callback=function(map) {
+        map.resources("appointments");
+    })
+.end();
+```
+
+#### Manual Nesting with nested=true
+
+You can also nest resources manually using `nested=true` and calling `.end()` to close the parent scope:
 
 ```javascript
 mapper()
@@ -310,7 +324,7 @@ mapper()
 .end();
 ```
 
-That will create the following routes:
+Both approaches create the same routes:
 
 |                         | HTTP Verb | Path                                               | Controller & Action | Description                                                                |
 | ----------------------- | --------- | -------------------------------------------------- | ------------------- | -------------------------------------------------------------------------- |
@@ -333,7 +347,29 @@ Notice that the routes for the `appointments` resource contain a parameter named
 
 You can nest resources and routes as deep as you want, though we recommend considering making the nesting shallower after you get to a few levels deep.
 
-Here's an example of how nesting can be used with different route mapping methods:
+Here's an example of how nesting can be used with different route mapping methods, using callback syntax:
+
+```javascript
+mapper()
+    // /products/[key]
+    .resources(name="products", callback=function(map) {
+        // /products/[productKey]/promote
+        map.patch(name="promote", to="promotions##create");
+        // /products/[productKey]/expire
+        map.delete(name="expire", to="expirations##create");
+
+        // A 2nd-level resource
+        // /products/[productKey]/variations/[key]
+        map.resources(name="variations", callback=function(map2) {
+            // A 3rd-level resource
+            // /products/[productKey]/variations/[variationKey]/primary
+            map2.resource("primary");
+        });
+    })
+.end();
+```
+
+The equivalent using manual `nested=true` syntax:
 
 ```javascript
 mapper()
@@ -354,6 +390,12 @@ mapper()
     .end()
 .end();
 ```
+
+{% hint style="info" %}
+#### Callback vs nested=true
+
+The callback syntax is recommended because it clearly scopes child routes inside the parent without requiring manual `.end()` calls. Wheels automatically handles the nesting lifecycle when using callbacks.
+{% endhint %}
 
 ### Wildcard Routes
 

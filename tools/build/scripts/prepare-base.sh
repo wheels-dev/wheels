@@ -27,22 +27,24 @@ ls -la
 BUILD_LABEL="wheels-base-template-${VERSION}-$(date +%Y%m%d%H%M%S)"
 echo "Built on $(date)" > "${BUILD_DIR}/${BUILD_LABEL}"
 
-# Copy base template files
-echo "Copying base template files..."
-cp -r templates/base/src/app "${BUILD_DIR}/"
-cp -r templates/base/src/config "${BUILD_DIR}/"
-cp -r templates/base/src/db "${BUILD_DIR}/"
-cp -r templates/base/src/plugins "${BUILD_DIR}/"
-cp -r templates/base/src/public "${BUILD_DIR}/"
-cp -r templates/base/src/tests "${BUILD_DIR}/"
-cp -r templates/base/src/vendor "${BUILD_DIR}/"
+# Copy app scaffold directories from root
+echo "Copying app scaffold files..."
+cp -r app "${BUILD_DIR}/"
+cp -r config "${BUILD_DIR}/"
+cp -r db "${BUILD_DIR}/"
+cp -r plugins "${BUILD_DIR}/"
+cp -r public "${BUILD_DIR}/"
+cp -r tests "${BUILD_DIR}/"
+mkdir -p "${BUILD_DIR}/vendor"
+cp vendor/wheels/.keep "${BUILD_DIR}/vendor/.keep" 2>/dev/null || touch "${BUILD_DIR}/vendor/.keep"
 
 # Copy AI documentation files
 echo "Copying AI documentation..."
 cp -r .ai "${BUILD_DIR}/"
-cp templates/base/src/CLAUDE.md "${BUILD_DIR}/"
-cp templates/base/src/AGENTS.md "${BUILD_DIR}/"
+cp CLAUDE.md "${BUILD_DIR}/"
+cp AGENTS.md "${BUILD_DIR}/"
 cp -r .claude "${BUILD_DIR}/"
+cp -r .opencode "${BUILD_DIR}/" 2>/dev/null || true
 
 # Copy Apache License how are you?
 cp LICENSE "${BUILD_DIR}/"

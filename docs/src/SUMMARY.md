@@ -119,6 +119,7 @@
 * [Contributing to Wheels VS Code Extension](working-with-wheels/contributing-to-wheels-vscode-extension.md)
 * [Contributing to Wheels Windows Installer](working-with-wheels/contributing-to-wheels-windows-installer.md)
 * [Contributing to Wheels macOS Installer](working-with-wheels/contributing-to-wheels-macos-installer.md)
+* [Background Jobs](working-with-wheels/background-jobs.md)
 * [Submitting Pull Requests](working-with-wheels/submitting-pull-requests.md)
 * [Documenting your Code](working-with-wheels/documenting-your-code.md)
 
@@ -142,6 +143,7 @@
   * [Nginx](handling-requests-with-controllers/url-rewriting/nginx.md)
 * [Obfuscating URLs](handling-requests-with-controllers/obfuscating-urls.md)
 * [Caching](handling-requests-with-controllers/caching.md)
+* [Server-Sent Events](handling-requests-with-controllers/server-sent-events.md)
 * [Nesting Controllers](handling-requests-with-controllers/nesting-controllers.md)
 * [CORS Requests](handling-requests-with-controllers/cors-requests.md)
 

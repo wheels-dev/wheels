@@ -771,6 +771,70 @@ Let's say you want a `data-ajax-url` HTML attribute as depicted above. All you n
 
 As an alternative, you can pass in `data_ajax_url` instead if you prefer underscores, and it will produce the same result.
 
+### HTML5 Form Helpers
+
+Wheels provides dedicated helpers for HTML5 input types. These generate the correct `type` attribute, which enables browser-native validation, mobile-optimized keyboards, and date/color pickers without any JavaScript.
+
+#### Object-Bound HTML5 Helpers
+
+These work exactly like `textField()` — pass `objectName` and `property` to bind to a model:
+
+```html
+<!--- Email: triggers email keyboard on mobile, browser validates format --->
+#emailField(objectName="user", property="email", label="Email Address")#
+
+<!--- URL: triggers URL keyboard on mobile --->
+#urlField(objectName="user", property="website", label="Website")#
+
+<!--- Number: spinner with min/max/step constraints --->
+#numberField(objectName="product", property="quantity", label="Quantity", min="1", max="100", step="1")#
+
+<!--- Telephone: triggers phone keyboard on mobile --->
+#telField(objectName="user", property="phone", label="Phone Number")#
+
+<!--- Date: native date picker (YYYY-MM-DD format) --->
+#dateField(objectName="event", property="startDate", label="Start Date", min="2020-01-01")#
+
+<!--- Color: native color picker --->
+#colorField(objectName="theme", property="primaryColor", label="Theme Color")#
+
+<!--- Range: slider control --->
+#rangeField(objectName="settings", property="volume", label="Volume", min="0", max="100")#
+
+<!--- Search: may show clearable X button in some browsers --->
+#searchField(objectName="search", property="query", label="Search")#
+```
+
+#### Tag-Based HTML5 Helpers
+
+Every object-bound helper has a tag-based counterpart with a `Tag` suffix. These use `name` and `value` instead of `objectName` and `property`:
+
+```html
+#emailFieldTag(name="email", value="", placeholder="you@example.com")#
+#urlFieldTag(name="website", value="")#
+#numberFieldTag(name="quantity", value="1", min="0", max="99", step="1")#
+#telFieldTag(name="phone", value="")#
+#dateFieldTag(name="startDate", value="", min="2020-01-01")#
+#colorFieldTag(name="color", value="##336699")#
+#rangeFieldTag(name="rating", value="5", min="1", max="10")#
+#searchFieldTag(name="q", value="", placeholder="Search...")#
+```
+
+#### Complete HTML5 Helper Reference
+
+| Object-Bound Helper | Tag Helper | HTML Input Type | Extra Attributes |
+|---------------------|------------|----------------|-----------------|
+| `emailField()` | `emailFieldTag()` | `email` | — |
+| `urlField()` | `urlFieldTag()` | `url` | — |
+| `numberField()` | `numberFieldTag()` | `number` | `min`, `max`, `step` |
+| `telField()` | `telFieldTag()` | `tel` | — |
+| `dateField()` | `dateFieldTag()` | `date` | `min`, `max` |
+| `colorField()` | `colorFieldTag()` | `color` | — |
+| `rangeField()` | `rangeFieldTag()` | `range` | `min`, `max`, `step` |
+| `searchField()` | `searchFieldTag()` | `search` | — |
+
+All HTML5 helpers accept the same common parameters as other form helpers (`label`, `labelPlacement`, `prepend`, `append`, `class`, `id`, `placeholder`, `required`, etc.).
+
 ### Special Form Helpers
 
 Wheels provides a few extra form helpers that make it easier for you to generate accessible fields for dates and/or times. These also bind to properties that are of type `DATE, TIMESTAMP, DATETIME`, etc.

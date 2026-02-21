@@ -19,8 +19,13 @@ ENV BOX_INSTALL             TRUE
 WORKDIR ${APP_DIR}
 
 # Copy files
-COPY templates/base/src ${APP_DIR}
-COPY core/src/wheels ${APP_DIR}/vendor/wheels
+# Copy app scaffold, framework core, and tests from repo root
+COPY app ${APP_DIR}/app
+COPY config ${APP_DIR}/config
+COPY public ${APP_DIR}/public
+COPY db ${APP_DIR}/db
+COPY plugins ${APP_DIR}/plugins
+COPY vendor/wheels ${APP_DIR}/vendor/wheels
 COPY tests ${APP_DIR}/tests
 COPY tools/docker/boxlang/box.json ${APP_DIR}/box.json
 COPY tools/docker/boxlang/CFConfig.json ${APP_DIR}/CFConfig.json

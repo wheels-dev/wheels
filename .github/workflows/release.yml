@@ -35,7 +35,6 @@ jobs:
       - name: Setup Environment Variables For Build Process
         id: Calculate-Version-And-Branch
         run: |
-          pwd
           cat box.json
           BASE_VERSION=$(cat box.json | jq '.version' -r)
           echo "Base version from box.json: ${BASE_VERSION}"

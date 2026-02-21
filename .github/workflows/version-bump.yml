@@ -49,7 +49,7 @@ jobs:
         run: |
           echo "Updating to version: $NEW_VERSION"
 
-          # Update box.json
+          # Update root box.json
           jq --arg version "$NEW_VERSION" '.version = $version | .dependencies."wheels-core" = ("^" + $version)' \
             box.json > box.json.tmp
           mv box.json.tmp box.json

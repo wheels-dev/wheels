@@ -259,7 +259,11 @@
 
     private function setTestboxEnvironment() {
         // creating backup for original environment
-        application.$$$wheels = Duplicate(application.wheels)
+        if (structKeyExists(server, "boxlang")) {
+            application.$$$wheels = $duplicateWheelsEnvironment(application.wheels)
+        } else {
+            application.$$$wheels = Duplicate(application.wheels)
+        }
 
         // load testbox routes
         application.wo.$include(template = "/tests/routes.cfm")
@@ -315,7 +319,17 @@
 
         local.populate = StructKeyExists(url, "populate") ? url.populate : true
         if (local.populate) {
-            include "populate.cfm"
+            include "/tests/populate.cfm"
         }
+    }
+
+    private function $duplicateWheelsEnvironment(required struct original) {
+        local.backup = {}
+        for (local.key in arguments.original) {
+            if (IsSimpleValue(arguments.original[local.key]) || IsArray(arguments.original[local.key]) || IsStruct(arguments.original[local.key])) {
+                local.backup[local.key] = arguments.original[local.key]
+            }
+        }
+        return local.backup
     }
 </cfscript>
