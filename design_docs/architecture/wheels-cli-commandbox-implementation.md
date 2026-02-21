@@ -94,10 +94,10 @@ wheels-cli/
 ```json
 {
     "name": "wheels-cli",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "author": "Wheels Team",
     "homepage": "https://wheels.dev",
-    "documentation": "https://wheels.dev/3.0.0/guides/command-line-tools/commands/README",
+    "documentation": "https://wheels.dev/3.1.0/guides/command-line-tools/commands/README",
     "repository": {
         "type": "git",
         "url": "https://github.com/wheels/wheels-cli"
@@ -115,7 +115,7 @@ wheels-cli/
     ],
     "private": false,
     "dependencies": {
-        "commandbox-migrations": "^3.0.0",
+        "commandbox-migrations": "^3.1.0",
         "commandbox-cfformat": "^2.0.0",
         "sqlite-jdbc": "^3.40.0"
     },
@@ -463,7 +463,7 @@ component extends="commands.wheels.BaseCommand" {
             "author": "",
             "type": "mvc",
             "dependencies": {
-                "wheels": "^3.0.0"
+                "wheels": "^3.1.0"
             },
             "devDependencies": {
                 "testbox": "^6.0.0"
@@ -972,7 +972,7 @@ component extends="commands.wheels.BaseCommand" {
 
         // Check Wheels version compatibility
         var wheelsVersion = getWheelsVersion();
-        if (wheelsVersion != "Unknown" && compareVersion(wheelsVersion, "3.0.0") < 0) {
+        if (wheelsVersion != "Unknown" && compareVersion(wheelsVersion, "3.1.0") < 0) {
             error("Database migrations require Wheels 3.0 or higher. Current version: #wheelsVersion#");
         }
 
@@ -2160,7 +2160,7 @@ component extends="wheels.Testbox" {
             // Create a mock box.json in vendor/wheels
             var mockBoxJson = {
                 "name": "wheels",
-                "version": "3.0.0",
+                "version": "3.1.0",
                 "type": "mvc"
             };
             fileWrite(
@@ -2265,7 +2265,7 @@ The Wheels framework package in `vendor/wheels/box.json` should contain:
 ```json
 {
     "name": "wheels",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "author": "Wheels Team",
     "homepage": "https://wheels.org",
     "type": "mvc",
@@ -2296,7 +2296,7 @@ box install wheels-cli
 box install wheels/wheels-cli
 
 # Install specific version
-box install wheels-cli@3.0.0
+box install wheels-cli@3.1.0
 ```
 
 ### Auto-Installation with Wheels
@@ -2531,7 +2531,7 @@ component extends="wheels.Testbox" {
             "version": "0.1.0",
             "type": "mvc",
             "dependencies": {
-                "wheels": "^3.0.0"
+                "wheels": "^3.1.0"
             }
         };
         fileWrite(projectPath & "/box.json", serializeJSON(boxJson));
@@ -2539,7 +2539,7 @@ component extends="wheels.Testbox" {
         // Create wheels box.json
         var wheelsBoxJson = {
             "name": "wheels",
-            "version": "3.0.0",
+            "version": "3.1.0",
             "type": "mvc",
             "author": "Wheels Team"
         };
@@ -2927,7 +2927,7 @@ component extends="tests.specs.BaseCommandSpec" {
 ```json
 {
     "name": "wheels-cli",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "testbox": {
         "runner": "tests/runner.cfm",
         "verbose": true,

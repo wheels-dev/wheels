@@ -79,7 +79,7 @@ t.create();
 ```
 {% endcode %}
 
-`t.timestamps();` creates Wheels [automatic timestamp](https://wheels.dev/3.0.0/guides/database-interaction-through-models/automatic-time-stamps) columns of `createdAt`,`updatedAt` and `deletedAt`.
+`t.timestamps();` creates Wheels [automatic timestamp](https://wheels.dev/3.1.0/guides/database-interaction-through-models/automatic-time-stamps) columns of `createdAt`,`updatedAt` and `deletedAt`.
 
 The `t.create();` is the final statement which executes the actual action.
 

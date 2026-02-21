@@ -215,7 +215,7 @@ box task run test:templates
 ```json
 {
     "name": "wheels-monorepo",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "scripts": {
         "test:all": "task run test:core && task run test:cli && task run test:templates",
         "test:core": "cd core && box testbox run",
@@ -698,7 +698,7 @@ component {
 FROM ortussolutions/commandbox:alpine
 
 # Install specific Wheels version
-ARG WHEELS_VERSION=3.0.0
+ARG WHEELS_VERSION=3.1.0
 RUN box install wheels@${WHEELS_VERSION}
 
 # Copy application template

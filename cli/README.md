@@ -8,7 +8,7 @@ Skips things like `rails server` which are provided by CommandBox already.
 Simply run `install wheels-cli` from CommandBox to install the latest release.
 
 ## Commands
-See [the CLI command guides](https://guides.wheels.dev/wheels-guides/3.0.0-snapshot/command-line-tools/cli-commands) or use `help wheels` in Commandbox.
+See [the CLI command guides](https://guides.wheels.dev/wheels-guides/3.1.0-snapshot/command-line-tools/cli-commands) or use `help wheels` in Commandbox.
 
 ## Template Customization
 
@@ -25,4 +25,4 @@ To customize a template:
 2. Modify it to match your needs
 3. The CLI will automatically use your custom template
 
-See the [Template System Guide](https://guides.wheels.dev/wheels-guides/3.0.0-snapshot/command-line-tools/cli-guides/template-system) for detailed documentation.
+See the [Template System Guide](https://guides.wheels.dev/wheels-guides/3.1.0-snapshot/command-line-tools/cli-guides/template-system) for detailed documentation.

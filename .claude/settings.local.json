@@ -92,7 +92,9 @@
       "WebFetch(domain:helpx.adobe.com)",
       "WebFetch(domain:opencode.ai)",
       "Bash(lsof:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(git merge-tree --write-tree origin/develop origin/feat/v3.1-internal-refactor 2>&1 | head -60)",
+      "Bash(git merge origin/develop --no-commit 2>&1)"
     ],
     "deny": []
   }

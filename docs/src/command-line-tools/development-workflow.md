@@ -60,7 +60,7 @@ When you run `wheels init`, it will ask for:
 ```bash
 $ wheels init
 ======================================
-Wheels CLI v3.0.0
+Wheels CLI v3.1.0
 ======================================
 You don't have a box.json. Let's create one
 
@@ -88,7 +88,7 @@ wheels upgrade --check
 
 # Output:
 # Current Wheels version: 2.5.0
-# Upgrade available: 3.0.0
+# Upgrade available: 3.1.0
 # Run 'wheels upgrade' to start the upgrade process.
 ```
 
@@ -111,10 +111,10 @@ wheels upgrade
 
 ```bash
 # Upgrade to specific version
-wheels upgrade --to=3.0.0
+wheels upgrade --to=3.1.0
 
 # Skip all confirmations
-wheels upgrade --to=3.0.0 --force
+wheels upgrade --to=3.1.0 --force
 
 # Upgrade without creating backup
 wheels upgrade --backup=false
@@ -146,7 +146,7 @@ By default, upgrades create a backup in `backups/upgrade-[timestamp]/` containin
 After a successful upgrade:
 
 1. Run your test suite: `wheels test run`
-2. Check the upgrade guide at <https://wheels.dev/3.0.0/guides/introduction/upgrading>
+2. Check the upgrade guide at <https://wheels.dev/3.1.0/guides/introduction/upgrading>
 3. Review deprecated features
 4. Update your plugins to compatible versions
 
@@ -414,7 +414,7 @@ The HTML documentation includes:
 wheels upgrade --check
 
 # Test upgrades in development first
-wheels upgrade --to=3.0.0
+wheels upgrade --to=3.1.0
 wheels test run
 ```
 

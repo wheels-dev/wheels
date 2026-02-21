@@ -4,11 +4,11 @@ description: How to create links to other pages in your paginated data in your v
 
 # Displaying Links for Pagination
 
-In the chapter titled [Getting Paginated Data](https://wheels.dev/3.0.0/guides/database-interaction-through-models/getting-paginated-data), we talked about how to get pages of records from the database (records 11-20, for example). Now we'll show you how to create links to the other pages in your view.
+In the chapter titled [Getting Paginated Data](https://wheels.dev/3.1.0/guides/database-interaction-through-models/getting-paginated-data), we talked about how to get pages of records from the database (records 11-20, for example). Now we'll show you how to create links to the other pages in your view.
 
 ### Displaying Paginated Links with the paginationLinks Function
 
-If you have fetched a paginated query in your controller (normally done using [findAll()](https://wheels.dev/api/v3.0.0/model.findall.html) and the page argument), all you have to do to get the page links to show up is this:&#x20;
+If you have fetched a paginated query in your controller (normally done using [findAll()](https://wheels.dev/api/v3.1.0/model.findall.html) and the page argument), all you have to do to get the page links to show up is this:&#x20;
 
 ```javascript
 #paginationLinks()#
@@ -20,7 +20,7 @@ How simple is that?&#x20;
 
 ### Arguments Used for Customization
 
-Simple is good, but sometimes you want a little more control over how the links are displayed. You can control the output of the links in a number of different ways. We'll show you the most important ones here. Please refer to the [paginationLinks()](https://wheels.dev/api/v3.0.0/controller.paginationlinks.html) documentation for all other uses.
+Simple is good, but sometimes you want a little more control over how the links are displayed. You can control the output of the links in a number of different ways. We'll show you the most important ones here. Please refer to the [paginationLinks()](https://wheels.dev/api/v3.1.0/controller.paginationlinks.html) documentation for all other uses.
 
 **The **_**name**_** Argument**
 
@@ -38,7 +38,7 @@ To change page to something else, you use the name argument like so:
 #paginationLinks(name="pgnum")#
 ```
 
-By the way, perhaps you noticed how Wheels chose to use that hideous question mark in the URL, despite the fact that you have URL rewriting turned on? Because [paginationLinks()](https://wheels.dev/api/v3.0.0/controller.paginationlinks.html) uses [linkTo()](https://wheels.dev/api/v3.0.0/controller.linkto.html) in the background, you can easily get rid of it by creating a custom route. You can read more about this in the [Routing](https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing) chapter.
+By the way, perhaps you noticed how Wheels chose to use that hideous question mark in the URL, despite the fact that you have URL rewriting turned on? Because [paginationLinks()](https://wheels.dev/api/v3.1.0/controller.paginationlinks.html) uses [linkTo()](https://wheels.dev/api/v3.1.0/controller.linkto.html) in the background, you can easily get rid of it by creating a custom route. You can read more about this in the [Routing](https://wheels.dev/3.1.0/guides/handling-requests-with-controllers/routing) chapter.
 
 **The **_**windowSize**_** Argument**
 

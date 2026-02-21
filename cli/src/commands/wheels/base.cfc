@@ -58,7 +58,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 			local.boxJSON = packageService.readPackageDescriptorRaw( getCWD() );
 			// Check if wheels-core is in dependencies
 			if(structKeyExists(local.boxJSON, "dependencies") && structKeyExists(local.boxJSON.dependencies, "wheels-core")){
-				// Extract version from dependency string like "^3.0.0-SNAPSHOT+695"
+				// Extract version from dependency string like "^3.1.0-SNAPSHOT+695"
 				local.wheelsDep = local.boxJSON.dependencies["wheels-core"];
 				local.wheelsDep = reReplace(local.wheelsDep, "[\^~>=<]", "", "all");
 				return local.wheelsDep;

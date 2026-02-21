@@ -36,12 +36,17 @@ jobs:
         id: Calculate-Version-And-Branch
         run: |
           cat box.json
-          echo "WHEELS_VERSION=`cat box.json | jq '.version' -r`+${{ github.run_number }}" >> $GITHUB_ENV
-          # main or snapshot
-          echo "BRANCH=main" >> $GITHUB_ENV
-          if [ $GITHUB_REF == 'refs/heads/develop' ]
-          then
+          BASE_VERSION=$(cat box.json | jq '.version' -r)
+          echo "Base version from box.json: ${BASE_VERSION}"
+          # Develop builds get -SNAPSHOT qualifier; main builds are stable releases.
+          # Source files keep clean versions (e.g. 3.1.0) so no changes are
+          # needed when promoting develop to main.
+          if [ "$GITHUB_REF" == "refs/heads/develop" ]; then
+            echo "WHEELS_VERSION=${BASE_VERSION}-SNAPSHOT+${{ github.run_number }}" >> $GITHUB_ENV
             echo "BRANCH=develop" >> $GITHUB_ENV
+          else
+            echo "WHEELS_VERSION=${BASE_VERSION}+${{ github.run_number }}" >> $GITHUB_ENV
+            echo "BRANCH=main" >> $GITHUB_ENV
           fi
 
       - name: Make build scripts executable
@@ -68,10 +73,13 @@ jobs:
             exit 1
           fi
 
-          # Check that version doesn't contain SNAPSHOT for main releases
-          if echo "$WHEELS_VERSION" | grep -qi "snapshot"; then
-            echo "ERROR: Version contains SNAPSHOT but this is a main branch release"
-            echo "Please remove SNAPSHOT suffix from box.json files before releasing."
+          # Check that source version in box.json is clean (no -SNAPSHOT suffix).
+          # The workflow injects -SNAPSHOT for develop builds automatically.
+          BASE_VERSION=$(jq -r '.version' templates/base/src/box.json)
+          if echo "$BASE_VERSION" | grep -qi "snapshot"; then
+            echo "ERROR: Version in box.json contains -SNAPSHOT suffix ($BASE_VERSION)"
+            echo "Source files should have clean versions (e.g., 3.1.0)."
+            echo "The workflow adds -SNAPSHOT automatically for develop builds."
             exit 1
           fi
 

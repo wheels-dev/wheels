@@ -6,7 +6,7 @@
  *
  * {code:bash}
  * wheels upgrade
- * wheels upgrade to=3.0.0
+ * wheels upgrade to=3.1.0
  * wheels upgrade check=true
  * {code}
  **/
@@ -174,6 +174,7 @@ component extends="base" {
 		// In a real implementation, this would query ForgeBox API
 		// For now, return a static list
 		return [
+			"3.1.0",
 			"3.0.0",
 			"2.5.0", 
 			"2.4.1",

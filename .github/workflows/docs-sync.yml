@@ -25,7 +25,7 @@ jobs:
       - name: Sync docs into wheels.dev
         run: |
           # Guides: mirror with delete
-          rsync -av --del wheels/docs/src/ wheels-dev/docs/3.0.0/guides/
+          rsync -av --del wheels/docs/src/ wheels-dev/docs/3.1.0/guides/
 
           # Images: additive (no delete)
           rsync -av wheels/docs/src/.gitbook/assets/ wheels-dev/public/images/

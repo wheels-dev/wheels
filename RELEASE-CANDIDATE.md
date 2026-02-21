@@ -9,7 +9,7 @@ A Release Candidate is a beta version of software that has the potential to be a
 ## When to Create an RC
 
 Create a Release Candidate when:
-- Major version changes (e.g., 3.0.0)
+- Major version changes (e.g., 3.1.0)
 - Significant new features or breaking changes
 - You want community testing before final release
 - Following a long development cycle
@@ -17,10 +17,10 @@ Create a Release Candidate when:
 ## RC Version Naming Convention
 
 Release Candidates follow semantic versioning with an `-rc.X` suffix:
-- `3.0.0-rc.1` - First release candidate
-- `3.0.0-rc.2` - Second release candidate (if issues found in rc.1)
-- `3.0.0-rc.3` - Third release candidate (if issues found in rc.2)
-- `3.0.0` - Final release (after RCs are validated)
+- `3.1.0-rc.1` - First release candidate
+- `3.1.0-rc.2` - Second release candidate (if issues found in rc.1)
+- `3.1.0-rc.3` - Third release candidate (if issues found in rc.2)
+- `3.1.0` - Final release (after RCs are validated)
 
 ## Creating a Release Candidate
 
@@ -32,7 +32,7 @@ git checkout main
 git pull origin main
 
 # Create RC branch with naming convention: release/VERSION-rc.X
-git checkout -b release/3.0.0-rc.1
+git checkout -b release/3.1.0-rc.1
 ```
 
 ### Step 2: Update Version Numbers
@@ -40,13 +40,13 @@ git checkout -b release/3.0.0-rc.1
 Update version in all box.json files to include `-rc.1` suffix:
 
 **Files to update:**
-- `box.json` (root) → `"version": "3.0.0-rc.1"`
-- `examples/starter-app/box.json` → `"version": "3.0.0-rc.1"`
+- `box.json` (root) → `"version": "3.1.0-rc.1"`
+- `examples/starter-app/box.json` → `"version": "3.1.0-rc.1"`
 
 **Update dependencies:**
 ```json
 "dependencies": {
-    "wheels-core": "^3.0.0-rc.1"
+    "wheels-core": "^3.1.0-rc.1"
 }
 ```
 
@@ -55,14 +55,14 @@ Update version in all box.json files to include `-rc.1` suffix:
 Add RC section at the top of CHANGELOG.md:
 
 ```markdown
-# [3.0.0-rc.1](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0-rc.1) => 2025-10-07
+# [3.1.0-rc.1](https://github.com/wheels-dev/wheels/releases/tag/v3.1.0-rc.1) => 2025-10-07
 
-**Release Candidate 1 for Wheels 3.0.0**
+**Release Candidate 1 for Wheels 3.1.0**
 
 This is a pre-release version for community testing. Please report any issues to GitHub.
 
-### What's New in 3.0.0
-- [List major features and changes from 3.0.0 development]
+### What's New in 3.1.0
+- [List major features and changes from 3.1.0 development]
 
 ### Known Issues
 - [List any known issues that need testing]
@@ -72,7 +72,7 @@ This is a pre-release version for community testing. Please report any issues to
 
 ---
 
-# [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => TBD
+# [3.1.0](https://github.com/wheels-dev/wheels/releases/tag/v3.1.0) => TBD
 ...
 ```
 
@@ -80,8 +80,8 @@ This is a pre-release version for community testing. Please report any issues to
 
 ```bash
 git add .
-git commit -m "Release Candidate 3.0.0-rc.1"
-git push -u origin release/3.0.0-rc.1
+git commit -m "Release Candidate 3.1.0-rc.1"
+git push -u origin release/3.1.0-rc.1
 ```
 
 ### Step 5: Automated Build
@@ -91,7 +91,7 @@ Once pushed, GitHub Actions will automatically:
 2. Build all packages
 3. Publish to ForgeBox as prerelease
 4. Create GitHub Prerelease with artifacts
-5. Tag as `v3.0.0-rc.1`
+5. Tag as `v3.1.0-rc.1`
 
 ## Testing the Release Candidate
 
@@ -100,8 +100,8 @@ Once pushed, GitHub Actions will automatically:
 Users can install the RC from ForgeBox:
 
 ```bash
-box install wheels@3.0.0-rc.1
-box install wheels-core@3.0.0-rc.1
+box install wheels@3.1.0-rc.1
+box install wheels-core@3.1.0-rc.1
 ```
 
 ### Testing Checklist
@@ -109,7 +109,7 @@ box install wheels-core@3.0.0-rc.1
 Create a GitHub issue for RC testing with this checklist:
 
 - [ ] Fresh installation on multiple CFML engines (Lucee 5, Lucee 6, ACF 2021, ACF 2023)
-- [ ] Upgrade from 2.x to 3.0.0-rc.1
+- [ ] Upgrade from 2.x to 3.1.0-rc.1
 - [ ] Run full test suite
 - [ ] Test major new features
 - [ ] Test breaking changes don't break existing apps
@@ -129,21 +129,21 @@ Create a GitHub issue for RC testing with this checklist:
 4. Push to trigger new RC build
 
 ```bash
-# On release/3.0.0-rc.1 branch
+# On release/3.1.0-rc.1 branch
 git add .
 git commit -m "Fix: [issue description]"
 
 # Update version to rc.2 in box.json files
 # Update CHANGELOG.md
 
-git commit -am "Release Candidate 3.0.0-rc.2"
+git commit -am "Release Candidate 3.1.0-rc.2"
 git push
 ```
 
 ### Major Issues (Breaking Bugs)
 1. Fix the issues
 2. May need to create new RC or postpone release
-3. Consider if issue requires version bump (3.0.1 instead of 3.0.0)
+3. Consider if issue requires version bump (3.0.1 instead of 3.1.0)
 
 ## Promoting RC to Final Release
 
@@ -154,13 +154,13 @@ Once RC has been thoroughly tested with no critical issues:
 On the RC branch:
 ```bash
 # Remove -rc.X suffix from all box.json files
-# Update to: "version": "3.0.0"
+# Update to: "version": "3.1.0"
 ```
 
 ### Step 2: Update CHANGELOG
 
 ```markdown
-# [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2025-10-15
+# [3.1.0](https://github.com/wheels-dev/wheels/releases/tag/v3.1.0) => 2025-10-15
 
 [Copy content from RC CHANGELOG, remove RC-specific notes]
 ```
@@ -170,11 +170,11 @@ On the RC branch:
 ```bash
 # Ensure all changes are committed
 git add .
-git commit -m "Prepare 3.0.0 final release"
+git commit -m "Prepare 3.1.0 final release"
 
 # Merge to main
 git checkout main
-git merge release/3.0.0-rc.1
+git merge release/3.1.0-rc.1
 git push origin main
 ```
 
@@ -184,7 +184,7 @@ Pushing to main will automatically:
 1. Build final release
 2. Publish to ForgeBox (not as prerelease)
 3. Create GitHub Release (not as prerelease)
-4. Tag as `v3.0.0`
+4. Tag as `v3.1.0`
 
 ### Step 5: Post-Release
 
@@ -211,11 +211,11 @@ Post announcement in:
 
 Example announcement:
 ```
-🎉 Wheels 3.0.0-rc.1 is now available for testing!
+🎉 Wheels 3.1.0-rc.1 is now available for testing!
 
 We need your help testing this major release before final publication.
 
-Install: box install wheels@3.0.0-rc.1
+Install: box install wheels@3.1.0-rc.1
 
 Please report issues: https://github.com/wheels-dev/wheels/issues
 

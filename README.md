@@ -133,7 +133,7 @@ Please check out our [Contributing Guide][3] for detailed guidelines on how to g
  4. In the gray debug area at the bottom of the page, click the `Run Tests` link next to the version number
     on the `Framework` line.
     
-For multi-engine testing, use our [Docker setup](https://wheels.dev/3.0.0/guides/working-with-wheels/testing-your-application#running-tests-with-docker)
+For multi-engine testing, use our [Docker setup](https://wheels.dev/3.1.0/guides/working-with-wheels/testing-your-application#running-tests-with-docker)
 
 ### Reporting Issues
 
@@ -176,6 +176,6 @@ Made with [contrib.rocks](https://contrib.rocks).
 **Wheels 3.0** - Faster, more organized, and just plain fun to use!
 
 [1]: https://wheels.dev/
-[2]: https://wheels.dev/3.0.0/guides/introduction/readme/beginner-tutorial-hello-world
+[2]: https://wheels.dev/3.1.0/guides/introduction/readme/beginner-tutorial-hello-world
 [3]: ./CONTRIBUTING.md
 [4]: https://github.com/wheels-dev/wheels/issues

@@ -20,11 +20,11 @@
 
 	<div class="row">
 		<div class="column">
-			<a class="" href="https://wheels.dev/3.0.0/guides/introduction/readme/beginner-tutorial-hello-world" target="_blank">View and code along with our
+			<a class="" href="https://wheels.dev/3.1.0/guides/introduction/readme/beginner-tutorial-hello-world" target="_blank">View and code along with our
 		&quot;Hello World&quot; tutorial.</a>
 		</div>
 		<div class="column">
-			<a class="" href="https://wheels.dev/3.0.0/guides" target="_blank">Have a look at the rest of our documentation.</a>
+			<a class="" href="https://wheels.dev/3.1.0/guides" target="_blank">Have a look at the rest of our documentation.</a>
 		</div>
 		<div class="column">
 			<a class="" href="https://github.com/wheels-dev/wheels/discussions" target="_blank">Say &quot;Hello!&quot; to everyone in the Wheels community.</a>
