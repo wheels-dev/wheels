@@ -715,9 +715,47 @@ function expensiveReport() {
 }
 ```
 
+## Server-Sent Events (SSE)
+
+Wheels includes built-in support for SSE responses. Use `renderSSE()` for single-event responses or `initSSEStream()` for streaming multiple events.
+
+### Single SSE Event
+```cfm
+function notifications() {
+    var data = model("Notification").findAll(where="userId=#params.userId# AND sent=0");
+    renderSSE(data=SerializeJSON(data), event="notifications", id=params.lastId);
+}
+```
+
+### Multi-Event Streaming
+```cfm
+function stream() {
+    var writer = initSSEStream();
+    var items = model("Activity").findAll(where="new=1");
+    for (var item in items) {
+        sendSSEEvent(writer=writer, data=SerializeJSON(item), event="update", id=item.id);
+    }
+    closeSSEStream(writer=writer);
+}
+```
+
+### Content Negotiation
+```cfm
+function updates() {
+    if (isSSERequest()) {
+        renderSSE(data=SerializeJSON(getLatestData()), event="data");
+    } else {
+        renderView();
+    }
+}
+```
+
+For full details, see [Server-Sent Events](./sse.md).
+
 ## Related Documentation
 - [Controller Architecture](./architecture.md)
 - [Controller Filters](./filters.md)
 - [API Controllers](./api.md)
 - [Controller Security](./security.md)
+- [Server-Sent Events](./sse.md)
 - [View Templates](../views/templates.md)

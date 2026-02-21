@@ -181,6 +181,27 @@ function navigationLink(required string text, required string route, string key 
 </cfscript>
 ```
 
+### HTML5 Form Helpers
+
+Wheels includes dedicated HTML5 input helpers for common input types:
+
+```cfm
+<cfoutput>
+    #emailField(objectName="user", property="email", label="Email")#
+    #urlField(objectName="user", property="website", label="Website")#
+    #numberField(objectName="product", property="qty", label="Quantity", min="1", max="100", step="1")#
+    #telField(objectName="user", property="phone", label="Phone")#
+    #dateField(objectName="event", property="startDate", label="Start Date")#
+    #colorField(objectName="theme", property="primaryColor", label="Theme Color")#
+    #rangeField(objectName="settings", property="volume", label="Volume", min="0", max="100")#
+    #searchField(objectName="search", property="query", label="Search")#
+</cfoutput>
+```
+
+Tag-based variants are also available: `emailFieldTag()`, `numberFieldTag()`, `dateFieldTag()`, etc.
+
+See [Form Helpers](./helpers/forms.md) for the complete reference.
+
 ### Form Helper Extensions
 
 ```cfm

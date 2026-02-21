@@ -3,13 +3,14 @@
 ## 🔴 CRITICAL ROUTING ANTI-PATTERNS (MOST COMMON CONFIG ERRORS)
 
 **Before writing ANY routing code, verify you will NOT:**
-- [ ] ❌ Use Rails-style nested resources: `.resources("posts", function(nested) { nested.resources("comments"); })`
+- [ ] ❌ Use Rails-style inline function: `.resources("posts", function(r) { r.resources("comments"); })`
 - [ ] ❌ Put wildcard route before other routes
 - [ ] ❌ Mix argument styles in route definitions
 - [ ] ❌ Forget to call `.end()` to close mapper
 
 **And you WILL:**
-- [ ] ✅ Use separate resource declarations: `.resources("posts").resources("comments")`
+- [ ] ✅ Use `callback` for nested resources: `.resources(name="posts", callback=function(map) { map.resources("comments"); })`
+- [ ] ✅ Or use `nested=true` with manual `.end()`: `.resources(name="posts", nested=true).resources("comments").end()`
 - [ ] ✅ Put routes in correct order: resources → custom → root → wildcard
 - [ ] ✅ Use consistent argument syntax throughout
 - [ ] ✅ Always close mapper with `.end()`
@@ -19,10 +20,11 @@
 ```cfm
 <cfscript>
 mapper()
-    // 1. Resource routes FIRST
-    .resources("posts")
-    .resources("comments")
+    // 1. Resource routes FIRST (with nested resources using callback)
     .resources("users")
+    .resources(name="posts", callback=function(map) {
+        map.resources("comments");
+    })
 
     // 2. Custom routes SECOND
     .get(name="login", to="sessions##new")
@@ -163,17 +165,29 @@ mapper()
 
 ## Common Routing Mistakes
 
-### ❌ Incorrect nested resource syntax:
+### ❌ Incorrect nested resource syntax (Rails-style inline):
 
 ```cfm
+// WRONG — passing closure as second positional argument
 .resources("posts", function(nested) {
-    nested.resources("comments");  // This doesn't work in Wheels
+    nested.resources("comments");
 })
 ```
 
-### ✅ Correct approach - separate declarations:
+### ✅ Correct approach — callback parameter:
 
 ```cfm
+// Callback syntax (recommended)
+.resources(name="posts", callback=function(map) {
+    map.resources("comments");
+})
+
+// Or manual nested=true + end()
+.resources(name="posts", nested=true)
+    .resources("comments")
+.end()
+
+// Or flat separate declarations (no URL nesting)
 .resources("posts")
 .resources("comments")
 ```
@@ -223,7 +237,7 @@ wheels server start
 ```
 
 **Manual checklist verification:**
-- [ ] Resources declared separately (not nested)
+- [ ] Nested resources use `callback` parameter or `nested=true` (not Rails-style inline)
 - [ ] Routes in correct order (resources, custom, root, wildcard)
 - [ ] Mapper closed with .end()
 - [ ] No mixed argument styles
