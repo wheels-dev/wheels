@@ -5,6 +5,9 @@ on:
     branches:
       - 'claude/**'
 
+permissions:
+  contents: write
+
 jobs:
   test-lucee7-mysql:
     name: Lucee 7 + MySQL
@@ -113,6 +116,86 @@ jobs:
             cat "/tmp/lucee7-mysql-result.txt"
           else
             echo "Result file not found"
+          fi
+
+      - name: Commit workflow results to branch
+        if: always()
+        run: |
+          RESULTS_DIR=".github/workflow-results"
+          RESULTS_FILE="${RESULTS_DIR}/test-lucee7-mysql.md"
+          mkdir -p "$RESULTS_DIR"
+
+          # Determine status
+          if [ "${{ steps.run-tests.outcome }}" = "success" ]; then
+            STATUS="PASSED"
+          else
+            STATUS="FAILED"
+          fi
+
+          # Build the results file
+          echo "# Workflow Results: Test Lucee 7 + MySQL" > "$RESULTS_FILE"
+
+          {
+            echo ""
+            echo "**Status:** ${STATUS}"
+            echo "**Run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "**Commit:** ${{ github.sha }}"
+            echo "**Branch:** ${{ github.ref_name }}"
+            echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+            echo ""
+            echo "## Test Results"
+            echo ""
+            if [ -f "/tmp/lucee7-mysql-result.txt" ]; then
+              CONTENT=$(cat /tmp/lucee7-mysql-result.txt)
+              # Try to detect if content is JSON and format accordingly
+              if echo "$CONTENT" | python3 -m json.tool > /dev/null 2>&1; then
+                echo '```json'
+                echo "$CONTENT" | python3 -m json.tool 2>/dev/null || echo "$CONTENT"
+                echo '```'
+              else
+                echo '```'
+                echo "$CONTENT"
+                echo '```'
+              fi
+            else
+              echo "No test result file was generated."
+            fi
+          } >> "$RESULTS_FILE"
+
+          # Add debug info on failure
+          if [ "$STATUS" = "FAILED" ]; then
+            {
+              echo ""
+              echo "## Debug Information"
+              echo ""
+              echo "### Docker Container Status"
+              echo '```'
+              docker ps -a 2>&1 || echo "Could not get container status"
+              echo '```'
+              echo ""
+              echo "### Lucee 7 Container Logs (last 50 lines)"
+              echo '```'
+              docker logs $(docker ps -aq -f "name=lucee7") 2>&1 | tail -50 || echo "Could not get logs"
+              echo '```'
+              echo ""
+              echo "### MySQL Container Logs (last 50 lines)"
+              echo '```'
+              docker logs $(docker ps -aq -f "name=mysql") 2>&1 | tail -50 || echo "Could not get logs"
+              echo '```'
+            } >> "$RESULTS_FILE"
+          fi
+
+          # Commit and push results back to the branch
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$RESULTS_FILE"
+
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "ci: add workflow results for test-lucee7-mysql [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
           fi
 
       - name: Upload Test Results
