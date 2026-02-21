@@ -107,6 +107,9 @@ if (StructKeyExists(url, "refresh")) {
 			.forcescroll { overflow-y: scroll; max-height: 40rem; }
 			.margin-top { margin-top: 5em; }
 			.flex-wrap { flex-wrap: wrap; }
+		</style>
+		</cfoutput>
+		<style>
 			/* ===== Wheels Dark Theme ===== */
 			:root {
 				--w-bg-base: #1e1e2e;
@@ -421,6 +424,7 @@ if (StructKeyExists(url, "refresh")) {
 			/* Checkbox */
 			.ui.checkbox label, .ui.radio.checkbox label { color: var(--w-text) !important; }
 		</style>
+<cfoutput>
 	</head>
 	<body>
 	<cfif request.isFluid>

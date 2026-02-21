@@ -1,3 +1,12 @@
+<!--- Skip debug bar for AJAX, HTMX, Turbo, and fetch requests to avoid breaking partial responses --->
+<cfset local.reqHeaders = GetHttpRequestData().headers>
+<cfif
+	(StructKeyExists(local.reqHeaders, "X-Requested-With") AND local.reqHeaders["X-Requested-With"] IS "XMLHttpRequest")
+	OR (StructKeyExists(local.reqHeaders, "HX-Request"))
+	OR (StructKeyExists(local.reqHeaders, "Turbo-Frame"))
+	OR (StructKeyExists(local.reqHeaders, "X-Fetch") AND local.reqHeaders["X-Fetch"] IS "true")
+	OR (StructKeyExists(url, "format") AND ListFindNoCase("json,xml,csv,pdf", url.format))
+><cfexit></cfif>
 <cfset local.baseReloadURL = cgi.script_name>
 <cfif IsDefined("request.cgi.path_info")>
 	<cfif request.cgi.path_info IS NOT cgi.script_name>
@@ -60,7 +69,7 @@
 </cfloop>
 <!--- cfformat-ignore-start --->
 <cfoutput>
-<div id="wheels-debugbar" style="all:initial;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
+<div id="wheels-debugbar" style="all:initial;position:fixed;bottom:0;left:0;right:0;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;">
 <style>
 ##wheels-debugbar *{box-sizing:border-box;margin:0;padding:0;}
 ##wheels-debugbar{position:fixed;bottom:0;left:0;right:0;z-index:99999;font-size:13px;line-height:1.4;}
@@ -109,7 +118,7 @@
 <div class="wdb-bar" id="wdb-bar">
 	<!--- Wheels logo / toggle --->
 	<button class="wdb-tab" onclick="wdbToggle('request')" title="Request Details">
-		<svg viewBox="0 0 153 18" xmlns="http://www.w3.org/2000/svg"><path d="M56.28 3.37h-2.36l-2.56 8.1-2.8-8.1h-1.37l-2.71 8.1-2.64-8.1h-2.36l4.11 11.23h1.79l1.36-3.5 1.16-3.58 1.19 3.55 1.38 3.53h1.79z" fill="##cdd6f4"/><path d="M15.71 12c1.65 0 2.99 1.34 2.99 3s-1.34 3-2.99 3c-1.65 0-2.99-1.34-2.99-3v-1.27c0-.42-.15-.79-.45-1.09L6.1 6.45c-.3-.3-.66-.45-1.09-.45H3.75c-1.65 0-2.99-1.34-2.99-3S2.09 0 3.74 0 6.73 1.34 6.73 3v1.27c0 .42.15.79.45 1.09l6.17 6.19c.3.3.66.45 1.09.45z" fill="##f38ba8"/></svg>
+		<svg viewBox="0 0 31 18" xmlns="http://www.w3.org/2000/svg" style="width:28px;height:16px;"><path d="M15.71 12c1.65 0 2.99 1.34 2.99 3s-1.34 3-2.99 3-2.99-1.34-2.99-3v-1.27c0-.42-.15-.79-.45-1.09L6.1 6.45c-.3-.3-.66-.45-1.09-.45H3.75c-1.65 0-2.99-1.34-2.99-3S2.09 0 3.74 0s2.99 1.34 2.99 3v1.27c0 .42.15.79.45 1.09l6.17 6.19c.3.3.66.45 1.09.45h1.27zM27.68 0c1.65 0 2.99 1.34 2.99 3s-1.34 3-2.99 3-2.99-1.34-2.99-3 1.34-3 2.99-3zm0 12h-1.27c-.42 0-.79-.15-1.09-.45l-6.17-6.19c-.3-.3-.45-.66-.45-1.09V3c0-1.65-1.34-3-2.99-3S12.73 1.35 12.73 3s1.34 3 2.99 3h1.27c.42 0 .79.16 1.09.45l6.17 6.19c.3.3.45.66.45 1.09V15c0 1.65 1.34 3 2.99 3s2.99-1.34 2.99-3-1.34-3-2.99-3z" fill="##f38ba8"/></svg>
 	</button>
 	<span class="wdb-sep"></span>
 
