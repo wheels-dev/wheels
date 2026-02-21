@@ -10,7 +10,7 @@ component {
 	param name="url.method" default="runRemote";
 
 	// Assertions object
-	variables.$assert          = this.$assert = new wheels.testbox.system.Assertion();
+	variables.$assert          = this.$assert = new wheels.wheelstest.system.Assertion();
 	// Custom Matchers
 	this.$customMatchers       = {};
 	// BDD Test Suites are stored here as an array so they are executed in order of definition
@@ -955,7 +955,7 @@ component {
 		getPageContext().getResponse().setContentType( "text/html" );
 
 		// run tests
-		var runner = new wheels.testbox.system.TestBox(
+		var runner = new wheels.wheelstest.system.TestBox(
 			bundles : "#getMetadata( this ).name#",
 			labels  : arguments.labels,
 			reporter: arguments.reporter,
@@ -1620,12 +1620,12 @@ component {
 	/**
 	 * Get the MockData Class object
 	 *
-	 * @return wheels.testbox.system.modules.cbMockData.models.MockData
+	 * @return wheels.wheelstest.system.modules.cbMockData.models.MockData
 	 */
 	function getCBMockData(){
 		// Lazy Load it
 		if ( isNull( variables.$cbMockData ) ) {
-			variables.$cbMockData = new wheels.testbox.system.modules.cbMockData.models.MockData();
+			variables.$cbMockData = new wheels.wheelstest.system.modules.cbMockData.models.MockData();
 		}
 		return variables.$cbMockData;
 	}
@@ -1633,12 +1633,12 @@ component {
 	/**
 	 * Get the TestBox utility object
 	 *
-	 * @return wheels.testbox.system.util.Util
+	 * @return wheels.wheelstest.system.util.Util
 	 */
 	function getUtility(){
 		// Lazy Load it
 		if ( isNull( variables.$utility ) ) {
-			variables.$utility = new wheels.testbox.system.util.Util();
+			variables.$utility = new wheels.wheelstest.system.util.Util();
 		}
 		return variables.$utility;
 	}
@@ -1646,12 +1646,12 @@ component {
 	/**
 	 * Get the TestBox Env  object
 	 *
-	 * @return wheels.testbox.system.util.Env
+	 * @return wheels.wheelstest.system.util.Env
 	 */
 	function getEnv(){
 		// Lazy Load it
 		if ( isNull( variables.$env ) ) {
-			variables.$env = new wheels.testbox.system.util.Env();
+			variables.$env = new wheels.wheelstest.system.util.Env();
 		}
 		return variables.$env;
 	}
@@ -1661,12 +1661,12 @@ component {
 	 *
 	 * @generationPath The path to generate the mocks if passed, else uses default location.
 	 *
-	 * @return wheels.testbox.system.MockBox
+	 * @return wheels.wheelstest.system.MockBox
 	 */
 	function getMockBox( string generationPath = "" ){
 		// Lazy Load it
 		if ( isNull( this.$mockbox ) ) {
-			variables.$mockbox = this.$mockbox = new wheels.testbox.system.MockBox( arguments.generationPath );
+			variables.$mockbox = this.$mockbox = new wheels.wheelstest.system.MockBox( arguments.generationPath );
 		} else {
 			// Generation path updates
 			if ( len( arguments.generationPath ) ) {

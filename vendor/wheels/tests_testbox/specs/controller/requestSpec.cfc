@@ -1,4 +1,4 @@
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		$$oldCGIScope = request.cgi

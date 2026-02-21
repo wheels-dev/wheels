@@ -77,7 +77,7 @@ wheels generate test model User
 
 **Generated Code:**
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
 
@@ -174,7 +174,7 @@ wheels generate test controller Users
 
 **Generated Code:**
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -242,7 +242,7 @@ wheels generate test view users edit
 
 **Generated Code:**
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
@@ -286,7 +286,7 @@ wheels generate test unit OrderProcessor
 
 **Generated Code:**
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
 
@@ -349,7 +349,7 @@ wheels generate test integration CheckoutFlow --crud
 
 **Generated Code:**
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     function beforeAll() {
         variables.baseUrl = "http://localhost:8080";
     }
@@ -406,7 +406,7 @@ wheels generate test api Users --crud
 
 **Generated Code:**
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         variables.apiUrl = "http://localhost:8080/api";

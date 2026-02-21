@@ -287,7 +287,7 @@ box reload
 Make sure your test files:
 - Are in the correct directory (`tests/specs/` or subdirectories)
 - Have the `.cfc` extension
-- Extend `wheels.Testbox`
+- Extend `wheels.WheelsTest`
 
 ### Coverage Not Working
 

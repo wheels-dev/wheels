@@ -33,7 +33,7 @@ component accessors="true" {
 	property name="bundlesPattern";
 
 	// Static Variables
-	variables.TESTBOX_PATH            = expandPath( "/wheels/testbox" );
+	variables.TESTBOX_PATH            = expandPath( "/wheels/wheelstest" );
 	variables.IS_BOXLANG              = server.keyExists( "boxlang" );
 	variables.IS_CLI                  = variables.IS_BOXLANG && server.boxlang.cliMode ? true : false;
 	variables.DEFAULT_REPORTER        = variables.IS_CLI ? "text" : "simple";
@@ -48,7 +48,7 @@ component accessors="true" {
 	 * @bundles        The path, list of paths or array of paths of the spec bundle classes to run and test
 	 * @directory      The directory to test which can be a simple mapping path or a struct with the following options: [ mapping = the path to the directory using dot notation (myapp.testing.specs), recurse = boolean, filter = closure that receives the path of the class found, it must return true to process or false to continue process ]
 	 * @directories    Same as @directory, but accepts an array or list
-	 * @reporter       The type of reporter to use for the results, by default is uses our 'simple' report. You can pass in a core reporter string type or an instance of a wheels.testbox.system.reports.IReporter
+	 * @reporter       The type of reporter to use for the results, by default is uses our 'simple' report. You can pass in a core reporter string type or an instance of a wheels.wheelstest.system.reports.IReporter
 	 * @labels         The list or array of labels that a suite or spec must have in order to execute.
 	 * @excludes       The list or array of labels that a suite or spec must not have in order to execute.
 	 * @options        A structure of configuration options that are optionally used to configure a runner.
@@ -70,12 +70,12 @@ component accessors="true" {
 		}
 		variables.bundlesPattern = arguments.bundlesPattern;
 		// Utility and mappings
-		variables.utility        = new wheels.testbox.system.util.Util();
+		variables.utility        = new wheels.wheelstest.system.util.Util();
 		// Coverage Service
 		if ( !structKeyExists( arguments.options, "coverage" ) ) {
 			arguments.options.coverage = {};
 		}
-		variables.coverageService = new wheels.testbox.system.coverage.CoverageService( arguments.options.coverage );
+		variables.coverageService = new wheels.wheelstest.system.coverage.CoverageService( arguments.options.coverage );
 		// reporter
 		variables.reporter        = arguments.reporter;
 		// options
@@ -255,12 +255,12 @@ component accessors="true" {
 	/**
 	 * Get the TestBox Env object
 	 *
-	 * @return wheels.testbox.system.util.Env
+	 * @return wheels.wheelstest.system.util.Env
 	 */
 	function getEnv(){
 		// Lazy Load it
 		if ( isNull( variables.env ) ) {
-			variables.env = new wheels.testbox.system.util.Env();
+			variables.env = new wheels.wheelstest.system.util.Env();
 		}
 		return variables.env;
 	}
@@ -323,7 +323,7 @@ component accessors="true" {
 	 *
 	 * @bundles      The path, list of paths or array of paths of the spec bundle classes to run and test
 	 * @directory    The directory to test which can be a simple mapping path or a struct with the following options: [ mapping = the path to the directory using dot notation (myapp.testing.specs), recurse = boolean, filter = closure that receives the path of the class found, it must return true to process or false to continue process ]
-	 * @reporter     The type of reporter to use for the results, by default is uses our 'simple' report. You can pass in a core reporter string type or an instance of a wheels.testbox.system.reports.IReporter. You can also pass a struct if the reporter requires options: {type="", options={}}
+	 * @reporter     The type of reporter to use for the results, by default is uses our 'simple' report. You can pass in a core reporter string type or an instance of a wheels.wheelstest.system.reports.IReporter. You can also pass a struct if the reporter requires options: {type="", options={}}
 	 * @labels       The list or array of labels that a suite or spec must have in order to execute.
 	 * @excludes     The list or array of labels that a suite or spec must not have in order to execute.
 	 * @options      A structure of configuration options that are optionally used to configure a runner.
@@ -376,7 +376,7 @@ component accessors="true" {
 	 * @callbacks    A struct of listener callbacks or a class with callbacks for listening to progress of the testing: onBundleStart,onBundleEnd,onSuiteStart,onSuiteEnd,onSpecStart,onSpecEnd
 	 * @eagerFailure If this boolean is set to true, then execution of more bundle tests will stop once the first failure/error is detected. By default this is false.
 	 */
-	wheels.testbox.system.TestResult function runRaw(
+	wheels.wheelstest.system.TestResult function runRaw(
 		any bundles,
 		any directory,
 		any labels,
@@ -440,7 +440,7 @@ component accessors="true" {
 		}
 
 		// create results object
-		var results = new wheels.testbox.system.TestResult(
+		var results = new wheels.wheelstest.system.TestResult(
 			bundleCount = arrayLen( variables.bundles ),
 			labels      = variables.labels,
 			excludes    = variables.excludes,
@@ -660,46 +660,46 @@ component accessors="true" {
 	any function buildReporter( required reporter ){
 		switch ( arguments.reporter ) {
 			case "json": {
-				return new "wheels.testbox.system.reports.JSONReporter"( );
+				return new "wheels.wheelstest.system.reports.JSONReporter"( );
 			}
 			case "xml": {
-				return new "wheels.testbox.system.reports.XMLReporter"( );
+				return new "wheels.wheelstest.system.reports.XMLReporter"( );
 			}
 			case "raw": {
-				return new "wheels.testbox.system.reports.RawReporter"( );
+				return new "wheels.wheelstest.system.reports.RawReporter"( );
 			}
 			case "simple": {
-				return new "wheels.testbox.system.reports.SimpleReporter"( );
+				return new "wheels.wheelstest.system.reports.SimpleReporter"( );
 			}
 			case "dot": {
-				return new "wheels.testbox.system.reports.DotReporter"( );
+				return new "wheels.wheelstest.system.reports.DotReporter"( );
 			}
 			case "text": {
-				return new "wheels.testbox.system.reports.TextReporter"( );
+				return new "wheels.wheelstest.system.reports.TextReporter"( );
 			}
 			case "junit": {
-				return new "wheels.testbox.system.reports.JUnitReporter"( );
+				return new "wheels.wheelstest.system.reports.JUnitReporter"( );
 			}
 			case "antjunit": {
-				return new "wheels.testbox.system.reports.ANTJUnitReporter"( );
+				return new "wheels.wheelstest.system.reports.ANTJUnitReporter"( );
 			}
 			case "console": {
-				return new "wheels.testbox.system.reports.ConsoleReporter"( );
+				return new "wheels.wheelstest.system.reports.ConsoleReporter"( );
 			}
 			case "min": {
-				return new "wheels.testbox.system.reports.MinReporter"( );
+				return new "wheels.wheelstest.system.reports.MinReporter"( );
 			}
 			case "mintext": {
-				return new "wheels.testbox.system.reports.MinTextReporter"( );
+				return new "wheels.wheelstest.system.reports.MinTextReporter"( );
 			}
 			case "tap": {
-				return new "wheels.testbox.system.reports.TapReporter"( );
+				return new "wheels.wheelstest.system.reports.TapReporter"( );
 			}
 			case "doc": {
-				return new "wheels.testbox.system.reports.DocReporter"( );
+				return new "wheels.wheelstest.system.reports.DocReporter"( );
 			}
 			case "codexwiki": {
-				return new "wheels.testbox.system.reports.CodexWikiReporter"( );
+				return new "wheels.wheelstest.system.reports.CodexWikiReporter"( );
 			}
 			default: {
 				return new "#arguments.reporter#"( );
@@ -763,14 +763,14 @@ component accessors="true" {
 			// Discover type?
 			if ( structKeyExists( target, "run" ) ) {
 				// Run via BDD Style
-				new wheels.testbox.system.runners.BDDRunner( options = variables.options, testbox = this ).run(
+				new wheels.wheelstest.system.runners.BDDRunner( options = variables.options, testbox = this ).run(
 					target,
 					arguments.testResults,
 					arguments.callbacks
 				);
 			} else {
 				// Run via xUnit Style
-				new wheels.testbox.system.runners.UnitRunner( options = variables.options, testbox = this ).run(
+				new wheels.wheelstest.system.runners.UnitRunner( options = variables.options, testbox = this ).run(
 					target,
 					arguments.testResults,
 					arguments.callbacks
@@ -813,7 +813,7 @@ component accessors="true" {
 			}
 			rethrow;
 		}
-		var familyPath = "wheels.testbox.system.BaseSpec";
+		var familyPath = "wheels.wheelstest.system.BaseSpec";
 
 		// check if base spec assigned
 		if ( isInstanceOf( bundle, familyPath ) ) {
@@ -821,7 +821,7 @@ component accessors="true" {
 		}
 
 		// Else virtualize it
-		var baseObject         = new wheels.testbox.system.BaseSpec();
+		var baseObject         = new wheels.wheelstest.system.BaseSpec();
 		var excludedProperties = "";
 
 		// Mix it up baby
@@ -848,7 +848,7 @@ component accessors="true" {
 	 */
 	private function getSpecPaths( required directory ){
 		var results            = [];
-		var pathPatternMatcher = new wheels.testbox.system.modules.globber.models.PathPatternMatcher();
+		var pathPatternMatcher = new wheels.wheelstest.system.modules.globber.models.PathPatternMatcher();
 
 		// recurse default
 		arguments.directory.recurse = (

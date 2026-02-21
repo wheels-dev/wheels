@@ -3,7 +3,7 @@
  * emailField, urlField, numberField, telField, dateField, colorField, rangeField, searchField
  * and their corresponding Tag variants.
  */
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
 	function run() {
 

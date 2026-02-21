@@ -599,7 +599,7 @@ tests/
 
 ```javascript
 // tests/helpers/TestBase.cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         // Setup test database

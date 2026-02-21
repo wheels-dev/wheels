@@ -2,16 +2,14 @@
  * Copyright Since 2005 TestBox Framework by Luis Majano and Ortus Solutions, Corp
  * www.ortussolutions.com
  * ---
- * A JSON reporter
+ * The TestBox main reporting interface for producing awesome testing reports
  */
-component extends="BaseReporter" {
+interface {
 
 	/**
 	 * Get the name of the reporter
 	 */
-	function getName(){
-		return "JSON";
-	}
+	function getName();
 
 	/**
 	 * Do the reporting thing here using the incoming test results
@@ -24,20 +22,10 @@ component extends="BaseReporter" {
 	 * @justReturn Boolean flag that if set just returns the content with no content type and buffer reset
 	 */
 	any function runReport(
-		required wheels.testbox.system.TestResult results,
-		required wheels.testbox.system.TestBox testbox,
+		required wheels.wheelstest.system.TestResult results,
+		required wheels.wheelstest.system.TestBox testbox,
 		struct options     = {},
 		boolean justReturn = false
-	){
-		if ( !arguments.justReturn ) {
-			resetHTMLResponse();
-			getPageContextResponse().setContentType( "application/json" );
-		}
-
-		// prepare incoming params
-		prepareIncomingParams();
-
-		return serializeJSON( arguments.results.getMemento( includeDebugBuffer = true ) );
-	}
+	);
 
 }

@@ -1,7 +1,7 @@
 /**
  * This tests Wheels Application Bootstrapping
  */
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     variables.checkLegacyFunctionsConfig = [
         "get",
         "patch",

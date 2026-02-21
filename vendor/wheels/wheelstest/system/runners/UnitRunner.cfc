@@ -5,8 +5,8 @@
  * This TestBox runner is used to run and report on xUnit style test suites.
  */
 component
-	extends   ="wheels.testbox.system.runners.BaseRunner"
-	implements="wheels.testbox.system.runners.IRunner"
+	extends   ="wheels.wheelstest.system.runners.BaseRunner"
+	implements="wheels.wheelstest.system.runners.IRunner"
 	accessors ="true"
 {
 
@@ -37,7 +37,7 @@ component
 	 */
 	any function run(
 		required any target,
-		required wheels.testbox.system.TestResult testResults,
+		required wheels.wheelstest.system.TestResult testResults,
 		required callbacks
 	){
 		// Get target information

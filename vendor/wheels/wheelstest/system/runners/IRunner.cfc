@@ -23,7 +23,7 @@ interface {
 	 */
 	any function run(
 		required any target,
-		required wheels.testbox.system.TestResult testResults,
+		required wheels.wheelstest.system.TestResult testResults,
 		required callbacks
 	);
 

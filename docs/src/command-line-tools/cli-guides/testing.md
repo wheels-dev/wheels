@@ -42,7 +42,7 @@ Follow these conventions:
 
 ```cfc
 // tests/unit/models/UserTest.cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("User Model", function() {
@@ -77,7 +77,7 @@ component extends="wheels.Testbox" {
 ### Model Testing
 
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("Product Model", function() {
@@ -128,7 +128,7 @@ component extends="wheels.Testbox" {
 ### Controller Testing
 
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         // Setup test request context
@@ -197,7 +197,7 @@ component extends="wheels.Testbox" {
 ### Integration Testing
 
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("User Registration Flow", function() {

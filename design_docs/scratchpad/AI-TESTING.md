@@ -28,7 +28,7 @@ Wheels follows BDD (Behavior Driven Development) principles using TestBox:
 ### Basic Test File Structure
 
 ```cfscript
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     function run() {
         describe("Component Being Tested", () => {
             beforeEach(() => {
@@ -75,12 +75,12 @@ component extends="wheels.Testbox" {
 
 ## Common Testing Patterns
 
-### Testing with wheels.Testbox
+### Testing with wheels.WheelsTest
 
-Always extend wheels.Testbox for Wheels integration:
+Always extend wheels.WheelsTest for Wheels integration:
 
 ```cfscript
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     // Provides reload(), processRequest(), and other helpers
 }
 ```
@@ -126,7 +126,7 @@ expect(array).notToContain("value");
 ### Basic Model Test
 
 ```cfscript
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     function run() {
         describe("User Model", () => {
             it("should validate required fields", () => {
@@ -247,7 +247,7 @@ describe("User validations", () => {
 ### Basic Controller Test
 
 ```cfscript
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     function run() {
         describe("UsersController", () => {
             it("should show index page", () => {
@@ -388,7 +388,7 @@ describe("API responses", () => {
 ### Full Request Cycle Test
 
 ```cfscript
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     function run() {
         describe("User Registration Flow", () => {
             it("should complete full registration process", () => {

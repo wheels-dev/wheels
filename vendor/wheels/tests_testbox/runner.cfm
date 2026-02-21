@@ -91,7 +91,7 @@
 
     try {
         // Try to create TestBox instance with coverage disabled
-        testBox = new wheels.testbox.system.TestBox(
+        testBox = new wheels.wheelstest.system.TestBox(
             directory="wheels.tests_testbox.specs",
             options={ coverage = { enabled = false } }
         );
@@ -110,12 +110,12 @@
     variables.$_setTestboxEnv()
     if (!structKeyExists(url, "format") || url.format eq "html") {
         result = testBox.run(
-            reporter = "wheels.testbox.system.reports.JSONReporter"
+            reporter = "wheels.wheelstest.system.reports.JSONReporter"
         );
     }
     else if(url.format eq "json"){
         result = testBox.run(
-            reporter = "wheels.testbox.system.reports.JSONReporter"
+            reporter = "wheels.wheelstest.system.reports.JSONReporter"
         );
         cfcontent(type="application/json");
         cfheader(name="Access-Control-Allow-Origin", value="*");
@@ -202,14 +202,14 @@
     }
     else if (url.format eq "txt") {
         result = testBox.run(
-            reporter = "wheels.testbox.system.reports.TextReporter"
+            reporter = "wheels.wheelstest.system.reports.TextReporter"
         )
         cfcontent(type="text/plain");
         writeOutput(result)
     }
     else if(url.format eq "junit"){
         result = testBox.run(
-            reporter = "wheels.testbox.system.reports.ANTJUnitReporter"
+            reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter"
         )
         cfcontent(type="text/xml");
         writeOutput(result)

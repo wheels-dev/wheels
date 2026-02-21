@@ -2,7 +2,7 @@
  * Tests for the Wheels Job Queue system.
  * Tests job configuration, enqueueing, processing, retry logic, and queue management.
  */
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
 	function run() {
 

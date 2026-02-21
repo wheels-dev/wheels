@@ -30,7 +30,7 @@ component accessors=true {
 			variables.generationPath = variables.generationPath & "/";
 		}
 
-		variables.mockGenerator = new wheels.testbox.system.mockutils.MockGenerator( this, false );
+		variables.mockGenerator = new wheels.wheelstest.system.mockutils.MockGenerator( this, false );
 
 		return this;
 	}
@@ -133,7 +133,7 @@ component accessors=true {
 	){
 		// No implements or inheritance
 		if ( NOT len( trim( arguments.implements ) ) AND NOT len( trim( arguments.extends ) ) ) {
-			return createMock( className = "wheels.testbox.system.mockutils.Stub", callLogging = arguments.callLogging );
+			return createMock( className = "wheels.wheelstest.system.mockutils.Stub", callLogging = arguments.callLogging );
 		}
 		// Generate the class + Create it + Remove it
 		return prepareMock( variables.mockGenerator.generateClass( argumentCollection = arguments ) );
@@ -714,7 +714,7 @@ component accessors=true {
 	 * Get the util object
 	 */
 	private function getUtil(){
-		return new wheels.testbox.system.util.Util();
+		return new wheels.wheelstest.system.util.Util();
 	}
 
 }

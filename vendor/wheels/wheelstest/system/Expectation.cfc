@@ -24,7 +24,7 @@ component accessors="true" {
 	 * Constructor
 	 *
 	 * @spec       The spec that this matcher belongs to.
-	 * @assertions The TestBox assertions object: wheels.testbox.system.Assertion
+	 * @assertions The TestBox assertions object: wheels.wheelstest.system.Assertion
 	 */
 	function init( required any spec, required any assertions ){
 		variables.spec   = arguments.spec;

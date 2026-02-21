@@ -1,7 +1,7 @@
 /**
  * Tests for Server-Sent Events (SSE) controller support.
  */
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
 	function run() {
 

@@ -3116,9 +3116,9 @@ wheels test app tests/specs/models/UserTest.cfc
 # Fix: Install TestBox
 box install testbox --saveDev
 
-# Error: wheels.Testbox not found
+# Error: wheels.WheelsTest not found
 # Fix: Ensure test extends correct path and that wheels is installed
-# component extends="wheels.Testbox"
+# component extends="wheels.WheelsTest"
 ```
 
 ### CLI Module Issues

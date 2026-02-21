@@ -35,7 +35,7 @@ Or visit: `http://localhost/tests/runner.cfm`
 ### 3. Write Your First Test
 
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     
     function run() {
         describe("My Feature", () => {

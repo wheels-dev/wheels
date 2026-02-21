@@ -24,8 +24,8 @@ component extends="BaseReporter" {
 	 * @justReturn Boolean flag that if set just returns the content with no content type and buffer reset
 	 */
 	any function runReport(
-		required wheels.testbox.system.TestResult results,
-		required wheels.testbox.system.TestBox testbox,
+		required wheels.wheelstest.system.TestResult results,
+		required wheels.wheelstest.system.TestBox testbox,
 		struct options     = {},
 		boolean justReturn = false
 	){
