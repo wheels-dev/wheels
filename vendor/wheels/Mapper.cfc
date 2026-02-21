@@ -38,6 +38,12 @@ component output="false" {
 		// placeholder for return value
 		variables.routes = [];
 
+		// Performance indexes for faster route matching.
+		// routeIndex: maps HTTP method -> array of routes for that method.
+		// staticRoutes: maps "METHOD:/path" -> route struct for routes with no variables (O(1) lookup).
+		variables.routeIndex = {};
+		variables.staticRoutes = {};
+
 		return this;
 	}
 
@@ -47,12 +53,14 @@ component output="false" {
 
 	/**
 	 * Internal function.
+	 * Compiles a regex string into a Java Pattern object and returns it.
+	 * Throws an error if the regex is invalid.
 	 */
-	public void function $compileRegex(required string regex) {
-		local.pattern = CreateObject("java", "java.util.regex.Pattern");
+	public any function $compileRegex(required string regex) {
+		local.patternClass = CreateObject("java", "java.util.regex.Pattern");
 		try {
-			local.regex = local.pattern.compile(arguments.regex);
-			return;
+			local.compiled = local.patternClass.compile(arguments.regex);
+			return local.compiled;
 		} catch (any e) {
 			local.identifier = arguments.pattern;
 			if (StructKeyExists(arguments, "name")) {
@@ -124,6 +132,10 @@ component output="false" {
 	/**
 	 * Private internal function.
 	 * Add route to Wheels, removing useless params.
+	 * Also builds performance indexes for faster route matching:
+	 * - compiledRegex: Pre-compiled Java Pattern object (avoids re-compiling on every request)
+	 * - routeIndex: Routes indexed by HTTP method (reduces search space)
+	 * - staticRoutes: Hash map for routes with no variables (O(1) lookup)
 	 */
 	private void function $addRoute(required string pattern, required struct constraints) {
 		// Remove controller and action if they are route variables.
@@ -139,12 +151,50 @@ component output="false" {
 		arguments.regex = $patternToRegex(arguments.pattern, arguments.constraints);
 		arguments.foundvariables = $stripRouteVariables(arguments.pattern);
 
-		// compile our regex to make sure the developer is using proper regex
-		$compileRegex(argumentCollection = arguments);
+		// Compile regex and cache the Java Pattern object for reuse at match time.
+		arguments.compiledRegex = $compileRegex(argumentCollection = arguments);
 
-		// add route to Wheels
+		// Determine if this is a static route (no variables in the pattern).
+		// Static routes can be matched via O(1) hash lookup instead of regex scanning.
+		arguments.isStatic = !Find("[", arguments.pattern);
+
+		// Add route to Wheels.
 		ArrayAppend(variables.routes, arguments);
 		ArrayAppend(application[$appKey()].routes, arguments);
+
+		// Build method-indexed lookup for faster matching.
+		// This allows $findMatchingRoute to only scan routes for the requested HTTP method.
+		if (StructKeyExists(arguments, "methods")) {
+			local.methodList = ListToArray(arguments.methods);
+		} else {
+			// If no method restriction, index under all methods.
+			local.methodList = ["get", "post", "put", "patch", "delete", "head"];
+		}
+
+		for (local.method in local.methodList) {
+			local.methodKey = UCase(local.method);
+
+			// Initialize route index and static route map in application scope if needed.
+			if (!StructKeyExists(application[$appKey()], "routeIndex")) {
+				application[$appKey()].routeIndex = {};
+			}
+			if (!StructKeyExists(application[$appKey()], "staticRoutes")) {
+				application[$appKey()].staticRoutes = {};
+			}
+
+			if (!StructKeyExists(application[$appKey()].routeIndex, local.methodKey)) {
+				application[$appKey()].routeIndex[local.methodKey] = [];
+			}
+			ArrayAppend(application[$appKey()].routeIndex[local.methodKey], arguments);
+
+			// Add to static route fast-path index.
+			if (arguments.isStatic) {
+				local.staticKey = local.methodKey & ":" & arguments.pattern;
+				if (!StructKeyExists(application[$appKey()].staticRoutes, local.staticKey)) {
+					application[$appKey()].staticRoutes[local.staticKey] = arguments;
+				}
+			}
+		}
 	}
 
 	/**

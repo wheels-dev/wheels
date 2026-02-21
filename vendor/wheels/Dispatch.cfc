@@ -104,31 +104,72 @@ component output="false" extends="wheels.Global"{
 		array routes = application.wheels.routes,
 		component mapper = application.wheels.mapper
 	) {
-		// If this is a HEAD request, look for the corresponding GET route
+		// If this is a HEAD request, look for the corresponding GET route.
 		if (arguments.requestMethod == 'HEAD') {
 			arguments.requestMethod = 'GET';
 		}
 
-		// Loop over Wheels routes.
-		for (local.route in arguments.routes) {
-			// If method doesn't match, skip this route.
-			if (StructKeyExists(local.route, "methods") && !ListFindNoCase(local.route.methods, arguments.requestMethod)) {
-				continue;
-			}
+		local.methodKey = UCase(arguments.requestMethod);
 
-			// Make sure route has been converted to regular expression.
-			if (!StructKeyExists(local.route, "regex")) {
-				local.route.regex = arguments.mapper.$patternToRegex(local.route.pattern);
+		// --- Fast path 1: Static route O(1) lookup ---
+		// Static routes (no variables in pattern) are indexed in a hash map at registration time.
+		// This avoids regex matching entirely for common static paths like /login, /about, etc.
+		if (StructKeyExists(application.wheels, "staticRoutes")) {
+			local.staticKey = local.methodKey & ":/" & arguments.path;
+			if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
+				local.rv = Duplicate(application.wheels.staticRoutes[local.staticKey]);
 			}
-
-			// If route matches regular expression, set it for return.
-			if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
-				local.rv = Duplicate(local.route);
-				break;
+			// Also try the root path.
+			if (!StructKeyExists(local, "rv") && !Len(arguments.path)) {
+				local.staticKey = local.methodKey & ":/";
+				if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
+					local.rv = Duplicate(application.wheels.staticRoutes[local.staticKey]);
+				}
 			}
 		}
 
-		// If returned route contains a redirect, execute that asap
+		// --- Fast path 2: Method-indexed route scan ---
+		// Instead of scanning ALL routes, only scan routes registered for this HTTP method.
+		// For a typical app with 100+ routes across all methods, this reduces the search space by ~5x.
+		if (!StructKeyExists(local, "rv") && StructKeyExists(application.wheels, "routeIndex") && StructKeyExists(application.wheels.routeIndex, local.methodKey)) {
+			local.methodRoutes = application.wheels.routeIndex[local.methodKey];
+			for (local.route in local.methodRoutes) {
+				// Make sure route has been converted to regular expression.
+				if (!StructKeyExists(local.route, "regex")) {
+					local.route.regex = arguments.mapper.$patternToRegex(local.route.pattern);
+				}
+
+				// If route matches regular expression, set it for return.
+				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
+					local.rv = Duplicate(local.route);
+					break;
+				}
+			}
+		}
+
+		// --- Fallback: Full linear scan (backward compatibility) ---
+		// Used when route indexes are not available (e.g., routes defined outside the mapper).
+		if (!StructKeyExists(local, "rv")) {
+			for (local.route in arguments.routes) {
+				// If method doesn't match, skip this route.
+				if (StructKeyExists(local.route, "methods") && !ListFindNoCase(local.route.methods, arguments.requestMethod)) {
+					continue;
+				}
+
+				// Make sure route has been converted to regular expression.
+				if (!StructKeyExists(local.route, "regex")) {
+					local.route.regex = arguments.mapper.$patternToRegex(local.route.pattern);
+				}
+
+				// If route matches regular expression, set it for return.
+				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
+					local.rv = Duplicate(local.route);
+					break;
+				}
+			}
+		}
+
+		// If returned route contains a redirect, execute that asap.
 		if (StructKeyExists(local, "rv") && StructKeyExists(local.rv, "redirect")) {
 			$location(url = local.rv.redirect, addToken = false);
 		}
@@ -138,14 +179,14 @@ component output="false" extends="wheels.Global"{
 			local.alternativeMatchingMethodsForURL = "";
 
 			// Try and provide some more information for why the route hasn't matched:
-			// For example, the developer is accidentally GETing to a route which only allows POST
+			// For example, the developer is accidentally GETing to a route which only allows POST.
 			for (local.route in arguments.routes) {
 				// Make sure route has been converted to regular expression.
 				if (!StructKeyExists(local.route, "regex")) {
 					local.route.regex = arguments.mapper.$patternToRegex(local.route.pattern);
 				}
 
-				// If route matches regular expression, append to alternatives to display
+				// If route matches regular expression, append to alternatives to display.
 				if (ReFindNoCase(local.route.regex, arguments.path) || (!Len(arguments.path) && local.route.pattern == "/")) {
 					local.alternativeMatchingMethodsForURL = ListAppend(local.alternativeMatchingMethodsForURL, local.route.methods);
 				}

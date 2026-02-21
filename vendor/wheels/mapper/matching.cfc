@@ -426,4 +426,201 @@ component {
 
 		return this;
 	}
+
+	// ---------------------------------------------------------------------------
+	// Typed Constraint Helpers
+	// ---------------------------------------------------------------------------
+	// These methods apply regex constraints to the most recently registered route's
+	// variables, similar to Laravel's whereNumber(), whereAlpha(), etc.
+	// They operate on the last route added to application.wheels.routes.
+
+	/**
+	 * Constrain a route variable to only match numeric values (digits). Similar to Laravel's `whereNumber()` or ASP.NET's `:int` constraint.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @variableName The route variable name to constrain (e.g., `"id"`). Can also be a comma-delimited list to constrain multiple variables.
+	 */
+	public struct function whereNumber(required string variableName) {
+		return $applyConstraintToLastRoute(arguments.variableName, "\d+");
+	}
+
+	/**
+	 * Constrain a route variable to only match alphabetic characters (a-zA-Z). Similar to Laravel's `whereAlpha()` or ASP.NET's `:alpha` constraint.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @variableName The route variable name to constrain. Can also be a comma-delimited list.
+	 */
+	public struct function whereAlpha(required string variableName) {
+		return $applyConstraintToLastRoute(arguments.variableName, "[a-zA-Z]+");
+	}
+
+	/**
+	 * Constrain a route variable to only match alphanumeric characters (a-zA-Z0-9). Similar to Laravel's `whereAlphaNumeric()`.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @variableName The route variable name to constrain. Can also be a comma-delimited list.
+	 */
+	public struct function whereAlphaNumeric(required string variableName) {
+		return $applyConstraintToLastRoute(arguments.variableName, "[a-zA-Z0-9]+");
+	}
+
+	/**
+	 * Constrain a route variable to only match UUID values. Similar to ASP.NET's `:guid` constraint.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @variableName The route variable name to constrain. Can also be a comma-delimited list.
+	 */
+	public struct function whereUuid(required string variableName) {
+		return $applyConstraintToLastRoute(arguments.variableName, "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+	}
+
+	/**
+	 * Constrain a route variable to only match URL-friendly slug values (lowercase alphanumeric and hyphens).
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @variableName The route variable name to constrain. Can also be a comma-delimited list.
+	 */
+	public struct function whereSlug(required string variableName) {
+		return $applyConstraintToLastRoute(arguments.variableName, "[a-z0-9]+(?:-[a-z0-9]+)*");
+	}
+
+	/**
+	 * Constrain a route variable to only match one of a set of allowed values. Similar to an enum constraint.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @variableName The route variable name to constrain.
+	 * @values A comma-delimited list of allowed values (e.g., `"active,inactive,pending"`).
+	 */
+	public struct function whereIn(required string variableName, required string values) {
+		local.pattern = Replace(arguments.values, ",", "|", "all");
+		local.pattern = Replace(local.pattern, " ", "", "all");
+		return $applyConstraintToLastRoute(arguments.variableName, "(?:#local.pattern#)");
+	}
+
+	/**
+	 * Constrain a route variable with a custom regex pattern.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @variableName The route variable name to constrain.
+	 * @pattern The regex pattern the variable must match.
+	 */
+	public struct function whereMatch(required string variableName, required string pattern) {
+		return $applyConstraintToLastRoute(arguments.variableName, arguments.pattern);
+	}
+
+	/**
+	 * Internal function.
+	 * Applies a regex constraint to the specified variable(s) on the most recently added route(s).
+	 * Supports comma-delimited variable names to constrain multiple variables at once.
+	 */
+	private struct function $applyConstraintToLastRoute(required string variableName, required string pattern) {
+		local.routeCount = ArrayLen(application[$appKey()].routes);
+		if (local.routeCount == 0) {
+			Throw(
+				type = "Wheels.NoRouteToConstrain",
+				message = "Cannot apply constraint: no routes have been defined yet."
+			);
+		}
+
+		// Apply constraint to the last route (and its optional-segment variants).
+		// When optional segments are used, $match adds multiple routes. We apply the
+		// constraint to all routes that share the same name as the last one.
+		local.lastRoute = application[$appKey()].routes[local.routeCount];
+		local.lastRouteName = StructKeyExists(local.lastRoute, "name") ? local.lastRoute.name : "";
+
+		local.variables = ListToArray(arguments.variableName);
+		for (local.varName in local.variables) {
+			local.varName = Trim(local.varName);
+
+			// Walk backward through routes to find all variants of the same named route.
+			for (local.i = local.routeCount; local.i >= 1; local.i--) {
+				local.route = application[$appKey()].routes[local.i];
+				local.routeName = StructKeyExists(local.route, "name") ? local.route.name : "";
+
+				// Stop if we've gone past the related routes.
+				if (Len(local.lastRouteName) && local.routeName != local.lastRouteName && local.i < local.routeCount) {
+					break;
+				}
+
+				// Only update if this variable exists in the route's pattern.
+				if (Find("[#local.varName#]", local.route.pattern)) {
+					if (!StructKeyExists(local.route, "constraints")) {
+						local.route.constraints = {};
+					}
+					local.route.constraints[local.varName] = arguments.pattern;
+
+					// Recompile the regex with the new constraint.
+					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
+				}
+
+				// If no name, only update the very last route.
+				if (!Len(local.lastRouteName)) {
+					break;
+				}
+			}
+
+			// Also update the internal routes array.
+			local.internalCount = ArrayLen(variables.routes);
+			for (local.i = local.internalCount; local.i >= 1; local.i--) {
+				local.route = variables.routes[local.i];
+				local.routeName = StructKeyExists(local.route, "name") ? local.route.name : "";
+
+				if (Len(local.lastRouteName) && local.routeName != local.lastRouteName && local.i < local.internalCount) {
+					break;
+				}
+
+				if (Find("[#local.varName#]", local.route.pattern)) {
+					if (!StructKeyExists(local.route, "constraints")) {
+						local.route.constraints = {};
+					}
+					local.route.constraints[local.varName] = arguments.pattern;
+					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
+				}
+
+				if (!Len(local.lastRouteName)) {
+					break;
+				}
+			}
+		}
+
+		return this;
+	}
+
+	// ---------------------------------------------------------------------------
+	// Health Check Route
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Register a health check route at `/health` (or a custom path). Returns a JSON response with status and timestamp by default, or delegates to a custom controller action.
+	 *
+	 * This is useful for container orchestration (Kubernetes liveness/readiness probes), load balancer health checks, and monitoring tools.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @to Set `controller##action` combination for a custom health check handler. If not provided, a default handler returns `{"status":"ok","timestamp":"..."}`.
+	 * @path Override the URL path. Defaults to `"health"`.
+	 * @name Override the route name. Defaults to `"health"`.
+	 */
+	public struct function health(
+		string to = "wheels##health",
+		string path = "health",
+		string name = "health"
+	) {
+		return get(name = arguments.name, pattern = arguments.path, to = arguments.to);
+	}
 }
