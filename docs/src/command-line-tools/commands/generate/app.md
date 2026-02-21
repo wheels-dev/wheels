@@ -186,8 +186,7 @@ myapp/
 ├── tests/
 └── vendor/                 # Framework files
     ├── testbox/
-    ├── wheels/
-    └── wirebox/
+    └── wheels/
 ```
 
 ## Configuration Files

@@ -661,10 +661,10 @@ component output="false" {
 		local.component = ListChangeDelims(arguments.path, ".", "/") & "." & ListChangeDelims(arguments.fileName, ".", "/");
 		local.argumentCollection = arguments;
 		if(local.method EQ 'init'){
-			local.rv = application.wirebox.getInstance(name = "#local.component#", initArguments = local.argumentCollection);
+			local.rv = application.wheelsdi.getInstance(name = "#local.component#", initArguments = local.argumentCollection);
 		}
 		else{
-			local.instance = application.wirebox.getInstance(name = "#local.component#");
+			local.instance = application.wheelsdi.getInstance(name = "#local.component#");
       local.rv = invoke(local.instance, local.method, local.argumentCollection);
 		}
 		return local.rv;

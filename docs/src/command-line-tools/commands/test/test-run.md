@@ -155,7 +155,7 @@ component extends="wheels.Testbox" {
 
             beforeEach(function() {
                 // Reset test data
-                application.wirebox.getInstance("User").deleteAll();
+                application.wheelsdi.getInstance("User").deleteAll();
             });
 
             it("validates required fields", function() {

@@ -113,7 +113,7 @@ component extends="wheels.Testbox" {
 		describe("Tests conditional validations", () => {
 
 			beforeEach(() => {
-				user = application.wirebox.getInstance("wheels.tests._assets.models.Model").$initModelClass(
+				user = application.wheelsdi.getInstance("wheels.tests._assets.models.Model").$initModelClass(
 					name = "c_o_r_e_Users",
 					path = g.get("modelPath")
 				)

@@ -263,7 +263,7 @@ component {
      */
     private function isWheelsPlugin(moduleName) {
         // Exclude the core framework and common non-plugin dependencies
-        if (listFindNoCase("wheels-core,wirebox,testbox,cfformat", arguments.moduleName)) {
+        if (listFindNoCase("wheels-core,testbox,cfformat", arguments.moduleName)) {
             return false;
         }
         

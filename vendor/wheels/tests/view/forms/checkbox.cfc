@@ -1,7 +1,7 @@
 component extends="wheels.tests.Test" {
 
 	function setup() {
-		_controller = application.wirebox.getInstance("wheels.tests._assets.controllers.ControllerWithModel");
+		_controller = application.wheelsdi.getInstance("wheels.tests._assets.controllers.ControllerWithModel");
 		args = {};
 		args.objectName = "user";
 		args.label = false;

@@ -43,7 +43,7 @@
 				Classification uses path segments (not base path math) for reliability.
 				Framework: vendor/wheels/, index.cfm & Application.cfc in public/
 				Plugin: plugins/
-				Library: any other vendor/ path (testbox, wirebox, coldbox, etc.)
+				Library: any other vendor/ path (testbox, coldbox, etc.)
 				App: app/, config/, public/, tests/, and anything else
 			--->
 			<cfset local.frameType = "app">
