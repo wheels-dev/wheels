@@ -136,7 +136,7 @@ http://www.mysite.com/?reload=true&password=mySecurePassword
 http://www.mysite.com/?reload=testing&password=mySecurePassword
 ```
 
-> **⚠️ WARNING: Always use a reload password in production**
+> ** WARNING: Always use a reload password in production**
 >
 > You really don't want random users hitting `?reload=development` on a production server, as it could expose sensitive data about your application and error messages. **Always set a reload password for production environments!**
 

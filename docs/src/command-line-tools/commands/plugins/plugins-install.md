@@ -19,12 +19,12 @@ This command supports multiple parameter formats:
 
 **Parameter Mixing Rules:**
 
-✅ **ALLOWED:**
+ **ALLOWED:**
 - Positional: `wheels plugins install cfwheels-bcrypt`
 - Positional + flags: `wheels plugins install cfwheels-bcrypt --version=1.0.0`
 - All named: `name=cfwheels-bcrypt version=1.0.0`
 
-❌ **NOT ALLOWED:**
+ **NOT ALLOWED:**
 - Positional + named for same param: `wheels plugins install cfwheels-bcrypt name=other`
 
 **Recommendation:** Use positional for plugin name, flags for options: `wheels plugins install cfwheels-bcrypt --version=1.0.0`
@@ -220,10 +220,10 @@ wheels plugins install cfwheels-bcrypt --version=0.0.4
 ### Unsupported Sources
 
 The following sources are NOT supported:
-- ❌ GitHub repositories
-- ❌ Direct URLs
-- ❌ Local ZIP files
-- ❌ Local directories
+-  GitHub repositories
+-  Direct URLs
+-  Local ZIP files
+-  Local directories
 
 To install plugins from these sources, use CommandBox's native `install` command and manually move to `/plugins` folder.
 
