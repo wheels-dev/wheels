@@ -668,4 +668,108 @@ component {
 
 		return local.rv;
 	}
+
+	/**
+	 * Defines a named query scope that can be chained onto finders.
+	 * Scopes allow you to define reusable query fragments in the model config and compose them together.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Scope Functions]
+	 *
+	 * @name The name of the scope. This becomes a callable method on the model (e.g. `model("User").active()`).
+	 * @where A `WHERE` clause fragment to apply when this scope is used.
+	 * @order An `ORDER BY` clause fragment to apply when this scope is used.
+	 * @select A `SELECT` clause override to apply when this scope is used.
+	 * @include Associations to include when this scope is used.
+	 * @maxRows Maximum number of records to return when this scope is used.
+	 * @handler The name of a method on this model that returns a struct of query arguments. Use for dynamic scopes that accept parameters. The method receives any arguments passed to the scope call.
+	 */
+	public void function scope(
+		required string name,
+		string where = "",
+		string order = "",
+		string select = "",
+		string include = "",
+		numeric maxRows = 0,
+		string handler = ""
+	) {
+		if (!StructKeyExists(variables.wheels.class, "scopes")) {
+			variables.wheels.class.scopes = {};
+		}
+		local.scopeDef = {};
+		if (Len(arguments.where)) {
+			local.scopeDef.where = arguments.where;
+		}
+		if (Len(arguments.order)) {
+			local.scopeDef.order = arguments.order;
+		}
+		if (Len(arguments.select)) {
+			local.scopeDef.select = arguments.select;
+		}
+		if (Len(arguments.include)) {
+			local.scopeDef.include = arguments.include;
+		}
+		if (arguments.maxRows > 0) {
+			local.scopeDef.maxRows = arguments.maxRows;
+		}
+		if (Len(arguments.handler)) {
+			local.scopeDef.handler = arguments.handler;
+		}
+		variables.wheels.class.scopes[arguments.name] = local.scopeDef;
+	}
+
+	/**
+	 * Maps a property to a set of named values (like Rails enums).
+	 * Generates boolean checker methods (`is<Value>()`), scopes for each value,
+	 * and validates that the property value is one of the allowed values.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Enum Functions]
+	 *
+	 * @property The name of the model property to map as an enum.
+	 * @values Either a comma-delimited list of string values (e.g. `"draft,published,archived"`) or a struct mapping names to stored values (e.g. `{low: 0, medium: 1, high: 2}`).
+	 */
+	public void function enum(
+		required string property,
+		required any values
+	) {
+		if (!StructKeyExists(variables.wheels.class, "enums")) {
+			variables.wheels.class.enums = {};
+		}
+		local.enumDef = {};
+		local.enumDef.property = arguments.property;
+
+		if (IsStruct(arguments.values)) {
+			// Struct mapping: name -> stored value
+			local.enumDef.values = arguments.values;
+			local.enumDef.names = StructKeyList(arguments.values);
+		} else {
+			// Comma-delimited list: each name is also the stored value
+			local.enumDef.names = arguments.values;
+			local.enumDef.values = {};
+			local.nameArray = ListToArray(arguments.values);
+			for (local.name in local.nameArray) {
+				local.enumDef.values[local.name] = local.name;
+			}
+		}
+		variables.wheels.class.enums[arguments.property] = local.enumDef;
+
+		// Auto-register inclusion validation for this property
+		validatesInclusionOf(
+			properties = arguments.property,
+			list = StructKeyList(local.enumDef.values),
+			allowBlank = true
+		);
+
+		// Auto-register scopes for each enum value
+		if (!StructKeyExists(variables.wheels.class, "scopes")) {
+			variables.wheels.class.scopes = {};
+		}
+		for (local.name in ListToArray(local.enumDef.names)) {
+			local.storedValue = local.enumDef.values[local.name];
+			variables.wheels.class.scopes[local.name] = {
+				where: "#arguments.property# = '#local.storedValue#'"
+			};
+		}
+	}
 }

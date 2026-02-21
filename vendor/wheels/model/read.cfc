@@ -605,4 +605,154 @@ component {
 			arguments.args.$debugName = Replace(Replace(arguments.args.$debugName, " ", "", "all"), ".", "", "all");
 		}
 	}
+
+	/**
+	 * Processes large result sets one record at a time without loading everything into memory.
+	 * Internally paginates through records and invokes the callback for each individual record.
+	 * The callback receives a model object (when `returnAs` is `"object"`) or a struct representing one row.
+	 *
+	 * [section: Model Class]
+	 * [category: Read Functions]
+	 *
+	 * @batchSize Number of records to load per internal database query. Defaults to 1000.
+	 * @callback A function/closure to call for each record. Receives a single argument: the record (object or struct).
+	 * @where [see:findAll].
+	 * @order [see:findAll]. Defaults to primary key ascending for consistent pagination.
+	 * @include [see:findAll].
+	 * @select [see:findAll].
+	 * @parameterize [see:findAll].
+	 * @includeSoftDeletes [see:findAll].
+	 * @returnAs Whether each record is an "object" (default) or "struct".
+	 */
+	public void function findEach(
+		numeric batchSize = 1000,
+		required any callback,
+		string where = "",
+		string order = "",
+		string include = "",
+		string select = "",
+		any parameterize,
+		boolean includeSoftDeletes = false,
+		string returnAs = "object"
+	) {
+		// Default order to primary key for consistent pagination
+		if (!Len(arguments.order)) {
+			arguments.order = primaryKey() & " ASC";
+		}
+
+		local.page = 1;
+		local.keepGoing = true;
+
+		while (local.keepGoing) {
+			local.finderArgs = {
+				where: arguments.where,
+				order: arguments.order,
+				include: arguments.include,
+				select: arguments.select,
+				page: local.page,
+				perPage: arguments.batchSize,
+				returnAs: arguments.returnAs == "struct" ? "structs" : "objects",
+				includeSoftDeletes: arguments.includeSoftDeletes
+			};
+			if (StructKeyExists(arguments, "parameterize")) {
+				local.finderArgs.parameterize = arguments.parameterize;
+			}
+
+			local.records = findAll(argumentCollection = local.finderArgs);
+
+			if (IsArray(local.records) && ArrayLen(local.records)) {
+				for (local.record in local.records) {
+					arguments.callback(local.record);
+				}
+				if (ArrayLen(local.records) < arguments.batchSize) {
+					local.keepGoing = false;
+				} else {
+					local.page++;
+				}
+			} else {
+				local.keepGoing = false;
+			}
+		}
+	}
+
+	/**
+	 * Processes large result sets in batches without loading everything into memory at once.
+	 * The callback receives a query result set (or array of objects/structs) for each batch.
+	 *
+	 * [section: Model Class]
+	 * [category: Read Functions]
+	 *
+	 * @batchSize Number of records per batch. Defaults to 500.
+	 * @callback A function/closure to call for each batch. Receives a single argument: the batch (query, array of objects, or array of structs depending on `returnAs`).
+	 * @where [see:findAll].
+	 * @order [see:findAll]. Defaults to primary key ascending for consistent pagination.
+	 * @include [see:findAll].
+	 * @select [see:findAll].
+	 * @parameterize [see:findAll].
+	 * @includeSoftDeletes [see:findAll].
+	 * @returnAs Set to "query" (default), "objects", or "structs" for the batch format.
+	 */
+	public void function findInBatches(
+		numeric batchSize = 500,
+		required any callback,
+		string where = "",
+		string order = "",
+		string include = "",
+		string select = "",
+		any parameterize,
+		boolean includeSoftDeletes = false,
+		string returnAs = "query"
+	) {
+		// Default order to primary key for consistent pagination
+		if (!Len(arguments.order)) {
+			arguments.order = primaryKey() & " ASC";
+		}
+
+		local.page = 1;
+		local.keepGoing = true;
+
+		while (local.keepGoing) {
+			local.finderArgs = {
+				where: arguments.where,
+				order: arguments.order,
+				include: arguments.include,
+				select: arguments.select,
+				page: local.page,
+				perPage: arguments.batchSize,
+				returnAs: arguments.returnAs,
+				includeSoftDeletes: arguments.includeSoftDeletes
+			};
+			if (StructKeyExists(arguments, "parameterize")) {
+				local.finderArgs.parameterize = arguments.parameterize;
+			}
+
+			local.batch = findAll(argumentCollection = local.finderArgs);
+
+			if (IsQuery(local.batch)) {
+				if (local.batch.recordCount > 0) {
+					arguments.callback(local.batch);
+					if (local.batch.recordCount < arguments.batchSize) {
+						local.keepGoing = false;
+					} else {
+						local.page++;
+					}
+				} else {
+					local.keepGoing = false;
+				}
+			} else if (IsArray(local.batch)) {
+				if (ArrayLen(local.batch) > 0) {
+					arguments.callback(local.batch);
+					if (ArrayLen(local.batch) < arguments.batchSize) {
+						local.keepGoing = false;
+					} else {
+						local.page++;
+					}
+				} else {
+					local.keepGoing = false;
+				}
+			} else {
+				local.keepGoing = false;
+			}
+		}
+	}
 }
