@@ -138,7 +138,10 @@ jobs:
         run: |
           
           mkdir -p ./.engine/${{ matrix.cfengine }}/WEB-INF/lib
-          wget ... -O ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+
+          wget https://download.oracle.com/otn-pub/otn_software/jdbc/1927/ojdbc10.jar \
+            -O ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
+
           ls -l ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/
 
       - name: Start cfengine (${{ matrix.cfengine }}) ...
