@@ -19,13 +19,9 @@
         "URL":"https://github.com/wheels-dev/wheels"
     },
     "dependencies": {
-        "wirebox": "^7.0.0",
-        "testbox": "^6.0.0",
         "wheels-core": "^3.0.0"
     },
     "installPaths": {
-        "wirebox": "vendor/wirebox/",
-        "testbox": "vendor/testbox/",
         "wheels-core": "vendor/wheels"
     },
     "keywords":[

@@ -121,16 +121,6 @@ component {
 			useFilterLists = !arguments.persisted
 		);
 
-		/**
-		 *	Wirebox adjustment for wirebox specific structs
-		*/
-		if (isStruct(local.rv) && StructKeyExists(local.rv, '$wbMixer')){
-			structDelete(local.rv, '$wbMixer');
-		}
-		if (isStruct(local.rv) && StructKeyExists(local.rv, '$WBDELEGATEMAP')){
-			structDelete(local.rv, '$WBDELEGATEMAP');
-		}
-
 		// If the object should be persisted, run afterFind callback, otherwise run afterNew callback.
 		// Then proceed to afterInitialization callback unless the previous callback method returned false.
 		local.afterFindResult = arguments.persisted && local.rv.$callback("afterFind", arguments.callbacks);

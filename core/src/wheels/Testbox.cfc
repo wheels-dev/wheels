@@ -3,7 +3,7 @@
  * Dynamically binds methods from `application.wo` into both
  * the `variables` and `this` scope for convenience.
  */
-component extends="testbox.system.BaseSpec" {
+component extends="wheels.testbox.system.BaseSpec" {
 
     // Pseudo-constructor (runs automatically)
     if (structKeyExists(application, "wo")) {

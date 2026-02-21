@@ -73,8 +73,8 @@ component extends="Controller" {
 			};
 			
 			// Run tests using TestBox
-			if (fileExists(expandPath("/testbox/system/TestBox.cfc"))) {
-				local.testbox = new testbox.system.TestBox();
+			if (fileExists(expandPath("/wheels/testbox/system/TestBox.cfc"))) {
+				local.testbox = new wheels.testbox.system.TestBox();
 				local.testResults = local.testbox.run(argumentCollection=local.testboxOptions);
 				
 				// Format results

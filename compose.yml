@@ -57,9 +57,6 @@ services:
       - type: bind
         source: ./tools/docker/lucee5/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
-      # Named volumes to prevent dependency pollution
-      - wirebox-lucee5:/wheels-test-suite/vendor/wirebox
-      - testbox-lucee5:/wheels-test-suite/vendor/testbox
     ports:
       - "60005:60005"
     networks:
@@ -86,9 +83,6 @@ services:
       - type: bind
         source: ./tools/docker/lucee6/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
-      # Named volumes to prevent dependency pollution
-      - wirebox-lucee6:/wheels-test-suite/vendor/wirebox
-      - testbox-lucee6:/wheels-test-suite/vendor/testbox
     ports:
       - "60006:60006"
     networks:
@@ -121,9 +115,6 @@ services:
       - type: bind
         source: ./tools/docker/lucee7/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
-      # Named volumes to prevent dependency pollution
-      - wirebox-lucee7:/wheels-test-suite/vendor/wirebox
-      - testbox-lucee7:/wheels-test-suite/vendor/testbox
     ports:
       - "60007:60007"
     networks:
@@ -152,9 +143,6 @@ services:
       - type: bind
         source: ./tools/docker/adobe2018/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
-      # Named volumes to prevent dependency pollution
-      - wirebox-adobe2018:/wheels-test-suite/vendor/wirebox
-      - testbox-adobe2018:/wheels-test-suite/vendor/testbox
     ports:
       - "62018:62018"
     networks:
@@ -184,9 +172,6 @@ services:
       - type: bind
         source: ./tools/docker/adobe2021/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
-      # Named volumes to prevent dependency pollution
-      - wirebox-adobe2021:/wheels-test-suite/vendor/wirebox
-      - testbox-adobe2021:/wheels-test-suite/vendor/testbox
     ports:
       - "62021:62021"
     networks:
@@ -216,9 +201,6 @@ services:
       - type: bind
         source: ./tools/docker/adobe2023/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
-      # Named volumes to prevent dependency pollution
-      - wirebox-adobe2023:/wheels-test-suite/vendor/wirebox
-      - testbox-adobe2023:/wheels-test-suite/vendor/testbox
     ports:
       - "62023:62023"
     networks:
@@ -248,9 +230,6 @@ services:
       - type: bind
         source: ./tools/docker/adobe2025/CFConfig.json
         target: /wheels-test-suite/CFConfig.json
-      # Named volumes to prevent dependency pollution
-      - wirebox-adobe2025:/wheels-test-suite/vendor/wirebox
-      - testbox-adobe2025:/wheels-test-suite/vendor/testbox
     ports:
       - "62025:62025"
     networks:
@@ -279,9 +258,7 @@ services:
     #   - type: bind
     #     source: ./tools/docker/boxlang/CFConfig.json
     #     target: /wheels-test-suite/CFConfig.json
-    #   # Named volumes to prevent dependency pollution
-    #   - wirebox-boxlang:/wheels-test-suite/vendor/wirebox
-    #   - testbox-boxlang:/wheels-test-suite/vendor/testbox
+    #
     ports:
       - "60001:60001"
     networks:
@@ -390,20 +367,3 @@ volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
-  # Named volumes for dependency isolation
-  wirebox-lucee5:
-  testbox-lucee5:
-  wirebox-lucee6:
-  testbox-lucee6:
-  wirebox-lucee7:
-  testbox-lucee7:
-  wirebox-adobe2018:
-  testbox-adobe2018:
-  wirebox-adobe2021:
-  testbox-adobe2021:
-  wirebox-adobe2023:
-  testbox-adobe2023:
-  wirebox-adobe2025:
-  testbox-adobe2025:
-  # wirebox-boxlang:
-  # testbox-boxlang:
