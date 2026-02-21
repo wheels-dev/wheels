@@ -29,116 +29,121 @@ component extends="../base" {
         boolean serve = false,
         boolean verbose = false
     ) {
-        requireWheelsApp(getCWD());
-        arguments = reconstructArgs(
-            argStruct=arguments,
-            allowedValues={
-                format: ["html", "json", "markdown"],
-                template: ["default", "minimal", "detailed"],
-                include: ["models", "controllers", "views", "services"]
-            },
-            allowCommaSeparated=["include"]
-        );
-        
-        detailOutput.header("Documentation Generator");
-        print.line("Generating documentation...").toConsole();
-        detailOutput.line();
-        
-        var outputPath = resolvePath(arguments.output);
-        var componentsToDocument = listToArray(arguments.include);
-        
-        // Ensure output directory exists
-        if (!directoryExists(outputPath)) {
-            directoryCreate(outputPath, true);
-            detailOutput.create("directory #arguments.output#");
-        }
-        
-        var documentedComponents = {
-            models = [],
-            controllers = [],
-            views = [],
-            services = [],
-            total = 0
-        };
-        
-        detailOutput.subHeader("Scanning Source Files");
-        
-        // Document each component type
-        for (var componentType in componentsToDocument) {
-            if (arguments.verbose) {
-                print.line("Documenting #componentType#...").toConsole();
-            }
-            
-            var documented = documentComponents(
-                type = componentType,
-                outputPath = outputPath,
-                format = arguments.format,
-                template = arguments.template,
-                verbose = arguments.verbose
+        try {
+            requireWheelsApp(getCWD());
+            arguments = reconstructArgs(
+                argStruct=arguments,
+                allowedValues={
+                    format: ["html", "json", "markdown"],
+                    template: ["default", "minimal", "detailed"],
+                    include: ["models", "controllers", "views", "services"]
+                },
+                allowCommaSeparated=["include"]
             );
             
-            documentedComponents[componentType] = documented;
-            documentedComponents.total += arrayLen(documented);
+            detailOutput.header("Documentation Generator");
+            print.line("Generating documentation...").toConsole();
+            detailOutput.line();
             
-            if (arrayLen(documented) > 0) {
-                detailOutput.statusSuccess("Found #arrayLen(documented)# #componentType#");
-            } else if (arguments.verbose) {
-                detailOutput.statusWarning("No #componentType# found");
+            var outputPath = resolvePath(arguments.output);
+            var componentsToDocument = listToArray(arguments.include);
+            
+            // Ensure output directory exists
+            if (!directoryExists(outputPath)) {
+                directoryCreate(outputPath, true);
+                detailOutput.create("directory #arguments.output#");
             }
-        }
-        
-        // Generate index/navigation
-        detailOutput.line();
-        print.line("Writing documentation...").toConsole();
-        
-        if (arguments.format == "html") {
-            generateHTMLIndex(outputPath, documentedComponents, arguments.template);
-            detailOutput.statusSuccess("HTML files generated");
-        } else if (arguments.format == "markdown") {
-            generateMarkdownIndex(outputPath, documentedComponents);
-            detailOutput.statusSuccess("Markdown files generated");
-        } else if (arguments.format == "json") {
-            fileWrite(outputPath & "/documentation.json", serializeJSON(documentedComponents, true));
-            detailOutput.statusSuccess("JSON documentation generated");
-        }
-        
-        // Display summary
-        detailOutput.line();
-        detailOutput.statusSuccess("Documentation generated successfully!");
-        detailOutput.line();
-        
-        detailOutput.subHeader("Summary");
-        for (var type in componentsToDocument) {
-            if (arrayLen(documentedComponents[type])) {
-                detailOutput.metric(
-                    label = "#uCase(left(type, 1)) & right(type, len(type)-1)#",
-                    value = "#arrayLen(documentedComponents[type])# files"
+            
+            var documentedComponents = {
+                models = [],
+                controllers = [],
+                views = [],
+                services = [],
+                total = 0
+            };
+            
+            detailOutput.subHeader("Scanning Source Files");
+            
+            // Document each component type
+            for (var componentType in componentsToDocument) {
+                if (arguments.verbose) {
+                    print.line("Documenting #componentType#...").toConsole();
+                }
+                
+                var documented = documentComponents(
+                    type = componentType,
+                    outputPath = outputPath,
+                    format = arguments.format,
+                    template = arguments.template,
+                    verbose = arguments.verbose
                 );
+                
+                documentedComponents[componentType] = documented;
+                documentedComponents.total += arrayLen(documented);
+                
+                if (arrayLen(documented) > 0) {
+                    detailOutput.statusSuccess("Found #arrayLen(documented)# #componentType#");
+                } else if (arguments.verbose) {
+                    detailOutput.statusWarning("No #componentType# found");
+                }
             }
-        }
-        detailOutput.metric(
-            label = "Total Components",
-            value = "#documentedComponents.total# documented"
-        );
-        detailOutput.line();
-        detailOutput.statusInfo("Output directory: #outputPath#");
-        
-        if (arguments.serve) {
+            
+            // Generate index/navigation
             detailOutput.line();
-            print.line("Starting documentation server...").toConsole();
+            print.line("Writing documentation...").toConsole();
+            
+            if (arguments.format == "html") {
+                generateHTMLIndex(outputPath, documentedComponents, arguments.template);
+                detailOutput.statusSuccess("HTML files generated");
+            } else if (arguments.format == "markdown") {
+                generateMarkdownIndex(outputPath, documentedComponents);
+                detailOutput.statusSuccess("Markdown files generated");
+            } else if (arguments.format == "json") {
+                fileWrite(outputPath & "/documentation.json", serializeJSON(documentedComponents, true));
+                detailOutput.statusSuccess("JSON documentation generated");
+            }
+            
+            // Display summary
+            detailOutput.line();
+            detailOutput.statusSuccess("Documentation generated successfully!");
             detailOutput.line();
             
-            // Start server using CommandBox
-            command("wheels docs serve")
-                .params(
-                    directory = outputPath,
-                    port = 8585,
-                    browser = true
-                )
-                .run();
+            detailOutput.subHeader("Summary");
+            for (var type in componentsToDocument) {
+                if (arrayLen(documentedComponents[type])) {
+                    detailOutput.metric(
+                        label = "#uCase(left(type, 1)) & right(type, len(type)-1)#",
+                        value = "#arrayLen(documentedComponents[type])# files"
+                    );
+                }
+            }
+            detailOutput.metric(
+                label = "Total Components",
+                value = "#documentedComponents.total# documented"
+            );
+            detailOutput.line();
+            detailOutput.statusInfo("Output directory: #outputPath#");
             
-            detailOutput.statusSuccess("Documentation server started at http://localhost:8585");
-        }
+            if (arguments.serve) {
+                detailOutput.line();
+                print.line("Starting documentation server...").toConsole();
+                detailOutput.line();
+                
+                // Start server using CommandBox
+                command("wheels docs serve")
+                    .params(
+                        directory = outputPath,
+                        port = 8585,
+                        browser = true
+                    )
+                    .run();
+                
+                detailOutput.statusSuccess("Documentation server started at http://localhost:8585");
+            }
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
     }
     
     private function documentComponents(

@@ -881,7 +881,7 @@ component extends="wheels-cli.models.BaseCommand" excludeFromHelp=true {
 			local.envContent = FileRead(local.envFile);
 
 			// Case-insensitive, multiline match; stop at line break
-			local.envMatch = REFind("(?im)^\s*wheels_env\s*=\s*([^\r\n##]+)", local.envContent, 1, true);
+			local.envMatch = REFind("(?im)^\s*WHEELS_ENV\s*=\s*([^\r\n##]+)", local.envContent, 1, true);
 
 			if (StructKeyExists(local.envMatch, "pos") && local.envMatch.pos[1] > 0) {
 				local.environment = Trim(Mid(local.envContent, local.envMatch.pos[2], local.envMatch.len[2]));

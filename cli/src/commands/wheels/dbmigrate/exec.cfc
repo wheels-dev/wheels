@@ -12,26 +12,33 @@ component aliases='wheels db exec' extends="../base" {
 	 *  Migrate to specific version
 	 * @version.hint Version to migrate to
 	 **/
-	function run( required string version	) {
-		// Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(arguments);
+	function run(
+		required string version
+	) {
+		try{
+			// Reconstruct arguments for handling --prefixed options
+			arguments = reconstructArgs(arguments);
 
-		var loc={
-			version = arguments.version
-		}
+			var loc={
+				version = arguments.version
+			}
 
-		detailOutput.header("Migration Execution", 50);
-		detailOutput.metric("Target Version", loc.version);
-		detailOutput.divider();
-		var result = $sendToCliCommand("&command=migrateTo&version=#loc.version#");
-		if(!local.result.success){
-			return;
-		}
-		
-		if (structKeyExists(result, "success") && result.success) {
-			detailOutput.statusSuccess("Migration completed successfully!");
-		} else {
-			detailOutput.statusFailed("Migration failed!");
+			detailOutput.header("Migration Execution", 50);
+			detailOutput.metric("Target Version", loc.version);
+			detailOutput.divider();
+			var result = $sendToCliCommand("&command=migrateTo&version=#loc.version#");
+			if(!local.result.success){
+				return;
+			}
+			
+			if (structKeyExists(result, "success") && result.success) {
+				detailOutput.statusSuccess("Migration completed successfully!");
+			} else {
+				detailOutput.statusFailed("Migration failed!");
+			}
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
 		}
 	}
 }

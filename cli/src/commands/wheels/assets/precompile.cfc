@@ -38,106 +38,111 @@ component extends="../base" {
 		boolean force = false,
 		string environment = "production"
 	) {
-		requireWheelsApp(getCWD());
-		// Reconstruct arguments for handling --prefixed options
-		arguments = reconstructArgs(
-			argStruct = arguments,
-            allowedValues = {
-                environment: ["production", "staging", "development", "test", "maintenance", "prod", "dev", "stage"]
-            }
-		);
+		try{
+			requireWheelsApp(getCWD());
+			// Reconstruct arguments for handling --prefixed options
+			arguments = reconstructArgs(
+				argStruct = arguments,
+				allowedValues = {
+					environment: ["production", "staging", "development", "test", "maintenance", "prod", "dev", "stage"]
+				}
+			);
 
-		// Normalize environment aliases
-		arguments.environment = normalizeEnvironment(arguments.environment);
+			// Normalize environment aliases
+			arguments.environment = normalizeEnvironment(arguments.environment);
 
-		detailOutput.output("Precompiling assets for #arguments.environment#...");
-		detailOutput.line();
-		
-		// Define asset directories		
-		var publicDir = fileSystemUtil.resolvePath("public");
+			detailOutput.output("Precompiling assets for #arguments.environment#...");
+			detailOutput.line();
+			
+			// Define asset directories		
+			var publicDir = fileSystemUtil.resolvePath("public");
 
-		var assetsDir = publicDir & "assets";
-		var jsDir = publicDir & "javascripts";
-		var cssDir = publicDir & "stylesheets";
-		var imagesDir = publicDir & "images";
-		
-		// Create compiled assets directory
-		var compiledDir = assetsDir & "/compiled";
-		if (!directoryExists(compiledDir)) {
-			directoryCreate(compiledDir);
-			detailOutput.output("Created compiled assets directory: #compiledDir#");
-		}
-		
-		// Initialize manifest
-		var manifest = {};
-		var processedCount = 0;
-		
-		// Process JavaScript files
-		if (directoryExists(jsDir)) {
-			detailOutput.output("Processing JavaScript files...");
-			var jsFiles = directoryList(jsDir, true, "query", "*.js");
-			for (var file in jsFiles) {
-				if (file.type == "File" && !findNoCase(".min.js", file.name)) {
-					processedCount += processJavaScriptFile(
-						source = file.directory & "/" & file.name,
-						target = compiledDir,
-						manifest = manifest,
-						force = arguments.force,
-						environment = arguments.environment
-					);
+			var assetsDir = publicDir & "assets";
+			var jsDir = publicDir & "javascripts";
+			var cssDir = publicDir & "stylesheets";
+			var imagesDir = publicDir & "images";
+			
+			// Create compiled assets directory
+			var compiledDir = assetsDir & "/compiled";
+			if (!directoryExists(compiledDir)) {
+				directoryCreate(compiledDir);
+				detailOutput.output("Created compiled assets directory: #compiledDir#");
+			}
+			
+			// Initialize manifest
+			var manifest = {};
+			var processedCount = 0;
+			
+			// Process JavaScript files
+			if (directoryExists(jsDir)) {
+				detailOutput.output("Processing JavaScript files...");
+				var jsFiles = directoryList(jsDir, true, "query", "*.js");
+				for (var file in jsFiles) {
+					if (file.type == "File" && !findNoCase(".min.js", file.name)) {
+						processedCount += processJavaScriptFile(
+							source = file.directory & "/" & file.name,
+							target = compiledDir,
+							manifest = manifest,
+							force = arguments.force,
+							environment = arguments.environment
+						);
+					}
 				}
 			}
-		}
-		
-		// Process CSS files
-		if (directoryExists(cssDir)) {
-			detailOutput.output("Processing CSS files...");
-			var cssFiles = directoryList(cssDir, true, "query", "*.css");
-			for (var file in cssFiles) {
-				if (file.type == "File" && !findNoCase(".min.css", file.name)) {
-					processedCount += processCSSFile(
-						source = file.directory & "/" & file.name,
-						target = compiledDir,
-						manifest = manifest,
-						force = arguments.force,
-						environment = arguments.environment
-					);
+			
+			// Process CSS files
+			if (directoryExists(cssDir)) {
+				detailOutput.output("Processing CSS files...");
+				var cssFiles = directoryList(cssDir, true, "query", "*.css");
+				for (var file in cssFiles) {
+					if (file.type == "File" && !findNoCase(".min.css", file.name)) {
+						processedCount += processCSSFile(
+							source = file.directory & "/" & file.name,
+							target = compiledDir,
+							manifest = manifest,
+							force = arguments.force,
+							environment = arguments.environment
+						);
+					}
 				}
 			}
-		}
-		
-		// Process image files
-		if (directoryExists(imagesDir)) {
-			detailOutput.output("Processing image files...");
-			var imageFiles = directoryList(imagesDir, true, "query");
-			for (var file in imageFiles) {
-				if (file.type == "File" && isImageFile(file.name)) {
-					processedCount += processImageFile(
-						source = file.directory & "/" & file.name,
-						target = compiledDir,
-						manifest = manifest,
-						force = arguments.force
-					);
+			
+			// Process image files
+			if (directoryExists(imagesDir)) {
+				detailOutput.output("Processing image files...");
+				var imageFiles = directoryList(imagesDir, true, "query");
+				for (var file in imageFiles) {
+					if (file.type == "File" && isImageFile(file.name)) {
+						processedCount += processImageFile(
+							source = file.directory & "/" & file.name,
+							target = compiledDir,
+							manifest = manifest,
+							force = arguments.force
+						);
+					}
 				}
 			}
+			
+			// Write manifest file
+			var manifestPath = compiledDir & "/manifest.json";
+			fileWrite(manifestPath, serializeJSON(manifest));
+			detailOutput.output("Asset manifest written to: #manifestPath#");
+
+			detailOutput.line();
+			detailOutput.statusSuccess("Asset precompilation complete!");
+			detailOutput.output("Processed #processedCount# files", true);
+			detailOutput.output("Compiled assets location: #compiledDir#", true);
+
+			// Provide instructions for production
+			detailOutput.line();
+			detailOutput.output("To use precompiled assets in production:");
+			detailOutput.output("1. Configure your web server to serve static files from /public/assets/compiled", true);
+			detailOutput.output("2. Update your application to use the asset manifest for cache-busted URLs", true);
+			detailOutput.output("3. Set wheels.assetManifest = true in your production environment", true);
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
 		}
-		
-		// Write manifest file
-		var manifestPath = compiledDir & "/manifest.json";
-		fileWrite(manifestPath, serializeJSON(manifest));
-		detailOutput.output("Asset manifest written to: #manifestPath#");
-
-		detailOutput.line();
-		detailOutput.statusSuccess("Asset precompilation complete!");
-		detailOutput.output("Processed #processedCount# files", true);
-		detailOutput.output("Compiled assets location: #compiledDir#", true);
-
-		// Provide instructions for production
-		detailOutput.line();
-		detailOutput.output("To use precompiled assets in production:");
-		detailOutput.output("1. Configure your web server to serve static files from /public/assets/compiled", true);
-		detailOutput.output("2. Update your application to use the asset manifest for cache-busted URLs", true);
-		detailOutput.output("3. Set wheels.assetManifest = true in your production environment", true);
 	}
 	
 	/**
