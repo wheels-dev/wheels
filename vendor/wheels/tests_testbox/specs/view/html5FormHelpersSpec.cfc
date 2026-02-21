@@ -25,7 +25,7 @@ component extends="wheels.Testbox" {
 			});
 
 			it("sets the correct value attribute", function() {
-				local.result = _controller.emailFieldTag(name = "userEmail", value = "test@example.com");
+				local.result = _controller.emailFieldTag(name = "userEmail", value = "test@example.com", encode = false);
 				expect(local.result).toInclude('value="test@example.com"');
 			});
 
@@ -45,7 +45,8 @@ component extends="wheels.Testbox" {
 					name = "userEmail",
 					value = "",
 					class = "form-control",
-					placeholder = "you@example.com"
+					placeholder = "you@example.com",
+					encode = false
 				);
 				expect(local.result).toInclude('class="form-control"');
 				expect(local.result).toInclude('placeholder="you@example.com"');
@@ -64,7 +65,7 @@ component extends="wheels.Testbox" {
 			});
 
 			it("sets the correct value", function() {
-				local.result = _controller.urlFieldTag(name = "website", value = "https://example.com");
+				local.result = _controller.urlFieldTag(name = "website", value = "https://example.com", encode = false);
 				expect(local.result).toInclude('value="https://example.com"');
 			});
 		});
@@ -122,7 +123,7 @@ component extends="wheels.Testbox" {
 			});
 
 			it("sets the correct value", function() {
-				local.result = _controller.telFieldTag(name = "phone", value = "+1234567890");
+				local.result = _controller.telFieldTag(name = "phone", value = "+1234567890", encode = false);
 				expect(local.result).toInclude('value="+1234567890"');
 			});
 		});
@@ -161,7 +162,7 @@ component extends="wheels.Testbox" {
 			});
 
 			it("sets the color value", function() {
-				local.result = _controller.colorFieldTag(name = "themeColor", value = "##336699");
+				local.result = _controller.colorFieldTag(name = "themeColor", value = "##336699", encode = false);
 				expect(local.result).toInclude('value="##336699"');
 			});
 		});
@@ -203,7 +204,7 @@ component extends="wheels.Testbox" {
 			});
 
 			it("sets the correct value", function() {
-				local.result = _controller.searchFieldTag(name = "query", value = "wheels framework");
+				local.result = _controller.searchFieldTag(name = "query", value = "wheels framework", encode = false);
 				expect(local.result).toInclude('value="wheels framework"');
 			});
 
