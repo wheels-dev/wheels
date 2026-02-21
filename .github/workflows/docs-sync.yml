@@ -9,6 +9,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # Docs sync should not block CI — PAT may expire independently
+    continue-on-error: true
     steps:
       - name: Checkout wheels repo
         uses: actions/checkout@v4
