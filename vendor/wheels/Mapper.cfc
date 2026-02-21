@@ -53,14 +53,14 @@ component output="false" {
 
 	/**
 	 * Internal function.
-	 * Compiles a regex string into a Java Pattern object and returns it.
+	 * Validates that a regex string compiles correctly.
 	 * Throws an error if the regex is invalid.
 	 */
-	public any function $compileRegex(required string regex) {
+	public void function $compileRegex(required string regex) {
 		local.patternClass = CreateObject("java", "java.util.regex.Pattern");
 		try {
-			local.compiled = local.patternClass.compile(arguments.regex);
-			return local.compiled;
+			local.patternClass.compile(arguments.regex);
+			return;
 		} catch (any e) {
 			local.identifier = arguments.pattern;
 			if (StructKeyExists(arguments, "name")) {
@@ -133,7 +133,6 @@ component output="false" {
 	 * Private internal function.
 	 * Add route to Wheels, removing useless params.
 	 * Also builds performance indexes for faster route matching:
-	 * - compiledRegex: Pre-compiled Java Pattern object (avoids re-compiling on every request)
 	 * - routeIndex: Routes indexed by HTTP method (reduces search space)
 	 * - staticRoutes: Hash map for routes with no variables (O(1) lookup)
 	 */
@@ -151,8 +150,10 @@ component output="false" {
 		arguments.regex = $patternToRegex(arguments.pattern, arguments.constraints);
 		arguments.foundvariables = $stripRouteVariables(arguments.pattern);
 
-		// Compile regex and cache the Java Pattern object for reuse at match time.
-		arguments.compiledRegex = $compileRegex(argumentCollection = arguments);
+		// Validate the regex compiles correctly (do not store the Java Pattern object
+		// in the route struct because Duplicate() cannot deep-copy Java objects reliably
+		// across all CFML engines, and route structs are duplicated at match time).
+		$compileRegex(argumentCollection = arguments);
 
 		// Determine if this is a static route (no variables in the pattern).
 		// Static routes can be matched via O(1) hash lookup instead of regex scanning.

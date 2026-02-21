@@ -194,11 +194,11 @@ mapper.$listRoutes()  // returns formatted table of all routes
 
 #### 2.1 Pre-Compile All Regex at Registration Time
 **Current**: `$findMatchingRoute()` lazily compiles regex on first match.
-**Fix**: Compile all regex in `$addRoute()` (already partially done — `$compileRegex` is called but the Java Pattern object is discarded).
+**Fix**: Compile all regex in `$addRoute()`. The `$compileRegex` call validates the regex at registration time rather than at first match. Note: the compiled Java Pattern object is NOT stored on the route struct because `Duplicate()` (used at match time) cannot reliably deep-copy Java objects across all CFML engines.
 
 ```cfc
-// In $addRoute: cache compiled Pattern object
-arguments.compiledRegex = CreateObject("java", "java.util.regex.Pattern").compile(arguments.regex);
+// In $addRoute: validate regex compiles correctly (do not store the Java object)
+$compileRegex(argumentCollection = arguments);
 ```
 
 #### 2.2 Build a Route Lookup Index

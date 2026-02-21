@@ -403,13 +403,14 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[2].isStatic).toBeFalse()
 			})
 
-			it("stores compiled regex on routes", () => {
+			it("stores pre-compiled regex string on routes", () => {
 				$mapper()
 					.$draw()
 					.get(name="test", pattern="test/[id]", to="test##show")
 					.end()
 
-				expect(application.wheels.routes[1]).toHaveKey("compiledRegex")
+				expect(application.wheels.routes[1]).toHaveKey("regex")
+				expect(application.wheels.routes[1].regex).toBeString()
 			})
 		})
 	}
