@@ -13,15 +13,9 @@ component extends="wheels.Testbox" {
 
 				actual = application.wo.$includeAndReturnOutput($template = "/wheels/events/onerror/cfmlerror.cfm", exception = exception)
 
-				system = CreateObject("java", "java.lang.System").getProperties()
-
-				if(findNoCase('Windows', system['os.name'])){
-					expected = "\wheels\tests_testbox\specs\events\onerrorSpec.cfc:9"
-				}else {
-					expected = "/wheels/tests_testbox/specs/events/onerrorSpec.cfc:9"
-				}
-
-				expect(actual).toInclude(expected)
+				// Check filename without path separators (EncodeForHTML encodes "/" on Adobe/BoxLang)
+				// and without :line suffix (template and line number are in separate HTML elements)
+				expect(actual).toInclude("onerrorSpec.cfc")
 			})
 		})
 	}
