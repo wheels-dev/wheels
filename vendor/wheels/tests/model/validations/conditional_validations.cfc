@@ -1,7 +1,7 @@
 component extends="wheels.tests.Test" {
 
 	function setup() {
-		user = application.wirebox.getInstance( "wheels.tests._assets.models.Model" ).$initModelClass(
+		user = application.wheelsdi.getInstance( "wheels.tests._assets.models.Model" ).$initModelClass(
 			name = "c_o_r_e_Users",
 			path = get("modelPath")
 		);

@@ -1,7 +1,7 @@
 component extends="wheels.tests.Test" {
 
 	function setup(){
-		_controller = application.wirebox.getInstance( "wheels.Controller" );
+		_controller = application.wheelsdi.getInstance( "wheels.Controller" );
 	}
 
 	function test_getting_object_from_request_scope() {

@@ -1,12 +1,12 @@
 /**
  * Lightweight dependency injection container for Wheels.
  *
- * Replaces WireBox with only the features Wheels actually uses:
+ * Provides only the DI features Wheels actually uses:
  * - map(name).to(componentPath) fluent bindings
  * - getInstance(name, initArguments) resolution
  * - onDIcomplete() lifecycle callback
  *
- * Self-registers at application.wirebox for backward compatibility.
+ * Self-registers at application.wheelsdi for framework-wide access.
  */
 component {
 
@@ -28,8 +28,8 @@ component {
 		// Track the current mapping being built (for fluent API)
 		variables.currentMapping = "";
 
-		// Register self at application.wirebox for backward compatibility
-		application.wirebox = this;
+		// Register self at application.wheelsdi for framework-wide access
+		application.wheelsdi = this;
 
 		// Load bindings configuration
 		local.binder = createObject("component", arguments.binderPath);

@@ -18,7 +18,7 @@ component extends="wheels.tests.Test" {
 		_params = {controller = "test", action = "index"};
 		c = controller("test", _params);
 		d = $createObjectFromRoot(path = "wheels", fileName = "Dispatch", method = "$init");
-		t = application.wirebox.getInstance("wheels.Test");
+		t = application.wheelsdi.getInstance("wheels.Test");
 	}
 
 	function teardown() {

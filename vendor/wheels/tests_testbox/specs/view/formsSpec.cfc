@@ -1171,7 +1171,7 @@ component extends="wheels.Testbox" {
 		describe("Tests that yearSelect", () => {
 
 			beforeEach(() => {
-				_controller = application.wirebox.getInstance("wheels.tests._assets.controllers.ControllerWithModel")
+				_controller = application.wheelsdi.getInstance("wheels.tests._assets.controllers.ControllerWithModel")
 				args = {}
 				args.objectName = "user"
 				args.property = "birthday"

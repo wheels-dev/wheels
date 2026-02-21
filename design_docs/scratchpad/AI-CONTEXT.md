@@ -8,9 +8,9 @@ This file provides structured context about the Wheels framework architecture fo
 1. Request arrives at /public/index.cfm
    ↓
 2. Application.cfc initializes
-   - Sets up mappings (/app, /vendor, /wheels, /wirebox, /testbox)
+   - Sets up mappings (/app, /vendor, /wheels, /testbox)
    - Loads environment configuration
-   - Creates WireBox injector
+   - Creates Wheels DI injector
    ↓
 3. onRequestStart() executes
    - Checks for reload parameter
