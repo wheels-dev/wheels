@@ -207,11 +207,10 @@ component output="false" {
 			return this;
 		}
 
-		// Check if this is a QueryBuilder method
-		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset,select", arguments.missingMethodName)) {
-			// Create a query builder from the current state and delegate
+		// Check if this is a QueryBuilder method — transition from scope chain to query builder
+		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset,select,include,group,distinct", arguments.missingMethodName)) {
 			local.builder = new QueryBuilder(modelReference = variables.modelReference, scopeSpecs = variables.specs);
-			return local.builder.onMissingMethod(argumentCollection = arguments);
+			return Invoke(local.builder, arguments.missingMethodName, arguments.missingMethodArguments);
 		}
 
 		Throw(

@@ -19,7 +19,7 @@ component {
 			} else {
 				local.spec = Duplicate(local.scopeDef);
 			}
-			local.rv = new wheels.model.ScopeChain(modelReference = this, specs = [local.spec]);
+			local.rv = new wheels.model.query.ScopeChain(modelReference = this, specs = [local.spec]);
 			return local.rv;
 		}
 
@@ -53,7 +53,7 @@ component {
 		// --- Chainable Query Builder entry points ---
 		// Allow calling .where(), .orWhere(), .orderBy() etc. directly on a model to start a query builder chain.
 		if (ListFindNoCase("where,orWhere,whereNull,whereNotNull,whereBetween,whereIn,whereNotIn,orderBy,limit,offset", arguments.missingMethodName)) {
-			local.builder = new wheels.model.QueryBuilder(modelReference = this);
+			local.builder = new wheels.model.query.QueryBuilder(modelReference = this);
 			// Delegate the call to the query builder
 			return Invoke(local.builder, arguments.missingMethodName, arguments.missingMethodArguments);
 		}
