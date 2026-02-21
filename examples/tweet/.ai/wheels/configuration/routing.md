@@ -46,7 +46,7 @@ Define URL patterns and map them to controller actions:
 <cfscript>
     // Use this file to add routes to your application
     // Don't forget to reload after changes: ?reload=true
-    // See https://wheels.dev/3.0.0/guides/handling-requests-with-controllers/routing
+    // See https://wheels.dev/3.1.0/guides/handling-requests-with-controllers/routing
 
     mapper()
         // Resource-based routing (recommended)

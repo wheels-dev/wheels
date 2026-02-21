@@ -1194,7 +1194,7 @@ The `wheels upgrade` command provides an interactive wizard for upgrading your W
 wheels upgrade
 
 # Upgrade to specific version
-wheels upgrade --to=3.0.0
+wheels upgrade --to=3.1.0
 
 # Check for available upgrades
 wheels upgrade --check

@@ -61,7 +61,7 @@ Wheels Core
 Wheels Framework Core Directory
 
 Details:
-  Version:     3.0.0-SNAPSHOT+1030
+  Version:     3.1.0-SNAPSHOT+1030
   Slug:        wheels-core
   Type:        mvc
   Author:      Wheels Core Team and Community

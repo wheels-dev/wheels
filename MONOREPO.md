@@ -14,9 +14,9 @@ This document provides a comprehensive guide to understanding the Wheels 3.0 mon
 
 ## Overview
 
-Wheels 3.0 uses a monorepo structure to maintain all framework components in a single repository. This approach provides:
+Wheels 3.1 uses a monorepo structure to maintain all framework components in a single repository. This approach provides:
 
-- **Unified Versioning**: All components share the same version number (currently `3.0.0-rc.1`)
+- **Unified Versioning**: All components share the same version number (currently `3.1.0`)
 - **Simplified Development**: Changes across components can be developed and tested together
 - **Atomic Commits**: Related changes across CLI, core, and templates happen in single commits
 - **Easier Testing**: Cross-component integration testing without dependency management
@@ -96,7 +96,7 @@ box install wheels-cli
 
 ```
 core/
-├── box.json                      # Package metadata (v3.0.0-rc.1)
+├── box.json                      # Package metadata (v3.1.0)
 ├── src/
 │   └── wheels/                   # Framework code (27 directories)
 │       ├── controller/           # Controller base class
@@ -344,7 +344,7 @@ All components share the same version number defined in their `box.json` files. 
 
 2. Update `CHANGELOG.md` with release notes
 
-3. Create git tag: `git tag v3.0.0`
+3. Create git tag: `git tag v3.1.0`
 
 4. Push and let CI/CD handle ForgeBox publishing
 
@@ -429,7 +429,7 @@ User's Application:
 
 ## Key Characteristics
 
-1. **Version Synchronization**: All components share version `3.0.0-rc.1`
+1. **Version Synchronization**: All components share version `3.1.0`
 2. **CFML-Based**: Framework written in CFML with CommandBox module system
 3. **Docker Testing**: Multi-engine and multi-database testing support
 4. **Template-Based Generation**: CLI uses Handlebars-style `{{variable}}` syntax
@@ -666,4 +666,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 ---
 
 **Last Updated:** 2025-10-20
-**Version:** 3.0.0-rc.1
+**Version:** 3.1.0

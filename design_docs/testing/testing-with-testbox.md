@@ -1047,7 +1047,7 @@ expect(getCurrentContext()).toBe("tests.specs.unit.UserSpec");
 ## Additional Resources
 
 - [TestBox Documentation](https://testbox.ortusbooks.com/)
-- [Wheels Testing Guide](https://wheels.dev/3.0.0/guides/working-with-wheels/testing-your-application)
+- [Wheels Testing Guide](https://wheels.dev/3.1.0/guides/working-with-wheels/testing-your-application)
 - [Example Test Suite](https://github.com/wheels-dev/wheels/tree/develop/tests)
 - [TestBox Migration Cheat Sheet](testbox-migration-cheatsheet.md)
 

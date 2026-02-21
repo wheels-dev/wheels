@@ -176,7 +176,7 @@ We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for deta
 
 ## Recent Updates
 
-### Version 3.0.0
+### Version 3.1.0
 - Modernized service architecture
 - Enhanced testing capabilities with watch mode
 - Security scanning and performance optimization

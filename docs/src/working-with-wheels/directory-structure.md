@@ -80,7 +80,7 @@ vendor
 
 ### System Files and Testing
 
-**app/migrator/migrations** - Database [migration](https://wheels.dev/3.0.0/guides/command-line-tools/cli-guides/migrations) CFC files.
+**app/migrator/migrations** - Database [migration](https://wheels.dev/3.1.0/guides/command-line-tools/cli-guides/migrations) CFC files.
 
 **tests/** - Location for your application's unit tests.
 
