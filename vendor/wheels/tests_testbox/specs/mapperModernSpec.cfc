@@ -10,12 +10,8 @@ component extends="wheels.Testbox" {
 
 	function afterAll() {
 		application.wheels.routes = _originalRoutes
-		if (!StructIsEmpty(_originalRouteIndex)) {
-			application.wheels.routeIndex = _originalRouteIndex
-		}
-		if (!StructIsEmpty(_originalStaticRoutes)) {
-			application.wheels.staticRoutes = _originalStaticRoutes
-		}
+		application.wheels.routeIndex = _originalRouteIndex
+		application.wheels.staticRoutes = _originalStaticRoutes
 	}
 
 	function run() {
