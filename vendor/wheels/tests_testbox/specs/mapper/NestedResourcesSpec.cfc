@@ -1,7 +1,7 @@
 /**
  * Tests for nested resource routes with callback syntax.
  */
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
 	function run() {
 

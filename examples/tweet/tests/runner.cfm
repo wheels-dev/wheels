@@ -96,9 +96,9 @@
     
     // Initialize TestBox with options
     if (len(url.bundles)) {
-        testBox = new wheels.testbox.system.TestBox(bundles=url.bundles);
+        testBox = new wheels.wheelstest.system.TestBox(bundles=url.bundles);
     } else {
-        testBox = new wheels.testbox.system.TestBox(
+        testBox = new wheels.wheelstest.system.TestBox(
             directory=testBoxOptions.directory.mapping,
             recurse=testBoxOptions.directory.recurse
         );
@@ -111,14 +111,14 @@
         if (len(url.reporter)) {
             testBoxOptions.reporter = url.reporter;
         } else {
-            testBoxOptions.reporter = "wheels.testbox.system.reports.JSONReporter";
+            testBoxOptions.reporter = "wheels.wheelstest.system.reports.JSONReporter";
         }
         
         result = testBox.run(argumentCollection = testBoxOptions);
     }
     else if(url.format eq "json"){
         // Set JSON reporter
-        testBoxOptions.reporter = "wheels.testbox.system.reports.JSONReporter";
+        testBoxOptions.reporter = "wheels.wheelstest.system.reports.JSONReporter";
         
         result = testBox.run(argumentCollection = testBoxOptions);
         
@@ -232,7 +232,7 @@
     }
     else if (url.format eq "txt") {
         // Set Text reporter
-        testBoxOptions.reporter = "wheels.testbox.system.reports.TextReporter";
+        testBoxOptions.reporter = "wheels.wheelstest.system.reports.TextReporter";
         
         result = testBox.run(argumentCollection = testBoxOptions);
         
@@ -241,7 +241,7 @@
     }
     else if(url.format eq "junit"){
         // Set JUnit reporter
-        testBoxOptions.reporter = "wheels.testbox.system.reports.ANTJUnitReporter";
+        testBoxOptions.reporter = "wheels.wheelstest.system.reports.ANTJUnitReporter";
         
         result = testBox.run(argumentCollection = testBoxOptions);
         

@@ -305,7 +305,7 @@ component {
 ### Unit Testing Services
 
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     
     function beforeAll() {
         // Create service instance

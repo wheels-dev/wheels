@@ -148,7 +148,7 @@ Standard test directory layout:
 
 ### Model Test Example
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("User Model", function() {
@@ -198,7 +198,7 @@ component extends="wheels.Testbox" {
 
 ### Controller Test Example
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("Products Controller", function() {
@@ -306,7 +306,7 @@ wheels test run bundles=tests.models,tests.controllers
 
 ### By Label
 ```cfc
-component extends="wheels.Testbox" labels="label title"
+component extends="wheels.WheelsTest" labels="label title"
 ```
 
 ```bash

@@ -198,7 +198,7 @@ component {
 		required testResults,
 		required targetMD
 	){
-		var pathPatternMatcher = new wheels.testbox.system.modules.globber.models.PathPatternMatcher();
+		var pathPatternMatcher = new wheels.wheelstest.system.modules.globber.models.PathPatternMatcher();
 		var testBundles        = arguments.testResults.getTestBundles();
 
 		if ( arrayLen( testBundles ) ) {

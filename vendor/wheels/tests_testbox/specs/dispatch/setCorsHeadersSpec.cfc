@@ -1,4 +1,4 @@
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
 	/**
 	 * Note, when testing headers, the result from getPageContext().getResponse().getHeader

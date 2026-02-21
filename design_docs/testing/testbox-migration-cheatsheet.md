@@ -6,7 +6,7 @@ This quick reference guide helps you migrate from RocketUnit to TestBox syntax i
 
 | RocketUnit | TestBox |
 |------------|---------|
-| `component extends="tests.Test"` | `component extends="wheels.Testbox"` |
+| `component extends="tests.Test"` | `component extends="wheels.WheelsTest"` |
 | Test methods start with `test` | Test methods wrapped in `it()` blocks |
 | Methods run in order | Tests can be organized with `describe()` |
 
@@ -23,7 +23,7 @@ component extends="tests.Test" {
 
 **TestBox:**
 ```cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 	function run() {
 		describe("Feature", () => {
 			it("should do something", () => {
@@ -119,7 +119,7 @@ component extends="wheels.Testbox" {
 
 ### Model Testing
 
-| Operation | TestBox with wheels.Testbox |
+| Operation | TestBox with wheels.WheelsTest |
 |-----------|----------------------|
 | Create model | `var user = model("User").new()` |
 | Create and save | `var user = create("user")` |
@@ -130,7 +130,7 @@ component extends="wheels.Testbox" {
 
 ### Controller Testing
 
-| Operation | TestBox with wheels.Testbox |
+| Operation | TestBox with wheels.WheelsTest |
 |-----------|----------------------|
 | Get controller | `var ctrl = controller("Users")` |
 | Process request | `var result = processRequest(route="users", method="GET")` |
@@ -140,7 +140,7 @@ component extends="wheels.Testbox" {
 
 ### Authentication Testing
 
-| Operation | TestBox with wheels.Testbox |
+| Operation | TestBox with wheels.WheelsTest |
 |-----------|----------------------|
 | Login as user | `loginAs(userId)` |
 | Logout | `logout()` |

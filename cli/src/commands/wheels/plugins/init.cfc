@@ -221,7 +221,7 @@ node_modules/
             fileWrite(pluginDir & "/.gitignore", gitignore);
 
             // Create test file
-            var testFile = 'component extends="wheels.Testbox" {
+            var testFile = 'component extends="wheels.WheelsTest" {
 
     function run() {
         describe("#pluginName# Tests", function() {

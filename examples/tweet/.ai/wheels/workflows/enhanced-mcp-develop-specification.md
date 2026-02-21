@@ -176,7 +176,7 @@ component extends="Model" {
 #### 4.1 Unit Testing (Models)
 **Automatic test generation for each model:**
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     function run() {
         describe("User Model", function() {
             it("should validate required fields", function() {

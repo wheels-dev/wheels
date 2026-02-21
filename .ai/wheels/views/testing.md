@@ -6,7 +6,7 @@
 
 ```cfm
 // tests/specs/views/UserViewSpec.cfc
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("User View Components", () => {
@@ -39,7 +39,7 @@ component extends="wheels.Testbox" {
 ### Testing Partials with BDD
 
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("User Card Partial", () => {
@@ -107,7 +107,7 @@ component extends="wheels.Testbox" {
 ### Testing Form Helpers with BDD
 
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("Form Helper Testing", () => {
@@ -160,7 +160,7 @@ component extends="wheels.Testbox" {
 ### Testing View Helpers with BDD
 
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("View Helper Functions", () => {
@@ -209,7 +209,7 @@ component extends="wheels.Testbox" {
 ### Integration Testing with Controllers using BDD
 
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("View Integration Testing", () => {
@@ -261,7 +261,7 @@ component extends="wheels.Testbox" {
 ### Testing AJAX Responses with BDD
 
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("AJAX Response Testing", () => {
@@ -306,7 +306,7 @@ component extends="wheels.Testbox" {
 ### Testing Flash Messages with BDD
 
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function run() {
         describe("Flash Message Display", () => {
@@ -485,7 +485,7 @@ curl -s http://localhost:8080 | grep '#urlFor'           # Should return empty (
 ### Integration Testing Pattern
 
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
     function run() {
         describe("Content Verification Tests", () => {
 

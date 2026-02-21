@@ -52,14 +52,14 @@ component extends="Controller" {
 				return;
 			}
 			
-			// Check if TestBox is available
-			if (!structKeyExists(application, "testbox") && !fileExists(expandPath("/testbox/system/TestBox.cfc"))) {
-				local.result.message = "TestBox is not installed. Please install TestBox to run tests.";
+			// Check if WheelsTest is available
+			if (!structKeyExists(application, "testbox") && !fileExists(expandPath("/wheels/wheelstest/system/TestBox.cfc"))) {
+				local.result.message = "WheelsTest is not installed. Please ensure the wheels test framework is available.";
 				renderWith(local.result);
 				return;
 			}
 			
-			// Build TestBox options
+			// Build WheelsTest options
 			local.testboxOptions = {
 				directory = local.testDirectory,
 				recurse = true,
@@ -69,12 +69,12 @@ component extends="Controller" {
 				coverageEnabled = params.coverage,
 				coveragePathToCapture = expandPath("/app"),
 				coverageWhitelist = "",
-				coverageBlacklist = "tests,testbox,vendor,wheels"
+				coverageBlacklist = "tests,wheelstest,vendor,wheels"
 			};
 			
-			// Run tests using TestBox
-			if (fileExists(expandPath("/wheels/testbox/system/TestBox.cfc"))) {
-				local.testbox = new wheels.testbox.system.TestBox();
+			// Run tests using WheelsTest
+			if (fileExists(expandPath("/wheels/wheelstest/system/TestBox.cfc"))) {
+				local.testbox = new wheels.wheelstest.system.TestBox();
 				local.testResults = local.testbox.run(argumentCollection=local.testboxOptions);
 				
 				// Format results
@@ -108,8 +108,8 @@ component extends="Controller" {
 				
 				local.result.message = "Tests completed successfully";
 			} else {
-				// Fallback for when TestBox isn't properly installed
-				local.result.message = "TestBox installation not found. Please ensure TestBox is properly installed.";
+				// Fallback for when WheelsTest isn't properly installed
+				local.result.message = "WheelsTest installation not found. Please ensure the wheels test framework is properly installed.";
 			}
 			
 		} catch (any e) {

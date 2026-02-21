@@ -742,7 +742,7 @@ tests/
 
 ### Model Testing
 ```cfm
-component extends="wheels.Testbox" {
+component extends="wheels.WheelsTest" {
 
     function beforeAll() {
         // Setup for all tests in this spec
