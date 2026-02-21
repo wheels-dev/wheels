@@ -180,6 +180,20 @@ component extends="Model" {
 
         // Callbacks
         beforeSave("sanitizeInput");
+
+        // Query scopes — reusable, composable query fragments
+        scope(name="active", where="status = 'active'");
+        scope(name="recent", order="createdAt DESC");
+        scope(name="byRole", handler="scopeByRole");  // dynamic scope
+
+        // Enums — named values with auto-generated checkers and scopes
+        enum(property="status", values="draft,published,archived");
+        enum(property="priority", values={low: 0, medium: 1, high: 2});
+    }
+
+    // Dynamic scope handler (must return struct with query keys)
+    private struct function scopeByRole(required string role) {
+        return {where: "role = '#arguments.role#'"};
     }
 }
 ```
@@ -187,6 +201,58 @@ component extends="Model" {
 Finders: `model("User").findAll()`, `model("User").findOne(where="...")`, `model("User").findByKey(params.key)`.
 Create: `model("User").new(params.user)` then `.save()`, or `model("User").create(params.user)`.
 Include associations: `findAll(include="role,orders")`. Pagination: `findAll(page=params.page, perPage=25)`.
+
+### Scopes (Composable Query Fragments)
+```cfm
+// Chain scopes together — each adds to the query
+model("User").active().recent().findAll();
+model("User").byRole("admin").findAll(page=1, perPage=25);
+model("User").active().recent().count();
+```
+
+### Chainable Query Builder (Injection-Safe)
+```cfm
+// Fluent alternative to raw WHERE strings — values are auto-quoted
+model("User")
+    .where("status", "active")
+    .where("age", ">", 18)
+    .whereNotNull("emailVerifiedAt")
+    .orderBy("name", "ASC")
+    .limit(25)
+    .get();
+
+// Combine with scopes
+model("User").active().where("role", "admin").get();
+
+// Other builder methods: orWhere, whereNull, whereBetween, whereIn, whereNotIn
+```
+
+### Enums (Named Property Values)
+```cfm
+// Auto-generated boolean checkers
+user.isDraft();       // true/false
+user.isPublished();   // true/false
+
+// Auto-generated scopes per value
+model("User").draft().findAll();
+model("User").published().findAll();
+```
+
+### Batch Processing (Memory-Efficient)
+```cfm
+// Process one record at a time (loads in batches internally)
+model("User").findEach(batchSize=1000, callback=function(user) {
+    user.sendReminderEmail();
+});
+
+// Process in batch groups (callback receives query/array)
+model("User").findInBatches(batchSize=500, callback=function(users) {
+    processUserBatch(users);
+});
+
+// Works with scopes and conditions
+model("User").active().findEach(batchSize=500, callback=function(user) { /* ... */ });
+```
 
 ## Routing Quick Reference
 
