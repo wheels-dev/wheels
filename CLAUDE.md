@@ -57,25 +57,43 @@ Model finders return query objects, not arrays. Loop accordingly.
 </cfloop>
 ```
 
-### 3. No Nested Resource Routes
-Wheels does not support Rails-style nested resource blocks.
+### 3. Nested Resource Routes — Use Callback Syntax
+Wheels supports nested resources via the `callback` parameter or `nested=true` with manual `end()`. Do NOT use Rails-style inline function blocks.
 ```cfm
-// WRONG
+// WRONG — Rails-style inline (not supported)
 .resources("posts", function(r) { r.resources("comments"); })
 
-// RIGHT — separate declarations
+// RIGHT — callback syntax (recommended)
+.resources(name="posts", callback=function(map) {
+    map.resources("comments");
+})
+
+// RIGHT — manual nested=true + end()
+.resources(name="posts", nested=true)
+    .resources("comments")
+.end()
+
+// RIGHT — flat separate declarations (no URL nesting)
 .resources("posts")
 .resources("comments")
 ```
 
-### 4. Non-Existent Form Helpers
-These helpers don't exist in Wheels: `emailField()`, `urlField()`, `numberField()`, `phoneField()`.
+### 4. HTML5 Form Helpers Available
+Wheels provides dedicated HTML5 input helpers. Use them instead of manual type attributes.
 ```cfm
-// WRONG
+// Object-bound helpers
 #emailField(objectName="user", property="email")#
+#urlField(objectName="user", property="website")#
+#numberField(objectName="product", property="quantity", min="1", max="100")#
+#telField(objectName="user", property="phone")#
+#dateField(objectName="event", property="startDate")#
+#colorField(objectName="theme", property="primaryColor")#
+#rangeField(objectName="settings", property="volume", min="0", max="100")#
+#searchField(objectName="search", property="query")#
 
-// RIGHT
-#textFieldTag(name="user[email]", type="email", value=user.email)#
+// Tag-based helpers
+#emailFieldTag(name="email", value="")#
+#numberFieldTag(name="qty", value="1", min="0", step="1")#
 ```
 
 ### 5. Migration Seed Data — Use Direct SQL
@@ -177,6 +195,10 @@ Include associations: `findAll(include="role,orders")`. Pagination: `findAll(pag
 mapper()
     .resources("users")                              // standard CRUD
     .resources("products", except="delete")           // skip actions
+    .resources(name="posts", callback=function(map) { // nested resources
+        map.resources("comments");
+        map.resources("tags");
+    })
     .get(name="login", to="sessions##new")           // named route
     .post(name="authenticate", to="sessions##create")
     .root(to="home##index", method="get")            // homepage
@@ -202,6 +224,63 @@ component extends="wheels.Testbox" {
 ```
 
 Tests live in `tests/models/`, `tests/controllers/`, `tests/integration/`. Run with MCP `wheels_test()` or CLI `wheels test run`.
+
+## Background Jobs Quick Reference
+
+```cfm
+// Define a job: app/jobs/SendWelcomeEmailJob.cfc
+component extends="wheels.Job" {
+    function config() {
+        super.config();
+        this.queue = "mailers";
+        this.maxRetries = 5;
+    }
+    public void function perform(struct data = {}) {
+        sendEmail(to=data.email, subject="Welcome!", from="app@example.com");
+    }
+}
+
+// Enqueue from a controller
+job = new app.jobs.SendWelcomeEmailJob();
+job.enqueue(data={email: user.email});           // immediate
+job.enqueueIn(seconds=300, data={email: "..."});  // delayed 5 minutes
+job.enqueueAt(runAt=scheduledDate, data={});       // at specific time
+
+// Process jobs (call from scheduled task or controller)
+job = new wheels.Job();
+result = job.processQueue(queue="mailers", limit=10);
+
+// Queue management
+stats = job.queueStats();          // {pending, processing, completed, failed, total}
+job.retryFailed(queue="mailers");  // retry all failed jobs
+job.purgeCompleted(days=7);        // clean up old completed jobs
+```
+
+Requires migration: `20260221000001_create_wheels_jobs_table.cfc`. Run with `wheels dbmigrate latest`.
+
+## Server-Sent Events (SSE) Quick Reference
+
+```cfm
+// In a controller action — single event response
+function notifications() {
+    var data = model("Notification").findAll(where="userId=#params.userId#");
+    renderSSE(data=SerializeJSON(data), event="notifications", id=params.lastId);
+}
+
+// Streaming multiple events (long-lived connection)
+function stream() {
+    var writer = initSSEStream();
+    for (var item in items) {
+        sendSSEEvent(writer=writer, data=SerializeJSON(item), event="update");
+    }
+    closeSSEStream(writer=writer);
+}
+
+// Check if request is from EventSource
+if (isSSERequest()) { renderSSE(data="..."); }
+```
+
+Client-side: `const es = new EventSource('/controller/notifications');`
 
 ## Reference Docs
 

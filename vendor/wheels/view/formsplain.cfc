@@ -76,6 +76,318 @@ component {
 	}
 
 	/**
+	 * Builds and returns a string containing an email field form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function emailFieldTag(
+		required string name,
+		string value = "",
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "emailFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return emailField(argumentCollection = arguments);
+	}
+
+	/**
+	 * Builds and returns a string containing a URL field form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function urlFieldTag(
+		required string name,
+		string value = "",
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "urlFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return urlField(argumentCollection = arguments);
+	}
+
+	/**
+	 * Builds and returns a string containing a number field form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @min Minimum allowed value.
+	 * @max Maximum allowed value.
+	 * @step Stepping interval.
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function numberFieldTag(
+		required string name,
+		string value = "",
+		string min,
+		string max,
+		string step,
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "numberFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return numberField(argumentCollection = arguments);
+	}
+
+	/**
+	 * Builds and returns a string containing a telephone field form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function telFieldTag(
+		required string name,
+		string value = "",
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "telFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return telField(argumentCollection = arguments);
+	}
+
+	/**
+	 * Builds and returns a string containing a date field form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @min Minimum allowed date (YYYY-MM-DD format).
+	 * @max Maximum allowed date (YYYY-MM-DD format).
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function dateFieldTag(
+		required string name,
+		string value = "",
+		string min,
+		string max,
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "dateFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return dateField(argumentCollection = arguments);
+	}
+
+	/**
+	 * Builds and returns a string containing a color picker form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function colorFieldTag(
+		required string name,
+		string value = "",
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "colorFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return colorField(argumentCollection = arguments);
+	}
+
+	/**
+	 * Builds and returns a string containing a range slider form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @min Minimum allowed value.
+	 * @max Maximum allowed value.
+	 * @step Stepping interval.
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function rangeFieldTag(
+		required string name,
+		string value = "",
+		string min,
+		string max,
+		string step,
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "rangeFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return rangeField(argumentCollection = arguments);
+	}
+
+	/**
+	 * Builds and returns a string containing a search field form control based on the supplied name.
+	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
+	 *
+	 * [section: View Helpers]
+	 * [category: Form Tag Functions]
+	 *
+	 * @name [see:textFieldTag].
+	 * @value [see:textFieldTag].
+	 * @label [see:textField].
+	 * @labelPlacement [see:textField].
+	 * @prepend [see:textField].
+	 * @append [see:textField].
+	 * @prependToLabel [see:textField].
+	 * @appendToLabel [see:textField].
+	 * @encode [see:styleSheetLinkTag].
+	 */
+	public string function searchFieldTag(
+		required string name,
+		string value = "",
+		string label,
+		string labelPlacement,
+		string prepend,
+		string append,
+		string prependToLabel,
+		string appendToLabel,
+		any encode
+	) {
+		$args(name = "searchFieldTag", args = arguments);
+		arguments.property = arguments.name;
+		arguments.objectName = {};
+		arguments.objectName[arguments.name] = arguments.value;
+		StructDelete(arguments, "name");
+		StructDelete(arguments, "value");
+		return searchField(argumentCollection = arguments);
+	}
+
+	/**
 	 * Builds and returns a string containing a hidden field form control based on the supplied name.
 	 * Note: Pass any additional arguments like `class`, `rel`, and `id`, and the generated tag will also include those values as HTML attributes.
 	 *

@@ -32,6 +32,7 @@ component {
 		string shallowPath,
 		string shallowName,
 		struct constraints,
+		any callback,
 		string $call = "resource",
 		boolean $plural = false,
 		boolean mapFormat = variables.mapFormat
@@ -158,12 +159,21 @@ component {
 			local.args.mapFormat = arguments.mapFormat;
 		}
 
+		// If a callback function is provided, enable nested mode automatically.
+		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
+			arguments.nested = true;
+		}
+
 		// Scope the resource.
 		scope($call = arguments.$call, argumentCollection = local.args);
 
 		// Call end() automatically unless this is a nested call.
 		// See 'end()' source for the resource routes logic.
 		if (!arguments.nested) {
+			end();
+		} else if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
+			// Execute the callback for nested resource declarations, then close.
+			arguments.callback(this);
 			end();
 		}
 
@@ -203,6 +213,7 @@ component {
 		string shallowPath,
 		string shallowName,
 		struct constraints,
+		any callback,
 		boolean mapFormat = variables.mapFormat
 	) {
 		return resource(argumentCollection = arguments, $plural = true, $call = "resources");
