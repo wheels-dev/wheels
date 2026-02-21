@@ -19,77 +19,82 @@ component extends="../base" {
         string filter="",
         boolean showSensitive=false
     ) {
-        requireWheelsApp(getCWD());
-        arguments = reconstructArgs(arguments);
-        // Welcome message
-        print.line();
-        print.boldMagentaLine("Wheels Configuration Settings");
-        print.line();
-        
-        // Create URL parameters
-        local.urlParams = "&command=configList";
-        
-        if (len(trim(arguments.environment))) {
-            local.urlParams &= "&environment=#arguments.environment#";
-        }
-        
-        if (len(trim(arguments.filter))) {
-            local.urlParams &= "&filter=#arguments.filter#";
-        }
-        
-        if (arguments.showSensitive) {
-            local.urlParams &= "&showSensitive=true";
-        }
-        
-        // Send command to get configuration
-        print.line("Retrieving configuration settings...");
-        local.result = $sendToCliCommand(urlstring=local.urlParams);
-        if(!local.result.success){
-            return;
-        }
-        
-        // Display results
-        if (structKeyExists(local.result, "config") && isStruct(local.result.config)) {
-            // Get environment
-            local.env = len(trim(arguments.environment)) ? arguments.environment : local.result.environment;
-            print.boldYellowLine("Environment: #local.env#");
+        try{
+            requireWheelsApp(getCWD());
+            arguments = reconstructArgs(arguments);
+            // Welcome message
+            print.line();
+            print.boldMagentaLine("Wheels Configuration Settings");
             print.line();
             
-            // Build and display table
-            local.configTable = [];
-            local.keys = structKeyArray(local.result.config);
-            arraySort(local.keys, "textnocase");
+            // Create URL parameters
+            local.urlParams = "&command=configList";
             
-            for (local.key in local.keys) {
-                // Apply filter if specified
-                if (len(trim(arguments.filter)) && !findNoCase(arguments.filter, local.key)) {
-                    continue;
-                }
-                
-                local.value = local.result.config[local.key];
-                
-                // Handle sensitive information
-                if (!arguments.showSensitive && isSensitiveKey(local.key)) {
-                    local.value = "********";
-                }
-                
-                // Format value for display
-                if (isSimpleValue(local.value)) {
-                    local.formattedValue = local.value;
-                } else {
-                    local.formattedValue = serializeJSON(local.value);
-                }
-                
-                arrayAppend(local.configTable, [local.key, local.formattedValue]);
+            if (len(trim(arguments.environment))) {
+                local.urlParams &= "&environment=#arguments.environment#";
             }
             
-            // Print table
-            print.table(local.configTable, ["Setting", "Value"]);
-        } else {
-            print.boldRedLine("No configuration settings found");
-        }
-        
-        print.line();
+            if (len(trim(arguments.filter))) {
+                local.urlParams &= "&filter=#arguments.filter#";
+            }
+            
+            if (arguments.showSensitive) {
+                local.urlParams &= "&showSensitive=true";
+            }
+            
+            // Send command to get configuration
+            print.line("Retrieving configuration settings...");
+            local.result = $sendToCliCommand(urlstring=local.urlParams);
+            if(!local.result.success){
+                return;
+            }
+            
+            // Display results
+            if (structKeyExists(local.result, "config") && isStruct(local.result.config)) {
+                // Get environment
+                local.env = len(trim(arguments.environment)) ? arguments.environment : local.result.environment;
+                print.boldYellowLine("Environment: #local.env#");
+                print.line();
+                
+                // Build and display table
+                local.configTable = [];
+                local.keys = structKeyArray(local.result.config);
+                arraySort(local.keys, "textnocase");
+                
+                for (local.key in local.keys) {
+                    // Apply filter if specified
+                    if (len(trim(arguments.filter)) && !findNoCase(arguments.filter, local.key)) {
+                        continue;
+                    }
+                    
+                    local.value = local.result.config[local.key];
+                    
+                    // Handle sensitive information
+                    if (!arguments.showSensitive && isSensitiveKey(local.key)) {
+                        local.value = "********";
+                    }
+                    
+                    // Format value for display
+                    if (isSimpleValue(local.value)) {
+                        local.formattedValue = local.value;
+                    } else {
+                        local.formattedValue = serializeJSON(local.value);
+                    }
+                    
+                    arrayAppend(local.configTable, [local.key, local.formattedValue]);
+                }
+                
+                // Print table
+                print.table(local.configTable, ["Setting", "Value"]);
+            } else {
+                print.boldRedLine("No configuration settings found");
+            }
+            
+            print.line();
+		} catch (any e) {
+			detailOutput.error("#e.message#");
+			setExitCode(1);
+		}
     }
     
     /**

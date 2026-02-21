@@ -115,7 +115,7 @@ component extends="Model" {
 		return Replace(LCase(CreateUUID()), "-", "", "all");
 	}
 
-	function getUsers(required array where, required bool includeSoftDeletes, required number page, required number perpage) {
+	function getUsers(required array where, required boolean includeSoftDeletes, required numeric page, required numeric perpage) {
 		return findAll(where=whereify(arguments.where), page=arguments.page, includeSoftDeletes=arguments.includeSoftDeletes, perpage=arguments.perpage, include="role");
 	}
 
