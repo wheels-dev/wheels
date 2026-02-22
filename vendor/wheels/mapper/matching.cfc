@@ -528,18 +528,11 @@ component {
 	 * Supports comma-delimited variable names to constrain multiple variables at once.
 	 */
 	public struct function $applyConstraintToLastRoute(required string variableName, required string pattern) {
-		// Resolve the application key for the Wheels scope.
-		local.appKey = "wheels";
-		if (StructKeyExists(application, "$wheels")) {
-			local.appKey = "$wheels";
-		}
-
-		// Deep-copy the routes array into a fully independent local variable.
-		// On Adobe CF, accessing application-scoped array elements by chained
-		// bracket/dot notation (e.g., application[key].routes[i].member) causes
-		// "dereference scalar as struct" errors. Duplicate() creates a plain local
-		// copy that is safe to traverse on all CFML engines.
-		local.routes = Duplicate(application[local.appKey].routes);
+		// Use this.getRoutes() to access routes via the Mapper's own method,
+		// which returns variables.routes from the Mapper's scope. This avoids
+		// both application-scope access issues on Adobe CF and potential mixin
+		// scope issues where `variables` may not reference the Mapper's state.
+		local.routes = this.getRoutes();
 		local.routeCount = ArrayLen(local.routes);
 		if (local.routeCount == 0) {
 			Throw(
@@ -578,7 +571,7 @@ component {
 					// Recompile the regex with the new constraint.
 					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
 
-					// Write back to the local array copy.
+					// Write modified route back to the local array reference.
 					local.routes[local.i] = local.route;
 				}
 
@@ -589,11 +582,14 @@ component {
 			}
 		}
 
-		// Replace both the application-scoped and internal routes arrays with
-		// the modified copy. A single array assignment avoids per-element
-		// application-scope access that triggers Adobe CF runtime errors.
+		// Sync routes back to application scope. On Lucee/BoxLang, routes
+		// are pass-by-reference so this is redundant but harmless. On Adobe CF,
+		// this ensures the application-scoped copy reflects the modifications.
+		local.appKey = "wheels";
+		if (StructKeyExists(application, "$wheels")) {
+			local.appKey = "$wheels";
+		}
 		application[local.appKey].routes = local.routes;
-		variables.routes = local.routes;
 
 		return this;
 	}

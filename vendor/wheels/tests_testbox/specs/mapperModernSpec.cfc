@@ -193,15 +193,16 @@ component extends="wheels.Testbox" {
 			})
 
 			it("whereNumber constrains to digits", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="user", pattern="users/[id]", to="users##show")
 						.whereNumber("id")
 					.end()
 
-				// Use intermediate variable for Adobe CF compatibility — deep chained
-				// access on application-scoped arrays can fail on Adobe CF engines.
-				local.route = application.wheels.routes[1]
+				// Use getRoutes() for Adobe CF compatibility — application-scoped
+				// array access causes "dereference scalar as struct" on Adobe CF.
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect(local.route.constraints.id).toBe("\d+")
 				// Should match digits
 				expect("users/123").toMatch(local.route.regex)
@@ -210,63 +211,68 @@ component extends="wheels.Testbox" {
 			})
 
 			it("whereAlpha constrains to letters", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="category", pattern="categories/[slug]", to="categories##show")
 						.whereAlpha("slug")
 					.end()
 
-				local.route = application.wheels.routes[1]
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect(local.route.constraints.slug).toBe("[a-zA-Z]+")
 				expect("categories/electronics").toMatch(local.route.regex)
 				expect("categories/123").notToMatch(local.route.regex)
 			})
 
 			it("whereAlphaNumeric constrains to alphanumeric", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="product", pattern="products/[code]", to="products##show")
 						.whereAlphaNumeric("code")
 					.end()
 
-				local.route = application.wheels.routes[1]
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect(local.route.constraints.code).toBe("[a-zA-Z0-9]+")
 				expect("products/abc123").toMatch(local.route.regex)
 			})
 
 			it("whereUuid constrains to UUID format", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="item", pattern="items/[guid]", to="items##show")
 						.whereUuid("guid")
 					.end()
 
-				local.route = application.wheels.routes[1]
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect(local.route.constraints.guid).toInclude("[0-9a-fA-F]")
 				expect("items/550e8400-e29b-41d4-a716-446655440000").toMatch(local.route.regex)
 				expect("items/not-a-uuid").notToMatch(local.route.regex)
 			})
 
 			it("whereSlug constrains to URL-friendly slugs", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="post", pattern="posts/[slug]", to="posts##show")
 						.whereSlug("slug")
 					.end()
 
-				local.route = application.wheels.routes[1]
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect("posts/my-great-post").toMatch(local.route.regex)
 				expect("posts/hello").toMatch(local.route.regex)
 			})
 
 			it("whereIn constrains to a set of values", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="userByStatus", pattern="users/status/[status]", to="users##byStatus")
 						.whereIn("status", "active,inactive,pending")
 					.end()
 
-				local.route = application.wheels.routes[1]
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect("users/status/active").toMatch(local.route.regex)
 				expect("users/status/inactive").toMatch(local.route.regex)
 				expect("users/status/pending").toMatch(local.route.regex)
@@ -274,26 +280,28 @@ component extends="wheels.Testbox" {
 			})
 
 			it("whereMatch applies a custom regex", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="dated", pattern="archive/[year]", to="archive##show")
 						.whereMatch("year", "20\d{2}")
 					.end()
 
-				local.route = application.wheels.routes[1]
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect("archive/2024").toMatch(local.route.regex)
 				expect("archive/2099").toMatch(local.route.regex)
 				expect("archive/1999").notToMatch(local.route.regex)
 			})
 
 			it("supports comma-delimited variable names", function() {
-				$mapper()
+				local.mapper = $mapper()
 					.$draw()
 					.get(name="userPost", pattern="users/[userId]/posts/[postId]", to="posts##show")
 						.whereNumber("userId,postId")
 					.end()
 
-				local.route = application.wheels.routes[1]
+				local.routes = local.mapper.getRoutes()
+				local.route = local.routes[1]
 				expect(local.route.constraints.userId).toBe("\d+")
 				expect(local.route.constraints.postId).toBe("\d+")
 			})
