@@ -565,6 +565,11 @@ component {
 
 					// Recompile the regex with the new constraint.
 					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
+
+					// Explicit write-back: on Adobe CF, modifying a local copy of an
+					// array element does not always propagate back to the array. Write
+					// the modified struct back to guarantee cross-engine safety.
+					application[$appKey()].routes[local.i] = local.route;
 				}
 
 				// If no name, only update the very last route.
@@ -589,6 +594,9 @@ component {
 					}
 					local.route.constraints[local.varName] = arguments.pattern;
 					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
+
+					// Explicit write-back for Adobe CF safety (see comment above).
+					variables.routes[local.i] = local.route;
 				}
 
 				if (!Len(local.lastRouteName)) {
