@@ -17,13 +17,13 @@ component extends="wheels.Testbox" {
 		// -----------------------------------------------------------------------
 		// group() tests
 		// -----------------------------------------------------------------------
-		describe("Tests that group()", () => {
+		describe("Tests that group()", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				$clearRoutes()
 			})
 
-			it("groups routes with a path prefix", () => {
+			it("groups routes with a path prefix", function() {
 				$mapper()
 					.$draw()
 					.group(path="admin", callback=function(map) {
@@ -35,7 +35,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].pattern).toBe("/admin/dashboard")
 			})
 
-			it("groups routes with a name prefix", () => {
+			it("groups routes with a name prefix", function() {
 				$mapper()
 					.$draw()
 					.group(name="admin", path="admin", callback=function(map) {
@@ -47,7 +47,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].name).toBe("adminDashboard")
 			})
 
-			it("groups routes with shared constraints", () => {
+			it("groups routes with shared constraints", function() {
 				$mapper()
 					.$draw()
 					.group(path="users", constraints={key: "\d+"}, callback=function(map) {
@@ -61,7 +61,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].constraints.key).toBe("\d+")
 			})
 
-			it("does not add package to controller (unlike namespace)", () => {
+			it("does not add package to controller (unlike namespace)", function() {
 				$mapper()
 					.$draw()
 					.group(path="admin", callback=function(map) {
@@ -73,7 +73,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].controller).toBe("users")
 			})
 
-			it("supports nesting groups", () => {
+			it("supports nesting groups", function() {
 				$mapper()
 					.$draw()
 					.group(path="api", callback=function(map) {
@@ -86,7 +86,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].pattern).toBe("/api/v1/users")
 			})
 
-			it("works with manual end() when no callback", () => {
+			it("works with manual end() when no callback", function() {
 				$mapper()
 					.$draw()
 					.group(path="admin")
@@ -101,13 +101,13 @@ component extends="wheels.Testbox" {
 		// -----------------------------------------------------------------------
 		// api() and version() tests
 		// -----------------------------------------------------------------------
-		describe("Tests that api() and version()", () => {
+		describe("Tests that api() and version()", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				$clearRoutes()
 			})
 
-			it("creates API-scoped routes with default path", () => {
+			it("creates API-scoped routes with default path", function() {
 				$mapper()
 					.$draw()
 					.api(callback=function(api) {
@@ -118,7 +118,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].pattern).toBe("/api/users")
 			})
 
-			it("creates API-scoped routes with custom path", () => {
+			it("creates API-scoped routes with custom path", function() {
 				$mapper()
 					.$draw()
 					.api(path="services", callback=function(api) {
@@ -129,7 +129,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].pattern).toBe("/services/status")
 			})
 
-			it("creates versioned API routes", () => {
+			it("creates versioned API routes", function() {
 				$mapper()
 					.$draw()
 					.api(callback=function(api) {
@@ -147,7 +147,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[2].pattern).toBe("/api/v2/users")
 			})
 
-			it("generates correct named routes for versioned APIs", () => {
+			it("generates correct named routes for versioned APIs", function() {
 				$mapper()
 					.$draw()
 					.api(callback=function(api) {
@@ -161,7 +161,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].name).toBe("apiV1Users")
 			})
 
-			it("version() works with resources", () => {
+			it("version() works with resources", function() {
 				$mapper()
 					.$draw()
 					.api(callback=function(api) {
@@ -186,109 +186,119 @@ component extends="wheels.Testbox" {
 		// -----------------------------------------------------------------------
 		// Typed constraint helper tests
 		// -----------------------------------------------------------------------
-		describe("Tests that typed constraint helpers", () => {
+		describe("Tests that typed constraint helpers", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				$clearRoutes()
 			})
 
-			it("whereNumber constrains to digits", () => {
+			it("whereNumber constrains to digits", function() {
 				$mapper()
 					.$draw()
 					.get(name="user", pattern="users/[id]", to="users##show")
 						.whereNumber("id")
 					.end()
 
-				expect(application.wheels.routes[1].constraints.id).toBe("\d+")
+				// Use intermediate variable for Adobe CF compatibility — deep chained
+				// access on application-scoped arrays can fail on Adobe CF engines.
+				local.route = application.wheels.routes[1]
+				expect(local.route.constraints.id).toBe("\d+")
 				// Should match digits
-				expect("users/123").toMatch(application.wheels.routes[1].regex)
+				expect("users/123").toMatch(local.route.regex)
 				// Should NOT match alphabetic
-				expect("users/abc").notToMatch(application.wheels.routes[1].regex)
+				expect("users/abc").notToMatch(local.route.regex)
 			})
 
-			it("whereAlpha constrains to letters", () => {
+			it("whereAlpha constrains to letters", function() {
 				$mapper()
 					.$draw()
 					.get(name="category", pattern="categories/[slug]", to="categories##show")
 						.whereAlpha("slug")
 					.end()
 
-				expect(application.wheels.routes[1].constraints.slug).toBe("[a-zA-Z]+")
-				expect("categories/electronics").toMatch(application.wheels.routes[1].regex)
-				expect("categories/123").notToMatch(application.wheels.routes[1].regex)
+				local.route = application.wheels.routes[1]
+				expect(local.route.constraints.slug).toBe("[a-zA-Z]+")
+				expect("categories/electronics").toMatch(local.route.regex)
+				expect("categories/123").notToMatch(local.route.regex)
 			})
 
-			it("whereAlphaNumeric constrains to alphanumeric", () => {
+			it("whereAlphaNumeric constrains to alphanumeric", function() {
 				$mapper()
 					.$draw()
 					.get(name="product", pattern="products/[code]", to="products##show")
 						.whereAlphaNumeric("code")
 					.end()
 
-				expect(application.wheels.routes[1].constraints.code).toBe("[a-zA-Z0-9]+")
-				expect("products/abc123").toMatch(application.wheels.routes[1].regex)
+				local.route = application.wheels.routes[1]
+				expect(local.route.constraints.code).toBe("[a-zA-Z0-9]+")
+				expect("products/abc123").toMatch(local.route.regex)
 			})
 
-			it("whereUuid constrains to UUID format", () => {
+			it("whereUuid constrains to UUID format", function() {
 				$mapper()
 					.$draw()
 					.get(name="item", pattern="items/[guid]", to="items##show")
 						.whereUuid("guid")
 					.end()
 
-				expect(application.wheels.routes[1].constraints.guid).toInclude("[0-9a-fA-F]")
-				expect("items/550e8400-e29b-41d4-a716-446655440000").toMatch(application.wheels.routes[1].regex)
-				expect("items/not-a-uuid").notToMatch(application.wheels.routes[1].regex)
+				local.route = application.wheels.routes[1]
+				expect(local.route.constraints.guid).toInclude("[0-9a-fA-F]")
+				expect("items/550e8400-e29b-41d4-a716-446655440000").toMatch(local.route.regex)
+				expect("items/not-a-uuid").notToMatch(local.route.regex)
 			})
 
-			it("whereSlug constrains to URL-friendly slugs", () => {
+			it("whereSlug constrains to URL-friendly slugs", function() {
 				$mapper()
 					.$draw()
 					.get(name="post", pattern="posts/[slug]", to="posts##show")
 						.whereSlug("slug")
 					.end()
 
-				expect("posts/my-great-post").toMatch(application.wheels.routes[1].regex)
-				expect("posts/hello").toMatch(application.wheels.routes[1].regex)
+				local.route = application.wheels.routes[1]
+				expect("posts/my-great-post").toMatch(local.route.regex)
+				expect("posts/hello").toMatch(local.route.regex)
 			})
 
-			it("whereIn constrains to a set of values", () => {
+			it("whereIn constrains to a set of values", function() {
 				$mapper()
 					.$draw()
 					.get(name="userByStatus", pattern="users/status/[status]", to="users##byStatus")
 						.whereIn("status", "active,inactive,pending")
 					.end()
 
-				expect("users/status/active").toMatch(application.wheels.routes[1].regex)
-				expect("users/status/inactive").toMatch(application.wheels.routes[1].regex)
-				expect("users/status/pending").toMatch(application.wheels.routes[1].regex)
-				expect("users/status/deleted").notToMatch(application.wheels.routes[1].regex)
+				local.route = application.wheels.routes[1]
+				expect("users/status/active").toMatch(local.route.regex)
+				expect("users/status/inactive").toMatch(local.route.regex)
+				expect("users/status/pending").toMatch(local.route.regex)
+				expect("users/status/deleted").notToMatch(local.route.regex)
 			})
 
-			it("whereMatch applies a custom regex", () => {
+			it("whereMatch applies a custom regex", function() {
 				$mapper()
 					.$draw()
 					.get(name="dated", pattern="archive/[year]", to="archive##show")
 						.whereMatch("year", "20\d{2}")
 					.end()
 
-				expect("archive/2024").toMatch(application.wheels.routes[1].regex)
-				expect("archive/2099").toMatch(application.wheels.routes[1].regex)
-				expect("archive/1999").notToMatch(application.wheels.routes[1].regex)
+				local.route = application.wheels.routes[1]
+				expect("archive/2024").toMatch(local.route.regex)
+				expect("archive/2099").toMatch(local.route.regex)
+				expect("archive/1999").notToMatch(local.route.regex)
 			})
 
-			it("supports comma-delimited variable names", () => {
+			it("supports comma-delimited variable names", function() {
 				$mapper()
 					.$draw()
 					.get(name="userPost", pattern="users/[userId]/posts/[postId]", to="posts##show")
 						.whereNumber("userId,postId")
 					.end()
 
-				expect(application.wheels.routes[1].constraints.userId).toBe("\d+")
-				expect(application.wheels.routes[1].constraints.postId).toBe("\d+")
+				local.route = application.wheels.routes[1]
+				expect(local.route.constraints.userId).toBe("\d+")
+				expect(local.route.constraints.postId).toBe("\d+")
 			})
 
-			it("throws error when no routes exist", () => {
+			it("throws error when no routes exist", function() {
 				mapper = $mapper().$draw()
 
 				expect(function() {
@@ -300,13 +310,13 @@ component extends="wheels.Testbox" {
 		// -----------------------------------------------------------------------
 		// health() tests
 		// -----------------------------------------------------------------------
-		describe("Tests that health()", () => {
+		describe("Tests that health()", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				$clearRoutes()
 			})
 
-			it("creates a health check route with defaults", () => {
+			it("creates a health check route with defaults", function() {
 				$mapper()
 					.$draw()
 					.health()
@@ -317,7 +327,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].name).toBe("health")
 			})
 
-			it("creates a health check route with custom handler", () => {
+			it("creates a health check route with custom handler", function() {
 				$mapper()
 					.$draw()
 					.health(to="monitoring##check")
@@ -327,7 +337,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[1].action).toBe("check")
 			})
 
-			it("creates a health check route with custom path", () => {
+			it("creates a health check route with custom path", function() {
 				$mapper()
 					.$draw()
 					.health(path="status")
@@ -340,13 +350,13 @@ component extends="wheels.Testbox" {
 		// -----------------------------------------------------------------------
 		// Performance index tests
 		// -----------------------------------------------------------------------
-		describe("Tests that performance indexes", () => {
+		describe("Tests that performance indexes", function() {
 
-			beforeEach(() => {
+			beforeEach(function() {
 				$clearRoutes()
 			})
 
-			it("indexes static routes for O(1) lookup", () => {
+			it("indexes static routes for O(1) lookup", function() {
 				$mapper()
 					.$draw()
 					.get(name="login", pattern="login", to="sessions##new")
@@ -358,7 +368,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.staticRoutes).toHaveKey("GET:/about")
 			})
 
-			it("does not index dynamic routes as static", () => {
+			it("does not index dynamic routes as static", function() {
 				$mapper()
 					.$draw()
 					.get(name="user", pattern="users/[id]", to="users##show")
@@ -372,7 +382,7 @@ component extends="wheels.Testbox" {
 				}
 			})
 
-			it("marks routes with isStatic flag", () => {
+			it("marks routes with isStatic flag", function() {
 				$mapper()
 					.$draw()
 					.get(name="about", pattern="about", to="pages##about")
@@ -385,7 +395,7 @@ component extends="wheels.Testbox" {
 				expect(application.wheels.routes[2].isStatic).toBeFalse()
 			})
 
-			it("stores pre-compiled regex string on routes", () => {
+			it("stores pre-compiled regex string on routes", function() {
 				$mapper()
 					.$draw()
 					.get(name="test", pattern="test/[id]", to="test##show")

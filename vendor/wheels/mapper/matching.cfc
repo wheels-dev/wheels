@@ -528,7 +528,16 @@ component {
 	 * Supports comma-delimited variable names to constrain multiple variables at once.
 	 */
 	public struct function $applyConstraintToLastRoute(required string variableName, required string pattern) {
-		local.routeCount = ArrayLen(application[$appKey()].routes);
+		// Cache the application key and routes array reference to avoid repeated
+		// dynamic key resolution via $appKey(). On Adobe CF, chained expressions
+		// like application[$appKey()].routes[i] can cause unexpected runtime errors
+		// when accessing array elements from application-scoped structs.
+		local.appKey = "wheels";
+		if (StructKeyExists(application, "$wheels")) {
+			local.appKey = "$wheels";
+		}
+		local.appRoutes = application[local.appKey].routes;
+		local.routeCount = ArrayLen(local.appRoutes);
 		if (local.routeCount == 0) {
 			Throw(
 				type = "Wheels.NoRouteToConstrain",
@@ -539,7 +548,7 @@ component {
 		// Apply constraint to the last route (and its optional-segment variants).
 		// When optional segments are used, $match adds multiple routes. We apply the
 		// constraint to all routes that share the same name as the last one.
-		local.lastRoute = application[$appKey()].routes[local.routeCount];
+		local.lastRoute = local.appRoutes[local.routeCount];
 		local.lastRouteName = StructKeyExists(local.lastRoute, "name") ? local.lastRoute.name : "";
 
 		local.variables = ListToArray(arguments.variableName);
@@ -548,7 +557,7 @@ component {
 
 			// Walk backward through routes to find all variants of the same named route.
 			for (local.i = local.routeCount; local.i >= 1; local.i--) {
-				local.route = application[$appKey()].routes[local.i];
+				local.route = local.appRoutes[local.i];
 				local.routeName = StructKeyExists(local.route, "name") ? local.route.name : "";
 
 				// Stop if we've gone past the related routes.
@@ -566,10 +575,12 @@ component {
 					// Recompile the regex with the new constraint.
 					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
 
-					// Explicit write-back: on Adobe CF, modifying a local copy of an
-					// array element does not always propagate back to the array. Write
-					// the modified struct back to guarantee cross-engine safety.
-					application[$appKey()].routes[local.i] = local.route;
+					// Explicit write-back: on Adobe CF, array elements from the
+					// application scope are returned by value. Write the modified
+					// struct back directly to the application-scoped array to
+					// ensure changes persist (not via a local reference which may
+					// be a copy on some engines).
+					application[local.appKey].routes[local.i] = local.route;
 				}
 
 				// If no name, only update the very last route.
