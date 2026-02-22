@@ -9,16 +9,13 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				dispatch = CreateObject("component", "wheels.Dispatch")
 				SavedRoutes = Duplicate(application.wheels.routes)
-				SavedRouteIndex = StructKeyExists(application.wheels, "routeIndex") ? Duplicate(application.wheels.routeIndex) : {}
-				SavedStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? Duplicate(application.wheels.staticRoutes) : {}
+				SavedStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
 				application.wheels.routes = []
-				application.wheels.routeIndex = {}
 				application.wheels.staticRoutes = {}
 			})
 
 			afterEach(() => {
 				application.wheels.routes = SavedRoutes
-				application.wheels.routeIndex = SavedRouteIndex
 				application.wheels.staticRoutes = SavedStaticRoutes
 			})
 

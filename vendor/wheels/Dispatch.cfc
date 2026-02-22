@@ -111,19 +111,19 @@ component output="false" extends="wheels.Global"{
 
 		local.methodKey = UCase(arguments.requestMethod);
 
-		// --- Fast path 1: Static route O(1) lookup ---
+		// --- Fast path: Static route O(1) lookup ---
 		// Static routes (no variables in pattern) are indexed in a hash map at registration time.
 		// This avoids regex matching entirely for common static paths like /login, /about, etc.
 		if (StructKeyExists(application.wheels, "staticRoutes")) {
 			local.staticKey = local.methodKey & ":/" & arguments.path;
 			if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
-				local.rv = Duplicate(application.wheels.staticRoutes[local.staticKey]);
+				local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
 			}
 			// Also try the root path.
 			if (!StructKeyExists(local, "rv") && !Len(arguments.path)) {
 				local.staticKey = local.methodKey & ":/";
 				if (StructKeyExists(application.wheels.staticRoutes, local.staticKey)) {
-					local.rv = Duplicate(application.wheels.staticRoutes[local.staticKey]);
+					local.rv = StructCopy(application.wheels.staticRoutes[local.staticKey]);
 				}
 			}
 		}
