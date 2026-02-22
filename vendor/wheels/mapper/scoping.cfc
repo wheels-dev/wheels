@@ -130,4 +130,115 @@ component {
 	public struct function constraints() {
 		return scope(constraints = arguments, $call = "constraints");
 	}
+
+	/**
+	 * Group routes together with shared attributes like path prefix, name prefix, and constraints without implying a controller package or namespace. Unlike `namespace()` (which maps to a subfolder and URL prefix) or `package()` (which maps to a subfolder), `group()` is a pure organizational grouping mechanism.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @name Name to prepend to child route names for use when building links, forms, and other URLs.
+	 * @path URL path prefix to apply to all child routes.
+	 * @constraints Variable patterns (regex constraints) to apply to all child routes.
+	 * @callback A callback function to define nested routes within this group. If provided, the group is automatically closed when the callback completes.
+	 */
+	public struct function group(
+		string name,
+		string path,
+		struct constraints,
+		any callback
+	) {
+		local.args = {};
+		local.args.$call = "group";
+
+		if (StructKeyExists(arguments, "name")) {
+			local.args.name = arguments.name;
+		}
+
+		if (StructKeyExists(arguments, "path")) {
+			local.args.path = arguments.path;
+		}
+
+		if (StructKeyExists(arguments, "constraints")) {
+			local.args.constraints = arguments.constraints;
+		}
+
+		scope(argumentCollection = local.args);
+
+		// If a callback is provided, execute it and auto-close the group.
+		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
+			arguments.callback(this);
+			end();
+		}
+
+		return this;
+	}
+
+	/**
+	 * Scope routes under an API path prefix. Shorthand for `.group(path="api", name="api", ...)`. Typically used in combination with `version()` to organize versioned API endpoints.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @path URL path prefix for the API. Defaults to `"api"`.
+	 * @name Name prefix for route names. Defaults to `"api"`.
+	 * @constraints Variable patterns to apply to all child routes.
+	 * @callback A callback function to define nested routes within this API scope.
+	 */
+	public struct function api(
+		string path = "api",
+		string name = "api",
+		struct constraints,
+		any callback
+	) {
+		local.args = {};
+		local.args.path = arguments.path;
+		local.args.name = arguments.name;
+		local.args.$call = "group";
+
+		if (StructKeyExists(arguments, "constraints")) {
+			local.args.constraints = arguments.constraints;
+		}
+
+		scope(argumentCollection = local.args);
+
+		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
+			arguments.callback(this);
+			end();
+		}
+
+		return this;
+	}
+
+	/**
+	 * Scope routes under a version prefix within an API group. Creates a URL path prefix of `v{number}` (e.g., `/api/v1/users`) and a name prefix of `v{number}` for named route generation.
+	 *
+	 * [section: Configuration]
+	 * [category: Routing]
+	 *
+	 * @number The version number (e.g., `1` creates path prefix `v1`).
+	 * @path Override the path prefix. Defaults to `v{number}`.
+	 * @name Override the name prefix. Defaults to `v{number}`.
+	 * @callback A callback function to define nested routes within this version scope.
+	 */
+	public struct function version(
+		required numeric number,
+		string path = "v#Int(arguments.number)#",
+		string name = "v#Int(arguments.number)#",
+		any callback
+	) {
+		local.args = {};
+		local.args.path = arguments.path;
+		local.args.name = arguments.name;
+		local.args.$call = "group";
+
+		scope(argumentCollection = local.args);
+
+		if (StructKeyExists(arguments, "callback") && IsCustomFunction(arguments.callback)) {
+			arguments.callback(this);
+			end();
+		}
+
+		return this;
+	}
 }

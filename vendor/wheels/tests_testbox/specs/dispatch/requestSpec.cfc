@@ -7,12 +7,18 @@ component extends="wheels.WheelsTest" {
 			beforeEach(() => {
 				_params = {controller = "test", action = "index"}
 				_originalRoutes = Duplicate(application.wheels.routes)
+				_originalRouteIndex = StructKeyExists(application.wheels, "routeIndex") ? Duplicate(application.wheels.routeIndex) : {}
+				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? Duplicate(application.wheels.staticRoutes) : {}
 				application.wheels.routes = []
+				application.wheels.routeIndex = {}
+				application.wheels.staticRoutes = {}
 				dispatch = CreateObject("component", "wheels.Dispatch")
 			})
 
 			afterEach(() => {
 				application.wheels.routes = _originalRoutes
+				application.wheels.routeIndex = _originalRouteIndex
+				application.wheels.staticRoutes = _originalStaticRoutes
 			})
 
 			it("is getting route with format", () => {
