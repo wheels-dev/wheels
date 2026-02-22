@@ -24,7 +24,30 @@ jobs:
       - name: Start MySQL
         run: docker compose up -d mysql
 
-      - name: Wait for containers to be ready
+      - name: Wait for MySQL to be healthy
+        run: |
+          echo "Waiting for MySQL to be ready..."
+          MAX_WAIT=30
+          WAIT_COUNT=0
+
+          while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
+            WAIT_COUNT=$((WAIT_COUNT + 1))
+            echo -n "Checking MySQL (attempt ${WAIT_COUNT}/${MAX_WAIT})... "
+
+            if docker exec $(docker ps -q -f "name=mysql") mysqladmin ping -h localhost -u root -pwheelstestdb --silent 2>/dev/null; then
+              echo "MySQL is ready!"
+              break
+            else
+              echo "Not ready yet"
+              sleep 5
+            fi
+          done
+
+          if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
+            echo "Warning: MySQL may not be fully ready after ${MAX_WAIT} attempts"
+          fi
+
+      - name: Wait for Lucee 7 to be ready
         run: |
           echo "Waiting for Lucee 7 to be ready..."
 
