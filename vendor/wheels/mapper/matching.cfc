@@ -528,12 +528,19 @@ component {
 	 * Supports comma-delimited variable names to constrain multiple variables at once.
 	 */
 	public struct function $applyConstraintToLastRoute(required string variableName, required string pattern) {
-		// Work exclusively with variables.routes (the Mapper's internal copy) to
-		// avoid Adobe CF runtime errors. Adobe CF returns application-scoped array
-		// elements by value, and chained expressions like
-		// application[key].routes[i].member cause "dereference scalar as struct"
-		// errors. After modifying routes here, we sync back to application scope.
-		local.routeCount = ArrayLen(variables.routes);
+		// Resolve the application key for the Wheels scope.
+		local.appKey = "wheels";
+		if (StructKeyExists(application, "$wheels")) {
+			local.appKey = "$wheels";
+		}
+
+		// Deep-copy the routes array into a fully independent local variable.
+		// On Adobe CF, accessing application-scoped array elements by chained
+		// bracket/dot notation (e.g., application[key].routes[i].member) causes
+		// "dereference scalar as struct" errors. Duplicate() creates a plain local
+		// copy that is safe to traverse on all CFML engines.
+		local.routes = Duplicate(application[local.appKey].routes);
+		local.routeCount = ArrayLen(local.routes);
 		if (local.routeCount == 0) {
 			Throw(
 				type = "Wheels.NoRouteToConstrain",
@@ -544,7 +551,7 @@ component {
 		// Apply constraint to the last route (and its optional-segment variants).
 		// When optional segments are used, $match adds multiple routes. We apply the
 		// constraint to all routes that share the same name as the last one.
-		local.lastRoute = variables.routes[local.routeCount];
+		local.lastRoute = local.routes[local.routeCount];
 		local.lastRouteName = StructKeyExists(local.lastRoute, "name") ? local.lastRoute.name : "";
 
 		local.variables = ListToArray(arguments.variableName);
@@ -553,7 +560,7 @@ component {
 
 			// Walk backward through routes to find all variants of the same named route.
 			for (local.i = local.routeCount; local.i >= 1; local.i--) {
-				local.route = variables.routes[local.i];
+				local.route = local.routes[local.i];
 				local.routeName = StructKeyExists(local.route, "name") ? local.route.name : "";
 
 				// Stop if we've gone past the related routes.
@@ -571,9 +578,8 @@ component {
 					// Recompile the regex with the new constraint.
 					local.route.regex = $patternToRegex(local.route.pattern, local.route.constraints);
 
-					// Write back to the internal array (Adobe CF returns array
-					// elements by value, so the local copy must be written back).
-					variables.routes[local.i] = local.route;
+					// Write back to the local array copy.
+					local.routes[local.i] = local.route;
 				}
 
 				// If no name, only update the very last route.
@@ -583,14 +589,11 @@ component {
 			}
 		}
 
-		// Sync modified routes back to application scope. We replace the entire
-		// array to avoid per-element access on application-scoped arrays, which
-		// triggers Adobe CF's "dereference scalar as struct" errors.
-		local.appKey = "wheels";
-		if (StructKeyExists(application, "$wheels")) {
-			local.appKey = "$wheels";
-		}
-		application[local.appKey].routes = variables.routes;
+		// Replace both the application-scoped and internal routes arrays with
+		// the modified copy. A single array assignment avoids per-element
+		// application-scope access that triggers Adobe CF runtime errors.
+		application[local.appKey].routes = local.routes;
+		variables.routes = local.routes;
 
 		return this;
 	}
