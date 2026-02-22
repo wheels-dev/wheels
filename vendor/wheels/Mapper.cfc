@@ -38,10 +38,8 @@ component output="false" {
 		// placeholder for return value
 		variables.routes = [];
 
-		// Performance indexes for faster route matching.
-		// routeIndex: maps HTTP method -> array of routes for that method.
+		// Performance index for faster route matching.
 		// staticRoutes: maps "METHOD:/path" -> route struct for routes with no variables (O(1) lookup).
-		variables.routeIndex = {};
 		variables.staticRoutes = {};
 
 		return this;
@@ -132,9 +130,7 @@ component output="false" {
 	/**
 	 * Private internal function.
 	 * Add route to Wheels, removing useless params.
-	 * Also builds performance indexes for faster route matching:
-	 * - routeIndex: Routes indexed by HTTP method (reduces search space)
-	 * - staticRoutes: Hash map for routes with no variables (O(1) lookup)
+	 * Also builds a static route index for O(1) lookup of routes with no variables.
 	 */
 	private void function $addRoute(required string pattern, required struct constraints) {
 		// Remove controller and action if they are route variables.
@@ -159,40 +155,32 @@ component output="false" {
 		// Static routes can be matched via O(1) hash lookup instead of regex scanning.
 		arguments.isStatic = !Find("[", arguments.pattern);
 
+		// Create a plain struct copy of the route data. On Adobe CF, the arguments
+		// scope is a special struct type that can cause Duplicate() failures when
+		// stored in shared scopes and later deep-copied. StructCopy() produces a
+		// plain CFML struct that is safe to Duplicate() on all engines.
+		local.routeStruct = StructCopy(arguments);
+
 		// Add route to Wheels.
-		ArrayAppend(variables.routes, arguments);
-		ArrayAppend(application[$appKey()].routes, arguments);
+		ArrayAppend(variables.routes, local.routeStruct);
+		ArrayAppend(application[$appKey()].routes, local.routeStruct);
 
-		// Build method-indexed lookup for faster matching.
-		// This allows $findMatchingRoute to only scan routes for the requested HTTP method.
-		if (StructKeyExists(arguments, "methods")) {
-			local.methodList = ListToArray(arguments.methods);
-		} else {
-			// If no method restriction, index under all methods.
-			local.methodList = ["get", "post", "put", "patch", "delete", "head"];
-		}
-
-		for (local.method in local.methodList) {
-			local.methodKey = UCase(local.method);
-
-			// Initialize route index and static route map in application scope if needed.
-			if (!StructKeyExists(application[$appKey()], "routeIndex")) {
-				application[$appKey()].routeIndex = {};
-			}
+		// Build static route index for O(1) lookup of routes with no variables.
+		if (local.routeStruct.isStatic) {
 			if (!StructKeyExists(application[$appKey()], "staticRoutes")) {
 				application[$appKey()].staticRoutes = {};
 			}
 
-			if (!StructKeyExists(application[$appKey()].routeIndex, local.methodKey)) {
-				application[$appKey()].routeIndex[local.methodKey] = [];
+			if (StructKeyExists(local.routeStruct, "methods")) {
+				local.methodList = ListToArray(local.routeStruct.methods);
+			} else {
+				local.methodList = ["get", "post", "put", "patch", "delete", "head"];
 			}
-			ArrayAppend(application[$appKey()].routeIndex[local.methodKey], arguments);
 
-			// Add to static route fast-path index.
-			if (arguments.isStatic) {
-				local.staticKey = local.methodKey & ":" & arguments.pattern;
+			for (local.method in local.methodList) {
+				local.staticKey = UCase(local.method) & ":" & local.routeStruct.pattern;
 				if (!StructKeyExists(application[$appKey()].staticRoutes, local.staticKey)) {
-					application[$appKey()].staticRoutes[local.staticKey] = arguments;
+					application[$appKey()].staticRoutes[local.staticKey] = local.routeStruct;
 				}
 			}
 		}

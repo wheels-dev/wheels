@@ -2,10 +2,8 @@ component extends="wheels.WheelsTest" {
 
 	function beforeAll() {
 		_originalRoutes = Duplicate(application.wheels.routes)
-		_originalRouteIndex = StructKeyExists(application.wheels, "routeIndex") ? Duplicate(application.wheels.routeIndex) : {}
-		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? Duplicate(application.wheels.staticRoutes) : {}
+		_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
 		application.wheels.routes = []
-		application.wheels.routeIndex = {}
 		application.wheels.staticRoutes = {}
 
 		application.wo.mapper()
@@ -23,7 +21,6 @@ component extends="wheels.WheelsTest" {
 
 	function afterAll() {
 		application.wheels.routes = _originalRoutes
-		application.wheels.routeIndex = _originalRouteIndex
 		application.wheels.staticRoutes = _originalStaticRoutes
 	}
 

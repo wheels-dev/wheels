@@ -10,8 +10,7 @@ component extends="wheels.WheelsTest" {
 				_params = {controller = "dummy", action = "dummy"}
 				_controller = g.controller("dummy", _params)
 				_originalRoutes = Duplicate(application.wheels.routes)
-				_originalRouteIndex = StructKeyExists(application.wheels, "routeIndex") ? Duplicate(application.wheels.routeIndex) : {}
-				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? Duplicate(application.wheels.staticRoutes) : {}
+				_originalStaticRoutes = StructKeyExists(application.wheels, "staticRoutes") ? StructCopy(application.wheels.staticRoutes) : {}
 				_originalRewrite = application.wheels.URLRewriting
 				$clearRoutes()
 				g.mapper().$match(name = "pagination", pattern = "pag/ina/tion/[special]", to = "pagi##nation").end()
@@ -23,7 +22,6 @@ component extends="wheels.WheelsTest" {
 
 			afterEach(() => {
 				application.wheels.routes = _originalRoutes
-				application.wheels.routeIndex = _originalRouteIndex
 				application.wheels.staticRoutes = _originalStaticRoutes
 				application.wheels.URLRewriting = _originalRewrite
 				g.set(functionName = "linkTo", encode = true)
@@ -126,7 +124,6 @@ component extends="wheels.WheelsTest" {
 
 	public void function $clearRoutes() {
 		application.wheels.routes = []
-		application.wheels.routeIndex = {}
 		application.wheels.staticRoutes = {}
 		application.wheels.namedRoutePositions = {}
 	}
