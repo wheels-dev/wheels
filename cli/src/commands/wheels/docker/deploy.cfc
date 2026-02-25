@@ -114,7 +114,8 @@ component extends="DockerCommand" {
         }
         
         if (arguments.local && arguments.remote) {
-            error("Cannot specify both --local and --remote. Please choose one.");
+            detailOutput.error("Cannot specify both --local and --remote. Please choose one.");
+            return;
         }
         
         // Route to appropriate deployment method
@@ -163,14 +164,16 @@ component extends="DockerCommand" {
             // Check for Dockerfile
             local.dockerfilePath = getCWD() & "/Dockerfile";
             if (!fileExists(local.dockerfilePath)) {
-                error("No Dockerfile or docker-compose.yml found in current directory");
+                detailOutput.error("No Dockerfile or docker-compose.yml found in current directory");
+                return;
             }
             
             detailOutput.statusSuccess("Found Dockerfile, will use standard docker commands");
             
             // Check if Docker is installed locally
             if (!isDockerInstalled()) {
-                error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+                detailOutput.error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+                return;
             }
             
             // Extract port from Dockerfile
@@ -258,7 +261,8 @@ component extends="DockerCommand" {
         if (len(trim(arguments.serversFile))) {
             var customPath = fileSystemUtil.resolvePath(arguments.serversFile);
             if (!fileExists(customPath)) {
-                error("Server configuration file not found: #arguments.serversFile#");
+                detailOutput.error("Server configuration file not found: #arguments.serversFile#");
+                return;
             }
             
             if (right(arguments.serversFile, 5) == ".json") {
@@ -271,7 +275,7 @@ component extends="DockerCommand" {
         else if (fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                 detailOutput.identical("Found config/deploy.yml, loading server configuration");
+                detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 servers = deployConfig.servers;
                 
                 // Add defaults for missing fields
@@ -293,11 +297,13 @@ component extends="DockerCommand" {
            detailOutput.identical("Found deploy-servers.json, loading server configuration");
             servers = loadServersFromConfig("deploy-servers.json");
         } else {
-            error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            return;
         }
 
         if (arrayLen(servers) == 0) {
-            error("No servers configured for deployment");
+            detailOutput.error("No servers configured for deployment");
+            return;
         }
 
         detailOutput.statusInfo("Starting remote deployment to #arrayLen(servers)# server(s)...");
@@ -376,7 +382,8 @@ component extends="DockerCommand" {
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            error("SSH connection failed to #local.host#. Check credentials and access.");
+            detailOutput.error("SSH connection failed to #local.host#. Check credentials and access.");
+            return;
         }
         detailOutput.statusSuccess("SSH connection successful");
 
@@ -502,7 +509,8 @@ component extends="DockerCommand" {
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            error("SSH connection failed to #local.host#. Check credentials and access.");
+            detailOutput.error("SSH connection failed to #local.host#. Check credentials and access.");
+            return;
         }
         detailOutput.statusSuccess("SSH connection successful");
 
@@ -689,7 +697,8 @@ component extends="DockerCommand" {
         if (local.sudoCheckResult.exitCode neq 0) {
             detailOutput.line();
             detailOutput.statusFailed("ERROR: User '#arguments.user#' does not have passwordless sudo access on #arguments.host#!");
-            error("Cannot install Docker: User '" & arguments.user & "' requires passwordless sudo access on " & arguments.host);
+            detailOutput.error("Cannot install Docker: User '" & arguments.user & "' requires passwordless sudo access on " & arguments.host);
+            return;
         }
         
         detailOutput.statusSuccess("User has sudo access");
@@ -702,7 +711,8 @@ component extends="DockerCommand" {
         local.osResult = runLocalCommand(osCmd);
         
         if (local.osResult.exitCode neq 0) {
-            error("Failed to detect OS type on remote server");
+            detailOutput.error("Failed to detect OS type on remote server");
+            return;
         }
         
         // Determine installation script based on OS
@@ -715,7 +725,8 @@ component extends="DockerCommand" {
             local.installScript = getDockerInstallScriptRHEL();
             detailOutput.identical("Detected RHEL/CentOS/Fedora system");
         } else {
-            error("Unsupported OS. Docker installation is only automated for Ubuntu/Debian and RHEL/CentOS/Fedora systems.");
+            detailOutput.error("Unsupported OS. Docker installation is only automated for Ubuntu/Debian and RHEL/CentOS/Fedora systems.");
+            return;
         }
         
         // Create temp file with install script
@@ -745,7 +756,8 @@ component extends="DockerCommand" {
         local.installResult = runLocalCommand(installCmd);
         
         if (local.installResult.exitCode neq 0) {
-            error("Failed to install Docker on remote server");
+            detailOutput.error("Failed to install Docker on remote server");
+            return;
         }
         
         detailOutput.statusSuccess("Docker installed successfully!");

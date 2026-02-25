@@ -20,7 +20,7 @@ The `wheels docker build` command handles the building of Docker images for your
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--local` | Build Docker image on local machine | `false` |
+| `--local` | Build Docker image on local machine | `true` |
 | `--remote` | Build Docker image on remote server(s) | `false` |
 | `--servers` | Comma-separated list of server numbers to build on (e.g., "1,3,5") - for remote only | `""` |
 | `--tag` | Custom tag for the Docker image (default: project-name:latest) | `""` |

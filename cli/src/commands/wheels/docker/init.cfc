@@ -28,20 +28,40 @@ component extends="DockerCommand" {
         string db="mysql",
         string dbVersion="",
         string cfengine="lucee",
-        string cfVersion="6",
+        string cfVersion="",
         string port="",
         boolean force=false,
         boolean production=false,
         boolean nginx=false
     ) {
         requireWheelsApp(getCWD());
-        arguments = reconstructArgs(
-            argStruct=arguments,
-            allowedValues={
-                db: ["h2", "sqlite", "mysql", "postgres", "mssql", "oracle"],
-                cfengine: ["lucee", "adobe"]
-            }
-        );
+        // Allowed values
+        var allowedValues = {
+            db: ["h2", "sqlite", "mysql", "postgres", "mssql", "oracle"],
+            cfengine: ["lucee", "adobe"]
+        };
+
+        // Validate db and cfengine
+        arguments = reconstructArgs(argStruct=arguments, allowedValues=allowedValues);
+
+        // Define CF defaults and allowed versions
+        var cfDefaults = {
+            lucee: { default: "6", versions: ["6", "7"] },
+            adobe: { default: "2018", versions: ["2018", "2021", "2023", "2025"] } // default is 2018
+        };
+
+        if (len(arguments.cfengine) && !len(arguments.cfVersion)) {
+            arguments.cfVersion = cfDefaults[arguments.cfengine].default;
+        }
+
+        // Validate cfVersion
+        if (!arrayContains(cfDefaults[arguments.cfengine].versions, arguments.cfVersion)) {
+            detailOutput.error("Invalid cfVersion: #arguments.cfVersion# for cfengine: #arguments.cfengine#");
+            detailOutput.statusInfo("Valid cfVersions for #arguments.cfengine# are: " & ArrayToList(cfDefaults[arguments.cfengine].versions, ", "));
+            detailOutput.line();
+            return;
+        }
+        
         // Welcome message
         detailOutput.header("Wheels Docker Configuration");
 
@@ -57,7 +77,7 @@ component extends="DockerCommand" {
         }
         
         detailOutput.subHeader("Production Server Configuration");
-        local.serverHost = ask("Server Host/IP (e.g. 192.168.1.10): ");
+        local.serverHost = ask("Server Host/IP (e.g. 192.168.1.10) (default: localhost): ");
         local.serverUser = "";
         
         if (len(trim(local.serverHost))) {

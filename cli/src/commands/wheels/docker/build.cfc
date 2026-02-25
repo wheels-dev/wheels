@@ -41,7 +41,8 @@ component extends="DockerCommand" {
         }
         
         if (arguments.local && arguments.remote) {
-            error("Cannot specify both --local and --remote. Please choose one.");
+            detailOutput.error("Cannot specify both --local and --remote. Please choose one.");
+            return;
         }
         
         // Route to appropriate build method
@@ -61,7 +62,8 @@ component extends="DockerCommand" {
         
         // Check if Docker is installed locally
         if (!isDockerInstalled()) {
-            error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+            detailOutput.error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+            return;
         }
 
         // Check for docker-compose file
@@ -81,7 +83,7 @@ component extends="DockerCommand" {
                 arrayAppend(local.buildCmd, "--pull");
             }
             
-            detailOutput.output("Building services with docker-compose...");
+            detailOutput.statusInfo("Building services with docker-compose...");
             runLocalCommand(local.buildCmd);
             
             detailOutput.line();
@@ -95,7 +97,8 @@ component extends="DockerCommand" {
             // Check for Dockerfile
             local.dockerfilePath = getCWD() & "/Dockerfile";
             if (!fileExists(local.dockerfilePath)) {
-                error("No Dockerfile or docker-compose.yml found in current directory");
+                detailOutput.error("No Dockerfile or docker-compose.yml found in current directory");
+                return;
             }
             
             detailOutput.statusSuccess("Found Dockerfile, will build using standard docker build");
@@ -130,7 +133,7 @@ component extends="DockerCommand" {
             
             arrayAppend(local.buildCmd, ".");
             
-            detailOutput.output("Building Docker image...");
+            detailOutput.statusInfo("Building Docker image...");
             runLocalCommand(local.buildCmd);
             
             detailOutput.line();
@@ -191,7 +194,8 @@ component extends="DockerCommand" {
         local.output = arrayToList(local.outputParts, chr(10));
         
         if (local.exitCode neq 0 && arguments.showOutput) {
-            error("Command failed with exit code: " & local.exitCode);
+            detailOutput.error("Command failed with exit code: " & local.exitCode);
+            return;
         }
 
         return { exitCode: local.exitCode, output: local.output };
@@ -239,12 +243,14 @@ component extends="DockerCommand" {
                 allServers = loadServersFromConfig("deploy-servers.json");
                 serversToBuild = filterServers(allServers, arguments.serverNumbers);
             } else {
-                error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+                detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+                return;
             }
         }
 
         if (arrayLen(serversToBuild) == 0) {
-            error("No servers configured for building");
+            detailOutput.error("No servers configured for building");
+            return;
         }
 
         detailOutput.line();
@@ -330,7 +336,8 @@ component extends="DockerCommand" {
 
         // Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            error("SSH connection failed to #local.host#. Check credentials and access.");
+            detailOutput.error("SSH connection failed to #local.host#. Check credentials and access.");
+            return;
         }
         detailOutput.statusSuccess("SSH connection successful");
 
@@ -501,7 +508,8 @@ component extends="DockerCommand" {
         var filePath = fileSystemUtil.resolvePath(arguments.textFile);
 
         if (!fileExists(filePath)) {
-            error("Text file not found: #filePath#");
+            detailOutput.error("Text file not found: #filePath#");
+            return;
         }
 
         try {
@@ -549,7 +557,8 @@ component extends="DockerCommand" {
         var configPath = fileSystemUtil.resolvePath(arguments.configFile);
 
         if (!fileExists(configPath)) {
-            error("Config file not found: #configPath#");
+            detailOutput.error("Config file not found: #configPath#");
+            return;
         }
 
         try {
@@ -557,7 +566,8 @@ component extends="DockerCommand" {
             var config = deserializeJSON(configContent);
 
             if (!structKeyExists(config, "servers") || !isArray(config.servers)) {
-                error("Invalid config file format. Expected { ""servers"": [ ... ] }");
+                detailOutput.error("Invalid config file format. Expected { ""servers"": [ ... ] }");
+                return;
             }
 
             var projectName = getProjectName();
@@ -618,7 +628,8 @@ component extends="DockerCommand" {
         ]);
 
         if (local.result.exitCode neq 0) {
-            error("Remote command failed: " & arguments.cmd);
+            detailOutput.error("Remote command failed: " & arguments.cmd);
+            return;
         }
 
         return local.result;
