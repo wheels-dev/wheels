@@ -160,11 +160,16 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
 				// Strip identifier quotes that may have been added by $quoteIdentifier
 				local.tbl = ReReplace(local.tbl, '^"|"$', "", "all");
-				query = $query(
-					sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",
-					argumentCollection = arguments.queryAttributes
-				);
-				local.rv[$generatedKey()] = query.lastId;
+				if(Left(local.sql, 11) == "INSERT INTO") {
+					query = $query(sql="SELECT #arguments.primaryKey# FROM #local.tbl#", argumentCollection = arguments.queryAttributes);
+					// writeDump($query(sql="SELECT #arguments.primaryKey# FROM #local.tbl#", argumentCollection = arguments.queryAttributes));
+				} else {
+					query = $query(
+						sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",
+						argumentCollection = arguments.queryAttributes
+					);
+				}
+				local.rv[$generatedKey()] = query.id;
 				return local.rv;
 			}
 		}
