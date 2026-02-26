@@ -161,8 +161,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				// Strip identifier quotes that may have been added by $quoteIdentifier
 				local.tbl = ReReplace(local.tbl, '^"|"$', "", "all");
 				if(Left(local.sql, 11) == "INSERT INTO") {
-					query = $query(sql="SELECT #arguments.primaryKey# FROM #local.tbl#", argumentCollection = arguments.queryAttributes);
-					// writeDump($query(sql="SELECT #arguments.primaryKey# FROM #local.tbl#", argumentCollection = arguments.queryAttributes));
+					query.id = listFirst(arguments.result.generatedKey);
 				} else {
 					query = $query(
 						sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",
