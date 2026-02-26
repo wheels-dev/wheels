@@ -90,16 +90,19 @@ component extends="DockerCommand" {
             detailOutput.identical("Found deploy-servers.json, loading server configuration");
             serverList = loadServersFromConfig("deploy-servers.json");
         } else {
-            error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            return;
         }
 
         if (arrayLen(serverList) == 0) {
-            error("No servers configured for execution");
+            detailOutput.error("No servers configured for execution");
+            return;
         }
 
         // Validate interactive mode with multiple servers
         if (arguments.interactive && arrayLen(serverList) > 1) {
-            error("Cannot run interactive commands on multiple servers simultaneously. Please specify a single server using 'servers=host'.");
+            detailOutput.error("Cannot run interactive commands on multiple servers simultaneously. Please specify a single server using 'servers=host'.");
+            return;
         }
 
         detailOutput.header("Wheels Deploy Remote Execution");
@@ -138,7 +141,8 @@ component extends="DockerCommand" {
 
         // 1. Check SSH Connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            throw("SSH connection failed");
+            detailOutput.error("SSH connection failed");
+            return;
         }
 
         // 2. Determine Container Name
@@ -188,7 +192,8 @@ component extends="DockerCommand" {
         }
 
         if (!len(containerName)) {
-            throw("Could not find running container for service: " & arguments.service);
+            detailOutput.error("Could not find running container for service: " & arguments.service);
+            return;
         }
 
         // 3. Construct Docker Exec Command
@@ -208,7 +213,10 @@ component extends="DockerCommand" {
             dockerCmd &= " -it";
         }
         
-        dockerCmd &= " " & containerName & " " & arguments.command;
+        // dockerCmd &= " " & containerName & " " & arguments.command;
+
+        var safeCommand = replace(arguments.command, "'", "'\''", "all");
+        dockerCmd &= " " & containerName & " /bin/sh -c '" & safeCommand & "'";
         
         execCmd.addAll([local.user & "@" & local.host, dockerCmd]);
         
@@ -223,7 +231,8 @@ component extends="DockerCommand" {
         var result = runInteractiveCommand(execCmd, arguments.interactive);
         
         if (result.exitCode != 0 && result.exitCode != 130) {
-            throw("Command failed with exit code: " & result.exitCode);
+            detailOutput.error("Command failed with exit code: " & result.exitCode);
+            return;
         }
     }
 

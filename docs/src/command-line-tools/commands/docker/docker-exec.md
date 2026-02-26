@@ -16,11 +16,16 @@ The `wheels docker exec` command allows you to run arbitrary commands inside you
 - **Source of Truth**: This command prioritizes settings from `config/deploy.yml` for server lists and project names.
 - **Interactive TTY**: The `--interactive` flag provides a full TTY session, allowing you to run shells, REPLs, and database clients with proper signal handling (e.g., `Ctrl+C`).
 
+## Arguments
+
+| Argument | Description | Default |
+|----------|-------------|---------|
+| `command` | Command to execute in container | Required |
+
 ## Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `command` | **Required**. Command to execute in container | |
 | `--servers` | Specific servers to execute on (defaults to `config/deploy.yml`) | `""` |
 | `--service` | Service to execute in: `app` or `db` | `app` |
 | `--interactive` | Run command interactively with full TTY support | `false` |

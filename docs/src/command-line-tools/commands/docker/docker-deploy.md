@@ -20,13 +20,10 @@ The `wheels docker deploy` command manages the deployment lifecycle of your Dock
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--local` | Deploy to local Docker environment | `false` |
+| `--local` | Deploy to local Docker environment | `true` |
 | `--remote` | Deploy to remote server(s) | `false` |
-| `--environment` | Deployment environment (production, staging) - for local deployment | `production` |
-| `--db` | Database to use (h2, mysql, postgres, mssql) - for local deployment | `mysql` |
-| `--cfengine` | ColdFusion engine to use (lucee, adobe) - for local deployment | `lucee` |
 | `--optimize` | Enable production optimizations - for local deployment | `true` |
-| `--servers` | Server configuration file (defaults to `config/deploy.yml`) | `""` |
+| `--serversFile` | Server configuration file (defaults to `config/deploy.yml`) | `""` |
 | `--skipDockerCheck` | Skip Docker installation check on remote servers | `false` |
 | `--blueGreen` | Enable Blue/Green deployment strategy (zero downtime) - for remote deployment | `false` |
 

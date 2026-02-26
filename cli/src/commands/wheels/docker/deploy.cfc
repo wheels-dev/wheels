@@ -20,7 +20,7 @@ component extends="DockerCommand" {
      * @db Database to use (h2, mysql, postgres, mssql) - for local deployment
      * @cfengine ColdFusion engine to use (lucee, adobe) - for local deployment
      * @optimize Enable production optimizations - for local deployment
-     * @servers Server configuration file (deploy-servers.txt or deploy-servers.json) - for remote deployment
+     * @serversFile Server configuration file (deploy-servers.txt or deploy-servers.json) - for remote deployment
      * @skipDockerCheck Skip Docker installation check on remote servers
      * @blueGreen Enable Blue/Green deployment strategy (zero downtime) - for remote deployment
      * @image Deprecated. Use unique project name in box.json instead.
@@ -29,11 +29,8 @@ component extends="DockerCommand" {
     function run(
         boolean local=false,
         boolean remote=false,
-        string environment="production",
-        string db="mysql",
-        string cfengine="lucee",
         boolean optimize=true,
-        string servers="",
+        string serversFile="",
         boolean skipDockerCheck=false,
         boolean blueGreen=false,
         string image="",
@@ -120,9 +117,9 @@ component extends="DockerCommand" {
         
         // Route to appropriate deployment method
         if (arguments.local) {
-            deployLocal(arguments.environment, arguments.db, arguments.cfengine, arguments.optimize, arguments.tag);
+            deployLocal(arguments.optimize, arguments.tag);
         } else {
-            deployRemote(arguments.servers, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
+            deployRemote(arguments.serversFile, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
         }
     }
     
@@ -131,9 +128,6 @@ component extends="DockerCommand" {
     // =============================================================================
     
     private function deployLocal(
-        string environment,
-        string db,
-        string cfengine,
         boolean optimize,
         string tag=""
     ) {

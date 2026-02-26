@@ -23,17 +23,32 @@ component extends="DockerCommand" {
      * @remote Fetch logs from remote Docker container instead of local
      */
     function run(
+        boolean local=false,
+        boolean remote=false,
         string servers="",
         string tail="100",
         boolean follow=false,
         string service="app",
-        string since="",
-        boolean remote=false
+        string since=""
     ) {
         //ensure we are in a Wheels app
         requireWheelsApp(getCWD());
         // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
+
+        if (arguments.local && arguments.remote) {
+            detailOutput.error("Cannot specify both --local and --remote. Please choose one.");
+            return;
+        }
+
+        if (!arguments.local && !arguments.remote) {
+            arguments.local = true;
+        }
+
+        if (len(arguments.tail) && !isNumeric(arguments.tail)) {
+            detailOutput.error("Invalid value for tail. It must be a number.");
+            return;
+        }
         
         if (arguments.remote == false) {
             fetchLocalLogs(arguments.tail, arguments.follow, arguments.service, arguments.since);
@@ -101,16 +116,19 @@ component extends="DockerCommand" {
             detailOutput.identical("Found deploy-servers.json, loading server configuration");
             serverList = loadServersFromConfig("deploy-servers.json");
         } else {
-            error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            return;
         }
 
         if (arrayLen(serverList) == 0) {
-            error("No servers configured for logs");
+            detailOutput.error("No servers configured for logs");
+            return;
         }
 
         // Validate follow mode with multiple servers
         if (arguments.follow && arrayLen(serverList) > 1) {
-            error("Cannot follow logs from multiple servers simultaneously. Please specify a single server using 'servers=host'.");
+            detailOutput.error("Cannot follow logs from multiple servers simultaneously. Please specify a single server using 'servers=host'.");
+            return;
         }
 
         detailOutput.header("Wheels Deployment Logs");
@@ -151,7 +169,8 @@ component extends="DockerCommand" {
         // 1. Check SSH Connection (skip if following to save time/output noise?)
         // Better to check to avoid hanging on bad connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            throw("SSH connection failed");
+            detailOutput.error("SSH connection failed");
+            return;
         }
 
         // 2. Determine Container Name
@@ -201,7 +220,8 @@ component extends="DockerCommand" {
         }
 
         if (!len(containerName)) {
-            throw("Could not find running container for service: " & arguments.service);
+            detailOutput.error("Could not find running container for service: " & arguments.service);
+            return;
         }
 
         // 3. Construct Docker Logs Command
@@ -228,6 +248,8 @@ component extends="DockerCommand" {
         dockerCmd &= " " & containerName;
         
         logsCmd.addAll([local.user & "@" & local.host, dockerCmd]);
+
+        detailOutput.statusInfo("Executing: " & dockerCmd);
         
         // 4. Execute
         // If following, we want to print output as it comes. runLocalCommand does this.
@@ -235,6 +257,10 @@ component extends="DockerCommand" {
         // This is fine for CLI usage.
         
         detailOutput.statusInfo("Fetching logs from container: " & containerName);
+        // Optional improvement
+        if (len(arguments.since)) {
+            detailOutput.statusInfo("Filtering logs since: " & arguments.since);
+        }
         if (arguments.follow) {
            detailOutput.statusInfo("Following logs... (Press Ctrl+C to stop)");
         }
@@ -243,7 +269,8 @@ component extends="DockerCommand" {
         var result = runInteractiveCommand(logsCmd);
         
         if (result.exitCode != 0 && result.exitCode != 130) {
-            throw("Command failed with exit code: " & result.exitCode);
+            detailOutput.error("Command failed with exit code: " & result.exitCode);
+            return;
         }
     }
 
@@ -296,11 +323,17 @@ component extends="DockerCommand" {
         }
 
         if (!len(containerName)) {
-            error("Could not find running container for service: " & arguments.service);
+            detailOutput.error("Could not find running container for service: " & arguments.service);
+            return;
         }
 
         detailOutput.header("Wheels Deployment Logs (Local)");
         detailOutput.statusInfo("Fetching logs from local container: " & containerName);
+
+        // Optional improvement
+        if (len(arguments.since)) {
+            detailOutput.statusInfo("Filtering logs since: " & arguments.since);
+        }
 
         if (arguments.follow) {
             detailOutput.statusInfo("Following logs... (Press Ctrl+C to stop)");
@@ -323,11 +356,14 @@ component extends="DockerCommand" {
         }
         
         dockerCmd.add(containerName);
+
+        detailOutput.statusInfo("Executing: " & arrayToList(dockerCmd, " "));
         
         var result = runInteractiveCommand(dockerCmd);
         
         if (result.exitCode != 0 && result.exitCode != 130) {
-            error("Command failed with exit code: " & result.exitCode);
+            detailOutput.error("Command failed with exit code: " & result.exitCode);
+            return;
         }
     }
 
