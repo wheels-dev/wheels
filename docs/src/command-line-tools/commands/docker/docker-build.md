@@ -33,7 +33,6 @@ The `wheels docker build` command handles the building of Docker images for your
 | `--local` | Build Docker image on local machine | `true` |
 | `--remote` | Build Docker image on remote server(s) | `false` |
 | `--servers` | Comma-separated list of server numbers to build on (e.g., "1,3,5") - for remote only | `""` |
-| `--tag` | Custom tag for the Docker image (default: project-name:latest) | `""` |
 | `--nocache` | Build without using cache | `false` |
 | `--pull` | Always attempt to pull a newer version of the base image | `false` |
 
@@ -42,7 +41,7 @@ The `wheels docker build` command handles the building of Docker images for your
 ### Local Development Builds
 
 **Standard Build**
-Builds the image using the `Dockerfile` in the current directory. Tags it with the folder name (e.g., `my-app:latest`).
+Builds the image using the `Dockerfile` in the current directory.
 ```bash
 wheels docker build --local
 ```
@@ -51,12 +50,6 @@ wheels docker build --local
 If you've changed base image dependencies or want to ensure a clean build, use `--nocache` and `--pull`.
 ```bash
 wheels docker build --local --nocache --pull
-```
-
-**Custom Tagging**
-Useful when building specific versions for release.
-```bash
-wheels docker build --local --tag=my-company/my-app:v2.0.0
 ```
 
 ### Remote Server Builds
@@ -88,7 +81,6 @@ wheels docker build --remote --nocache --pull
 2.  **Compose Detection**:
     *   **If `docker-compose.yml` exists**: It executes `docker compose build`. This is ideal for complex apps with multiple services (app, db, redis).
     *   **If only `Dockerfile` exists**: It executes `docker build -t [tag] .`.
-3.  **Tagging**: If no custom tag is provided, it sanitizes the current directory name to create a valid Docker tag (e.g., `My Project` -> `my-project:latest`).
 
 ### Remote Build Strategy (`--remote`)
 
@@ -166,7 +158,6 @@ Understanding when to use `build` vs `deploy`:
 - Testing Docker configuration changes
 - Preparing images for later deployment
 - Building on CI/CD pipeline
-- Creating multiple tagged versions
 - Building on remote servers for later use
 
 ### Use `wheels docker deploy` when:
@@ -178,7 +169,7 @@ Understanding when to use `build` vs `deploy`:
 ### Combined Workflow:
 ```bash
 # 1. Build the image
-wheels docker build --tag=myapp:v1.0.0 --nocache
+wheels docker build --nocache
 
 # 2. Test locally if needed
 docker run -d -p 8080:8080 myapp:v1.0.0
