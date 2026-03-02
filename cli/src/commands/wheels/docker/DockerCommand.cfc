@@ -776,4 +776,195 @@ component extends="../base" {
         }
     }
 
+    // =============================================================================
+    // CENTRALIZED CONFIG RESOLUTION
+    // =============================================================================
+
+    /**
+     * Global Docker Defaults
+     */
+    public struct function getDefaults() {
+        return {
+            configFile        = "config/deploy.yml",
+            legacyConfigFile  = "deploy-servers.json",
+            legacyTextFile    = "deploy-servers.txt",
+            defaultTag        = "latest",
+            defaultPort       = 8090,
+            defaultRole       = "production"
+        };
+    }
+
+    /**
+     * Determine App Name from various sources
+     */
+    private string function resolveAppName() {
+        var folderName = listLast(getCWD(), "/");
+        return len(folderName) ? lcase(folderName) : "wheels-app";
+    }
+
+    /**
+     * Resolve final configuration
+     * Priority: CLI args > config file > init defaults > hardcoded defaults
+     */
+    public struct function resolveConfig(struct cliArgs = {}) {
+        var defaults = getDefaults();
+        var config   = {};
+        
+        config.appName = resolveAppName();
+
+        if (fileExists(getCWD() & defaults.configFile)) {
+            config = readDeployConfig(defaults.configFile);
+        } else if (fileExists(getCWD() & defaults.legacyConfigFile)) {
+            config = deserializeJSON(fileRead(defaults.legacyConfigFile));
+        }
+
+        structAppend(config, cliArgs, true);
+
+        normalizeConfig(config, defaults);
+
+        return config;
+    }
+
+    /**
+     * Read and parse config/deploy.yml with full YAML support
+     */
+    private struct function readDeployConfig(string configPath) {
+        var config = { "name": "", "image": "", "servers": [] };
+        
+        try {
+            var fullPath = fileSystemUtil.resolvePath(arguments.configPath);
+            if (!fileExists(fullPath)) {
+                return config;
+            }
+
+            var content = fileRead(fullPath);
+            
+            if (isJSON(content)) {
+                return deserializeJSON(content);
+            }
+
+            var lines = listToArray(content, chr(10));
+            var currentServer = {};
+
+            for (var line in lines) {
+                var trimmedLine = trim(line);
+                if (
+                    !len(trimmedLine) 
+                    || left(trimmedLine, 2) == "##" 
+                    || asc(left(trimmedLine, 1)) == 35
+                ) {
+                    continue;
+                }
+
+                if (find("name:", trimmedLine) == 1) {
+                    config.name = trim(replace(trimmedLine, "name:", ""));
+                } else if (find("image:", trimmedLine) == 1) {
+                    var imageValue = trim(replace(trimmedLine, "image:", ""));
+
+                    if (find(":", imageValue)) {
+                        var parts = listToArray(imageValue, ":");
+                        config.imageName = parts[1];
+                        config.tag = parts[2];
+                    } else {
+                        config.imageName = imageValue;
+                    }
+                } else if (find("tag:", trimmedLine) == 1) {
+                    config.tag = trim(replace(trimmedLine, "tag:", ""));
+                } else if (find("- host:", trimmedLine)) {
+                    if (!structIsEmpty(currentServer)) {
+                        arrayAppend(config.servers, currentServer);
+                    }
+                    currentServer = { "host": trim(replace(trimmedLine, "- host:", "")), "port": 22, "role": "production" };
+                } else if (find("user:", trimmedLine) && !structIsEmpty(currentServer)) {
+                    currentServer.user = trim(replace(trimmedLine, "user:", ""));
+                } else if (find("port:", trimmedLine) && !structIsEmpty(currentServer)) {
+                    currentServer.port = val(trim(replace(trimmedLine, "port:", "")));
+                } else if (find("role:", trimmedLine) && !structIsEmpty(currentServer)) {
+                    currentServer.role = trim(replace(trimmedLine, "role:", ""));
+                }
+            }
+
+            if (!structIsEmpty(currentServer)) {
+                arrayAppend(config.servers, currentServer);
+            }
+
+        } catch (any e) {
+            // Return empty config on error
+        }
+
+        return config;
+    }
+
+    /**
+     * Normalize config with computed values
+     */
+    private void function normalizeConfig(required struct config, required struct defaults) {
+        // Ensure name
+        if (!structKeyExists(config, "name") || !len(trim(config.name))) {
+            config.name = defaults.appName;
+        }
+
+        // Ensure imageName
+        if (!structKeyExists(config, "imageName") || !len(trim(config.imageName))) {
+            config.imageName = lcase(config.name);
+        }
+
+        // Ensure tag
+        if (!structKeyExists(config, "tag") || !len(trim(config.tag))) {
+            config.tag = defaults.defaultTag;
+        }
+
+        // Ensure port
+        if (!structKeyExists(config, "port") || !isNumeric(config.port)) {
+            config.port = defaults.defaultPort;
+        }
+
+        // Compose final image
+        config.image = config.imageName & ":" & config.tag;
+
+        // IMPORTANT: Do NOT force "-app" if compose already defines it
+        config.containerName = config.name;
+    }
+
+    /**
+     * Get Container Name
+     */
+    public string function getContainerName(required struct config) {
+        return config.containerName;
+    }
+
+    /**
+     * Get Full Image Name
+     */
+    public string function getImageName(required struct config) {
+        return config.fullImageName;
+    }
+
+    // =============================================================================
+    // FLOW VALIDATION / STATE TRACKING
+    // =============================================================================
+
+    /**
+     * Check if Docker configuration exists (created by wheels docker init)
+     */
+    public boolean function hasDockerConfig() {
+        var dockerfilePath = getCWD() & "/Dockerfile";
+        var composePath = getCWD() & "/docker-compose.yml";
+        var composePathYaml = getCWD() & "/docker-compose.yaml";
+        
+        return fileExists(dockerfilePath) || fileExists(composePath) || fileExists(composePathYaml);
+    }
+
+    /**
+     * Check if image has been built locally
+     */
+    public boolean function hasLocalImage(required string imageName) {
+        try {
+            var result = runLocalCommand(["docker", "image", "inspect", arguments.imageName], false);
+            return (result.exitCode eq 0);
+        } catch (any e) {
+            return false;
+        }
+    }
+
 }

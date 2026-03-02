@@ -16,15 +16,10 @@ component extends="DockerCommand" {
     /**
      * @local Deploy to local Docker environment
      * @remote Deploy to remote server(s)
-     * @environment Deployment environment (production, staging) - for local deployment
-     * @db Database to use (h2, mysql, postgres, mssql) - for local deployment
-     * @cfengine ColdFusion engine to use (lucee, adobe) - for local deployment
      * @optimize Enable production optimizations - for local deployment
      * @serversFile Server configuration file (deploy-servers.txt or deploy-servers.json) - for remote deployment
      * @skipDockerCheck Skip Docker installation check on remote servers
      * @blueGreen Enable Blue/Green deployment strategy (zero downtime) - for remote deployment
-     * @image Deprecated. Use unique project name in box.json instead.
-     * @tag Custom tag to use (default: latest). Always treated as suffix to project name.
      */
     function run(
         boolean local=false,
@@ -32,77 +27,85 @@ component extends="DockerCommand" {
         boolean optimize=true,
         string serversFile="",
         boolean skipDockerCheck=false,
-        boolean blueGreen=false,
-        string image="",
-        string tag=""
+        boolean blueGreen=false
     ) {
         //ensure we are in a Wheels app
         requireWheelsApp(getCWD());
+
+        var config = resolveConfig({});
+        
+        // Check if Docker config exists (created by wheels docker init)
+        if (!hasDockerConfig()) {
+            detailOutput.error("Docker configuration not found. Please run 'wheels docker init' first.");
+            detailOutput.output("This command creates the necessary Docker files (Dockerfile, docker-compose.yml, etc.)");
+            return;
+        }
+        
+        // For local deploy, check if image exists (built by wheels docker build)
+        if (arguments.local) {
+            if (!hasLocalImage(config.fullImageName)) {
+                detailOutput.error("Docker image '#config.fullImageName#' not found.");
+                detailOutput.output("Please run 'wheels docker build' first to build the image.");
+                return;
+            }
+        }
+        
         // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
-        
-        var projectName = getProjectName();
+        var config = resolveConfig();
         
         // Interactive Tag Selection logic
         // Only trigger if no tag is specified and we are running?
         // Actually, if tag is empty, we usually default to 'latest'.
         // But user requested: "check the images available with different tags and then ask the user to select"
         
-        if (!len(arguments.tag)) {
-            try {
-                // List images for project with a safe delimiter
-                var imageCheck = runLocalCommand(["docker", "images", "--format", "{{.Repository}}:::{{.Tag}}"], false);
+        try {
+            // List images for project with a safe delimiter
+            var imageCheck = runLocalCommand(["docker", "images", "--format", "{{.Repository}}:::{{.Tag}}"], false);
+            
+            if (imageCheck.exitCode == 0) {
+                var candidates = [];
+                var lines = listToArray(imageCheck.output, chr(10));
                 
-                if (imageCheck.exitCode == 0) {
-                    var candidates = [];
-                    var lines = listToArray(imageCheck.output, chr(10));
-                    
-                    for (var img in lines) {
-                        // Split by our custom delimiter
-                        var parts = listToArray(img, ":::");
-                        if (arrayLen(parts) >= 2) {
-                            var repo = trim(parts[1]);
-                            var t = trim(parts[2]);
-                            
-                            // Check for exact match on project name
-                            if (repo == projectName) {
-                                arrayAppend(candidates, t);
-                            }
-                        }
-                    }
-                    
-                    // Deduplicate candidates just in case
-                    // (CFML doesn't have a native Set, so we can use a struct key trick or just leave it if docker output is unique enough)
-                    
-                    if (arrayLen(candidates) > 1) {
-                        detailOutput.line();
-                        detailOutput.output("Select a tag to deploy for project '#projectName#':");
-                        
-                        for (var i=1; i<=arrayLen(candidates); i++) {
-                            detailOutput.output("   #i#. " & candidates[i]);
-                        }
-                        detailOutput.line();
-                        
-                        var selection = ask("Enter number to select, or press Enter for 'latest': ");
-                        
-                        if (len(trim(selection)) && isNumeric(selection) && selection > 0 && selection <= arrayLen(candidates)) {
-                            arguments.tag = candidates[selection];
-                            detailOutput.statusSuccess("Selected tag: " & arguments.tag);
-                        } else if (len(trim(selection))) {
-                            // Treat as custom tag input if they typed a string not in the list? 
-                            // Or just fallback to what they typed
-                            arguments.tag = selection;
-                            detailOutput.statusSuccess("Using custom tag: " & arguments.tag);
-                        } else {
-                            // Empty selection matches 'latest' default logic later, or we can explicit set it
-                            detailOutput.statusInfo("No selection made, defaulting to 'latest'");
+                for (var img in lines) {
+                    // Split by our custom delimiter
+                    var parts = listToArray(img, ":::");
+                    if (arrayLen(parts) >= 2) {
+                        var imageName = trim(parts[1]);
+                        var t = trim(parts[2]);
+
+                        // Check for exact match on project name
+                        if (imageName == config.imageName) {
+                            arrayAppend(candidates, t);
                         }
                     }
                 }
-            } catch (any e) {
-                // Determine if we should show error or just fail silently to defaults
-                // print.redLine("Warning: Failed to list local images: " & e.message).toConsole();
+                
+                // Deduplicate candidates just in case
+                // (CFML doesn't have a native Set, so we can use a struct key trick or just leave it if docker output is unique enough)
+                
+                if (arrayLen(candidates) > 1) {
+                    detailOutput.line();
+                    detailOutput.output("Multiple images found for project '#config.imageName#':");
+                    
+                    for (var i=1; i<=arrayLen(candidates); i++) {
+                        detailOutput.output("   #i#. " & candidates[i]);
+                    }
+                    detailOutput.line();
+                    detailOutput.output("Currently configured to use tag: " & config.tag);
+                    detailOutput.output("Are you sure you want to continue with this tag?");
+                    
+                    var answer = ask("Type 'y' to continue or 'n' to cancel deployment: ");
+                    if (lcase(trim(answer)) != "y") {
+                        detailOutput.line();
+                        detailOutput.error("Deployment cancelled. To deploy a different tag, update docker-compose.yml or rebuild the image with the desired tag.");
+                        return;
+                    }
+                }
             }
+        } catch (any e) {
+            // Determine if we should show error or just fail silently to defaults
+            // print.redLine("Warning: Failed to list local images: " & e.message).toConsole();
         }
         
         // set local as default if neither specified
@@ -117,9 +120,9 @@ component extends="DockerCommand" {
         
         // Route to appropriate deployment method
         if (arguments.local) {
-            deployLocal(arguments.optimize, arguments.tag);
+            deployLocal(arguments.optimize);
         } else {
-            deployRemote(arguments.serversFile, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
+            deployRemote(arguments.serversFile, arguments.skipDockerCheck, arguments.blueGreen);
         }
     }
     
@@ -128,8 +131,7 @@ component extends="DockerCommand" {
     // =============================================================================
     
     private function deployLocal(
-        boolean optimize,
-        string tag=""
+        boolean optimize
     ) {
         // Welcome message
         detailOutput.header("Wheels Docker Local Deployment");
@@ -139,19 +141,16 @@ component extends="DockerCommand" {
         
         if (local.useCompose) {
             detailOutput.statusSuccess("Found docker-compose file, will use docker-compose");
-            
-            // Just run docker-compose up
-            if (len(arguments.tag)) {
-                detailOutput.statusInfo("Note: --tag argument is ignored when using docker-compose.");
-            }
+            local.buildCmd = ["docker-compose", "up", "-d", "--build"];
             
             detailOutput.statusInfo("Starting services...");
-            runLocalCommand(["docker-compose", "up", "-d", "--build"]);
+            detailOutput.statusInfo("Executing: " & arrayToList(local.buildCmd, " "));
+            runLocalCommand(local.buildCmd);
             
             detailOutput.line();
             detailOutput.statusSuccess("Services started successfully!");
             detailOutput.line();
-            detailOutput.output("View logs with: docker-compose logs -f");
+            detailOutput.output("View logs with: wheels docker logs --local");
             detailOutput.line();
             
         } else {
@@ -170,6 +169,8 @@ component extends="DockerCommand" {
                 return;
             }
             
+            var config = resolveConfig();
+            
             // Extract port from Dockerfile
             local.exposedPort = getDockerExposedPort();
             if (!len(local.exposedPort)) {
@@ -179,27 +180,16 @@ component extends="DockerCommand" {
                 detailOutput.statusSuccess("Found EXPOSE port: " & local.exposedPort);
             }
             
-            // Get project name for image/container naming
-            local.projectName = getProjectName();
-            local.deployConfig = getDeployConfig();
+            // Use config from resolveConfig
+            local.imageName = config.image;
+            local.containerName = config.containerName;
             
-            // Strict Tag Strategy: projectName:tag
-            local.tag = len(arguments.tag) ? arguments.tag : "latest";
-            
-            // Smart Tag Logic: Check if tag contains colon (full image name)
-            if (find(":", local.tag)) {
-                local.imageName = local.tag;
-            } else if (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) {
-                local.imageName = local.deployConfig.image & ":" & local.tag;
-            } else {
-                local.imageName = local.projectName & ":" & local.tag;
-            }
-            
-            // Container Name: Always use project name for consistency
-            local.containerName = local.projectName;
-            
+            local.buildCmd = ["docker", "build", "-t", local.imageName, "."];
+
             detailOutput.statusInfo("Building Docker image (" & local.imageName & ")...");
-            runLocalCommand(["docker", "build", "-t", local.imageName, "."]);
+            detailOutput.statusInfo("Executing: " & arrayToList(local.buildCmd, " "));
+
+            runLocalCommand(local.buildCmd);
             
             detailOutput.statusInfo("Starting container...");
             
@@ -212,7 +202,7 @@ component extends="DockerCommand" {
             }
             
             // Run new container
-            runLocalCommand(["docker", "run", "-d", "--name", local.containerName, "-p", local.exposedPort & ":" & local.exposedPort, local.imageName]);
+            runLocalCommand(["docker", "run", "-d", "--name", local.containerName, "-p", local.exposedPort & ":" & local.exposedPort, local.imageName, "sh", "-c", "box install && box server start --console --force"]);
             
             detailOutput.line();
             detailOutput.statusSuccess("Container started successfully!");
