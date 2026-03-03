@@ -3,7 +3,7 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	/**
 	 * Map database types to the ones used in CFML.
 	 * Using oid cols should probably be avoided, included here for completeness.
-	 * PostgreSQL has deprecated the money type, included here for completeness.
+	 * CockroachDB has deprecated the money type, included here for completeness.
 	 */
 	public string function $getType(required string type, string scale, string details) {
 		switch (arguments.type) {
@@ -128,6 +128,10 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	) {
 		var query = {};
 		local.sql = Trim(arguments.result.sql);
+		// writeDump(arguments);
+		// writeDump(local);
+		// writeDump($generatedKey());
+		// abort;
 		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
 			local.startPar = Find("(", local.sql) + 1;
 			local.endPar = Find(")", local.sql);
@@ -151,20 +155,19 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				}
 			}
 
-			// Strip identifier quotes from column list for comparison
-			local.columnList = $stripIdentifierQuotes(local.columnList);
-
-			// Lucee/ACF doesn't support PostgreSQL natively when it comes to returning the primary key value of the last inserted record so we have to do it manually by using the sequence.
+			// Lucee/ACF doesn't support CockroachDB natively when it comes to returning the primary key value of the last inserted record so we have to do it manually by using the sequence.
 			if (!ListFindNoCase(local.columnList, ListFirst(arguments.primaryKey))) {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
-				// Strip identifier quotes that may have been added by $quoteIdentifier
-				local.tbl = ReReplace(local.tbl, '^"|"$', "", "all");
-				query = $query(
-					sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",
-					argumentCollection = arguments.queryAttributes
-				);
-				local.rv[$generatedKey()] = query.lastId;
+				if(Left(local.sql, 11) == "INSERT INTO") {
+					query.id = listFirst(arguments.result.generatedKey);
+				} else {
+					query = $query(
+						sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",
+						argumentCollection = arguments.queryAttributes
+					);
+				}
+				local.rv[$generatedKey()] = query.id;
 				return local.rv;
 			}
 		}
@@ -177,14 +180,5 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		return "random()";
 	}
 
-	/**
-	 * Override Base adapter's function.
-	 * PostgreSQL uses double-quotes to quote identifiers (ANSI SQL standard).
-	 */
-	public string function $quoteIdentifier(required string name) {
-		// PostgreSQL folds unquoted identifiers to lowercase, so we must lowercase
-		// before quoting to match the actual stored name
-		return """#LCase(arguments.name)#""";
-	}
 
 }
