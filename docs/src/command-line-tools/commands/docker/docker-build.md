@@ -214,11 +214,8 @@ ssh user@host "docker images"
 
 - [wheels docker init](docker-init.md) - Initialize Docker configuration files
 - [wheels docker deploy](docker-deploy.md) - Build and deploy Docker containers
-- [wheels docker push](docker-push.md) - Push Docker images to registries
 - [wheels docker logs](docker-logs.md) - View container logs
-- [wheels docker stop](docker-stop.md) - Stop Docker containers
 - [wheels docker exec](docker-exec.md) - Execute commands in containers
-
----
+- [wheels docker stop](docker-stop.md) - Stop Docker containers
 
 **Note**: This command is part of the Wheels CLI tool suite for Docker management.

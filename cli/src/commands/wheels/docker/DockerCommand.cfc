@@ -960,8 +960,18 @@ component extends="../base" {
      */
     public boolean function hasLocalImage(required string imageName) {
         try {
-            var result = runLocalCommand(["docker", "image", "inspect", arguments.imageName], false);
-            return (result.exitCode eq 0);
+            var result = runLocalCommand(
+                ["docker", "image", "ls", "--format", "{{.Repository}}"],
+                false
+            );
+
+            if (result.exitCode neq 0) {
+                return false;
+            }
+
+            var images = listToArray(trim(result.output), chr(10));
+            return arrayContains(images, arguments.imageName);
+
         } catch (any e) {
             return false;
         }

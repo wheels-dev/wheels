@@ -150,49 +150,6 @@ component extends="DockerCommand" {
         }
     }
     
-    /**
-     * Run a local system command
-     */
-    private function runLocalCommand(array cmd, boolean showOutput=true) {
-        var local = {};
-        local.javaCmd = createObject("java","java.util.ArrayList").init();
-        for (var c in arguments.cmd) {
-            local.javaCmd.add(c & "");
-        }
-
-        local.pb = createObject("java","java.lang.ProcessBuilder").init(local.javaCmd);
-        
-        // Set working directory to current directory
-        local.currentDir = createObject("java", "java.io.File").init(getCWD());
-        local.pb.directory(local.currentDir);
-        
-        local.pb.redirectErrorStream(true);
-        local.proc = local.pb.start();
-
-        local.isr = createObject("java","java.io.InputStreamReader").init(local.proc.getInputStream(), "UTF-8");
-        local.br = createObject("java","java.io.BufferedReader").init(local.isr);
-        local.outputParts = [];
-
-        while (true) {
-            local.line = local.br.readLine();
-            if (isNull(local.line)) break;
-            arrayAppend(local.outputParts, local.line);
-            if (arguments.showOutput) {
-                detailOutput.output(local.line);
-            }
-        }
-
-        local.exitCode = local.proc.waitFor();
-        local.output = arrayToList(local.outputParts, chr(10));
-        
-        if (local.exitCode neq 0 && arguments.showOutput) {
-            detailOutput.error("Command failed with exit code: " & local.exitCode);
-            return;
-        }
-
-        return { exitCode: local.exitCode, output: local.output };
-    }
-    
     // =============================================================================
     // REMOTE BUILD
     // =============================================================================

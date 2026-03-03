@@ -16,7 +16,6 @@ component extends="DockerCommand" {
     /**
      * @local Deploy to local Docker environment
      * @remote Deploy to remote server(s)
-     * @optimize Enable production optimizations - for local deployment
      * @serversFile Server configuration file (deploy-servers.txt or deploy-servers.json) - for remote deployment
      * @skipDockerCheck Skip Docker installation check on remote servers
      * @blueGreen Enable Blue/Green deployment strategy (zero downtime) - for remote deployment
@@ -24,90 +23,17 @@ component extends="DockerCommand" {
     function run(
         boolean local=false,
         boolean remote=false,
-        boolean optimize=true,
         string serversFile="",
         boolean skipDockerCheck=false,
         boolean blueGreen=false
     ) {
         //ensure we are in a Wheels app
         requireWheelsApp(getCWD());
-
-        var config = resolveConfig({});
-        
-        // Check if Docker config exists (created by wheels docker init)
-        if (!hasDockerConfig()) {
-            detailOutput.error("Docker configuration not found. Please run 'wheels docker init' first.");
-            detailOutput.output("This command creates the necessary Docker files (Dockerfile, docker-compose.yml, etc.)");
-            return;
-        }
-        
-        // For local deploy, check if image exists (built by wheels docker build)
-        if (arguments.local) {
-            if (!hasLocalImage(config.fullImageName)) {
-                detailOutput.error("Docker image '#config.fullImageName#' not found.");
-                detailOutput.output("Please run 'wheels docker build' first to build the image.");
-                return;
-            }
-        }
         
         // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
-        var config = resolveConfig();
-        
-        // Interactive Tag Selection logic
-        // Only trigger if no tag is specified and we are running?
-        // Actually, if tag is empty, we usually default to 'latest'.
-        // But user requested: "check the images available with different tags and then ask the user to select"
-        
-        try {
-            // List images for project with a safe delimiter
-            var imageCheck = runLocalCommand(["docker", "images", "--format", "{{.Repository}}:::{{.Tag}}"], false);
-            
-            if (imageCheck.exitCode == 0) {
-                var candidates = [];
-                var lines = listToArray(imageCheck.output, chr(10));
-                
-                for (var img in lines) {
-                    // Split by our custom delimiter
-                    var parts = listToArray(img, ":::");
-                    if (arrayLen(parts) >= 2) {
-                        var imageName = trim(parts[1]);
-                        var t = trim(parts[2]);
+        var config = resolveConfig({});
 
-                        // Check for exact match on project name
-                        if (imageName == config.imageName) {
-                            arrayAppend(candidates, t);
-                        }
-                    }
-                }
-                
-                // Deduplicate candidates just in case
-                // (CFML doesn't have a native Set, so we can use a struct key trick or just leave it if docker output is unique enough)
-                
-                if (arrayLen(candidates) > 1) {
-                    detailOutput.line();
-                    detailOutput.output("Multiple images found for project '#config.imageName#':");
-                    
-                    for (var i=1; i<=arrayLen(candidates); i++) {
-                        detailOutput.output("   #i#. " & candidates[i]);
-                    }
-                    detailOutput.line();
-                    detailOutput.output("Currently configured to use tag: " & config.tag);
-                    detailOutput.output("Are you sure you want to continue with this tag?");
-                    
-                    var answer = ask("Type 'y' to continue or 'n' to cancel deployment: ");
-                    if (lcase(trim(answer)) != "y") {
-                        detailOutput.line();
-                        detailOutput.error("Deployment cancelled. To deploy a different tag, update docker-compose.yml or rebuild the image with the desired tag.");
-                        return;
-                    }
-                }
-            }
-        } catch (any e) {
-            // Determine if we should show error or just fail silently to defaults
-            // print.redLine("Warning: Failed to list local images: " & e.message).toConsole();
-        }
-        
         // set local as default if neither specified
         if (!arguments.local && !arguments.remote) {
             arguments.local=true;
@@ -117,10 +43,72 @@ component extends="DockerCommand" {
             detailOutput.error("Cannot specify both --local and --remote. Please choose one.");
             return;
         }
+
+        // Check if Docker config exists (created by wheels docker init)
+        if (!hasDockerConfig()) {
+            detailOutput.error("Docker configuration not found. Please run 'wheels docker init' first.");
+            detailOutput.output("This command creates the necessary Docker files (Dockerfile, docker-compose.yml, etc.)");
+            return;
+        }
+        
+        // For local deploy, check if image exists (built by wheels docker build)
+        if (arguments.local) {
+            if (!hasLocalImage(config.imageName)) {
+                detailOutput.error("Docker image '#config.imageName#' not found.");
+                detailOutput.output("Please run 'wheels docker build' first to build the image.");
+                return;
+            }
+
+            try {
+                // List images for project with a safe delimiter
+                var imageCheck = runLocalCommand(["docker", "images", "--format", "{{.Repository}}:::{{.Tag}}"], false);
+                
+                if (imageCheck.exitCode == 0) {
+                    var candidates = [];
+                    var lines = listToArray(imageCheck.output, chr(10));
+                    
+                    for (var img in lines) {
+                        // Split by our custom delimiter
+                        var parts = listToArray(img, ":::");
+                        if (arrayLen(parts) >= 2) {
+                            var imageName = trim(parts[1]);
+                            var t = trim(parts[2]);
+
+                            // Check for exact match on project name
+                            if (imageName == config.imageName) {
+                                arrayAppend(candidates, t);
+                            }
+                        }
+                    }
+                    
+                    if (arrayLen(candidates) > 1) {
+                        detailOutput.line();
+                        detailOutput.output("Multiple images found for project '#config.imageName#':");
+                        
+                        for (var i=1; i<=arrayLen(candidates); i++) {
+                            detailOutput.output("   #i#. " & candidates[i]);
+                        }
+                        detailOutput.line();
+                        detailOutput.output("Currently configured to use tag: " & config.tag);
+                        detailOutput.output("Are you sure you want to continue with this tag?");
+                        
+                        var answer = ask("Type 'y' to continue or 'n' to cancel deployment: ");
+                        if (lcase(trim(answer)) != "y") {
+                            detailOutput.line();
+                            detailOutput.error("Deployment cancelled. To deploy a different tag, update docker-compose.yml or rebuild the image with the desired tag.");
+                            return;
+                        }
+                    }
+                }
+            } catch (any e) {
+                // Determine if we should show error or just fail silently to defaults
+                // print.redLine("Warning: Failed to list local images: " & e.message).toConsole();
+            }
+        }
         
         // Route to appropriate deployment method
         if (arguments.local) {
-            deployLocal(arguments.optimize);
+            deployLocal();
         } else {
             deployRemote(arguments.serversFile, arguments.skipDockerCheck, arguments.blueGreen);
         }
@@ -130,10 +118,7 @@ component extends="DockerCommand" {
     // LOCAL DEPLOYMENT
     // =============================================================================
     
-    private function deployLocal(
-        boolean optimize
-    ) {
-        // Welcome message
+    private function deployLocal() {
         detailOutput.header("Wheels Docker Local Deployment");
 
         // Check for docker-compose file
@@ -202,7 +187,7 @@ component extends="DockerCommand" {
             }
             
             // Run new container
-            runLocalCommand(["docker", "run", "-d", "--name", local.containerName, "-p", local.exposedPort & ":" & local.exposedPort, local.imageName, "sh", "-c", "box install && box server start --console --force"]);
+            runLocalCommand(["docker", "run", "-d", "--name", local.containerName, "-p", local.exposedPort & ":" & local.exposedPort, local.imageName]);
             
             detailOutput.line();
             detailOutput.statusSuccess("Container started successfully!");

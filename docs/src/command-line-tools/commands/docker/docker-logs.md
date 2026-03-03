@@ -20,12 +20,13 @@ The `wheels docker logs` command fetches and displays logs from running containe
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--servers` | Specific servers to check (defaults to `config/deploy.yml`) | `""` |
-| `--local` | Fetch logs from local Docker environment | `false` |
+| `--local` | Fetch logs from local Docker environment | `true` |
 | `--tail` | Number of lines to show | `100` |
 | `--follow` | Follow log output in real-time | `false` |
-| `--service` | Service to show logs for: `app` or `db` | `app` |
+| `--service` | Service to show logs for: `wheels-app` or `wheels-db` | `wheels-app` |
 | `--since` | Show logs since timestamp | `""` |
+| `--remote` | Fetch logs from remote Docker environment | `false` |
+| `--servers` | Specific servers to check (defaults to `config/deploy.yml`) | `""` |
 
 ## Detailed Examples
 
@@ -46,7 +47,7 @@ wheels docker logs --local
 **View Database Logs**
 Fetches logs from the database service container.
 ```bash
-wheels docker logs --service=db
+wheels docker logs --service=wheels-db
 ```
 
 ### Real-Time Monitoring
@@ -89,10 +90,20 @@ wheels docker logs --tail=50 --servers=problematic-server.com
 **Checking Database Errors**
 If the app reports database connection errors, check the DB logs for rejection messages or startup errors.
 ```bash
-wheels docker logs --service=db --tail=100
+wheels docker logs --service=wheels-db --tail=100
 ```
 
 ## Notes
 
 *   **Service Discovery**: Automatically finds the correct container, handling Blue/Green deployment naming (e.g., it knows to look at `myapp-green` if that's the active container).
 *   **SSH**: Uses your local SSH configuration. Ensure you have access to the servers.
+
+## Related Commands
+
+- [wheels docker init](docker-init.md) - Initialize Docker configuration files
+- [wheels docker build](docker-build.md) - Build Docker images
+- [wheels docker deploy](docker-deploy.md) - Build and deploy Docker containers
+- [wheels docker exec](docker-exec.md) - Execute commands in containers
+- [wheels docker stop](docker-stop.md) - Stop Docker containers
+
+**Note**: This command is part of the Wheels CLI tool suite for Docker management.

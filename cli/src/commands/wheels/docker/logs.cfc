@@ -15,12 +15,13 @@ component extends="DockerCommand" {
     property name="detailOutput" inject="DetailOutputService@wheels-cli";
 
     /**
+     * @local Fetch logs from local Docker environment
+     * @remote Fetch logs from remote server(s)
      * @servers Specific servers to check (comma-separated list)
      * @tail Number of lines to show (default: 100)
      * @follow Follow log output in real-time (default: false)
      * @service Service to show logs for: app or db (default: app)
      * @since Show logs since timestamp (e.g., "2023-01-01", "1h", "5m")
-     * @remote Fetch logs from remote Docker container instead of local
      */
     function run(
         boolean local=false,
@@ -33,6 +34,7 @@ component extends="DockerCommand" {
     ) {
         //ensure we are in a Wheels app
         requireWheelsApp(getCWD());
+
         // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
 
@@ -58,11 +60,14 @@ component extends="DockerCommand" {
         // Load servers
         var serverList = [];
         
+        // Resolve config using centralized config resolution
+        var config = resolveConfig({});
+        var projectName = config.name;
+        
         // Check for deploy-servers file (text or json) in current directory
         var textConfigPath = fileSystemUtil.resolvePath("deploy-servers.txt");
         var jsonConfigPath = fileSystemUtil.resolvePath("deploy-servers.json");
         var ymlConfigPath = fileSystemUtil.resolvePath("config/deploy.yml");
-        var projectName = getProjectName();
         
         // If specific servers argument is provided
         if (len(trim(arguments.servers))) {
@@ -280,7 +285,9 @@ component extends="DockerCommand" {
         string service, 
         string since
     ) {
-        var projectName = getProjectName();
+        // Resolve config using centralized config resolution
+        var config = resolveConfig({});
+        var projectName = config.name;
         var containerName = "";
         
         if (arguments.service == "app") {
@@ -323,7 +330,7 @@ component extends="DockerCommand" {
         }
 
         if (!len(containerName)) {
-            detailOutput.error("Could not find running container for service: " & arguments.service);
+            detailOutput.error("Could not find running container for service: " & projectName);
             return;
         }
 
