@@ -149,7 +149,26 @@ jobs:
 
       - name: Start external DB if needed (${{ matrix.dbengine }}) ...
         if: ${{ matrix.dbengine != 'h2' && matrix.dbengine != 'sqlite'}}
-        run: docker compose up -d ${{ matrix.dbengine }}
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "Attempt $RETRY_COUNT of $MAX_RETRIES: Starting ${{ matrix.dbengine }}..."
+            if docker compose up -d ${{ matrix.dbengine }}; then
+              echo "✅ ${{ matrix.dbengine }} container started successfully"
+              exit 0
+            else
+              echo "❌ Failed to start ${{ matrix.dbengine }} on attempt $RETRY_COUNT"
+              if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                echo "Cleaning up and retrying in 10 seconds..."
+                docker compose down ${{ matrix.dbengine }} 2>/dev/null || true
+                sleep 10
+              fi
+            fi
+          done
+          echo "Failed to start ${{ matrix.dbengine }} after $MAX_RETRIES attempts"
+          exit 1
 
       - name: Wait for containers to be ready
         run: |

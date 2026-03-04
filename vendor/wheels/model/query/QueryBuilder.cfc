@@ -269,8 +269,12 @@ component output="false" {
 			local.args.distinct = true;
 		}
 
-		// Apply LIMIT
-		if (variables.limitValue > 0) {
+		// Apply LIMIT and OFFSET
+		if (variables.offsetValue > 0 && variables.limitValue > 0) {
+			// Use internal limit/offset for precise row-range control (works on all DB engines)
+			local.args.$limit = variables.limitValue;
+			local.args.$offset = variables.offsetValue;
+		} else if (variables.limitValue > 0) {
 			local.args.maxRows = variables.limitValue;
 		}
 
