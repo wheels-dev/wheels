@@ -17,7 +17,7 @@ jobs:
       matrix:
         cfengine:
           ["lucee5", "lucee6", "lucee7", "adobe2018", "adobe2021", "adobe2023", "adobe2025", "boxlang"]
-        dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle", sqlite]
+        dbengine: ["mysql", "postgres", "sqlserver", "h2", "oracle", sqlite, cockroachdb]
         commandbox_version: ["6.2.1"]
         jdkVersion: ["21"]
         experimental: [false]
@@ -46,6 +46,8 @@ jobs:
             dbengine: h2
           - cfengine: lucee7
             dbengine: oracle
+          - cfengine: lucee7
+            dbengine: cockroachdb
           - cfengine: lucee5
             dbengine: mysql
           - cfengine: lucee5
@@ -56,6 +58,8 @@ jobs:
             dbengine: h2
           - cfengine: lucee5
             dbengine: oracle
+          - cfengine: lucee5
+            dbengine: cockroachdb
           - cfengine: lucee6
             dbengine: mysql
           - cfengine: lucee6
@@ -66,6 +70,8 @@ jobs:
             dbengine: h2
           - cfengine: lucee6
             dbengine: oracle
+          - cfengine: lucee6
+            dbengine: cockroachdb
           - cfengine: adobe2018
             dbengine: mysql
           - cfengine: adobe2018
@@ -74,6 +80,8 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2018
             dbengine: oracle
+          - cfengine: adobe2018
+            dbengine: cockroachdb
           - cfengine: adobe2021
             dbengine: mysql
           - cfengine: adobe2021
@@ -82,6 +90,8 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2021
             dbengine: oracle
+          - cfengine: adobe2021
+            dbengine: cockroachdb
           - cfengine: adobe2023
             dbengine: mysql
           - cfengine: adobe2023
@@ -90,6 +100,8 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2023
             dbengine: oracle
+          - cfengine: adobe2023
+            dbengine: cockroachdb
           - cfengine: adobe2025
             dbengine: mysql
           - cfengine: adobe2025
@@ -98,6 +110,8 @@ jobs:
             dbengine: sqlserver
           - cfengine: adobe2025
             dbengine: oracle
+          - cfengine: adobe2025
+            dbengine: cockroachdb
           - cfengine: boxlang
             dbengine: mysql
           - cfengine: boxlang
@@ -106,6 +120,8 @@ jobs:
             dbengine: postgres
           - cfengine: boxlang
             dbengine: oracle
+          - cfengine: boxlang
+            dbengine: cockroachdb
         exclude:
           - cfengine: adobe2018
             dbengine: sqlite

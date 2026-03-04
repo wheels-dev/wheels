@@ -347,7 +347,27 @@ services:
     networks:
       - wheels-network
 
+  cockroachdb:
+    image: cockroachdb/cockroach:v24.1.0
+    entrypoint: ["/bin/bash", "/docker-init/start.sh"]
+    restart: always
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    volumes:
+      - cockroach_data:/cockroach/cockroach-data
+      - ./tools/docker/cockroach:/docker-init
+    healthcheck:
+      test: ["CMD", "cockroach", "sql", "--insecure", "--host=localhost:26257", "--execute=SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - wheels-network
+    
 volumes:
   mysql_data:
   postgres_data:
   sqlserver_data:
+  cockroach_data:

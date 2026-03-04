@@ -105,6 +105,21 @@
 			"host":"",
 			"password":"",
 			"username":""
+		},
+		"wheelstestdb_cockroachdb": {
+			"blob": "false",
+			"class": "org.postgresql.Driver",
+			"clob": "false",
+			"connectionLimit": "-1",
+			"connectionTimeout": "20",
+			"database": "wheelstestdb",
+			"dbdriver": "PostgreSql",
+			"dsn": "jdbc:postgresql://{host}:{port}/{database}?sslmode=disable",
+			"host": "cockroachdb",
+			"password": "",
+			"port": "26257",
+			"username": "wheelstestdb",
+			"validate": "false"
 		}
 	}
 }
