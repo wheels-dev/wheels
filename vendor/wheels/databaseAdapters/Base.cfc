@@ -104,11 +104,17 @@ component output=false extends="wheels.Global"{
 			wheels.rv.query = local[args.debugName];
 		}
 
+		// Initialize local.query as an empty struct if not present.
+		// Used for Adobe CF to handle RETURNING primary key in CockroachDB inserts.
+		if(!structKeyExists(local, "query")){
+			local.query = "";
+		}
 		// Manual identity retrieval for Lucee / ACF
 		wheels.id = $identitySelect(
-			primaryKey      = args.primaryKey,
-			queryAttributes = args.queryAttributes,
-			result          = wheels.result
+			primaryKey        = args.primaryKey,
+			queryAttributes   = args.queryAttributes,
+			result            = wheels.result,
+			returningIdentity = local.query
 		);
 
 		if (structKeyExists(wheels,"id") && isStruct(wheels.id) && !structIsEmpty(wheels.id)) {

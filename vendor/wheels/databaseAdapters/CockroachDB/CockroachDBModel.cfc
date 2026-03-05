@@ -104,6 +104,9 @@ component extends="wheels.databaseAdapters.Base" output=false {
 		required boolean parameterize,
 		string $primaryKey = ""
 	) {
+		if(left(arguments.sql[1], 11) eq 'INSERT INTO'){
+			arrayAppend(arguments.sql, "RETURNING #$primaryKey#")
+		}
 		$convertMaxRowsToLimit(args = arguments);
 		$removeColumnAliasesInOrderClause(args = arguments);
 		$addColumnsToSelectAndGroupBy(args = arguments);
@@ -124,14 +127,11 @@ component extends="wheels.databaseAdapters.Base" output=false {
 	public any function $identitySelect(
 		required struct queryAttributes,
 		required struct result,
-		required string primaryKey
+		required string primaryKey,
+		any returningIdentity=""
 	) {
 		var query = {};
 		local.sql = Trim(arguments.result.sql);
-		// writeDump(arguments);
-		// writeDump(local);
-		// writeDump($generatedKey());
-		// abort;
 		if (Left(local.sql, 11) == "INSERT INTO" && !StructKeyExists(arguments.result, $generatedKey())) {
 			local.startPar = Find("(", local.sql) + 1;
 			local.endPar = Find(")", local.sql);
@@ -160,7 +160,12 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
 				if(Left(local.sql, 11) == "INSERT INTO") {
-					query.id = listFirst(arguments.result.generatedKey);
+					if(structKeyExists(arguments.result, "generatedKey"))
+					{
+						query.id = arguments.result[arguments.primaryKey][1];
+					} else {
+						query.id = arguments.returningIdentity[arguments.primaryKey][1];
+					}
 				} else {
 					query = $query(
 						sql = "SELECT currval(pg_get_serial_sequence('#local.tbl#', '#arguments.primaryKey#')) AS lastId",

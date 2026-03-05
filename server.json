@@ -13,7 +13,8 @@
         }
     },
     "app":{
-        "cfengine":"lucee"
+        "cfengine":"lucee",
+        "libDirs":"app/lib"
     },
     "rewritesEnable=true":true,
     "openbrowser":"false"
