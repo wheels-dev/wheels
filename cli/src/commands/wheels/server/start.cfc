@@ -6,7 +6,6 @@
  * {code:bash}
  * wheels server start
  * wheels server start port=8080
- * wheels server start rewritesEnable=true
  * {code}
  **/
 component extends="../base" {
@@ -14,7 +13,6 @@ component extends="../base" {
 	/**
 	 * @port Port number to start server on
 	 * @host Host/IP to bind server to
-	 * @rewritesEnable Enable URL rewriting
 	 * @openbrowser Open browser after starting
 	 * @directory Directory to serve (defaults to current)
 	 * @name Server name
@@ -23,27 +21,34 @@ component extends="../base" {
 	function run(
 		numeric port,
 		string host = "127.0.0.1",
-		boolean rewritesEnable,
 		boolean openbrowser = true,
 		string directory = getCWD(),
 		string name,
 		boolean force = false
 	) {
-		// Check if we're in a Wheels application
-		if (!isWheelsApp(arguments.directory)) {
-			print.redLine("This doesn't appear to be a Wheels application directory.");
-			print.line("Looking for /vendor/wheels, /config, and /app folders in: #arguments.directory#");
-			print.line();
-			print.yellowLine("Did you mean to run 'wheels generate app' first?");
-			return;
-		}
+		requireWheelsApp(getCWD());
+
+		arguments = reconstructArgs(
+			argStruct = arguments
+		);
+
+		// Header
+		detailOutput.header("Wheels Development Server");
 
 		// Check if server is already running
 		if (!arguments.force) {
-			var serverInfo = getServerInfo();
-			if (structKeyExists(serverInfo, "port") && serverInfo.port > 0) {
-				print.yellowLine("Server appears to be already running on port #serverInfo.port#");
-				print.line("Use --force to start anyway, or 'wheels server restart' to restart.");
+			detailOutput.statusInfo("Checking server status");
+			var statusCommand = "server status";
+			local.result = runCommand(statusCommand);
+
+			// Check if server is not running
+			if (findNoCase("running", local.result)) {
+				detailOutput.statusWarning("Server appears to already be running");
+				detailOutput.nextSteps([
+					"Run 'wheels server restart' to restart the server",
+					"Run 'wheels server stop' to stop the server",
+					"Run with --force to start anyway"
+				]);
 				return;
 			}
 		}
@@ -53,40 +58,39 @@ component extends="../base" {
 		
 		// Add parameters if provided
 		if (!isNull(arguments.port)) {
-			startCommand &= " --port=#arguments.port#";
+			startCommand &= " port=#arguments.port#";
 		}
 		if (!isNull(arguments.host)) {
-			startCommand &= " --host=#arguments.host#";
-		}
-		if (!isNull(arguments.rewritesEnable)) {
-			startCommand &= " --rewritesEnable=#arguments.rewritesEnable#";
+			startCommand &= " host=#arguments.host#";
 		}
 		if (!isNull(arguments.openbrowser)) {
-			startCommand &= " --openbrowser=#arguments.openbrowser#";
+			startCommand &= " openbrowser=#arguments.openbrowser#";
 		}
 		if (!isNull(arguments.name)) {
-			startCommand &= " --name=#arguments.name#";
+			startCommand &= " name=#arguments.name#";
 		}
 		if (arguments.directory != getCWD()) {
-			startCommand &= " --directory=#arguments.directory#";
+			startCommand &= " directory=#arguments.directory#";
 		}
 
-		print.greenLine("Starting Wheels development server...");
-		print.line();
+		detailOutput.statusInfo("Starting Wheels development server...");
+
+		// Show command
+		detailOutput.subHeader("Executing Command");
+		detailOutput.code(startCommand);
 		
 		// Execute the server start command
 		command(startCommand).run();
 		
 		// Show helpful information
-		print.line();
-		print.greenLine("Server started successfully!");
-		print.line();
-		print.line("Useful commands:");
-		print.indentedLine("wheels server status   - Check server status");
-		print.indentedLine("wheels server log      - View server logs");
-		print.indentedLine("wheels server stop     - Stop the server");
-		print.indentedLine("wheels reload          - Reload your application");
-		print.line();
+		detailOutput.success("Server started successfully!");
+
+		detailOutput.nextSteps([
+			"wheels server status   - Check server status",
+			"wheels server log      - View server logs",
+			"wheels server stop     - Stop the server",
+			"wheels reload          - Reload your application"
+		]);
 	}
 
 	/**

@@ -4,6 +4,7 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	 * Internal function.
 	 */
 	public struct function $init() {
+		include "/wheels/public/helpers.cfm";
 		return this;
 	}
 
@@ -23,7 +24,6 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 	function routetester(verb, path) {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/routetester.cfm";
 		return "";
 	}
@@ -32,7 +32,6 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 		return "";
 	}
 	function api() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/api.cfm";
 		return "";
 	}
@@ -172,13 +171,11 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	function guides() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/guides.cfm";
 		return "";
 	}
 
 	function ai() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/ai.cfm";
 		return "";
 	}
@@ -208,7 +205,6 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 	}
 
 	function mcp() {
-		include "/wheels/public/helpers.cfm";
 		include "/wheels/public/views/mcp.cfm";
 		return "";
 	}

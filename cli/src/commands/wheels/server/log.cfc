@@ -22,6 +22,7 @@ component extends="../base" {
 		numeric lines = 50,
 		boolean debug = false
 	) {
+		detailOutput.header("Wheels Server Logs");
 		// Build the log command
 		var logCommand = "server log";
 		
@@ -63,7 +64,14 @@ component extends="../base" {
 		print.line();
 		
 		// Execute the server log command
+		detailOutput.subHeader("Executing Log Command");
+		detailOutput.code(logCommand);
+
 		command(logCommand).run();
+
+		if (arguments.follow) {
+			detailOutput.statusInfo("Press Ctrl+C to stop following logs");
+		}
 	}
 
 }
