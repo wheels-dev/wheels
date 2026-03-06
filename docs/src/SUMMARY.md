@@ -79,8 +79,6 @@
     * [wheels docker logs](command-line-tools/commands/docker/docker-logs.md)
     * [wheels docker exec](command-line-tools/commands/docker/docker-exec.md)
     * [wheels docker stop](command-line-tools/commands/docker/docker-stop.md)
-    * [wheels docker login](command-line-tools/commands/docker/docker-login.md)
-    * [wheels docker push](command-line-tools/commands/docker/docker-push.md)
   * Get Commands
     * [wheels get environment](command-line-tools/commands/get/get-environment.md)
     * [wheels get settings](command-line-tools/commands/get/get-settings.md)
