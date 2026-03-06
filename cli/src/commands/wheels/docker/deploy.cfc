@@ -16,42 +16,49 @@ component extends="DockerCommand" {
     /**
      * @local Deploy to local Docker environment
      * @remote Deploy to remote server(s)
-     * @environment Deployment environment (production, staging) - for local deployment
-     * @db Database to use (h2, mysql, postgres, mssql) - for local deployment
-     * @cfengine ColdFusion engine to use (lucee, adobe) - for local deployment
-     * @optimize Enable production optimizations - for local deployment
-     * @servers Server configuration file (deploy-servers.txt or deploy-servers.json) - for remote deployment
+     * @serversFile Server configuration file (deploy-servers.txt or deploy-servers.json) - for remote deployment
      * @skipDockerCheck Skip Docker installation check on remote servers
      * @blueGreen Enable Blue/Green deployment strategy (zero downtime) - for remote deployment
-     * @image Deprecated. Use unique project name in box.json instead.
-     * @tag Custom tag to use (default: latest). Always treated as suffix to project name.
      */
     function run(
         boolean local=false,
         boolean remote=false,
-        string environment="production",
-        string db="mysql",
-        string cfengine="lucee",
-        boolean optimize=true,
-        string servers="",
+        string serversFile="",
         boolean skipDockerCheck=false,
-        boolean blueGreen=false,
-        string image="",
-        string tag=""
+        boolean blueGreen=false
     ) {
         //ensure we are in a Wheels app
         requireWheelsApp(getCWD());
+        
         // Reconstruct arguments for handling --key=value style
         arguments = reconstructArgs(arguments);
+        var config = resolveConfig({});
+
+        // set local as default if neither specified
+        if (!arguments.local && !arguments.remote) {
+            arguments.local=true;
+        }
         
-        var projectName = getProjectName();
+        if (arguments.local && arguments.remote) {
+            detailOutput.error("Cannot specify both --local and --remote. Please choose one.");
+            return;
+        }
+
+        // Check if Docker config exists (created by wheels docker init)
+        if (!hasDockerConfig()) {
+            detailOutput.error("Docker configuration not found. Please run 'wheels docker init' first.");
+            detailOutput.output("This command creates the necessary Docker files (Dockerfile, docker-compose.yml, etc.)");
+            return;
+        }
         
-        // Interactive Tag Selection logic
-        // Only trigger if no tag is specified and we are running?
-        // Actually, if tag is empty, we usually default to 'latest'.
-        // But user requested: "check the images available with different tags and then ask the user to select"
-        
-        if (!len(arguments.tag)) {
+        // For local deploy, check if image exists (built by wheels docker build)
+        if (arguments.local) {
+            if (!hasLocalImage(config.imageName)) {
+                detailOutput.error("Docker image '#config.imageName#' not found.");
+                detailOutput.output("Please run 'wheels docker build' first to build the image.");
+                return;
+            }
+
             try {
                 // List images for project with a safe delimiter
                 var imageCheck = runLocalCommand(["docker", "images", "--format", "{{.Repository}}:::{{.Tag}}"], false);
@@ -64,41 +71,32 @@ component extends="DockerCommand" {
                         // Split by our custom delimiter
                         var parts = listToArray(img, ":::");
                         if (arrayLen(parts) >= 2) {
-                            var repo = trim(parts[1]);
+                            var imageName = trim(parts[1]);
                             var t = trim(parts[2]);
-                            
+
                             // Check for exact match on project name
-                            if (repo == projectName) {
+                            if (imageName == config.imageName) {
                                 arrayAppend(candidates, t);
                             }
                         }
                     }
                     
-                    // Deduplicate candidates just in case
-                    // (CFML doesn't have a native Set, so we can use a struct key trick or just leave it if docker output is unique enough)
-                    
                     if (arrayLen(candidates) > 1) {
                         detailOutput.line();
-                        detailOutput.output("Select a tag to deploy for project '#projectName#':");
+                        detailOutput.output("Multiple images found for project '#config.imageName#':");
                         
                         for (var i=1; i<=arrayLen(candidates); i++) {
                             detailOutput.output("   #i#. " & candidates[i]);
                         }
                         detailOutput.line();
+                        detailOutput.output("Currently configured to use tag: " & config.tag);
+                        detailOutput.output("Are you sure you want to continue with this tag?");
                         
-                        var selection = ask("Enter number to select, or press Enter for 'latest': ");
-                        
-                        if (len(trim(selection)) && isNumeric(selection) && selection > 0 && selection <= arrayLen(candidates)) {
-                            arguments.tag = candidates[selection];
-                            detailOutput.statusSuccess("Selected tag: " & arguments.tag);
-                        } else if (len(trim(selection))) {
-                            // Treat as custom tag input if they typed a string not in the list? 
-                            // Or just fallback to what they typed
-                            arguments.tag = selection;
-                            detailOutput.statusSuccess("Using custom tag: " & arguments.tag);
-                        } else {
-                            // Empty selection matches 'latest' default logic later, or we can explicit set it
-                            detailOutput.statusInfo("No selection made, defaulting to 'latest'");
+                        var answer = ask("Type 'y' to continue or 'n' to cancel deployment: ");
+                        if (lcase(trim(answer)) != "y") {
+                            detailOutput.line();
+                            detailOutput.error("Deployment cancelled. To deploy a different tag, update docker-compose.yml or rebuild the image with the desired tag.");
+                            return;
                         }
                     }
                 }
@@ -108,20 +106,11 @@ component extends="DockerCommand" {
             }
         }
         
-        // set local as default if neither specified
-        if (!arguments.local && !arguments.remote) {
-            arguments.local=true;
-        }
-        
-        if (arguments.local && arguments.remote) {
-            error("Cannot specify both --local and --remote. Please choose one.");
-        }
-        
         // Route to appropriate deployment method
         if (arguments.local) {
-            deployLocal(arguments.environment, arguments.db, arguments.cfengine, arguments.optimize, arguments.tag);
+            deployLocal();
         } else {
-            deployRemote(arguments.servers, arguments.skipDockerCheck, arguments.blueGreen, arguments.tag);
+            deployRemote(arguments.serversFile, arguments.skipDockerCheck, arguments.blueGreen);
         }
     }
     
@@ -129,14 +118,7 @@ component extends="DockerCommand" {
     // LOCAL DEPLOYMENT
     // =============================================================================
     
-    private function deployLocal(
-        string environment,
-        string db,
-        string cfengine,
-        boolean optimize,
-        string tag=""
-    ) {
-        // Welcome message
+    private function deployLocal() {
         detailOutput.header("Wheels Docker Local Deployment");
 
         // Check for docker-compose file
@@ -144,34 +126,35 @@ component extends="DockerCommand" {
         
         if (local.useCompose) {
             detailOutput.statusSuccess("Found docker-compose file, will use docker-compose");
-            
-            // Just run docker-compose up
-            if (len(arguments.tag)) {
-                detailOutput.statusInfo("Note: --tag argument is ignored when using docker-compose.");
-            }
+            local.buildCmd = ["docker-compose", "up", "-d", "--build"];
             
             detailOutput.statusInfo("Starting services...");
-            runLocalCommand(["docker-compose", "up", "-d", "--build"]);
+            detailOutput.statusInfo("Executing: " & arrayToList(local.buildCmd, " "));
+            runLocalCommand(local.buildCmd);
             
             detailOutput.line();
             detailOutput.statusSuccess("Services started successfully!");
             detailOutput.line();
-            detailOutput.output("View logs with: docker-compose logs -f");
+            detailOutput.output("View logs with: wheels docker logs --local");
             detailOutput.line();
             
         } else {
             // Check for Dockerfile
             local.dockerfilePath = getCWD() & "/Dockerfile";
             if (!fileExists(local.dockerfilePath)) {
-                error("No Dockerfile or docker-compose.yml found in current directory");
+                detailOutput.error("No Dockerfile or docker-compose.yml found in current directory");
+                return;
             }
             
             detailOutput.statusSuccess("Found Dockerfile, will use standard docker commands");
             
             // Check if Docker is installed locally
             if (!isDockerInstalled()) {
-                error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+                detailOutput.error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+                return;
             }
+            
+            var config = resolveConfig();
             
             // Extract port from Dockerfile
             local.exposedPort = getDockerExposedPort();
@@ -182,27 +165,16 @@ component extends="DockerCommand" {
                 detailOutput.statusSuccess("Found EXPOSE port: " & local.exposedPort);
             }
             
-            // Get project name for image/container naming
-            local.projectName = getProjectName();
-            local.deployConfig = getDeployConfig();
+            // Use config from resolveConfig
+            local.imageName = config.image;
+            local.containerName = config.containerName;
             
-            // Strict Tag Strategy: projectName:tag
-            local.tag = len(arguments.tag) ? arguments.tag : "latest";
-            
-            // Smart Tag Logic: Check if tag contains colon (full image name)
-            if (find(":", local.tag)) {
-                local.imageName = local.tag;
-            } else if (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) {
-                local.imageName = local.deployConfig.image & ":" & local.tag;
-            } else {
-                local.imageName = local.projectName & ":" & local.tag;
-            }
-            
-            // Container Name: Always use project name for consistency
-            local.containerName = local.projectName;
-            
+            local.buildCmd = ["docker", "build", "-t", local.imageName, "."];
+
             detailOutput.statusInfo("Building Docker image (" & local.imageName & ")...");
-            runLocalCommand(["docker", "build", "-t", local.imageName, "."]);
+            detailOutput.statusInfo("Executing: " & arrayToList(local.buildCmd, " "));
+
+            runLocalCommand(local.buildCmd);
             
             detailOutput.statusInfo("Starting container...");
             
@@ -258,7 +230,8 @@ component extends="DockerCommand" {
         if (len(trim(arguments.serversFile))) {
             var customPath = fileSystemUtil.resolvePath(arguments.serversFile);
             if (!fileExists(customPath)) {
-                error("Server configuration file not found: #arguments.serversFile#");
+                detailOutput.error("Server configuration file not found: #arguments.serversFile#");
+                return;
             }
             
             if (right(arguments.serversFile, 5) == ".json") {
@@ -271,7 +244,7 @@ component extends="DockerCommand" {
         else if (fileExists(ymlConfigPath)) {
             var deployConfig = getDeployConfig();
             if (arrayLen(deployConfig.servers)) {
-                 detailOutput.identical("Found config/deploy.yml, loading server configuration");
+                detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 servers = deployConfig.servers;
                 
                 // Add defaults for missing fields
@@ -293,11 +266,13 @@ component extends="DockerCommand" {
            detailOutput.identical("Found deploy-servers.json, loading server configuration");
             servers = loadServersFromConfig("deploy-servers.json");
         } else {
-            error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+            return;
         }
 
         if (arrayLen(servers) == 0) {
-            error("No servers configured for deployment");
+            detailOutput.error("No servers configured for deployment");
+            return;
         }
 
         detailOutput.statusInfo("Starting remote deployment to #arrayLen(servers)# server(s)...");
@@ -376,7 +351,8 @@ component extends="DockerCommand" {
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            error("SSH connection failed to #local.host#. Check credentials and access.");
+            detailOutput.error("SSH connection failed to #local.host#. Check credentials and access.");
+            return;
         }
         detailOutput.statusSuccess("SSH connection successful");
 
@@ -502,7 +478,8 @@ component extends="DockerCommand" {
 
         // Step 1: Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            error("SSH connection failed to #local.host#. Check credentials and access.");
+            detailOutput.error("SSH connection failed to #local.host#. Check credentials and access.");
+            return;
         }
         detailOutput.statusSuccess("SSH connection successful");
 
@@ -689,7 +666,8 @@ component extends="DockerCommand" {
         if (local.sudoCheckResult.exitCode neq 0) {
             detailOutput.line();
             detailOutput.statusFailed("ERROR: User '#arguments.user#' does not have passwordless sudo access on #arguments.host#!");
-            error("Cannot install Docker: User '" & arguments.user & "' requires passwordless sudo access on " & arguments.host);
+            detailOutput.error("Cannot install Docker: User '" & arguments.user & "' requires passwordless sudo access on " & arguments.host);
+            return;
         }
         
         detailOutput.statusSuccess("User has sudo access");
@@ -702,7 +680,8 @@ component extends="DockerCommand" {
         local.osResult = runLocalCommand(osCmd);
         
         if (local.osResult.exitCode neq 0) {
-            error("Failed to detect OS type on remote server");
+            detailOutput.error("Failed to detect OS type on remote server");
+            return;
         }
         
         // Determine installation script based on OS
@@ -715,7 +694,8 @@ component extends="DockerCommand" {
             local.installScript = getDockerInstallScriptRHEL();
             detailOutput.identical("Detected RHEL/CentOS/Fedora system");
         } else {
-            error("Unsupported OS. Docker installation is only automated for Ubuntu/Debian and RHEL/CentOS/Fedora systems.");
+            detailOutput.error("Unsupported OS. Docker installation is only automated for Ubuntu/Debian and RHEL/CentOS/Fedora systems.");
+            return;
         }
         
         // Create temp file with install script
@@ -745,7 +725,8 @@ component extends="DockerCommand" {
         local.installResult = runLocalCommand(installCmd);
         
         if (local.installResult.exitCode neq 0) {
-            error("Failed to install Docker on remote server");
+            detailOutput.error("Failed to install Docker on remote server");
+            return;
         }
         
         detailOutput.statusSuccess("Docker installed successfully!");
