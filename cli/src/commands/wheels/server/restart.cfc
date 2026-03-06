@@ -17,6 +17,7 @@ component extends="../base" {
 		string name,
 		boolean force = false
 	) {
+		detailOutput.header("Restart Wheels Development Server");
 		// Build the restart command
 		var restartCommand = "server restart";
 		
@@ -45,25 +46,23 @@ component extends="../base" {
 			restartCommand &= " --force";
 		}
 
-		print.yellowLine("Restarting Wheels development server...");
-		print.line();
+		// Show command
+		detailOutput.subHeader("Executing Restart Command");
+		detailOutput.code(restartCommand);
 		
 		// Execute the server restart command
 		command(restartCommand).run();
 		
-		print.line();
-		print.greenLine("Server restarted successfully!");
-		print.line();
-		
-		// Also reload the Wheels application
-		print.line("Reloading Wheels application...");
+		detailOutput.statusSuccess("Server restarted successfully");
+
+		// Reload Wheels
+		detailOutput.subHeader("Reload Wheels Application");
 		try {
 			command("wheels reload").run();
-			print.greenLine("Application reloaded successfully!");
+			detailOutput.statusSuccess("Application reloaded successfully");
 		} catch (any e) {
-			print.yellowLine("Note: Application reload may require manual refresh in browser.");
+			detailOutput.statusWarning("Application reload may require manual browser refresh");
 		}
-		print.line();
 	}
 
 }
