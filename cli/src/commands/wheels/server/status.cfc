@@ -36,10 +36,7 @@ component extends="../base" {
 		}
 
 		if (!arguments.json) {
-			print.line();
-			print.yellowLine("Wheels Server Status");
-			print.line("===================");
-			print.line();
+			detailOutput.header("Wheels Server Status");
 		}
 		
 		// Execute the server status command
@@ -50,27 +47,24 @@ component extends="../base" {
 			try {
 				var serverInfo = $getServerInfo();
 				if (structKeyExists(serverInfo, "port") && serverInfo.port > 0) {
-					print.line();
-					print.line("Wheels Application Info:");
-					print.indentedLine("URL: #serverInfo.serverURL#");
+					detailOutput.subHeader("Wheels Application Info");
+					detailOutput.metric("URL", serverInfo.serverURL);
 					
 					// Check if it's a Wheels app
 					if (isWheelsApp()) {
-						print.indentedLine("Wheels Version: #$getWheelsVersion()#");
-						print.indentedLine("Application Root: #getCWD()#");
+						detailOutput.metric("Wheels Version", $getWheelsVersion());
+						detailOutput.metric("Application Root", getCWD());
 					}
 					
-					print.line();
-					print.line("Quick Actions:");
-					print.indentedLine("wheels server open     - Open in browser");
-					print.indentedLine("wheels server log      - View logs");
-					print.indentedLine("wheels reload          - Reload application");
+					detailOutput.nextSteps([
+						"wheels server open     - Open in browser",
+						"wheels server log      - View logs",
+						"wheels reload          - Reload application"
+					]);
 				}
 			} catch (any e) {
 				// Silently continue if we can't get additional info
 			}
-			print.line();
 		}
 	}
-
 }
