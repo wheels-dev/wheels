@@ -58,8 +58,8 @@ jobs:
           echo "=========================================="
 
           # Check that version contains -rc.
-          if ! echo "$WHEELS_VERSION" | grep -q "\-rc\."; then
-            echo "ERROR: Version must contain '-rc.X' suffix for release candidates"
+          if ! echo "$WHEELS_VERSION" | grep -q "\-SNAPSHOT\.rc\.\|\-rc\."; then
+            echo "ERROR: Version must contain '-SNAPSHOT.rc.X' or '-rc.X' suffix for release candidates"
             echo "Current version: $WHEELS_VERSION"
             exit 1
           fi
