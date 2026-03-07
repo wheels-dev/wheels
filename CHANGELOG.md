@@ -18,6 +18,13 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Added
+- Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation
+
+----
+
 
 # [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
 
