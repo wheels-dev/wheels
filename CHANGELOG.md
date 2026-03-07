@@ -18,6 +18,13 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Added
+- Query scopes with `scope()` for reusable, composable query fragments in models
+
+----
+
 
 # [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
 
