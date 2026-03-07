@@ -18,6 +18,13 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Added
+- Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries
+
+----
+
 
 # [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
 
