@@ -18,6 +18,13 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ----
 
+## [Unreleased]
+
+### Added
+- Batch processing with `findEach()` and `findInBatches()` for memory-efficient record iteration
+
+----
+
 
 # [3.0.0](https://github.com/wheels-dev/wheels/releases/tag/v3.0.0) => 2026-01-10
 
