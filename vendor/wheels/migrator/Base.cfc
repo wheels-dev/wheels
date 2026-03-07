@@ -33,7 +33,12 @@ component extends="wheels.Global"{
 		} else if (local.info.database_productname Contains "CockroachDB") {
 			local.adapterName = "CockroachDB";
 		} else if (local.info.driver_name Contains "PostgreSQL") {
-			local.adapterName = "PostgreSQL";
+			local.query = $query(sql = "SELECT version() AS versionString", datasource=application[local.appKey].dataSourceName);
+			if(findNoCase("CockroachDB", local.query.versionString)){
+				local.adapterName = "CockroachDB";
+			} else {
+				local.adapterName = "PostgreSQL";
+			}
 			// NB: using mySQL adapter for H2 as the cli defaults to this for development
 		} else if (local.info.driver_name Contains "H2") {
 			// determine the emulation mode

@@ -23,21 +23,21 @@ component extends="wheels.WheelsTest" {
 
 					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
-					expect(result[3].type).toBe("cf_sql_integer")
+					expect(result[3].type).toBeIn("cf_sql_integer,cf_sql_bigint")
 					expect(Right(result[2], Len(i))).toBe(i)
 
 					result = g.model("author").$whereClause(where = "id#i# 11")
 
 					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
-					expect(result[3].type).toBe("cf_sql_integer")
+					expect(result[3].type).toBeIn("cf_sql_integer,cf_sql_bigint")
 					expect(Right(result[2], Len(i))).toBe(i)
 
 					result = g.model("author").$whereClause(where = "id #i#999")
 
 					expect(result[2]).toHaveLength(whereBaseLen+len(i))
 					expect(result).toHaveLength(3)
-					expect(result[3].type).toBe("cf_sql_integer")
+					expect(result[3].type).toBeIn("cf_sql_integer,cf_sql_bigint")
 					expect(Right(result[2], Len(i))).toBe(i)
 				}
 			})

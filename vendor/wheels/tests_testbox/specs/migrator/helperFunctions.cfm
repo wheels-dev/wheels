@@ -177,7 +177,7 @@
 			case "MySQL":
 				return "INT";
 			case "PostgreSQL":
-				return "INTEGER,INT4"; // depends on db engine/drivers
+				return "INTEGER,INT4,INT8"; // depends on db engine/drivers
 			default:
 				return "`addinteger()` not supported for " & migration.adapter.adapterName();
 		}
