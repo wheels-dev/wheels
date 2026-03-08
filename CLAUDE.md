@@ -276,11 +276,14 @@ Helpers: `linkTo(route="user", key=user.id, text="View")`, `urlFor(route="users"
 
 ## Testing Quick Reference
 
+**All new tests use TestBox BDD syntax.** RocketUnit (`test_` prefix, `assert()`) is legacy only — never use it for new tests.
+
 ```cfm
+// tests/specs/models/MyFeatureSpec.cfc
 component extends="wheels.WheelsTest" {
     function run() {
-        describe("User", function() {
-            it("validates presence of name", function() {
+        describe("My Feature", () => {
+            it("validates presence of name", () => {
                 var user = model("User").new();
                 expect(user.valid()).toBeFalse();
             });
@@ -289,7 +292,13 @@ component extends="wheels.WheelsTest" {
 }
 ```
 
-Tests live in `tests/models/`, `tests/controllers/`, `tests/integration/`. Run with MCP `wheels_test()` or CLI `wheels test run`.
+- **Specs**: `tests/specs/models/`, `tests/specs/controllers/`, `tests/specs/functional/`
+- **Test models**: `tests/_assets/models/` (use `table()` to map to test tables)
+- **Test data**: `tests/populate.cfm` (DROP + CREATE tables, seed data)
+- **Runner URL**: `/wheels/app/tests?format=json&directory=tests.specs.models`
+- **Force reload**: append `&reload=true` after adding new model CFCs
+- **Closure gotcha**: CFML closures can't access outer `local` vars — use shared structs (`var result = {count: 0}`)
+- Run with MCP `wheels_test()` or CLI `wheels test run`
 
 ## Background Jobs Quick Reference
 
@@ -356,6 +365,7 @@ Deeper documentation lives in `.ai/` — Claude will search it automatically whe
 - `.ai/wheels/controllers/` — filters, rendering, security
 - `.ai/wheels/views/` — layouts, partials, form helpers, link helpers
 - `.ai/wheels/database/` — migration column types, queries, advanced operations
+- `.ai/wheels/testing/` — unit testing with TestBox, test infrastructure, common gotchas
 - `.ai/wheels/configuration/` — routing, environments, settings
 
 ## MCP Server

@@ -22,6 +22,8 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 
 ### Added
 - Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation
+- Query scopes with `scope()` for reusable, composable query fragments in models
+- Batch processing with `findEach()` and `findInBatches()` for memory-efficient record iteration
 
 ----
 
