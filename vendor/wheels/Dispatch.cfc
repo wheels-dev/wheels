@@ -5,7 +5,35 @@ component output="false" extends="wheels.Global"{
 	 * Returns itself (the Dispatch object).
 	 */
 	public any function $init() {
+		// Initialize the middleware pipeline from application settings.
+		variables.$middlewarePipeline = $buildMiddlewarePipeline();
 		return this;
+	}
+
+	/**
+	 * Build the middleware pipeline from application.wheels.middleware (array of component instances or paths).
+	 */
+	private any function $buildMiddlewarePipeline() {
+		local.middlewareInstances = [];
+		if (StructKeyExists(application, "$wheels") && StructKeyExists(application.$wheels, "middleware")) {
+			local.configured = application.$wheels.middleware;
+		} else if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "middleware")) {
+			local.configured = application.wheels.middleware;
+		} else {
+			local.configured = [];
+		}
+
+		for (local.item in local.configured) {
+			if (IsSimpleValue(local.item)) {
+				// It's a CFC path — instantiate it.
+				ArrayAppend(local.middlewareInstances, CreateObject("component", local.item).init());
+			} else {
+				// Already an instance.
+				ArrayAppend(local.middlewareInstances, local.item);
+			}
+		}
+
+		return new wheels.middleware.Pipeline(middleware = local.middlewareInstances);
 	}
 
 	/**
@@ -262,20 +290,66 @@ component output="false" extends="wheels.Global"{
 				return "";
 			}
 		} else {
-			// Create the requested controller and call the action on it.
-			local.controller = controller(name = local.params.controller, params = local.params);
-			local.controller.processAction();
+			// Build the request context for middleware.
+			local.requestContext = {
+				params = local.params,
+				route = StructKeyExists(request.wheels, "currentRoute") ? request.wheels.currentRoute : {},
+				pathInfo = arguments.pathInfo,
+				method = $getRequestMethod()
+			};
 
-			// If there is a delayed redirect pending we execute it here thus halting the rest of the request.
-			if (local.controller.$performedRedirect()) {
-				$location(argumentCollection = local.controller.getRedirect());
+			// The core handler that middleware wraps around.
+			local.coreHandler = function(required struct request) {
+				local.ctrl = controller(name = arguments.request.params.controller, params = arguments.request.params);
+				local.ctrl.processAction();
+
+				if (local.ctrl.$performedRedirect()) {
+					$location(argumentCollection = local.ctrl.getRedirect());
+				}
+
+				local.ctrl.$flashClear();
+				return local.ctrl.response();
+			};
+
+			// Merge global + route-scoped middleware and run through the pipeline.
+			local.routeMiddleware = $getRouteMiddleware(local.params);
+			if (ArrayLen(local.routeMiddleware)) {
+				local.allMiddleware = [];
+				ArrayAppend(local.allMiddleware, variables.$middlewarePipeline.getMiddleware(), true);
+				ArrayAppend(local.allMiddleware, local.routeMiddleware, true);
+				local.pipeline = new wheels.middleware.Pipeline(middleware = local.allMiddleware);
+				return local.pipeline.run(request = local.requestContext, coreHandler = local.coreHandler);
 			}
 
-			// Clear out the flash (note that this is not done for redirects since the processing does not get here).
-			local.controller.$flashClear();
-
-			return local.controller.response();
+			return variables.$middlewarePipeline.run(request = local.requestContext, coreHandler = local.coreHandler);
 		}
+	}
+
+	/**
+	 * Resolve route-scoped middleware from the matched route's `middleware` property.
+	 * Returns an array of instantiated middleware components.
+	 */
+	private array function $getRouteMiddleware(required struct params) {
+		local.instances = [];
+		// The matched route is stored on request.wheels.currentRoute during $findMatchingRoute.
+		if (!StructKeyExists(request.wheels, "currentRoute") || !StructKeyExists(request.wheels.currentRoute, "middleware")) {
+			return local.instances;
+		}
+
+		local.routeMiddleware = request.wheels.currentRoute.middleware;
+		if (IsSimpleValue(local.routeMiddleware)) {
+			local.routeMiddleware = ListToArray(local.routeMiddleware);
+		}
+
+		for (local.item in local.routeMiddleware) {
+			if (IsSimpleValue(local.item)) {
+				ArrayAppend(local.instances, CreateObject("component", local.item).init());
+			} else {
+				ArrayAppend(local.instances, local.item);
+			}
+		}
+
+		return local.instances;
 	}
 
 	/**
@@ -289,6 +363,10 @@ component output="false" extends="wheels.Global"{
 	) {
 		local.path = $getPathFromRequest(pathInfo = arguments.pathInfo, scriptName = arguments.scriptName);
 		local.route = $findMatchingRoute(path = local.path);
+
+		// Store the matched route so middleware and other components can inspect it.
+		request.wheels.currentRoute = local.route;
+
 		return $createParams(
 			path = local.path,
 			route = local.route,

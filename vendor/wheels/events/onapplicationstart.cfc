@@ -88,6 +88,7 @@ component {
 		application.$wheels.nonExistingObjectFiles = "";
 		application.$wheels.directoryFiles = {};
 		application.$wheels.routes = [];
+		application.$wheels.middleware = [];
 		application.$wheels.resourceControllerNaming = "plural";
 		application.$wheels.namedRoutePositions = {};
 		application.$wheels.mixins = {};
