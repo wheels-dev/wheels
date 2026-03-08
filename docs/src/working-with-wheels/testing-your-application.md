@@ -724,6 +724,96 @@ Your test suite should provide comprehensive coverage for:
 
 For detailed guidance on what to test and testing strategies, see the [TestBox Testing Code Coverage documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/introduction).
 
+## Common Gotchas
+
+### CFML Closure Scoping
+
+Closures in CFML have their own `local` scope. You **cannot** read or write outer `local` variables from inside a closure — assignments create a new variable in the closure's scope instead.
+
+```cfm
+// WRONG — count inside the closure is a different variable
+var count = 0;
+model("User").findEach(callback = function(user) {
+    count++; // Modifies the closure's own local.count, not the outer one
+});
+expect(count).toBe(10); // FAILS — count is still 0
+
+// RIGHT — use a shared struct (structs are passed by reference)
+var result = {count: 0};
+model("User").findEach(callback = function(user) {
+    result.count++; // Modifies the shared struct
+});
+expect(result.count).toBe(10); // PASSES
+```
+
+This applies to any test that passes a closure to a Wheels method (`findEach`, `findInBatches`, callbacks, etc.).
+
+### Model Cache Requires Reload After Adding New Models
+
+When you add a new model CFC to `tests/_assets/models/`, the first test run may fail with errors like `table 'authorscopeds' not found`. This happens because Wheels caches model metadata and hasn't loaded your new model's `config()` method yet — so it falls back to convention-based table naming.
+
+**Fix:** Append `&reload=true` to the test runner URL to clear the model cache:
+
+```
+http://localhost:8080/wheels/app/tests?format=json&directory=tests.specs.models&reload=true
+```
+
+You only need to do this once after adding or renaming model CFCs. Subsequent runs without `&reload=true` will work fine.
+
+### Use DROP + CREATE in populate.cfm, Not IF NOT EXISTS
+
+When setting up test tables in `populate.cfm`, always drop and recreate tables rather than using `CREATE TABLE IF NOT EXISTS`:
+
+```cfm
+<!--- WRONG — if the table exists from a previous run with a different schema,
+      IF NOT EXISTS skips the CREATE and your new columns are missing --->
+<cfquery datasource="#application.wheels.dataSourceName#">
+    CREATE TABLE IF NOT EXISTS my_test_table (...)
+</cfquery>
+
+<!--- RIGHT — DROP first guarantees a clean schema every time --->
+<cftry>
+    <cfquery datasource="#application.wheels.dataSourceName#">
+        DROP TABLE IF EXISTS my_test_table
+    </cfquery>
+    <cfcatch></cfcatch>
+</cftry>
+<cfquery datasource="#application.wheels.dataSourceName#">
+    CREATE TABLE my_test_table (...)
+</cfquery>
+```
+
+**Why?** If you add a column to a test table (e.g., adding a `status` column for enum tests), `IF NOT EXISTS` silently skips the `CREATE` when the table already exists from a previous test run — and the new column is missing. DROP + CREATE ensures the schema matches your current test requirements.
+
+{% hint style="warning" %}
+When dropping tables, drop child tables (with foreign keys) before parent tables to avoid constraint errors.
+{% endhint %}
+
+### Test Model CFCs Must Override the Table Name
+
+Test models in `tests/_assets/models/` should always call `table()` in their `config()` to explicitly set the table name. Without it, Wheels pluralizes the component name using conventions — which often produces unexpected results for compound names.
+
+```cfm
+// Without table() override, Wheels would look for a table called "authorscopeds"
+component extends="Model" {
+    function config() {
+        table("c_o_r_e_authors"); // Explicit table name
+        scope(name="active", where="active = 1");
+    }
+}
+```
+
+### TestBox JSON Output Contains Non-Standard Booleans
+
+When parsing TestBox JSON results programmatically (e.g., in CI/CD scripts), be aware that the Wheels TestBox runner may produce JSON with unquoted `true`/`false` boolean values, which can cause strict JSON parsers to fail.
+
+**Workaround:** Use Node.js `JSON.parse()` instead of tools like `jq` for parsing test results:
+
+```bash
+curl -sL "http://localhost:8080/wheels/app/tests?format=json" > results.json
+node -e "const j = JSON.parse(require('fs').readFileSync('results.json','utf8')); console.log('Passed:', j.totalPass, '| Failed:', j.totalFail)"
+```
+
 ## Best Practices
 
 For comprehensive testing best practices and advanced techniques, refer to the [TestBox Testing documentation](https://testbox.ortusbooks.com/v6.x/digging-deeper/life-cycle-methods).
