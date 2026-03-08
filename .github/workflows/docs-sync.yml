@@ -26,6 +26,11 @@ jobs:
 
       - name: Sync docs into wheels.dev
         run: |
+          # Ensure destination directories exist (first sync for a new version)
+          mkdir -p wheels-dev/docs/3.1.0/guides
+          mkdir -p wheels-dev/public/images
+          mkdir -p wheels-dev/public/json
+
           # Guides: mirror with delete
           rsync -av --del wheels/docs/src/ wheels-dev/docs/3.1.0/guides/
 
