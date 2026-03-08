@@ -7,8 +7,8 @@ Wheels has two test frameworks. **All new tests must use TestBox.**
 | | TestBox (current) | RocketUnit (legacy) |
 |---|---|---|
 | **Syntax** | `describe`/`it`/`expect` (BDD) | `test_methodName()` + `assert()` |
-| **Base class** | `wheels.WheelsTest` | `wheels.tests.Test` |
-| **Location** | `tests/specs/` | `vendor/wheels/tests/` |
+| **Base class** | `wheels.WheelsTest` | `wheels.Test` |
+| **Location** | `vendor/wheels/tests/specs/` | `vendor/wheels/rocketunit_tests/` |
 | **Runner URL** | `/wheels/app/tests` | `/wheels/tests/core` |
 | **Status** | Active, all new tests | Legacy, backwards-compat only |
 
@@ -197,4 +197,4 @@ DROP TABLE IF EXISTS c_o_r_e_authors <!--- parent --->
 
 ### 5. Pre-existing Test Failures
 
-The `vendor/wheels/tests/` RocketUnit suite has some pre-existing failures (e.g., in `model.errors`). Don't chase these — they're known issues in the legacy suite. Focus on making your TestBox specs green.
+The `vendor/wheels/rocketunit_tests/` legacy RocketUnit suite has some pre-existing failures (e.g., in `model.errors`). Don't chase these — they're known issues in the legacy suite. The RocketUnit test files have been removed; only infrastructure (Test.cfc, populate.cfm, _assets/) remains for backwards compatibility. Focus on making your TestBox specs green.
