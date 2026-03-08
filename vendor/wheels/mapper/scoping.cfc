@@ -23,6 +23,7 @@ component {
 		string shallowPath,
 		string shallowName,
 		struct constraints,
+		any middleware,
 		string $call = "scope"
 	) {
 		// Set shallow path and prefix if not in a resource.
@@ -59,6 +60,21 @@ component {
 		// Copy existing constraints if they were previously set.
 		if (StructKeyExists(variables.scopeStack[1], "constraints") && StructKeyExists(arguments, "constraints")) {
 			StructAppend(arguments.constraints, variables.scopeStack[1].constraints, false);
+		}
+
+		// Merge middleware from parent scope with current scope.
+		if (StructKeyExists(arguments, "middleware") || StructKeyExists(variables.scopeStack[1], "middleware")) {
+			local.parentMiddleware = StructKeyExists(variables.scopeStack[1], "middleware") ? variables.scopeStack[1].middleware : [];
+			local.currentMiddleware = StructKeyExists(arguments, "middleware") ? arguments.middleware : [];
+			if (IsSimpleValue(local.currentMiddleware)) {
+				local.currentMiddleware = ListToArray(local.currentMiddleware);
+			}
+			if (IsSimpleValue(local.parentMiddleware)) {
+				local.parentMiddleware = ListToArray(local.parentMiddleware);
+			}
+			arguments.middleware = [];
+			ArrayAppend(arguments.middleware, local.parentMiddleware, true);
+			ArrayAppend(arguments.middleware, local.currentMiddleware, true);
 		}
 
 		// Put scope arguments on the stack.

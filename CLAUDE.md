@@ -254,6 +254,30 @@ model("User").findInBatches(batchSize=500, callback=function(users) {
 model("User").active().findEach(batchSize=500, callback=function(user) { /* ... */ });
 ```
 
+## Middleware Quick Reference
+
+Middleware runs at the dispatch level, before controller instantiation. Each implements `handle(request, next)`.
+
+```cfm
+// config/settings.cfm — global middleware (runs on every request)
+set(middleware = [
+    new wheels.middleware.RequestId(),
+    new wheels.middleware.SecurityHeaders(),
+    new wheels.middleware.Cors(allowOrigins="https://myapp.com")
+]);
+```
+
+```cfm
+// config/routes.cfm — route-scoped middleware
+mapper()
+    .scope(path="/api", middleware=["app.middleware.ApiAuth"])
+        .resources("users")
+    .end()
+.end();
+```
+
+Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`. Custom middleware: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+
 ## Routing Quick Reference
 
 ```cfm

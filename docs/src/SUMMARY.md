@@ -132,6 +132,7 @@
 * [Sending Email](handling-requests-with-controllers/sending-email.md)
 * [Responding with Multiple Formats](handling-requests-with-controllers/responding-with-multiple-formats.md)
 * [Using the Flash](handling-requests-with-controllers/using-the-flash.md)
+* [Middleware](handling-requests-with-controllers/middleware.md)
 * [Using Filters](handling-requests-with-controllers/using-filters.md)
 * [Verification](handling-requests-with-controllers/verification.md)
 * [Event Handlers](handling-requests-with-controllers/event-handlers.md)

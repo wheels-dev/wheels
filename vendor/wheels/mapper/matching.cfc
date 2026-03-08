@@ -361,6 +361,11 @@ component {
 			StructAppend(arguments.constraints, variables.scopeStack[1].constraints, false);
 		}
 
+		// Inherit middleware from scope stack.
+		if (!StructKeyExists(arguments, "middleware") && StructKeyExists(variables.scopeStack[1], "middleware")) {
+			arguments.middleware = variables.scopeStack[1].middleware;
+		}
+
 		// Add shallow path to pattern.
 		// Or, add scoped path to pattern.
 		if ($shallow()) {
