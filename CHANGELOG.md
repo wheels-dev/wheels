@@ -21,6 +21,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ## [Unreleased]
 
 ### Added
+- Query scopes with `scope()` for reusable, composable query fragments in models
 - Batch processing with `findEach()` and `findInBatches()` for memory-efficient record iteration
 
 ----
