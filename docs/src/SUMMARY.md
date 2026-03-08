@@ -177,6 +177,7 @@
 * [Transactions](database-interaction-through-models/transactions.md)
 * [Dirty Records](database-interaction-through-models/dirty-records.md)
 * [Soft Delete](database-interaction-through-models/soft-delete.md)
+* [Query Builder](database-interaction-through-models/query-builder.md)
 * [Enums](database-interaction-through-models/enums.md)
 * [Query Scopes](database-interaction-through-models/query-scopes.md)
 * [Batch Processing](database-interaction-through-models/batch-processing.md)
