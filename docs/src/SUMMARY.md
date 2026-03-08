@@ -178,6 +178,7 @@
 * [Dirty Records](database-interaction-through-models/dirty-records.md)
 * [Soft Delete](database-interaction-through-models/soft-delete.md)
 * [Query Scopes](database-interaction-through-models/query-scopes.md)
+* [Batch Processing](database-interaction-through-models/batch-processing.md)
 * [Automatic Time Stamps](database-interaction-through-models/automatic-time-stamps.md)
 * [Database Migrations](database-interaction-through-models/database-migrations/README.md)
   * [Migrations in Production](database-interaction-through-models/database-migrations/migrations-in-production.md)
