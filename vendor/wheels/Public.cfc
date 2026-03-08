@@ -72,8 +72,8 @@ component output="false" displayName="Internal GUI" extends="wheels.Global" {
 			cfcontent(type="text/plain");
 		}
 
-		// Include the TestBox runner directly without buffering
-		include "/wheels/tests_testbox/runner.cfm";
+		// Include the TestBox runner
+		include "/wheels/tests/runner.cfm";
 
 		// Ensure we abort to prevent any further processing
 		abort;

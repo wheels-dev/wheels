@@ -22,20 +22,9 @@ component extends="Model" {
 		validateOnCreate("validateOnCreateCalled");
 		validateOnUpdate("validateOnUpdateCalled");
 		local.db_info = $dbinfo(datasource = application.wheels.dataSourceName, type = "version");
-		local.db = LCase(
-			Replace(
-				local.db_info.database_productname,
-				" ",
-				"",
-				"all"
-			)
-		);
-		property(
-			name = "salesTotal",
-			sql = "SUM(birthDayMonth)",
-			select = false,
-			dataType = "int"
-		);
+		local.db = LCase(Replace(local.db_info.database_productname, " ", "", "all"));
+		property(name = "salesTotal", sql = "SUM(birthDayMonth)", select = false, dataType = "int");
+		property(name = "virtual", label = "Virtual property");
 	}
 
 	function validateCalled() {

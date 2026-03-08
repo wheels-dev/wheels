@@ -490,7 +490,7 @@ component output="false" extends="wheels.Global"{
 
 		// Filter out illegal characters from the controller and action arguments.
 		// Debug log before filtering
-		if (local.rv.controller == "wheels.public" && local.rv.action == "tests_testbox") {
+		if (local.rv.controller == "wheels.public" && local.rv.action == "tests_testbox") { // keep action name for route compat
 			writeLog(file="application", text="Before filter - action: #local.rv.action#");
 		}
 		local.rv.action = ReReplace(local.rv.action, "[^0-9A-Za-z-_\.]", "", "all");

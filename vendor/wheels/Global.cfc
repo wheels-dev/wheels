@@ -2616,7 +2616,7 @@ component output="false" {
 		];
 
 		// directories & files to be removed
-		local.exclude = ["/wheels/tests", "/wheels/public/build.cfm", "/wheels/tests_testbox"];
+		local.exclude = ["/wheels/rocketunit_tests", "/wheels/public/build.cfm", "/wheels/tests"];
 
 		// filter out these bad boys
 		local.filter = "*.settings, *.classpath, *.project, *.DS_Store";

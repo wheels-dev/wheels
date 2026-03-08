@@ -6,12 +6,7 @@ component extends="Model" {
 	}
 
 	function createWelcomePost() {
-		var objPost = model("Post").create(
-			authorId = 1,
-			title = "Welcome",
-			body = "This is my first post",
-			views = 0
-		);
+		var objPost = model("Post").create(authorId = 1, title = "Welcome", body = "This is my first post", views = 0);
 		if (IsObject(objPost)) {
 			return true;
 		}
