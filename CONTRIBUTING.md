@@ -102,6 +102,19 @@ We welcome PRs of all sizes — from typo fixes to major features. To make revie
 * Use meaningful variable and function names
 * Add comments for complex logic
 
+**Definition of Done:**
+
+A feature or enhancement is not complete until all of the following are satisfied:
+
+* **Tests** -- Unit tests covering happy path, edge cases, and error conditions in `vendor/wheels/tests/`
+* **Framework Docs** -- New or updated page in `docs/src/` with a corresponding entry in `docs/src/SUMMARY.md`
+* **AI Reference Docs** -- New or updated file in `.ai/wheels/` so AI assistants have accurate context
+* **CLAUDE.md** -- Updated if the feature changes model, controller, or view conventions
+* **CHANGELOG.md** -- Entry under the `[Unreleased]` section
+* **Test runner passes** -- All existing tests still pass (`/wheels/tests/core?format=json`)
+
+Bug-fix PRs require tests and a CHANGELOG entry at minimum. Documentation-only PRs are exempt from the test requirement.
+
 If you're making a **breaking change** or working on **core functionality**, it's best to open an Issue first to discuss the approach.
 
 **Fork-and-Pull Workflow:**
