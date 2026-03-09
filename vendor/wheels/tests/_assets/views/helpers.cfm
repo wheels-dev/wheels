@@ -1,5 +1,5 @@
 <cfscript>
-function globalHelperFunction() {
-	request.test.globalHelperFunctionWasCalled = true;
-}
+	function globalHelperFunction() {
+		request.test.globalHelperFunctionWasCalled = true;
+	}
 </cfscript>

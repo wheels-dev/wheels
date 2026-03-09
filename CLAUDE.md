@@ -156,7 +156,7 @@ Every variable passed from controller to view needs a cfparam declaration.
 - **config()**: All model associations/validations/callbacks and controller filters/verifies go in `config()`
 - **Naming**: Models are singular PascalCase (`User.cfc`), controllers are plural PascalCase (`Users.cfc`), table names are plural lowercase (`users`)
 - **Parameters**: `params.key` for URL key, `params.user` for form struct, `params.user.firstName` for nested
-- **extends**: Models extend `"Model"`, controllers extend `"Controller"`, tests extend `"wheels.Test"` or `"wheels.WheelsTest"`
+- **extends**: Models extend `"Model"`, controllers extend `"Controller"`, tests extend `"wheels.WheelsTest"` (legacy: `"wheels.Test"` for RocketUnit)
 - **Associations**: All named params when using options: `hasMany(name="orders")`, `belongsTo(name="user")`, `hasOne(name="profile")`
 - **Validations**: Property param is `property` (singular) for single, `properties` (plural) for list: `validatesPresenceOf(properties="name,email")`
 

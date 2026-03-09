@@ -106,12 +106,12 @@ We welcome PRs of all sizes — from typo fixes to major features. To make revie
 
 A feature or enhancement is not complete until all of the following are satisfied:
 
-* **Tests** -- Unit tests covering happy path, edge cases, and error conditions in `vendor/wheels/tests/`
+* **Tests** -- Unit tests covering happy path, edge cases, and error conditions in `vendor/wheels/tests/specs/`
 * **Framework Docs** -- New or updated page in `docs/src/` with a corresponding entry in `docs/src/SUMMARY.md`
 * **AI Reference Docs** -- New or updated file in `.ai/wheels/` so AI assistants have accurate context
 * **CLAUDE.md** -- Updated if the feature changes model, controller, or view conventions
 * **CHANGELOG.md** -- Entry under the `[Unreleased]` section
-* **Test runner passes** -- All existing tests still pass (`/wheels/tests/core?format=json`)
+* **Test runner passes** -- All existing tests still pass (`/wheels/app/tests?format=json`)
 
 Bug-fix PRs require tests and a CHANGELOG entry at minimum. Documentation-only PRs are exempt from the test requirement.
 
