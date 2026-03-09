@@ -634,7 +634,7 @@ component {
 		// Issue#1273: Added this section to allow included tables to be referenced in the query
 		local.migration = CreateObject("component", "wheels.migrator.Migration").init();
 		local.tempSql = "";
-		if(arguments.include != "" && ListFind('PostgreSQL,H2,MicrosoftSQLServer,Oracle,SQLite', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		if(arguments.include != "" && ListFind('PostgreSQL,H2,MicrosoftSQLServer,Oracle,SQLite,CockroachDB', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			local.tempSql = arguments.sql;
 		}
 		local.whereClause = $whereClause(
@@ -645,7 +645,7 @@ component {
 			useIndex = arguments.useIndex,
 			sql = local.tempSql
 		);
-		if(arguments.include != "" && ListFind('PostgreSQL', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
+		if(arguments.include != "" && ListFind('PostgreSQL,CockroachDB', local.migration.adapter.adapterName()) && structKeyExists(arguments, "sql")){
 			if(left(arguments.sql[1], 6) == 'UPDATE'){
 				ArrayAppend(arguments.sql, "FROM #arguments.include#");
 			}
@@ -682,7 +682,7 @@ component {
 			// Issue#1273: Added this section to allow included tables to be referenced in the query
 			local.joinclause = "";
 			local.migration = CreateObject("component", "wheels.migrator.Migration").init();
-			if(arguments.include != "" && ListFind('PostgreSQL,H2', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
+			if(arguments.include != "" && ListFind('PostgreSQL,H2,CockroachDB', local.migration.adapter.adapterName()) && left(arguments.sql[1], 6) == 'UPDATE'){
 				for(local.i = 1; local.i<= arrayLen(local.classes); i++){
 					if(structKeyExists(local.classes[local.i], "JOIN")){
 						local.joinclause &= local.classes[local.i].JOIN.Split("ON")[2];
