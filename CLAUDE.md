@@ -276,7 +276,7 @@ mapper()
 .end();
 ```
 
-Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`. Custom middleware: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
+Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`. Custom middleware: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
 
 ## Routing Quick Reference
 

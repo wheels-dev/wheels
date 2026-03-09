@@ -21,6 +21,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ## [Unreleased]
 
 ### Added
+- Rate limiting middleware with `wheels.middleware.RateLimiter` supporting fixed window, sliding window, and token bucket strategies with in-memory and database storage
 - Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries
 - Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation
 - Query scopes with `scope()` for reusable, composable query fragments in models
