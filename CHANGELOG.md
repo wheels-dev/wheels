@@ -21,6 +21,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 ## [Unreleased]
 
 ### Added
+- Route model binding with `binding=true` on resource routes or `set(routeModelBinding=true)` globally to auto-resolve model instances from route key parameters
 - Chainable query builder with `where()`, `orWhere()`, `whereNull()`, `whereBetween()`, `whereIn()`, `orderBy()`, `limit()`, and more for injection-safe fluent queries
 - Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation
 - Query scopes with `scope()` for reusable, composable query fragments in models

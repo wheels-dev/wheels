@@ -366,6 +366,11 @@ component {
 			arguments.middleware = variables.scopeStack[1].middleware;
 		}
 
+		// Inherit binding from scope stack.
+		if (!StructKeyExists(arguments, "binding") && StructKeyExists(variables.scopeStack[1], "binding")) {
+			arguments.binding = variables.scopeStack[1].binding;
+		}
+
 		// Add shallow path to pattern.
 		// Or, add scoped path to pattern.
 		if ($shallow()) {
