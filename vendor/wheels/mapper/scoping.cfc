@@ -24,6 +24,7 @@ component {
 		string shallowName,
 		struct constraints,
 		any middleware,
+		any binding,
 		string $call = "scope"
 	) {
 		// Set shallow path and prefix if not in a resource.

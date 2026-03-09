@@ -50,6 +50,7 @@ component output="false" extends="wheels.Global"{
 		local.rv = $parseJsonBody(params = local.rv);
 		local.rv = $mergeRoutePattern(params = local.rv, route = arguments.route, path = arguments.path);
 		local.rv = $deobfuscateParams(params = local.rv);
+		local.rv = $resolveRouteModelBinding(params = local.rv, route = arguments.route);
 		local.rv = $translateBlankCheckBoxSubmissions(params = local.rv);
 		local.rv = $translateDatePartSubmissions(params = local.rv);
 		local.rv = $createNestedParamStruct(params = local.rv);
@@ -462,6 +463,71 @@ component output="false" extends="wheels.Global"{
 				}
 			}
 		}
+		return local.rv;
+	}
+
+	/**
+	 * Resolves a model instance from params.key when route model binding is enabled.
+	 * The resolved model is stored in params under the singularized controller name (e.g., params.user).
+	 * Throws Wheels.RecordNotFound if the record doesn't exist. Silently skips if the model class doesn't exist.
+	 */
+	public struct function $resolveRouteModelBinding(required struct params, required struct route) {
+		local.rv = arguments.params;
+
+		// Determine if binding is enabled: route-level takes precedence, then global setting.
+		local.binding = false;
+		if (StructKeyExists(arguments.route, "binding")) {
+			local.binding = arguments.route.binding;
+		} else if ($get("routeModelBinding")) {
+			local.binding = true;
+		}
+
+		// Skip if disabled or no key parameter exists.
+		if (IsBoolean(local.binding) && !local.binding) {
+			return local.rv;
+		}
+		if (!StructKeyExists(local.rv, "key")) {
+			return local.rv;
+		}
+
+		// Derive the model name.
+		if (IsSimpleValue(local.binding) && !IsBoolean(local.binding) && Len(local.binding)) {
+			// Explicit model name override (e.g., binding="BlogPost").
+			local.modelName = local.binding;
+		} else {
+			// Convention: singularize + capitalize controller name.
+			// Check params first, then fall back to route struct (controller may not be in params yet).
+			if (StructKeyExists(local.rv, "controller")) {
+				local.controllerName = local.rv.controller;
+			} else if (StructKeyExists(arguments.route, "controller")) {
+				local.controllerName = arguments.route.controller;
+			} else {
+				return local.rv;
+			}
+			local.modelName = capitalize(singularize(local.controllerName));
+		}
+
+		// Attempt to resolve the model instance.
+		try {
+			local.instance = model(local.modelName).findByKey(local.rv.key);
+		} catch (any e) {
+			// Model class doesn't exist — silently skip (don't break non-model routes).
+			return local.rv;
+		}
+
+		// If no record was found, throw a 404.
+		if (IsBoolean(local.instance) && !local.instance) {
+			$throwErrorOrShow404Page(
+				type = "Wheels.RecordNotFound",
+				message = "#local.modelName# record not found.",
+				extendedInfo = "A #local.modelName# record with key `#EncodeForHTML(local.rv.key)#` could not be found."
+			);
+		}
+
+		// Store the resolved model in params under the singular name.
+		local.paramKey = LCase(Left(local.modelName, 1)) & Mid(local.modelName, 2, Len(local.modelName) - 1);
+		local.rv[local.paramKey] = local.instance;
+
 		return local.rv;
 	}
 
