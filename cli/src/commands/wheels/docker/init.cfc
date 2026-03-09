@@ -69,9 +69,9 @@ component extends="DockerCommand" {
         local.dockerNamePattern = "^[a-z0-9]+([._-][a-z0-9]+)*$";
 
         // Interactive prompts for Deployment Configuration
-        local.appName = ask("Application Name (default: #listLast(getCWD(), '\/')#): ");
+        local.appName = ask("Application Name (default: #lcase(listLast(getCWD(), '\/'))#): ");
         if (!len(trim(local.appName))) {
-            local.appName = listLast(getCWD(), '\/');
+            local.appName = lcase(listLast(getCWD(), '\/'));
         }
 
         // Validate appName

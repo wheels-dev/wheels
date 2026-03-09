@@ -308,7 +308,11 @@ component extends="DockerCommand" {
         }
 
         if (!len(containerName)) {
-            detailOutput.error("Could not find running container for service: " & projectName);
+            if(arguments.service == "app") {
+                detailOutput.error("Could not find running container for service: " & projectName);
+            } else {
+                detailOutput.error("Could not find running container for service: " & arguments.service);
+            }
             return;
         }
 
