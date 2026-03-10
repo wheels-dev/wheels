@@ -42,7 +42,7 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(function() {
 				// Clean up any test jobs
-				try { queryExecute("DELETE FROM _wheels_jobs WHERE queue LIKE 'test_%'"); }
+				try { queryExecute("DELETE FROM _wheels_jobs WHERE queue LIKE 'test_%'", {}, {datasource = application.wheels.dataSourceName}); }
 				catch (any e) { /* table may not exist */ }
 			});
 
@@ -136,7 +136,8 @@ component extends="wheels.WheelsTest" {
 							runAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
 							createdAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"},
 							updatedAt = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
-						}
+						},
+						{datasource = application.wheels.dataSourceName}
 					);
 
 					local.worker = new wheels.JobWorker();
@@ -146,7 +147,8 @@ component extends="wheels.WheelsTest" {
 					// Verify job was reset
 					local.job = queryExecute(
 						"SELECT status FROM _wheels_jobs WHERE id = :id",
-						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}}
+						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
 					);
 					// Should be either pending (retried) or failed (exhausted)
 					expect(ListFindNoCase("pending,failed", local.job.status)).toBeGT(0);
@@ -252,7 +254,8 @@ component extends="wheels.WheelsTest" {
 						{
 							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
 							now = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-						}
+						},
+						{datasource = application.wheels.dataSourceName}
 					);
 
 					local.worker = new wheels.JobWorker();
@@ -262,7 +265,8 @@ component extends="wheels.WheelsTest" {
 					// Verify job was reset
 					local.job = queryExecute(
 						"SELECT status, attempts FROM _wheels_jobs WHERE id = :id",
-						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}}
+						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
 					);
 					expect(local.job.status).toBe("pending");
 					expect(local.job.attempts).toBe(0);
@@ -310,7 +314,8 @@ component extends="wheels.WheelsTest" {
 						{
 							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
 							oldTime = {value = local.oldTime, cfsqltype = "cf_sql_timestamp"}
-						}
+						},
+						{datasource = application.wheels.dataSourceName}
 					);
 
 					local.worker = new wheels.JobWorker();
@@ -320,7 +325,8 @@ component extends="wheels.WheelsTest" {
 					// Verify job was deleted
 					local.remaining = queryExecute(
 						"SELECT COUNT(*) as cnt FROM _wheels_jobs WHERE id = :id",
-						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}}
+						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
 					);
 					expect(local.remaining.cnt).toBe(0);
 				} catch (any e) {

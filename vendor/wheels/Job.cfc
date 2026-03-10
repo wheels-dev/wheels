@@ -39,6 +39,10 @@ component {
 	 */
 	public function init() {
 		config();
+		variables.$datasource = "";
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
+			variables.$datasource = application.wheels.dataSourceName;
+		}
 		return this;
 	}
 
@@ -144,7 +148,8 @@ component {
 					runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
 					createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 		} catch (any e) {
 			// Auto-create table on first use and retry
@@ -163,7 +168,8 @@ component {
 							runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
 							createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
 							updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-						}
+						},
+						{datasource = variables.$datasource}
 					);
 				} catch (any e2) {
 					writeLog(text = "Job enqueue failed after table creation: #e2.message#", type = "error", file = "wheels_jobs");
@@ -192,8 +198,7 @@ component {
 	public struct function processQueue(string queue = "", numeric limit = 10) {
 		local.result = {processed = 0, failed = 0, errors = []};
 		local.params = {
-			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-			limit = {value = arguments.limit, cfsqltype = "cf_sql_integer"}
+			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
 		};
 
 		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
@@ -205,10 +210,10 @@ component {
 			local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 		}
 
-		local.sql &= " ORDER BY priority DESC, runAt ASC LIMIT :limit";
+		local.sql &= " ORDER BY priority DESC, runAt ASC";
 
 		try {
-			local.jobs = queryExecute(local.sql, local.params);
+			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
 		} catch (any e) {
 			// Auto-create table and return empty result (no jobs to process yet)
 			$ensureJobTable();
@@ -243,7 +248,8 @@ component {
 				{
 					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 		} catch (any e) {
 			local.result.error = "Failed to lock job #arguments.jobRow.id#: #e.message#";
@@ -265,7 +271,8 @@ component {
 					completedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 
 			writeLog(
@@ -298,7 +305,8 @@ component {
 						runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
 						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-					}
+					},
+					{datasource = variables.$datasource}
 				);
 
 				writeLog(
@@ -320,7 +328,8 @@ component {
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
 						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-					}
+					},
+					{datasource = variables.$datasource}
 				);
 
 				writeLog(
@@ -353,7 +362,7 @@ component {
 			}
 
 			local.sql &= " GROUP BY status";
-			local.result = queryExecute(local.sql, local.params);
+			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 
 			for (local.row in local.result) {
 				if (StructKeyExists(local.stats, local.row.status)) {
@@ -389,7 +398,7 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params);
+			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -415,7 +424,7 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params);
+			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -431,7 +440,7 @@ component {
 	private boolean function $ensureJobTable() {
 		try {
 			// Check if table already exists by querying it
-			queryExecute("SELECT COUNT(*) AS cnt FROM _wheels_jobs WHERE 1=0");
+			queryExecute("SELECT COUNT(*) AS cnt FROM _wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -455,13 +464,13 @@ component {
 					createdAt DATETIME,
 					updatedAt DATETIME
 				)
-			");
+			", {}, {datasource = variables.$datasource});
 
 			// Add indexes for efficient queue processing
 			try {
-				queryExecute("CREATE INDEX idx_wheels_jobs_processing ON _wheels_jobs (status, runAt, priority)");
-				queryExecute("CREATE INDEX idx_wheels_jobs_queue ON _wheels_jobs (queue, status)");
-				queryExecute("CREATE INDEX idx_wheels_jobs_cleanup ON _wheels_jobs (status, completedAt)");
+				queryExecute("CREATE INDEX idx_wheels_jobs_processing ON _wheels_jobs (status, runAt, priority)", {}, {datasource = variables.$datasource});
+				queryExecute("CREATE INDEX idx_wheels_jobs_queue ON _wheels_jobs (queue, status)", {}, {datasource = variables.$datasource});
+				queryExecute("CREATE INDEX idx_wheels_jobs_cleanup ON _wheels_jobs (status, completedAt)", {}, {datasource = variables.$datasource});
 			} catch (any indexError) {
 				// Indexes are optional — don't fail if they can't be created
 			}

@@ -16,6 +16,10 @@ component {
 		this.startedAt = Now();
 		this.jobsProcessed = 0;
 		this.jobsFailed = 0;
+		variables.$datasource = "";
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
+			variables.$datasource = application.wheels.dataSourceName;
+		}
 		return this;
 	}
 
@@ -53,7 +57,7 @@ component {
 
 		// Fetch a small batch of candidates for optimistic locking
 		try {
-			local.candidates = queryExecute(local.sql, local.params, {maxrows = 5});
+			local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = 5});
 		} catch (any e) {
 			$ensureJobTable();
 			local.result.skipped = true;
@@ -113,7 +117,8 @@ component {
 				"SELECT id, jobClass, attempts, maxRetries
 				FROM _wheels_jobs
 				WHERE status = 'processing' AND updatedAt < :cutoff",
-				{cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}}
+				{cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}},
+				{datasource = variables.$datasource}
 			);
 		} catch (any e) {
 			$ensureJobTable();
@@ -159,7 +164,7 @@ component {
 			}
 
 			local.sql &= " GROUP BY queue, status ORDER BY queue, status";
-			local.rows = queryExecute(local.sql, local.params);
+			local.rows = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
 			return local.result;
@@ -209,7 +214,7 @@ component {
 				local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 			}
 			local.sql &= " GROUP BY status";
-			local.throughputRows = queryExecute(local.sql, local.params);
+			local.throughputRows = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 
 			for (local.row in local.throughputRows) {
 				if (local.row.status == "completed") local.result.throughput.completed = local.row.cnt;
@@ -228,7 +233,7 @@ component {
 		try {
 			local.recentSql = "SELECT id, jobClass, queue, status, attempts, lastError, updatedAt
 				FROM _wheels_jobs ORDER BY updatedAt DESC";
-			local.recentRows = queryExecute(local.recentSql, {}, {maxrows = 10});
+			local.recentRows = queryExecute(local.recentSql, {}, {datasource = variables.$datasource, maxrows = 10});
 
 			for (local.row in local.recentRows) {
 				ArrayAppend(local.result.recentJobs, {
@@ -248,7 +253,7 @@ component {
 		// Oldest pending job
 		try {
 			local.oldestSql = "SELECT createdAt FROM _wheels_jobs WHERE status = 'pending' ORDER BY createdAt ASC";
-			local.oldestRow = queryExecute(local.oldestSql, {}, {maxrows = 1});
+			local.oldestRow = queryExecute(local.oldestSql, {}, {datasource = variables.$datasource, maxrows = 1});
 			if (local.oldestRow.recordCount) {
 				local.result.oldestPending = local.oldestRow.createdAt;
 			}
@@ -277,7 +282,7 @@ component {
 					local.selectParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 				}
 				local.selectSql &= " ORDER BY failedAt ASC";
-				local.failedJobs = queryExecute(local.selectSql, local.selectParams, {maxrows = arguments.limit});
+				local.failedJobs = queryExecute(local.selectSql, local.selectParams, {datasource = variables.$datasource, maxrows = arguments.limit});
 
 				if (!local.failedJobs.recordCount) return 0;
 
@@ -300,7 +305,7 @@ component {
 						runAt = :runAt, updatedAt = :updatedAt
 					WHERE id IN (#ArrayToList(local.idConditions)#)";
 
-				queryExecute(local.updateSql, local.updateParams);
+				queryExecute(local.updateSql, local.updateParams, {datasource = variables.$datasource});
 				return local.failedJobs.recordCount;
 			} catch (any e) {
 				$ensureJobTable();
@@ -324,7 +329,7 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params);
+			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -358,7 +363,7 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params);
+			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			return local.result.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
@@ -381,7 +386,8 @@ component {
 				{
 					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 			return (local.result.recordCount ?: 0) > 0;
 		} catch (any e) {
@@ -408,7 +414,8 @@ component {
 					completedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 
 			writeLog(
@@ -462,7 +469,8 @@ component {
 				runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
 				updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 				id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-			}
+			},
+			{datasource = variables.$datasource}
 		);
 
 		writeLog(
@@ -493,7 +501,8 @@ component {
 				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
 				updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 				id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-			}
+			},
+			{datasource = variables.$datasource}
 		);
 
 		writeLog(
