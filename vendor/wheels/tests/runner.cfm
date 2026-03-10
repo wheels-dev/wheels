@@ -166,7 +166,12 @@
                 DeJsonResult.bundleStats = filteredBundles;
                 // Update the result with filtered data
 
-                count = 1;
+                // Build lookup of filtered bundles by name for safe access
+                filteredBundleMap = {};
+                for (fb in filteredBundles) {
+                    filteredBundleMap[fb.name] = fb;
+                }
+
                 for(bundle in allBundles){
                     writeOutput("Bundle: #bundle.name##Chr(13)##Chr(10)#")
                     writeOutput("CFML Engine: #DeJsonResult.CFMLEngine# #DeJsonResult.CFMLEngineVersion##Chr(13)##Chr(10)#")
@@ -174,15 +179,16 @@
                     writeOutput("Labels: #ArrayToList(DeJsonResult.labels, ', ')##Chr(13)##Chr(10)#")
                     writeOutput("╔═══════════════════════════════════════════════════════════╗#Chr(13)##Chr(10)#║ Suites  ║ Specs   ║ Passed  ║ Failed  ║ Errored ║ Skipped ║#Chr(13)##Chr(10)#╠═══════════════════════════════════════════════════════════╣#Chr(13)##Chr(10)#║ #NumberFormat(bundle.totalSuites,'999')#     ║ #NumberFormat(bundle.totalSpecs,'999')#     ║ #NumberFormat(bundle.totalPass,'999')#     ║ #NumberFormat(bundle.totalFail,'999')#     ║ #NumberFormat(bundle.totalError,'999')#     ║ #NumberFormat(bundle.totalSkipped,'999')#     ║#Chr(13)##Chr(10)#╚═══════════════════════════════════════════════════════════╝#Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                     if(bundle.totalFail > 0 || bundle.totalError > 0){
-                        for(suite in DeJsonResult.bundleStats[count].suiteStats){
-                            writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
-                            for(spec in suite.specStats){
-                                writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
-                                writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
-                                writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                        if (structKeyExists(filteredBundleMap, bundle.name)) {
+                            for(suite in filteredBundleMap[bundle.name].suiteStats){
+                                writeOutput("Suite with Error or Failure: #suite.name##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                                for(spec in suite.specStats){
+                                    writeOutput("       Spec Name: #spec.name##Chr(13)##Chr(10)#")
+                                    writeOutput("       Error Message: #spec.failMessage##Chr(13)##Chr(10)#")
+                                    writeOutput("       Error Detail: #spec.failDetail##Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
+                                }
                             }
                         }
-                        count += 1;
                     }
                     writeOutput("#Chr(13)##Chr(10)##Chr(13)##Chr(10)##Chr(13)##Chr(10)#")
                 }
