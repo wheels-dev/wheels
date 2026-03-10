@@ -256,6 +256,67 @@
 			sortProperty = "",
 			rejectIfBlank = ""
 		};
+		application.$wheels.functions.paginationInfo = {
+			format = "Showing [startRow]-[endRow] of [totalRecords] records",
+			encode = true
+		};
+		application.$wheels.functions.previousPageLink = {
+			text = "Previous",
+			name = "page",
+			class = "",
+			disabledClass = "disabled",
+			showDisabled = true,
+			pageNumberAsParam = true,
+			encode = true
+		};
+		application.$wheels.functions.nextPageLink = {
+			text = "Next",
+			name = "page",
+			class = "",
+			disabledClass = "disabled",
+			showDisabled = true,
+			pageNumberAsParam = true,
+			encode = true
+		};
+		application.$wheels.functions.firstPageLink = {
+			text = "First",
+			name = "page",
+			class = "",
+			disabledClass = "disabled",
+			showDisabled = true,
+			pageNumberAsParam = true,
+			encode = true
+		};
+		application.$wheels.functions.lastPageLink = {
+			text = "Last",
+			name = "page",
+			class = "",
+			disabledClass = "disabled",
+			showDisabled = true,
+			pageNumberAsParam = true,
+			encode = true
+		};
+		application.$wheels.functions.pageNumberLinks = {
+			windowSize = 2,
+			name = "page",
+			class = "",
+			classForCurrent = "current",
+			linkToCurrentPage = false,
+			prependToPage = "",
+			appendToPage = "",
+			pageNumberAsParam = true,
+			encode = true
+		};
+		application.$wheels.functions.paginationNav = {
+			navClass = "pagination",
+			showFirst = true,
+			showLast = true,
+			showPrevious = true,
+			showNext = true,
+			showInfo = false,
+			showSinglePage = false,
+			encode = true
+		};
 		application.$wheels.functions.paginationLinks = {
 			windowSize = 2,
 			alwaysShowAnchors = true,
