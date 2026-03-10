@@ -212,37 +212,32 @@ component extends="wheels.WheelsTest" {
 			describe("inject() controller helper", () => {
 
 				it("stores service names in class data", () => {
-					// Simulate what happens inside a controller's config()
-					var classData = {services: []};
-					variables.$class = classData;
-					inject("myService");
-					expect(variables.$class.services).toHaveLength(1);
-					expect(variables.$class.services[1]).toBe("myService");
+					// Test through a real controller instance (inject/injectedServices are Controller mixins)
+					var ctrl = application.wo.controller("dummy");
+					ctrl.inject("myService");
+					expect(ctrl.injectedServices()).toHaveLength(1);
+					expect(ctrl.injectedServices()[1]).toBe("myService");
 				});
 
 				it("supports comma-delimited list", () => {
-					var classData = {services: []};
-					variables.$class = classData;
-					inject("svcA, svcB, svcC");
-					expect(variables.$class.services).toHaveLength(3);
-					expect(variables.$class.services[1]).toBe("svcA");
-					expect(variables.$class.services[2]).toBe("svcB");
-					expect(variables.$class.services[3]).toBe("svcC");
+					var ctrl = application.wo.controller("dummy");
+					ctrl.inject("svcA, svcB, svcC");
+					expect(ctrl.injectedServices()).toHaveLength(3);
+					expect(ctrl.injectedServices()[1]).toBe("svcA");
+					expect(ctrl.injectedServices()[2]).toBe("svcB");
+					expect(ctrl.injectedServices()[3]).toBe("svcC");
 				});
 
 				it("deduplicates repeated names", () => {
-					var classData = {services: []};
-					variables.$class = classData;
-					inject("myService");
-					inject("myService");
-					expect(variables.$class.services).toHaveLength(1);
+					var ctrl = application.wo.controller("dummy");
+					ctrl.inject("myService");
+					ctrl.inject("myService");
+					expect(ctrl.injectedServices()).toHaveLength(1);
 				});
 
-				it("injectedServices() returns declared names", () => {
-					var classData = {services: ["svcA", "svcB"]};
-					variables.$class = classData;
-					var names = injectedServices();
-					expect(names).toHaveLength(2);
+				it("injectedServices() returns empty array by default", () => {
+					var ctrl = application.wo.controller("dummy");
+					expect(ctrl.injectedServices()).toHaveLength(0);
 				});
 
 			});
