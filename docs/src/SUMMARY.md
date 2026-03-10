@@ -120,6 +120,7 @@
 * [Contributing to Wheels Windows Installer](working-with-wheels/contributing-to-wheels-windows-installer.md)
 * [Contributing to Wheels macOS Installer](working-with-wheels/contributing-to-wheels-macos-installer.md)
 * [Background Jobs](working-with-wheels/background-jobs.md)
+* [Dependency Injection](working-with-wheels/dependency-injection.md)
 * [Submitting Pull Requests](working-with-wheels/submitting-pull-requests.md)
 * [Documenting your Code](working-with-wheels/documenting-your-code.md)
 

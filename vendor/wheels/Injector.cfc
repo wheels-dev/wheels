@@ -1,10 +1,13 @@
 /**
- * Lightweight dependency injection container for Wheels.
+ * Dependency injection container for Wheels.
  *
- * Provides only the DI features Wheels actually uses:
+ * Provides DI features for Wheels applications:
  * - map(name).to(componentPath) fluent bindings
  * - getInstance(name, initArguments) resolution
  * - onDIcomplete() lifecycle callback
+ * - Singleton and request-scoped lifecycles
+ * - Auto-wiring of init() arguments
+ * - bind() for interface-style aliasing
  *
  * Self-registers at application.wheelsdi for framework-wide access.
  */
@@ -24,6 +27,12 @@ component {
 
 		// Track which mappings are singletons
 		variables.singletonFlags = {};
+
+		// Track which mappings are request-scoped
+		variables.requestScopedFlags = {};
+
+		// Circular dependency guard during resolution
+		variables.resolving = {};
 
 		// Track the current mapping being built (for fluent API)
 		variables.currentMapping = "";
@@ -67,15 +76,33 @@ component {
 	 * When getInstance() is called for a singleton, the instance is cached.
 	 */
 	public Injector function asSingleton() {
-		// asSingleton can be called after to() — find the last mapping
-		local.lastKey = "";
-		for (local.key in variables.mappings) {
-			local.lastKey = local.key;
-		}
+		local.lastKey = $findLastMappingKey();
 		if (len(local.lastKey)) {
 			variables.singletonFlags[local.lastKey] = true;
 		}
 		return this;
+	}
+
+	/**
+	 * Mark the current or last mapping as request-scoped.
+	 * When getInstance() is called, the instance is cached per-request in request.$wheelsDICache.
+	 */
+	public Injector function asRequestScoped() {
+		local.lastKey = $findLastMappingKey();
+		if (len(local.lastKey)) {
+			variables.requestScopedFlags[local.lastKey] = true;
+		}
+		return this;
+	}
+
+	/**
+	 * Alias for map() with interface-binding semantics.
+	 * Use bind("InterfaceName").to("concrete.Path") for clarity when mapping abstractions.
+	 *
+	 * @name The interface or abstract name to bind
+	 */
+	public Injector function bind(required string name) {
+		return map(arguments.name);
 	}
 
 	/**
@@ -85,7 +112,7 @@ component {
 	 * 1. Check alias mappings
 	 * 2. Treat name as a full dotted component path
 	 *
-	 * After creation: call init(), then onDIcomplete().
+	 * After creation: call init() (with auto-wiring if no initArguments), then onDIcomplete().
 	 *
 	 * @name Alias name or dotted component path
 	 * @initArguments Struct of arguments to pass to the init() method
@@ -99,26 +126,61 @@ component {
 			return variables.singletons[local.componentPath];
 		}
 
-		// Create the component instance
-		local.instance = createObject("component", local.componentPath);
-
-		// Call init() if it exists
-		if (structKeyExists(local.instance, "init")) {
-			if (!structIsEmpty(arguments.initArguments)) {
-				local.instance.init(argumentCollection = arguments.initArguments);
-			} else {
-				local.instance.init();
+		// Check request-scope cache
+		if (structKeyExists(variables.requestScopedFlags, arguments.name)) {
+			local.requestCache = $getRequestCache();
+			if (structKeyExists(local.requestCache, arguments.name)) {
+				return local.requestCache[arguments.name];
 			}
 		}
 
-		// Call onDIcomplete() lifecycle callback if present
-		if (structKeyExists(local.instance, "onDIcomplete")) {
-			local.instance.onDIcomplete();
+		// Circular dependency guard
+		if (structKeyExists(variables.resolving, arguments.name)) {
+			throw(
+				type="Wheels.DI.CircularDependency",
+				message="Circular dependency detected while resolving '#arguments.name#'. Resolution chain: #structKeyList(variables.resolving)# -> #arguments.name#"
+			);
 		}
 
-		// Cache singletons
-		if (structKeyExists(variables.singletonFlags, arguments.name)) {
-			variables.singletons[local.componentPath] = local.instance;
+		variables.resolving[arguments.name] = true;
+
+		try {
+			// Create the component instance
+			local.instance = createObject("component", local.componentPath);
+
+			// Call init() if it exists
+			if (structKeyExists(local.instance, "init")) {
+				if (!structIsEmpty(arguments.initArguments)) {
+					local.instance.init(argumentCollection = arguments.initArguments);
+				} else {
+					// Auto-wire: resolve init() arguments from container mappings
+					local.autoArgs = $resolveInitArguments(local.instance);
+					if (!structIsEmpty(local.autoArgs)) {
+						local.instance.init(argumentCollection = local.autoArgs);
+					} else {
+						local.instance.init();
+					}
+				}
+			}
+
+			// Call onDIcomplete() lifecycle callback if present
+			if (structKeyExists(local.instance, "onDIcomplete")) {
+				local.instance.onDIcomplete();
+			}
+
+			// Cache singletons
+			if (structKeyExists(variables.singletonFlags, arguments.name)) {
+				variables.singletons[local.componentPath] = local.instance;
+			}
+
+			// Cache in request scope
+			if (structKeyExists(variables.requestScopedFlags, arguments.name)) {
+				local.requestCache = $getRequestCache();
+				local.requestCache[arguments.name] = local.instance;
+			}
+		} finally {
+			// Clean up resolving guard
+			structDelete(variables.resolving, arguments.name);
 		}
 
 		return local.instance;
@@ -133,6 +195,31 @@ component {
 		return structKeyExists(variables.mappings, arguments.name);
 	}
 
+	/**
+	 * Return all registered mappings (name → componentPath).
+	 */
+	public struct function getMappings() {
+		return variables.mappings;
+	}
+
+	/**
+	 * Check if a mapping is request-scoped.
+	 *
+	 * @name Alias name to check
+	 */
+	public boolean function isRequestScoped(required string name) {
+		return structKeyExists(variables.requestScopedFlags, arguments.name);
+	}
+
+	/**
+	 * Check if a mapping is a singleton.
+	 *
+	 * @name Alias name to check
+	 */
+	public boolean function isSingleton(required string name) {
+		return structKeyExists(variables.singletonFlags, arguments.name);
+	}
+
 	// ---------------------------------------------------------------------------
 	// Private helpers
 	// ---------------------------------------------------------------------------
@@ -145,6 +232,65 @@ component {
 			return variables.mappings[arguments.name];
 		}
 		return arguments.name;
+	}
+
+	/**
+	 * Find the last key added to the mappings struct (used by asSingleton/asRequestScoped).
+	 */
+	private string function $findLastMappingKey() {
+		local.lastKey = "";
+		for (local.key in variables.mappings) {
+			local.lastKey = local.key;
+		}
+		return local.lastKey;
+	}
+
+	/**
+	 * Return the per-request DI cache struct, creating it if needed.
+	 */
+	private struct function $getRequestCache() {
+		if (!structKeyExists(request, "$wheelsDICache")) {
+			request["$wheelsDICache"] = {};
+		}
+		return request["$wheelsDICache"];
+	}
+
+	/**
+	 * Inspect the init() method of an instance and auto-resolve parameters
+	 * whose names match registered container mappings.
+	 *
+	 * @instance The component instance to inspect
+	 */
+	private struct function $resolveInitArguments(required any instance) {
+		local.args = {};
+		local.meta = getMetaData(arguments.instance);
+
+		// Find the init() function in the metadata
+		if (!structKeyExists(local.meta, "functions")) {
+			return local.args;
+		}
+
+		local.initMeta = {};
+		for (local.fn in local.meta.functions) {
+			if (local.fn.name == "init") {
+				local.initMeta = local.fn;
+				break;
+			}
+		}
+
+		// No init() or no parameters
+		if (structIsEmpty(local.initMeta) || !structKeyExists(local.initMeta, "parameters")) {
+			return local.args;
+		}
+
+		// Match parameter names against container mappings
+		for (local.param in local.initMeta.parameters) {
+			if (containsInstance(local.param.name)) {
+				local.args[local.param.name] = getInstance(local.param.name);
+			}
+		}
+
+		return local.args;
 	}
 
 }

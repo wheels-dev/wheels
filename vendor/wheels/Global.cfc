@@ -897,6 +897,46 @@ component output="false" {
 		);
 	}
 
+	/**
+	 * Resolve a DI-registered service by name.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Miscellaneous Functions]
+	 *
+	 * @name The registered service name to resolve.
+	 */
+	public any function service(required string name) {
+		if (!isDefined("application.wheelsdi")) {
+			throw(
+				type="Wheels.DI.NotInitialized",
+				message="The DI container has not been initialized. Ensure your application has started properly."
+			);
+		}
+		if (!application.wheelsdi.containsInstance(arguments.name)) {
+			throw(
+				type="Wheels.DI.ServiceNotFound",
+				message="No service registered with the name '#arguments.name#'. Check your config/services.cfm registrations."
+			);
+		}
+		return application.wheelsdi.getInstance(arguments.name);
+	}
+
+	/**
+	 * Return a reference to the DI container for direct configuration.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Miscellaneous Functions]
+	 */
+	public any function injector() {
+		if (!isDefined("application.wheelsdi")) {
+			throw(
+				type="Wheels.DI.NotInitialized",
+				message="The DI container has not been initialized. Ensure your application has started properly."
+			);
+		}
+		return application.wheelsdi;
+	}
+
 	// ======================================================================
 	// ROUTING FUNCTIONS
 	// ======================================================================
