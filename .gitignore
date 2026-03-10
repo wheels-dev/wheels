@@ -28,3 +28,4 @@ settings.xml
 .claude/settings.local.json
 cli/tests/
 test-output/
+.worktrees/
