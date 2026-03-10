@@ -65,10 +65,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("claims and completes a valid job", function() {
-				// Enqueue a test job
-				local.job = new wheels.Job();
-				prepareMock(local.job);
-				local.enqueued = local.job.enqueue(data = {test: true}, queue = "test_claim");
+				// Enqueue a test job using a concrete subclass so jobClass resolves correctly
+				local.testJob = new app.jobs.ProcessOrdersJob();
+				local.enqueued = local.testJob.enqueue(data = {test: true}, queue = "test_claim");
 
 				// Process it
 				local.worker = new wheels.JobWorker();
@@ -80,10 +79,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("skips jobs with future runAt", function() {
-				// Enqueue a delayed job
-				local.job = new wheels.Job();
-				prepareMock(local.job);
-				local.enqueued = local.job.enqueueIn(seconds = 3600, data = {}, queue = "test_future");
+				// Enqueue a delayed job using a concrete subclass
+				local.testJob = new app.jobs.ProcessOrdersJob();
+				local.enqueued = local.testJob.enqueueIn(seconds = 3600, data = {}, queue = "test_future");
 
 				// Try to process — should skip since runAt is in the future
 				local.worker = new wheels.JobWorker();
@@ -92,10 +90,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("filters by queue name", function() {
-				// Enqueue to specific queue
-				local.job = new wheels.Job();
-				prepareMock(local.job);
-				local.enqueued = local.job.enqueue(data = {}, queue = "test_filter_a");
+				// Enqueue to specific queue using a concrete subclass
+				local.testJob = new app.jobs.ProcessOrdersJob();
+				local.enqueued = local.testJob.enqueue(data = {}, queue = "test_filter_a");
 
 				// Process from a different queue — should skip
 				local.worker = new wheels.JobWorker();
@@ -290,9 +287,9 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("rejects invalid status", function() {
-				local.worker = new wheels.JobWorker();
+				var worker = new wheels.JobWorker();
 				expect(function() {
-					local.worker.purge(status = "pending");
+					worker.purge(status = "pending");
 				}).toThrow(type = "Wheels.InvalidArgument");
 			});
 
