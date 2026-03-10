@@ -305,6 +305,28 @@ function create() {
 ```
 
 Scopes: transient (default, new each call), `.asSingleton()` (app lifetime), `.asRequestScoped()` (per-request via `request.$wheelsDICache`). Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed. `bind()` = semantic alias for `map()`.
+### Rate Limiting
+
+```cfm
+// Fixed window (default) — 60 requests per 60 seconds
+new wheels.middleware.RateLimiter()
+
+// Sliding window — smoother enforcement
+new wheels.middleware.RateLimiter(maxRequests=100, windowSeconds=120, strategy="slidingWindow")
+
+// Token bucket — allows bursts up to capacity, refills steadily
+new wheels.middleware.RateLimiter(maxRequests=50, windowSeconds=60, strategy="tokenBucket")
+
+// Database-backed storage (auto-creates wheels_rate_limits table)
+new wheels.middleware.RateLimiter(storage="database")
+
+// Custom key function (rate limit per API key instead of IP)
+new wheels.middleware.RateLimiter(keyFunction=function(req) {
+    return req.cgi.http_x_api_key ?: "anonymous";
+})
+```
+
+Strategies: `fixedWindow` (default), `slidingWindow`, `tokenBucket`. Storage: `memory` (default) or `database`. Adds `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers. Returns `429 Too Many Requests` with `Retry-After` when limit exceeded.
 
 ## Routing Quick Reference
 
@@ -325,6 +347,55 @@ mapper()
 ```
 
 Helpers: `linkTo(route="user", key=user.id, text="View")`, `urlFor(route="users")`, `redirectTo(route="user", key=user.id)`, `startFormTag(route="user", method="put", key=user.id)`.
+
+### Route Model Binding
+
+Automatically resolves `params.key` into a model instance before the controller action runs. The instance lands in `params.<singularModelName>` (e.g., `params.user`). Throws `Wheels.RecordNotFound` (404) if the record doesn't exist; silently skips if the model class doesn't exist.
+
+```cfm
+// Per-resource — convention: singularize controller name → model
+.resources(name="users", binding=true)
+
+// Explicit model name override
+.resources(name="posts", binding="BlogPost")  // resolves BlogPost, stored in params.blogPost
+
+// Scope-level — all nested resources inherit binding
+.scope(path="/api", binding=true)
+    .resources("users")     // params.user
+    .resources("products")  // params.product
+.end()
+
+// Global — enable for all resource routes
+set(routeModelBinding=true);  // in config/settings.cfm
+```
+
+In the controller, use the resolved instance directly:
+```cfm
+function show() {
+    user = params.user;  // already a model object, no findByKey needed
+}
+```
+
+## Pagination View Helpers
+
+Requires a paginated query: `findAll(page=params.page, perPage=25)`. The recommended all-in-one helper is `paginationNav()`.
+
+```cfm
+// All-in-one nav (wraps first/prev/page-numbers/next/last in <nav>)
+#paginationNav()#
+#paginationNav(showInfo=true, showFirst=false, showLast=false, navClass="my-pagination")#
+
+// Individual helpers for custom layouts
+#paginationInfo()#            // "Showing 26-50 of 1,000 records"
+#firstPageLink()#             // link to page 1
+#previousPageLink()#          // link to previous page
+#pageNumberLinks()#           // windowed page number links (default windowSize=2)
+#nextPageLink()#              // link to next page
+#lastPageLink()#              // link to last page
+#pageNumberLinks(windowSize=5, classForCurrent="active")#
+```
+
+Disabled links render as `<span class="disabled">` by default. All helpers accept `handle` for named pagination queries.
 
 ## Testing Quick Reference
 
