@@ -206,6 +206,15 @@ component {
 			application.wo.$include(template = "/config/#application.$wheels.environment#/settings.cfm");
 		}
 
+		// Load DI service registrations.
+		if (FileExists(ExpandPath("/config/services.cfm"))) {
+			application.wo.$include(template = "/config/services.cfm");
+		}
+		// Environment-specific services override.
+		if (FileExists(ExpandPath("/config/#application.$wheels.environment#/services.cfm"))) {
+			application.wo.$include(template = "/config/#application.$wheels.environment#/services.cfm");
+		}
+
 		// Clear query (cfquery) and page (cfcache) caches.
 		if (application.$wheels.clearQueryCacheOnReload or !StructKeyExists(application.$wheels, "cacheKey")) {
 			application.$wheels.cacheKey = Hash(CreateUUID());

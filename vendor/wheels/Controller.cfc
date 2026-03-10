@@ -51,6 +51,9 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 		variables.$class.formats.existingTemplates = "";
 		variables.$class.formats.nonExistingTemplates = "";
 
+		// Storage for declared service injections (populated by inject() in config)
+		variables.$class.services = [];
+
 		$setFlashStorage($get("flashStorage"));
 		$setFlashAppend($get("flashAppend"));
 
@@ -114,6 +117,10 @@ component output="false" displayName="Controller" extends="wheels.Global"{
 			executeArgs = local.executeArgs
 		);
 		variables.params = arguments.params;
+
+		// Resolve any services declared via inject() in config()
+		$resolveInjectedServices();
+
 		return this;
 	}
 

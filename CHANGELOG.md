@@ -28,6 +28,7 @@ All historical references to "CFWheels" in this changelog have been preserved fo
 - Enum support with `enum()` for named property values, auto-generated `is*()` checkers, auto-scopes, and inclusion validation
 - Query scopes with `scope()` for reusable, composable query fragments in models
 - Batch processing with `findEach()` and `findInBatches()` for memory-efficient record iteration
+- Expanded DI container with `asRequestScoped()` for per-request service instances, `service()` global helper, declarative `inject()` in controller config, `bind()` interface binding, auto-wiring of init() arguments, and `config/services.cfm` for service registration
 
 ----
 

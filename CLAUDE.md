@@ -278,6 +278,33 @@ mapper()
 
 Built-in: `wheels.middleware.RequestId`, `wheels.middleware.Cors`, `wheels.middleware.SecurityHeaders`, `wheels.middleware.RateLimiter`. Custom middleware: implement `wheels.middleware.MiddlewareInterface`, place in `app/middleware/`.
 
+## DI Container Quick Reference
+
+Register services in `config/services.cfm` (loaded at app start, environment overrides supported):
+
+```cfm
+var di = injector();
+di.map("emailService").to("app.lib.EmailService").asSingleton();
+di.map("currentUser").to("app.lib.CurrentUserResolver").asRequestScoped();
+di.bind("INotifier").to("app.lib.SlackNotifier").asSingleton();
+```
+
+Resolve with `service()` anywhere, or use `inject()` in controller `config()`:
+
+```cfm
+// In any controller/view
+var svc = service("emailService");
+
+// Declarative injection in controller config()
+function config() {
+    inject("emailService, currentUser");
+}
+function create() {
+    this.emailService.send(to=user.email);  // resolved per-request
+}
+```
+
+Scopes: transient (default, new each call), `.asSingleton()` (app lifetime), `.asRequestScoped()` (per-request via `request.$wheelsDICache`). Auto-wiring: `init()` params matching registered names are auto-resolved when no `initArguments` passed. `bind()` = semantic alias for `map()`.
 ### Rate Limiting
 
 ```cfm
