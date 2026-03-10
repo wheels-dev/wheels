@@ -19,6 +19,8 @@ component extends="wheels.WheelsTest" {
 				expect(local.job.priority).toBe(0);
 				expect(local.job.maxRetries).toBe(3);
 				expect(local.job.timeout).toBe(300);
+				expect(local.job.baseDelay).toBe(2);
+				expect(local.job.maxDelay).toBe(3600);
 			});
 
 			it("throws NotImplemented when perform() is called on base class", function() {

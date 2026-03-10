@@ -31,6 +31,8 @@ component {
 	this.maxRetries = 3;
 	this.retryBackoff = "exponential";
 	this.timeout = 300;
+	this.baseDelay = 2;
+	this.maxDelay = 3600;
 
 	/**
 	 * Constructor
@@ -280,8 +282,8 @@ component {
 			local.maxRetries = Val(arguments.jobRow.maxRetries);
 
 			if (local.currentAttempts < local.maxRetries) {
-				// Schedule retry with exponential backoff: 2^attempt seconds (4s, 8s, 16s, 32s...)
-				local.backoffSeconds = 2 ^ (local.currentAttempts + 1);
+				// Schedule retry with configurable exponential backoff, capped at maxDelay
+				local.backoffSeconds = Min(this.baseDelay * (2 ^ local.currentAttempts), this.maxDelay);
 				local.nextRunAt = DateAdd("s", local.backoffSeconds, Now());
 
 				queryExecute(

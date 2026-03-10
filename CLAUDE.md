@@ -355,6 +355,19 @@ job.retryFailed(queue="mailers");  // retry all failed jobs
 job.purgeCompleted(days=7);        // clean up old completed jobs
 ```
 
+**Job Worker CLI** — persistent daemon for processing jobs:
+```bash
+wheels jobs work                           # process all queues
+wheels jobs work --queue=mailers --interval=3  # specific queue, 3s poll
+wheels jobs status                         # per-queue breakdown
+wheels jobs status --format=json           # JSON output
+wheels jobs retry --queue=mailers          # retry failed jobs
+wheels jobs purge --completed --failed --older-than=30
+wheels jobs monitor                        # live dashboard
+```
+
+**Configurable backoff**: `this.baseDelay = 2` and `this.maxDelay = 3600` in job `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`.
+
 Requires migration: `20260221000001_create_wheels_jobs_table.cfc`. Run with `wheels dbmigrate latest`.
 
 ## Server-Sent Events (SSE) Quick Reference
