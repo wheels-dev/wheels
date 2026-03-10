@@ -211,6 +211,13 @@ component extends="wheels.WheelsTest" {
 
 			describe("inject() controller helper", () => {
 
+				beforeEach(() => {
+					// Reset the cached controller's services array to prevent cross-test contamination.
+					// controller("dummy") returns a cached class whose $class.services persists between specs.
+					var ctrl = application.wo.controller("dummy");
+					ctrl.$getControllerClassData().services = [];
+				});
+
 				it("stores service names in class data", () => {
 					// Test through a real controller instance (inject/injectedServices are Controller mixins)
 					var ctrl = application.wo.controller("dummy");
