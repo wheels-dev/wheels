@@ -20,13 +20,9 @@ The `wheels docker deploy` command manages the deployment lifecycle of your Dock
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--local` | Deploy to local Docker environment | `false` |
+| `--local` | Deploy to local Docker environment | `true` |
 | `--remote` | Deploy to remote server(s) | `false` |
-| `--environment` | Deployment environment (production, staging) - for local deployment | `production` |
-| `--db` | Database to use (h2, mysql, postgres, mssql) - for local deployment | `mysql` |
-| `--cfengine` | ColdFusion engine to use (lucee, adobe) - for local deployment | `lucee` |
-| `--optimize` | Enable production optimizations - for local deployment | `true` |
-| `--servers` | Server configuration file (defaults to `config/deploy.yml`) | `""` |
+| `--serversFile` | Server configuration file (defaults to `config/deploy.yml`) | `""` |
 | `--skipDockerCheck` | Skip Docker installation check on remote servers | `false` |
 | `--blueGreen` | Enable Blue/Green deployment strategy (zero downtime) - for remote deployment | `false` |
 
@@ -38,18 +34,6 @@ The `wheels docker deploy` command manages the deployment lifecycle of your Dock
 Starts the application locally, mimicking a production environment (optimized settings, no hot-reload).
 ```bash
 wheels docker deploy --local
-```
-
-**Staging Environment**
-Deploys locally with staging environment variables.
-```bash
-wheels docker deploy --local --environment=staging
-```
-
-**Custom Stack**
-Deploys locally using PostgreSQL and Adobe ColdFusion.
-```bash
-wheels docker deploy --local --db=postgres --cfengine=adobe
 ```
 
 ### Remote Deployment
@@ -69,7 +53,7 @@ wheels docker deploy --remote --blueGreen
 **Deploy to Specific Servers**
 Uses an override server list file for deployment.
 ```bash
-wheels docker deploy --remote --servers=staging-servers.yml
+wheels docker deploy --remote --serversFile=staging-servers.yml
 ```
 
 **Skip Docker Checks**
@@ -112,3 +96,30 @@ If the remote user is not part of the `docker` group, the CLI tries to use `sudo
 ## Server Configuration
 
 See [wheels docker build](docker-build.md#server-configuration) for details on `deploy-servers.txt` and `deploy-servers.json`.
+
+## Security Notes
+
+1. **SSH Keys**: Use SSH key authentication instead of passwords
+2. **Sudo Access**: Configure minimal sudo permissions for production
+3. **Firewall**: Ensure proper firewall rules are in place
+4. **Docker Socket**: The deployment sets permissions on `/var/run/docker.sock` for convenience; review for production security
+
+## Best Practices
+
+1. **Test Locally First**: Always test deployments locally before remote deployment
+2. **Use Blue/Green for Production**: Minimize downtime with `--blueGreen` flag
+3. **Version Control**: Keep `Dockerfile` and `docker-compose.yml` in version control
+4. **Environment-Specific Configs**: Use different configuration files for staging/production
+5. **Monitor Resources**: Keep track of Docker resource usage on remote servers
+6. **Backup Data**: Always backup databases before major deployments
+7. **Rollback Plan**: Keep previous images for quick rollback if needed
+
+## Related Commands
+
+- [wheels docker init](docker-init.md) - Initialize Docker configuration files
+- [wheels docker build](docker-build.md) - Build Docker images
+- [wheels docker logs](docker-logs.md) - View container logs
+- [wheels docker exec](docker-exec.md) - Execute commands in containers
+- [wheels docker stop](docker-stop.md) - Stop Docker containers
+
+**Note**: This command is part of the Wheels CLI tool suite for Docker management.

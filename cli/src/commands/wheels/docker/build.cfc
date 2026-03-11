@@ -3,7 +3,6 @@
  *
  * {code:bash}
  * wheels docker build --local
- * wheels docker build --local --tag=myapp:v1.0
  * wheels docker build --local --nocache
  * wheels docker build --remote
  * wheels docker build --remote --servers=1,3
@@ -17,7 +16,6 @@ component extends="DockerCommand" {
      * @local Build Docker image on local machine
      * @remote Build Docker image on remote server(s)
      * @servers Comma-separated list of server numbers to build on (e.g., "1,3,5") - for remote only
-     * @tag Custom tag for the Docker image (default: project-name:latest)
      * @nocache Build without using cache
      * @pull Always attempt to pull a newer version of the base image
      */
@@ -25,12 +23,18 @@ component extends="DockerCommand" {
         boolean local=false,
         boolean remote=false,
         string servers="",
-        string tag="",
         boolean nocache=false,
         boolean pull=false
     ) {
         // Ensure we are in a Wheels app
         requireWheelsApp(getCWD());
+
+        // Check if Docker config exists (created by wheels docker init)
+        if (!hasDockerConfig()) {
+            detailOutput.error("Docker configuration not found. Please run 'wheels docker init' first.");
+            detailOutput.output("This command creates the necessary Docker files (Dockerfile, docker-compose.yml, etc.)");
+            return;
+        }
 
         // Reconstruct arguments for handling --key=value style
         arguments=reconstructArgs(arguments);
@@ -41,14 +45,15 @@ component extends="DockerCommand" {
         }
         
         if (arguments.local && arguments.remote) {
-            error("Cannot specify both --local and --remote. Please choose one.");
+            detailOutput.error("Cannot specify both --local and --remote. Please choose one.");
+            return;
         }
         
         // Route to appropriate build method
         if (arguments.local) {
-            buildLocal(arguments.tag, arguments.nocache, arguments.pull);
+            buildLocal(arguments.nocache, arguments.pull);
         } else {
-            buildRemote(arguments.servers, arguments.tag, arguments.nocache, arguments.pull);
+            buildRemote(arguments.servers, arguments.nocache, arguments.pull);
         }
     }
     
@@ -56,12 +61,13 @@ component extends="DockerCommand" {
     // LOCAL BUILD
     // =============================================================================
     
-    private function buildLocal(string customTag, boolean nocache, boolean pull) {
+    private function buildLocal(boolean nocache, boolean pull) {
         detailOutput.header("Wheels Docker Local Build");
         
         // Check if Docker is installed locally
         if (!isDockerInstalled()) {
-            error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+            detailOutput.error("Docker is not installed or not accessible. Please ensure Docker Desktop or Docker Engine is running.");
+            return;
         }
 
         // Check for docker-compose file
@@ -81,7 +87,8 @@ component extends="DockerCommand" {
                 arrayAppend(local.buildCmd, "--pull");
             }
             
-            detailOutput.output("Building services with docker-compose...");
+            detailOutput.statusInfo("Building services with docker-compose...");
+            detailOutput.statusInfo("Executing: " & arrayToList(local.buildCmd, " "));
             runLocalCommand(local.buildCmd);
             
             detailOutput.line();
@@ -95,30 +102,18 @@ component extends="DockerCommand" {
             // Check for Dockerfile
             local.dockerfilePath = getCWD() & "/Dockerfile";
             if (!fileExists(local.dockerfilePath)) {
-                error("No Dockerfile or docker-compose.yml found in current directory");
+                detailOutput.error("No Dockerfile or docker-compose.yml found in current directory");
+                return;
             }
             
             detailOutput.statusSuccess("Found Dockerfile, will build using standard docker build");
             
-            // Get project name and determine tag
-            local.projectName = getProjectName();
-            local.deployConfig = getDeployConfig();
-            local.baseImageName = (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) ? local.deployConfig.image : local.projectName;
+            var config = resolveConfig();
             
-            if (len(trim(arguments.customTag))) {
-                if (find(":", arguments.customTag)) {
-                    local.imageTag = arguments.customTag;
-                } else {
-                    local.imageTag = local.baseImageName & ":" & arguments.customTag;
-                }
-            } else {
-                local.imageTag = local.baseImageName & ":latest";
-            }
-            
-            detailOutput.statusInfo("Building image: " & local.imageTag);
+            detailOutput.statusInfo("Building Docker image: " & config.image);
             
             // Build command array
-            local.buildCmd = ["docker", "build", "-t", local.imageTag];
+            local.buildCmd = ["docker", "build", "-t", config.image];
             
             if (arguments.nocache) {
                 arrayAppend(local.buildCmd, "--no-cache");
@@ -130,14 +125,14 @@ component extends="DockerCommand" {
             
             arrayAppend(local.buildCmd, ".");
             
-            detailOutput.output("Building Docker image...");
+            detailOutput.statusInfo("Executing: " & arrayToList(local.buildCmd, " "));
+
             runLocalCommand(local.buildCmd);
             
             detailOutput.line();
             detailOutput.statusSuccess("Docker image built successfully!");
             detailOutput.line();
-            detailOutput.output("Image tag: " & local.imageTag);
-            detailOutput.output("View image with: docker images " & local.projectName);
+            detailOutput.output("View image with: docker images " & config.image);
             detailOutput.output("Run container with: wheels docker deploy --local");
             detailOutput.line();
         }
@@ -155,63 +150,23 @@ component extends="DockerCommand" {
         }
     }
     
-    /**
-     * Run a local system command
-     */
-    private function runLocalCommand(array cmd, boolean showOutput=true) {
-        var local = {};
-        local.javaCmd = createObject("java","java.util.ArrayList").init();
-        for (var c in arguments.cmd) {
-            local.javaCmd.add(c & "");
-        }
-
-        local.pb = createObject("java","java.lang.ProcessBuilder").init(local.javaCmd);
-        
-        // Set working directory to current directory
-        local.currentDir = createObject("java", "java.io.File").init(getCWD());
-        local.pb.directory(local.currentDir);
-        
-        local.pb.redirectErrorStream(true);
-        local.proc = local.pb.start();
-
-        local.isr = createObject("java","java.io.InputStreamReader").init(local.proc.getInputStream(), "UTF-8");
-        local.br = createObject("java","java.io.BufferedReader").init(local.isr);
-        local.outputParts = [];
-
-        while (true) {
-            local.line = local.br.readLine();
-            if (isNull(local.line)) break;
-            arrayAppend(local.outputParts, local.line);
-            if (arguments.showOutput) {
-                detailOutput.output(local.line);
-            }
-        }
-
-        local.exitCode = local.proc.waitFor();
-        local.output = arrayToList(local.outputParts, chr(10));
-        
-        if (local.exitCode neq 0 && arguments.showOutput) {
-            error("Command failed with exit code: " & local.exitCode);
-        }
-
-        return { exitCode: local.exitCode, output: local.output };
-    }
-    
     // =============================================================================
     // REMOTE BUILD
     // =============================================================================
     
-    private function buildRemote(string serverNumbers, string customTag, boolean nocache, boolean pull) {
+    private function buildRemote(string serverNumbers, boolean nocache, boolean pull) {
+        var config = resolveConfig();
+        
         // Check for deploy-servers file (text or json) in current directory
         var textConfigPath = fileSystemUtil.resolvePath("deploy-servers.txt");
         var jsonConfigPath = fileSystemUtil.resolvePath("deploy-servers.json");
         var ymlConfigPath = fileSystemUtil.resolvePath("config/deploy.yml");
         var allServers = [];
         var serversToBuild = [];
-        var projectName = getProjectName();
+        var projectName = config.name;
 
         if (len(trim(arguments.serverNumbers)) == 0 && fileExists(ymlConfigPath)) {
-            var deployConfig = getDeployConfig();
+            var deployConfig = readDeployConfig(ymlConfigPath);
             if (arrayLen(deployConfig.servers)) {
                 detailOutput.identical("Found config/deploy.yml, loading server configuration");
                 allServers = deployConfig.servers;
@@ -223,6 +178,9 @@ component extends="DockerCommand" {
                     }
                     if (!structKeyExists(s, "port")) {
                         s.port = 22;
+                    }
+                    if (!structKeyExists(s, "imageName")) {
+                        s.imageName = config.image;
                     }
                 }
                 serversToBuild = allServers;
@@ -239,19 +197,21 @@ component extends="DockerCommand" {
                 allServers = loadServersFromConfig("deploy-servers.json");
                 serversToBuild = filterServers(allServers, arguments.serverNumbers);
             } else {
-                error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+                detailOutput.error("No server configuration found. Use 'wheels docker init' or create deploy-servers.txt.");
+                return;
             }
         }
 
         if (arrayLen(serversToBuild) == 0) {
-            error("No servers configured for building");
+            detailOutput.error("No servers configured for building");
+            return;
         }
 
         detailOutput.line();
         detailOutput.statusInfo("Building Docker images on #arrayLen(serversToBuild)# server(s)...");
 
         // Build on all selected servers
-        buildOnServers(serversToBuild, arguments.customTag, arguments.nocache, arguments.pull);
+        buildOnServers(serversToBuild, arguments.nocache, arguments.pull);
 
         detailOutput.line();
         detailOutput.success("Build operations completed on all servers!");
@@ -290,7 +250,7 @@ component extends="DockerCommand" {
     /**
      * Build on multiple servers sequentially
      */
-    private function buildOnServers(required array servers, string customTag, boolean nocache, boolean pull) {
+    private function buildOnServers(required array servers, boolean nocache, boolean pull) {
         var successCount = 0;
         var failureCount = 0;
         var serverConfig = {};
@@ -300,7 +260,7 @@ component extends="DockerCommand" {
             detailOutput.header("Building on server #i# of #arrayLen(servers)#: #serverConfig.host#");
 
             try {
-                buildOnServer(serverConfig, arguments.customTag, arguments.nocache, arguments.pull);
+                buildOnServer(serverConfig, arguments.nocache, arguments.pull);
                 successCount++;
                 detailOutput.statusSuccess("Build on #serverConfig.host# completed successfully");
             } catch (any e) {
@@ -320,17 +280,24 @@ component extends="DockerCommand" {
     /**
      * Build on a single server
      */
-    private function buildOnServer(required struct serverConfig, string customTag, boolean nocache, boolean pull) {
+    private function buildOnServer(required struct serverConfig, boolean nocache, boolean pull) {
         var local = {};
         local.host = arguments.serverConfig.host;
         local.user = arguments.serverConfig.user;
         local.port = structKeyExists(arguments.serverConfig, "port") ? arguments.serverConfig.port : 22;
-        local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : "#local.user#-app";
-        local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.user#-app";
+        local.imageName = structKeyExists(arguments.serverConfig, "imageName") ? arguments.serverConfig.imageName : config.image;
+        local.remoteDir = structKeyExists(arguments.serverConfig, "remoteDir") ? arguments.serverConfig.remoteDir : "/home/#local.user#/#local.imageName#";
+
+        var config = resolveConfig();
+        
+        // Use image name from config or server config
+        local.baseImageName = len(local.imageName) ? local.imageName : config.image;
+        local.imageTag = local.baseImageName & ":" & config.tag;
 
         // Check SSH connection
         if (!testSSHConnection(local.host, local.user, local.port)) {
-            error("SSH connection failed to #local.host#. Check credentials and access.");
+            detailOutput.error("SSH connection failed to #local.host#. Check credentials and access.");
+            return;
         }
         detailOutput.statusSuccess("SSH connection successful");
 
@@ -411,15 +378,7 @@ component extends="DockerCommand" {
             local.deployConfig = getDeployConfig();
             local.baseImageName = (structKeyExists(local.deployConfig, "image") && len(trim(local.deployConfig.image))) ? local.deployConfig.image : local.imageName;
 
-            if (len(trim(arguments.customTag))) {
-                if (find(":", arguments.customTag)) {
-                    local.imageTag = arguments.customTag;
-                } else {
-                    local.imageTag = local.baseImageName & ":" & arguments.customTag;
-                }
-            } else {
-                local.imageTag = local.baseImageName & ":latest";
-            }
+            local.imageTag = local.baseImageName & ":" & config.tag;
             detailOutput.create("Building image: " & local.imageTag);
             
             local.buildCmd = "cd " & local.remoteDir & " && ";
@@ -501,7 +460,8 @@ component extends="DockerCommand" {
         var filePath = fileSystemUtil.resolvePath(arguments.textFile);
 
         if (!fileExists(filePath)) {
-            error("Text file not found: #filePath#");
+            detailOutput.error("Text file not found: #filePath#");
+            return;
         }
 
         try {
@@ -549,7 +509,8 @@ component extends="DockerCommand" {
         var configPath = fileSystemUtil.resolvePath(arguments.configFile);
 
         if (!fileExists(configPath)) {
-            error("Config file not found: #configPath#");
+            detailOutput.error("Config file not found: #configPath#");
+            return;
         }
 
         try {
@@ -557,7 +518,8 @@ component extends="DockerCommand" {
             var config = deserializeJSON(configContent);
 
             if (!structKeyExists(config, "servers") || !isArray(config.servers)) {
-                error("Invalid config file format. Expected { ""servers"": [ ... ] }");
+                detailOutput.error("Invalid config file format. Expected { ""servers"": [ ... ] }");
+                return;
             }
 
             var projectName = getProjectName();
@@ -618,7 +580,8 @@ component extends="DockerCommand" {
         ]);
 
         if (local.result.exitCode neq 0) {
-            error("Remote command failed: " & arguments.cmd);
+            detailOutput.error("Remote command failed: " & arguments.cmd);
+            setExitCode(1);
         }
 
         return local.result;
@@ -652,26 +615,4 @@ component extends="DockerCommand" {
         return { exitCode: local.exitCode, output: local.output };
     }
 
-    private function getProjectName() {
-        var cwd = getCWD();
-        var dirName = listLast(cwd, "\/");
-        dirName = lCase(dirName);
-        dirName = reReplace(dirName, "[^a-z0-9\-]", "-", "all");
-        dirName = reReplace(dirName, "\-+", "-", "all");
-        dirName = reReplace(dirName, "^\-|\-$", "", "all");
-        return len(dirName) ? dirName : "wheels-app";
-    }
-
-    private function hasDockerComposeFile() {
-        var composeFiles = ["docker-compose.yml", "docker-compose.yaml"];
-
-        for (var composeFile in composeFiles) {
-            var composePath = getCWD() & "/" & composeFile;
-            if (fileExists(composePath)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }
