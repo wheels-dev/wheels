@@ -4,7 +4,7 @@
  * queue statistics, monitoring, and management operations.
  *
  * Used by CLI commands (wheels jobs work/status/retry/purge/monitor)
- * and the CLI bridge to process jobs from the _wheels_jobs table.
+ * and the CLI bridge to process jobs from the wheels_jobs table.
  */
 component {
 
@@ -39,7 +39,7 @@ component {
 		};
 
 		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
-			FROM _wheels_jobs
+			FROM wheels_jobs
 			WHERE status = 'pending' AND runAt <= :runAt";
 
 		if (Len(arguments.queues)) {
@@ -115,7 +115,7 @@ component {
 		try {
 			local.timedOut = queryExecute(
 				"SELECT id, jobClass, attempts, maxRetries
-				FROM _wheels_jobs
+				FROM wheels_jobs
 				WHERE status = 'processing' AND updatedAt < :cutoff",
 				{cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}},
 				{datasource = variables.$datasource}
@@ -155,7 +155,7 @@ component {
 		};
 
 		try {
-			local.sql = "SELECT queue, status, COUNT(*) as cnt FROM _wheels_jobs";
+			local.sql = "SELECT queue, status, COUNT(*) as cnt FROM wheels_jobs";
 			local.params = {};
 
 			if (Len(arguments.queue)) {
@@ -207,7 +207,7 @@ component {
 
 		// Throughput — completed and failed in the window
 		try {
-			local.sql = "SELECT status, COUNT(*) as cnt FROM _wheels_jobs
+			local.sql = "SELECT status, COUNT(*) as cnt FROM wheels_jobs
 				WHERE updatedAt >= :lookback AND status IN ('completed', 'failed')";
 			if (Len(arguments.queue)) {
 				local.sql &= " AND queue = :queue";
@@ -232,7 +232,7 @@ component {
 		// Recent jobs
 		try {
 			local.recentSql = "SELECT id, jobClass, queue, status, attempts, lastError, updatedAt
-				FROM _wheels_jobs ORDER BY updatedAt DESC";
+				FROM wheels_jobs ORDER BY updatedAt DESC";
 			local.recentRows = queryExecute(local.recentSql, {}, {datasource = variables.$datasource, maxrows = 10});
 
 			for (local.row in local.recentRows) {
@@ -252,7 +252,7 @@ component {
 
 		// Oldest pending job
 		try {
-			local.oldestSql = "SELECT createdAt FROM _wheels_jobs WHERE status = 'pending' ORDER BY createdAt ASC";
+			local.oldestSql = "SELECT createdAt FROM wheels_jobs WHERE status = 'pending' ORDER BY createdAt ASC";
 			local.oldestRow = queryExecute(local.oldestSql, {}, {datasource = variables.$datasource, maxrows = 1});
 			if (local.oldestRow.recordCount) {
 				local.result.oldestPending = local.oldestRow.createdAt;
@@ -275,7 +275,7 @@ component {
 		// If limit specified, get the IDs first
 		if (arguments.limit > 0) {
 			try {
-				local.selectSql = "SELECT id FROM _wheels_jobs WHERE status = 'failed'";
+				local.selectSql = "SELECT id FROM wheels_jobs WHERE status = 'failed'";
 				local.selectParams = {};
 				if (Len(arguments.queue)) {
 					local.selectSql &= " AND queue = :queue";
@@ -300,7 +300,7 @@ component {
 					local.updateParams[local.paramName] = {value = local.id, cfsqltype = "cf_sql_varchar"};
 				}
 
-				local.updateSql = "UPDATE _wheels_jobs
+				local.updateSql = "UPDATE wheels_jobs
 					SET status = 'pending', attempts = 0, lastError = NULL, failedAt = NULL,
 						runAt = :runAt, updatedAt = :updatedAt
 					WHERE id IN (#ArrayToList(local.idConditions)#)";
@@ -314,7 +314,7 @@ component {
 		}
 
 		// No limit — update all
-		local.sql = "UPDATE _wheels_jobs
+		local.sql = "UPDATE wheels_jobs
 			SET status = 'pending', attempts = 0, lastError = NULL, failedAt = NULL,
 				runAt = :runAt, updatedAt = :updatedAt
 			WHERE status = 'failed'";
@@ -331,7 +331,7 @@ component {
 		try {
 			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 			// DML recordCount is unreliable across CFML engines; count via SELECT
-			local.countSql = "SELECT COUNT(*) AS cnt FROM _wheels_jobs WHERE status = 'pending'";
+			local.countSql = "SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'pending'";
 			local.countParams = {};
 			if (Len(arguments.queue)) {
 				local.countSql &= " AND queue = :queue";
@@ -359,7 +359,7 @@ component {
 		local.cutoff = DateAdd("d", -arguments.days, $now());
 		local.dateColumn = (arguments.status == "completed") ? "completedAt" : "failedAt";
 
-		local.sql = "DELETE FROM _wheels_jobs WHERE status = :status AND #local.dateColumn# < :cutoff";
+		local.sql = "DELETE FROM wheels_jobs WHERE status = :status AND #local.dateColumn# < :cutoff";
 		local.params = {
 			status = {value = arguments.status, cfsqltype = "cf_sql_varchar"},
 			cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
@@ -387,26 +387,24 @@ component {
 	 */
 	private boolean function $claimJob(required string jobId) {
 		try {
-			// Wrap in transaction to ensure UPDATE + SELECT use the same DB connection
-			// (prevents connection pool issues where SELECT misses uncommitted UPDATE)
-			transaction {
-				queryExecute(
-					"UPDATE _wheels_jobs
-					SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
-					WHERE id = :id AND status = 'pending'",
-					{
-						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
-						id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-					},
-					{datasource = variables.$datasource}
-				);
-				// Verify claim with SELECT (reliable across all CFML engines and JDBC drivers)
-				local.check = queryExecute(
-					"SELECT id FROM _wheels_jobs WHERE id = :id AND status = 'processing'",
-					{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
-					{datasource = variables.$datasource}
-				);
-			}
+			// UPDATE auto-commits; no explicit transaction needed.
+			// Using transaction {} caused failures on some engines (BoxLang + PostgreSQL).
+			queryExecute(
+				"UPDATE wheels_jobs
+				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
+				WHERE id = :id AND status = 'pending'",
+				{
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
+				},
+				{datasource = variables.$datasource}
+			);
+			// Verify claim with SELECT (reliable across all CFML engines and JDBC drivers)
+			local.check = queryExecute(
+				"SELECT id FROM wheels_jobs WHERE id = :id AND status = 'processing'",
+				{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
+				{datasource = variables.$datasource}
+			);
 			return local.check.recordCount > 0;
 		} catch (any e) {
 			return false;
@@ -425,7 +423,7 @@ component {
 
 			// Mark completed
 			queryExecute(
-				"UPDATE _wheels_jobs
+				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
@@ -476,7 +474,7 @@ component {
 		local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 		queryExecute(
-			"UPDATE _wheels_jobs
+			"UPDATE wheels_jobs
 			SET status = 'pending',
 				lastError = :lastError,
 				runAt = :runAt,
@@ -508,7 +506,7 @@ component {
 		required string errorMessage
 	) {
 		queryExecute(
-			"UPDATE _wheels_jobs
+			"UPDATE wheels_jobs
 			SET status = 'failed',
 				failedAt = :failedAt,
 				lastError = :lastError,
@@ -540,7 +538,7 @@ component {
 	}
 
 	/**
-	 * Ensure the _wheels_jobs table exists. Delegates to Job.cfc's implementation.
+	 * Ensure the wheels_jobs table exists. Delegates to Job.cfc's implementation.
 	 */
 	private boolean function $ensureJobTable() {
 		try {

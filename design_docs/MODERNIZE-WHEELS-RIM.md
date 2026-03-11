@@ -473,7 +473,7 @@ wheels jobs purge --completed --older-than=7d
 ```
 
 **Implementation steps:**
-1. Ensure `_wheels_jobs` table auto-creates on first use (already designed in `Job.cfc`)
+1. Ensure `wheels_jobs` table auto-creates on first use (already designed in `Job.cfc`)
 2. Implement `wheels.JobWorker` class that polls the job table
 3. Create CLI commands: `work`, `status`, `retry`, `purge`
 4. Add exponential backoff retry: delay = `min(baseDelay * 2^attempt, maxDelay)`

@@ -137,7 +137,7 @@ The native MCP server (`vendor/wheels/public/mcp/McpServer.cfc`) is a genuine di
 
 **Impact:** Without a persistent job runner, background jobs cannot reliably execute. Email sending, report generation, and API syncs all require this.
 
-**Recommendation:** Implement a database-backed job queue (following Rails' Solid Queue approach). Store jobs in a `_wheels_jobs` table with status, retry count, scheduled_at, and error tracking. A poll-based worker running as a CLI daemon (`wheels jobs work`) would complete the picture.
+**Recommendation:** Implement a database-backed job queue (following Rails' Solid Queue approach). Store jobs in a `wheels_jobs` table with status, retry count, scheduled_at, and error tracking. A poll-based worker running as a CLI daemon (`wheels jobs work`) would complete the picture.
 
 #### Gap 3: No Nested Resource Routes
 
@@ -234,7 +234,7 @@ Implement Server-Sent Events (SSE) as a lightweight first step:
 ### Priority 2: Complete the Job System (High Impact)
 
 Turn the existing `wheels.Job` skeleton into a full system:
-1. Database-backed queue table (`_wheels_jobs`)
+1. Database-backed queue table (`wheels_jobs`)
 2. CLI worker: `wheels jobs work --queue=default,high`
 3. Retry with exponential backoff, max attempts, dead letter storage
 4. `wheels jobs status` command for monitoring

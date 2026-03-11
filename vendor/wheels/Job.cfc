@@ -3,7 +3,7 @@
  * Provides background job processing with database-backed persistence,
  * retry logic with exponential backoff, and priority queue support.
  *
- * The _wheels_jobs table is auto-created on first use — no migration needed.
+ * The wheels_jobs table is auto-created on first use — no migration needed.
  *
  * Usage:
  *   // In app/jobs/SendWelcomeEmailJob.cfc
@@ -136,7 +136,7 @@ component {
 
 		try {
 			queryExecute(
-				"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+				"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 				VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
 				{
 					id = {value = local.id, cfsqltype = "cf_sql_varchar"},
@@ -156,7 +156,7 @@ component {
 			if ($ensureJobTable()) {
 				try {
 					queryExecute(
-						"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 						VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
 						{
 							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
@@ -202,7 +202,7 @@ component {
 		};
 
 		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
-			FROM _wheels_jobs
+			FROM wheels_jobs
 			WHERE status = 'pending' AND runAt <= :runAt";
 
 		if (Len(arguments.queue)) {
@@ -242,7 +242,7 @@ component {
 		// Mark as processing
 		try {
 			queryExecute(
-				"UPDATE _wheels_jobs
+				"UPDATE wheels_jobs
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
@@ -264,7 +264,7 @@ component {
 
 			// Mark as completed
 			queryExecute(
-				"UPDATE _wheels_jobs
+				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
@@ -294,7 +294,7 @@ component {
 				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 				queryExecute(
-					"UPDATE _wheels_jobs
+					"UPDATE wheels_jobs
 					SET status = 'pending',
 						lastError = :lastError,
 						runAt = :runAt,
@@ -317,7 +317,7 @@ component {
 			} else {
 				// Max retries exceeded — mark as failed (dead letter)
 				queryExecute(
-					"UPDATE _wheels_jobs
+					"UPDATE wheels_jobs
 					SET status = 'failed',
 						failedAt = :failedAt,
 						lastError = :lastError,
@@ -353,7 +353,7 @@ component {
 		local.stats = {pending = 0, processing = 0, completed = 0, failed = 0, total = 0};
 
 		try {
-			local.sql = "SELECT status, COUNT(*) as cnt FROM _wheels_jobs";
+			local.sql = "SELECT status, COUNT(*) as cnt FROM wheels_jobs";
 			local.params = {};
 
 			if (Len(arguments.queue)) {
@@ -383,7 +383,7 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public numeric function retryFailed(string queue = "") {
-		local.sql = "UPDATE _wheels_jobs
+		local.sql = "UPDATE wheels_jobs
 			SET status = 'pending', attempts = 0, lastError = NULL, failedAt = NULL,
 				runAt = :runAt, updatedAt = :updatedAt
 			WHERE status = 'failed'";
@@ -413,7 +413,7 @@ component {
 	 */
 	public numeric function purgeCompleted(numeric days = 7, string queue = "") {
 		local.cutoff = DateAdd("d", -arguments.days, $now());
-		local.sql = "DELETE FROM _wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
+		local.sql = "DELETE FROM wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
 		local.params = {
 			cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
 		};
@@ -433,14 +433,14 @@ component {
 	}
 
 	/**
-	 * Auto-create the _wheels_jobs table if it doesn't exist.
+	 * Auto-create the wheels_jobs table if it doesn't exist.
 	 * Uses database-agnostic SQL compatible with MySQL, PostgreSQL, SQL Server, H2, and SQLite.
 	 * Returns true if the table was created or already exists, false if creation failed.
 	 */
 	private boolean function $ensureJobTable() {
 		try {
 			// Check if table already exists by querying it
-			queryExecute("SELECT COUNT(*) AS cnt FROM _wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
+			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
@@ -472,7 +472,7 @@ component {
 			}
 
 			queryExecute("
-				CREATE TABLE _wheels_jobs (
+				CREATE TABLE wheels_jobs (
 					id #local.varcharType#(36) NOT NULL PRIMARY KEY,
 					jobClass #local.varcharType#(255) NOT NULL,
 					queue #local.varcharType#(100) DEFAULT 'default' NOT NULL,
@@ -492,17 +492,17 @@ component {
 
 			// Add indexes for efficient queue processing
 			try {
-				queryExecute("CREATE INDEX idx_wheels_jobs_processing ON _wheels_jobs (status, runAt, priority)", {}, {datasource = variables.$datasource});
-				queryExecute("CREATE INDEX idx_wheels_jobs_queue ON _wheels_jobs (queue, status)", {}, {datasource = variables.$datasource});
-				queryExecute("CREATE INDEX idx_wheels_jobs_cleanup ON _wheels_jobs (status, completedAt)", {}, {datasource = variables.$datasource});
+				queryExecute("CREATE INDEX idx_wjobs_processing ON wheels_jobs (status, runAt, priority)", {}, {datasource = variables.$datasource});
+				queryExecute("CREATE INDEX idx_wjobs_queue ON wheels_jobs (queue, status)", {}, {datasource = variables.$datasource});
+				queryExecute("CREATE INDEX idx_wjobs_cleanup ON wheels_jobs (status, completedAt)", {}, {datasource = variables.$datasource});
 			} catch (any indexError) {
 				// Indexes are optional — don't fail if they can't be created
 			}
 
-			writeLog(text = "Auto-created _wheels_jobs table", type = "information", file = "wheels_jobs");
+			writeLog(text = "Auto-created wheels_jobs table", type = "information", file = "wheels_jobs");
 			return true;
 		} catch (any createError) {
-			writeLog(text = "Failed to auto-create _wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
+			writeLog(text = "Failed to auto-create wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
 			return false;
 		}
 	}

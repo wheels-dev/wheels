@@ -1,7 +1,7 @@
 # Background Jobs
 
 ## Description
-Wheels provides a database-backed job queue system for running tasks asynchronously. Jobs are persisted to a `_wheels_jobs` table, processed in priority order, and automatically retried with exponential backoff on failure.
+Wheels provides a database-backed job queue system for running tasks asynchronously. Jobs are persisted to a `wheels_jobs` table, processed in priority order, and automatically retried with exponential backoff on failure.
 
 ## Key Points
 - Jobs extend `wheels.Job` and implement a `perform()` method
@@ -17,7 +17,7 @@ Wheels provides a database-backed job queue system for running tasks asynchronou
 ```bash
 wheels dbmigrate latest
 ```
-This creates the `_wheels_jobs` table. The migration is at `app/migrator/migrations/20260221000001_create_wheels_jobs_table.cfc`.
+This creates the `wheels_jobs` table. The migration is at `app/migrator/migrations/20260221000001_createwheels_jobs_table.cfc`.
 
 ### 2. Create a Job
 ```cfm
@@ -177,7 +177,7 @@ count = job.purgeCompleted(days=30, queue="reports");
 
 ## Database Schema
 
-The `_wheels_jobs` table has these columns:
+The `wheels_jobs` table has these columns:
 
 | Column | Type | Description |
 |--------|------|-------------|

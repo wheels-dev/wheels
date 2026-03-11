@@ -42,7 +42,7 @@ component extends="wheels.WheelsTest" {
 
 			beforeEach(function() {
 				// Clean up any test jobs
-				try { queryExecute("DELETE FROM _wheels_jobs WHERE queue LIKE 'test_%'", {}, {datasource = application.wheels.dataSourceName}); }
+				try { queryExecute("DELETE FROM wheels_jobs WHERE queue LIKE 'test_%'", {}, {datasource = application.wheels.dataSourceName}); }
 				catch (any e) { /* table may not exist */ }
 			});
 
@@ -133,7 +133,7 @@ component extends="wheels.WheelsTest" {
 				local.oldTime = DateAdd("s", -600, Now());
 				try {
 					queryExecute(
-						"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 						VALUES (:id, 'wheels.Job', 'test_timeout', '{}', 0, 'processing', 1, 3, :runAt, :createdAt, :updatedAt)",
 						{
 							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
@@ -150,7 +150,7 @@ component extends="wheels.WheelsTest" {
 
 					// Verify job was reset
 					local.job = queryExecute(
-						"SELECT status FROM _wheels_jobs WHERE id = :id",
+						"SELECT status FROM wheels_jobs WHERE id = :id",
 						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 						{datasource = application.wheels.dataSourceName}
 					);
@@ -253,7 +253,7 @@ component extends="wheels.WheelsTest" {
 				local.now = Now();
 				try {
 					queryExecute(
-						"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, lastError, runAt, failedAt, createdAt, updatedAt)
+						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, lastError, runAt, failedAt, createdAt, updatedAt)
 						VALUES (:id, 'wheels.Job', 'test_retry', '{}', 0, 'failed', 3, 3, 'Test error', :now, :now, :now, :now)",
 						{
 							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
@@ -268,7 +268,7 @@ component extends="wheels.WheelsTest" {
 
 					// Verify job was reset
 					local.job = queryExecute(
-						"SELECT status, attempts FROM _wheels_jobs WHERE id = :id",
+						"SELECT status, attempts FROM wheels_jobs WHERE id = :id",
 						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 						{datasource = application.wheels.dataSourceName}
 					);
@@ -313,7 +313,7 @@ component extends="wheels.WheelsTest" {
 				local.oldTime = DateAdd("d", -30, Now());
 				try {
 					queryExecute(
-						"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, completedAt, createdAt, updatedAt)
+						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, completedAt, createdAt, updatedAt)
 						VALUES (:id, 'wheels.Job', 'test_purge', '{}', 0, 'completed', 1, 3, :oldTime, :oldTime, :oldTime, :oldTime)",
 						{
 							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
@@ -328,7 +328,7 @@ component extends="wheels.WheelsTest" {
 
 					// Verify job was deleted
 					local.remaining = queryExecute(
-						"SELECT COUNT(*) as cnt FROM _wheels_jobs WHERE id = :id",
+						"SELECT COUNT(*) as cnt FROM wheels_jobs WHERE id = :id",
 						{id = {value = local.id, cfsqltype = "cf_sql_varchar"}},
 						{datasource = application.wheels.dataSourceName}
 					);

@@ -4,7 +4,7 @@ description: Purge old completed or failed jobs from the queue table.
 
 # wheels jobs purge
 
-Delete old jobs from the `_wheels_jobs` table to prevent table bloat. By default, purges completed jobs older than 7 days.
+Delete old jobs from the `wheels_jobs` table to prevent table bloat. By default, purges completed jobs older than 7 days.
 
 ## Usage
 

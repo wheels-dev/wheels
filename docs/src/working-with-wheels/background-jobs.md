@@ -20,7 +20,7 @@ First, create the jobs table by running the included migration:
 wheels dbmigrate latest
 ```
 
-This creates the `_wheels_jobs` table. The migration file is at `app/migrator/migrations/20260221000001_create_wheels_jobs_table.cfc`.
+This creates the `wheels_jobs` table. The migration file is at `app/migrator/migrations/20260221000001_createwheels_jobs_table.cfc`.
 
 ### 2. Create a Job
 
@@ -228,7 +228,7 @@ Each job goes through these statuses:
 
 ## Database Schema
 
-The `_wheels_jobs` table contains:
+The `wheels_jobs` table contains:
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -355,4 +355,4 @@ The formula is `baseDelay * 2^attempt`, capped at `maxDelay`:
 5. **Monitor the queue**: Use `wheels jobs monitor` or `queueStats()` to track queue health and alert on growing `failed` counts.
 6. **Purge old jobs**: Run `wheels jobs purge` or `purgeCompleted()` on a schedule to prevent table bloat.
 7. **Run multiple workers**: For higher throughput, run multiple `wheels jobs work` processes — optimistic locking prevents duplicate processing.
-8. **Handle missing tables gracefully**: If the `_wheels_jobs` table doesn't exist yet, `enqueue()` will log a warning and return `persisted=false` instead of throwing an error.
+8. **Handle missing tables gracefully**: If the `wheels_jobs` table doesn't exist yet, `enqueue()` will log a warning and return `persisted=false` instead of throwing an error.

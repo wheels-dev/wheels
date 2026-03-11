@@ -368,7 +368,7 @@ wheels jobs monitor                        # live dashboard
 
 **Configurable backoff**: `this.baseDelay = 2` and `this.maxDelay = 3600` in job `config()`. Formula: `Min(baseDelay * 2^attempt, maxDelay)`.
 
-Requires migration: `20260221000001_create_wheels_jobs_table.cfc`. Run with `wheels dbmigrate latest`.
+Requires migration: `20260221000001_createwheels_jobs_table.cfc`. Run with `wheels dbmigrate latest`.
 
 ## Server-Sent Events (SSE) Quick Reference
 
