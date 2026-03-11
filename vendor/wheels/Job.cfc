@@ -398,8 +398,8 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			return local.result.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.updateResult"});
+			return local.updateResult.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -424,8 +424,8 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			return local.result.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.deleteResult"});
+			return local.deleteResult.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;

@@ -329,8 +329,8 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			return local.result.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.updateResult"});
+			return local.updateResult.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -363,8 +363,8 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
-			return local.result.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.deleteResult"});
+			return local.deleteResult.recordCount ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -379,7 +379,7 @@ component {
 	 */
 	private boolean function $claimJob(required string jobId) {
 		try {
-			local.result = queryExecute(
+			queryExecute(
 				"UPDATE _wheels_jobs
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
 				WHERE id = :id AND status = 'pending'",
@@ -387,9 +387,9 @@ component {
 					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 				},
-				{datasource = variables.$datasource}
+				{datasource = variables.$datasource, result = "local.updateResult"}
 			);
-			return (local.result.recordCount ?: 0) > 0;
+			return (local.updateResult.recordCount ?: 0) > 0;
 		} catch (any e) {
 			return false;
 		}
