@@ -398,8 +398,8 @@ component {
 		}
 
 		try {
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.updateResult"});
-			return local.updateResult.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			return 1; // DML executed successfully; exact count unreliable across engines
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -424,8 +424,8 @@ component {
 		}
 
 		try {
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.deleteResult"});
-			return local.deleteResult.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			return 1; // DML executed successfully; exact count unreliable across engines
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -447,22 +447,43 @@ component {
 		}
 
 		try {
+			// Detect database adapter for type compatibility
+			local.adapterName = "";
+			if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "adapterName")) {
+				local.adapterName = application.wheels.adapterName;
+			}
+
+			// Use database-appropriate types
+			if (local.adapterName == "OracleModel") {
+				local.varcharType = "VARCHAR2";
+				local.textType = "CLOB";
+				local.datetimeType = "TIMESTAMP";
+			} else if (local.adapterName == "PostgreSQLModel" || local.adapterName == "CockroachDBModel") {
+				local.varcharType = "VARCHAR";
+				local.textType = "TEXT";
+				local.datetimeType = "TIMESTAMP";
+			} else {
+				local.varcharType = "VARCHAR";
+				local.textType = "TEXT";
+				local.datetimeType = "DATETIME";
+			}
+
 			queryExecute("
 				CREATE TABLE _wheels_jobs (
-					id VARCHAR(36) NOT NULL PRIMARY KEY,
-					jobClass VARCHAR(255) NOT NULL,
-					queue VARCHAR(100) NOT NULL DEFAULT 'default',
-					data TEXT,
+					id #local.varcharType#(36) NOT NULL PRIMARY KEY,
+					jobClass #local.varcharType#(255) NOT NULL,
+					queue #local.varcharType#(100) NOT NULL DEFAULT 'default',
+					data #local.textType#,
 					priority INT NOT NULL DEFAULT 0,
-					status VARCHAR(20) NOT NULL DEFAULT 'pending',
+					status #local.varcharType#(20) NOT NULL DEFAULT 'pending',
 					attempts INT NOT NULL DEFAULT 0,
 					maxRetries INT NOT NULL DEFAULT 3,
-					lastError TEXT,
-					runAt DATETIME,
-					completedAt DATETIME,
-					failedAt DATETIME,
-					createdAt DATETIME,
-					updatedAt DATETIME
+					lastError #local.textType#,
+					runAt #local.datetimeType#,
+					completedAt #local.datetimeType#,
+					failedAt #local.datetimeType#,
+					createdAt #local.datetimeType#,
+					updatedAt #local.datetimeType#
 				)
 			", {}, {datasource = variables.$datasource});
 

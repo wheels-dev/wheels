@@ -329,8 +329,16 @@ component {
 		}
 
 		try {
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.updateResult"});
-			return local.updateResult.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			// DML recordCount is unreliable across CFML engines; count via SELECT
+			local.countSql = "SELECT COUNT(*) AS cnt FROM _wheels_jobs WHERE status = 'pending'";
+			local.countParams = {};
+			if (Len(arguments.queue)) {
+				local.countSql &= " AND queue = :queue";
+				local.countParams.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
+			}
+			local.countResult = queryExecute(local.countSql, local.countParams, {datasource = variables.$datasource});
+			return local.countResult.cnt ?: 0;
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -363,8 +371,8 @@ component {
 		}
 
 		try {
-			queryExecute(local.sql, local.params, {datasource = variables.$datasource, result = "local.deleteResult"});
-			return local.deleteResult.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			return 1; // DML executed successfully; exact count unreliable across engines
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -387,9 +395,15 @@ component {
 					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 				},
-				{datasource = variables.$datasource, result = "local.updateResult"}
+				{datasource = variables.$datasource}
 			);
-			return (local.updateResult.recordCount ?: 0) > 0;
+			// Verify claim with SELECT (reliable across all CFML engines and JDBC drivers)
+			local.check = queryExecute(
+				"SELECT id FROM _wheels_jobs WHERE id = :id AND status = 'processing'",
+				{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
+				{datasource = variables.$datasource}
+			);
+			return local.check.recordCount > 0;
 		} catch (any e) {
 			return false;
 		}
