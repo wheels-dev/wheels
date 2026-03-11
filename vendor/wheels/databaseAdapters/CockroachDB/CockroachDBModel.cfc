@@ -160,10 +160,13 @@ component extends="wheels.databaseAdapters.Base" output=false {
 				local.rv = {};
 				local.tbl = SpanExcluding(Right(local.sql, Len(local.sql) - 12), " ");
 				if(Left(local.sql, 11) == "INSERT INTO") {
-					if(structKeyExists(arguments.result, "generatedKey"))
-					{
-						query.id = arguments.result[arguments.primaryKey][1];
-					} else {
+					if (structKeyExists(arguments.result, "generatedKey")) {
+						query.id = arguments.result.generatedKey;
+					}
+					else if (structKeyExists(arguments.result, "query") && structKeyExists(arguments.result.query, arguments.primaryKey)) {
+						query.id = arguments.result.query[arguments.primaryKey][1];
+					}
+					else if (isQuery(arguments.returningIdentity)) {
 						query.id = arguments.returningIdentity[arguments.primaryKey][1];
 					}
 				} else {
