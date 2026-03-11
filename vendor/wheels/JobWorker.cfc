@@ -35,7 +35,7 @@ component {
 
 		// Find the next candidate job
 		local.params = {
-			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
 
 		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
@@ -109,7 +109,7 @@ component {
 	 * @timeout Seconds after which a processing job is considered timed out. Default 300.
 	 */
 	public numeric function checkTimeouts(numeric timeout = 300) {
-		local.cutoff = DateAdd("s", -arguments.timeout, Now());
+		local.cutoff = DateAdd("s", -arguments.timeout, $now());
 
 		// Find timed-out jobs
 		try {
@@ -202,7 +202,7 @@ component {
 			worker = {id = this.workerId, startedAt = this.startedAt, processed = this.jobsProcessed, failed = this.jobsFailed}
 		};
 
-		local.lookback = DateAdd("n", -arguments.minutes, Now());
+		local.lookback = DateAdd("n", -arguments.minutes, $now());
 		local.params = {lookback = {value = local.lookback, cfsqltype = "cf_sql_timestamp"}};
 
 		// Throughput — completed and failed in the window
@@ -270,7 +270,7 @@ component {
 	 * @limit Maximum number of jobs to retry. 0 = unlimited.
 	 */
 	public numeric function retryFailed(string queue = "", numeric limit = 0) {
-		local.now = Now();
+		local.now = $now();
 
 		// If limit specified, get the IDs first
 		if (arguments.limit > 0) {
@@ -356,7 +356,7 @@ component {
 			throw(type = "Wheels.InvalidArgument", message = "Purge status must be 'completed' or 'failed'.");
 		}
 
-		local.cutoff = DateAdd("d", -arguments.days, Now());
+		local.cutoff = DateAdd("d", -arguments.days, $now());
 		local.dateColumn = (arguments.status == "completed") ? "completedAt" : "failedAt";
 
 		local.sql = "DELETE FROM _wheels_jobs WHERE status = :status AND #local.dateColumn# < :cutoff";
@@ -395,7 +395,7 @@ component {
 					SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
 					WHERE id = :id AND status = 'pending'",
 					{
-						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 					},
 					{datasource = variables.$datasource}
@@ -429,8 +429,8 @@ component {
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
-					completedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 				},
 				{datasource = variables.$datasource}
@@ -473,7 +473,7 @@ component {
 		}
 
 		local.backoffSeconds = Min(local.baseDelay * (2 ^ arguments.currentAttempts), local.maxDelay);
-		local.nextRunAt = DateAdd("s", local.backoffSeconds, Now());
+		local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 		queryExecute(
 			"UPDATE _wheels_jobs
@@ -485,7 +485,7 @@ component {
 			{
 				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
 				runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
-				updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 				id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 			},
 			{datasource = variables.$datasource}
@@ -515,9 +515,9 @@ component {
 				updatedAt = :updatedAt
 			WHERE id = :id",
 			{
-				failedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+				failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 				lastError = {value = Left(arguments.errorMessage, 1000), cfsqltype = "cf_sql_longvarchar"},
-				updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+				updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 				id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 			},
 			{datasource = variables.$datasource}
@@ -528,6 +528,15 @@ component {
 			type = "error",
 			file = "wheels_jobs"
 		);
+	}
+
+	/**
+	 * Returns Now() truncated to whole seconds.
+	 * Prevents MySQL/H2 DATETIME rounding: fractional seconds >= 0.5 round UP.
+	 */
+	private date function $now() {
+		local.n = Now();
+		return CreateDateTime(Year(local.n), Month(local.n), Day(local.n), Hour(local.n), Minute(local.n), Second(local.n));
 	}
 
 	/**

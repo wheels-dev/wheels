@@ -69,6 +69,10 @@ component extends="wheels.WheelsTest" {
 				local.testJob = new app.jobs.ProcessOrdersJob();
 				local.enqueued = local.testJob.enqueue(data = {test: true}, queue = "test_claim");
 
+				// Verify the job was persisted (catches silent enqueue failures)
+				expect(local.enqueued).toHaveKey("persisted");
+				expect(local.enqueued.persisted).toBeTrue();
+
 				// Process it
 				local.worker = new wheels.JobWorker();
 				local.result = local.worker.processNext(queues = "test_claim");

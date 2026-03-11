@@ -72,7 +72,7 @@ component {
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = Now()
+			runAt = $now()
 		);
 	}
 
@@ -94,7 +94,7 @@ component {
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = DateAdd("s", arguments.seconds, Now())
+			runAt = DateAdd("s", arguments.seconds, $now())
 		);
 	}
 
@@ -132,7 +132,7 @@ component {
 	) {
 		local.id = CreateUUID();
 		local.serializedData = SerializeJSON(arguments.data);
-		local.now = Now();
+		local.now = $now();
 
 		try {
 			queryExecute(
@@ -198,7 +198,7 @@ component {
 	public struct function processQueue(string queue = "", numeric limit = 10) {
 		local.result = {processed = 0, failed = 0, errors = []};
 		local.params = {
-			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
 
 		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
@@ -246,7 +246,7 @@ component {
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
-					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 				},
 				{datasource = variables.$datasource}
@@ -268,8 +268,8 @@ component {
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
-					completedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 				},
 				{datasource = variables.$datasource}
@@ -291,7 +291,7 @@ component {
 			if (local.currentAttempts < local.maxRetries) {
 				// Schedule retry with configurable exponential backoff, capped at maxDelay
 				local.backoffSeconds = Min(this.baseDelay * (2 ^ local.currentAttempts), this.maxDelay);
-				local.nextRunAt = DateAdd("s", local.backoffSeconds, Now());
+				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 				queryExecute(
 					"UPDATE _wheels_jobs
@@ -303,7 +303,7 @@ component {
 					{
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
 						runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 					},
 					{datasource = variables.$datasource}
@@ -324,9 +324,9 @@ component {
 						updatedAt = :updatedAt
 					WHERE id = :id",
 					{
-						failedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
-						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
 					},
 					{datasource = variables.$datasource}
@@ -388,8 +388,8 @@ component {
 				runAt = :runAt, updatedAt = :updatedAt
 			WHERE status = 'failed'";
 		local.params = {
-			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
 
 		if (Len(arguments.queue)) {
@@ -412,7 +412,7 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public numeric function purgeCompleted(numeric days = 7, string queue = "") {
-		local.cutoff = DateAdd("d", -arguments.days, Now());
+		local.cutoff = DateAdd("d", -arguments.days, $now());
 		local.sql = "DELETE FROM _wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
 		local.params = {
 			cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
@@ -447,20 +447,23 @@ component {
 		}
 
 		try {
-			// Detect database adapter for type compatibility
-			local.adapterName = "";
-			if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "adapterName")) {
-				local.adapterName = application.wheels.adapterName;
-			}
+			// Detect actual database type from the datasource via JDBC metadata.
+			// We query the datasource directly rather than using application.wheels.adapterName
+			// because the adapter may have been detected from a different datasource.
+			local.dbType = $detectDatabaseType();
 
 			// Use database-appropriate types
-			if (local.adapterName == "OracleModel") {
+			if (local.dbType == "oracle") {
 				local.varcharType = "VARCHAR2";
 				local.textType = "CLOB";
 				local.datetimeType = "TIMESTAMP";
-			} else if (local.adapterName == "PostgreSQLModel" || local.adapterName == "CockroachDBModel") {
+			} else if (local.dbType == "postgresql") {
 				local.varcharType = "VARCHAR";
 				local.textType = "TEXT";
+				local.datetimeType = "TIMESTAMP";
+			} else if (local.dbType == "h2") {
+				local.varcharType = "VARCHAR";
+				local.textType = "CLOB";
 				local.datetimeType = "TIMESTAMP";
 			} else {
 				local.varcharType = "VARCHAR";
@@ -502,5 +505,35 @@ component {
 			writeLog(text = "Failed to auto-create _wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
 			return false;
 		}
+	}
+
+	/**
+	 * Returns Now() truncated to whole seconds.
+	 * Prevents MySQL/H2 DATETIME rounding: when fractional seconds >= 0.5,
+	 * these databases round UP to the next second, making runAt appear in the future.
+	 */
+	private date function $now() {
+		local.n = Now();
+		return CreateDateTime(Year(local.n), Month(local.n), Day(local.n), Hour(local.n), Minute(local.n), Second(local.n));
+	}
+
+	/**
+	 * Detect the database type from the actual datasource via JDBC metadata.
+	 * Returns: "oracle", "postgresql", "h2", "mysql", "sqlserver", "sqlite", or "default".
+	 */
+	private string function $detectDatabaseType() {
+		try {
+			cfdbinfo(type = "version", datasource = "#variables.$datasource#", name = "local.info");
+			local.product = local.info.database_productname;
+			if (FindNoCase("oracle", local.product)) return "oracle";
+			if (FindNoCase("postgre", local.product)) return "postgresql";
+			if (FindNoCase("h2", local.product)) return "h2";
+			if (FindNoCase("mysql", local.product) || FindNoCase("mariadb", local.product)) return "mysql";
+			if (FindNoCase("sql server", local.product)) return "sqlserver";
+			if (FindNoCase("sqlite", local.product)) return "sqlite";
+		} catch (any e) {
+			// cfdbinfo not available — fall through to default
+		}
+		return "default";
 	}
 }
