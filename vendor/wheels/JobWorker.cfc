@@ -387,22 +387,26 @@ component {
 	 */
 	private boolean function $claimJob(required string jobId) {
 		try {
-			queryExecute(
-				"UPDATE _wheels_jobs
-				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
-				WHERE id = :id AND status = 'pending'",
-				{
-					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-					id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
-				},
-				{datasource = variables.$datasource}
-			);
-			// Verify claim with SELECT (reliable across all CFML engines and JDBC drivers)
-			local.check = queryExecute(
-				"SELECT id FROM _wheels_jobs WHERE id = :id AND status = 'processing'",
-				{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
-				{datasource = variables.$datasource}
-			);
+			// Wrap in transaction to ensure UPDATE + SELECT use the same DB connection
+			// (prevents connection pool issues where SELECT misses uncommitted UPDATE)
+			transaction {
+				queryExecute(
+					"UPDATE _wheels_jobs
+					SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
+					WHERE id = :id AND status = 'pending'",
+					{
+						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
+					},
+					{datasource = variables.$datasource}
+				);
+				// Verify claim with SELECT (reliable across all CFML engines and JDBC drivers)
+				local.check = queryExecute(
+					"SELECT id FROM _wheels_jobs WHERE id = :id AND status = 'processing'",
+					{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
+					{datasource = variables.$datasource}
+				);
+			}
 			return local.check.recordCount > 0;
 		} catch (any e) {
 			return false;
