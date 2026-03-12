@@ -340,9 +340,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1536M
         reservations:
-          memory: 1G
+          memory: 512M
     networks:
       - wheels-network
 
