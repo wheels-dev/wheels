@@ -73,56 +73,59 @@ component extends="wheels.WheelsTest" {
 				expect(local.enqueued).toHaveKey("persisted");
 				expect(local.enqueued.persisted).toBeTrue();
 
-				// Diagnostic: replicate processNext's candidate query to isolate failures
+				// Diagnostic: test candidate query pieces to isolate BoxLang+Postgres issue
 				local.now = CreateDateTime(Year(Now()), Month(Now()), Day(Now()), Hour(Now()), Minute(Now()), Second(Now()));
 				local.diag = "";
-				local.candidateFound = false;
+
+				// Test A: full candidate query WITH maxrows (same as processNext)
 				try {
-					local.candidateCheck = queryExecute(
-						"SELECT id, status, queue, runAt FROM wheels_jobs
-						WHERE status = 'pending' AND runAt <= :runAt AND queue IN (:queue1)
-						ORDER BY priority DESC, runAt ASC",
-						{
-							runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-							queue1 = {value = "test_claim", cfsqltype = "cf_sql_varchar"}
-						},
+					local.qA = queryExecute(
+						"SELECT id FROM wheels_jobs WHERE status = 'pending' AND runAt <= :runAt AND queue IN (:queue1) ORDER BY priority DESC, runAt ASC",
+						{runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}, queue1 = {value = "test_claim", cfsqltype = "cf_sql_varchar"}},
 						{datasource = application.wheels.dataSourceName, maxrows = 5}
 					);
-					local.diag = "candidateRows=#local.candidateCheck.recordCount#";
-					local.candidateFound = local.candidateCheck.recordCount > 0;
-				} catch (any e) {
-					local.diag = "candidateQueryError=[#e.type ?: 'unknown'#] #e.message#";
+					local.diag &= "A=#local.qA.recordCount#";
+				} catch (any eA) {
+					local.diag &= "A=ERR:#Left(eA.message, 100)#";
 				}
 
-				// If candidate query failed, try simpler queries to isolate the issue
-				if (!local.candidateFound) {
-					// Test 1: simple count without params
-					try {
-						local.countAll = queryExecute(
-							"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'pending'",
-							{}, {datasource = application.wheels.dataSourceName}
-						);
-						local.diag &= ", pendingCount=#local.countAll.cnt#";
-					} catch (any e2) {
-						local.diag &= ", countError=#e2.message#";
-					}
-					// Test 2: query by ID only
-					try {
-						local.byId = queryExecute(
-							"SELECT id, status, queue, runAt FROM wheels_jobs WHERE id = :id",
-							{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
-							{datasource = application.wheels.dataSourceName}
-						);
-						if (local.byId.recordCount) {
-							local.diag &= ", byId=found(status=#local.byId.status#,runAt=#local.byId.runAt#,now=#local.now#)";
-						}
-					} catch (any e3) {
-						local.diag &= ", byIdError=#e3.message#";
-					}
+				// Test B: same query WITHOUT maxrows
+				try {
+					local.qB = queryExecute(
+						"SELECT id FROM wheels_jobs WHERE status = 'pending' AND runAt <= :runAt AND queue IN (:queue1) ORDER BY priority DESC, runAt ASC",
+						{runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}, queue1 = {value = "test_claim", cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
+					);
+					local.diag &= ", B=#local.qB.recordCount#";
+				} catch (any eB) {
+					local.diag &= ", B=ERR:#Left(eB.message, 100)#";
 				}
 
-				// Only call processNext if diagnostics show it could succeed
-				// This ensures we get the diagnostic message when it fails
+				// Test C: without IN clause, use direct = comparison
+				try {
+					local.qC = queryExecute(
+						"SELECT id FROM wheels_jobs WHERE status = 'pending' AND runAt <= :runAt AND queue = :queue1",
+						{runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}, queue1 = {value = "test_claim", cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
+					);
+					local.diag &= ", C=#local.qC.recordCount#";
+				} catch (any eC) {
+					local.diag &= ", C=ERR:#Left(eC.message, 100)#";
+				}
+
+				// Test D: without timestamp param comparison
+				try {
+					local.qD = queryExecute(
+						"SELECT id FROM wheels_jobs WHERE status = 'pending' AND queue = :queue1",
+						{queue1 = {value = "test_claim", cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
+					);
+					local.diag &= ", D=#local.qD.recordCount#";
+				} catch (any eD) {
+					local.diag &= ", D=ERR:#Left(eD.message, 100)#";
+				}
+
+				// Process it
 				local.worker = new wheels.JobWorker();
 				local.result = local.worker.processNext(queues = "test_claim");
 
