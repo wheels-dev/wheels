@@ -73,33 +73,57 @@ component extends="wheels.WheelsTest" {
 				expect(local.enqueued).toHaveKey("persisted");
 				expect(local.enqueued.persisted).toBeTrue();
 
-				// Verify the row is visible via direct SELECT (diagnostic for cross-connection issues)
-				local.directCheck = queryExecute(
-					"SELECT id, status, queue FROM wheels_jobs WHERE id = :id",
-					{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
-					{datasource = application.wheels.dataSourceName}
-				);
-
-				// If the row isn't visible yet, wait and retry the SELECT
-				if (!local.directCheck.recordCount) {
-					sleep(500);
-					local.directCheck = queryExecute(
-						"SELECT id, status, queue FROM wheels_jobs WHERE id = :id",
-						{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
-						{datasource = application.wheels.dataSourceName}
+				// Diagnostic: replicate processNext's candidate query to isolate failures
+				local.now = CreateDateTime(Year(Now()), Month(Now()), Day(Now()), Hour(Now()), Minute(Now()), Second(Now()));
+				local.diag = "";
+				try {
+					local.candidateCheck = queryExecute(
+						"SELECT id, status, queue, runAt FROM wheels_jobs
+						WHERE status = 'pending' AND runAt <= :runAt AND queue IN (:queue1)
+						ORDER BY priority DESC, runAt ASC",
+						{
+							runAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
+							queue1 = {value = "test_claim", cfsqltype = "cf_sql_varchar"}
+						},
+						{datasource = application.wheels.dataSourceName, maxrows = 5}
 					);
+					local.diag = "candidateRows=#local.candidateCheck.recordCount#";
+				} catch (any e) {
+					local.diag = "candidateQueryError=#e.message#";
 				}
 
-				expect(local.directCheck.recordCount).toBe(1,
-					"Enqueued job (id=#local.enqueued.id#) not visible via direct SELECT after 500ms");
+				// Diagnostic: test the claim UPDATE with result option
+				if (local.candidateCheck.recordCount > 0) {
+					try {
+						queryExecute(
+							"UPDATE wheels_jobs
+							SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
+							WHERE id = :id AND status = 'pending'",
+							{
+								updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
+								id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}
+							},
+							{datasource = application.wheels.dataSourceName, result = "local.claimResult"}
+						);
+						local.diag &= ", claimKeys=#structKeyList(local.claimResult)#";
+						local.diag &= ", claimRC=#local.claimResult.recordCount ?: 'NULL'#";
+						// Reset status for the actual processNext test
+						queryExecute(
+							"UPDATE wheels_jobs SET status = 'pending', attempts = 0 WHERE id = :id",
+							{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
+							{datasource = application.wheels.dataSourceName}
+						);
+					} catch (any e) {
+						local.diag &= ", claimError=#e.message#";
+					}
+				}
 
 				// Process it
 				local.worker = new wheels.JobWorker();
 				local.result = local.worker.processNext(queues = "test_claim");
 
 				// Job was processed (may succeed or fail depending on job class)
-				expect(local.result.skipped).toBeFalse(
-					"processNext returned skipped=true despite row being visible (status=#local.directCheck.status#, queue=#local.directCheck.queue#)");
+				expect(local.result.skipped).toBeFalse(local.diag);
 				expect(Len(local.result.jobId)).toBeGT(0);
 			});
 
