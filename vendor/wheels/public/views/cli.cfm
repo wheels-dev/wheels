@@ -508,7 +508,7 @@ try {
 			case "dbShell":
 				// Database shell
 				data.success = false;
-				
+
 				// For H2, provide specific information about accessing the console
 				if (data.databaseType == "H2") {
 					data.message = "H2 Database Console Access:" & chr(10);
@@ -516,7 +516,7 @@ try {
 					data.message &= "The H2 web console may be available at the /h2-console path of your application." & chr(10);
 					data.message &= "URL: http://localhost:[your-port]/h2-console" & chr(10);
 					data.message &= "JDBC URL: " & application.wheels.dataSourceName & chr(10);
-					
+
 					// Try to get connection info
 					try {
 						local.dbinfo = new Query();
@@ -530,10 +530,10 @@ try {
 					} catch (any e) {
 						// Ignore errors getting extra info
 					}
-					
+
 					data.message &= chr(10) & "Option 2: Command Line" & chr(10);
 					data.message &= "java -cp [path-to-h2.jar] org.h2.tools.Shell" & chr(10);
-					
+
 					// If command parameter provided, execute it
 					if (structKeyExists(request.wheels.params, "command")) {
 						try {
@@ -541,7 +541,7 @@ try {
 							local.shellQuery.setDatasource(application.wheels.dataSourceName);
 							local.shellQuery.setSQL(request.wheels.params.command);
 							local.shellResult = local.shellQuery.execute().getResult();
-							
+
 							data.success = true;
 							data.result = local.shellResult;
 							data.message = "Command executed successfully.";
@@ -565,6 +565,92 @@ try {
 					}
 				}
 				break;
+
+			// ── Job Worker Commands ──────────────────────────────────────
+
+			case "jobsProcessNext":
+				// Process the next available job (used by `wheels jobs work`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueues = structKeyExists(request.wheels.params, "queues") ? request.wheels.params.queues : "";
+					local.jobTimeout = structKeyExists(request.wheels.params, "timeout") ? val(request.wheels.params.timeout) : 300;
+					local.jobResult = local.worker.processNext(queues=local.jobQueues, timeout=local.jobTimeout);
+					data.success = true;
+					data.jobResult = local.jobResult;
+					data.message = local.jobResult.skipped ? "No jobs available" : "Processed job #local.jobResult.jobId#";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error processing job: " & e.message;
+				}
+				break;
+
+			case "jobsStatus":
+				// Get queue statistics (used by `wheels jobs status`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					data.success = true;
+					data.stats = local.worker.getStats(queue=local.jobQueue);
+					data.message = "Queue statistics retrieved";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error getting status: " & e.message;
+				}
+				break;
+
+			case "jobsRetry":
+				// Retry failed jobs (used by `wheels jobs retry`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					local.jobLimit = structKeyExists(request.wheels.params, "limit") ? val(request.wheels.params.limit) : 0;
+					local.retryCount = local.worker.retryFailed(queue=local.jobQueue, limit=local.jobLimit);
+					data.success = true;
+					data.retried = local.retryCount;
+					data.message = "Retried #local.retryCount# failed job(s)";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error retrying jobs: " & e.message;
+				}
+				break;
+
+			case "jobsPurge":
+				// Purge old jobs (used by `wheels jobs purge`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					local.purgeStatus = structKeyExists(request.wheels.params, "status") ? request.wheels.params.status : "completed";
+					local.purgeDays = structKeyExists(request.wheels.params, "days") ? val(request.wheels.params.days) : 7;
+					local.purgeCount = local.worker.purge(status=local.purgeStatus, days=local.purgeDays, queue=local.jobQueue);
+					data.success = true;
+					data.purged = local.purgeCount;
+					data.message = "Purged #local.purgeCount# #local.purgeStatus# job(s)";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error purging jobs: " & e.message;
+				}
+				break;
+
+			case "jobsMonitor":
+				// Get monitoring data (used by `wheels jobs monitor`)
+				try {
+					local.worker = new wheels.JobWorker();
+					local.jobQueue = structKeyExists(request.wheels.params, "queue") ? request.wheels.params.queue : "";
+					local.minutes = structKeyExists(request.wheels.params, "minutes") ? val(request.wheels.params.minutes) : 60;
+					data.success = true;
+					data.monitor = local.worker.getMonitorData(queue=local.jobQueue, minutes=local.minutes);
+					data.stats = local.worker.getStats(queue=local.jobQueue);
+					local.timeouts = local.worker.checkTimeouts();
+					if (local.timeouts > 0) {
+						data.timeoutsRecovered = local.timeouts;
+					}
+					data.message = "Monitor data retrieved";
+				} catch (any e) {
+					data.success = false;
+					data.message = "Error getting monitor data: " & e.message;
+				}
+				break;
+
 		}
 	}
 } catch (any e) {

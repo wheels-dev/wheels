@@ -99,6 +99,12 @@
     * [wheels plugin init](command-line-tools/commands/plugins/plugins-init.md)
   * Asset Management
     * [asset management commands](command-line-tools/commands/assets-cache-management.md)
+  * Job Commands
+    * [wheels jobs work](command-line-tools/commands/jobs/jobs-work.md)
+    * [wheels jobs status](command-line-tools/commands/jobs/jobs-status.md)
+    * [wheels jobs retry](command-line-tools/commands/jobs/jobs-retry.md)
+    * [wheels jobs purge](command-line-tools/commands/jobs/jobs-purge.md)
+    * [wheels jobs monitor](command-line-tools/commands/jobs/jobs-monitor.md)
 * CLI Development Guides
   * [Configuration Management](command-line-tools/configuration.md)
   * [Creating Commands](command-line-tools/cli-guides/creating-commands.md)

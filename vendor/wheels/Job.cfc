@@ -3,7 +3,7 @@
  * Provides background job processing with database-backed persistence,
  * retry logic with exponential backoff, and priority queue support.
  *
- * The _wheels_jobs table is auto-created on first use — no migration needed.
+ * The wheels_jobs table is auto-created on first use — no migration needed.
  *
  * Usage:
  *   // In app/jobs/SendWelcomeEmailJob.cfc
@@ -31,12 +31,18 @@ component {
 	this.maxRetries = 3;
 	this.retryBackoff = "exponential";
 	this.timeout = 300;
+	this.baseDelay = 2;
+	this.maxDelay = 3600;
 
 	/**
 	 * Constructor
 	 */
 	public function init() {
 		config();
+		variables.$datasource = "";
+		if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "dataSourceName")) {
+			variables.$datasource = application.wheels.dataSourceName;
+		}
 		return this;
 	}
 
@@ -66,7 +72,7 @@ component {
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = Now()
+			runAt = $now()
 		);
 	}
 
@@ -88,7 +94,7 @@ component {
 			data = arguments.data,
 			queue = arguments.queue,
 			priority = arguments.priority,
-			runAt = DateAdd("s", arguments.seconds, Now())
+			runAt = DateAdd("s", arguments.seconds, $now())
 		);
 	}
 
@@ -126,11 +132,11 @@ component {
 	) {
 		local.id = CreateUUID();
 		local.serializedData = SerializeJSON(arguments.data);
-		local.now = Now();
+		local.now = $now();
 
 		try {
 			queryExecute(
-				"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+				"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 				VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
 				{
 					id = {value = local.id, cfsqltype = "cf_sql_varchar"},
@@ -142,14 +148,15 @@ component {
 					runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
 					createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
 					updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 		} catch (any e) {
 			// Auto-create table on first use and retry
 			if ($ensureJobTable()) {
 				try {
 					queryExecute(
-						"INSERT INTO _wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
+						"INSERT INTO wheels_jobs (id, jobClass, queue, data, priority, status, attempts, maxRetries, runAt, createdAt, updatedAt)
 						VALUES (:id, :jobClass, :queue, :data, :priority, 'pending', 0, :maxRetries, :runAt, :createdAt, :updatedAt)",
 						{
 							id = {value = local.id, cfsqltype = "cf_sql_varchar"},
@@ -161,7 +168,8 @@ component {
 							runAt = {value = arguments.runAt, cfsqltype = "cf_sql_timestamp"},
 							createdAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
 							updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"}
-						}
+						},
+						{datasource = variables.$datasource}
 					);
 				} catch (any e2) {
 					writeLog(text = "Job enqueue failed after table creation: #e2.message#", type = "error", file = "wheels_jobs");
@@ -190,12 +198,11 @@ component {
 	public struct function processQueue(string queue = "", numeric limit = 10) {
 		local.result = {processed = 0, failed = 0, errors = []};
 		local.params = {
-			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-			limit = {value = arguments.limit, cfsqltype = "cf_sql_integer"}
+			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
 
 		local.sql = "SELECT id, jobClass, queue, data, attempts, maxRetries
-			FROM _wheels_jobs
+			FROM wheels_jobs
 			WHERE status = 'pending' AND runAt <= :runAt";
 
 		if (Len(arguments.queue)) {
@@ -203,10 +210,10 @@ component {
 			local.params.queue = {value = arguments.queue, cfsqltype = "cf_sql_varchar"};
 		}
 
-		local.sql &= " ORDER BY priority DESC, runAt ASC LIMIT :limit";
+		local.sql &= " ORDER BY priority DESC, runAt ASC";
 
 		try {
-			local.jobs = queryExecute(local.sql, local.params);
+			local.jobs = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = arguments.limit});
 		} catch (any e) {
 			// Auto-create table and return empty result (no jobs to process yet)
 			$ensureJobTable();
@@ -235,13 +242,14 @@ component {
 		// Mark as processing
 		try {
 			queryExecute(
-				"UPDATE _wheels_jobs
+				"UPDATE wheels_jobs
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
-					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 		} catch (any e) {
 			local.result.error = "Failed to lock job #arguments.jobRow.id#: #e.message#";
@@ -256,14 +264,15 @@ component {
 
 			// Mark as completed
 			queryExecute(
-				"UPDATE _wheels_jobs
+				"UPDATE wheels_jobs
 				SET status = 'completed', completedAt = :completedAt, updatedAt = :updatedAt
 				WHERE id = :id",
 				{
-					completedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-					updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+					completedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-				}
+				},
+				{datasource = variables.$datasource}
 			);
 
 			writeLog(
@@ -280,12 +289,12 @@ component {
 			local.maxRetries = Val(arguments.jobRow.maxRetries);
 
 			if (local.currentAttempts < local.maxRetries) {
-				// Schedule retry with exponential backoff: 2^attempt seconds (4s, 8s, 16s, 32s...)
-				local.backoffSeconds = 2 ^ (local.currentAttempts + 1);
-				local.nextRunAt = DateAdd("s", local.backoffSeconds, Now());
+				// Schedule retry with configurable exponential backoff, capped at maxDelay
+				local.backoffSeconds = Min(this.baseDelay * (2 ^ local.currentAttempts), this.maxDelay);
+				local.nextRunAt = DateAdd("s", local.backoffSeconds, $now());
 
 				queryExecute(
-					"UPDATE _wheels_jobs
+					"UPDATE wheels_jobs
 					SET status = 'pending',
 						lastError = :lastError,
 						runAt = :runAt,
@@ -294,9 +303,10 @@ component {
 					{
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
 						runAt = {value = local.nextRunAt, cfsqltype = "cf_sql_timestamp"},
-						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-					}
+					},
+					{datasource = variables.$datasource}
 				);
 
 				writeLog(
@@ -307,18 +317,19 @@ component {
 			} else {
 				// Max retries exceeded — mark as failed (dead letter)
 				queryExecute(
-					"UPDATE _wheels_jobs
+					"UPDATE wheels_jobs
 					SET status = 'failed',
 						failedAt = :failedAt,
 						lastError = :lastError,
 						updatedAt = :updatedAt
 					WHERE id = :id",
 					{
-						failedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						failedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						lastError = {value = Left(e.message, 1000), cfsqltype = "cf_sql_longvarchar"},
-						updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
+						updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 						id = {value = arguments.jobRow.id, cfsqltype = "cf_sql_varchar"}
-					}
+					},
+					{datasource = variables.$datasource}
 				);
 
 				writeLog(
@@ -342,7 +353,7 @@ component {
 		local.stats = {pending = 0, processing = 0, completed = 0, failed = 0, total = 0};
 
 		try {
-			local.sql = "SELECT status, COUNT(*) as cnt FROM _wheels_jobs";
+			local.sql = "SELECT status, COUNT(*) as cnt FROM wheels_jobs";
 			local.params = {};
 
 			if (Len(arguments.queue)) {
@@ -351,7 +362,7 @@ component {
 			}
 
 			local.sql &= " GROUP BY status";
-			local.result = queryExecute(local.sql, local.params);
+			local.result = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 
 			for (local.row in local.result) {
 				if (StructKeyExists(local.stats, local.row.status)) {
@@ -372,13 +383,13 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public numeric function retryFailed(string queue = "") {
-		local.sql = "UPDATE _wheels_jobs
+		local.sql = "UPDATE wheels_jobs
 			SET status = 'pending', attempts = 0, lastError = NULL, failedAt = NULL,
 				runAt = :runAt, updatedAt = :updatedAt
 			WHERE status = 'failed'";
 		local.params = {
-			runAt = {value = Now(), cfsqltype = "cf_sql_timestamp"},
-			updatedAt = {value = Now(), cfsqltype = "cf_sql_timestamp"}
+			runAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
+			updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"}
 		};
 
 		if (Len(arguments.queue)) {
@@ -387,8 +398,8 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params);
-			return local.result.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			return 1; // DML executed successfully; exact count unreliable across engines
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -401,8 +412,8 @@ component {
 	 * @queue Optional queue name to filter by.
 	 */
 	public numeric function purgeCompleted(numeric days = 7, string queue = "") {
-		local.cutoff = DateAdd("d", -arguments.days, Now());
-		local.sql = "DELETE FROM _wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
+		local.cutoff = DateAdd("d", -arguments.days, $now());
+		local.sql = "DELETE FROM wheels_jobs WHERE status = 'completed' AND completedAt < :cutoff";
 		local.params = {
 			cutoff = {value = local.cutoff, cfsqltype = "cf_sql_timestamp"}
 		};
@@ -413,8 +424,8 @@ component {
 		}
 
 		try {
-			local.result = queryExecute(local.sql, local.params);
-			return local.result.recordCount ?: 0;
+			queryExecute(local.sql, local.params, {datasource = variables.$datasource});
+			return 1; // DML executed successfully; exact count unreliable across engines
 		} catch (any e) {
 			$ensureJobTable();
 			return 0;
@@ -422,53 +433,107 @@ component {
 	}
 
 	/**
-	 * Auto-create the _wheels_jobs table if it doesn't exist.
+	 * Auto-create the wheels_jobs table if it doesn't exist.
 	 * Uses database-agnostic SQL compatible with MySQL, PostgreSQL, SQL Server, H2, and SQLite.
 	 * Returns true if the table was created or already exists, false if creation failed.
 	 */
 	private boolean function $ensureJobTable() {
 		try {
 			// Check if table already exists by querying it
-			queryExecute("SELECT COUNT(*) AS cnt FROM _wheels_jobs WHERE 1=0");
+			queryExecute("SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE 1=0", {}, {datasource = variables.$datasource});
 			return true;
 		} catch (any e) {
 			// Table doesn't exist — create it
 		}
 
 		try {
+			// Detect actual database type from the datasource via JDBC metadata.
+			// We query the datasource directly rather than using application.wheels.adapterName
+			// because the adapter may have been detected from a different datasource.
+			local.dbType = $detectDatabaseType();
+
+			// Use database-appropriate types
+			if (local.dbType == "oracle") {
+				local.varcharType = "VARCHAR2";
+				local.textType = "CLOB";
+				local.datetimeType = "TIMESTAMP";
+			} else if (local.dbType == "postgresql") {
+				local.varcharType = "VARCHAR";
+				local.textType = "TEXT";
+				local.datetimeType = "TIMESTAMP";
+			} else if (local.dbType == "h2") {
+				local.varcharType = "VARCHAR";
+				local.textType = "CLOB";
+				local.datetimeType = "TIMESTAMP";
+			} else {
+				local.varcharType = "VARCHAR";
+				local.textType = "TEXT";
+				local.datetimeType = "DATETIME";
+			}
+
 			queryExecute("
-				CREATE TABLE _wheels_jobs (
-					id VARCHAR(36) NOT NULL PRIMARY KEY,
-					jobClass VARCHAR(255) NOT NULL,
-					queue VARCHAR(100) NOT NULL DEFAULT 'default',
-					data TEXT,
-					priority INT NOT NULL DEFAULT 0,
-					status VARCHAR(20) NOT NULL DEFAULT 'pending',
-					attempts INT NOT NULL DEFAULT 0,
-					maxRetries INT NOT NULL DEFAULT 3,
-					lastError TEXT,
-					runAt DATETIME,
-					completedAt DATETIME,
-					failedAt DATETIME,
-					createdAt DATETIME,
-					updatedAt DATETIME
+				CREATE TABLE wheels_jobs (
+					id #local.varcharType#(36) NOT NULL PRIMARY KEY,
+					jobClass #local.varcharType#(255) NOT NULL,
+					queue #local.varcharType#(100) DEFAULT 'default' NOT NULL,
+					data #local.textType#,
+					priority INT DEFAULT 0 NOT NULL,
+					status #local.varcharType#(20) DEFAULT 'pending' NOT NULL,
+					attempts INT DEFAULT 0 NOT NULL,
+					maxRetries INT DEFAULT 3 NOT NULL,
+					lastError #local.textType#,
+					runAt #local.datetimeType#,
+					completedAt #local.datetimeType#,
+					failedAt #local.datetimeType#,
+					createdAt #local.datetimeType#,
+					updatedAt #local.datetimeType#
 				)
-			");
+			", {}, {datasource = variables.$datasource});
 
 			// Add indexes for efficient queue processing
 			try {
-				queryExecute("CREATE INDEX idx_wheels_jobs_processing ON _wheels_jobs (status, runAt, priority)");
-				queryExecute("CREATE INDEX idx_wheels_jobs_queue ON _wheels_jobs (queue, status)");
-				queryExecute("CREATE INDEX idx_wheels_jobs_cleanup ON _wheels_jobs (status, completedAt)");
+				queryExecute("CREATE INDEX idx_wjobs_processing ON wheels_jobs (status, runAt, priority)", {}, {datasource = variables.$datasource});
+				queryExecute("CREATE INDEX idx_wjobs_queue ON wheels_jobs (queue, status)", {}, {datasource = variables.$datasource});
+				queryExecute("CREATE INDEX idx_wjobs_cleanup ON wheels_jobs (status, completedAt)", {}, {datasource = variables.$datasource});
 			} catch (any indexError) {
 				// Indexes are optional — don't fail if they can't be created
 			}
 
-			writeLog(text = "Auto-created _wheels_jobs table", type = "information", file = "wheels_jobs");
+			writeLog(text = "Auto-created wheels_jobs table", type = "information", file = "wheels_jobs");
 			return true;
 		} catch (any createError) {
-			writeLog(text = "Failed to auto-create _wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
+			writeLog(text = "Failed to auto-create wheels_jobs table: #createError.message#", type = "error", file = "wheels_jobs");
 			return false;
 		}
+	}
+
+	/**
+	 * Returns Now() truncated to whole seconds.
+	 * Prevents MySQL/H2 DATETIME rounding: when fractional seconds >= 0.5,
+	 * these databases round UP to the next second, making runAt appear in the future.
+	 */
+	private date function $now() {
+		local.n = Now();
+		return CreateDateTime(Year(local.n), Month(local.n), Day(local.n), Hour(local.n), Minute(local.n), Second(local.n));
+	}
+
+	/**
+	 * Detect the database type from the actual datasource via JDBC metadata.
+	 * Returns: "oracle", "postgresql", "h2", "mysql", "sqlserver", "sqlite", or "default".
+	 */
+	private string function $detectDatabaseType() {
+		try {
+			cfdbinfo(type = "version", datasource = "#variables.$datasource#", name = "local.info");
+			local.product = local.info.database_productname;
+			if (FindNoCase("oracle", local.product)) return "oracle";
+			if (FindNoCase("postgre", local.product)) return "postgresql";
+			if (FindNoCase("h2", local.product)) return "h2";
+			if (FindNoCase("mysql", local.product) || FindNoCase("mariadb", local.product)) return "mysql";
+			if (FindNoCase("sql server", local.product)) return "sqlserver";
+			if (FindNoCase("sqlite", local.product)) return "sqlite";
+		} catch (any e) {
+			// cfdbinfo not available — fall through to default
+		}
+		return "default";
 	}
 }
