@@ -224,13 +224,19 @@ jobs:
 
             # Use format=json WITHOUT only=failure,error to get clean, full JSON
             # (the only= param produces text output, not parseable JSON)
-            RELOAD_URL="${BASE_URL}?db=${db}&reload=true&format=json"
             JSON_URL="${BASE_URL}?db=${db}&format=json"
 
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
             JUNIT_FILE="/tmp/junit-results/${{ matrix.cfengine }}-${db}-junit.xml"
 
-            # Run tests with reload (clears model cache for clean DB switch)
+            # Trigger Wheels reload to clear model cache for clean DB switch.
+            # reload=true causes a 302 redirect, so we follow redirects and
+            # discard output — we only care that it completes successfully.
+            echo "Triggering Wheels reload for ${db}..."
+            curl -s -L -o /dev/null --max-time 120 \
+              "${BASE_URL}?db=${db}&reload=true" || echo "Reload request returned non-zero (non-fatal)"
+
+            # Now run the actual test suite (no reload)
             MAX_RETRIES=3
             RETRY_COUNT=0
             HTTP_CODE="000"
@@ -239,17 +245,10 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
               echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
 
-              # Use reload URL on first attempt, plain URL on retries
-              if [ "$RETRY_COUNT" -eq 1 ]; then
-                TEST_URL="$RELOAD_URL"
-              else
-                TEST_URL="$JSON_URL"
-              fi
-
               HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
                 --max-time 900 \
                 --write-out "%{http_code}" \
-                "$TEST_URL" || echo "000")
+                "$JSON_URL" || echo "000")
 
               echo "HTTP Code: ${HTTP_CODE}"
 
