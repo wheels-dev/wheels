@@ -222,21 +222,16 @@ jobs:
             echo "Running tests: ${{ matrix.cfengine }} + ${db}"
             echo "=============================================="
 
-            # Use format=json WITHOUT only=failure,error to get clean, full JSON
-            # (the only= param produces text output, not parseable JSON)
-            JSON_URL="${BASE_URL}?db=${db}&format=json"
+            # reload=true clears model cache for clean DB switch. Wheels strips
+            # reload/password from the URL and 302s (redirectAfterReload setting),
+            # preserving db= and format=. Using -L follows the redirect, so a single
+            # request both reloads AND runs tests — no double execution.
+            TEST_URL="${BASE_URL}?db=${db}&reload=true&format=json"
+            RETRY_URL="${BASE_URL}?db=${db}&format=json"
 
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
             JUNIT_FILE="/tmp/junit-results/${{ matrix.cfengine }}-${db}-junit.xml"
 
-            # Trigger Wheels reload to clear model cache for clean DB switch.
-            # reload=true causes a 302 redirect, so we follow redirects and
-            # discard output — we only care that it completes successfully.
-            echo "Triggering Wheels reload for ${db}..."
-            curl -s -L -o /dev/null --max-time 120 \
-              "${BASE_URL}?db=${db}&reload=true" || echo "Reload request returned non-zero (non-fatal)"
-
-            # Now run the actual test suite (no reload)
             MAX_RETRIES=3
             RETRY_COUNT=0
             HTTP_CODE="000"
@@ -245,10 +240,17 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
               echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
 
-              HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
+              # First attempt includes reload=true; retries skip reload
+              if [ "$RETRY_COUNT" -eq 1 ]; then
+                CURL_URL="$TEST_URL"
+              else
+                CURL_URL="$RETRY_URL"
+              fi
+
+              HTTP_CODE=$(curl -s -L -o "$RESULT_FILE" \
                 --max-time 900 \
                 --write-out "%{http_code}" \
-                "$JSON_URL" || echo "000")
+                "$CURL_URL" || echo "000")
 
               echo "HTTP Code: ${HTTP_CODE}"
 
