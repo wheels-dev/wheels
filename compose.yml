@@ -228,21 +228,20 @@ services:
     image: wheels-test-boxlang:v1.0.0
     tty: true
     stdin_open: true
-    # volumes:
-    #   - ./:/wheels-test-suite
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/server.json
-    #     target: /wheels-test-suite/server.json
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/settings.cfm
-    #     target: /wheels-test-suite/config/settings.cfm
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/box.json
-    #     target: /wheels-test-suite/box.json
-    #   - type: bind
-    #     source: ./tools/docker/boxlang/CFConfig.json
-    #     target: /wheels-test-suite/CFConfig.json
-    #
+    volumes:
+      - ./:/wheels-test-suite
+      - type: bind
+        source: ./tools/docker/boxlang/server.json
+        target: /wheels-test-suite/server.json
+      - type: bind
+        source: ./tools/docker/boxlang/settings.cfm
+        target: /wheels-test-suite/config/settings.cfm
+      - type: bind
+        source: ./tools/docker/boxlang/box.json
+        target: /wheels-test-suite/box.json
+      - type: bind
+        source: ./tools/docker/boxlang/CFConfig.json
+        target: /wheels-test-suite/CFConfig.json
     ports:
       - "60001:60001"
     networks:
