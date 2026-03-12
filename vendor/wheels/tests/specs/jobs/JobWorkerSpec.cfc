@@ -73,9 +73,14 @@ component extends="wheels.WheelsTest" {
 				expect(local.enqueued).toHaveKey("persisted");
 				expect(local.enqueued.persisted).toBeTrue();
 
-				// Process it
+				// Process it (retry once if skipped — some engines need a moment
+				// for the INSERT to become visible across pooled connections)
 				local.worker = new wheels.JobWorker();
 				local.result = local.worker.processNext(queues = "test_claim");
+				if (local.result.skipped) {
+					sleep(200);
+					local.result = local.worker.processNext(queues = "test_claim");
+				}
 
 				// Job was processed (may succeed or fail depending on job class)
 				expect(local.result.skipped).toBeFalse();

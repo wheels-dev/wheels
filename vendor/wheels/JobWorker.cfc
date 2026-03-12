@@ -387,8 +387,10 @@ component {
 	 */
 	private boolean function $claimJob(required string jobId) {
 		try {
-			// UPDATE auto-commits; no explicit transaction needed.
-			// Using transaction {} caused failures on some engines (BoxLang + PostgreSQL).
+			// Use the result option to get affected-row count from the same connection
+			// that executed the UPDATE. A separate verification SELECT can fail on
+			// BoxLang + PostgreSQL when the connection pool hands out a different
+			// connection that cannot see the uncommitted UPDATE.
 			queryExecute(
 				"UPDATE wheels_jobs
 				SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
@@ -397,15 +399,9 @@ component {
 					updatedAt = {value = $now(), cfsqltype = "cf_sql_timestamp"},
 					id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}
 				},
-				{datasource = variables.$datasource}
+				{datasource = variables.$datasource, result = "local.updateResult"}
 			);
-			// Verify claim with SELECT (reliable across all CFML engines and JDBC drivers)
-			local.check = queryExecute(
-				"SELECT id FROM wheels_jobs WHERE id = :id AND status = 'processing'",
-				{id = {value = arguments.jobId, cfsqltype = "cf_sql_varchar"}},
-				{datasource = variables.$datasource}
-			);
-			return local.check.recordCount > 0;
+			return (local.updateResult.recordCount ?: 0) > 0;
 		} catch (any e) {
 			return false;
 		}
