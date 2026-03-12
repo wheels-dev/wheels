@@ -279,12 +279,20 @@ component {
 								}
 							}
 						}
-						if (application.wheels.showErrorInformation && !Len(local.toAdd)) {
-							Throw(
-								type = "Wheels.ColumnNotFound",
-								message = "Wheels looked for the column mapped to the `#local.property#` property but couldn't find it in the database table.",
-								extendedInfo = "Verify the `order` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
-							);
+						if (!Len(local.toAdd)) {
+							if (application.wheels.throwOnColumnNotFound) {
+								Throw(
+									type = "Wheels.ColumnNotFound",
+									message = "Wheels looked for the column mapped to the `#local.property#` property but couldn't find it in the database table.",
+									extendedInfo = "Verify the `order` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+								);
+							} else {
+								writeLog(
+									text = "ColumnNotFound: column mapped to `#local.property#` not found in database table (order clause). Set throwOnColumnNotFound=true to throw an exception.",
+									type = "warning",
+									file = "wheels_columnnotfound"
+								);
+							}
 						}
 					}
 				}
@@ -532,12 +540,20 @@ component {
 					Added an exception in case the column specified in the select or group argument does not exist in the database.
 					This will only be in case when not using "table.column" or "column AS something" since in those cases Wheels passes through the select clause unchanged.
 				*/
-				if (application.wheels.showErrorInformation && !Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem) EQ 0) {
-					Throw(
-						type = "Wheels.ColumnNotFound",
-						message = "Wheels looked for the column mapped to the `#local.iItem#` property but couldn't find it in the database table.",
-						extendedInfo = "Verify the `#arguments.clause#` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
-					);
+				if (!Len(local.toAppend) && arguments.clause == "select" && ListFindNoCase(local.addedPropertiesByModel[local.associationKey], local.iItem) EQ 0) {
+					if (application.wheels.throwOnColumnNotFound) {
+						Throw(
+							type = "Wheels.ColumnNotFound",
+							message = "Wheels looked for the column mapped to the `#local.iItem#` property but couldn't find it in the database table.",
+							extendedInfo = "Verify the `#arguments.clause#` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+						);
+					} else {
+						writeLog(
+							text = "ColumnNotFound: column mapped to `#local.iItem#` not found in database table (#arguments.clause# clause). Set throwOnColumnNotFound=true to throw an exception.",
+							type = "warning",
+							file = "wheels_columnnotfound"
+						);
+					}
 				}
 
 				if (Len(local.toAppend)) {
@@ -767,12 +783,24 @@ component {
 							}
 						}
 					}
-					if (application.wheels.showErrorInformation && !StructKeyExists(local.param, "column")) {
-						Throw(
-							type = "Wheels.ColumnNotFound",
-							message = "Wheels looked for the column mapped to the `#local.param.property#` property but couldn't find it in the database table.",
-							extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
-						);
+					if (!StructKeyExists(local.param, "column")) {
+						if (application.wheels.throwOnColumnNotFound) {
+							Throw(
+								type = "Wheels.ColumnNotFound",
+								message = "Wheels looked for the column mapped to the `#local.param.property#` property but couldn't find it in the database table.",
+								extendedInfo = "Verify the `where` argument and/or your property to column mappings done with the `property` method inside the model's `config` method to make sure everything is correct."
+							);
+						} else {
+							writeLog(
+								text = "ColumnNotFound: column mapped to `#local.param.property#` not found in database table (where clause). Set throwOnColumnNotFound=true to throw an exception.",
+								type = "warning",
+								file = "wheels_columnnotfound"
+							);
+							// Undo the ? replacement so where/params arrays stay in sync.
+							// The raw column name passes through to the database as-is.
+							local.where = Replace(local.where, Replace(local.element, local.elementDataPart, "?", "one"), local.element);
+							continue;
+						}
 					}
 					local.temp = ReFind(
 						"^[a-zA-Z0-9-_\.]* ?#variables.wheels.class.RESQLOperators#",

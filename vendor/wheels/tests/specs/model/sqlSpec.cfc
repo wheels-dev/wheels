@@ -52,7 +52,7 @@ component extends="wheels.WheelsTest" {
 				expect(Right(result[2], 6)).toBe("NOT IN")
 
 				result = g.model("author").$whereClause(where = "lastName LIKE 'Djurner'")
-				
+
 				expect(Right(result[2], 4)).toBe("LIKE")
 
 				result = g.model("author").$whereClause(where = "lastName NOT LIKE 'Djurner'")
@@ -69,13 +69,13 @@ component extends="wheels.WheelsTest" {
 				expect(datatypes).toHaveKey(result[4].datatype)
 
 				result = g.model("post").$whereClause(where = "averagerating NOT IN(3.6,3.2)")
-				
+
 				expect(arraylen(result)).toBeGTE(4)
 				expect(result[4]).toBeStruct()
 				expect(datatypes).toHaveKey(result[4].datatype)
 
 				result = g.model("post").$whereClause(where = "averagerating = 3.6")
-				
+
 				expect(arraylen(result)).toBeGTE(4)
 				expect(result[4]).toBeStruct()
 				expect(datatypes).toHaveKey(result[4].datatype)
@@ -108,7 +108,7 @@ component extends="wheels.WheelsTest" {
 					g.model("user").findall(where="username = '#badparams.username#' AND password = '#badparams.password#'", parameterize=2)
 				}).toThrow("Wheels.ParameterMismatch")
 			})
-			
+
 			it("protects against SQL Injection with Parameterize and Pagination", () => {
 				badparams = {username = "tonyp", password = "tonyp123' OR password!='tonyp123"}
 
@@ -135,6 +135,18 @@ component extends="wheels.WheelsTest" {
 					g.model("user").findAll(where = "username='tonyp'", select = "CONCAT(firstname,' ',lastname) as fullname")
 				}).toThrow("Wheels.ColumnNotFound");
 
+			});
+
+			it( "skips invalid select column in CONCAT when throwOnColumnNotFound is false", function(){
+				application.wheels.throwOnColumnNotFound = false;
+				try {
+					actual = g.model("user").findAll(where = "username='tonyp'", select = "id,username,nonexistentcolumn");
+					expect( actual.recordcount ).toBeGTE(1);
+					expect( actual.columnList ).toInclude("id");
+					expect( actual.columnList ).toInclude("username");
+				} finally {
+					application.wheels.throwOnColumnNotFound = true;
+				}
 			});
 		})
 	}
