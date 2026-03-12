@@ -222,12 +222,12 @@ jobs:
             echo "Running tests: ${{ matrix.cfengine }} + ${db}"
             echo "=============================================="
 
-            # reload=true clears model cache for clean DB switch. Wheels strips
-            # reload/password from the URL and 302s (redirectAfterReload setting),
-            # preserving db= and format=. Using -L follows the redirect, so a single
-            # request both reloads AND runs tests — no double execution.
-            TEST_URL="${BASE_URL}?db=${db}&reload=true&format=json"
-            RETRY_URL="${BASE_URL}?db=${db}&format=json"
+            # The ?db= parameter switches application.wheels.dataSourceName
+            # (runner.cfm:70-80). No reload needed — runner.cfm's $_setTestboxEnv()
+            # handles datasource switching per request, and populate.cfm ensures
+            # identical table schemas across all databases. The old workflow never
+            # used reload=true either.
+            TEST_URL="${BASE_URL}?db=${db}&format=json"
 
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
             JUNIT_FILE="/tmp/junit-results/${{ matrix.cfengine }}-${db}-junit.xml"
@@ -240,17 +240,10 @@ jobs:
               RETRY_COUNT=$((RETRY_COUNT + 1))
               echo "Test attempt ${RETRY_COUNT} of ${MAX_RETRIES}..."
 
-              # First attempt includes reload=true; retries skip reload
-              if [ "$RETRY_COUNT" -eq 1 ]; then
-                CURL_URL="$TEST_URL"
-              else
-                CURL_URL="$RETRY_URL"
-              fi
-
-              HTTP_CODE=$(curl -s -L -o "$RESULT_FILE" \
+              HTTP_CODE=$(curl -s -o "$RESULT_FILE" \
                 --max-time 900 \
                 --write-out "%{http_code}" \
-                "$CURL_URL" || echo "000")
+                "$TEST_URL" || echo "000")
 
               echo "HTTP Code: ${HTTP_CODE}"
 
