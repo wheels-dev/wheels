@@ -76,6 +76,7 @@ component extends="wheels.WheelsTest" {
 				// Diagnostic: replicate processNext's candidate query to isolate failures
 				local.now = CreateDateTime(Year(Now()), Month(Now()), Day(Now()), Hour(Now()), Minute(Now()), Second(Now()));
 				local.diag = "";
+				local.candidateFound = false;
 				try {
 					local.candidateCheck = queryExecute(
 						"SELECT id, status, queue, runAt FROM wheels_jobs
@@ -88,37 +89,40 @@ component extends="wheels.WheelsTest" {
 						{datasource = application.wheels.dataSourceName, maxrows = 5}
 					);
 					local.diag = "candidateRows=#local.candidateCheck.recordCount#";
+					local.candidateFound = local.candidateCheck.recordCount > 0;
 				} catch (any e) {
-					local.diag = "candidateQueryError=#e.message#";
+					local.diag = "candidateQueryError=[#e.type ?: 'unknown'#] #e.message#";
 				}
 
-				// Diagnostic: test the claim UPDATE with result option
-				if (local.candidateCheck.recordCount > 0) {
+				// If candidate query failed, try simpler queries to isolate the issue
+				if (!local.candidateFound) {
+					// Test 1: simple count without params
 					try {
-						queryExecute(
-							"UPDATE wheels_jobs
-							SET status = 'processing', attempts = attempts + 1, updatedAt = :updatedAt
-							WHERE id = :id AND status = 'pending'",
-							{
-								updatedAt = {value = local.now, cfsqltype = "cf_sql_timestamp"},
-								id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}
-							},
-							{datasource = application.wheels.dataSourceName, result = "local.claimResult"}
+						local.countAll = queryExecute(
+							"SELECT COUNT(*) AS cnt FROM wheels_jobs WHERE status = 'pending'",
+							{}, {datasource = application.wheels.dataSourceName}
 						);
-						local.diag &= ", claimKeys=#structKeyList(local.claimResult)#";
-						local.diag &= ", claimRC=#local.claimResult.recordCount ?: 'NULL'#";
-						// Reset status for the actual processNext test
-						queryExecute(
-							"UPDATE wheels_jobs SET status = 'pending', attempts = 0 WHERE id = :id",
+						local.diag &= ", pendingCount=#local.countAll.cnt#";
+					} catch (any e2) {
+						local.diag &= ", countError=#e2.message#";
+					}
+					// Test 2: query by ID only
+					try {
+						local.byId = queryExecute(
+							"SELECT id, status, queue, runAt FROM wheels_jobs WHERE id = :id",
 							{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
 							{datasource = application.wheels.dataSourceName}
 						);
-					} catch (any e) {
-						local.diag &= ", claimError=#e.message#";
+						if (local.byId.recordCount) {
+							local.diag &= ", byId=found(status=#local.byId.status#,runAt=#local.byId.runAt#,now=#local.now#)";
+						}
+					} catch (any e3) {
+						local.diag &= ", byIdError=#e3.message#";
 					}
 				}
 
-				// Process it
+				// Only call processNext if diagnostics show it could succeed
+				// This ensures we get the diagnostic message when it fails
 				local.worker = new wheels.JobWorker();
 				local.result = local.worker.processNext(queues = "test_claim");
 
