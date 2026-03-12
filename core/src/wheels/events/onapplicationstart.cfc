@@ -321,6 +321,7 @@ component {
 		application.$wheels.deletePluginDirectories = true;
 		application.$wheels.loadIncompatiblePlugins = true;
 		application.$wheels.automaticValidations = true;
+		application.$wheels.throwOnColumnNotFound = true;
 		application.$wheels.setUpdatedAtOnCreate = true;
 		application.$wheels.useExpandedColumnAliases = false;
 		application.$wheels.lowerCaseTableNames = false;
