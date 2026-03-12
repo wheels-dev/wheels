@@ -46,14 +46,23 @@ component extends="wheels.Testbox" {
 				}).toThrow("Wheels.ColumnNotFound")
 			})
 
-			it("does not throw for invalid select column when throwOnColumnNotFound is false", () => {
+			it("skips invalid select column when throwOnColumnNotFound is false", () => {
 				application.wheels.throwOnColumnNotFound = false;
 				try {
-					result = g.model("user").findAll(select="id,email,firstname,lastname,createdat");
+					result = g.model("user").findAll(select="id,firstname,nonexistentcolumn");
 					expect(result.recordcount).toBeGTE(0);
+					expect(result.columnList).toInclude("id");
+					expect(result.columnList).toInclude("firstname");
 				} finally {
 					application.wheels.throwOnColumnNotFound = true;
 				}
+			})
+
+			it("still throws ColumnNotFound for invalid select column when throwOnColumnNotFound is true", () => {
+				application.wheels.throwOnColumnNotFound = true;
+				expect(function() {
+					g.model("user").findAll(select="id,firstname,nonexistentcolumn")
+				}).toThrow("Wheels.ColumnNotFound")
 			})
 		})
 	}
