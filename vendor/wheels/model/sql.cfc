@@ -796,6 +796,10 @@ component {
 								type = "warning",
 								file = "wheels_columnnotfound"
 							);
+							// Undo the ? replacement so where/params arrays stay in sync.
+							// The raw column name passes through to the database as-is.
+							local.where = Replace(local.where, Replace(local.element, local.elementDataPart, "?", "one"), local.element);
+							continue;
 						}
 					}
 					local.temp = ReFind(
