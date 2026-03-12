@@ -55,9 +55,12 @@ component {
 
 		local.sql &= " ORDER BY priority DESC, runAt ASC";
 
-		// Fetch a small batch of candidates for optimistic locking
+		// Fetch candidates for optimistic locking.
+		// NOTE: Avoid maxrows option — BoxLang + PostgreSQL throws when setMaxRows()
+		// is called on the JDBC PreparedStatement with certain parameter combinations.
+		// The for-loop below processes only the first successful claim anyway.
 		try {
-			local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource, maxrows = 5});
+			local.candidates = queryExecute(local.sql, local.params, {datasource = variables.$datasource});
 		} catch (any e) {
 			$ensureJobTable();
 			local.result.skipped = true;
