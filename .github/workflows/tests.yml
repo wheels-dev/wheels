@@ -29,7 +29,7 @@ jobs:
       PORT_boxlang: 60001
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Determine databases for this engine
         id: db-list
@@ -216,17 +216,36 @@ jobs:
           mkdir -p /tmp/test-results
           mkdir -p /tmp/junit-results
 
+          DB_INDEX=0
           for db in "${DBS[@]}"; do
+            DB_INDEX=$((DB_INDEX + 1))
             echo ""
             echo "=============================================="
             echo "Running tests: ${{ matrix.cfengine }} + ${db}"
             echo "=============================================="
 
-            # The ?db= parameter switches application.wheels.dataSourceName
-            # (runner.cfm:70-80). No reload needed — runner.cfm's $_setTestboxEnv()
-            # handles datasource switching per request, and populate.cfm ensures
-            # identical table schemas across all databases. The old workflow never
-            # used reload=true either.
+            # Restart the CF engine container between database runs to ensure
+            # a completely clean application state. Without this, cached model
+            # metadata (application.wheels.models) and association methods from
+            # the previous database's test run can leak into subsequent runs.
+            # This is cheaper than a full container rebuild (~10-15s restart vs
+            # minutes for Docker build) and guarantees no cross-DB contamination.
+            if [ "$DB_INDEX" -gt 1 ]; then
+              echo "Restarting ${{ matrix.cfengine }} for clean application state..."
+              docker restart wheels-${{ matrix.cfengine }}-1
+              PORT_VAR="PORT_${{ matrix.cfengine }}"
+              PORT="${!PORT_VAR}"
+              WAIT=0
+              while [ "$WAIT" -lt 30 ]; do
+                WAIT=$((WAIT + 1))
+                if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
+                  echo "${{ matrix.cfengine }} is back up"
+                  break
+                fi
+                sleep 5
+              done
+            fi
+
             TEST_URL="${BASE_URL}?db=${db}&format=json"
 
             RESULT_FILE="/tmp/test-results/${{ matrix.cfengine }}-${db}-result.txt"
@@ -394,14 +413,14 @@ jobs:
 
       - name: Upload test result artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-results-${{ matrix.cfengine }}
           path: /tmp/test-results/
 
       - name: Upload JUnit XML artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: junit-${{ matrix.cfengine }}
           path: /tmp/junit-results/
@@ -419,7 +438,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download JUnit artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: junit-*
           path: junit-results/
@@ -442,7 +461,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all test result artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: test-results-*
           path: results/
