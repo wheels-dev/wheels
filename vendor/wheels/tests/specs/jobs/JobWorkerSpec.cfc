@@ -73,17 +73,33 @@ component extends="wheels.WheelsTest" {
 				expect(local.enqueued).toHaveKey("persisted");
 				expect(local.enqueued.persisted).toBeTrue();
 
-				// Process it (retry once if skipped — some engines need a moment
-				// for the INSERT to become visible across pooled connections)
-				local.worker = new wheels.JobWorker();
-				local.result = local.worker.processNext(queues = "test_claim");
-				if (local.result.skipped) {
-					sleep(200);
-					local.result = local.worker.processNext(queues = "test_claim");
+				// Verify the row is visible via direct SELECT (diagnostic for cross-connection issues)
+				local.directCheck = queryExecute(
+					"SELECT id, status, queue FROM wheels_jobs WHERE id = :id",
+					{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
+					{datasource = application.wheels.dataSourceName}
+				);
+
+				// If the row isn't visible yet, wait and retry the SELECT
+				if (!local.directCheck.recordCount) {
+					sleep(500);
+					local.directCheck = queryExecute(
+						"SELECT id, status, queue FROM wheels_jobs WHERE id = :id",
+						{id = {value = local.enqueued.id, cfsqltype = "cf_sql_varchar"}},
+						{datasource = application.wheels.dataSourceName}
+					);
 				}
 
+				expect(local.directCheck.recordCount).toBe(1,
+					"Enqueued job (id=#local.enqueued.id#) not visible via direct SELECT after 500ms");
+
+				// Process it
+				local.worker = new wheels.JobWorker();
+				local.result = local.worker.processNext(queues = "test_claim");
+
 				// Job was processed (may succeed or fail depending on job class)
-				expect(local.result.skipped).toBeFalse();
+				expect(local.result.skipped).toBeFalse(
+					"processNext returned skipped=true despite row being visible (status=#local.directCheck.status#, queue=#local.directCheck.queue#)");
 				expect(Len(local.result.jobId)).toBeGT(0);
 			});
 
