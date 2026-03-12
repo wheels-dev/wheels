@@ -127,6 +127,16 @@ component extends="wheels.Testbox" {
 				}).toThrow("Wheels.ColumnNotFound");
 
 			});
+
+			it( "CONCAT without table alias does not throw when throwOnColumnNotFound is false", function(){
+				application.wheels.throwOnColumnNotFound = false;
+				try {
+					actual = g.model("user").findAll(where = "username='tonyp'", select = "id,username");
+					expect( actual.recordcount ).toBeGTE(0);
+				} finally {
+					application.wheels.throwOnColumnNotFound = true;
+				}
+			});
 		})
 	}
 }
