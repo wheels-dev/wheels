@@ -299,8 +299,7 @@ services:
       MSSQL_SA_PASSWORD: x!bsT8t60yo0cTVTPq
       ACCEPT_EULA: Y
       MSSQL_PID: Developer
-      # Increase memory to ensure stability
-      MSSQL_MEMORY_LIMIT_MB: 4096
+      MSSQL_MEMORY_LIMIT_MB: 2048
     ports:
       - "1434:1433"
     healthcheck:
@@ -314,9 +313,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
-        reservations:
           memory: 2G
+        reservations:
+          memory: 512M
     networks:
       - wheels-network
 
