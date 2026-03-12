@@ -413,14 +413,14 @@ jobs:
 
       - name: Upload test result artifacts
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: test-results-${{ matrix.cfengine }}
           path: /tmp/test-results/
 
       - name: Upload JUnit XML artifacts
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: junit-${{ matrix.cfengine }}
           path: /tmp/junit-results/
@@ -438,7 +438,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download JUnit artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: junit-*
           path: junit-results/
@@ -461,7 +461,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all test result artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: test-results-*
           path: results/
