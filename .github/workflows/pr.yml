@@ -9,6 +9,11 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
 jobs:
   label:
     name: Auto-Label PR
