@@ -305,17 +305,17 @@ jobs:
                   process_suite(parent_el, child)
 
           root = Element('testsuites',
-              tests=str(d.get('totalSpecs', 0)),
-              failures=str(d.get('totalFail', 0)),
-              errors=str(d.get('totalError', 0)),
+              tests=str(int(d.get('totalSpecs', 0))),
+              failures=str(int(d.get('totalFail', 0))),
+              errors=str(int(d.get('totalError', 0))),
               time=str(d.get('totalDuration', 0) / 1000))
 
           for b in d.get('bundleStats', []):
               ts = SubElement(root, 'testsuite',
                   name=b.get('name', ''),
-                  tests=str(b.get('totalSpecs', 0)),
-                  failures=str(b.get('totalFail', 0)),
-                  errors=str(b.get('totalError', 0)),
+                  tests=str(int(b.get('totalSpecs', 0))),
+                  failures=str(int(b.get('totalFail', 0))),
+                  errors=str(int(b.get('totalError', 0))),
                   time=str(b.get('totalDuration', 0) / 1000))
               for s in b.get('suiteStats', []):
                   process_suite(ts, s)
@@ -436,6 +436,8 @@ jobs:
     permissions:
       checks: write
       pull-requests: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Download JUnit artifacts
         uses: actions/download-artifact@v6
@@ -459,6 +461,8 @@ jobs:
     needs: tests
     if: always()
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Download all test result artifacts
         uses: actions/download-artifact@v6
