@@ -464,7 +464,7 @@ jobs:
           report_suite_logs: any
           json_file: junit-results/test-results.json
           json_suite_details: true
-          json_test_case_results: all
+          json_test_case_results: true
 
   #############################################
   # Test Matrix Summary Grid
