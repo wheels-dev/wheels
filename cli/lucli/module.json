@@ -1,0 +1,11 @@
+{
+  "name": "wheels",
+  "version": "3.1.0",
+  "description": "Wheels CLI - Code generation, migrations, testing, and server management for CFWheels",
+  "author": "CFWheels Team",
+  "license": "Apache-2.0",
+  "keywords": ["lucli", "module", "cfml", "wheels", "cfwheels", "mvc", "framework"],
+  "main": "Module.cfc",
+  "repository": "https://github.com/wheels-dev/wheels",
+  "homepage": "https://wheels.dev"
+}

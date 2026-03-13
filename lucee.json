@@ -1,0 +1,36 @@
+{
+  "name": "wheels",
+  "version": "7.0.2.101",
+  "port": 8080,
+  "shutdownPort": 8081,
+  "webroot": "./public",
+  "openBrowser": true,
+  "jvm": {
+    "maxMemory": "512m",
+    "minMemory": "128m"
+  },
+  "urlRewrite": {
+    "enabled": true,
+    "routerFile": "index.cfm"
+  },
+  "admin": {
+    "enabled": true
+  },
+  "enableLucee": true,
+  "enableREST": false,
+  "monitoring": {
+    "enabled": false,
+    "jmx": {
+      "port": 8082
+    }
+  },
+  "configuration": {
+    "datasources": {},
+    "mappings": {
+      "/wheels": "../vendor/wheels",
+      "/app": "../app",
+      "/config": "../config",
+      "/tests": "../tests"
+    }
+  }
+}
