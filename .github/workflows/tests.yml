@@ -83,20 +83,34 @@ jobs:
         run: |
           PORT_VAR="PORT_${{ matrix.cfengine }}"
           PORT="${!PORT_VAR}"
+          CONTAINER="wheels-${{ matrix.cfengine }}-1"
 
           echo "Waiting for ${{ matrix.cfengine }} on port ${PORT}..."
 
-          # Wait for container to be running
-          timeout 150 bash -c 'until docker ps --filter "name=${{ matrix.cfengine }}" | grep -q "${{ matrix.cfengine }}"; do
-            echo "Waiting for container to start..."
-            sleep 2
-          done'
-
-          # Wait for HTTP response
+          # Wait for HTTP response, restarting container if it crashes
           MAX_WAIT=60
           WAIT_COUNT=0
+          RESTARTS=0
+          MAX_RESTARTS=3
           while [ "$WAIT_COUNT" -lt "$MAX_WAIT" ]; do
             WAIT_COUNT=$((WAIT_COUNT + 1))
+
+            # Check if container has exited (crashed during startup)
+            CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "missing")
+            if [ "$CONTAINER_STATUS" = "exited" ] || [ "$CONTAINER_STATUS" = "dead" ] || [ "$CONTAINER_STATUS" = "missing" ]; then
+              RESTARTS=$((RESTARTS + 1))
+              if [ "$RESTARTS" -le "$MAX_RESTARTS" ]; then
+                echo "Container $CONTAINER has status '$CONTAINER_STATUS' — restarting (attempt $RESTARTS/$MAX_RESTARTS)..."
+                docker compose up -d ${{ matrix.cfengine }}
+                sleep 10
+                continue
+              else
+                echo "::error::Container $CONTAINER failed to start after $MAX_RESTARTS restart attempts"
+                docker logs "$CONTAINER" 2>&1 | tail -50
+                exit 1
+              fi
+            fi
+
             if curl -s -o /dev/null --connect-timeout 2 --max-time 5 -w "%{http_code}" "http://localhost:${PORT}/" | grep -q "200\|404\|302"; then
               echo "CF engine is ready!"
               break
@@ -107,7 +121,9 @@ jobs:
           done
 
           if [ "$WAIT_COUNT" -ge "$MAX_WAIT" ]; then
-            echo "Warning: CF engine may not be fully ready after ${MAX_WAIT} attempts"
+            echo "::error::CF engine not ready after ${MAX_WAIT} attempts"
+            docker logs "$CONTAINER" 2>&1 | tail -50
+            exit 1
           fi
 
       - name: Patch Adobe CF serialfilter.txt for Oracle JDBC
