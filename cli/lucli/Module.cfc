@@ -25,6 +25,9 @@ component extends="modules.BaseModule" {
 		// Resolve project root (where lucee.json / vendor/wheels lives)
 		variables.projectRoot = resolveProjectRoot(arguments.cwd);
 
+		// Module root for template resolution
+		variables.moduleRoot = getDirectoryFromPath(getCurrentTemplatePath());
+
 		// Lazy-init service instances
 		variables.services = {};
 
@@ -32,13 +35,11 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
-	//  generate — Code generation (model, controller, view, migration, scaffold)
+	//  generate — Code generation
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Generate code: model, controller, view, migration, or scaffold
-	 *
-	 * hint: Generate models, controllers, views, migrations, or scaffolds
+	 * hint: Generate Wheels components (model, controller, view, migration, scaffold, route, test, property)
 	 */
 	public string function generate() {
 		var args = __arguments ?: [];
@@ -51,13 +52,19 @@ component extends="modules.BaseModule" {
 			out("  controller  Generate a controller CFC");
 			out("  view        Generate a view template");
 			out("  migration   Generate a database migration");
-			out("  scaffold    Generate model + controller + views + migration");
+			out("  scaffold    Generate model + controller + views + migration + tests + routes");
+			out("  route       Add a resource route to config/routes.cfm");
+			out("  test        Generate a test spec file");
+			out("  property    Generate an add-column migration for a model property");
 			out("");
 			out("Examples:", "bold");
 			out("  wheels generate model User name email:string active:boolean");
 			out("  wheels generate controller Users index show create");
 			out("  wheels generate migration CreateUsers");
 			out("  wheels generate scaffold Post title body:text publishedAt:datetime");
+			out("  wheels generate route posts");
+			out("  wheels generate test model User");
+			out("  wheels generate property User email:string");
 			return "";
 		}
 
@@ -80,6 +87,14 @@ component extends="modules.BaseModule" {
 			case "scaffold":
 			case "s":
 				return generateScaffold(remaining);
+			case "route":
+			case "r":
+				return generateRoute(remaining);
+			case "test":
+				return generateTest(remaining);
+			case "property":
+			case "prop":
+				return generateProperty(remaining);
 			default:
 				out("Unknown generator type: #type#", "red");
 				out("Run 'wheels generate' for available types.");
@@ -92,8 +107,6 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Run database migrations
-	 *
 	 * hint: Run database migrations (latest, up, down, info)
 	 */
 	public string function migrate() {
@@ -118,15 +131,14 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Run the test suite
-	 *
-	 * hint: Run tests with optional filter and reporter
+	 * hint: Run test suite with optional filter and reporter
 	 */
 	public string function test() {
 		var args = __arguments ?: [];
 		var filter = "";
 		var reporter = "simple";
 		var format = "json";
+		var verboseOutput = false;
 
 		// Parse named arguments from --key=value or --key value
 		for (var i = 1; i <= arrayLen(args); i++) {
@@ -139,13 +151,15 @@ component extends="modules.BaseModule" {
 				reporter = args[++i];
 			} else if (reFindNoCase("^--reporter=", arg)) {
 				reporter = valueAfterEquals(arg);
+			} else if (arg == "--verbose" || arg == "-v") {
+				verboseOutput = true;
 			} else if (!arg.startsWith("--")) {
 				// Positional arg is the filter directory
 				filter = arg;
 			}
 		}
 
-		return runTests(filter, reporter, format);
+		return runTests(filter, reporter, format, verboseOutput);
 	}
 
 	// ─────────────────────────────────────────────────
@@ -153,8 +167,6 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Reload the Wheels application
-	 *
 	 * hint: Reload the running Wheels application
 	 */
 	public string function reload() {
@@ -164,13 +176,18 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
+		var password = detectReloadPassword();
+
 		try {
-			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=";
+			var reloadUrl = "http://localhost:#serverPort#/?reload=true&password=#password#";
 			var httpResult = makeHttpRequest(reloadUrl);
 			out("Application reloaded successfully.", "green");
+			verbose("URL: http://localhost:#serverPort#/?reload=true&password=***");
 		} catch (any e) {
 			out("Failed to reload: #e.message#", "red");
-			verbose("URL: #reloadUrl#");
+			if (!len(password)) {
+				out("Hint: Set RELOAD_PASSWORD in .env or config/settings.cfm", "yellow");
+			}
 		}
 		return "";
 	}
@@ -180,8 +197,6 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Start the development server
-	 *
 	 * hint: Start the Wheels development server via LuCLI
 	 */
 	public string function start() {
@@ -200,8 +215,6 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Stop the development server
-	 *
 	 * hint: Stop the running Wheels development server
 	 */
 	public string function stop() {
@@ -215,8 +228,6 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Create a new Wheels application
-	 *
 	 * hint: Scaffold a new Wheels project directory
 	 */
 	public string function new() {
@@ -241,9 +252,7 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Display application routes
-	 *
-	 * hint: List all configured routes
+	 * hint: List all configured routes with method, path, and controller action
 	 */
 	public string function routes() {
 		var serverPort = detectServerPort();
@@ -255,6 +264,7 @@ component extends="modules.BaseModule" {
 		try {
 			var routesUrl = "http://localhost:#serverPort#/wheels/ai?context=routing";
 			var httpResult = makeHttpRequest(routesUrl);
+
 			out(httpResult);
 		} catch (any e) {
 			out("Failed to fetch routes: #e.message#", "red");
@@ -267,32 +277,84 @@ component extends="modules.BaseModule" {
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Display Wheels environment information
-	 *
 	 * hint: Show framework version, environment, and configuration
 	 */
 	public string function info() {
 		out("Wheels CLI v#version()#", "bold");
+		out("");
 
 		if (len(variables.projectRoot) && directoryExists(variables.projectRoot & "/vendor/wheels")) {
-			out("Project: #variables.projectRoot#");
+			out("Project:  #variables.projectRoot#");
 
-			// Try to detect environment from config
+			// Detect Wheels version from vendor
+			var versionFile = variables.projectRoot & "/vendor/wheels/events/onapplicationstart/settings.cfm";
+			if (fileExists(versionFile)) {
+				try {
+					var vContent = fileRead(versionFile);
+					var vMatch = reFindNoCase('version[^"]*"([^"]+)"', vContent, 1, true);
+					if (arrayLen(vMatch.match) > 1) {
+						out("Wheels:   v#vMatch.match[2]#");
+					}
+				} catch (any e) { /* skip */ }
+			}
+
+			// CFML engine
+			out("Engine:   Lucee (LuCLI module)");
+
+			// Datasource
+			var settingsFile = variables.projectRoot & "/config/settings.cfm";
+			if (fileExists(settingsFile)) {
+				try {
+					var sContent = fileRead(settingsFile);
+					var dsMatch = reFindNoCase('dataSourceName\s*[=,]\s*"([^"]+)"', sContent, 1, true);
+					if (arrayLen(dsMatch.match) > 1) {
+						out("Database: #dsMatch.match[2]#");
+					}
+				} catch (any e) { /* skip */ }
+			}
+
+			// Environment file
 			var envFile = variables.projectRoot & "/.env";
 			if (fileExists(envFile)) {
-				out("Environment file: .env found", "green");
+				out("Env file: .env found", "green");
 			}
 
+			// lucee.json
 			var luceeJson = variables.projectRoot & "/lucee.json";
 			if (fileExists(luceeJson)) {
-				out("Server config: lucee.json found", "green");
+				out("Config:   lucee.json found", "green");
 			}
 
+			// Count routes
+			var routesFile = variables.projectRoot & "/config/routes.cfm";
+			if (fileExists(routesFile)) {
+				var routeContent = fileRead(routesFile);
+				var resourceCount = 0;
+				var pos = 1;
+				while (pos > 0) {
+					pos = findNoCase(".resources(", routeContent, pos);
+					if (pos > 0) { resourceCount++; pos++; }
+				}
+				if (resourceCount > 0) {
+					out("Routes:   #resourceCount# resource route(s)");
+				}
+			}
+
+			// Count models
+			var modelsDir = variables.projectRoot & "/app/models";
+			if (directoryExists(modelsDir)) {
+				var modelCount = arrayLen(directoryList(modelsDir, false, "name", "*.cfc"));
+				if (modelCount > 0) {
+					out("Models:   #modelCount# model(s)");
+				}
+			}
+
+			// Server status
 			var serverPort = detectServerPort();
 			if (serverPort) {
-				out("Server: running on port #serverPort#", "green");
+				out("Server:   running on port #serverPort#", "green");
 			} else {
-				out("Server: not running", "yellow");
+				out("Server:   not running", "yellow");
 			}
 		} else {
 			out("Not in a Wheels project directory.", "yellow");
@@ -301,23 +363,134 @@ component extends="modules.BaseModule" {
 	}
 
 	// ─────────────────────────────────────────────────
-	//  mcp — Start MCP server over stdio
+	//  mcp — MCP server instructions
 	// ─────────────────────────────────────────────────
 
 	/**
-	 * Start MCP server for AI editor integration
-	 *
-	 * hint: Start Model Context Protocol server over stdio
+	 * hint: Show MCP server configuration instructions
 	 */
 	public string function mcp() {
-		var args = __arguments ?: [];
-
-		// Placeholder for Phase 2 MCP implementation
-		out("MCP server support coming in Wheels 3.1.1", "yellow");
+		out("MCP is built into LuCLI. Run:", "bold");
+		out("  lucli mcp wheels");
 		out("");
-		out("For now, use the HTTP MCP endpoint:");
-		out("  Start server: wheels start");
-		out("  MCP endpoint: http://localhost:<port>/wheels/mcp");
+		out("Configure in Claude Code (.claude/claude_project_config.json):", "bold");
+		out('  {"mcpServers":{"wheels":{"command":"lucli","args":["mcp","wheels"]}}}');
+		out("");
+		out("All public commands in this module are auto-discovered as MCP tools.");
+		out("Tools are prefixed with the module name: wheels_generate, wheels_migrate, etc.");
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  analyze — Code analysis
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Analyze Wheels application code for quality issues, anti-patterns, and complexity metrics
+	 */
+	public string function analyze() {
+		var args = __arguments ?: [];
+		var target = arrayLen(args) ? lCase(args[1]) : "all";
+
+		if (!arrayLen(args) && !directoryExists(variables.projectRoot & "/app")) {
+			out("No app/ directory found. Are you in a Wheels project?", "red");
+			return "";
+		}
+
+		out("Analyzing code...", "cyan");
+		out("");
+
+		try {
+			var analysis = getService("analysis");
+			var results = analysis.analyze(target);
+
+			// Display metrics
+			out("Code Analysis Results", "bold");
+			out("────────────────────────────────────");
+			out("Files:      #results.totalFiles#");
+			out("Lines:      #results.totalLines#");
+			out("Functions:  #results.totalFunctions#");
+			out("Grade:      #results.metrics.grade# (#results.metrics.healthScore#/100)");
+			out("");
+
+			// Anti-patterns
+			if (arrayLen(results.antiPatterns)) {
+				out("Anti-Patterns (#arrayLen(results.antiPatterns)#)", "red");
+				for (var issue in results.antiPatterns) {
+					var fileName = listLast(issue.file, "/\");
+					var severity = issue.severity == "error" ? "red" : "yellow";
+					out("  [#uCase(issue.severity)#] #fileName#:#issue.line ?: 1# — #issue.message#", severity);
+				}
+				out("");
+			}
+
+			// Complex functions
+			if (arrayLen(results.complexFunctions)) {
+				out("Complex Functions (#arrayLen(results.complexFunctions)#)", "yellow");
+				for (var f in results.complexFunctions) {
+					var fName = listLast(f.file, "/\");
+					out("  #fName#:#f.functionName# — complexity #f.complexity#", "yellow");
+				}
+				out("");
+			}
+
+			// Code smells
+			if (arrayLen(results.codeSmells)) {
+				out("Code Smells (#arrayLen(results.codeSmells)#)", "yellow");
+				for (var smell in results.codeSmells) {
+					var sName = listLast(smell.file, "/\");
+					out("  #sName# — #smell.message#", "yellow");
+				}
+				out("");
+			}
+
+			if (!arrayLen(results.antiPatterns) && !arrayLen(results.complexFunctions) && !arrayLen(results.codeSmells)) {
+				out("No issues found!", "green");
+			}
+
+			out("Completed in #numberFormat(results.executionTime, '0.00')#s");
+		} catch (any e) {
+			out("Analysis failed: #e.message#", "red");
+		}
+
+		return "";
+	}
+
+	// ─────────────────────────────────────────────────
+	//  validate — Quick validation
+	// ─────────────────────────────────────────────────
+
+	/**
+	 * hint: Validate Wheels application code for common errors and anti-patterns
+	 */
+	public string function validate() {
+		if (!directoryExists(variables.projectRoot & "/app")) {
+			out("No app/ directory found. Are you in a Wheels project?", "red");
+			return "";
+		}
+
+		out("Validating...", "cyan");
+		out("");
+
+		try {
+			var analysis = getService("analysis");
+			var results = analysis.validate();
+
+			if (results.valid) {
+				out("Validation passed — no errors found (#results.totalIssues# warnings)", "green");
+			} else {
+				out("Validation found #results.totalIssues# issue(s):", "red");
+			}
+
+			for (var issue in results.issues) {
+				var fileName = listLast(issue.file, "/\");
+				var severity = issue.severity == "error" ? "red" : "yellow";
+				out("  [#uCase(issue.severity)#] #fileName# — #issue.message#", severity);
+			}
+		} catch (any e) {
+			out("Validation failed: #e.message#", "red");
+		}
+
 		return "";
 	}
 
@@ -336,38 +509,39 @@ component extends="modules.BaseModule" {
 
 		var modelName = capitalize(args[1]);
 		var properties = args.len() > 1 ? args.slice(2) : [];
-		var filePath = variables.projectRoot & "/app/models/#modelName#.cfc";
-
-		if (fileExists(filePath)) {
-			out("Model already exists: app/models/#modelName#.cfc", "red");
-			out("Use --force to overwrite.");
-			return "";
-		}
 
 		// Parse properties and associations from args
 		var parsed = parseGeneratorArgs(properties);
 
-		// Build model content from template
-		var content = buildModelContent(modelName, parsed);
+		// Use CodeGen service with template files
+		var codegen = getService("codegen");
+		var validation = codegen.validateName(modelName, "model");
+		if (!validation.valid) {
+			out("Invalid model name: #arrayToList(validation.errors, '; ')#", "red");
+			return "";
+		}
 
-		// Ensure directory exists
-		ensureDirectory(getDirectoryFromPath(filePath));
-		fileWrite(filePath, content);
+		var result = codegen.generateModel(
+			name = modelName,
+			properties = parsed.properties,
+			belongsTo = arrayToList(parsed.belongsTo),
+			hasMany = arrayToList(parsed.hasMany),
+			hasOne = arrayToList(parsed.hasOne)
+		);
 
-		printCreated("app/models/#modelName#.cfc");
+		if (result.success) {
+			printCreated("app/models/#modelName#.cfc");
+		} else {
+			out(result.error, "red");
+			return "";
+		}
 
 		// Also generate migration if properties provided
 		if (arrayLen(parsed.properties)) {
-			var migrationName = "Create#getService('helpers').pluralize(modelName)#";
-			var migrationContent = buildCreateTableMigration(
-				getService("helpers").pluralize(lCase(modelName)),
-				parsed.properties
-			);
-			var timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
-			var migrationFile = variables.projectRoot & "/app/migrator/migrations/#timestamp#_#migrationName#.cfc";
-			ensureDirectory(getDirectoryFromPath(migrationFile));
-			fileWrite(migrationFile, migrationContent);
-			printCreated("app/migrator/migrations/#timestamp#_#migrationName#.cfc");
+			var scaffold = getService("scaffold");
+			var migrationPath = scaffold.createMigrationWithProperties(modelName, parsed.properties);
+			var migrationFileName = listLast(migrationPath, "/\");
+			printCreated("app/migrator/migrations/#migrationFileName#");
 		}
 
 		return "";
@@ -382,30 +556,27 @@ component extends="modules.BaseModule" {
 
 		var controllerName = capitalize(args[1]);
 		var actions = args.len() > 1 ? args.slice(2) : [];
-		var filePath = variables.projectRoot & "/app/controllers/#controllerName#.cfc";
 
-		if (fileExists(filePath)) {
-			out("Controller already exists: app/controllers/#controllerName#.cfc", "red");
+		var codegen = getService("codegen");
+		var result = codegen.generateController(name = controllerName, actions = actions);
+
+		if (result.success) {
+			printCreated("app/controllers/#controllerName#.cfc");
+		} else {
+			out(result.error, "red");
 			return "";
 		}
 
-		var content = buildControllerContent(controllerName, actions);
-
-		ensureDirectory(getDirectoryFromPath(filePath));
-		fileWrite(filePath, content);
-
-		printCreated("app/controllers/#controllerName#.cfc");
-
-		// Create view directory
+		// Create view files for non-mutation actions
 		var viewDir = variables.projectRoot & "/app/views/#lCase(controllerName)#";
 		ensureDirectory(viewDir);
 
-		// Create view files for each action
 		for (var action in actions) {
 			if (!listFindNoCase("create,update,delete,destroy", action)) {
-				var viewPath = viewDir & "/#lCase(action)#.cfm";
-				fileWrite(viewPath, '<cfparam name="params" default="">#chr(10)##chr(10)#<h1>#controllerName# - #capitalize(action)#</h1>');
-				printCreated("app/views/#lCase(controllerName)#/#lCase(action)#.cfm");
+				var viewResult = codegen.generateView(name = controllerName, action = action);
+				if (viewResult.success) {
+					printCreated("app/views/#lCase(controllerName)#/#lCase(action)#.cfm");
+				}
 			}
 		}
 
@@ -418,19 +589,17 @@ component extends="modules.BaseModule" {
 			return "";
 		}
 
-		var controllerName = lCase(args[1]);
+		var controllerName = args[1];
 		var actionName = lCase(args[2]);
-		var viewDir = variables.projectRoot & "/app/views/#controllerName#";
-		var filePath = viewDir & "/#actionName#.cfm";
 
-		if (fileExists(filePath)) {
-			out("View already exists: app/views/#controllerName#/#actionName#.cfm", "red");
-			return "";
+		var codegen = getService("codegen");
+		var result = codegen.generateView(name = controllerName, action = actionName);
+
+		if (result.success) {
+			printCreated("app/views/#lCase(controllerName)#/#actionName#.cfm");
+		} else {
+			out(result.error, "red");
 		}
-
-		ensureDirectory(viewDir);
-		fileWrite(filePath, '<cfparam name="params" default="">#chr(10)##chr(10)#<h1>#capitalize(controllerName)# - #capitalize(actionName)#</h1>');
-		printCreated("app/views/#controllerName#/#actionName#.cfm");
 		return "";
 	}
 
@@ -442,15 +611,27 @@ component extends="modules.BaseModule" {
 		}
 
 		var migrationName = args[1];
-		var timestamp = dateFormat(now(), "yyyymmdd") & timeFormat(now(), "HHmmss");
+		var timestamp = getService("helpers").generateMigrationTimestamp();
 		var fileName = "#timestamp#_#migrationName#.cfc";
 		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
 		var filePath = migrationDir & "/#fileName#";
 
 		ensureDirectory(migrationDir);
 
-		var content = buildEmptyMigration(migrationName);
-		fileWrite(filePath, content);
+		// Use the DBMigrate template if available, otherwise inline
+		var templates = getService("templates");
+		var result = templates.generateFromTemplate(
+			template = "dbmigrate/blank.txt",
+			destination = "app/migrator/migrations/#fileName#",
+			context = {migrationName: migrationName}
+		);
+
+		if (!result.success) {
+			// Fallback to inline empty migration
+			var content = buildEmptyMigration(migrationName);
+			fileWrite(filePath, content);
+		}
+
 		printCreated("app/migrator/migrations/#fileName#");
 		return "";
 	}
@@ -469,17 +650,150 @@ component extends="modules.BaseModule" {
 		out("Scaffolding #modelName#...", "cyan");
 		out("");
 
-		// Generate model
-		generateModel(args);
+		// Parse properties
+		var parsed = parseGeneratorArgs(properties);
 
-		// Generate controller with CRUD actions
-		generateController([controllerName, "index", "show", "new", "create", "edit", "update", "delete"]);
+		var scaffold = getService("scaffold");
+		var results = scaffold.generateScaffold(
+			name = modelName,
+			properties = parsed.properties,
+			belongsTo = arrayToList(parsed.belongsTo),
+			hasMany = arrayToList(parsed.hasMany)
+		);
 
+		if (results.success) {
+			for (var item in results.generated) {
+				var relPath = listLast(item.path, "/\");
+				printCreated("#item.type#: #relPath#");
+			}
+
+			out("");
+			out("Scaffold complete! Next steps:", "green");
+			out("  1. Run migrations: wheels migrate latest");
+			out("  2. Start server: wheels start");
+		} else {
+			out("Scaffold failed:", "red");
+			for (var err in results.errors) {
+				out("  #err#", "red");
+			}
+		}
+
+		return "";
+	}
+
+	private string function generateRoute(required array args) {
+		if (!arrayLen(args)) {
+			out("Usage: wheels generate route <name>", "yellow");
+			out("  Example: wheels generate route posts");
+			return "";
+		}
+
+		var routeName = lCase(args[1]);
+		var routesPath = variables.projectRoot & "/config/routes.cfm";
+
+		if (!fileExists(routesPath)) {
+			out("config/routes.cfm not found.", "red");
+			return "";
+		}
+
+		// Check for duplicate before delegating
+		var content = fileRead(routesPath);
+		var resourceRoute = '.resources("' & routeName & '")';
+		if (findNoCase(resourceRoute, content)) {
+			out("Route already exists: #resourceRoute#", "yellow");
+			return "";
+		}
+
+		// Delegate to Scaffold service for the actual route insertion
+		var scaffold = getService("scaffold");
+		var inserted = scaffold.updateRoutes(routeName);
+
+		if (inserted) {
+			out("  route   #resourceRoute# added to config/routes.cfm", "green");
+		} else {
+			out("Could not find insertion point in routes.cfm. Add manually:", "yellow");
+			out("  #resourceRoute#");
+		}
+
+		return "";
+	}
+
+	private string function generateTest(required array args) {
+		if (arrayLen(args) < 2) {
+			out("Usage: wheels generate test <type> <Name>", "yellow");
+			out("  Types: model, controller");
+			out("  Example: wheels generate test model User");
+			return "";
+		}
+
+		var testType = lCase(args[1]);
+		var testName = capitalize(args[2]);
+
+		if (!listFindNoCase("model,controller", testType)) {
+			out("Unknown test type: #testType#. Use 'model' or 'controller'.", "red");
+			return "";
+		}
+
+		var codegen = getService("codegen");
+		var result = codegen.generateTest(type = testType, name = testName);
+
+		if (result.success) {
+			var relPath = listLast(result.path, "/\");
+			printCreated(relPath);
+		} else {
+			out(result.error, "red");
+		}
+
+		return "";
+	}
+
+	private string function generateProperty(required array args) {
+		if (arrayLen(args) < 2) {
+			out("Usage: wheels generate property <ModelName> <property:type>", "yellow");
+			out("  Example: wheels generate property User email:string");
+			return "";
+		}
+
+		var modelName = capitalize(args[1]);
+		var propArg = args[2];
+		var parts = listToArray(propArg, ":");
+		var propName = parts[1];
+		var propType = arrayLen(parts) > 1 ? parts[2] : "string";
+
+		var tableName = getService("helpers").pluralize(lCase(modelName));
+		var timestamp = getService("helpers").generateMigrationTimestamp();
+		var migrationName = "Add#capitalize(propName)#To#capitalize(tableName)#";
+		var fileName = "#timestamp#_#migrationName#.cfc";
+		var migrationDir = variables.projectRoot & "/app/migrator/migrations";
+
+		ensureDirectory(migrationDir);
+
+		var colType = mapPropertyType(propType);
+		var nl = chr(10);
+		var tab = chr(9);
+		var content = 'component extends="wheels.migrator.Migration" {' & nl & nl;
+		content &= tab & 'function up() {' & nl;
+		content &= tab & tab & 'transaction {' & nl;
+		content &= tab & tab & tab & 't = changeTable(name="#tableName#");' & nl;
+		content &= tab & tab & tab & 't.#colType#(columnNames="#propName#");' & nl;
+		content &= tab & tab & tab & 't.change();' & nl;
+		content &= tab & tab & '}' & nl;
+		content &= tab & '}' & nl & nl;
+
+		content &= tab & 'function down() {' & nl;
+		content &= tab & tab & 'transaction {' & nl;
+		content &= tab & tab & tab & 'removeColumn(table="#tableName#", columnName="#propName#");' & nl;
+		content &= tab & tab & '}' & nl;
+		content &= tab & '}' & nl & nl;
+
+		content &= '}' & nl;
+
+		fileWrite(migrationDir & "/" & fileName, content);
+		printCreated("app/migrator/migrations/#fileName#");
 		out("");
-		out("Scaffold complete! Next steps:", "green");
-		out("  1. Run migrations: wheels migrate latest");
-		out("  2. Add route to config/routes.cfm:");
-		out('     .resources("#lCase(controllerName)#")');
+		out("Remember to add validation in app/models/#modelName#.cfc config():", "yellow");
+		out('  validatesPresenceOf("#propName#");');
+
 		return "";
 	}
 
@@ -528,7 +842,8 @@ component extends="modules.BaseModule" {
 	private string function runTests(
 		string filter = "",
 		string reporter = "simple",
-		string format = "json"
+		string format = "json",
+		boolean verboseOutput = false
 	) {
 		var serverPort = detectServerPort();
 		if (!serverPort) {
@@ -551,9 +866,16 @@ component extends="modules.BaseModule" {
 			// Try to parse JSON result
 			if (isJSON(httpResult)) {
 				var result = deserializeJSON(httpResult);
-				displayTestResults(result);
+				displayTestResults(result, verboseOutput);
 			} else {
-				out(httpResult);
+				// Could be an HTML error page
+				if (reFindNoCase("<html", httpResult)) {
+					out("Server returned HTML instead of JSON — possible error page.", "red");
+					out("Check server logs or visit the test URL directly.", "yellow");
+					verbose(httpResult);
+				} else {
+					out(httpResult);
+				}
 			}
 		} catch (any e) {
 			out("Test execution failed: #e.message#", "red");
@@ -562,19 +884,52 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
-	private void function displayTestResults(required any result) {
-		if (isStruct(result)) {
-			var passed = result.totalPassed ?: 0;
-			var failed = result.totalFailed ?: 0;
-			var errors = result.totalErrors ?: 0;
-			var total = passed + failed + errors;
+	private void function displayTestResults(required any result, boolean verboseOutput = false) {
+		if (!isStruct(result)) {
+			out(serializeJSON(result));
+			return;
+		}
 
-			if (failed == 0 && errors == 0) {
-				out("#total# tests passed", "green");
-			} else {
-				out("#total# tests: #passed# passed, #failed# failed, #errors# errors", "red");
+		// Parse TestBox JSON format
+		var totalPass = result.totalPass ?: (result.totalPassed ?: 0);
+		var totalFail = result.totalFail ?: (result.totalFailed ?: 0);
+		var totalError = result.totalError ?: (result.totalErrors ?: 0);
+		var totalDuration = result.totalDuration ?: 0;
+		var total = totalPass + totalFail + totalError;
 
-				// Show failure details
+		// Display bundle/suite/spec tree if verbose and bundles exist
+		if (arguments.verboseOutput && structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
+			for (var bundle in result.bundleStats) {
+				out("Bundle: #bundle.name ?: 'Unknown'#", "bold");
+				if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
+					for (var suite in bundle.suiteStats) {
+						displaySuite(suite, "  ");
+					}
+				}
+			}
+			out("");
+		}
+
+		// Summary line
+		var duration = totalDuration > 0 ? " (#numberFormat(totalDuration / 1000, '0.00')#s)" : "";
+
+		if (totalFail == 0 && totalError == 0) {
+			out("#totalPass# passed#duration#", "green");
+		} else {
+			out("#totalPass# passed, #totalFail# failed, #totalError# error(s)#duration#", "red");
+			out("");
+
+			// Show failure details (skip if verbose already displayed them via displaySuite)
+			if (!arguments.verboseOutput) {
+				if (structKeyExists(result, "bundleStats") && isArray(result.bundleStats)) {
+					for (var bundle in result.bundleStats) {
+						if (structKeyExists(bundle, "suiteStats") && isArray(bundle.suiteStats)) {
+							displayFailures(bundle.suiteStats);
+						}
+					}
+				}
+
+				// Fallback: check for flat failures array
 				if (structKeyExists(result, "failures") && isArray(result.failures)) {
 					for (var failure in result.failures) {
 						out("  FAIL: #failure.name ?: 'unknown'#", "red");
@@ -584,10 +939,66 @@ component extends="modules.BaseModule" {
 					}
 				}
 			}
-		} else {
-			out(serializeJSON(result));
 		}
 	}
+
+	private void function displaySuite(required struct suite, string indent = "") {
+		out("#indent##suite.name ?: 'Suite'#", "bold");
+		if (structKeyExists(suite, "specStats") && isArray(suite.specStats)) {
+			for (var spec in suite.specStats) {
+				var status = spec.status ?: "unknown";
+				switch (status) {
+					case "Passed":
+						out("#indent#  [PASS] #spec.name#", "green");
+						break;
+					case "Failed":
+						out("#indent#  [FAIL] #spec.name#", "red");
+						if (structKeyExists(spec, "failMessage") && len(spec.failMessage)) {
+							out("#indent#         #spec.failMessage#", "yellow");
+						}
+						break;
+					case "Error":
+						out("#indent#  [ERR]  #spec.name#", "red");
+						if (structKeyExists(spec, "error") && isStruct(spec.error) && structKeyExists(spec.error, "message")) {
+							out("#indent#         #spec.error.message#", "yellow");
+						}
+						break;
+					default:
+						out("#indent#  [#uCase(status)#] #spec.name#");
+				}
+			}
+		}
+		// Nested suites
+		if (structKeyExists(suite, "suiteStats") && isArray(suite.suiteStats)) {
+			for (var child in suite.suiteStats) {
+				displaySuite(child, indent & "  ");
+			}
+		}
+	}
+
+	private void function displayFailures(required array suites) {
+		for (var suite in arguments.suites) {
+			if (structKeyExists(suite, "specStats") && isArray(suite.specStats)) {
+				for (var spec in suite.specStats) {
+					var status = spec.status ?: "";
+					if (status == "Failed" || status == "Error") {
+						out("  FAIL: #spec.name ?: 'unknown'#", "red");
+						if (structKeyExists(spec, "failMessage") && len(spec.failMessage)) {
+							out("    #spec.failMessage#", "yellow");
+						}
+						if (structKeyExists(spec, "failOrigin") && isStruct(spec.failOrigin) && structKeyExists(spec.failOrigin, "template")) {
+							out("    at #spec.failOrigin.template#:#spec.failOrigin.line ?: '?'#", "yellow");
+						}
+					}
+				}
+			}
+			// Recurse into nested suites
+			if (structKeyExists(suite, "suiteStats") && isArray(suite.suiteStats)) {
+				displayFailures(suite.suiteStats);
+			}
+		}
+	}
+
 
 	// ── New App Scaffolding ──────────────────────────
 
@@ -695,89 +1106,7 @@ component extends="modules.BaseModule" {
 		return "";
 	}
 
-	// ── Template Builders ────────────────────────────
-
-	private string function buildModelContent(required string modelName, required struct parsed) {
-		var nl = chr(10);
-		var tab = chr(9);
-		var content = "component extends=""Model"" {" & nl & nl;
-		content &= tab & "function config() {" & nl;
-
-		// belongsTo
-		for (var rel in parsed.belongsTo) {
-			content &= tab & tab & "belongsTo('#rel#');" & nl;
-		}
-
-		// hasMany
-		for (var rel in parsed.hasMany) {
-			content &= tab & tab & "hasMany('#rel#');" & nl;
-		}
-
-		// hasOne
-		for (var rel in parsed.hasOne) {
-			content &= tab & tab & "hasOne('#rel#');" & nl;
-		}
-
-		// Validations for required properties
-		var requiredProps = [];
-		for (var prop in parsed.properties) {
-			arrayAppend(requiredProps, prop.name);
-		}
-		if (arrayLen(requiredProps)) {
-			content &= tab & tab & "validatesPresenceOf(""#arrayToList(requiredProps)#"");" & nl;
-		}
-
-		content &= tab & "}" & nl & nl;
-		content &= "}" & nl;
-		return content;
-	}
-
-	private string function buildControllerContent(required string controllerName, required array actions) {
-		var nl = chr(10);
-		var tab = chr(9);
-		var content = "component extends=""Controller"" {" & nl & nl;
-		content &= tab & "function config() {" & nl;
-		content &= tab & tab & "// Controller configuration" & nl;
-		content &= tab & "}" & nl;
-
-		for (var action in actions) {
-			content &= nl;
-			content &= tab & "function #action#() {" & nl;
-			content &= tab & tab & "// TODO: Implement #action#" & nl;
-			content &= tab & "}" & nl;
-		}
-
-		content &= nl & "}" & nl;
-		return content;
-	}
-
-	private string function buildCreateTableMigration(required string tableName, required array properties) {
-		var nl = chr(10);
-		var tab = chr(9);
-		var content = "component extends=""wheels.migrator.Migration"" {" & nl & nl;
-		content &= tab & "function up() {" & nl;
-		content &= tab & tab & "transaction {" & nl;
-		content &= tab & tab & tab & 't = createTable(name="#tableName#");' & nl;
-
-		for (var prop in properties) {
-			var colType = mapPropertyType(prop.type ?: "string");
-			content &= tab & tab & tab & 't.#colType#(columnNames="#prop.name#");' & nl;
-		}
-
-		content &= tab & tab & tab & "t.timestamps();" & nl;
-		content &= tab & tab & tab & "t.create();" & nl;
-		content &= tab & tab & "}" & nl;
-		content &= tab & "}" & nl & nl;
-
-		content &= tab & "function down() {" & nl;
-		content &= tab & tab & "transaction {" & nl;
-		content &= tab & tab & tab & 'dropTable(name="#tableName#");' & nl;
-		content &= tab & tab & "}" & nl;
-		content &= tab & "}" & nl & nl;
-
-		content &= "}" & nl;
-		return content;
-	}
+	// ── Inline Template Fallback ─────────────────────
 
 	private string function buildEmptyMigration(required string migrationName) {
 		var nl = chr(10);
@@ -842,36 +1171,17 @@ component extends="modules.BaseModule" {
 	 */
 	private string function mapPropertyType(required string type) {
 		switch (lCase(type)) {
-			case "string":
-			case "varchar":
-				return "string";
-			case "text":
-			case "longtext":
-				return "text";
-			case "integer":
-			case "int":
-				return "integer";
-			case "biginteger":
-			case "bigint":
-				return "bigInteger";
-			case "boolean":
-			case "bool":
-				return "boolean";
-			case "date":
-				return "date";
-			case "datetime":
-			case "timestamp":
-				return "datetime";
-			case "time":
-				return "time";
-			case "decimal":
-			case "float":
-			case "numeric":
-				return "decimal";
-			case "binary":
-				return "binary";
-			default:
-				return "string";
+			case "string": case "varchar": return "string";
+			case "text": case "longtext": return "text";
+			case "integer": case "int": return "integer";
+			case "biginteger": case "bigint": return "bigInteger";
+			case "boolean": case "bool": return "boolean";
+			case "date": return "date";
+			case "datetime": case "timestamp": return "datetime";
+			case "time": return "time";
+			case "decimal": case "float": case "numeric": return "decimal";
+			case "binary": return "binary";
+			default: return "string";
 		}
 	}
 
@@ -938,6 +1248,33 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
+	 * Detect the reload password from .env or config/settings.cfm
+	 */
+	private string function detectReloadPassword() {
+		// 1. Check .env for RELOAD_PASSWORD
+		var envFile = variables.projectRoot & "/.env";
+		if (fileExists(envFile)) {
+			var envContent = fileRead(envFile);
+			var pwMatch = reFindNoCase("RELOAD_PASSWORD\s*=\s*(.+)", envContent, 1, true);
+			if (arrayLen(pwMatch.match) > 1 && len(trim(pwMatch.match[2]))) {
+				return trim(pwMatch.match[2]);
+			}
+		}
+
+		// 2. Check config/settings.cfm
+		var settingsFile = variables.projectRoot & "/config/settings.cfm";
+		if (fileExists(settingsFile)) {
+			var settingsContent = fileRead(settingsFile);
+			var settingsMatch = reFindNoCase('reloadPassword\s*[=,]\s*"([^"]*)"', settingsContent, 1, true);
+			if (arrayLen(settingsMatch.match) > 1) {
+				return settingsMatch.match[2];
+			}
+		}
+
+		return "";
+	}
+
+	/**
 	 * Check if a port is responding to HTTP requests
 	 */
 	private boolean function isPortOpen(required numeric port) {
@@ -973,13 +1310,40 @@ component extends="modules.BaseModule" {
 	}
 
 	/**
-	 * Get or create a service instance
+	 * Get or create a service instance (lazy-loaded with constructor wiring)
 	 */
 	private any function getService(required string name) {
 		if (!structKeyExists(variables.services, name)) {
 			switch (name) {
 				case "helpers":
 					variables.services.helpers = new services.Helpers();
+					break;
+				case "templates":
+					variables.services.templates = new services.Templates(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot,
+						moduleRoot = variables.moduleRoot
+					);
+					break;
+				case "codegen":
+					variables.services.codegen = new services.CodeGen(
+						templateService = getService("templates"),
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot
+					);
+					break;
+				case "scaffold":
+					variables.services.scaffold = new services.Scaffold(
+						codeGenService = getService("codegen"),
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot
+					);
+					break;
+				case "analysis":
+					variables.services.analysis = new services.Analysis(
+						helpers = getService("helpers"),
+						projectRoot = variables.projectRoot
+					);
 					break;
 				default:
 					throw("Unknown service: #name#");
