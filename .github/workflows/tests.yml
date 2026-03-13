@@ -465,6 +465,7 @@ jobs:
           json_file: junit-results/test-results.json
           json_suite_details: true
           json_test_case_results: true
+          json_thousands_separator: ","
 
   #############################################
   # Test Matrix Summary Grid
