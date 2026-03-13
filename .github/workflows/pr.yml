@@ -9,6 +9,11 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
 jobs:
   label:
     name: Auto-Label PR
@@ -17,7 +22,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@v6
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
