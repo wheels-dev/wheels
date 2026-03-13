@@ -938,6 +938,80 @@ component output="false" {
 	}
 
 	// ======================================================================
+	// CHANNEL / PUB-SUB FUNCTIONS
+	// ======================================================================
+
+	/**
+	 * Publish an event to a channel.
+	 * Delegates to the in-memory Channel engine or the DatabaseAdapter
+	 * depending on the adapter argument (or the global channelAdapter setting).
+	 *
+	 * Can be called from controllers, models, jobs, or anywhere with access
+	 * to global helpers.
+	 *
+	 * [section: Global Helpers]
+	 * [category: Channel Functions]
+	 *
+	 * @channel The channel name to publish to (e.g. "user.42").
+	 * @event The event type (e.g. "notification", "update").
+	 * @data The event data as a string (typically JSON).
+	 * @adapter Adapter to use: "memory" (default) or "database".
+	 */
+	public struct function publish(
+		required string channel,
+		required string event,
+		required string data,
+		string adapter = ""
+	) {
+		local.engine = $getChannelEngine(arguments.adapter);
+		return local.engine.publish(
+			channel = arguments.channel,
+			event = arguments.event,
+			data = arguments.data
+		);
+	}
+
+	/**
+	 * Internal: Get or create the channel engine singleton for the given adapter type.
+	 * Uses double-checked locking to ensure thread-safe lazy initialization.
+	 *
+	 * @adapter "memory" or "database". Defaults to application.wheels.channelAdapter or "memory".
+	 */
+	public any function $getChannelEngine(string adapter = "") {
+		// Resolve adapter type
+		if (!Len(arguments.adapter)) {
+			if (StructKeyExists(application, "wheels") && StructKeyExists(application.wheels, "channelAdapter")) {
+				local.adapterType = application.wheels.channelAdapter;
+			} else {
+				local.adapterType = "memory";
+			}
+		} else {
+			local.adapterType = arguments.adapter;
+		}
+
+		if (local.adapterType == "database") {
+			if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelDatabaseEngine")) {
+				lock name="wheelsChannelDatabaseEngine" timeout="10" {
+					if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelDatabaseEngine")) {
+						application.wheels.channelDatabaseEngine = CreateObject("component", "wheels.channel.DatabaseAdapter").init();
+					}
+				}
+			}
+			return application.wheels.channelDatabaseEngine;
+		}
+
+		// Default: memory adapter
+		if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
+			lock name="wheelsChannelEngine" timeout="10" {
+				if (!StructKeyExists(application, "wheels") || !StructKeyExists(application.wheels, "channelEngine")) {
+					application.wheels.channelEngine = CreateObject("component", "wheels.Channel").init();
+				}
+			}
+		}
+		return application.wheels.channelEngine;
+	}
+
+	// ======================================================================
 	// ROUTING FUNCTIONS
 	// ======================================================================
 
