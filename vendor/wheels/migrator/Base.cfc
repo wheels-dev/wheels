@@ -12,11 +12,12 @@ component extends="wheels.Global"{
 		request.$wheelsMigrationOutput = request.$wheelsMigrationOutput & arguments.message & Chr(13);
 	}
 
-	public string function $getDBType() {
+	public string function $getDBType(string dataSource = "") {
 		local.appKey = $appKey();
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
 		local.info = $dbinfo(
 			type = "version",
-			datasource = application[local.appKey].dataSourceName,
+			datasource = local.dsName,
 			username = application[local.appKey].dataSourceUserName,
 			password = application[local.appKey].dataSourcePassword
 		);
@@ -85,12 +86,13 @@ component extends="wheels.Global"{
 		return local.foreignKeyList;
 	}
 
-	private void function $execute(required string sql) {
+	private void function $execute(required string sql, string dataSource = "") {
 		local.appKey = $appKey();
+		local.dsName = Len(arguments.dataSource) ? arguments.dataSource : application[local.appKey].dataSourceName;
 		local.sql = Trim(arguments.sql);
 		local.info = $dbinfo(
 			type = "version",
-			datasource = application.wheels.dataSourceName,
+			datasource = local.dsName,
 			username = application.wheels.dataSourceUserName,
 			password = application.wheels.dataSourcePassword
 		);
@@ -112,7 +114,7 @@ component extends="wheels.Global"{
 			}
 			ArrayAppend(request.$wheelsDebugSQLResult, local.sql);
 		} else {
-			$query(datasource = application[local.appKey].dataSourceName, sql = local.sql);
+			$query(datasource = local.dsName, sql = local.sql);
 		}
 	}
 

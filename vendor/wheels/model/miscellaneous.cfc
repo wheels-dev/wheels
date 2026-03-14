@@ -349,6 +349,18 @@ component {
 	}
 
 	/**
+	 * Marks this model as shared — it will always use the default application datasource
+	 * even when a tenant is active. Use this for models like `Tenant`, `Plan`, or any
+	 * lookup table that lives in the central database rather than per-tenant databases.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Multi-Tenancy]
+	 */
+	public void function sharedModel() {
+		variables.wheels.class.sharedModel = true;
+	}
+
+	/**
 	 * Internal function.
 	 */
 	public void function $timestampProperty(required string property) {
