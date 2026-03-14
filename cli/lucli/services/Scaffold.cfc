@@ -32,7 +32,7 @@ component {
 		boolean force = false
 	) {
 		var results = {success: true, generated: [], errors: [], rollback: []};
-		var pluralName = pluralName;
+		var pluralName = variables.helpers.pluralize(arguments.name);
 
 		try {
 			// Add foreign key columns for belongsTo relationships
@@ -167,7 +167,7 @@ component {
 			if (!fileExists(routesPath)) return false;
 
 			var content = fileRead(routesPath);
-			var resourceName = lCase(pluralName);
+			var resourceName = lCase(arguments.name);
 			var resourceRoute = '.resources("' & resourceName & '")';
 
 			// Skip if route already exists
