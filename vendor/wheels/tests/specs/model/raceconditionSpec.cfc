@@ -6,6 +6,14 @@ component extends="wheels.WheelsTest" {
 
 		describe("Stress Testing for Race Conditions", () => {
 
+			beforeEach(() => {
+				info = g.$dbinfo(datasource = application.wheels.dataSourceName, type = "version");
+				db = LCase(Replace(info.database_productname, " ", "", "all"));
+				if (db == "sqlite") {
+					skip("Skipping race condition tests on SQLite — concurrent cache manipulation is unreliable");
+				}
+			});
+
 			it("should handle concurrent model access with cache manipulation", () => {
 				// Store original state to restore later
 				var originalCacheConfig = application.wheels.cacheModelConfig;

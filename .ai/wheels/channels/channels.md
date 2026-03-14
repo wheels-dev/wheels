@@ -45,7 +45,7 @@ Best for: single-server deployments, development.
 
 ### Database
 
-Persists events to a `_wheels_events` table (auto-created on first use). Subscribers poll the table at configurable intervals. Events are retained for 60 minutes by default with automatic cleanup.
+Persists events to a `wheels_events` table (auto-created on first use). Subscribers poll the table at configurable intervals. Events are retained for 60 minutes by default with automatic cleanup.
 
 Best for: multi-server deployments, event history/replay.
 
@@ -142,7 +142,7 @@ var events = adapter.poll(channel = "orders", lastEventId = "evt-123");
 adapter.cleanup(olderThanMinutes = 30);
 ```
 
-#### Database Table: `_wheels_events`
+#### Database Table: `wheels_events`
 
 Auto-created on first use. Schema:
 

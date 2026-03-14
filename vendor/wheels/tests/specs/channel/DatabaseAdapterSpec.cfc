@@ -17,7 +17,7 @@ component extends="wheels.WheelsTest" {
 				// Clean up test events before each test
 				try {
 					queryExecute(
-						"DELETE FROM _wheels_events WHERE channel LIKE :prefix",
+						"DELETE FROM wheels_events WHERE channel LIKE :prefix",
 						{prefix: {value: "test.%", cfsqltype: "cf_sql_varchar"}},
 						{datasource: application.wheels.dataSourceName}
 					);
@@ -134,7 +134,7 @@ component extends="wheels.WheelsTest" {
 				// Insert an event with a timestamp far in the past
 				try {
 					queryExecute(
-						"INSERT INTO _wheels_events (id, channel, event, data, createdAt)
+						"INSERT INTO wheels_events (id, channel, event, data, createdAt)
 						VALUES (:id, :channel, :event, :data, :createdAt)",
 						{
 							id: {value: "old-event-cleanup", cfsqltype: "cf_sql_varchar"},
@@ -152,7 +152,7 @@ component extends="wheels.WheelsTest" {
 				adapter.cleanup(olderThanMinutes = 60);
 
 				var remaining = queryExecute(
-					"SELECT id FROM _wheels_events WHERE id = :id",
+					"SELECT id FROM wheels_events WHERE id = :id",
 					{id: {value: "old-event-cleanup", cfsqltype: "cf_sql_varchar"}},
 					{datasource: application.wheels.dataSourceName}
 				);
@@ -160,7 +160,7 @@ component extends="wheels.WheelsTest" {
 				expect(remaining.recordCount).toBe(0);
 			});
 
-			it("auto-creates _wheels_events table on first use", function() {
+			it("auto-creates wheels_events table on first use", function() {
 				// The table should already exist from previous tests,
 				// but verify we can query it
 				var events = adapter.poll(

@@ -22,7 +22,7 @@ component {
 	 *
 	 * For the "memory" adapter, subscribes to the in-memory Channel
 	 * engine and buffers events for delivery. For the "database" adapter,
-	 * polls the _wheels_events table at regular intervals.
+	 * polls the wheels_events table at regular intervals.
 	 *
 	 * @channel The channel name to subscribe to (e.g. "user.42").
 	 * @events Comma-delimited list of event types to filter. Empty = all events.

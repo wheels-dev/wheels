@@ -1,7 +1,7 @@
 /**
  * Database-backed pub/sub adapter for multi-server SSE channels.
  *
- * Uses a _wheels_events table for event persistence and cross-server
+ * Uses a wheels_events table for event persistence and cross-server
  * communication. Auto-creates the table on first use (same pattern as Job.cfc).
  *
  * Usage:
@@ -46,7 +46,7 @@ component {
 
 		try {
 			queryExecute(
-				"INSERT INTO _wheels_events (id, channel, event, data, createdAt)
+				"INSERT INTO wheels_events (id, channel, event, data, createdAt)
 				VALUES (:id, :channel, :event, :data, :createdAt)",
 				{
 					id: {value: arguments.id, cfsqltype: "cf_sql_varchar"},
@@ -101,12 +101,12 @@ component {
 		if (Len(arguments.lastEventId)) {
 			return queryExecute(
 				"SELECT e.id, e.channel, e.event, e.data, e.createdAt
-				FROM _wheels_events e
+				FROM wheels_events e
 				WHERE e.channel = :channel
 				AND e.id != :lastEventId
 				AND e.createdAt >= (
 					SELECT COALESCE(MAX(r.createdAt), :fallback)
-					FROM _wheels_events r
+					FROM wheels_events r
 					WHERE r.id = :lastEventId
 				)
 				ORDER BY e.createdAt ASC",
@@ -121,7 +121,7 @@ component {
 
 		return queryExecute(
 			"SELECT id, channel, event, data, createdAt
-			FROM _wheels_events
+			FROM wheels_events
 			WHERE channel = :channel
 			AND createdAt > :since
 			ORDER BY createdAt ASC",
@@ -143,7 +143,7 @@ component {
 
 		try {
 			queryExecute(
-				"DELETE FROM _wheels_events WHERE createdAt < :cutoff",
+				"DELETE FROM wheels_events WHERE createdAt < :cutoff",
 				{
 					cutoff: {value: DateAdd("n", -arguments.olderThanMinutes, Now()), cfsqltype: "cf_sql_timestamp"}
 				},
@@ -170,7 +170,7 @@ component {
 	}
 
 	/**
-	 * Auto-create the _wheels_events table if it doesn't exist.
+	 * Auto-create the wheels_events table if it doesn't exist.
 	 * Pattern copied from Job.cfc $ensureJobTable().
 	 */
 	private boolean function $ensureEventsTable() {
@@ -180,7 +180,7 @@ component {
 
 		try {
 			queryExecute(
-				"SELECT COUNT(*) AS cnt FROM _wheels_events WHERE 1=0",
+				"SELECT COUNT(*) AS cnt FROM wheels_events WHERE 1=0",
 				{},
 				{datasource: variables.$datasource}
 			);
@@ -212,7 +212,7 @@ component {
 			}
 
 			queryExecute("
-				CREATE TABLE _wheels_events (
+				CREATE TABLE wheels_events (
 					id #local.varcharType#(36) NOT NULL PRIMARY KEY,
 					channel #local.varcharType#(255) NOT NULL,
 					event #local.varcharType#(255) NOT NULL,
@@ -223,12 +223,12 @@ component {
 
 			try {
 				queryExecute(
-					"CREATE INDEX idx_wevents_channel ON _wheels_events (channel, createdAt)",
+					"CREATE INDEX idx_wevents_channel ON wheels_events (channel, createdAt)",
 					{},
 					{datasource: variables.$datasource}
 				);
 				queryExecute(
-					"CREATE INDEX idx_wevents_cleanup ON _wheels_events (createdAt)",
+					"CREATE INDEX idx_wevents_cleanup ON wheels_events (createdAt)",
 					{},
 					{datasource: variables.$datasource}
 				);
@@ -236,12 +236,12 @@ component {
 				// Indexes are optional
 			}
 
-			writeLog(text="Auto-created _wheels_events table", type="information", file="wheels_channels");
+			writeLog(text="Auto-created wheels_events table", type="information", file="wheels_channels");
 			variables.tableVerified = true;
 			return true;
 		} catch (any createError) {
 			writeLog(
-				text="Failed to auto-create _wheels_events table: #createError.message#",
+				text="Failed to auto-create wheels_events table: #createError.message#",
 				type="error",
 				file="wheels_channels"
 			);
