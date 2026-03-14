@@ -50,10 +50,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Resolve the tenant, set request.wheels.tenant, then delegate to the next middleware.
 	 */
 	public string function handle(required struct request, required any next) {
-		// Ensure request.wheels exists
-		if (!StructKeyExists(request, "wheels")) {
-			request.wheels = {};
-		}
+		// Note: In CFML, bare `request` inside a function always refers to the
+		// built-in request scope, even when a parameter is named `request`.
+		// We use `arguments.request` to access the middleware pipeline's request struct,
+		// but set tenant state on the built-in `request` scope since that's what
+		// $performQuery() and $get() read from.
 
 		local.tenant = $resolveTenant(arguments.request);
 
@@ -70,14 +71,17 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			// Lock the tenant to prevent mid-request switching
 			local.tenant["$locked"] = true;
 
+			// Set on the built-in request scope (where $performQuery reads it)
 			request.wheels.tenant = local.tenant;
 		}
 
 		try {
 			return arguments.next(arguments.request);
 		} finally {
-			// Clean up tenant context
-			StructDelete(request.wheels, "tenant");
+			// Clean up tenant context from the built-in request scope
+			if (IsDefined("request.wheels.tenant")) {
+				StructDelete(request.wheels, "tenant");
+			}
 		}
 	}
 

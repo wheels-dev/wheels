@@ -5,7 +5,8 @@ component extends="wheels.WheelsTest" {
 		describe("TenantResolver Middleware", () => {
 
 			afterEach(() => {
-				if (StructKeyExists(request, "wheels")) {
+				// Only clean up the tenant key, never wipe request.wheels
+				if (IsDefined("request.wheels.tenant")) {
 					StructDelete(request.wheels, "tenant");
 				}
 			});
@@ -19,13 +20,16 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {server_name: "example.com"}};
+					// The middleware sets the built-in request scope, not the argument.
+					// Use a shared struct to capture state inside the closure (CFML closure gotcha).
+					var reqData = {cgi: {server_name: "example.com"}};
 					var result = {called: false, tenant: {}};
 
-					mw.handle(req, function(r) {
+					mw.handle(reqData, function(r) {
 						result.called = true;
-						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
-							result.tenant = Duplicate(r.wheels.tenant);
+						// Check built-in request scope, not callback argument
+						if (IsDefined("request.wheels.tenant")) {
+							result.tenant = Duplicate(request.wheels.tenant);
 						}
 						return "";
 					});
@@ -43,11 +47,11 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {}};
+					var reqData = {cgi: {}};
 					var result = {hasTenant: false};
 
-					mw.handle(req, function(r) {
-						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+					mw.handle(reqData, function(r) {
+						result.hasTenant = IsDefined("request.wheels.tenant");
 						return "";
 					});
 
@@ -61,11 +65,11 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {}};
+					var reqData = {cgi: {}};
 					var result = {hasTenant: false};
 
-					mw.handle(req, function(r) {
-						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+					mw.handle(reqData, function(r) {
+						result.hasTenant = IsDefined("request.wheels.tenant");
 						return "";
 					});
 
@@ -79,12 +83,12 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {}};
+					var reqData = {cgi: {}};
 					var result = {tenant: {}};
 
-					mw.handle(req, function(r) {
-						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
-							result.tenant = Duplicate(r.wheels.tenant);
+					mw.handle(reqData, function(r) {
+						if (IsDefined("request.wheels.tenant")) {
+							result.tenant = Duplicate(request.wheels.tenant);
 						}
 						return "";
 					});
@@ -106,12 +110,12 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {http_x_tenant_id: "acme"}};
+					var reqData = {cgi: {http_x_tenant_id: "acme"}};
 					var result = {tenant: {}};
 
-					mw.handle(req, function(r) {
-						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
-							result.tenant = Duplicate(r.wheels.tenant);
+					mw.handle(reqData, function(r) {
+						if (IsDefined("request.wheels.tenant")) {
+							result.tenant = Duplicate(request.wheels.tenant);
 						}
 						return "";
 					});
@@ -129,11 +133,11 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {}};
+					var reqData = {cgi: {}};
 					var result = {hasTenant: false};
 
-					mw.handle(req, function(r) {
-						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+					mw.handle(reqData, function(r) {
+						result.hasTenant = IsDefined("request.wheels.tenant");
 						return "";
 					});
 
@@ -151,12 +155,12 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {server_name: "acme.example.com"}};
+					var reqData = {cgi: {server_name: "acme.example.com"}};
 					var result = {tenant: {}};
 
-					mw.handle(req, function(r) {
-						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
-							result.tenant = Duplicate(r.wheels.tenant);
+					mw.handle(reqData, function(r) {
+						if (IsDefined("request.wheels.tenant")) {
+							result.tenant = Duplicate(request.wheels.tenant);
 						}
 						return "";
 					});
@@ -172,11 +176,11 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var req = {cgi: {server_name: "example.com"}};
+					var reqData = {cgi: {server_name: "example.com"}};
 					var result = {hasTenant: false};
 
-					mw.handle(req, function(r) {
-						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+					mw.handle(reqData, function(r) {
+						result.hasTenant = IsDefined("request.wheels.tenant");
 						return "";
 					});
 
@@ -193,14 +197,13 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					request.wheels = {};
-					var req = request;
+					var reqData = {cgi: {}};
 
-					mw.handle(req, function(r) {
+					mw.handle(reqData, function(r) {
 						return "";
 					});
 
-					expect(StructKeyExists(request.wheels, "tenant")).toBeFalse();
+					expect(IsDefined("request.wheels.tenant")).toBeFalse();
 				});
 
 				it("cleans up request.wheels.tenant even when next() throws", () => {
@@ -210,12 +213,11 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					request.wheels = {};
-					var req = request;
+					var reqData = {cgi: {}};
 					var result = {threw: false};
 
 					try {
-						mw.handle(req, function(r) {
+						mw.handle(reqData, function(r) {
 							throw(type="TestException", message="boom");
 						});
 					} catch (TestException e) {
@@ -223,7 +225,7 @@ component extends="wheels.WheelsTest" {
 					}
 
 					expect(result.threw).toBeTrue();
-					expect(StructKeyExists(request.wheels, "tenant")).toBeFalse();
+					expect(IsDefined("request.wheels.tenant")).toBeFalse();
 				});
 			});
 
