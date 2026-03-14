@@ -94,13 +94,17 @@ component {
 	) {
 		$ensureEventsTable();
 
-		// If lastEventId is provided, find its timestamp and get events after it
+		// If lastEventId is provided, find its timestamp and get events at or after it,
+		// excluding the event itself. Uses >= instead of > because MySQL and Oracle
+		// DATETIME/TIMESTAMP have only second-level precision — events within the same
+		// second would be missed with a strict > comparison.
 		if (Len(arguments.lastEventId)) {
 			return queryExecute(
 				"SELECT e.id, e.channel, e.event, e.data, e.createdAt
 				FROM _wheels_events e
 				WHERE e.channel = :channel
-				AND e.createdAt > (
+				AND e.id != :lastEventId
+				AND e.createdAt >= (
 					SELECT COALESCE(MAX(r.createdAt), :fallback)
 					FROM _wheels_events r
 					WHERE r.id = :lastEventId
