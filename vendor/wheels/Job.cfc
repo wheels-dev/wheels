@@ -138,9 +138,9 @@ component {
 			&& Len(request.wheels.tenant.dataSource)
 		) {
 			arguments.data["$wheelsTenantContext"] = {
-				id: StructKeyExists(request.wheels.tenant, "id") ? request.wheels.tenant.id : "",
-				dataSource: request.wheels.tenant.dataSource,
-				config: StructKeyExists(request.wheels.tenant, "config") ? request.wheels.tenant.config : {}
+				id = StructKeyExists(request.wheels.tenant, "id") ? request.wheels.tenant.id : "",
+				dataSource = request.wheels.tenant.dataSource,
+				config = StructKeyExists(request.wheels.tenant, "config") ? request.wheels.tenant.config : {}
 			};
 		}
 
@@ -283,9 +283,9 @@ component {
 						request.wheels = {};
 					}
 					request.wheels.tenant = {
-						id: StructKeyExists(local.tenantCtx, "id") ? local.tenantCtx.id : "",
-						dataSource: local.tenantCtx.dataSource,
-						config: StructKeyExists(local.tenantCtx, "config") ? local.tenantCtx.config : {}
+						id = StructKeyExists(local.tenantCtx, "id") ? local.tenantCtx.id : "",
+						dataSource = local.tenantCtx.dataSource,
+						config = StructKeyExists(local.tenantCtx, "config") ? local.tenantCtx.config : {}
 					};
 					local.hasTenantContext = true;
 				}

@@ -47,9 +47,9 @@ component {
 		boolean stopOnError = true
 	) {
 		local.results = {
-			success: [],
-			failed: [],
-			total: 0
+			success = [],
+			failed = [],
+			total = 0
 		};
 
 		// Resolve tenants from provider if no static list given
@@ -67,8 +67,8 @@ component {
 		for (local.tenant in local.tenantList) {
 			if (!IsStruct(local.tenant) || !StructKeyExists(local.tenant, "dataSource") || !Len(local.tenant.dataSource)) {
 				ArrayAppend(local.results.failed, {
-					tenant: local.tenant,
-					error: "Tenant struct missing required 'dataSource' key"
+					tenant = local.tenant,
+					error = "Tenant struct missing required 'dataSource' key"
 				});
 				if (arguments.stopOnError) break;
 				continue;
@@ -82,9 +82,9 @@ component {
 					request.wheels = {};
 				}
 				request.wheels.tenant = {
-					id: local.tenantId,
-					dataSource: local.tenant.dataSource,
-					config: StructKeyExists(local.tenant, "config") ? local.tenant.config : {}
+					id = local.tenantId,
+					dataSource = local.tenant.dataSource,
+					config = StructKeyExists(local.tenant, "config") ? local.tenant.config : {}
 				};
 
 				// Run the standard migrator with the tenant's datasource
@@ -92,15 +92,15 @@ component {
 				local.output = local.migrator.migrate(arguments.action);
 
 				ArrayAppend(local.results.success, {
-					tenant: local.tenantId,
-					dataSource: local.tenant.dataSource,
-					output: local.output
+					tenant = local.tenantId,
+					dataSource = local.tenant.dataSource,
+					output = local.output
 				});
 			} catch (any e) {
 				ArrayAppend(local.results.failed, {
-					tenant: local.tenantId,
-					dataSource: local.tenant.dataSource,
-					error: e.message
+					tenant = local.tenantId,
+					dataSource = local.tenant.dataSource,
+					error = e.message
 				});
 				if (arguments.stopOnError) break;
 			} finally {

@@ -16,14 +16,14 @@ component extends="wheels.WheelsTest" {
 				it("sets request.wheels.tenant from resolver closure", () => {
 					var mw = new wheels.middleware.TenantResolver(
 						resolver = function(req) {
-							return {id: "t1", dataSource: "tenant_one_ds", config: {showDebugInformation: false}};
+							return {id = "t1", dataSource = "tenant_one_ds", config = {showDebugInformation = false}};
 						}
 					);
 
 					// The middleware sets the built-in request scope, not the argument.
 					// Use a shared struct to capture state inside the closure (CFML closure gotcha).
-					var reqData = {cgi: {server_name: "example.com"}};
-					var result = {called: false, tenant: {}};
+					var reqData = {cgi = {server_name = "example.com"}};
+					var result = {called = false, tenant = {}};
 
 					mw.handle(reqData, function(r) {
 						result.called = true;
@@ -47,8 +47,8 @@ component extends="wheels.WheelsTest" {
 						}
 					);
 
-					var reqData = {cgi: {}};
-					var result = {hasTenant: false};
+					var reqData = {cgi = {}};
+					var result = {hasTenant = false};
 
 					mw.handle(reqData, function(r) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
@@ -61,12 +61,12 @@ component extends="wheels.WheelsTest" {
 				it("does not set tenant when resolver returns struct without dataSource", () => {
 					var mw = new wheels.middleware.TenantResolver(
 						resolver = function(req) {
-							return {id: "t1"};
+							return {id = "t1"};
 						}
 					);
 
-					var reqData = {cgi: {}};
-					var result = {hasTenant: false};
+					var reqData = {cgi = {}};
+					var result = {hasTenant = false};
 
 					mw.handle(reqData, function(r) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
@@ -79,12 +79,12 @@ component extends="wheels.WheelsTest" {
 				it("provides default id and config when not returned by resolver", () => {
 					var mw = new wheels.middleware.TenantResolver(
 						resolver = function(req) {
-							return {dataSource: "my_ds"};
+							return {dataSource = "my_ds"};
 						}
 					);
 
-					var reqData = {cgi: {}};
-					var result = {tenant: {}};
+					var reqData = {cgi = {}};
+					var result = {tenant = {}};
 
 					mw.handle(reqData, function(r) {
 						if (IsDefined("request.wheels.tenant")) {
@@ -106,12 +106,12 @@ component extends="wheels.WheelsTest" {
 						strategy = "header",
 						headerName = "X-Tenant-ID",
 						resolver = function(req) {
-							return {id: "from_header", dataSource: "header_ds"};
+							return {id = "from_header", dataSource = "header_ds"};
 						}
 					);
 
-					var reqData = {cgi: {http_x_tenant_id: "acme"}};
-					var result = {tenant: {}};
+					var reqData = {cgi = {http_x_tenant_id = "acme"}};
+					var result = {tenant = {}};
 
 					mw.handle(reqData, function(r) {
 						if (IsDefined("request.wheels.tenant")) {
@@ -129,12 +129,12 @@ component extends="wheels.WheelsTest" {
 						strategy = "header",
 						headerName = "X-Tenant-ID",
 						resolver = function(req) {
-							return {id: "t1", dataSource: "ds1"};
+							return {id = "t1", dataSource = "ds1"};
 						}
 					);
 
-					var reqData = {cgi: {}};
-					var result = {hasTenant: false};
+					var reqData = {cgi = {}};
+					var result = {hasTenant = false};
 
 					mw.handle(reqData, function(r) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
@@ -151,12 +151,12 @@ component extends="wheels.WheelsTest" {
 					var mw = new wheels.middleware.TenantResolver(
 						strategy = "subdomain",
 						resolver = function(req) {
-							return {id: "acme", dataSource: "acme_ds"};
+							return {id = "acme", dataSource = "acme_ds"};
 						}
 					);
 
-					var reqData = {cgi: {server_name: "acme.example.com"}};
-					var result = {tenant: {}};
+					var reqData = {cgi = {server_name = "acme.example.com"}};
+					var result = {tenant = {}};
 
 					mw.handle(reqData, function(r) {
 						if (IsDefined("request.wheels.tenant")) {
@@ -172,12 +172,12 @@ component extends="wheels.WheelsTest" {
 					var mw = new wheels.middleware.TenantResolver(
 						strategy = "subdomain",
 						resolver = function(req) {
-							return {id: "t1", dataSource: "ds1"};
+							return {id = "t1", dataSource = "ds1"};
 						}
 					);
 
-					var reqData = {cgi: {server_name: "example.com"}};
-					var result = {hasTenant: false};
+					var reqData = {cgi = {server_name = "example.com"}};
+					var result = {hasTenant = false};
 
 					mw.handle(reqData, function(r) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
@@ -193,11 +193,11 @@ component extends="wheels.WheelsTest" {
 				it("cleans up request.wheels.tenant after next() completes", () => {
 					var mw = new wheels.middleware.TenantResolver(
 						resolver = function(req) {
-							return {id: "t1", dataSource: "ds1"};
+							return {id = "t1", dataSource = "ds1"};
 						}
 					);
 
-					var reqData = {cgi: {}};
+					var reqData = {cgi = {}};
 
 					mw.handle(reqData, function(r) {
 						return "";
@@ -209,12 +209,12 @@ component extends="wheels.WheelsTest" {
 				it("cleans up request.wheels.tenant even when next() throws", () => {
 					var mw = new wheels.middleware.TenantResolver(
 						resolver = function(req) {
-							return {id: "t1", dataSource: "ds1"};
+							return {id = "t1", dataSource = "ds1"};
 						}
 					);
 
-					var reqData = {cgi: {}};
-					var result = {threw: false};
+					var reqData = {cgi = {}};
+					var result = {threw = false};
 
 					try {
 						mw.handle(reqData, function(r) {
