@@ -14,11 +14,12 @@ component extends="wheels.WheelsTest" {
 			describe("Custom strategy", () => {
 
 				it("sets request.wheels.tenant from resolver closure", () => {
-					var mw = new wheels.middleware.TenantResolver(
-						resolver = function(req) {
-							return {id = "t1", dataSource = "tenant_one_ds", config = {showDebugInformation = false}};
-						}
-					);
+					// ACF bug: inline closures inside new Component() cause ArrayStoreException.
+					// Define closure as variable first, then pass to constructor.
+					var fn = function(req) {
+						return {id = "t1", dataSource = "tenant_one_ds", config = {showDebugInformation = false}};
+					};
+					var mw = new wheels.middleware.TenantResolver(resolver = fn);
 
 					// The middleware sets the built-in request scope, not the argument.
 					// Use a shared struct to capture state inside the closure (CFML closure gotcha).
@@ -41,11 +42,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("does not set tenant when resolver returns empty struct", () => {
-					var mw = new wheels.middleware.TenantResolver(
-						resolver = function(req) {
-							return {};
-						}
-					);
+					var fn = function(req) {
+						return {};
+					};
+					var mw = new wheels.middleware.TenantResolver(resolver = fn);
 
 					var reqData = {cgi = {}};
 					var result = {hasTenant = false};
@@ -59,11 +59,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("does not set tenant when resolver returns struct without dataSource", () => {
-					var mw = new wheels.middleware.TenantResolver(
-						resolver = function(req) {
-							return {id = "t1"};
-						}
-					);
+					var fn = function(req) {
+						return {id = "t1"};
+					};
+					var mw = new wheels.middleware.TenantResolver(resolver = fn);
 
 					var reqData = {cgi = {}};
 					var result = {hasTenant = false};
@@ -77,11 +76,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("provides default id and config when not returned by resolver", () => {
-					var mw = new wheels.middleware.TenantResolver(
-						resolver = function(req) {
-							return {dataSource = "my_ds"};
-						}
-					);
+					var fn = function(req) {
+						return {dataSource = "my_ds"};
+					};
+					var mw = new wheels.middleware.TenantResolver(resolver = fn);
 
 					var reqData = {cgi = {}};
 					var result = {tenant = {}};
@@ -102,12 +100,13 @@ component extends="wheels.WheelsTest" {
 			describe("Header strategy", () => {
 
 				it("passes request to resolver when header is present", () => {
+					var fn = function(req) {
+						return {id = "from_header", dataSource = "header_ds"};
+					};
 					var mw = new wheels.middleware.TenantResolver(
 						strategy = "header",
 						headerName = "X-Tenant-ID",
-						resolver = function(req) {
-							return {id = "from_header", dataSource = "header_ds"};
-						}
+						resolver = fn
 					);
 
 					var reqData = {cgi = {http_x_tenant_id = "acme"}};
@@ -125,12 +124,13 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("returns empty when header is missing", () => {
+					var fn = function(req) {
+						return {id = "t1", dataSource = "ds1"};
+					};
 					var mw = new wheels.middleware.TenantResolver(
 						strategy = "header",
 						headerName = "X-Tenant-ID",
-						resolver = function(req) {
-							return {id = "t1", dataSource = "ds1"};
-						}
+						resolver = fn
 					);
 
 					var reqData = {cgi = {}};
@@ -148,11 +148,12 @@ component extends="wheels.WheelsTest" {
 			describe("Subdomain strategy", () => {
 
 				it("passes request to resolver when subdomain exists", () => {
+					var fn = function(req) {
+						return {id = "acme", dataSource = "acme_ds"};
+					};
 					var mw = new wheels.middleware.TenantResolver(
 						strategy = "subdomain",
-						resolver = function(req) {
-							return {id = "acme", dataSource = "acme_ds"};
-						}
+						resolver = fn
 					);
 
 					var reqData = {cgi = {server_name = "acme.example.com"}};
@@ -169,11 +170,12 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("returns empty when hostname has no subdomain", () => {
+					var fn = function(req) {
+						return {id = "t1", dataSource = "ds1"};
+					};
 					var mw = new wheels.middleware.TenantResolver(
 						strategy = "subdomain",
-						resolver = function(req) {
-							return {id = "t1", dataSource = "ds1"};
-						}
+						resolver = fn
 					);
 
 					var reqData = {cgi = {server_name = "example.com"}};
@@ -191,11 +193,10 @@ component extends="wheels.WheelsTest" {
 			describe("Cleanup", () => {
 
 				it("cleans up request.wheels.tenant after next() completes", () => {
-					var mw = new wheels.middleware.TenantResolver(
-						resolver = function(req) {
-							return {id = "t1", dataSource = "ds1"};
-						}
-					);
+					var fn = function(req) {
+						return {id = "t1", dataSource = "ds1"};
+					};
+					var mw = new wheels.middleware.TenantResolver(resolver = fn);
 
 					var reqData = {cgi = {}};
 
@@ -207,11 +208,10 @@ component extends="wheels.WheelsTest" {
 				});
 
 				it("cleans up request.wheels.tenant even when next() throws", () => {
-					var mw = new wheels.middleware.TenantResolver(
-						resolver = function(req) {
-							return {id = "t1", dataSource = "ds1"};
-						}
-					);
+					var fn = function(req) {
+						return {id = "t1", dataSource = "ds1"};
+					};
+					var mw = new wheels.middleware.TenantResolver(resolver = fn);
 
 					var reqData = {cgi = {}};
 					var result = {threw = false};
