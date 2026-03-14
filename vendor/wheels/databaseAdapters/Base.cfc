@@ -568,12 +568,12 @@ component output=false extends="wheels.Global"{
 	) {
 		// Multi-tenant datasource override: if a tenant is active and this model
 		// is not shared, route the query to the tenant's datasource.
+		// Use IsDefined() for safe nested scope traversal — StructKeyExists on
+		// the request scope can throw during app startup when request.wheels is absent.
 		if (
 			!variables.$sharedModel
 			&& arguments.dataSource == variables.dataSource
-			&& StructKeyExists(request, "wheels")
-			&& StructKeyExists(request.wheels, "tenant")
-			&& StructKeyExists(request.wheels.tenant, "dataSource")
+			&& IsDefined("request.wheels.tenant.dataSource")
 			&& Len(request.wheels.tenant.dataSource)
 		) {
 			arguments.dataSource = request.wheels.tenant.dataSource;

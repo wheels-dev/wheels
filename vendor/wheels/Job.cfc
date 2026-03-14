@@ -134,9 +134,7 @@ component {
 
 		// Capture tenant context so jobs run against the correct tenant datasource
 		if (
-			StructKeyExists(request, "wheels")
-			&& StructKeyExists(request.wheels, "tenant")
-			&& StructKeyExists(request.wheels.tenant, "dataSource")
+			IsDefined("request.wheels.tenant.dataSource")
 			&& Len(request.wheels.tenant.dataSource)
 		) {
 			arguments.data["$wheelsTenantContext"] = {

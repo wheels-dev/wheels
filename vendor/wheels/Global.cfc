@@ -425,11 +425,10 @@ component output="false" {
 	public any function $get(required string name, string functionName = "") {
 		// Multi-tenant config override: per-tenant settings take precedence
 		// over application-level settings (non-function settings only).
+		// Use IsDefined() for safe nested scope traversal during app startup.
 		if (
 			!Len(arguments.functionName)
-			&& StructKeyExists(request, "wheels")
-			&& StructKeyExists(request.wheels, "tenant")
-			&& StructKeyExists(request.wheels.tenant, "config")
+			&& IsDefined("request.wheels.tenant.config")
 			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
 		) {
 			return request.wheels.tenant.config[arguments.name];
@@ -477,10 +476,7 @@ component output="false" {
 	 * [category: Multi-Tenancy]
 	 */
 	public struct function tenant() {
-		if (
-			StructKeyExists(request, "wheels")
-			&& StructKeyExists(request.wheels, "tenant")
-		) {
+		if (IsDefined("request.wheels.tenant")) {
 			return request.wheels.tenant;
 		}
 		return {};
@@ -494,9 +490,7 @@ component output="false" {
 	 */
 	public string function $tenantDataSource() {
 		if (
-			StructKeyExists(request, "wheels")
-			&& StructKeyExists(request.wheels, "tenant")
-			&& StructKeyExists(request.wheels.tenant, "dataSource")
+			IsDefined("request.wheels.tenant.dataSource")
 			&& Len(request.wheels.tenant.dataSource)
 		) {
 			return request.wheels.tenant.dataSource;
@@ -527,7 +521,7 @@ component output="false" {
 		// Check if current tenant is locked
 		if (
 			!arguments.force
-			&& StructKeyExists(request.wheels, "tenant")
+			&& IsDefined("request.wheels.tenant")
 			&& StructKeyExists(request.wheels.tenant, "$locked")
 			&& request.wheels.tenant["$locked"]
 		) {

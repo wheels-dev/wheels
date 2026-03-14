@@ -5,7 +5,9 @@ component extends="wheels.WheelsTest" {
 		describe("TenantResolver Middleware", () => {
 
 			afterEach(() => {
-				StructDelete(request, "wheels");
+				if (StructKeyExists(request, "wheels")) {
+					StructDelete(request.wheels, "tenant");
+				}
 			});
 
 			describe("Custom strategy", () => {
@@ -18,21 +20,20 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {server_name: "example.com"}};
-					var called = false;
-					var capturedTenant = {};
+					var result = {called: false, tenant: {}};
 
 					mw.handle(req, function(r) {
-						called = true;
+						result.called = true;
 						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
-							capturedTenant = Duplicate(r.wheels.tenant);
+							result.tenant = Duplicate(r.wheels.tenant);
 						}
 						return "";
 					});
 
-					expect(called).toBeTrue();
-					expect(capturedTenant.id).toBe("t1");
-					expect(capturedTenant.dataSource).toBe("tenant_one_ds");
-					expect(capturedTenant["$locked"]).toBeTrue();
+					expect(result.called).toBeTrue();
+					expect(result.tenant.id).toBe("t1");
+					expect(result.tenant.dataSource).toBe("tenant_one_ds");
+					expect(result.tenant["$locked"]).toBeTrue();
 				});
 
 				it("does not set tenant when resolver returns empty struct", () => {
@@ -43,14 +44,14 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {}};
-					var hasTenant = false;
+					var result = {hasTenant: false};
 
 					mw.handle(req, function(r) {
-						hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
 						return "";
 					});
 
-					expect(hasTenant).toBeFalse();
+					expect(result.hasTenant).toBeFalse();
 				});
 
 				it("does not set tenant when resolver returns struct without dataSource", () => {
@@ -61,14 +62,14 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {}};
-					var hasTenant = false;
+					var result = {hasTenant: false};
 
 					mw.handle(req, function(r) {
-						hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
 						return "";
 					});
 
-					expect(hasTenant).toBeFalse();
+					expect(result.hasTenant).toBeFalse();
 				});
 
 				it("provides default id and config when not returned by resolver", () => {
@@ -79,16 +80,18 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {}};
-					var capturedTenant = {};
+					var result = {tenant: {}};
 
 					mw.handle(req, function(r) {
-						capturedTenant = Duplicate(r.wheels.tenant);
+						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
+							result.tenant = Duplicate(r.wheels.tenant);
+						}
 						return "";
 					});
 
-					expect(capturedTenant.id).toBe("");
-					expect(capturedTenant.config).toBeStruct();
-					expect(StructIsEmpty(capturedTenant.config)).toBeTrue();
+					expect(result.tenant.id).toBe("");
+					expect(result.tenant.config).toBeStruct();
+					expect(StructIsEmpty(result.tenant.config)).toBeTrue();
 				});
 			});
 
@@ -104,17 +107,17 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {http_x_tenant_id: "acme"}};
-					var capturedTenant = {};
+					var result = {tenant: {}};
 
 					mw.handle(req, function(r) {
-						if (StructKeyExists(r.wheels, "tenant")) {
-							capturedTenant = Duplicate(r.wheels.tenant);
+						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
+							result.tenant = Duplicate(r.wheels.tenant);
 						}
 						return "";
 					});
 
-					expect(capturedTenant.id).toBe("from_header");
-					expect(capturedTenant.dataSource).toBe("header_ds");
+					expect(result.tenant.id).toBe("from_header");
+					expect(result.tenant.dataSource).toBe("header_ds");
 				});
 
 				it("returns empty when header is missing", () => {
@@ -127,14 +130,14 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {}};
-					var hasTenant = false;
+					var result = {hasTenant: false};
 
 					mw.handle(req, function(r) {
-						hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
 						return "";
 					});
 
-					expect(hasTenant).toBeFalse();
+					expect(result.hasTenant).toBeFalse();
 				});
 			});
 
@@ -149,16 +152,16 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {server_name: "acme.example.com"}};
-					var capturedTenant = {};
+					var result = {tenant: {}};
 
 					mw.handle(req, function(r) {
-						if (StructKeyExists(r.wheels, "tenant")) {
-							capturedTenant = Duplicate(r.wheels.tenant);
+						if (StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant")) {
+							result.tenant = Duplicate(r.wheels.tenant);
 						}
 						return "";
 					});
 
-					expect(capturedTenant.id).toBe("acme");
+					expect(result.tenant.id).toBe("acme");
 				});
 
 				it("returns empty when hostname has no subdomain", () => {
@@ -170,14 +173,14 @@ component extends="wheels.WheelsTest" {
 					);
 
 					var req = {cgi: {server_name: "example.com"}};
-					var hasTenant = false;
+					var result = {hasTenant: false};
 
 					mw.handle(req, function(r) {
-						hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
+						result.hasTenant = StructKeyExists(r, "wheels") && StructKeyExists(r.wheels, "tenant");
 						return "";
 					});
 
-					expect(hasTenant).toBeFalse();
+					expect(result.hasTenant).toBeFalse();
 				});
 			});
 
@@ -209,17 +212,17 @@ component extends="wheels.WheelsTest" {
 
 					request.wheels = {};
 					var req = request;
-					var threw = false;
+					var result = {threw: false};
 
 					try {
 						mw.handle(req, function(r) {
 							throw(type="TestException", message="boom");
 						});
 					} catch (TestException e) {
-						threw = true;
+						result.threw = true;
 					}
 
-					expect(threw).toBeTrue();
+					expect(result.threw).toBeTrue();
 					expect(StructKeyExists(request.wheels, "tenant")).toBeFalse();
 				});
 			});
