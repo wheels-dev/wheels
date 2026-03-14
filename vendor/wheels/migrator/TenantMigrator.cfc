@@ -54,7 +54,7 @@ component {
 
 		// Resolve tenants from provider if no static list given
 		local.tenantList = arguments.tenants;
-		if (ArrayIsEmpty(local.tenantList) && StructKeyExists(arguments, "tenantProvider") && IsClosure(arguments.tenantProvider)) {
+		if (ArrayIsEmpty(local.tenantList) && StructKeyExists(arguments, "tenantProvider") && (IsCustomFunction(arguments.tenantProvider) || IsClosure(arguments.tenantProvider))) {
 			local.tenantList = arguments.tenantProvider();
 		}
 

@@ -37,7 +37,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		variables.strategy = arguments.strategy;
 		variables.headerName = arguments.headerName;
 
-		if (StructKeyExists(arguments, "resolver") && IsClosure(arguments.resolver)) {
+		if (StructKeyExists(arguments, "resolver") && (IsCustomFunction(arguments.resolver) || IsClosure(arguments.resolver))) {
 			variables.resolver = arguments.resolver;
 		} else {
 			variables.resolver = JavaCast("null", "");
