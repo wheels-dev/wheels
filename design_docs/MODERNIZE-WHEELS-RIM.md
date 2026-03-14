@@ -509,7 +509,7 @@ publish(channel="user.42", event="notification", data=SerializeJSON({
 
 **Implementation steps:**
 1. Create `wheels.Channel` module with in-memory pub/sub (suitable for single-server)
-2. Create `wheels.channel.DatabaseAdapter` for multi-server pub/sub via a `_wheels_events` table
+2. Create `wheels.channel.DatabaseAdapter` for multi-server pub/sub via a `wheels_events` table
 3. Add `subscribeToChannel()` controller method that wraps `initSSEStream()` with channel filtering
 4. Add global `publish()` function
 5. Ship `wheels-sse.js` client library for auto-reconnect and event handling

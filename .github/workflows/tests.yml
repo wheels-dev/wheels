@@ -63,7 +63,7 @@ jobs:
             -O ./.engine/${{ matrix.cfengine }}/WEB-INF/lib/ojdbc10.jar
 
       - name: Start CF engine
-        run: docker compose up -d ${{ matrix.cfengine }}
+        run: docker compose build --no-cache ${{ matrix.cfengine }} && docker compose up -d ${{ matrix.cfengine }}
 
       - name: Start all databases
         run: |

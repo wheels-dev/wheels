@@ -14,7 +14,7 @@
 			}
 	},
 	"app":{
-			"cfengine":"boxlang@^1.6.0",
+			"cfengine":"boxlang@1.11.0+48",
 			"libDirs":"tools/docker/boxlang/lib",
 			"serverHomeDirectory":".engine/boxlang"
 	},
