@@ -93,8 +93,8 @@ component extends="wheels.Global"{
 		local.info = $dbinfo(
 			type = "version",
 			datasource = local.dsName,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
+			username = application[local.appKey].dataSourceUserName,
+			password = application[local.appKey].dataSourcePassword
 		);
 		if (Right(local.sql, 1) neq ";" && !FindNoCase("Oracle", local.info.database_productname)) {
 			local.sql = local.sql &= ";";
@@ -126,9 +126,9 @@ component extends="wheels.Global"{
 		local.sql = Trim(arguments.sql);
 		local.info = $dbinfo(
 			type = "version",
-			datasource = application.wheels.dataSourceName,
-			username = application.wheels.dataSourceUserName,
-			password = application.wheels.dataSourcePassword
+			datasource = application[local.appKey].dataSourceName,
+			username = application[local.appKey].dataSourceUserName,
+			password = application[local.appKey].dataSourcePassword
 		);
 		if (Right(local.sql, 1) neq ";" && !FindNoCase("Oracle", local.info.database_productname)) {
 			local.sql = local.sql & ";";

@@ -21,17 +21,11 @@ component extends="wheels.WheelsTest" {
 				if (IsDefined("request.wheels.tenant")) {
 					StructDelete(request.wheels, "tenant");
 				}
-			});
 
-			afterEach(function() {
-				if (IsDefined("request.wheels.tenant")) {
-					StructDelete(request.wheels, "tenant");
-				}
-			});
-
-			it("sets up isolated tables in each datasource", function() {
-				// Create table in DS-A
+				// Create and seed tables fresh for every test
 				try { QueryExecute("DROP TABLE IF EXISTS mt_products", [], {datasource = dsA}); } catch (any e) {}
+				try { QueryExecute("DROP TABLE IF EXISTS mt_products", [], {datasource = dsB}); } catch (any e) {}
+
 				QueryExecute("
 					CREATE TABLE mt_products (
 						id INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,8 +36,6 @@ component extends="wheels.WheelsTest" {
 					)
 				", [], {datasource = dsA});
 
-				// Create same table in DS-B
-				try { QueryExecute("DROP TABLE IF EXISTS mt_products", [], {datasource = dsB}); } catch (any e) {}
 				QueryExecute("
 					CREATE TABLE mt_products (
 						id INT AUTO_INCREMENT PRIMARY KEY,
@@ -54,13 +46,20 @@ component extends="wheels.WheelsTest" {
 					)
 				", [], {datasource = dsB});
 
-				// Seed different data in each
 				QueryExecute("INSERT INTO mt_products (name, price) VALUES ('Widget-A', 10.00)", [], {datasource = dsA});
 				QueryExecute("INSERT INTO mt_products (name, price) VALUES ('Widget-A2', 15.00)", [], {datasource = dsA});
-
 				QueryExecute("INSERT INTO mt_products (name, price) VALUES ('Gadget-B', 20.00)", [], {datasource = dsB});
+			});
 
-				// Verify isolation via direct SQL
+			afterEach(function() {
+				if (IsDefined("request.wheels.tenant")) {
+					StructDelete(request.wheels, "tenant");
+				}
+				try { QueryExecute("DROP TABLE IF EXISTS mt_products", [], {datasource = dsA}); } catch (any e) {}
+				try { QueryExecute("DROP TABLE IF EXISTS mt_products", [], {datasource = dsB}); } catch (any e) {}
+			});
+
+			it("sets up isolated tables in each datasource", function() {
 				var countA = QueryExecute("SELECT COUNT(*) AS cnt FROM mt_products", [], {datasource = dsA});
 				var countB = QueryExecute("SELECT COUNT(*) AS cnt FROM mt_products", [], {datasource = dsB});
 
@@ -117,7 +116,9 @@ component extends="wheels.WheelsTest" {
 				var tenantDsB = dsB;
 				var resolver = function(req) {
 					var tenantId = "";
-					if (StructKeyExists(req, "cgi") && StructKeyExists(req.cgi, "http_x_tenant_id")) {
+					if (StructKeyExists(req, "$tenantHeaderValue")) {
+						tenantId = req.$tenantHeaderValue;
+					} else if (StructKeyExists(req, "cgi") && StructKeyExists(req.cgi, "http_x_tenant_id")) {
 						tenantId = req.cgi.http_x_tenant_id;
 					}
 					if (tenantId == "tenant_a") return {id = "tenant_a", dataSource = tenantDsA};
@@ -210,10 +211,20 @@ component extends="wheels.WheelsTest" {
 				expect(val).toBe("Tenant A App");
 			});
 
-			it("cleans up test tables", function() {
-				try { QueryExecute("DROP TABLE IF EXISTS mt_products", [], {datasource = dsA}); } catch (any e) {}
-				try { QueryExecute("DROP TABLE IF EXISTS mt_products", [], {datasource = dsB}); } catch (any e) {}
-				expect(true).toBeTrue();
+			it("per-tenant config cannot override security-sensitive settings", function() {
+				request.wheels.tenant = {
+					id = "tenant_a",
+					dataSource = dsA,
+					config = {encryptionAlgorithm = "none", reloadPassword = "hacked"},
+					"$locked" = true
+				};
+
+				// These should return the application-level values, not the tenant overrides
+				var algo = application.wo.$get("encryptionAlgorithm");
+				expect(algo).notToBe("none");
+
+				var pwd = application.wo.$get("reloadPassword");
+				expect(pwd).notToBe("hacked");
 			});
 
 		});

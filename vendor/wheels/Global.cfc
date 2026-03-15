@@ -425,11 +425,13 @@ component output="false" {
 	public any function $get(required string name, string functionName = "") {
 		// Multi-tenant config override: per-tenant settings take precedence
 		// over application-level settings (non-function settings only).
+		// Security-sensitive settings cannot be overridden per-tenant.
 		// Use IsDefined() for safe nested scope traversal during app startup.
 		if (
 			!Len(arguments.functionName)
 			&& IsDefined("request.wheels.tenant.config")
 			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
+			&& !ListFindNoCase("encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls", arguments.name)
 		) {
 			return request.wheels.tenant.config[arguments.name];
 		}

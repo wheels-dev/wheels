@@ -21,15 +21,17 @@ Delegates entirely to the resolver closure. If no resolver is provided, returns 
 1. Normalizes `headerName` to CGI format: `X-Tenant-ID` → `http_x_tenant_id`
 2. Reads from `request.cgi[headerKey]` or falls back to `cgi[headerKey]`
 3. If empty, returns `{}`
-4. If resolver provided, calls `resolver(request)` and returns result
-5. Without resolver, returns `{}` (header alone is not enough — no datasource)
+4. Sets `request.$tenantHeaderValue` to the extracted value (available to resolver)
+5. If resolver provided, calls `resolver(request)` and returns result
+6. Without resolver, returns `{}` (header alone is not enough — no datasource)
 
 ### Subdomain
 1. Reads `server_name` from `request.cgi` or `cgi` scope
 2. If fewer than 3 domain segments, returns `{}` (e.g., `myapp.com` has no subdomain)
 3. Extracts first segment: `acme.myapp.com` → `"acme"`
-4. If resolver provided, calls `resolver(request)` and returns result
-5. Without resolver, returns `{}`
+4. Sets `request.$tenantSubdomain` to the extracted value (available to resolver)
+5. If resolver provided, calls `resolver(request)` and returns result
+6. Without resolver, returns `{}`
 
 ## Method Inventory
 
@@ -92,7 +94,8 @@ new wheels.middleware.TenantResolver(
 new wheels.middleware.TenantResolver(
     strategy = "subdomain",
     resolver = function(req) {
-        var slug = ListFirst(cgi.server_name, ".");
+        // req.$tenantSubdomain is pre-populated by the strategy
+        var slug = req.$tenantSubdomain;
         var t = model("Tenant").findOne(where="slug='#slug#'");
         if (IsObject(t)) return {id: t.id, dataSource: t.dsName};
         return {};

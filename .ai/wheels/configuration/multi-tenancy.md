@@ -149,6 +149,8 @@ return {
 
 Any call to `get("appName")` during that request returns the tenant-specific value instead of the application default. Function-scoped settings (e.g., `get(name="x", functionName="findAll")`) are not overridden.
 
+**Security denylist**: The following settings cannot be overridden per-tenant: `encryptionAlgorithm`, `encryptionSecretKey`, `encryptionEncoding`, `CSRFProtection`, `csrfStore`, `reloadPassword`, `obfuscateUrls`. Attempts to override these are silently ignored.
+
 ## Accessing Tenant Context
 
 ### `tenant()`

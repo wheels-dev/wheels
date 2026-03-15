@@ -119,7 +119,8 @@ set(middleware = [
     new wheels.middleware.TenantResolver(
         strategy = "subdomain",
         resolver = function(req) {
-            var slug = ListFirst(cgi.server_name, ".");
+            // req.$tenantSubdomain is pre-populated by the strategy
+            var slug = req.$tenantSubdomain;
             var t = model("Tenant").findOne(where="slug='#slug#'");
             if (IsObject(t)) return {id: t.id, dataSource: t.dsName};
             return {};
@@ -130,6 +131,10 @@ set(middleware = [
 {% endcode %}
 
 **Use when:** Each tenant has a unique subdomain (e.g., `acme.myapp.com`, `globex.myapp.com`).
+
+{% hint style="info" %}
+Both the header and subdomain strategies pre-populate the extracted value on the request struct before calling your resolver: `req.$tenantHeaderValue` for header strategy, `req.$tenantSubdomain` for subdomain strategy. This saves you from re-extracting the value yourself.
+{% endhint %}
 
 ## Shared Models
 
@@ -236,6 +241,10 @@ return {
 ```
 
 Any call to `get("appName")` during that request returns the tenant's value instead of the application default. This works for any non-function-scoped setting.
+
+{% hint style="warning" %}
+**Security-sensitive settings cannot be overridden per-tenant.** The following settings are protected: `encryptionAlgorithm`, `encryptionSecretKey`, `encryptionEncoding`, `CSRFProtection`, `csrfStore`, `reloadPassword`, `obfuscateUrls`. Attempts to override these via tenant config are silently ignored.
+{% endhint %}
 
 ## Multi-Tenant Migrations
 

@@ -66,6 +66,11 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 			// Lock the tenant to prevent mid-request switching
 			local.tenant["$locked"] = true;
 
+			// Ensure request.wheels exists (ACF won't auto-create nested keys)
+			if (!StructKeyExists(request, "wheels")) {
+				request.wheels = {};
+			}
+
 			// Set on the built-in request scope (where $performQuery reads it)
 			request.wheels.tenant = local.tenant;
 		}
@@ -116,6 +121,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 
 		local.subdomain = ListFirst(local.serverName, ".");
 
+		// Expose the extracted subdomain so the resolver can use it
+		arguments.request.$tenantSubdomain = local.subdomain;
+
 		// If a custom resolver is provided, pass the request to it
 		if (!IsSimpleValue(variables.resolver)) {
 			return variables.resolver(arguments.request);
@@ -147,6 +155,9 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		if (!Len(local.headerValue)) {
 			return {};
 		}
+
+		// Expose the extracted header value so the resolver can use it
+		arguments.request.$tenantHeaderValue = local.headerValue;
 
 		// If a custom resolver is provided, pass the request to it
 		if (!IsSimpleValue(variables.resolver)) {

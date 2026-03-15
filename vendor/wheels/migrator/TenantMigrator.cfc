@@ -115,19 +115,23 @@ component {
 	/**
 	 * Create a migrator instance configured for a specific datasource.
 	 * Temporarily overrides the application datasource for the migration run.
+	 * Uses cflock to prevent race conditions when multiple threads migrate concurrently.
 	 */
 	private any function $createMigrator(required string dataSource) {
 		local.appKey = "wheels";
-		local.originalDS = application[local.appKey].dataSourceName;
 
-		// Temporarily set the application datasource to the tenant's
-		application[local.appKey].dataSourceName = arguments.dataSource;
+		lock name="wheels_tenant_migrator" type="exclusive" timeout="30" {
+			local.originalDS = application[local.appKey].dataSourceName;
 
-		try {
-			local.migrator = new wheels.migrator.Migrator();
-		} finally {
-			// Restore original datasource
-			application[local.appKey].dataSourceName = local.originalDS;
+			// Temporarily set the application datasource to the tenant's
+			application[local.appKey].dataSourceName = arguments.dataSource;
+
+			try {
+				local.migrator = new wheels.migrator.Migrator();
+			} finally {
+				// Restore original datasource
+				application[local.appKey].dataSourceName = local.originalDS;
+			}
 		}
 
 		return local.migrator;
