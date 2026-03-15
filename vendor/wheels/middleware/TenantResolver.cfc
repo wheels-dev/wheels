@@ -30,18 +30,13 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * @headerName HTTP header to read tenant ID from when strategy is "header".
 	 */
 	public TenantResolver function init(
-		any resolver,
+		any resolver = "",
 		string strategy = "custom",
 		string headerName = "X-Tenant-ID"
 	) {
 		variables.strategy = arguments.strategy;
 		variables.headerName = arguments.headerName;
-
-		if (StructKeyExists(arguments, "resolver") && (IsCustomFunction(arguments.resolver) || IsClosure(arguments.resolver))) {
-			variables.resolver = arguments.resolver;
-		} else {
-			variables.resolver = JavaCast("null", "");
-		}
+		variables.resolver = arguments.resolver;
 
 		return this;
 	}
@@ -122,7 +117,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		local.subdomain = ListFirst(local.serverName, ".");
 
 		// If a custom resolver is provided, pass the request to it
-		if (!IsNull(variables.resolver)) {
+		if (IsCustomFunction(variables.resolver) || IsClosure(variables.resolver)) {
 			return variables.resolver(arguments.request);
 		}
 
@@ -154,7 +149,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		// If a custom resolver is provided, pass the request to it
-		if (!IsNull(variables.resolver)) {
+		if (IsCustomFunction(variables.resolver) || IsClosure(variables.resolver)) {
 			return variables.resolver(arguments.request);
 		}
 
@@ -165,7 +160,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Delegate entirely to the user-provided resolver closure.
 	 */
 	private struct function $resolveFromCustom(required struct request) {
-		if (!IsNull(variables.resolver)) {
+		if (IsCustomFunction(variables.resolver) || IsClosure(variables.resolver)) {
 			local.result = variables.resolver(arguments.request);
 			if (IsStruct(local.result)) {
 				return local.result;
