@@ -18,18 +18,19 @@ component extends="wheels.WheelsTest" {
 						return {id = "t1", dataSource = "tenant_one_ds", config = {showDebugInformation = false}};
 					};
 					var mw = new wheels.middleware.TenantResolver(resolver = fn);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {server_name = "example.com"}};
 					var result = {called = false, tenant = {}};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						result.called = true;
 						if (IsDefined("request.wheels.tenant")) {
 							result.tenant = StructCopy(request.wheels.tenant);
 						}
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.called).toBeTrue();
 					expect(result.tenant.id).toBe("t1");
@@ -42,15 +43,16 @@ component extends="wheels.WheelsTest" {
 						return {};
 					};
 					var mw = new wheels.middleware.TenantResolver(resolver = fn);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {}};
 					var result = {hasTenant = false};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.hasTenant).toBeFalse();
 				});
@@ -60,15 +62,16 @@ component extends="wheels.WheelsTest" {
 						return {id = "t1"};
 					};
 					var mw = new wheels.middleware.TenantResolver(resolver = fn);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {}};
 					var result = {hasTenant = false};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.hasTenant).toBeFalse();
 				});
@@ -78,17 +81,18 @@ component extends="wheels.WheelsTest" {
 						return {dataSource = "my_ds"};
 					};
 					var mw = new wheels.middleware.TenantResolver(resolver = fn);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {}};
 					var result = {tenant = {}};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						if (IsDefined("request.wheels.tenant")) {
 							result.tenant = StructCopy(request.wheels.tenant);
 						}
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.tenant.id).toBe("");
 					expect(result.tenant.config).toBeStruct();
@@ -107,17 +111,18 @@ component extends="wheels.WheelsTest" {
 						headerName = "X-Tenant-ID",
 						resolver = fn
 					);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {http_x_tenant_id = "acme"}};
 					var result = {tenant = {}};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						if (IsDefined("request.wheels.tenant")) {
 							result.tenant = StructCopy(request.wheels.tenant);
 						}
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.tenant.id).toBe("from_header");
 					expect(result.tenant.dataSource).toBe("header_ds");
@@ -132,15 +137,16 @@ component extends="wheels.WheelsTest" {
 						headerName = "X-Tenant-ID",
 						resolver = fn
 					);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {}};
 					var result = {hasTenant = false};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.hasTenant).toBeFalse();
 				});
@@ -156,17 +162,18 @@ component extends="wheels.WheelsTest" {
 						strategy = "subdomain",
 						resolver = fn
 					);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {server_name = "acme.example.com"}};
 					var result = {tenant = {}};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						if (IsDefined("request.wheels.tenant")) {
 							result.tenant = StructCopy(request.wheels.tenant);
 						}
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.tenant.id).toBe("acme");
 				});
@@ -179,15 +186,16 @@ component extends="wheels.WheelsTest" {
 						strategy = "subdomain",
 						resolver = fn
 					);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {server_name = "example.com"}};
 					var result = {hasTenant = false};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						result.hasTenant = IsDefined("request.wheels.tenant");
-						return "";
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(result.hasTenant).toBeFalse();
 				});
@@ -200,13 +208,14 @@ component extends="wheels.WheelsTest" {
 						return {id = "t1", dataSource = "ds1"};
 					};
 					var mw = new wheels.middleware.TenantResolver(resolver = fn);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {}};
 
-					var nextFn = function(r) {
-						return "";
+					var handler = function(required struct request) {
+						return "ok";
 					};
-					mw.handle(request = reqData, next = nextFn);
+					pipeline.run(request = reqData, coreHandler = handler);
 
 					expect(IsDefined("request.wheels.tenant")).toBeFalse();
 				});
@@ -216,16 +225,17 @@ component extends="wheels.WheelsTest" {
 						return {id = "t1", dataSource = "ds1"};
 					};
 					var mw = new wheels.middleware.TenantResolver(resolver = fn);
+					var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
 					var reqData = {cgi = {}};
 					var result = {threw = false};
 
-					var nextFn = function(r) {
+					var handler = function(required struct request) {
 						throw(type="TestException", message="boom");
 					};
 
 					try {
-						mw.handle(request = reqData, next = nextFn);
+						pipeline.run(request = reqData, coreHandler = handler);
 					} catch (TestException e) {
 						result.threw = true;
 					}
