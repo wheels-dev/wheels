@@ -216,16 +216,18 @@ component extends="wheels.WheelsTest" {
 				request.wheels.tenant = {
 					id = "tenant_a",
 					dataSource = dsA,
-					config = {encryptionAlgorithm = "none", reloadPassword = "hacked"},
+					config = {
+						appName = "Tenant Override",
+						reloadPassword = "hacked"
+					},
 					"$locked" = true
 				};
 
-				// These should return the application-level values, not the tenant overrides
-				var algo = application.wo.$get("encryptionAlgorithm");
-				expect(algo).notToBe("none");
+				// Non-denylisted setting should be overridden
+				expect(application.wo.$get("appName")).toBe("Tenant Override");
 
-				var pwd = application.wo.$get("reloadPassword");
-				expect(pwd).notToBe("hacked");
+				// Denylisted setting should be ignored — returns app-level value
+				expect(application.wo.$get("reloadPassword")).notToBe("hacked");
 			});
 
 		});
