@@ -5,13 +5,26 @@
  *   - wheelstestdb_h2          (default / "tenant A")
  *   - wheelstestdb_h2_tenant_b ("tenant B")
  *
- * Both are configured in tools/docker/lucee7/CFConfig.json.
+ * Both are configured in tools/docker/*/CFConfig.json.
+ * Skipped on engines where H2 datasources are not functional (e.g. Adobe CF, BoxLang).
  */
 component extends="wheels.WheelsTest" {
 
+	private boolean function $h2Available() {
+		try {
+			QueryExecute("SELECT 1", [], {datasource = "wheelstestdb_h2"});
+			QueryExecute("SELECT 1", [], {datasource = "wheelstestdb_h2_tenant_b"});
+			return true;
+		} catch (any e) {
+			return false;
+		}
+	}
+
 	function run() {
 
-		describe("Multi-Tenant Integration (real databases)", function() {
+		var h2Works = $h2Available();
+
+		describe(title="Multi-Tenant Integration (real databases)", body=function() {
 
 			var dsA = "wheelstestdb_h2";
 			var dsB = "wheelstestdb_h2_tenant_b";
@@ -230,7 +243,7 @@ component extends="wheels.WheelsTest" {
 				expect(application.wo.$get("reloadPassword")).notToBe("hacked");
 			});
 
-		});
+		}, skip=(!h2Works));
 	}
 
 }
