@@ -126,6 +126,17 @@
 			"host":"",
 			"password":"",
 			"username":""
+		},
+		"wheelstestdb_sqlite_tenant_b":{
+			"blob":"false",
+			"class":"org.sqlite.JDBC",
+			"clob":"false",
+			"database":"wheelstestdb_tenant_b",
+			"dbdriver":"Other",
+			"dsn":"jdbc:sqlite:/app/wheelstestdb_tenant_b.db",
+			"host":"",
+			"password":"",
+			"username":""
 		}
 	}
 }

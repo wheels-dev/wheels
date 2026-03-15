@@ -1,33 +1,20 @@
 /**
  * Integration test: verifies multi-tenant datasource switching with real databases.
  *
- * Requires two H2 datasources:
- *   - wheelstestdb_h2          (default / "tenant A")
- *   - wheelstestdb_h2_tenant_b ("tenant B")
+ * Requires two SQLite datasources:
+ *   - wheelstestdb_sqlite          (default / "tenant A")
+ *   - wheelstestdb_sqlite_tenant_b ("tenant B")
  *
  * Both are configured in tools/docker/*/CFConfig.json.
- * Skipped on engines where H2 datasources are not functional (e.g. Adobe CF, BoxLang).
  */
 component extends="wheels.WheelsTest" {
 
-	private boolean function $h2Available() {
-		try {
-			QueryExecute("SELECT 1", [], {datasource = "wheelstestdb_h2"});
-			QueryExecute("SELECT 1", [], {datasource = "wheelstestdb_h2_tenant_b"});
-			return true;
-		} catch (any e) {
-			return false;
-		}
-	}
-
 	function run() {
 
-		var h2Works = $h2Available();
+		describe("Multi-Tenant Integration (real databases)", function() {
 
-		describe(title="Multi-Tenant Integration (real databases)", body=function() {
-
-			var dsA = "wheelstestdb_h2";
-			var dsB = "wheelstestdb_h2_tenant_b";
+			var dsA = "wheelstestdb_sqlite";
+			var dsB = "wheelstestdb_sqlite_tenant_b";
 
 			beforeEach(function() {
 				// Ensure clean tenant state
@@ -41,7 +28,7 @@ component extends="wheels.WheelsTest" {
 
 				QueryExecute("
 					CREATE TABLE mt_products (
-						id INT AUTO_INCREMENT PRIMARY KEY,
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
 						name VARCHAR(100) NOT NULL,
 						price DECIMAL(10,2) NOT NULL DEFAULT 0,
 						createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -51,7 +38,7 @@ component extends="wheels.WheelsTest" {
 
 				QueryExecute("
 					CREATE TABLE mt_products (
-						id INT AUTO_INCREMENT PRIMARY KEY,
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
 						name VARCHAR(100) NOT NULL,
 						price DECIMAL(10,2) NOT NULL DEFAULT 0,
 						createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -243,7 +230,7 @@ component extends="wheels.WheelsTest" {
 				expect(application.wo.$get("reloadPassword")).notToBe("hacked");
 			});
 
-		}, skip=(!h2Works));
+		});
 	}
 
 }

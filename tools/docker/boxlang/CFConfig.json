@@ -80,16 +80,6 @@
 			"clob":true,
 			"blob":true
 		},
-		"wheelstestdb_h2_tenant_b": {
-			"class":"org.h2.Driver",
-			"dbdriver":"H2",
-			"custom":"mode=MySQL&path=./db/",
-			"database":"wheelstestdb_tenant_b",
-			"dsn":"jdbc:h2:{path}{database};MODE={mode}",
-			"allow":"511",
-			"clob":true,
-			"blob":true
-		},
 		"wheelstestdb_oracle": {
 			"blob": "false",
 			"class": "oracle.jdbc.OracleDriver",
@@ -109,6 +99,17 @@
 			"database":"wheelstestdb",
 			"dbdriver":"Other",
 			"dsn":"jdbc:sqlite:/app/wheelstestdb.db",
+			"host":"",
+			"password":"",
+			"username":""
+		},
+		"wheelstestdb_sqlite_tenant_b":{
+			"blob":false,
+			"class":"org.sqlite.JDBC",
+			"clob":false,
+			"database":"wheelstestdb_tenant_b",
+			"dbdriver":"Other",
+			"dsn":"jdbc:sqlite:/app/wheelstestdb_tenant_b.db",
 			"host":"",
 			"password":"",
 			"username":""
