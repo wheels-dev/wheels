@@ -23,6 +23,7 @@ Dispatch.$request()
 | `vendor/wheels/middleware/RequestId.cfc` | Adds `X-Request-Id` header + `request.wheels.requestId` |
 | `vendor/wheels/middleware/Cors.cfc` | CORS headers + OPTIONS preflight |
 | `vendor/wheels/middleware/SecurityHeaders.cfc` | OWASP security headers |
+| `vendor/wheels/middleware/TenantResolver.cfc` | Multi-tenant resolution + datasource switching |
 | `vendor/wheels/Dispatch.cfc` | `$buildMiddlewarePipeline()`, `$getRouteMiddleware()`, modified `$request()` |
 | `vendor/wheels/mapper/scoping.cfc` | `middleware` param on `scope()`, parent-child merging |
 | `vendor/wheels/mapper/matching.cfc` | Copies `middleware` from scope stack to matched route |
@@ -131,3 +132,10 @@ Middleware can add arbitrary keys (e.g., `request.currentUser`) for downstream a
 - `referrerPolicy` (default `"strict-origin-when-cross-origin"`)
 - Set any to `""` to disable that header
 - Runs after `next()` (post-processing pattern)
+
+### TenantResolver
+- `resolver` — closure(request) => struct `{id, dataSource, config}`; return `{}` for no-op
+- `strategy` (default `"custom"`) — `"custom"`, `"header"`, or `"subdomain"`
+- `headerName` (default `"X-Tenant-ID"`) — header to read when strategy is `"header"`
+- Sets `request.wheels.tenant` with `$locked=true`; cleaned up in `finally` block
+- See [Multi-Tenancy Configuration](../configuration/multi-tenancy.md) and [TenantResolver Reference](tenant-resolver.md)

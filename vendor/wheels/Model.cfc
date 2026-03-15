@@ -106,6 +106,11 @@ component output="false" displayName="Model" extends="wheels.Global"{
 			// load the database adapter
 			variables.wheels.class.adapter = $assignAdapter();
 
+			// Propagate sharedModel flag to the adapter so it can bypass tenant datasource overrides
+			if (StructKeyExists(variables.wheels.class, "sharedModel") && variables.wheels.class.sharedModel) {
+				variables.wheels.class.adapter.$setSharedModel(true);
+			}
+
 			// get columns for the table
 			local.columns = variables.wheels.class.adapter.$getColumns(tableName()).filter(function(r) {
 				return !StructKeyExists(variables.wheels.class.ignoredColumns, arguments.r.column_name);

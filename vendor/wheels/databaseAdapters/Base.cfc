@@ -128,7 +128,26 @@ component output=false extends="wheels.Global"{
 		variables.dataSource = arguments.dataSource;
 		variables.username = arguments.username;
 		variables.password = arguments.password;
+		variables.$sharedModel = false;
 		return this;
+	}
+
+	/**
+	 * Mark this adapter's model as shared (immune to tenant datasource overrides).
+	 * Shared models always use the default application datasource.
+	 *
+	 * [section: Model Configuration]
+	 * [category: Multi-Tenancy]
+	 */
+	public void function $setSharedModel(required boolean flag) {
+		variables.$sharedModel = arguments.flag;
+	}
+
+	/**
+	 * Returns whether this adapter's model is shared.
+	 */
+	public boolean function $isSharedModel() {
+		return variables.$sharedModel;
 	}
 
 	/**
@@ -547,6 +566,19 @@ component output=false extends="wheels.Global"{
 		string $primaryKey = "",
 		string $debugName = "query"
 	) {
+		// Multi-tenant datasource override: if a tenant is active and this model
+		// is not shared, route the query to the tenant's datasource.
+		// Use IsDefined() for safe nested scope traversal — StructKeyExists on
+		// the request scope can throw during app startup when request.wheels is absent.
+		if (
+			!variables.$sharedModel
+			&& arguments.dataSource == variables.dataSource
+			&& IsDefined("request.wheels.tenant.dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
+			arguments.dataSource = request.wheels.tenant.dataSource;
+		}
+
 		local.queryAttributes = {};
 		local.queryAttributes.dataSource = arguments.dataSource;
 		local.queryAttributes.username = variables.username;

@@ -131,6 +131,19 @@ component {
 		required date runAt
 	) {
 		local.id = CreateUUID();
+
+		// Capture tenant context so jobs run against the correct tenant datasource
+		if (
+			IsDefined("request.wheels.tenant.dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
+			arguments.data["$wheelsTenantContext"] = {
+				id = StructKeyExists(request.wheels.tenant, "id") ? request.wheels.tenant.id : "",
+				dataSource = request.wheels.tenant.dataSource,
+				config = StructKeyExists(request.wheels.tenant, "config") ? request.wheels.tenant.config : {}
+			};
+		}
+
 		local.serializedData = SerializeJSON(arguments.data);
 		local.now = $now();
 
@@ -260,6 +273,26 @@ component {
 			// Instantiate and execute the job
 			local.jobInstance = CreateObject("component", arguments.jobRow.jobClass);
 			local.jobData = DeserializeJSON(arguments.jobRow.data);
+
+			// Restore tenant context if the job was enqueued within a tenant scope
+			local.hasTenantContext = false;
+			if (StructKeyExists(local.jobData, "$wheelsTenantContext") && IsStruct(local.jobData["$wheelsTenantContext"])) {
+				local.tenantCtx = local.jobData["$wheelsTenantContext"];
+				if (StructKeyExists(local.tenantCtx, "dataSource") && Len(local.tenantCtx.dataSource)) {
+					if (!StructKeyExists(request, "wheels")) {
+						request.wheels = {};
+					}
+					request.wheels.tenant = {
+						id = StructKeyExists(local.tenantCtx, "id") ? local.tenantCtx.id : "",
+						dataSource = local.tenantCtx.dataSource,
+						config = StructKeyExists(local.tenantCtx, "config") ? local.tenantCtx.config : {}
+					};
+					local.hasTenantContext = true;
+				}
+				// Remove internal key before passing data to perform()
+				StructDelete(local.jobData, "$wheelsTenantContext");
+			}
+
 			local.jobInstance.perform(data = local.jobData);
 
 			// Mark as completed
@@ -340,6 +373,11 @@ component {
 			}
 
 			local.result.error = "Job #arguments.jobRow.id# (#arguments.jobRow.jobClass#): #e.message#";
+		}
+
+		// Clean up tenant context after job execution
+		if (local.hasTenantContext && StructKeyExists(request, "wheels")) {
+			StructDelete(request.wheels, "tenant");
 		}
 
 		return local.result;

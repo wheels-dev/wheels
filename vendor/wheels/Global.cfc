@@ -423,6 +423,18 @@ component output="false" {
 	 * Called from get().
 	 */
 	public any function $get(required string name, string functionName = "") {
+		// Multi-tenant config override: per-tenant settings take precedence
+		// over application-level settings (non-function settings only).
+		// Security-sensitive settings cannot be overridden per-tenant.
+		// Use IsDefined() for safe nested scope traversal during app startup.
+		if (
+			!Len(arguments.functionName)
+			&& IsDefined("request.wheels.tenant.config")
+			&& StructKeyExists(request.wheels.tenant.config, arguments.name)
+			&& !ListFindNoCase("encryptionAlgorithm,encryptionSecretKey,encryptionEncoding,CSRFProtection,csrfStore,reloadPassword,obfuscateUrls", arguments.name)
+		) {
+			return request.wheels.tenant.config[arguments.name];
+		}
 		local.appKey = $appKey();
 		if (Len(arguments.functionName)) {
 			local.rv = application[local.appKey].functions[arguments.functionName][arguments.name];
@@ -452,6 +464,83 @@ component output="false" {
 		} else {
 			application[local.appKey][StructKeyList(arguments)] = arguments[1];
 		}
+	}
+
+	// ======================================================================
+	// MULTI-TENANCY FUNCTIONS
+	// ======================================================================
+
+	/**
+	 * Returns the current tenant struct, or an empty struct if no tenant is active.
+	 * The tenant struct contains: `id`, `dataSource`, `config`, and `$locked`.
+	 *
+	 * [section: Configuration]
+	 * [category: Multi-Tenancy]
+	 */
+	public struct function tenant() {
+		if (IsDefined("request.wheels.tenant")) {
+			return request.wheels.tenant;
+		}
+		return {};
+	}
+
+	/**
+	 * Returns the current tenant's datasource name, or the application default if no tenant is active.
+	 *
+	 * [section: Configuration]
+	 * [category: Multi-Tenancy]
+	 */
+	public string function $tenantDataSource() {
+		if (
+			IsDefined("request.wheels.tenant.dataSource")
+			&& Len(request.wheels.tenant.dataSource)
+		) {
+			return request.wheels.tenant.dataSource;
+		}
+		return $get("dataSourceName");
+	}
+
+	/**
+	 * Switches the active tenant mid-request. Throws if the current tenant is locked
+	 * (set by TenantResolver middleware) unless `force` is true.
+	 *
+	 * [section: Configuration]
+	 * [category: Multi-Tenancy]
+	 *
+	 * @tenant Struct with at minimum a `dataSource` key. Optional: `id`, `config`.
+	 * @force If true, overrides the lock set by TenantResolver middleware.
+	 */
+	public void function switchTenant(required struct tenant, boolean force = false) {
+		if (!StructKeyExists(arguments.tenant, "dataSource") || !Len(arguments.tenant.dataSource)) {
+			Throw(
+				type = "Wheels.InvalidTenant",
+				message = "The tenant struct must contain a non-empty `dataSource` key."
+			);
+		}
+		if (!StructKeyExists(request, "wheels")) {
+			request.wheels = {};
+		}
+		// Check if current tenant is locked
+		if (
+			!arguments.force
+			&& IsDefined("request.wheels.tenant")
+			&& StructKeyExists(request.wheels.tenant, "$locked")
+			&& request.wheels.tenant["$locked"]
+		) {
+			Throw(
+				type = "Wheels.TenantLocked",
+				message = "Cannot switch tenants mid-request. The current tenant was set by middleware and is locked.",
+				extendedInfo = "Use `switchTenant(tenant={...}, force=true)` to override, or remove the lock in your middleware configuration."
+			);
+		}
+		// Set defaults
+		if (!StructKeyExists(arguments.tenant, "id")) {
+			arguments.tenant.id = "";
+		}
+		if (!StructKeyExists(arguments.tenant, "config")) {
+			arguments.tenant.config = {};
+		}
+		request.wheels.tenant = arguments.tenant;
 	}
 
 	// ======================================================================
