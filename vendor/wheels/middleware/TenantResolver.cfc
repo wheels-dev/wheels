@@ -117,7 +117,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		local.subdomain = ListFirst(local.serverName, ".");
 
 		// If a custom resolver is provided, pass the request to it
-		if (IsCustomFunction(variables.resolver) || IsClosure(variables.resolver)) {
+		if (!IsSimpleValue(variables.resolver)) {
 			return variables.resolver(arguments.request);
 		}
 
@@ -149,7 +149,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 		}
 
 		// If a custom resolver is provided, pass the request to it
-		if (IsCustomFunction(variables.resolver) || IsClosure(variables.resolver)) {
+		if (!IsSimpleValue(variables.resolver)) {
 			return variables.resolver(arguments.request);
 		}
 
@@ -160,7 +160,7 @@ component implements="wheels.middleware.MiddlewareInterface" output="false" {
 	 * Delegate entirely to the user-provided resolver closure.
 	 */
 	private struct function $resolveFromCustom(required struct request) {
-		if (IsCustomFunction(variables.resolver) || IsClosure(variables.resolver)) {
+		if (!IsSimpleValue(variables.resolver)) {
 			local.result = variables.resolver(arguments.request);
 			if (IsStruct(local.result)) {
 				return local.result;
