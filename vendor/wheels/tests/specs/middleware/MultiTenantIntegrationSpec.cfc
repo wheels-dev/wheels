@@ -171,12 +171,13 @@ component extends="wheels.WheelsTest" {
 			});
 
 			it("no tenant header means no tenant context is set", function() {
+				var resolverFn = function(req) {
+					return {id = "x", dataSource = dsB};
+				};
 				var mw = new wheels.middleware.TenantResolver(
 					strategy = "header",
 					headerName = "X-Tenant-ID",
-					resolver = function(req) {
-						return {id = "x", dataSource = dsB};
-					}
+					resolver = resolverFn
 				);
 				var pipeline = new wheels.middleware.Pipeline(middleware = [mw]);
 
