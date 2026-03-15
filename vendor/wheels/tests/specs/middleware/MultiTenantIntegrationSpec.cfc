@@ -5,7 +5,7 @@
  *   - wheelstestdb_sqlite          (default / "tenant A")
  *   - wheelstestdb_sqlite_tenant_b ("tenant B")
  *
- * Both are configured in tools/docker/*/CFConfig.json.
+ * Both are configured in each engine's CFConfig.json under tools/docker/.
  */
 component extends="wheels.WheelsTest" {
 
