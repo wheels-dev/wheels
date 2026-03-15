@@ -346,6 +346,22 @@ The formula is `baseDelay * 2^attempt`, capped at `maxDelay`:
 | 5th retry | 64s | 320s |
 | 6th retry | 128s | 600s (capped) |
 
+## Multi-Tenant Jobs
+
+If you're using [multi-tenancy](multi-tenancy.md), background jobs automatically capture the current tenant context when enqueued and restore it before `perform()` runs. No extra code is needed.
+
+```javascript
+// Enqueued during a tenant request — context is captured automatically
+job = new app.jobs.GenerateInvoiceJob();
+job.enqueue(data={userId: user.id});
+```
+
+When the job processes (possibly later, on a different server, or outside a web request), Wheels restores the original tenant context so all model queries inside `perform()` run against the correct tenant database.
+
+{% hint style="info" %}
+The tenant context is stored internally as `$wheelsTenantContext` in the job's data. It's automatically removed before your `perform()` method receives the data struct — you don't need to handle it yourself.
+{% endhint %}
+
 ## Best Practices
 
 1. **Keep jobs small and focused**: Each job should do one thing. Chain multiple jobs for complex workflows.

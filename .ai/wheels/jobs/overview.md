@@ -265,6 +265,42 @@ this.maxDelay = 3600;   // Maximum delay cap (default: 3600)
 // Formula: Min(baseDelay * 2^attempt, maxDelay)
 ```
 
+## Multi-Tenant Jobs
+
+Jobs automatically capture and restore tenant context. When a job is enqueued within a tenant request, the current `request.wheels.tenant` is serialized into the job's data as `$wheelsTenantContext`. When the job processes, the context is restored before `perform()` runs and removed from the data struct.
+
+### Capture (on enqueue)
+```cfm
+// In Job.cfc $insertJob() — automatic, no user code needed
+if (IsDefined("request.wheels.tenant.dataSource") && Len(request.wheels.tenant.dataSource)) {
+    arguments.data["$wheelsTenantContext"] = {
+        id: request.wheels.tenant.id,
+        dataSource: request.wheels.tenant.dataSource,
+        config: request.wheels.tenant.config
+    };
+}
+```
+
+### Restore (on process)
+```cfm
+// In Job.cfc $processJob() — automatic
+// 1. Deserialize job data
+// 2. If $wheelsTenantContext exists, set request.wheels.tenant
+// 3. Remove $wheelsTenantContext from data before calling perform()
+// 4. Call perform(data)
+// 5. Clean up request.wheels.tenant in finally block
+```
+
+### Example
+```cfm
+// Enqueued within a tenant request — context captured automatically
+job = new app.jobs.GenerateInvoiceJob();
+job.enqueue(data={userId: user.id});
+
+// When processed, perform() runs with the tenant's datasource active
+// model("Invoice").create(...) hits the correct tenant database
+```
+
 ## Best Practices
 
 1. **Keep `perform()` idempotent** — Jobs may be retried, so handle duplicate execution gracefully
