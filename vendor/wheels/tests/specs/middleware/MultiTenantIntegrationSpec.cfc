@@ -16,6 +16,16 @@ component extends="wheels.WheelsTest" {
 			var dsA = "wheelstestdb_sqlite";
 			var dsB = "wheelstestdb_sqlite_tenant_b";
 
+			// Skip entire suite if SQLite datasources are not functional
+			var sqliteAvailable = true;
+			try {
+				QueryExecute("SELECT 1 AS t", [], {datasource = dsA});
+				QueryExecute("SELECT 1 AS t", [], {datasource = dsB});
+			} catch (any e) {
+				sqliteAvailable = false;
+			}
+			if (!sqliteAvailable) return;
+
 			beforeEach(function() {
 				// Ensure clean tenant state
 				if (IsDefined("request.wheels.tenant")) {
