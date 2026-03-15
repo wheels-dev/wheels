@@ -75,7 +75,7 @@ These numbers are for trivial workloads. Real-world Wheels applications involve 
 
 | Feature | Notes |
 |---------|-------|
-| `CsrfGenerateToken()` / `CsrfVerifyToken()` | Wheels CSRF uses these Lucee/ACF built-ins. RustCFML has security functions but these specific ones are unconfirmed. |
+| `CsrfGenerateToken()` / `CsrfVerifyToken()` | Confirmed supported in RustCFML. Behavioral compatibility with Lucee's implementation (session binding, token format) needs verification. |
 | `cfheader` / `cfcookie` in middleware | RustCFML's web server handles these differently than servlet-based engines. |
 | Application scope persistence | Wheels stores extensive config in `application.$wheels`. Behavior under RustCFML's Application.cfc lifecycle needs validation. |
 | Error handling (`cftry`/`cfcatch`/`cfthrow`) | Basic support likely exists, but Wheels uses typed exceptions (`type="Wheels.InvalidAuthenticityToken"`) that need precise matching. |
